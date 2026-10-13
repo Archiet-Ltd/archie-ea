@@ -449,13 +449,17 @@ def bulk_update_applications():
 # Maps SAD-01…SAD-14 keys to (service_import_path, method, kwargs_key)
 # Each entry: (module_path, class_name, method_name, id_arg)
 # id_arg is the kwarg name that receives solution_id.
+#
+# SAD-02 (solution lifecycle forecasting) has no backing implementation —
+# no service in this codebase forecasts a solution's lifecycle — so it is
+# listed in _SAD_SECTION_UNAVAILABLE below instead of here, and the route
+# returns an honest "not available" response rather than attempting a call
+# that would fail with AttributeError.
+_SAD_SECTION_UNAVAILABLE = {
+    "SAD-02": "Lifecycle forecasting is not implemented for this section.",
+}
+
 _SAD_SECTION_SERVICE_MAP = {
-    "SAD-02": (
-        "app.services.predictive_analytics_engine",
-        "PredictiveAnalyticsEngine",
-        "forecast_solution_lifecycle",
-        "solution_id",
-    ),
     "SAD-03": (
         "app.modules.solutions_strategic.v2.services.gap_analysis_service",
         "GapAnalysisService",
@@ -495,6 +499,12 @@ def generate_sad_section():
 
         if not solution_id or not isinstance(solution_id, int):
             return jsonify({"success": False, "error": "solution_id (int) is required"}), 400
+        if sad_section in _SAD_SECTION_UNAVAILABLE:
+            return jsonify({
+                "success": False,
+                "sad_section": sad_section,
+                "error": _SAD_SECTION_UNAVAILABLE[sad_section],
+            }), 501
         if sad_section not in _SAD_SECTION_SERVICE_MAP:
             supported = list(_SAD_SECTION_SERVICE_MAP.keys())
             return jsonify({
