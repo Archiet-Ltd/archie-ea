@@ -327,13 +327,6 @@ def init_cli(app):
         app.logger.warning(f"⚠️  Failed to register value-stream ArchiMate backfill CLI: {e}")
 
     try:
-        from app.commands.backfill_data_archimate import init_app as init_data_archimate
-        init_data_archimate(app)
-        app.logger.info("✅ Data-entity ArchiMate backfill CLI command registered")
-    except Exception as e:
-        app.logger.warning(f"⚠️  Failed to register data-entity ArchiMate backfill CLI: {e}")
-
-    try:
         from app.commands.backfill_archimate_layer_casing import init_app as init_layer_casing
         init_layer_casing(app)
         app.logger.info("✅ ArchiMate layer-casing backfill CLI command registered")
@@ -538,6 +531,14 @@ def init_cli(app):
         app.logger.info("✅ Demo company seed CLI command registered")
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register demo company seed CLI: {e}")
+
+# Domain element backfill
+    try:
+        from app.commands.backfill_domain_elements import init_app as init_domain_elements
+        init_domain_elements(app)
+        app.logger.info("✅ Domain element backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register domain element backfill CLI: {e}")
 
 # Application owners backfill
     try:
