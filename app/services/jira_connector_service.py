@@ -1,3 +1,11 @@
+# CANONICAL JIRA CONNECTION (register concept `jira-connection`).
+# This service is the one Jira connection the product describes: ConnectorConfig
+# with connector_type "jira", saved per organisation (TenantMixin) on the Jira
+# settings screen (app/modules/admin/connector_routes.py, jira_config_save), API
+# token encrypted into config["api_token_encrypted"]. New Jira access goes
+# through this service. tests/test_jira_canonical_connection.py pins it and
+# stops other files from reading a Jira credential from elsewhere.
+
 """
 Jira Connector Service (COM-009)
 
