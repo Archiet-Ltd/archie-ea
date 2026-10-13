@@ -46,6 +46,22 @@ def approver_queue():
     return jsonify(result), _decision_status(result)
 
 
+@unified_ai_chat_bp.route("/approvals/decided", methods=["GET"])
+@login_required
+def decided_approvals():
+    """The organisation's latest approved and rejected proposals, with reasons."""
+    result = _approval_service().get_recent_decisions()
+    return jsonify(result), _decision_status(result)
+
+
+@unified_ai_chat_bp.route("/approvals/<int:approval_id>/impact", methods=["GET"])
+@login_required
+def approval_impact(approval_id):
+    """What approving this proposal would affect: services, interfaces, owners."""
+    result = _approval_service().get_approval_impact(approval_id)
+    return jsonify(result), _decision_status(result)
+
+
 @unified_ai_chat_bp.route("/approvals/<int:approval_id>/approve", methods=["POST"])
 @login_required
 def approve_pending_approval(approval_id):
@@ -87,6 +103,8 @@ def approval_inbox():
 __all__ = [
     "pending_approvals",
     "approver_queue",
+    "decided_approvals",
+    "approval_impact",
     "approve_pending_approval",
     "reject_pending_approval",
     "approval_inbox",

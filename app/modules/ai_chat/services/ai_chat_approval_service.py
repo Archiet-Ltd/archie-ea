@@ -528,6 +528,11 @@ class AIChatApprovalService:
             )
             db.session.commit()
 
+            # Owners of the thing being changed are told, in the app and by
+            # email. After the commit and fully contained: a notification
+            # problem must never undo or fail a recorded proposal.
+            self._notify_owners_of_new_approval(approval, requester, operation_payload)
+
             self.logger.info(
                 f"Created pending approval {approval.id} for {operation_type} {entity_type} "
                 f"(chat_session_id={chat_session_id!r}, agent_turn_id={agent_turn_id!r})"
@@ -1048,6 +1053,163 @@ class AIChatApprovalService:
             db.session.rollback()
             self.logger.error(f"Failed to reject approval {approval_id}: {e}")
             return {"success": False, "error": f"Rejection failed: {str(e)}"}
+
+    def _notify_owners_of_new_approval(
+        self, approval: AIChatCRUDApproval, requester: User, operation_payload: Dict[str, Any]
+    ) -> int:
+        """Tell the owners of what a new proposal changes, in-app and by email.
+
+        Recipients are the owners the one ownership store records for the
+        proposal's target (never the requester), in the approval's own
+        organisation. Written through the one notification writer; the email
+        goes through the shared log-or-send helper, so an unconfigured mail
+        server logs instead of dropping it. Returns the number of owners told.
+        Never raises: the proposal is already committed.
+        """
+        try:
+            from html import escape
+
+            from flask import current_app
+
+            from app._bootstrap._digest_emails import _safe_send_email
+            from app.services.architecture_change_impact_service import (
+                resolve_approval_targets,
+                target_owner_rows,
+            )
+            from app.services.notification_service import NotificationService
+
+            org_id = approval.organization_id
+            if org_id is None:
+                return 0
+            targets = resolve_approval_targets(
+                approval.operation_type,
+                approval.entity_type,
+                approval.entity_id,
+                operation_payload if isinstance(operation_payload, dict) else {},
+                org_id,
+            )
+            owner_user_ids = {row.user_id for row in target_owner_rows(targets, org_id)}
+            owner_user_ids.discard(requester.id)
+            if not owner_user_ids:
+                return 0
+            recipients = (
+                User.query.filter(User.organization_id == org_id, User.id.in_(owner_user_ids))
+                .order_by(User.id)
+                .all()
+            )
+            inbox_path = f"/ai-chat/approvals/inbox?approval={approval.id}"
+            message = f"A change needs your review: {approval.summary}"
+            notifications = [
+                (
+                    user,
+                    NotificationService.create(
+                        user.id,
+                        message,
+                        inbox_path,
+                        organization_id=org_id,
+                        event_type="approval_requested",
+                        entity_type="approval",
+                        entity_id=approval.id,
+                    ),
+                )
+                for user in recipients
+            ]
+            db.session.commit()
+
+            subject = "A change to something you own needs review"
+            body = (
+                "<p>A proposed change to something you own is waiting for review:</p>"
+                f"<p>{escape(approval.summary or '')}</p>"
+                f'<p><a href="{escape(inbox_path)}">Open the approval inbox</a></p>'
+            )
+            for user, notification in notifications:
+                if user.email and _safe_send_email(current_app, subject, [user.email], body):
+                    notification.email_sent_at = datetime.utcnow()
+            db.session.commit()
+            return len(notifications)
+        except Exception as exc:
+            db.session.rollback()
+            self.logger.warning("Could not notify owners of approval %s: %s", approval.id, exc)
+            return 0
+
+    def _active_org_actor(self):
+        """The reviewer (GENERAL) and the ACTIVE organisation, or an error.
+
+        The automatic tenant filter does nothing when no organisation is
+        active, so an unset organisation is refused here as not found rather
+        than read through an unfiltered query; and the reviewer must belong to
+        the organisation that is active.
+        """
+        from app.middleware.tenant_context import current_org_id
+
+        actor, actor_error = self._acting_user(require_general=True)
+        if actor_error:
+            return None, None, actor_error
+        org_id = current_org_id()
+        if org_id is None or actor.organization_id != org_id:
+            return None, None, {
+                "success": False,
+                "code": "NOT_FOUND",
+                "error": "No active organization for this request",
+            }
+        return actor, org_id, None
+
+    def get_approval_impact(self, approval_id: int) -> Dict[str, Any]:
+        """What approving one proposal would affect (services, interfaces, owners).
+
+        Computed on demand for one proposal by the change-impact service over
+        the canonical impact engine, so the inbox list stays flat in the number
+        of proposals. A foreign or unknown id is not found.
+        """
+        _, org_id, error = self._active_org_actor()
+        if error:
+            return error
+        approval = AIChatCRUDApproval.query.filter_by(id=approval_id, organization_id=org_id).first()
+        if not approval:
+            return {"success": False, "code": "NOT_FOUND", "error": f"Approval {approval_id} not found"}
+        from app.services.architecture_change_impact_service import ArchitectureChangeImpactService
+
+        return {
+            "success": True,
+            "impact": ArchitectureChangeImpactService().assess_approval_impact(approval, org_id),
+        }
+
+    RECENT_DECISIONS_LIMIT = 20
+
+    def get_recent_decisions(self) -> Dict[str, Any]:
+        """The organisation's latest approved and rejected proposals, newest first.
+
+        A rejected proposal keeps its reason here, so the decision is still
+        visible after a reload. One read, bounded by RECENT_DECISIONS_LIMIT.
+        """
+        _, org_id, error = self._active_org_actor()
+        if error:
+            return error
+        rows = (
+            AIChatCRUDApproval.query.filter(
+                AIChatCRUDApproval.organization_id == org_id,
+                AIChatCRUDApproval.status.in_([ApprovalStatus.APPROVED, ApprovalStatus.REJECTED]),
+            )
+            .order_by(AIChatCRUDApproval.id.desc())
+            .limit(self.RECENT_DECISIONS_LIMIT)
+            .all()
+        )
+        return {
+            "success": True,
+            "decisions": [
+                {
+                    "id": row.id,
+                    "operation_type": row.operation_type,
+                    "entity_type": row.entity_type,
+                    "summary": row.summary,
+                    "status": row.status.value,
+                    "rejected_reason": row.rejected_reason if row.status == ApprovalStatus.REJECTED else None,
+                    "created_at": row.created_at.isoformat() if row.created_at else None,
+                    "approved_at": row.approved_at.isoformat() if row.approved_at else None,
+                }
+                for row in rows
+            ],
+        }
 
     def get_pending_approvals(self) -> List[Dict[str, Any]]:
         """
