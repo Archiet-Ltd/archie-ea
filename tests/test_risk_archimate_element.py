@@ -1,11 +1,11 @@
 """Every Risk record must have exactly one ArchiMate element node.
 
-Every domain record of the nine types has exactly one element node in its
+Every domain record of the eight types has exactly one element node in its
 organisation. Risk is the first slice built in this PR.
 
 Before this change, Risk had an archimate_element_id column but no automatic
 listener to populate it -- callers had to remember to call
-sync_archimate_element() from the backbone. The before_insert listener now
+sync_archimate_element() from the backbone. The shared flush listener now
 mirrors every new Risk into an Assessment (Motivation layer) element.
 """
 

@@ -1,8 +1,8 @@
 """Every ApplicationComplianceControl record must have exactly one ArchiMate element node.
 
-Every domain record of the nine types has exactly one element node in its
-organisation. ApplicationComplianceControl now has a before_insert listener
-that mirrors it into a BusinessObject (Business layer) element.
+Every domain record of the eight types has exactly one element node in its
+organisation. The shared flush listener mirrors an
+ApplicationComplianceControl into a BusinessObject (Business layer) element.
 """
 
 import pytest
