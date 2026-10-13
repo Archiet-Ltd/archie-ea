@@ -590,6 +590,7 @@ def risk_for_element(element_id: int):
             "risks": result["risks"],
             "reasons": result.get("reasons") or [],
             "elements": result.get("elements") or {},
+            "link_resolution": result.get("link_resolution") or {},
         }
     )
 

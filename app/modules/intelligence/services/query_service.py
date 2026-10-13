@@ -44,6 +44,7 @@ NO_TENANT_CONTEXT_REASON = validate_reason_code("no_tenant_context")
 ELEMENT_NOT_FOUND_REASON = validate_reason_code("element_not_found")
 DERIVATION_NOT_COMPUTED_REASON = validate_reason_code("derivation_not_computed")
 NO_RISK_RECORDED_REASON = validate_reason_code("no_risk_recorded")
+RISK_LINK_UNRESOLVABLE_REASON = validate_reason_code("risk_link_unresolvable")
 NO_APPLICATION_COMPONENT_REASON = validate_reason_code("no_application_component")
 NO_WORK_PACKAGE_RECORDED_REASON = validate_reason_code("no_work_package_recorded")
 NOT_COSTED_REASON = validate_reason_code("not_costed")
@@ -1052,14 +1053,20 @@ class IntelligenceQueryService:
         algorithm, per the platform convention against parallel scoring
         logic.
 
-        Scope note, not silently dropped: ``RiskEntityLink`` (a risk
-        threatening an Application/Solution/Programme with no direct
-        ``archimate_element_id`` of its own on this element) is not resolved
-        here -- none of those three models carry an ArchiMate mirror id
-        today, so there is no element to seed a traversal from. Only
-        directly-mirrored risks are answered; an indirect risk is invisible
-        to this query, not wrongly reported as "none". Tracked as a
-        follow-up, not implemented speculatively.
+        Risks are also reached through a ``RiskEntityLink`` of type
+        ``application`` whose ``entity_id`` is the ``ApplicationComponent``
+        this element resolves to (the element-to-component resolution
+        ``portfolio_component_for_element`` already makes, called here, not
+        copied). Each risk carries ``seeded_via`` (``element`` or
+        ``application_link``); a risk that is both mirrored on the element
+        and linked to its component is listed once, as ``element``. A linked
+        risk seeds the same traversal from the same element.
+
+        Solution and programme links carry no ArchiMate mirror id, so they
+        cannot be followed to an element. They are not dropped: the answer's
+        ``link_resolution`` block counts them by type across the tenant, with
+        the reason ``risk_link_unresolvable``. That block says what this
+        answer cannot see, not that this element has none.
 
         Score is a **display** label, not a stored fact (per
         ``intelligence-lenses-v1.md`` L6): each risk's own
@@ -1080,9 +1087,15 @@ class IntelligenceQueryService:
                     "risks": [],
                     "reasons": [NO_TENANT_CONTEXT_REASON],
                     "elements": {},
+                    "link_resolution": {
+                        "application_links_resolved": None,
+                        "unresolvable_entity_types": None,
+                        "reason": NO_TENANT_CONTEXT_REASON,
+                    },
                 }
 
             from app.models import ArchiMateElement
+            from app.models.risk_entity_link import RiskEntityLink
 
             element = db.session.execute(
                 db.select(ArchiMateElement).where(ArchiMateElement.id == element_id)
@@ -1092,26 +1105,92 @@ class IntelligenceQueryService:
                     "risks": [],
                     "reasons": [ELEMENT_NOT_FOUND_REASON],
                     "elements": {},
+                    "link_resolution": {
+                        "application_links_resolved": None,
+                        "unresolvable_entity_types": None,
+                        "reason": ELEMENT_NOT_FOUND_REASON,
+                    },
                 }
 
-            seed_risks = (
+            direct_risks = (
                 db.session.execute(
-                    db.select(Risk).where(Risk.archimate_element_id == element_id)
+                    db.select(Risk)
+                    .where(Risk.archimate_element_id == element_id)
+                    .order_by(Risk.id)
                 )
                 .scalars()
                 .all()
             )
+
+            # The one element-to-component resolution on the lens path.
+            component_id = IntelligenceQueryService.portfolio_component_for_element(
+                element_id
+            )["application_component_id"]
+
+            link_id_by_risk: Dict[int, int] = {}
+            linked_risks: List[Any] = []
+            if component_id is not None:
+                direct_ids = {risk.id for risk in direct_risks}
+                link_rows = db.session.execute(
+                    db.select(RiskEntityLink.id, RiskEntityLink.risk_id)
+                    .where(
+                        RiskEntityLink.entity_type == "application",
+                        RiskEntityLink.entity_id == component_id,
+                        RiskEntityLink.organization_id == org_id,
+                    )
+                    .order_by(RiskEntityLink.id)
+                ).all()
+                for link_id, linked_risk_id in link_rows:
+                    if linked_risk_id not in direct_ids:
+                        link_id_by_risk.setdefault(linked_risk_id, link_id)
+                if link_id_by_risk:
+                    linked_risks = (
+                        db.session.execute(
+                            db.select(Risk)
+                            .where(
+                                Risk.id.in_(list(link_id_by_risk)),
+                                Risk.organization_id == org_id,
+                            )
+                            .order_by(Risk.id)
+                        )
+                        .scalars()
+                        .all()
+                    )
+
+            type_rows = db.session.execute(
+                db.select(RiskEntityLink.entity_type, db.func.count(RiskEntityLink.id))
+                .where(
+                    RiskEntityLink.organization_id == org_id,
+                    RiskEntityLink.entity_type != "application",
+                )
+                .group_by(RiskEntityLink.entity_type)
+                .order_by(RiskEntityLink.entity_type)
+            ).all()
+            unresolvable_types = [
+                {"entity_type": entity_type, "count": int(count)}
+                for entity_type, count in type_rows
+            ]
+            link_resolution = {
+                "application_links_resolved": len(linked_risks),
+                "unresolvable_entity_types": unresolvable_types,
+                "reason": RISK_LINK_UNRESOLVABLE_REASON if unresolvable_types else None,
+            }
+
+            seed_risks = [(risk, "element", None) for risk in direct_risks] + [
+                (risk, "application_link", link_id_by_risk[risk.id]) for risk in linked_risks
+            ]
 
             if not seed_risks:
                 return {
                     "risks": [],
                     "reasons": [NO_RISK_RECORDED_REASON],
                     "elements": {},
+                    "link_resolution": link_resolution,
                 }
 
             all_elements: Dict[str, Dict[str, Any]] = {}
             risk_payloads: List[Dict[str, Any]] = []
-            for risk in seed_risks:
+            for risk, seeded_via, link_id in seed_risks:
                 blast = IntelligenceQueryService.cross_layer_impact(
                     element_id,
                     include_derived=include_derived,
@@ -1119,23 +1198,30 @@ class IntelligenceQueryService:
                     with_owner=True,
                 )
                 all_elements.update(blast.get("elements") or {})
-                risk_payloads.append(
-                    {
-                        "risk_id": risk.id,
-                        "title": risk.title,
-                        "status": risk.status.value if risk.status else None,
-                        "likelihood": risk.likelihood,
-                        "impact": risk.impact,
-                        "risk_score": risk.risk_score,
-                        "risk_level": risk.risk_level,
-                        "owner": risk.owner,
-                        "mitigation_plan": risk.mitigation_plan,
-                        "affected_rows": blast.get("rows", []),
-                        "affected_summary": blast.get("summary", {}),
-                    }
-                )
+                payload = {
+                    "risk_id": risk.id,
+                    "title": risk.title,
+                    "status": risk.status.value if risk.status else None,
+                    "likelihood": risk.likelihood,
+                    "impact": risk.impact,
+                    "risk_score": risk.risk_score,
+                    "risk_level": risk.risk_level,
+                    "owner": risk.owner,
+                    "mitigation_plan": risk.mitigation_plan,
+                    "affected_rows": blast.get("rows", []),
+                    "affected_summary": blast.get("summary", {}),
+                    "seeded_via": seeded_via,
+                }
+                if link_id is not None:
+                    payload["link_id"] = link_id
+                risk_payloads.append(payload)
 
-        return {"risks": risk_payloads, "reasons": [], "elements": all_elements}
+        return {
+            "risks": risk_payloads,
+            "reasons": [],
+            "elements": all_elements,
+            "link_resolution": link_resolution,
+        }
 
     @staticmethod
     def portfolio_component_for_element(element_id: int) -> Dict[str, Any]:
