@@ -28,10 +28,13 @@ import importlib
 import inspect
 import json
 import logging
+import os
+import re
 import time
 import uuid
 from urllib.parse import urlparse
 
+import pyotp
 import pytest
 from flask import session, url_for
 
@@ -51,6 +54,7 @@ MSG_UNVERIFIED = (
 MSG_INVITATION = "You have an invitation waiting. Open the invitation email to join."
 MSG_EXISTS = "An account already exists for this address. Sign in with your password."
 MSG_PLATFORM_ADMIN = "This account signs in with a password."
+MSG_SERVICE = "This account cannot sign in here."
 
 # Values that must never reach a log line or an audit row.
 _SECRET_ID_TOKEN = "id-token-value-that-must-not-be-logged"
@@ -194,6 +198,18 @@ def _sso_events():
     return [
         json.loads(e.details) if e.details else {}
         for e in AuditEvent.query.filter_by(action="sso_callback").order_by(AuditEvent.id).all()
+    ]
+
+
+def _login_attempt_events():
+    """Every successful-login audit row, oldest first, as its ``details``
+    dict. Read from the persisted ``AuditEvent`` rows rather than a spy, so
+    this proves what actually reached the audit log."""
+    from app.security.audit import AuditEvent
+
+    return [
+        json.loads(e.details) if e.details else {}
+        for e in AuditEvent.query.filter_by(action="login_attempt").order_by(AuditEvent.id).all()
     ]
 
 
@@ -581,7 +597,10 @@ def test_sso_callback_route_refuses_cross_org_sign_in_end_to_end(
     events_before = len(_sso_events())
     login_path = _endpoint_path(app, "account.login")
 
-    for verified, expected in ((False, "refused_unverified"), (True, "refused_account_exists")):
+    for verified, expected, expected_target in (
+        (False, "refused_unverified", None),
+        (True, "refused_account_exists", holder.id),
+    ):
         sub = f"okta-e2e-{_uid()}"
         claims = _okta(holder.email, sub, verified=verified)
         monkeypatch.setattr(v2, "_get_sso_oauth", lambda c=claims: _FakeOAuth(c))
@@ -599,7 +618,12 @@ def test_sso_callback_route_refuses_cross_org_sign_in_end_to_end(
             assert urlparse(page.headers["Location"]).path == login_path
 
         events = _sso_events()[events_before:]
-        assert events[-1] == {"provider": "okta", "outcome": expected, "user_id": None}
+        assert events[-1] == {
+            "provider": "okta",
+            "outcome": expected,
+            "user_id": None,
+            "target_user_id": expected_target,
+        }
         assert sub not in caplog.text
 
     assert _snapshot(db_session, holder) == before
@@ -658,7 +682,10 @@ def test_v1_sso_callback_route_refuses_cross_org_sign_in_end_to_end(monkeypatch)
         db.session.remove()
 
     try:
-        for verified in (False, True):
+        for verified, expected_outcome, expected_target in (
+            (False, "refused_unverified", None),
+            (True, "refused_account_exists", holder_id),
+        ):
             claims = _okta(holder_email, f"okta-v1-{_uid()}", verified=verified)
             monkeypatch.setattr(v1, "_get_sso_oauth", lambda c=claims: _FakeOAuth(c))
             client = v1_app.test_client()
@@ -668,6 +695,23 @@ def test_v1_sso_callback_route_refuses_cross_org_sign_in_end_to_end(monkeypatch)
             with client.session_transaction() as sess:
                 assert "_user_id" not in sess
                 assert "_mfa_pending_user_id" not in sess
+
+            with v1_app.app_context():
+                from app.security.audit import AuditEvent
+
+                last_event = (
+                    AuditEvent.query.filter_by(action="sso_callback")
+                    .order_by(AuditEvent.id.desc())
+                    .first()
+                )
+                details = json.loads(last_event.details)
+                db.session.remove()
+            assert details == {
+                "provider": "okta",
+                "outcome": expected_outcome,
+                "user_id": None,
+                "target_user_id": expected_target,
+            }
 
         with v1_app.app_context():
             row = db.session.get(User, holder_id)
@@ -871,18 +915,30 @@ def test_every_outcome_writes_one_cross_org_audit_event(
         db_session, make_org("b10-admin"), "b10-admin", is_platform_admin=True,
         role=Role.query.filter_by(name="Administrator").first(),
     )
+    service_sub = f"okta-service-{_uid()}"
+    service = _make_account(
+        db_session, org, "b10-service", password=False, is_service_user=True,
+        external_id=service_sub, sso_provider="okta",
+    )
     new_address = f"b10-new-{_uid()}@example.com"
 
     cases = [
-        ("okta", {"sub": f"s-{_uid()}"}, "refused_missing_claims", False),
-        ("okta", _okta(linked.email, linked_sub, verified=False), "signed_in_returning", True),
-        ("okta", _okta(new_address, f"s-{_uid()}", verified=False), "refused_unverified", False),
-        ("okta", _okta(new_address, f"s-{_uid()}", verified=True), "signed_in_new", True),
-        ("okta", _okta(active.email, f"s-{_uid()}", verified=True), "refused_account_exists", False),
-        ("okta", _okta(invitee.email, f"s-{_uid()}", verified=True), "refused_invitation_pending", False),
-        ("azure", _azure(admin.email, oid=f"oid-{_uid()}"), "refused_platform_admin", False),
+        ("okta", {"sub": f"s-{_uid()}"}, "refused_missing_claims", False, None),
+        ("okta", _okta(linked.email, linked_sub, verified=False), "signed_in_returning", True, None),
+        ("okta", _okta(new_address, f"s-{_uid()}", verified=False), "refused_unverified", False, None),
+        ("okta", _okta(new_address, f"s-{_uid()}", verified=True), "signed_in_new", True, None),
+        ("okta", _okta(active.email, f"s-{_uid()}", verified=True), "refused_account_exists", False, active.id),
+        (
+            "okta", _okta(invitee.email, f"s-{_uid()}", verified=True), "refused_invitation_pending",
+            False, invitee.id,
+        ),
+        ("azure", _azure(admin.email, oid=f"oid-{_uid()}"), "refused_platform_admin", False, admin.id),
+        (
+            "okta", _okta(service.email, service_sub, verified=False), "refused_service_account",
+            False, service.id,
+        ),
     ]
-    for provider, claims, outcome, signed_in in cases:
+    for provider, claims, outcome, signed_in, target in cases:
         before = len(_sso_events())
         result = _resolve(app, provider, claims)
         assert result.outcome == outcome
@@ -894,7 +950,453 @@ def test_every_outcome_writes_one_cross_org_audit_event(
                 "provider": provider,
                 "outcome": outcome,
                 "user_id": result.user.id if result.user is not None else None,
+                "target_user_id": target,
             }
         ]
         if claims.get("sub"):
             assert claims["sub"] not in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# F1-F9: fix round 1 -- the provider is audited after MFA, refusal targets
+# are audited, account creation cannot 500 without an audit row, provider
+# values are bounded, and a service account is refused.
+# ---------------------------------------------------------------------------
+
+
+def test_sso_sign_in_completed_through_mfa_is_audited_with_the_provider(
+    app, db_session, make_org, monkeypatch, pinned_tenant, sent_mail
+):
+    """F1"""
+    from app.models import Role
+    from app.models.user import User
+    from app.modules.account.v2.routes import account_routes as v2
+
+    _enable_sso(db_session)
+
+    # A new verified Okta identity owns its own organisation, so it is sent
+    # to MFA enrolment before any session exists.
+    address = f"f1-new-{_uid()}@example.com"
+    sub = f"okta-{_uid()}"
+    claims = _okta(address, sub, verified=True)
+    monkeypatch.setattr(v2, "_get_sso_oauth", lambda: _FakeOAuth(claims))
+    client = app.test_client()
+    resp = _http_callback(client, claims, provider="okta")
+    assert _path(resp) == _endpoint_path(app, "account.mfa_challenge")
+
+    client.get("/account/mfa-challenge")
+    with client.session_transaction() as sess:
+        secret = sess["_mfa_enroll_secret"]
+    code = pyotp.TOTP(secret).now()
+
+    new_user = User.find_by_email(address)
+    events_before = len(_login_attempt_events())
+    complete = client.post("/account/mfa-challenge", data={"code": code}, follow_redirects=False)
+    assert complete.status_code in (302, 303)
+
+    with client.session_transaction() as sess:
+        assert sess.get("_user_id") == str(new_user.id)
+        assert sess.get("_login_audit_id") is not None
+        assert "_mfa_pending_sso_provider" not in sess
+
+    events = _login_attempt_events()[events_before:]
+    assert len(events) == 1
+    assert events[0]["method"] == "sso:okta"
+
+    # A returning, already-enrolled Azure org-admin completes the same gate.
+    org = make_org("f1-azure")
+    azure_oid = f"oid-{_uid()}"
+    azure_secret = pyotp.random_base32()
+    admin = _make_account(
+        db_session, org, "f1-azure-admin",
+        external_id=f"{PINNED_TENANT}:{azure_oid}", sso_provider="azure",
+        mfa_enabled=True, mfa_secret=azure_secret,
+        role=Role.query.filter_by(name="Administrator").first(),
+    )
+    azure_claims = _azure(admin.email, oid=azure_oid)
+    monkeypatch.setattr(v2, "_get_sso_oauth", lambda: _FakeOAuth(azure_claims))
+    client2 = app.test_client()
+    resp2 = _http_callback(client2, azure_claims, provider="azure")
+    assert _path(resp2) == _endpoint_path(app, "account.mfa_challenge")
+    with client2.session_transaction() as sess:
+        assert sess.get("_mfa_pending_sso_provider") == "azure"
+
+    events_before2 = len(_login_attempt_events())
+    azure_code = pyotp.TOTP(azure_secret).now()
+    complete2 = client2.post(
+        "/account/mfa-challenge", data={"code": azure_code}, follow_redirects=False
+    )
+    assert complete2.status_code in (302, 303)
+    with client2.session_transaction() as sess:
+        assert sess.get("_user_id") == str(admin.id)
+        assert "_mfa_pending_sso_provider" not in sess
+
+    events2 = _login_attempt_events()[events_before2:]
+    assert len(events2) == 1
+    assert events2[0]["method"] == "sso:azure"
+
+
+def test_v1_sso_sign_in_completed_through_mfa_is_audited_with_the_provider(monkeypatch):
+    """F2"""
+    from app import db
+    from app.models.feature_flags import FeatureFlag
+    from app.models.org_role import OrgRole
+    from app.models.organization import Organization
+    from app.models.user import User
+    from app.modules.account.routes import account_routes as v1
+    from app.security.audit import AuditEvent
+
+    v1_app = _v1_forced_app(monkeypatch)
+    with v1_app.app_context():
+        flag = FeatureFlag.query.filter_by(key="sso_authentication").first()
+        flag_existed = flag is not None
+        if flag is None:
+            flag = FeatureFlag(key="sso_authentication", name="SSO (test)", enabled=True)
+            db.session.add(flag)
+        flag_was_enabled = bool(flag_existed and flag.enabled)
+        flag.enabled = True
+        db.session.commit()
+        db.session.remove()
+
+    address = f"f2-new-{_uid()}@example.com"
+    sub = f"okta-{_uid()}"
+    claims = _okta(address, sub, verified=True)
+    monkeypatch.setattr(v1, "_get_sso_oauth", lambda: _FakeOAuth(claims))
+    client = v1_app.test_client()
+    resp = _http_callback(client, claims, provider="okta")
+    assert urlparse(resp.headers["Location"]).path.endswith("/account/mfa-challenge")
+
+    client.get("/account/mfa-challenge")
+    with client.session_transaction() as sess:
+        secret = sess["_mfa_enroll_secret"]
+    code = pyotp.TOTP(secret).now()
+
+    with v1_app.app_context():
+        new_user = User.query.filter_by(email=address).first()
+        new_user_id, org_id = new_user.id, new_user.organization_id
+        db.session.remove()
+
+    try:
+        complete = client.post("/account/mfa-challenge", data={"code": code}, follow_redirects=False)
+        assert complete.status_code in (302, 303)
+        with client.session_transaction() as sess:
+            assert sess.get("_user_id") == str(new_user_id)
+            assert "_mfa_pending_sso_provider" not in sess
+
+        with v1_app.app_context():
+            events = [
+                json.loads(e.details)
+                for e in AuditEvent.query.filter_by(action="login_attempt").order_by(AuditEvent.id).all()
+            ]
+            db.session.remove()
+        assert len(events) == 1
+        assert events[0]["method"] == "sso:okta"
+    finally:
+        with v1_app.app_context():
+            OrgRole.query.filter_by(user_id=new_user_id).delete()
+            User.query.filter_by(id=new_user_id).delete()
+            Organization.query.filter_by(id=org_id).delete()
+            flag = FeatureFlag.query.filter_by(key="sso_authentication").first()
+            if flag is not None:
+                if flag_existed:
+                    flag.enabled = flag_was_enabled
+                else:
+                    db.session.delete(flag)
+            db.session.commit()
+            db.session.remove()
+
+
+def test_password_sign_in_after_an_unfinished_sso_mfa_step_is_audited_as_password(
+    app, db_session, make_org, monkeypatch, pinned_tenant
+):
+    """F3"""
+    from app.models import Role
+
+    _enable_sso(db_session)
+    org = make_org("f3")
+    sub = f"okta-{_uid()}"
+    admin = _make_account(
+        db_session, org, "f3-admin",
+        external_id=sub, sso_provider="okta",
+        role=Role.query.filter_by(name="Administrator").first(),
+    )
+
+    claims = _okta(admin.email, sub, verified=False)
+    monkeypatch.setattr(
+        importlib.import_module(MODULE_V2), "_get_sso_oauth", lambda: _FakeOAuth(claims)
+    )
+    client = app.test_client()
+    resp = _http_callback(client, claims, provider="okta")
+    assert _path(resp) == _endpoint_path(app, "account.mfa_challenge")
+    with client.session_transaction() as sess:
+        assert sess.get("_mfa_pending_sso_provider") == "okta"
+
+    # The same client now signs in with the account's password instead.
+    login_resp = client.post(
+        "/account/login",
+        data={"email": admin.email, "password": _PASSWORD, "remember_me": ""},
+        follow_redirects=False,
+    )
+    assert _path(login_resp) == _endpoint_path(app, "account.mfa_challenge")
+    with client.session_transaction() as sess:
+        assert "_mfa_pending_sso_provider" not in sess
+
+    client.get("/account/mfa-challenge")
+    with client.session_transaction() as sess:
+        secret = sess["_mfa_enroll_secret"]
+    code = pyotp.TOTP(secret).now()
+
+    events_before = len(_login_attempt_events())
+    complete = client.post("/account/mfa-challenge", data={"code": code}, follow_redirects=False)
+    assert complete.status_code in (302, 303)
+    events = _login_attempt_events()[events_before:]
+    assert len(events) == 1
+    assert events[0]["method"] == "password"
+
+    # Cross-check: a stale _mfa_pending_sso_provider key beside a
+    # password-only pending login is never honoured.
+    password_only = _make_account(db_session, org, "f3-password-only")
+    client2 = app.test_client()
+    with client2.session_transaction() as sess:
+        sess["_mfa_pending_user_id"] = password_only.id
+        sess["_mfa_pending_remember"] = False
+        sess["_mfa_pending_next"] = ""
+        sess["_mfa_pending_sso_provider"] = "okta"
+
+    client2.get("/account/mfa-challenge")
+    with client2.session_transaction() as sess:
+        secret2 = sess["_mfa_enroll_secret"]
+    code2 = pyotp.TOTP(secret2).now()
+
+    events_before2 = len(_login_attempt_events())
+    complete2 = client2.post("/account/mfa-challenge", data={"code": code2}, follow_redirects=False)
+    assert complete2.status_code in (302, 303)
+    events2 = _login_attempt_events()[events_before2:]
+    assert len(events2) == 1
+    assert events2[0]["method"] == "password"
+
+
+def test_refused_sign_in_records_the_targeted_account(
+    app, db_session, make_org, monkeypatch, pinned_tenant
+):
+    """F4"""
+    from app.models import Role
+
+    _enable_sso(db_session)
+    org = make_org("f4")
+
+    # Platform admin, linked branch.
+    oid = f"oid-{_uid()}"
+    admin_linked = _make_account(
+        db_session, org, "f4-admin-linked", is_platform_admin=True,
+        external_id=f"{PINNED_TENANT}:{oid}", sso_provider="azure",
+        role=Role.query.filter_by(name="Administrator").first(),
+    )
+    events_before = len(_sso_events())
+    result = _resolve(app, "azure", _azure(admin_linked.email, oid=oid))
+    assert result.user is None
+    events = _sso_events()[events_before:]
+    assert events[-1]["user_id"] is None
+    assert events[-1]["target_user_id"] == admin_linked.id
+
+    # Platform admin, verified-email branch.
+    admin_email = _make_account(
+        db_session, org, "f4-admin-email", is_platform_admin=True,
+        role=Role.query.filter_by(name="Administrator").first(),
+    )
+    events_before = len(_sso_events())
+    result = _resolve(app, "okta", _okta(admin_email.email, f"okta-{_uid()}", verified=True))
+    assert result.user is None
+    events = _sso_events()[events_before:]
+    assert events[-1]["user_id"] is None
+    assert events[-1]["target_user_id"] == admin_email.id
+
+    # Pending invitation.
+    invitee = _make_account(db_session, org, "f4-invitee", password=False, confirmed=False)
+    events_before = len(_sso_events())
+    result = _resolve(app, "okta", _okta(invitee.email, f"okta-{_uid()}", verified=True))
+    assert result.user is None
+    events = _sso_events()[events_before:]
+    assert events[-1]["user_id"] is None
+    assert events[-1]["target_user_id"] == invitee.id
+
+    # Existing active account.
+    active = _make_account(db_session, org, "f4-active")
+    events_before = len(_sso_events())
+    result = _resolve(app, "okta", _okta(active.email, f"okta-{_uid()}", verified=True))
+    assert result.user is None
+    events = _sso_events()[events_before:]
+    assert events[-1]["user_id"] is None
+    assert events[-1]["target_user_id"] == active.id
+
+    # Service account, linked branch.
+    service_oid = f"oid-{_uid()}"
+    service = _make_account(
+        db_session, org, "f4-service", password=False, is_service_user=True,
+        external_id=f"{PINNED_TENANT}:{service_oid}", sso_provider="azure",
+    )
+    events_before = len(_sso_events())
+    result = _resolve(app, "azure", _azure(service.email, oid=service_oid))
+    assert result.user is None
+    events = _sso_events()[events_before:]
+    assert events[-1]["user_id"] is None
+    assert events[-1]["target_user_id"] == service.id
+
+
+def test_long_provider_names_are_bounded_on_a_new_account(app, db_session, monkeypatch):
+    """F5"""
+    from app.models.organization import Organization
+    from app.models.user import User
+    from app.modules.account.services.account_service import SIGNED_IN_NEW
+
+    _enable_sso(db_session)
+    address = f"f5-{_uid()}@example.com"
+    sub = f"okta-{_uid()}"
+    claims = _okta(address, sub, verified=True)
+    claims["given_name"] = "G" * 80
+    claims["family_name"] = "F" * 80
+
+    result = _resolve(app, "okta", claims)
+    assert result.outcome == SIGNED_IN_NEW
+
+    created = User.find_by_email(address)
+    assert len(created.first_name) == 64
+    assert len(created.last_name) == 64
+    org = db_session.get(Organization, created.organization_id)
+    assert len(org.slug) <= 100
+
+
+def test_over_length_verified_address_is_refused_before_lookup(app, db_session, monkeypatch):
+    """F6"""
+    from app.models.organization import Organization
+    from app.models.user import User
+    from app.modules.account.services.account_service import REFUSED_MISSING_CLAIMS
+
+    _enable_sso(db_session)
+    long_address = "a" * 58 + "@example.com"
+    assert len(long_address) >= 65
+    sub = f"okta-{_uid()}"
+    claims = _okta(long_address, sub, verified=True)
+    orgs_before = Organization.query.count()
+    events_before = len(_sso_events())
+
+    result = _resolve(app, "okta", claims)
+    assert result.outcome == REFUSED_MISSING_CLAIMS
+    assert result.user is None
+
+    assert User.find_by_email(long_address) is None
+    assert Organization.query.count() == orgs_before
+
+    events = _sso_events()[events_before:]
+    assert events[-1]["target_user_id"] is None
+
+
+def test_failed_account_creation_is_audited_and_raised(app, db_session, monkeypatch):
+    """F7"""
+    from app.models.org_role import OrgRole
+    from app.models.organization import Organization
+    from app.models.user import User
+    from app.modules.account.services.account_service import AccountService
+
+    _enable_sso(db_session)
+    address = f"f7-{_uid()}@example.com"
+    sub = f"okta-{_uid()}"
+    claims = _okta(address, sub, verified=True)
+
+    def _boom(cls, *a, **k):
+        raise RuntimeError("set_role boom (test-induced)")
+
+    monkeypatch.setattr(OrgRole, "set_role", classmethod(_boom))
+
+    orgs_before = Organization.query.count()
+    events_before = len(_sso_events())
+    with pytest.raises(RuntimeError):
+        AccountService.sign_in_external_identity("okta", claims)
+
+    assert User.find_by_email(address) is None
+    assert Organization.query.count() == orgs_before
+
+    events = _sso_events()[events_before:]
+    assert len(events) == 1
+    assert events[0]["outcome"] == "failed_account_creation"
+    assert events[0]["user_id"] is None
+    assert events[0]["target_user_id"] is None
+
+
+@pytest.mark.parametrize("module_path", MODULES)
+def test_service_account_is_never_signed_in_through_sso(
+    app, db_session, make_org, module_path, monkeypatch, pinned_tenant
+):
+    """F8"""
+    from app.modules.account.services.account_service import REFUSED_SERVICE_ACCOUNT
+
+    _enable_sso(db_session)
+    org = make_org("f8")
+
+    # Linked branch.
+    oid = f"oid-{_uid()}"
+    linked = _make_account(
+        db_session, org, "f8-linked", password=False, is_service_user=True,
+        external_id=f"{PINNED_TENANT}:{oid}", sso_provider="azure",
+    )
+    before_linked = _snapshot(db_session, linked)
+    resp, flashes, signed_in, sess = _call(
+        app, module_path, "azure", _azure(linked.email, oid=oid), monkeypatch
+    )
+    assert _path(resp) == _endpoint_path(app, "account.login")
+    assert ("error", MSG_SERVICE) in flashes
+    assert signed_in is None
+    assert "_mfa_pending_user_id" not in sess
+    assert _snapshot(db_session, linked) == before_linked
+
+    result = _resolve(app, "azure", _azure(linked.email, oid=oid))
+    assert result.outcome == REFUSED_SERVICE_ACCOUNT
+
+    # Email branch.
+    email_only = _make_account(db_session, org, "f8-email", password=False, is_service_user=True)
+    before_email = _snapshot(db_session, email_only)
+    claims = _okta(email_only.email, f"okta-{_uid()}", verified=True)
+    resp, flashes, signed_in, sess = _call(app, module_path, "okta", claims, monkeypatch)
+    assert _path(resp) == _endpoint_path(app, "account.login")
+    assert ("error", MSG_SERVICE) in flashes
+    assert signed_in is None
+    assert "_mfa_pending_user_id" not in sess
+    assert _snapshot(db_session, email_only) == before_email
+
+    result = _resolve(app, "okta", claims)
+    assert result.outcome == REFUSED_SERVICE_ACCOUNT
+
+
+def test_one_function_creates_an_organisation_with_its_first_administrator():
+    """F9"""
+    from app.services.org_service import OrgService
+
+    assert not hasattr(OrgService, "create_org")
+
+    tests_dir = os.path.dirname(os.path.abspath(__file__))
+    app_root = os.path.join(os.path.dirname(tests_dir), "app")
+    organization_model_path = os.path.join(app_root, "models", "organization.py")
+
+    matches = set()
+    for dirpath, dirnames, filenames in os.walk(app_root):
+        dirnames[:] = [d for d in dirnames if d != "tests"]
+        for filename in filenames:
+            if not filename.endswith(".py"):
+                continue
+            path = os.path.join(dirpath, filename)
+            if path == organization_model_path:
+                # The class Organization( definition itself, not a call.
+                continue
+            with open(path, "r", encoding="utf-8") as fh:
+                text = fh.read()
+            # A constructor call, not a class whose own name merely ends in
+            # "Organization" (e.g. "class VendorOrganization(db.Model)").
+            if re.search(r"\bOrganization\(", text):
+                matches.add(os.path.relpath(path, app_root).replace(os.sep, "/"))
+
+    expected = {
+        "modules/account/services/account_service.py",
+        "modules/admin/v2/routes/admin_routes.py",
+        "commands/seed_demo_company.py",
+    }
+    assert matches == expected

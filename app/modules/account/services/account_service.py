@@ -46,6 +46,12 @@ REFUSED_UNVERIFIED = "refused_unverified"
 REFUSED_INVITATION_PENDING = "refused_invitation_pending"
 REFUSED_PLATFORM_ADMIN = "refused_platform_admin"
 REFUSED_MISSING_CLAIMS = "refused_missing_claims"
+REFUSED_SERVICE_ACCOUNT = "refused_service_account"
+
+# Audit-only code: written to the audit log when account creation raises
+# during the resolver's create-account branch, before the error is
+# re-raised. Never an ExternalSignInResult outcome.
+FAILED_ACCOUNT_CREATION = "failed_account_creation"
 
 _SIGNED_IN_OUTCOMES = frozenset({SIGNED_IN_RETURNING, SIGNED_IN_NEW})
 
@@ -59,6 +65,7 @@ EXTERNAL_SIGN_IN_MESSAGES = {
     REFUSED_INVITATION_PENDING: "You have an invitation waiting. Open the invitation email to join.",
     REFUSED_ACCOUNT_EXISTS: "An account already exists for this address. Sign in with your password.",
     REFUSED_PLATFORM_ADMIN: "This account signs in with a password.",
+    REFUSED_SERVICE_ACCOUNT: "This account cannot sign in here.",
 }
 
 
@@ -205,27 +212,32 @@ class AccountService:
 
         _label = ("{} {}".format(first_name or "", last_name or "").strip()
                   or (email.split("@")[0] if email else "New"))
-        _base_slug = _re.sub(r"[^a-z0-9]+", "-",
-                             ((first_name or "") + (last_name or "") or email.split("@")[0]).lower()).strip("-") or "org"
+        # Cut to leave room for the "-xxxxxx" collision suffix below inside
+        # the Organization.slug column's own length, so a long name pair
+        # is bounded rather than failing at insert.
+        _base_slug = _re.sub(
+            r"[^a-z0-9]+", "-",
+            ((first_name or "") + (last_name or "") or email.split("@")[0]).lower(),
+        )[: Organization.__table__.c.slug.type.length - 7].strip("-") or "org"
         _slug = _base_slug
         while Organization.query.filter_by(slug=_slug).first():
             _slug = "{}-{}".format(_base_slug, _uuid.uuid4().hex[:6])
-        org = Organization(name="{}'s Workspace".format(_label), slug=_slug)
-        db.session.add(org)
-        db.session.flush()
-
-        user = User(
-            first_name=first_name,
-            last_name=last_name,
-            email=email,
-            organization_id=org.id,
-            **user_fields,
-        )
-        # The user owns the organisation just created for them, so granting
-        # org-admin here is always a grant in their own organisation.
-        user.grant_org_admin()
-        db.session.add(user)
         try:
+            org = Organization(name="{}'s Workspace".format(_label), slug=_slug)
+            db.session.add(org)
+            db.session.flush()
+
+            user = User(
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                organization_id=org.id,
+                **user_fields,
+            )
+            # The user owns the organisation just created for them, so granting
+            # org-admin here is always a grant in their own organisation.
+            user.grant_org_admin()
+            db.session.add(user)
             db.session.flush()
             OrgRole.set_role(org.id, user.id, "org_admin", granted_by_id=user.id)
             db.session.commit()
@@ -253,6 +265,7 @@ class AccountService:
           in and changes nothing: an invitation still waiting is pointed at its
           email, any other account at its password.
         - A platform administrator is never signed in this way.
+        - A service account is never signed in this way.
 
         No branch changes an existing account's email. Every outcome is audited.
         """
@@ -261,9 +274,11 @@ class AccountService:
 
         claims = claims if isinstance(claims, dict) else {}
 
-        def done(outcome, user=None):
+        def done(outcome, user=None, target_user_id=None):
             result = ExternalSignInResult(outcome, user)
-            AccountService._audit_external_sign_in(provider, result)
+            AccountService._audit_external_sign_in(
+                provider, outcome, user.id if user is not None else None, target_user_id
+            )
             return result
 
         email = claims.get("email")
@@ -284,10 +299,15 @@ class AccountService:
         with platform_scope("SSO sign-in: resolve the account for an external identity"):
             linked = find_linked_user(provider, claims, User)
             if linked is not None:
+                linked_id = linked.id
                 if linked.is_platform_admin:
                     # Also discards find_linked_user's in-place link migration.
                     db.session.rollback()
-                    return done(REFUSED_PLATFORM_ADMIN)
+                    return done(REFUSED_PLATFORM_ADMIN, target_user_id=linked_id)
+                if getattr(linked, "is_service_user", False):
+                    # Also discards find_linked_user's in-place link migration.
+                    db.session.rollback()
+                    return done(REFUSED_SERVICE_ACCOUNT, target_user_id=linked_id)
                 # Commits find_linked_user's legacy link migration, if it made one.
                 db.session.commit()
                 return done(SIGNED_IN_RETURNING, linked)
@@ -296,42 +316,67 @@ class AccountService:
             if not isinstance(verified, str) or not User.normalize_email(verified):
                 return done(REFUSED_UNVERIFIED)
             verified = verified.strip()
+            if len(verified) > User.__table__.c.email.type.length:
+                # No account can hold a longer address, so this is refused
+                # before any lookup.
+                return done(REFUSED_MISSING_CLAIMS)
 
             existing = User.find_by_email(verified)
             if existing is None:
-                user = AccountService._create_own_workspace(
-                    claims.get("given_name") or "",
-                    claims.get("family_name") or "",
-                    verified,
-                    external_id=external_id,
-                    sso_provider=provider,
-                    confirmed=True,
+                given_name = claims.get("given_name")
+                given_name = (
+                    given_name.strip()[: User.__table__.c.first_name.type.length]
+                    if isinstance(given_name, str)
+                    else ""
                 )
+                family_name = claims.get("family_name")
+                family_name = (
+                    family_name.strip()[: User.__table__.c.last_name.type.length]
+                    if isinstance(family_name, str)
+                    else ""
+                )
+                try:
+                    user = AccountService._create_own_workspace(
+                        given_name,
+                        family_name,
+                        verified,
+                        external_id=external_id,
+                        sso_provider=provider,
+                        confirmed=True,
+                    )
+                except Exception:
+                    AccountService._audit_external_sign_in(provider, FAILED_ACCOUNT_CREATION)
+                    raise
                 return done(SIGNED_IN_NEW, user)
             if existing.is_platform_admin:
-                return done(REFUSED_PLATFORM_ADMIN)
+                return done(REFUSED_PLATFORM_ADMIN, target_user_id=existing.id)
+            if getattr(existing, "is_service_user", False):
+                return done(REFUSED_SERVICE_ACCOUNT, target_user_id=existing.id)
             if is_unactivated(existing):
-                return done(REFUSED_INVITATION_PENDING)
-            return done(REFUSED_ACCOUNT_EXISTS)
+                return done(REFUSED_INVITATION_PENDING, target_user_id=existing.id)
+            return done(REFUSED_ACCOUNT_EXISTS, target_user_id=existing.id)
 
     @staticmethod
-    def _audit_external_sign_in(provider, result):
-        """One audit event per outcome: provider, outcome, user id. Never claims or tokens."""
+    def _audit_external_sign_in(provider, outcome, user_id=None, target_user_id=None):
+        """One audit event per outcome: provider, outcome, the account signed
+        in (``user_id``, if any) and the existing account a refusal reached
+        (``target_user_id``, if any). Never claims or tokens."""
         from app.security.audit import AuditEventSeverity, AuditEventType, audit_logger
 
         try:
             audit_logger.log_event(
                 AuditEventType.AUTHENTICATION,
-                AuditEventSeverity.LOW if result.signed_in else AuditEventSeverity.HIGH,
+                AuditEventSeverity.LOW if outcome in _SIGNED_IN_OUTCOMES else AuditEventSeverity.HIGH,
                 "sso_callback",
                 details={
                     "provider": provider,
-                    "outcome": result.outcome,
-                    "user_id": result.user.id if result.user is not None else None,
+                    "outcome": outcome,
+                    "user_id": user_id,
+                    "target_user_id": target_user_id,
                 },
             )
         except Exception:
-            _log.warning("Audit log failed for SSO outcome %s (%s)", result.outcome, provider, exc_info=True)
+            _log.warning("Audit log failed for SSO outcome %s (%s)", outcome, provider, exc_info=True)
 
     @staticmethod
     def record_external_sign_in(user, provider):

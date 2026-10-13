@@ -103,6 +103,7 @@ def login():
             from app.services import mfa_service
 
             if mfa_service.required_for(user):
+                session.pop("_mfa_pending_sso_provider", None)
                 session["_mfa_pending_user_id"] = user.id
                 session["_mfa_pending_remember"] = bool(form.remember_me.data)
                 session["_mfa_pending_next"] = buy_intent.next_candidate(consume=True) or ""
@@ -174,13 +175,19 @@ def _complete_login_after_mfa(user):
     remember = bool(session.pop("_mfa_pending_remember", False))
     next_url = session.pop("_mfa_pending_next", "") or ""
     session.pop("_mfa_pending_user_id", None)
+    sso_provider = session.pop("_mfa_pending_sso_provider", None)
+    method = (
+        f"sso:{sso_provider}"
+        if isinstance(sso_provider, str) and sso_provider and sso_provider == getattr(user, "sso_provider", None)
+        else "password"
+    )
 
     session.clear()
     session.modified = True
     _svc.login(user, remember)
     session.permanent = True
     try:
-        audit_logger.log_authentication(success=True)
+        audit_logger.log_authentication(success=True, method=method)
     except Exception:  # fabricated-ok: guarded skip on error; emits no fabricated value — audit log is fire-and-forget
         pass
     _login_entry = auth_audit.record_login_success(user)
@@ -639,6 +646,7 @@ def sso_callback(provider):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = False
         session["_mfa_pending_next"] = ""
+        session["_mfa_pending_sso_provider"] = provider
         return redirect(url_for("account.mfa_challenge"))
 
     session_registry.login_and_register(user, remember=False)

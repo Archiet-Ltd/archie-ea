@@ -334,19 +334,3 @@ def verified_identity_email(provider, userinfo):
         return userinfo.get("preferred_username")
 
     return None
-
-
-def sso_email_claim_is_trusted_for(provider, userinfo, existing_user):
-    """True when *userinfo*'s email-ish claim proves the party signing in
-    via *provider* controls *existing_user*'s mailbox, and so may be
-    first-linked (or, for callbacks with no subject-based lookup at all,
-    logged in) by email. False for everything else, including a verified
-    claim for a *different* email than the existing user's -- that is a
-    verified identity, just not this one's.
-    """
-    from app.models.user import User
-
-    verified_email = verified_identity_email(provider, userinfo)
-    if not verified_email:
-        return False
-    return User.normalize_email(verified_email) == User.normalize_email(existing_user.email)
