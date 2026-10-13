@@ -10,7 +10,7 @@ saving is the same class of lie as a dashboard that invents a number.
 """
 from datetime import datetime
 
-from flask import abort, flash, redirect, request, url_for
+from flask import abort, flash, g, redirect, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -42,6 +42,18 @@ def _uid():
     return getattr(current_user, "id", None)
 
 
+def _require_org_id():
+    """The signed-in organisation; 403 when it is not resolved.
+
+    The automatic tenant filter does nothing without an organisation, so the
+    demand routes state it explicitly and refuse to run without one.
+    """
+    org_id = getattr(g, "current_org_id", None)
+    if org_id is None:
+        abort(403)
+    return org_id
+
+
 # ── Demand ────────────────────────────────────────────────────────────────
 
 @portfolio_bp.route("/demands")
@@ -52,13 +64,20 @@ def demands():
 
     from app.models.demand import Demand
 
-    rows = db.session.query(Demand).order_by(Demand.id.desc()).all()
+    org_id = _require_org_id()
+    rows = (
+        db.session.query(Demand)
+        .filter(Demand.organization_id == org_id)
+        .order_by(Demand.id.desc())
+        .all()
+    )
     open_demands = [d for d in rows if not d.is_decided]
     open_demands.sort(key=lambda d: (d.days_awaiting_decision or 0), reverse=True)
     from app.models.demand import DEMAND_ROUTES
-    from app.modules.portfolio.services.demand_triage import recommend
+    from app.modules.portfolio.services.demand_triage import recommend_many
 
-    recommendations = {d.id: recommend(d.capability_id) for d in open_demands}
+    by_capability = recommend_many([d.capability_id for d in open_demands])
+    recommendations = {d.id: by_capability[d.capability_id] for d in open_demands}
     return render_template(
         "portfolio/demands.html",
         recommendations=recommendations,
@@ -75,14 +94,15 @@ def demand_new():
     from flask import render_template
 
     from app.models.demand import DEMAND_SOURCES, Demand
-    from app.modules.portfolio.services.demand_triage import visible_capabilities
+    from app.modules.portfolio.services.demand_triage import visible_capabilities, visible_capability
 
+    _require_org_id()
     capabilities = visible_capabilities()
 
     if request.method == "POST":
         title = (request.form.get("title") or "").strip()
         capability_id = _int_or_none(request.form.get("capability_id"))
-        if capability_id is not None and capability_id not in {c.id for c in capabilities}:
+        if capability_id is not None and visible_capability(capability_id) is None:
             flash("That capability could not be found.", "error")
             return render_template(
                 "portfolio/demand_form.html", sources=DEMAND_SOURCES, form=request.form,
@@ -131,7 +151,12 @@ def demand_decide(demand_id):
     """
     from app.models.demand import Demand
 
-    demand = db.session.get(Demand, demand_id)
+    org_id = _require_org_id()
+    demand = (
+        db.session.query(Demand)
+        .filter(Demand.id == demand_id, Demand.organization_id == org_id)
+        .one_or_none()
+    )
     if demand is None:
         abort(404)
 
@@ -156,6 +181,10 @@ def demand_decide(demand_id):
         # Keep the coverage the person was looking at with the route they chose.
         demand.triage_route = route
         demand.triage_route_reasons = recommend(demand.capability_id)["reason"]
+    else:
+        # A blank route clears an earlier one, with the reasons recorded for it.
+        demand.triage_route = None
+        demand.triage_route_reasons = None
 
     demand.status = decision
     demand.decision_rationale = rationale or None

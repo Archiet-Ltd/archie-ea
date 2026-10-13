@@ -53,6 +53,8 @@
                   placeholder="The cost of not doing it, or the deadline driving it">{{ form.get('business_justification', '') }}</textarea>
       </div>
 
+      {# A plain select on purpose: PR 554's element search picker is meant to
+         replace this select when stacked on this change, so the form never keeps two pickers. #}
       <div>
         <label for="capability_id" class="block text-sm font-medium mb-1.5">Capability this is about</label>
         <select id="capability_id" name="capability_id"
