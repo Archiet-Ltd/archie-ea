@@ -585,11 +585,24 @@ def risk_for_element(element_id: int):
         include_derived=include_derived,
     )
 
+    vendor_concentration = result.get("vendor_concentration") or {}
+    _redact_financial_fields(
+        [
+            entry
+            for block in (vendor_concentration.get("by_element") or {}).values()
+            for entry in (block.get("mappings") or [])
+        ],
+        ("annual_spend",),
+        "access_reason",
+    )
+
     return success_response(
         {
             "risks": result["risks"],
             "reasons": result.get("reasons") or [],
             "elements": result.get("elements") or {},
+            "link_resolution": result.get("link_resolution") or {},
+            "vendor_concentration": vendor_concentration,
         }
     )
 
@@ -656,13 +669,19 @@ def portfolio_component_for_element(element_id: int):
         )
         _redact_financial_fields(component["licences"] or [], ("unit_cost",), "access_reason")
 
-    return success_response(
-        {
-            "application_component_id": result.get("application_component_id"),
-            "reasons": result.get("reasons") or [],
-            "component": component,
-        }
-    )
+    payload = {
+        "application_component_id": result.get("application_component_id"),
+        "reasons": result.get("reasons") or [],
+        "component": component,
+    }
+    if "vendor_concentration" in result:
+        payload["vendor_concentration"] = result["vendor_concentration"]
+        _redact_financial_fields(
+            list(result["vendor_concentration"].get("mappings") or []),
+            ("annual_spend",),
+            "access_reason",
+        )
+    return success_response(payload)
 
 
 @intelligence_api.route("/programme/<int:element_id>", methods=["GET"])
