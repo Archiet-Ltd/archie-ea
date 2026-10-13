@@ -1,0 +1,200 @@
+pack_key: microsoft-dynamics-365
+pack_version: '2025.1'
+vendor: Microsoft
+product: Microsoft Dynamics 365
+product_edition: ''
+segment_tags: []
+industry_tags: []
+attribution_text: Facts about Microsoft Dynamics 365 are taken from Microsoft's public product documentation,
+  read on 2026-09-23; product, module and service names are used as names only.
+trademark_line: Product and company names are the property of their respective owners; no affiliation
+  or endorsement is implied.
+modules:
+- key: core
+  question: Do you run Microsoft Dynamics 365?
+- key: platform
+  question: Do you run the Microsoft Dynamics 365 platform components (hosting, integration, data)?
+elements:
+- type: ApplicationComponent
+  layer: application
+  name: Microsoft Dynamics 365
+  description: Microsoft Dynamics 365, the core application component of the Microsoft pack.
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/dynamics-365
+  element_key: application.microsoft-dynamics-365
+  module_keys:
+  - core
+- type: Node
+  layer: technology
+  name: Microsoft Dynamics 365 Application Server
+  description: Microsoft Dynamics 365 Application Server, part of the platform.
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/dynamics-365
+  element_key: technology.microsoft-dynamics-365-application-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Azure SQL Database
+  description: Azure SQL Database, part of the platform.
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/dynamics-365
+  element_key: technology.azure-sql-database
+  module_keys:
+  - platform
+- type: ApplicationComponent
+  layer: application
+  name: Azure Active Directory
+  description: Azure Active Directory, part of the platform.
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/dynamics-365
+  element_key: application.azure-active-directory
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Dynamics 365 Finance Module
+  description: Dynamics 365 Finance Module, part of the platform.
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/dynamics-365
+  element_key: application.dynamics-365-finance-module
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Dynamics 365 SCM Module
+  description: Dynamics 365 SCM Module, part of the platform.
+  mandatory: false
+  source_urls:
+  - https://www.microsoft.com/en-us/dynamics-365
+  element_key: application.dynamics-365-scm-module
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Azure API Management
+  description: Azure API Management, part of the platform.
+  mandatory: false
+  source_urls:
+  - https://www.microsoft.com/en-us/dynamics-365
+  element_key: application.azure-api-management
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Dynamics 365 Customer Engagement
+  description: Dynamics 365 Customer Engagement, part of the platform.
+  mandatory: false
+  source_urls:
+  - https://www.microsoft.com/en-us/dynamics-365
+  element_key: application.dynamics-365-customer-engagement
+  module_keys:
+  - core
+- type: SystemSoftware
+  layer: technology
+  name: Azure Service Bus
+  description: Azure Service Bus, part of the platform.
+  mandatory: false
+  source_urls:
+  - https://www.microsoft.com/en-us/dynamics-365
+  element_key: technology.azure-service-bus
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Azure Key Vault
+  description: Azure Key Vault, part of the platform.
+  mandatory: false
+  source_urls:
+  - https://www.microsoft.com/en-us/dynamics-365
+  element_key: technology.azure-key-vault
+  module_keys:
+  - platform
+- type: ApplicationComponent
+  layer: application
+  name: Azure Monitor
+  description: Azure Monitor, part of the platform.
+  mandatory: false
+  source_urls:
+  - https://www.microsoft.com/en-us/dynamics-365
+  element_key: application.azure-monitor
+  module_keys:
+  - core
+- type: Node
+  layer: technology
+  name: Power Platform Environment
+  description: Power Platform Environment, part of the platform.
+  mandatory: false
+  source_urls:
+  - https://www.microsoft.com/en-us/dynamics-365
+  element_key: technology.power-platform-environment
+  module_keys:
+  - platform
+relationships:
+- source_key: application.microsoft-dynamics-365
+  target_key: application.azure-active-directory
+  type: composition
+  module_keys:
+  - core
+- source_key: application.microsoft-dynamics-365
+  target_key: application.dynamics-365-finance-module
+  type: composition
+  module_keys:
+  - core
+- source_key: application.microsoft-dynamics-365
+  target_key: application.dynamics-365-scm-module
+  type: composition
+  module_keys:
+  - core
+- source_key: application.microsoft-dynamics-365
+  target_key: application.azure-api-management
+  type: composition
+  module_keys:
+  - core
+- source_key: application.microsoft-dynamics-365
+  target_key: application.dynamics-365-customer-engagement
+  type: composition
+  module_keys:
+  - core
+- source_key: application.microsoft-dynamics-365
+  target_key: application.azure-monitor
+  type: composition
+  module_keys:
+  - core
+- source_key: technology.azure-service-bus
+  target_key: application.microsoft-dynamics-365
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.azure-key-vault
+  target_key: application.microsoft-dynamics-365
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.microsoft-dynamics-365-application-server
+  target_key: application.microsoft-dynamics-365
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.azure-sql-database
+  target_key: application.microsoft-dynamics-365
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.power-platform-environment
+  target_key: application.microsoft-dynamics-365
+  type: association
+  module_keys:
+  - core
+  - platform
+integrations: []
+capability_mappings: []

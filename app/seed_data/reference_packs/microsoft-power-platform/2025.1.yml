@@ -1,0 +1,1799 @@
+pack_key: microsoft-power-platform
+pack_version: '2025.1'
+vendor: Microsoft
+product: Microsoft Power Platform
+product_edition: ''
+segment_tags: []
+industry_tags: []
+attribution_text: Facts about Microsoft Power Platform are taken from Microsoft's public product documentation,
+  read on 2026-09-23; product, module and service names are used as names only.
+trademark_line: Product and company names are the property of their respective owners; no affiliation
+  or endorsement is implied.
+modules:
+- key: core
+  question: Do you run Microsoft Power Platform?
+- key: platform
+  question: Do you run the Microsoft Power Platform platform components (hosting, integration, data)?
+elements:
+- type: ApplicationComponent
+  layer: application
+  name: Microsoft Power Platform
+  description: Microsoft Power Platform, the core application component of the Microsoft pack.
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.microsoft-power-platform
+  module_keys:
+  - core
+- type: Node
+  layer: technology
+  name: Power BI Service (Azure)
+  description: Power BI Service (Azure)
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-bi-service-azure
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Power Apps Environment
+  description: Power Apps Environment
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-apps-environment
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Dataverse Instance
+  description: Dataverse Instance
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.dataverse-instance
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: On-Premises Data Gateway
+  description: On-Premises Data Gateway
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.on-premises-data-gateway
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Power BI Mobile App
+  description: iOS/Android analytics app
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-bi-mobile-app
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Power Apps Mobile
+  description: Custom mobile apps
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-apps-mobile
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Power BI Desktop
+  description: Report development tool
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-bi-desktop
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Browser-Based Portal
+  description: Web access to all Power Platform
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.browser-based-portal
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Power BI Service
+  description: Power BI Service
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-bi-service
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Power Apps
+  description: Power Apps
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-apps
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Power Automate
+  description: Power Automate
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-automate
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Power Virtual Agents
+  description: Power Virtual Agents
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-virtual-agents
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Dataverse
+  description: Dataverse
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.dataverse
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: AI Builder
+  description: AI Builder
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.ai-builder
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Power BI Report Server
+  description: Power BI Report Server
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-bi-report-server
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: On-Premises Data Gateway
+  description: On-Premises Data Gateway
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.on-premises-data-gateway-2
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Power BI Analytics Service
+  description: Data visualization and reporting
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-bi-analytics-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Power Apps Runtime Service
+  description: Low-code application execution
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-apps-runtime-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Power Automate Flow Service
+  description: Automated workflow execution
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-automate-flow-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Dataverse Data Service
+  description: Common data storage and management
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.dataverse-data-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: AI Builder Service
+  description: Pre-built AI models
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.ai-builder-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Connector Service
+  description: 400+ data connectors
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.connector-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Power Virtual Agents Service
+  description: Conversational AI
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-virtual-agents-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Data Gateway Service
+  description: On-premises data connectivity
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.data-gateway-service
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Power BI Report
+  description: Power BI Report
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-bi-report
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Power Apps Solution
+  description: Power Apps Solution
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-apps-solution
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Power Automate Flow
+  description: Power Automate Flow
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-automate-flow
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Dataverse Backup
+  description: Dataverse Backup
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.dataverse-backup
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Azure Global Network
+  description: Azure Global Network
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.azure-global-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Data Gateway Network
+  description: Data Gateway Network
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.data-gateway-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: ExpressRoute
+  description: ExpressRoute
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.expressroute
+  module_keys:
+  - platform
+- type: Capability
+  layer: strategy
+  name: Business Intelligence & Reporting
+  description: Interactive dashboards, visualizations, paginated reports
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.business-intelligence-reporting
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Real-Time Analytics
+  description: Streaming data analysis, real-time dashboards
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.real-time-analytics
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Self-Service Analytics
+  description: Citizen data analyst enablement, drag-and-drop BI
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.self-service-analytics
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Advanced Analytics
+  description: R/Python integration, AI-powered insights, forecasting
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.advanced-analytics
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Mobile Analytics
+  description: Mobile BI apps, offline capability, touch-optimized
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.mobile-analytics
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Embedded Analytics
+  description: BI embedded in applications, white-label analytics
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.embedded-analytics
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Rapid App Development
+  description: Drag-and-drop app builder, responsive design
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.rapid-app-development
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Canvas Apps
+  description: Pixel-perfect custom apps
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.canvas-apps
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Model-Driven Apps
+  description: Data-driven apps from Dataverse
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.model-driven-apps
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Portal Apps
+  description: External-facing portals
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.portal-apps
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Offline Mobile Apps
+  description: Apps that work without connectivity
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.offline-mobile-apps
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Component Library
+  description: Reusable UI components, code components
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.component-library
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Business Process Automation
+  description: Automated workflows, approval processes
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.business-process-automation
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: RPA (Robotic Process Automation)
+  description: UI automation, desktop flows
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.rpa-robotic-process-automation
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Cloud Flows
+  description: Cloud-based workflow automation
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.cloud-flows
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Desktop Flows
+  description: Legacy system automation via RPA
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.desktop-flows
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Business Process Flows
+  description: Guided workflows, stage-based processes
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.business-process-flows
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Scheduled Automation
+  description: Time-based triggers, batch processing
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.scheduled-automation
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Common Data Model
+  description: Standardized data schemas, entity relationships
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.common-data-model
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Data Integration
+  description: 400+ connectors, custom connectors
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.data-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Data Transformation
+  description: Power Query, dataflows, ETL
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.data-transformation
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Data Governance
+  description: DLP policies, data classification, compliance
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.data-governance
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Master Data Management
+  description: Centralized data repository, data quality
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.master-data-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: AI Builder Models
+  description: Pre-built AI models (forms, objects, text)
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.ai-builder-models
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Custom AI Models
+  description: Train custom ML models
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.custom-ai-models
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Virtual Agents (Chatbots)
+  description: Conversational AI, bot development
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.virtual-agents-chatbots
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Sentiment Analysis
+  description: Text sentiment analysis
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.sentiment-analysis
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Form Recognition
+  description: Extract data from forms/documents
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.form-recognition
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Teams Integration
+  description: Embedded apps and bots in Microsoft Teams
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.teams-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: SharePoint Integration
+  description: Document management, lists integration
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.sharepoint-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Outlook Integration
+  description: Email automation, calendar integration
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.outlook-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Excel Integration
+  description: Excel data sources, export to Excel
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: strategy.excel-integration
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Manufacturing Analytics Service
+  description: Real-time production dashboards and KPIs
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: business.manufacturing-analytics-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Quality Inspection App Service
+  description: Mobile quality inspection application
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: business.quality-inspection-app-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Production Reporting Automation
+  description: Automated daily/weekly reporting
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: business.production-reporting-automation
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Maintenance Request Portal
+  description: Employee self-service maintenance requests
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: business.maintenance-request-portal
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Supply Chain Analytics
+  description: Supplier performance and inventory analytics
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: business.supply-chain-analytics
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Daily Production Dashboard Refresh
+  description: Real-time OEE and production KPIs
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: business.daily-production-dashboard-refresh
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Quality Inspection Process
+  description: Mobile quality inspection workflow
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: business.quality-inspection-process
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Approval Workflow Automation
+  description: Purchase requisition approval
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: business.approval-workflow-automation
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Supplier Performance Reporting
+  description: Weekly supplier scorecards
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: business.supplier-performance-reporting
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Equipment Maintenance Request
+  description: Employee-initiated maintenance requests
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: business.equipment-maintenance-request
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Power BI Report
+  description: Interactive analytics report
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: business.power-bi-report
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Power App
+  description: Custom business application
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: business.power-app
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Power Automate Flow
+  description: Automated workflow
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: business.power-automate-flow
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Dataverse Table
+  description: Data entity
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: business.dataverse-table
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Virtual Agent
+  description: Chatbot
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: business.virtual-agent
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Power BI Service
+  description: Cloud analytics platform
+  mandatory: false
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.power-bi-service
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Power BI Desktop
+  description: Report authoring tool
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.power-bi-desktop
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Power BI Mobile
+  description: iOS/Android analytics app
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.power-bi-mobile
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Power Apps Studio
+  description: App development tool
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.power-apps-studio
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Power Apps Runtime
+  description: App player
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.power-apps-runtime
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Power Automate Designer
+  description: Workflow designer
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.power-automate-designer
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Dataverse
+  description: Common data platform
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.dataverse
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: AI Builder
+  description: AI model builder
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.ai-builder
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Power BI REST API
+  description: Programmatic access to Power BI
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.power-bi-rest-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Dataverse Web API
+  description: CRUD operations on Dataverse
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.dataverse-web-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Power Automate API
+  description: Manage flows programmatically
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.power-automate-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Power Apps API
+  description: Manage apps programmatically
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.power-apps-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Connector API
+  description: Custom connector API
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.connector-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: REST API
+  description: REST API
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.rest-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: OData
+  description: OData
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.odata
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Custom Connector
+  description: Custom Connector
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.custom-connector
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: On-Premises Data Gateway
+  description: On-Premises Data Gateway
+  mandatory: false
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.on-premises-data-gateway
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Dataverse TDS Endpoint
+  description: Dataverse TDS Endpoint
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.dataverse-tds-endpoint
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Power BI Dataset
+  description: Power BI Dataset
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.power-bi-dataset
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Dataverse Table
+  description: Dataverse Table
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.dataverse-table
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Flow Run History
+  description: Flow Run History
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.flow-run-history
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: App Usage Telemetry
+  description: App Usage Telemetry
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.app-usage-telemetry
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: AI Model Training Data
+  description: AI Model Training Data
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.ai-model-training-data
+  module_keys:
+  - core
+- type: Facility
+  layer: physical
+  name: Azure Data Center (US)
+  description: Power Platform cloud services
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: physical.azure-data-center-us
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: Azure Data Center (EU)
+  description: EU data residency
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: physical.azure-data-center-eu
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: Corporate Data Center
+  description: On-premises data gateway
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: physical.corporate-data-center
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Data Gateway Server
+  description: Data Gateway Server
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: physical.data-gateway-server
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Power BI Desktop Licenses
+  description: Power BI Desktop Licenses
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: physical.power-bi-desktop-licenses
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Tablets for Shop Floor
+  description: Tablets for Shop Floor
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: physical.tablets-for-shop-floor
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Azure Global Network
+  description: Azure Global Network
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: physical.azure-global-network
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Corporate WAN
+  description: Corporate WAN
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: physical.corporate-wan
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: ExpressRoute
+  description: ExpressRoute
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: physical.expressroute
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Power Platform Environment
+  description: Power Platform Environment, part of the platform.
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.power-platform-environment
+  module_keys:
+  - platform
+- type: ApplicationComponent
+  layer: application
+  name: Azure Active Directory
+  description: Azure Active Directory, part of the platform.
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.azure-active-directory
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Power Apps Service
+  description: Power Apps Service, part of the platform.
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.power-apps-service
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Power Automate Service
+  description: Power Automate Service, part of the platform.
+  mandatory: true
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.power-automate-service
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Azure API Management
+  description: Azure API Management, part of the platform.
+  mandatory: false
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: application.azure-api-management
+  module_keys:
+  - core
+- type: SystemSoftware
+  layer: technology
+  name: Azure Key Vault
+  description: Azure Key Vault, part of the platform.
+  mandatory: false
+  source_urls:
+  - https://www.microsoft.com/en-us/power-platform
+  element_key: technology.azure-key-vault
+  module_keys:
+  - platform
+relationships:
+- source_key: application.microsoft-power-platform
+  target_key: application.power-bi-service
+  type: composition
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: application.power-bi-desktop
+  type: composition
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: application.power-bi-mobile
+  type: composition
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: application.power-apps-studio
+  type: composition
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: application.power-apps-runtime
+  type: composition
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: application.power-automate-designer
+  type: composition
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: application.dataverse
+  type: composition
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: application.ai-builder
+  type: composition
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: application.azure-active-directory
+  type: composition
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: application.power-apps-service
+  type: composition
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: application.power-automate-service
+  type: composition
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: application.azure-api-management
+  type: composition
+  module_keys:
+  - core
+- source_key: technology.power-bi-service
+  target_key: application.power-bi-service
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.power-apps
+  target_key: application.microsoft-power-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.power-automate
+  target_key: application.microsoft-power-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.power-virtual-agents
+  target_key: application.microsoft-power-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.dataverse
+  target_key: application.dataverse
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.ai-builder
+  target_key: application.ai-builder
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.power-bi-report-server
+  target_key: application.microsoft-power-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.on-premises-data-gateway-2
+  target_key: application.microsoft-power-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.azure-key-vault
+  target_key: application.microsoft-power-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.power-bi-service-azure
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.power-apps-environment
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.dataverse-instance
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.on-premises-data-gateway
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.power-bi-mobile-app
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.power-apps-mobile
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.power-bi-desktop
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.browser-based-portal
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.power-bi-analytics-service
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.power-apps-runtime-service
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.power-automate-flow-service
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.dataverse-data-service
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.ai-builder-service
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.connector-service
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.power-virtual-agents-service
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.data-gateway-service
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.power-bi-service-azure
+  target_key: technology.power-bi-report
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.power-bi-service-azure
+  target_key: technology.power-apps-solution
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.power-bi-service-azure
+  target_key: technology.power-automate-flow
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.power-bi-service-azure
+  target_key: technology.dataverse-backup
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.azure-global-network
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.data-gateway-network
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.expressroute
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: strategy.business-intelligence-reporting
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.real-time-analytics
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.self-service-analytics
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.advanced-analytics
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.mobile-analytics
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.embedded-analytics
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.rapid-app-development
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.canvas-apps
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.model-driven-apps
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.portal-apps
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.offline-mobile-apps
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.component-library
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.business-process-automation
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.rpa-robotic-process-automation
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.cloud-flows
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.desktop-flows
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.business-process-flows
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.scheduled-automation
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.common-data-model
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.data-integration
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.data-transformation
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.data-governance
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.master-data-management
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.ai-builder-models
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.custom-ai-models
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.virtual-agents-chatbots
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.sentiment-analysis
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.form-recognition
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.teams-integration
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.sharepoint-integration
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.outlook-integration
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.excel-integration
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: business.manufacturing-analytics-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: business.quality-inspection-app-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: business.production-reporting-automation
+  type: association
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: business.maintenance-request-portal
+  type: association
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: business.supply-chain-analytics
+  type: association
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: business.daily-production-dashboard-refresh
+  type: association
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: business.quality-inspection-process
+  type: association
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: business.approval-workflow-automation
+  type: association
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: business.supplier-performance-reporting
+  type: association
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: business.equipment-maintenance-request
+  type: association
+  module_keys:
+  - core
+- source_key: business.power-bi-report
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.power-app
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.power-automate-flow
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.dataverse-table
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.virtual-agent
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.power-bi-rest-api
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.dataverse-web-api
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.power-automate-api
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.power-apps-api
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.connector-api
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.rest-api
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.odata
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.custom-connector
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.on-premises-data-gateway
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.dataverse-tds-endpoint
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: application.power-bi-dataset
+  type: association
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: application.dataverse-table
+  type: association
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: application.flow-run-history
+  type: association
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: application.app-usage-telemetry
+  type: association
+  module_keys:
+  - core
+- source_key: application.microsoft-power-platform
+  target_key: application.ai-model-training-data
+  type: association
+  module_keys:
+  - core
+- source_key: physical.azure-data-center-us
+  target_key: technology.power-bi-service-azure
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.azure-data-center-eu
+  target_key: technology.power-bi-service-azure
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.corporate-data-center
+  target_key: technology.power-bi-service-azure
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.data-gateway-server
+  target_key: technology.power-bi-service-azure
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.power-bi-desktop-licenses
+  target_key: technology.power-bi-service-azure
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.tablets-for-shop-floor
+  target_key: technology.power-bi-service-azure
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.azure-global-network
+  target_key: physical.data-gateway-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.corporate-wan
+  target_key: physical.data-gateway-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.expressroute
+  target_key: physical.data-gateway-server
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.power-platform-environment
+  target_key: application.microsoft-power-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+integrations: []
+capability_mappings: []

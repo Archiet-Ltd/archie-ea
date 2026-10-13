@@ -1,0 +1,1620 @@
+pack_key: ibm-maximo
+pack_version: '1.0'
+vendor: IBM
+product: IBM Maximo Application Suite
+product_edition: ''
+segment_tags: []
+industry_tags: []
+attribution_text: Facts about IBM Maximo Application Suite are taken from IBM's public product documentation,
+  read on 2026-09-23; product, module and service names are used as names only.
+trademark_line: Product and company names are the property of their respective owners; no affiliation
+  or endorsement is implied.
+modules:
+- key: core
+  question: Do you run IBM Maximo Application Suite?
+- key: platform
+  question: Do you run the IBM Maximo Application Suite platform components (hosting, integration, data)?
+elements:
+- type: ApplicationComponent
+  layer: application
+  name: IBM Maximo Application Suite
+  description: IBM Maximo Application Suite, the core application component of the IBM pack.
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.ibm-maximo-application-suite
+  module_keys:
+  - core
+- type: Node
+  layer: technology
+  name: Maximo Application Server
+  description: Maximo Application Server
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.maximo-application-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: DB2 Database Server
+  description: DB2 Database Server
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.db2-database-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Integration Server
+  description: Integration Server
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.integration-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Maximo Monitor (IoT) Server
+  description: Maximo Monitor (IoT) Server
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.maximo-monitor-iot-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Maximo Health/Predict AI Server
+  description: Maximo Health/Predict AI Server
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.maximo-health-predict-ai-server
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Maximo Mobile (Technician App)
+  description: iOS/Android work order management
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.maximo-mobile-technician-app
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Barcode Scanner
+  description: Asset tagging and inventory
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.barcode-scanner
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: IoT Sensors
+  description: Equipment condition monitoring
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.iot-sensors
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: CMMS Kiosk
+  description: Shop floor work order interface
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.cmms-kiosk
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: IBM Maximo Manage
+  description: IBM Maximo Manage
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.ibm-maximo-manage
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: IBM Maximo Monitor
+  description: IBM Maximo Monitor
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.ibm-maximo-monitor
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: IBM Maximo Health
+  description: IBM Maximo Health
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.ibm-maximo-health
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: IBM Maximo Predict
+  description: IBM Maximo Predict
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.ibm-maximo-predict
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: IBM Maximo Visual Inspection
+  description: IBM Maximo Visual Inspection
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.ibm-maximo-visual-inspection
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: IBM Maximo Mobile
+  description: IBM Maximo Mobile
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.ibm-maximo-mobile
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: IBM DB2 Database
+  description: IBM DB2 Database
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.ibm-db2-database
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Red Hat OpenShift
+  description: Red Hat OpenShift
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.red-hat-openshift
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: IBM Watson Studio
+  description: IBM Watson Studio
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.ibm-watson-studio
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Work Order Management Service
+  description: Work order creation, scheduling, execution
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.work-order-management-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Preventive Maintenance Service
+  description: PM schedule generation and execution
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.preventive-maintenance-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Asset Management Service
+  description: Asset registry, lifecycle, and hierarchy
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.asset-management-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Inventory Management Service
+  description: MRO parts and storeroom management
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.inventory-management-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Predictive Analytics Service
+  description: Asset failure prediction
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.predictive-analytics-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: IoT Data Ingestion Service
+  description: Sensor data collection and processing
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.iot-data-ingestion-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Integration Service
+  description: ERP/MES integration
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.integration-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Mobile Sync Service
+  description: Offline mobile synchronization
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.mobile-sync-service
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Maximo EAR File
+  description: Maximo EAR File
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.maximo-ear-file
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Integration Object Structure
+  description: Integration Object Structure
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.integration-object-structure
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Automation Script
+  description: Automation Script
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.automation-script
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: DB2 Backup
+  description: DB2 Backup
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.db2-backup
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Mobile App Package
+  description: Mobile App Package
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.mobile-app-package
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Plant Network
+  description: Plant Network
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.plant-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: IoT Network
+  description: IoT Network
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.iot-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: WAN to ERP
+  description: WAN to ERP
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.wan-to-erp
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Cloud Pak Network
+  description: Cloud Pak Network
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: technology.cloud-pak-network
+  module_keys:
+  - platform
+- type: Capability
+  layer: strategy
+  name: Work Order Management
+  description: Create, schedule, dispatch, execute, and close work orders
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.work-order-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Preventive Maintenance
+  description: PM schedule generation, route-based maintenance, meter-based triggers
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.preventive-maintenance
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Predictive Maintenance
+  description: AI-powered failure prediction, anomaly detection, condition-based maintenance
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.predictive-maintenance
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Asset Lifecycle Management
+  description: Asset registry, commissioning, operation, maintenance, retirement
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.asset-lifecycle-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Asset Health & Criticality
+  description: Asset health scoring, criticality ranking, risk assessment
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.asset-health-criticality
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: MRO Inventory Management
+  description: Storeroom management, parts cataloging, reorder point, ABC analysis
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.mro-inventory-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Procurement & Purchasing
+  description: Purchase requisitions, POs, vendor management, receiving
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.procurement-purchasing
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Reliability Engineering
+  description: RCM, FMEA, root cause analysis, failure tracking
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.reliability-engineering
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Calibration Management
+  description: Instrument calibration schedules, due date tracking, compliance
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.calibration-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Failure & Downtime Tracking
+  description: Equipment failure recording, downtime analysis, MTBF/MTTR metrics
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.failure-downtime-tracking
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Mobile Work Order Execution
+  description: Mobile app for technicians with offline capability
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.mobile-work-order-execution
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Condition Monitoring
+  description: IoT sensor integration, vibration analysis, temperature monitoring
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.condition-monitoring
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Work Planning & Scheduling
+  description: Work plan templates, labor/material planning, scheduling optimization
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.work-planning-scheduling
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Service Level Agreements (SLA)
+  description: SLA tracking, breach alerting, vendor performance
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.service-level-agreements-sla
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Warranty Management
+  description: Equipment warranty tracking, claim submission, recovery
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.warranty-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Safety Management
+  description: Lock-out/tag-out, safety permits, hazard tracking
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.safety-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Document Management
+  description: Equipment manuals, procedures, drawings, as-built documentation
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.document-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Labor Management
+  description: Craft tracking, labor hours, crew scheduling, skill certifications
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.labor-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: KPI & Analytics
+  description: OEE, equipment availability, PM compliance, cost analysis
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.kpi-analytics
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Asset Mobility & Transfer
+  description: Equipment moves, transfers between locations, asset tracking
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.asset-mobility-transfer
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Compliance & Audit
+  description: Regulatory compliance tracking, audit trails, e-signature
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.compliance-audit
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Visual Inspection AI
+  description: AI-powered image analysis for asset inspection
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: strategy.visual-inspection-ai
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Maintenance Management Service
+  description: Work order lifecycle management
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: business.maintenance-management-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Asset Registry Service
+  description: Centralized asset information
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: business.asset-registry-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: MRO Storeroom Service
+  description: Spare parts availability
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: business.mro-storeroom-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Predictive Analytics Service
+  description: Failure prediction and prevention
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: business.predictive-analytics-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Mobile Field Service
+  description: Mobile work order execution
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: business.mobile-field-service
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Corrective Maintenance
+  description: Respond to equipment failures
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: business.corrective-maintenance
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Preventive Maintenance
+  description: Scheduled maintenance execution
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: business.preventive-maintenance
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Predictive Maintenance
+  description: Condition-based maintenance
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: business.predictive-maintenance
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Parts Replenishment
+  description: MRO inventory management
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: business.parts-replenishment
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Asset Commissioning
+  description: New equipment setup
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: business.asset-commissioning
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Work Order
+  description: Maintenance work order
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: business.work-order
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Asset
+  description: Equipment or facility component
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: business.asset
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: PM Record
+  description: Preventive maintenance schedule
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: business.pm-record
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Inventory Item
+  description: MRO spare part
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: business.inventory-item
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Purchase Order
+  description: MRO procurement
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: business.purchase-order
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Failure Report
+  description: Equipment failure record
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: business.failure-report
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Maximo UI (Work Centers)
+  description: Main Maximo user interface
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.maximo-ui-work-centers
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Maximo Mobile App
+  description: Technician mobile application
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.maximo-mobile-app
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Maximo Monitor Dashboard
+  description: IoT monitoring dashboard
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.maximo-monitor-dashboard
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Maximo Health Insights
+  description: Asset health analytics
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.maximo-health-insights
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Maximo Predict Engine
+  description: Predictive analytics engine
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.maximo-predict-engine
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Integration Framework
+  description: MIF/MEA integration layer
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.integration-framework
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: REST API Gateway
+  description: OSLC/REST API
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.rest-api-gateway
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: OSLC REST API
+  description: Object Structure API
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.oslc-rest-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Standard API
+  description: Standard Maximo API
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.standard-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Custom Integration API
+  description: Custom integration endpoints
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.custom-integration-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Mobile API
+  description: Mobile synchronization API
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.mobile-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: IoT Data Ingestion API
+  description: Sensor data ingestion
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.iot-data-ingestion-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: OSLC REST API
+  description: OSLC REST API
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.oslc-rest-api-2
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Web Services
+  description: Web Services
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.web-services
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Integration Framework
+  description: Integration Framework
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.integration-framework-2
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: JDBC Connection
+  description: JDBC Connection
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.jdbc-connection
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Kafka Streaming
+  description: Kafka Streaming
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.kafka-streaming
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: WORKORDER
+  description: WORKORDER
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.workorder
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: ASSET
+  description: ASSET
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.asset
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: PM
+  description: PM
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.pm
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: INVENTORY
+  description: INVENTORY
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.inventory
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: INVUSAGE
+  description: INVUSAGE
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: application.invusage
+  module_keys:
+  - core
+- type: Facility
+  layer: physical
+  name: Corporate Data Center
+  description: On-premises Maximo servers
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: physical.corporate-data-center
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: IBM Cloud Pak
+  description: Cloud-hosted Monitor/Predict
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: physical.ibm-cloud-pak
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: Plant Server Room
+  description: Local caching servers
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: physical.plant-server-room
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Maximo Application Server
+  description: Maximo Application Server
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: physical.maximo-application-server
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: DB2 Database Server
+  description: DB2 Database Server
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: physical.db2-database-server
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Technician Tablets
+  description: Technician Tablets
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: physical.technician-tablets
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Corporate Network
+  description: Corporate Network
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: physical.corporate-network
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: WAN to Plants
+  description: WAN to Plants
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: physical.wan-to-plants
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Cloud Connection
+  description: Cloud Connection
+  mandatory: true
+  source_urls:
+  - https://www.ibm.com/products/maximo
+  element_key: physical.cloud-connection
+  module_keys:
+  - platform
+relationships:
+- source_key: application.ibm-maximo-application-suite
+  target_key: application.maximo-ui-work-centers
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: application.maximo-mobile-app
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: application.maximo-monitor-dashboard
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: application.maximo-health-insights
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: application.maximo-predict-engine
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: application.integration-framework
+  type: composition
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: application.rest-api-gateway
+  type: composition
+  module_keys:
+  - core
+- source_key: technology.ibm-maximo-manage
+  target_key: application.ibm-maximo-application-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.ibm-maximo-monitor
+  target_key: application.ibm-maximo-application-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.ibm-maximo-health
+  target_key: application.ibm-maximo-application-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.ibm-maximo-predict
+  target_key: application.ibm-maximo-application-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.ibm-maximo-visual-inspection
+  target_key: application.ibm-maximo-application-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.ibm-maximo-mobile
+  target_key: application.ibm-maximo-application-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.ibm-db2-database
+  target_key: application.ibm-maximo-application-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.red-hat-openshift
+  target_key: application.ibm-maximo-application-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.ibm-watson-studio
+  target_key: application.ibm-maximo-application-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.maximo-application-server
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.db2-database-server
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.integration-server
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.maximo-monitor-iot-server
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.maximo-health-predict-ai-server
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.maximo-mobile-technician-app
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.barcode-scanner
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.iot-sensors
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.cmms-kiosk
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.work-order-management-service
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.preventive-maintenance-service
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.asset-management-service
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.inventory-management-service
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.predictive-analytics-service
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.iot-data-ingestion-service
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.integration-service
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mobile-sync-service
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.maximo-application-server
+  target_key: technology.maximo-ear-file
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.maximo-application-server
+  target_key: technology.integration-object-structure
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.maximo-application-server
+  target_key: technology.automation-script
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.maximo-application-server
+  target_key: technology.db2-backup
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.maximo-application-server
+  target_key: technology.mobile-app-package
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.plant-network
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.iot-network
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.wan-to-erp
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.cloud-pak-network
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: strategy.work-order-management
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.preventive-maintenance
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.predictive-maintenance
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.asset-lifecycle-management
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.asset-health-criticality
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.mro-inventory-management
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.procurement-purchasing
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.reliability-engineering
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.calibration-management
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.failure-downtime-tracking
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.mobile-work-order-execution
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.condition-monitoring
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.work-planning-scheduling
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.service-level-agreements-sla
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.warranty-management
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.safety-management
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.document-management
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.labor-management
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.kpi-analytics
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.asset-mobility-transfer
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.compliance-audit
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.visual-inspection-ai
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: business.maintenance-management-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: business.asset-registry-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: business.mro-storeroom-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: business.predictive-analytics-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: business.mobile-field-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: business.corrective-maintenance
+  type: association
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: business.preventive-maintenance
+  type: association
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: business.predictive-maintenance
+  type: association
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: business.parts-replenishment
+  type: association
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: business.asset-commissioning
+  type: association
+  module_keys:
+  - core
+- source_key: business.work-order
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.asset
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.pm-record
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.inventory-item
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.purchase-order
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.failure-report
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.oslc-rest-api
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.standard-api
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.custom-integration-api
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.mobile-api
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.iot-data-ingestion-api
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.oslc-rest-api-2
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.web-services
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.integration-framework-2
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.jdbc-connection
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.kafka-streaming
+  target_key: application.ibm-maximo-application-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: application.workorder
+  type: association
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: application.asset
+  type: association
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: application.pm
+  type: association
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: application.inventory
+  type: association
+  module_keys:
+  - core
+- source_key: application.ibm-maximo-application-suite
+  target_key: application.invusage
+  type: association
+  module_keys:
+  - core
+- source_key: physical.corporate-data-center
+  target_key: technology.maximo-application-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.ibm-cloud-pak
+  target_key: technology.maximo-application-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.plant-server-room
+  target_key: technology.maximo-application-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.maximo-application-server
+  target_key: technology.maximo-application-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.db2-database-server
+  target_key: technology.maximo-application-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.technician-tablets
+  target_key: technology.maximo-application-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.corporate-network
+  target_key: physical.maximo-application-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.wan-to-plants
+  target_key: physical.maximo-application-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.cloud-connection
+  target_key: physical.maximo-application-server
+  type: association
+  module_keys:
+  - platform
+integrations: []
+capability_mappings: []

@@ -1,0 +1,2277 @@
+pack_key: rockwell-factorytalk
+pack_version: '1.0'
+vendor: Rockwell Automation
+product: Rockwell FactoryTalk Manufacturing Suite
+product_edition: ''
+segment_tags: []
+industry_tags: []
+attribution_text: Facts about Rockwell FactoryTalk Manufacturing Suite are taken from Rockwell Automation's
+  public product documentation, read on 2026-09-23; product, module and service names are used as names
+  only.
+trademark_line: Product and company names are the property of their respective owners; no affiliation
+  or endorsement is implied.
+modules:
+- key: core
+  question: Do you run Rockwell FactoryTalk Manufacturing Suite?
+- key: platform
+  question: Do you run the Rockwell FactoryTalk Manufacturing Suite platform components (hosting, integration,
+    data)?
+elements:
+- type: ApplicationComponent
+  layer: application
+  name: Rockwell FactoryTalk Manufacturing Suite
+  description: Rockwell FactoryTalk Manufacturing Suite, the core application component of the Rockwell
+    Automation pack.
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.rockwell-factorytalk-manufacturing-suite
+  module_keys:
+  - core
+- type: Node
+  layer: technology
+  name: FactoryTalk View SE Server
+  description: FactoryTalk View SE Server
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-view-se-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: FactoryTalk Batch Server
+  description: FactoryTalk Batch Server
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-batch-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: FactoryTalk Historian Server
+  description: FactoryTalk Historian Server
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-historian-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: FactoryTalk VantagePoint Server
+  description: FactoryTalk VantagePoint Server
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-vantagepoint-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: FactoryTalk Production Centre Server
+  description: FactoryTalk Production Centre Server
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-production-centre-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: SQL Server Database
+  description: SQL Server Database
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.sql-server-database
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: FactoryTalk Directory Server
+  description: FactoryTalk Directory Server
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-directory-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: HMI Operator Stations
+  description: HMI Operator Stations
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.hmi-operator-stations
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Allen-Bradley ControlLogix PLC
+  description: Primary process control logic
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.allen-bradley-controllogix-plc
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Allen-Bradley CompactLogix PLC
+  description: Machine-level control
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.allen-bradley-compactlogix-plc
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: StratixManaged Ethernet Switch
+  description: Industrial network infrastructure
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.stratixmanaged-ethernet-switch
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: PanelView Plus HMI
+  description: Machine-level operator interface
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.panelview-plus-hmi
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: PowerFlex VFD
+  description: Motor control
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.powerflex-vfd
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: FactoryTalk View SE
+  description: FactoryTalk View SE
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-view-se
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: FactoryTalk Batch
+  description: FactoryTalk Batch
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-batch
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: FactoryTalk Historian SE
+  description: FactoryTalk Historian SE
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-historian-se
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: FactoryTalk VantagePoint
+  description: FactoryTalk VantagePoint
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-vantagepoint
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: FactoryTalk Production Centre
+  description: FactoryTalk Production Centre
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-production-centre
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: FactoryTalk Transaction Manager
+  description: FactoryTalk Transaction Manager
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-transaction-manager
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: FactoryTalk Metrics
+  description: FactoryTalk Metrics
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-metrics
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Studio 5000 Logix Designer
+  description: Studio 5000 Logix Designer
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.studio-5000-logix-designer
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: FactoryTalk Linx
+  description: FactoryTalk Linx
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-linx
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Microsoft SQL Server
+  description: Microsoft SQL Server
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.microsoft-sql-server
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: FactoryTalk View SE Service
+  description: SCADA/HMI visualization and control
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-view-se-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: FactoryTalk Batch Service
+  description: ISA - 88 compliant batch execution
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-batch-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: FactoryTalk Historian Service
+  description: High-speed process data collection
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-historian-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: FactoryTalk VantagePoint Service
+  description: Manufacturing intelligence and KPIs
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-vantagepoint-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: FactoryTalk Production Centre Service
+  description: Production order and material management
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-production-centre-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: FactoryTalk Transaction Manager Service
+  description: Operator and machine data collection
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-transaction-manager-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: FactoryTalk Metrics Service
+  description: OEE and downtime tracking
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-metrics-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: FactoryTalk Directory Service
+  description: Centralized user and tag management
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-directory-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: FactoryTalk Linx Gateway
+  description: Allen-Bradley device connectivity
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-linx-gateway
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: FactoryTalk Alarm & Events Service
+  description: Centralized alarm handling
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-alarm-events-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: FactoryTalk Security Service
+  description: User authentication and authorization
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-security-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: FactoryTalk AssetCentre Service
+  description: Application version control
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-assetcentre-service
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: FactoryTalk View Application (.APA)
+  description: FactoryTalk View Application (.APA)
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-view-application-apa
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: FactoryTalk Batch Recipe
+  description: FactoryTalk Batch Recipe
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.factorytalk-batch-recipe
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Historian Archive
+  description: Historian Archive
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.historian-archive
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: VantagePoint Dashboard
+  description: VantagePoint Dashboard
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.vantagepoint-dashboard
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Studio 5000 Project (.ACD)
+  description: Studio 5000 Project (.ACD)
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.studio-5000-project-acd
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Database Backup
+  description: Database Backup
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.database-backup
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: EtherNet/IP Control Network
+  description: EtherNet/IP Control Network
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.ethernet-ip-control-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: ControlNet Network
+  description: ControlNet Network
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.controlnet-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: DeviceNet Network
+  description: DeviceNet Network
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.devicenet-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Plant IT Network
+  description: Plant IT Network
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: technology.plant-it-network
+  module_keys:
+  - platform
+- type: Capability
+  layer: strategy
+  name: Process Visualization & Control
+  description: Real-time HMI/SCADA for plant-wide operations
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.process-visualization-control
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Batch Process Management
+  description: ISA - 88 compliant batch recipe execution
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.batch-process-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Historical Data Management
+  description: High-performance time-series data storage
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.historical-data-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Manufacturing Analytics
+  description: Real-time KPI dashboards and reporting
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.manufacturing-analytics
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Production Management
+  description: Work order, material, and resource management
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.production-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: OEE Tracking
+  description: Overall equipment effectiveness monitoring
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.oee-tracking
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Alarm Management
+  description: ISA - 18.2 compliant alarm rationalization
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.alarm-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Data Collection
+  description: Operator and machine data capture
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.data-collection
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: PLC Integration
+  description: Native Allen-Bradley PLC connectivity
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.plc-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Recipe Management
+  description: Master and control recipe management
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.recipe-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Material Tracking
+  description: Lot tracking and genealogy
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.material-tracking
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Downtime Tracking
+  description: Automated downtime capture and classification
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.downtime-tracking
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Quality Management
+  description: SPC and quality data management
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.quality-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Asset Performance
+  description: Equipment monitoring and predictive maintenance
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.asset-performance
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Energy Management
+  description: Energy consumption monitoring and optimization
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.energy-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Regulatory Compliance
+  description: 21 CFR Part 11 compliance for pharma
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.regulatory-compliance
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Mobile Access
+  description: Mobile HMI and analytics access
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.mobile-access
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Advanced Process Control
+  description: Model predictive control integration
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.advanced-process-control
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Batch Genealogy
+  description: Complete batch execution traceability
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.batch-genealogy
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Industrial IoT Integration
+  description: Cloud connectivity for analytics
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.industrial-iot-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: ERP Integration
+  description: SAP/Oracle integration for production orders and inventory
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.erp-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Warehouse Management Integration
+  description: WMS connectivity for material flow
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.warehouse-management-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Supply Chain Visibility
+  description: Real-time material and capacity visibility
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.supply-chain-visibility
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Production Scheduling Integration
+  description: APS integration for schedule optimization
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.production-scheduling-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Operator Performance Analytics
+  description: Labor productivity and training gap analysis
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.operator-performance-analytics
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Environmental Monitoring
+  description: Emissions, waste, and environmental compliance tracking
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.environmental-monitoring
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Cost Accounting Integration
+  description: Real-time production cost capture and variance
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.cost-accounting-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Customer Order Tracking
+  description: Link production to customer orders for visibility
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.customer-order-tracking
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Multi-Plant Coordination
+  description: Global MES coordination across sites
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.multi-plant-coordination
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Augmented Reality Work Instructions
+  description: AR-based training and work guidance
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: strategy.augmented-reality-work-instructions
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Process Control Service
+  description: Real-time plant monitoring and control
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.process-control-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Batch Execution Service
+  description: Execute batch manufacturing recipes
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.batch-execution-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Data Historian Service
+  description: Store and retrieve process data
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.data-historian-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Analytics Service
+  description: Real-time KPI calculation and dashboards
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.analytics-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Production Tracking Service
+  description: Track production orders and materials
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.production-tracking-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: OEE Monitoring Service
+  description: Calculate and display OEE metrics
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.oee-monitoring-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Alarm Management Service
+  description: Manage plant-wide alarms
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.alarm-management-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Data Collection Service
+  description: Capture operator and machine data
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.data-collection-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Asset Monitoring Service
+  description: Monitor equipment health
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.asset-monitoring-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: ERP Integration Service
+  description: Synchronize with enterprise systems
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.erp-integration-service
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Batch Recipe Execution
+  description: Execute ISA - 88 batch recipes
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.batch-recipe-execution
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Continuous Process Monitoring
+  description: Monitor and control continuous processes
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.continuous-process-monitoring
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Production Order Processing
+  description: Execute discrete manufacturing orders
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.production-order-processing
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: OEE Calculation
+  description: Calculate real-time OEE metrics
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.oee-calculation
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Downtime Management
+  description: Track and analyze equipment downtime
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.downtime-management
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Historical Data Trending
+  description: Analyze historical process data
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.historical-data-trending
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Batch
+  description: Process batch instance
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.batch
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Recipe
+  description: Batch manufacturing recipe
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.recipe
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Production Order
+  description: Manufacturing work order
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.production-order
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Material Lot
+  description: Material batch or lot
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.material-lot
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Equipment Unit
+  description: Process equipment unit
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.equipment-unit
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Alarm
+  description: Process alarm
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.alarm
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Downtime Event
+  description: Equipment downtime occurrence
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.downtime-event
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Historical Tag
+  description: Time-series data point
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: business.historical-tag
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: FactoryTalk View SE Server
+  description: Central HMI/SCADA server
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-view-se-server
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: FactoryTalk View SE Client
+  description: Operator HMI client
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-view-se-client
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: FactoryTalk Batch Server
+  description: Batch execution engine
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-batch-server
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: FactoryTalk Historian Server
+  description: High-speed data collector
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-historian-server
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: FactoryTalk VantagePoint Server
+  description: KPI and dashboard engine
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-vantagepoint-server
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: FactoryTalk Production Centre
+  description: MES production tracking
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-production-centre
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: FactoryTalk Metrics
+  description: OEE calculation engine
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-metrics
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: FactoryTalk Directory Server
+  description: Central tag and user directory
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-directory-server
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: FactoryTalk Linx Gateway
+  description: EtherNet/IP gateway
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-linx-gateway
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SQL Server Database
+  description: Relational data storage
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.sql-server-database
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Studio 5000 Logix Designer
+  description: PLC programming environment
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.studio-5000-logix-designer
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: FactoryTalk View Studio
+  description: HMI development environment
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-view-studio
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: FactoryTalk View Data Server
+  description: Real-time tag data service
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-view-data-server
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: FactoryTalk Batch API
+  description: Batch management API
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-batch-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: FactoryTalk Historian API
+  description: Historical data retrieval
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-historian-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: FactoryTalk VantagePoint API
+  description: Analytics and KPI API
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-vantagepoint-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: FactoryTalk Production Centre API
+  description: Production order API
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-production-centre-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: FactoryTalk Linx Classic
+  description: Allen-Bradley PLC driver
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-linx-classic
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: FactoryTalk Alarms & Events
+  description: Alarm notification service
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-alarms-events
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: FactoryTalk Security API
+  description: Authentication service
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-security-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: FactoryTalk Transaction Manager API
+  description: Data collection API
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.factorytalk-transaction-manager-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: OPC DA/UA Interface
+  description: OPC DA/UA Interface
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.opc-da-ua-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: EtherNet/IP Interface
+  description: EtherNet/IP Interface
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.ethernet-ip-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: SOAP Interface
+  description: SOAP Interface
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.soap-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: REST API
+  description: REST API
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.rest-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Database Interface
+  description: Database Interface
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.database-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: COM Interface
+  description: COM Interface
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.com-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: File Interface
+  description: File Interface
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.file-interface
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Batch Report
+  description: Batch Report
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.batch-report
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Process Tag Value
+  description: Process Tag Value
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.process-tag-value
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Production Order
+  description: Production Order
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.production-order
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Alarm History
+  description: Alarm History
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.alarm-history
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Electronic Signature
+  description: Electronic Signature
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.electronic-signature
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Recipe Master
+  description: Recipe Master
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.recipe-master
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: OEE Data
+  description: OEE Data
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.oee-data
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Downtime Event
+  description: Downtime Event
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: application.downtime-event
+  module_keys:
+  - core
+- type: Facility
+  layer: physical
+  name: Plant 1 - Chemical Processing
+  description: Batch chemical manufacturing
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: physical.plant-1-chemical-processing
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: Plant 2 - Food & Beverage
+  description: Continuous food processing
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: physical.plant-2-food-beverage
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: Central Control Room
+  description: Centralized monitoring facility
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: physical.central-control-room
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: FactoryTalk Servers
+  description: FactoryTalk Servers
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: physical.factorytalk-servers
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: SQL Server Cluster
+  description: SQL Server Cluster
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: physical.sql-server-cluster
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Allen-Bradley ControlLogix
+  description: Allen-Bradley ControlLogix
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: physical.allen-bradley-controllogix
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: PanelView Plus 7
+  description: PanelView Plus 7
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: physical.panelview-plus-7
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Stratix 5700 Switches
+  description: Stratix 5700 Switches
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: physical.stratix-5700-switches
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: EtherNet/IP Plant Network
+  description: EtherNet/IP Plant Network
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: physical.ethernet-ip-plant-network
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Control Network
+  description: Control Network
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: physical.control-network
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: WAN to Remote Plants
+  description: WAN to Remote Plants
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: physical.wan-to-remote-plants
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Internet Gateway
+  description: Internet Gateway
+  mandatory: true
+  source_urls:
+  - https://www.rockwellautomation.com/en-us/products/software/factorytalk.html
+  element_key: physical.internet-gateway
+  module_keys:
+  - platform
+relationships:
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.factorytalk-view-se-server
+  type: composition
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.factorytalk-view-se-client
+  type: composition
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.factorytalk-batch-server
+  type: composition
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.factorytalk-historian-server
+  type: composition
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.factorytalk-vantagepoint-server
+  type: composition
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.factorytalk-production-centre
+  type: composition
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.factorytalk-metrics
+  type: composition
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.factorytalk-directory-server
+  type: composition
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.factorytalk-linx-gateway
+  type: composition
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.sql-server-database
+  type: composition
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.studio-5000-logix-designer
+  type: composition
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.factorytalk-view-studio
+  type: composition
+  module_keys:
+  - core
+- source_key: application.factorytalk-metrics
+  target_key: business.oee-calculation
+  type: serving
+  module_keys:
+  - core
+- source_key: technology.factorytalk-view-se
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-batch
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-historian-se
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-vantagepoint
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-production-centre
+  target_key: application.factorytalk-production-centre
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-transaction-manager
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-metrics
+  target_key: application.factorytalk-metrics
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.studio-5000-logix-designer
+  target_key: application.studio-5000-logix-designer
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-linx
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.microsoft-sql-server
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-view-se-server
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-batch-server
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-historian-server
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-vantagepoint-server
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-production-centre-server
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sql-server-database
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-directory-server
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.hmi-operator-stations
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.allen-bradley-controllogix-plc
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.allen-bradley-compactlogix-plc
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.stratixmanaged-ethernet-switch
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.panelview-plus-hmi
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.powerflex-vfd
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-view-se-service
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-batch-service
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-historian-service
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-vantagepoint-service
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-production-centre-service
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-transaction-manager-service
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-metrics-service
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-directory-service
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-linx-gateway
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-alarm-events-service
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-security-service
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-assetcentre-service
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.factorytalk-view-se-server
+  target_key: technology.factorytalk-view-application-apa
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.factorytalk-view-se-server
+  target_key: technology.factorytalk-batch-recipe
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.factorytalk-view-se-server
+  target_key: technology.historian-archive
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.factorytalk-view-se-server
+  target_key: technology.vantagepoint-dashboard
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.factorytalk-view-se-server
+  target_key: technology.studio-5000-project-acd
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.factorytalk-view-se-server
+  target_key: technology.database-backup
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.ethernet-ip-control-network
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.controlnet-network
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.devicenet-network
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.plant-it-network
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: strategy.process-visualization-control
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.batch-process-management
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.historical-data-management
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.manufacturing-analytics
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.production-management
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.oee-tracking
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.alarm-management
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.data-collection
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.plc-integration
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.recipe-management
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.material-tracking
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.downtime-tracking
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.quality-management
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.asset-performance
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.energy-management
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.regulatory-compliance
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.mobile-access
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.advanced-process-control
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.batch-genealogy
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.industrial-iot-integration
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.erp-integration
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.warehouse-management-integration
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.supply-chain-visibility
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.production-scheduling-integration
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.operator-performance-analytics
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.environmental-monitoring
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.cost-accounting-integration
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.customer-order-tracking
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.multi-plant-coordination
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.augmented-reality-work-instructions
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: business.process-control-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: business.batch-execution-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: business.data-historian-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: business.analytics-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: business.production-tracking-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: business.oee-monitoring-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: business.alarm-management-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: business.data-collection-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: business.asset-monitoring-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: business.erp-integration-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: business.batch-recipe-execution
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: business.continuous-process-monitoring
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: business.production-order-processing
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: business.downtime-management
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: business.historical-data-trending
+  type: association
+  module_keys:
+  - core
+- source_key: business.batch
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.recipe
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.production-order
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.material-lot
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.equipment-unit
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.alarm
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.downtime-event
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: business.historical-tag
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.factorytalk-view-data-server
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.factorytalk-batch-api
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.factorytalk-historian-api
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.factorytalk-vantagepoint-api
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.factorytalk-production-centre-api
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.factorytalk-linx-classic
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.factorytalk-alarms-events
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.factorytalk-security-api
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.factorytalk-transaction-manager-api
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.opc-da-ua-interface
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.ethernet-ip-interface
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.soap-interface
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.rest-api
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.database-interface
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.com-interface
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.file-interface
+  target_key: application.rockwell-factorytalk-manufacturing-suite
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.batch-report
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.process-tag-value
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.production-order
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.alarm-history
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.electronic-signature
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.recipe-master
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.oee-data
+  type: association
+  module_keys:
+  - core
+- source_key: application.rockwell-factorytalk-manufacturing-suite
+  target_key: application.downtime-event
+  type: association
+  module_keys:
+  - core
+- source_key: physical.plant-1-chemical-processing
+  target_key: technology.factorytalk-view-se-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.plant-2-food-beverage
+  target_key: technology.factorytalk-view-se-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.central-control-room
+  target_key: technology.factorytalk-view-se-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.factorytalk-servers
+  target_key: technology.factorytalk-view-se-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.sql-server-cluster
+  target_key: technology.factorytalk-view-se-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.allen-bradley-controllogix
+  target_key: technology.factorytalk-view-se-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.panelview-plus-7
+  target_key: technology.factorytalk-view-se-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.stratix-5700-switches
+  target_key: technology.factorytalk-view-se-server
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.ethernet-ip-plant-network
+  target_key: physical.factorytalk-servers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.control-network
+  target_key: physical.factorytalk-servers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.wan-to-remote-plants
+  target_key: physical.factorytalk-servers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.internet-gateway
+  target_key: physical.factorytalk-servers
+  type: association
+  module_keys:
+  - platform
+integrations: []
+capability_mappings: []
