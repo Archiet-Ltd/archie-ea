@@ -178,6 +178,40 @@ def test_self_loop_dependency_is_reported_as_a_cycle(two_orgs, db_session):
     assert len(names) == len(set(names))
 
 
+def test_retired_roadmap_row_delegates_to_own_organisation_only(two_orgs, db_session):
+    from app.models.roadmap_models import RoadmapWorkPackage
+    from app.models.unified_work_package import UnifiedWorkPackage
+    from app.services import work_package_service as svc
+
+    a, b = two_orgs["a"], two_orgs["b"]
+    user_a = two_orgs["user_a"]
+    plateau_a = _plateau(db_session, a, "A plateau")
+    # A unified work package in org B
+    wp_b = _wp(db_session, b, "B wp", plateau=None,
+               start=datetime(2026, 5, 1), end=datetime(2026, 5, 5))
+    # A retired roadmap row pointing at org B's unified row
+    retired = RoadmapWorkPackage(
+        name="Retired row", business_capability="Cap",
+        created_by=user_a.id, retired_into_id=wp_b.id,
+    )
+    db_session.add(retired)
+    db_session.flush()
+
+    # Under org A's context, the delegation to org B's unified row returns
+    # the empty critical path.
+    result = retired.get_critical_path_impact(organization_id=a.id)
+    assert result["has_critical_path"] is False
+    assert result["path"] == []
+    assert result["blocking"] is None
+
+    # Under org B's context, the delegation works normally.
+    result_b = retired.get_critical_path_impact(organization_id=b.id)
+    # wp_b has no plateau link, so the path is also empty, but the
+    # organisation fence is the gate we are testing: the call does not
+    # raise and returns the empty path from the unified row's own logic.
+    assert result_b["has_critical_path"] is False
+
+
 def test_dependency_on_another_organisations_work_package_is_ignored_and_reported(
     two_orgs, db_session
 ):

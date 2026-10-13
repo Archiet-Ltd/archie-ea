@@ -207,16 +207,23 @@ class RoadmapWorkPackage(db.Model):
             return datetime.utcnow() > self.end_date
         return False
 
-    def get_critical_path_impact(self):
+    def get_critical_path_impact(self, organization_id=None):
         """The critical path impact, computed by the one computation on the one
         work package store: delegates to the copy this retired row was merged
-        into (``retired_into_id``). No constant answer."""
+        into (``retired_into_id``). No constant answer.
+
+        When ``organization_id`` is given and the unified copy belongs to a
+        different organisation, returns the empty critical path -- the retired
+        store has no organisation column, so the fence is applied through the
+        unified row's organisation."""
         from app.services import work_package_service
         from app.models.unified_work_package import UnifiedWorkPackage
 
         if self.retired_into_id:
             copy = UnifiedWorkPackage.query.filter_by(id=self.retired_into_id).first()
             if copy is not None:
+                if organization_id is not None and copy.organization_id != organization_id:
+                    return work_package_service.empty_critical_path()
                 return copy.get_critical_path_impact()
         return work_package_service.empty_critical_path()
 
