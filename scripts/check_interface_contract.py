@@ -15,19 +15,28 @@ Scope matching rule:
     ``graph:query``, ``intelligence:read`` and any scope ending in ``:read``).
     A route tagged ``api:write`` requires an operation with a non-read scope.
 
+Proven-against: a new token-accepting /api/v1 route with no operation in the
+committed subset, a write-scoped route against a read-only operation, and a
+read-scoped route against a write operation (check i names the route and the
+reason); a subset operation with no route raising the unbuilt count above its
+baseline (check ii). Pinned red and green in tests/test_interface_contract_gate.py.
+
 Usage:
     python scripts/check_interface_contract.py --subset <path> [--count]
     python scripts/check_interface_contract.py --subset <path> [--baseline N]
-    python scripts/check_interface_contract.py --subset <path> --fixture-app
+
+The checks take the application as an argument (``check_unlisted_routes``,
+``count_unbuilt_operations``), so tests build a small application with the real
+``require_api_scope`` decorator and call them directly.
 """
 
 from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 from pathlib import Path
-from typing import Any
 
 import yaml
 
@@ -52,18 +61,21 @@ def _is_read_scope(scope: str) -> bool:
     return False
 
 
-def _operation_scopes(operation: dict) -> list[str]:
-    """Extract the list of required OAuth scopes from a contract operation."""
+def _operation_scopes(operation: dict, default_security: list | None = None) -> list[str]:
+    """Extract the list of required OAuth scopes from a contract operation.
+
+    An operation without its own ``security`` inherits the document-level one.
+    """
     scopes: list[str] = []
-    for sec in operation.get("security", []):
+    for sec in operation.get("security", default_security or []):
         for _provider, scope_list in sec.items():
             scopes.extend(scope_list)
     return scopes
 
 
-def _operation_has_read_only_scopes(operation: dict) -> bool:
+def _operation_has_read_only_scopes(operation: dict, default_security: list | None = None) -> bool:
     """Return True if all required scopes on the operation are read-class."""
-    scopes = _operation_scopes(operation)
+    scopes = _operation_scopes(operation, default_security)
     if not scopes:
         # No scopes means no restriction — treat as read-class
         return True
@@ -106,10 +118,11 @@ def _normalize_path(path: str) -> str:
     /api/v1/elements/{element_id} -> /elements/{}
     /elements/{id} -> /elements/{}
     """
-    import re
     # Strip /api/v1 prefix if present
     if path.startswith("/api/v1"):
         path = path[len("/api/v1"):]
+    if len(path) > 1:
+        path = path.rstrip("/")
     return re.sub(r"\{[^}]+\}", "{}", path)
 
 
@@ -147,17 +160,18 @@ def check_unlisted_routes(
 
         # Check scope compatibility
         route_is_write = route_scope == "api:write"
-        op_is_read_only = _operation_has_read_only_scopes(operation)
+        default_security = subset.get("security")
+        op_is_read_only = _operation_has_read_only_scopes(operation, default_security)
 
         if route_is_write and op_is_read_only:
-            op_scopes = _operation_scopes(operation)
+            op_scopes = _operation_scopes(operation, default_security)
             violations.append(
                 f"Route {method.upper()} {path} (scope={route_scope}) "
                 f"requires a non-read operation but the matching contract "
                 f"operation has only read-class scopes: {op_scopes}"
             )
         elif not route_is_write and not op_is_read_only:
-            op_scopes = _operation_scopes(operation)
+            op_scopes = _operation_scopes(operation, default_security)
             violations.append(
                 f"Route {method.upper()} {path} (scope={route_scope}) "
                 f"is a read-scoped route but the matching contract "
@@ -174,7 +188,6 @@ def count_unbuilt_operations(
 
     Returns the count of unbuilt operations.
     """
-    route_index = _build_route_index(subset)
     token_routes = set()
 
     for path, method, _scope in _get_token_accepting_routes(app):
@@ -189,43 +202,6 @@ def count_unbuilt_operations(
                     unbuilt += 1
 
     return unbuilt
-
-
-def _build_fixture_app() -> Any:
-    """Build a minimal Flask app with a token-accepting route for testing.
-
-    This is used by the --fixture-app flag for testing the gate logic
-    without needing the real application.
-    """
-    from flask import Flask
-
-    app = Flask(__name__)
-    app.config["TESTING"] = True
-    app.config["SECRET_KEY"] = "test-secret-key"
-
-    # Register a minimal token-accepting route
-    from functools import wraps
-
-    def _make_require_api_scope(scope: str):
-        def decorator(view):
-            @wraps(view)
-            def wrapped(*args, **kwargs):
-                return view(*args, **kwargs)
-            wrapped._api_token_scope = scope
-            return wrapped
-        return decorator
-
-    @app.route("/api/v1/elements", methods=["GET"])
-    @_make_require_api_scope("api:read")
-    def list_elements():
-        return {"elements": []}
-
-    @app.route("/api/v1/elements/<int:element_id>", methods=["GET"])
-    @_make_require_api_scope("api:read")
-    def get_element(element_id):
-        return {"id": element_id}
-
-    return app
 
 
 def main() -> int:
@@ -244,14 +220,6 @@ def main() -> int:
         "--baseline", type=int, default=None,
         help="Baseline for the unbuilt-operations ratchet",
     )
-    parser.add_argument(
-        "--fixture-app", action="store_true",
-        help="Use a fixture app instead of the real application (for testing)",
-    )
-    parser.add_argument(
-        "--fixture-route-scope", default=None,
-        help="Override the fixture route scope (for testing scope matching)",
-    )
     args = parser.parse_args()
 
     subset_path = Path(args.subset)
@@ -261,42 +229,10 @@ def main() -> int:
 
     subset = _load_subset(subset_path)
 
-    if args.fixture_app:
-        app = _build_fixture_app()
-        if args.fixture_route_scope:
-            # Rebuild fixture app with custom scope
-            from flask import Flask
-            from functools import wraps
-
-            app = Flask(__name__)
-            app.config["TESTING"] = True
-            app.config["SECRET_KEY"] = "test-secret-key"
-
-            scope = args.fixture_route_scope
-
-            def _make_require_api_scope(s: str):
-                def decorator(view):
-                    @wraps(view)
-                    def wrapped(*args, **kwargs):
-                        return view(*args, **kwargs)
-                    wrapped._api_token_scope = s
-                    return wrapped
-                return decorator
-
-            @app.route("/api/v1/elements", methods=["GET"])
-            @_make_require_api_scope(scope)
-            def list_elements():
-                return {"elements": []}
-
-            @app.route("/api/v1/elements/<int:element_id>", methods=["GET"])
-            @_make_require_api_scope(scope)
-            def get_element(element_id):
-                return {"id": element_id}
-    else:
-        # Import the real application
-        os.environ.setdefault("FLASK_CONFIG", "testing")
-        from app import create_app
-        app = create_app("testing")
+    # Import the real application
+    os.environ.setdefault("FLASK_CONFIG", "testing")
+    from app import create_app
+    app = create_app("testing")
 
     if args.count:
         # Print the unbuilt-operations count
@@ -318,7 +254,7 @@ def main() -> int:
     unbuilt_ok = unbuilt <= baseline
 
     if not unbuilt_ok:
-        print(f"FAIL: interface-contract-unimplemented")
+        print("FAIL: interface-contract-unimplemented")
         print(f"  {unbuilt} unbuilt operation(s) > baseline {baseline}")
 
     if passes and unbuilt_ok:

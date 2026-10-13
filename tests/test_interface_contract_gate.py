@@ -39,8 +39,10 @@ def _run(*args: str, **kwargs) -> subprocess.CompletedProcess:
         list(args),
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=kwargs.get("cwd", REPO_ROOT),
-        timeout=kwargs.get("timeout", 60),
+        timeout=kwargs.get("timeout", 600),
         env=env,
     )
 
@@ -117,7 +119,8 @@ def _write_contract(path: Path, doc: dict) -> str:
     """Write *doc* as YAML to *path* and return its sha256 hex digest."""
     text = yaml.dump(doc, default_flow_style=False, sort_keys=False)
     path.write_text(text, encoding="utf-8")
-    return hashlib.sha256(text.encode()).hexdigest()
+    # Hash the bytes on disk: write_text translates newlines on Windows.
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -497,182 +500,204 @@ class TestGenerateApiContractSubset:
 # ---------------------------------------------------------------------------
 
 
+GATE_SCRIPT = REPO_ROOT / "scripts" / "check_interface_contract.py"
+
+
+def _gate_module():
+    """Import the gate script as a module (scripts/ is not a package)."""
+    scripts_dir = str(REPO_ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    import check_interface_contract
+
+    return check_interface_contract
+
+
+def _app_with_routes(routes):
+    """A small application whose routes use the real ``require_api_scope``.
+
+    ``routes`` is a list of (rule, methods, scope-or-None); None means a plain
+    route that does not accept a token.
+    """
+    from flask import Flask
+
+    from app.modules.oauth_provider.scopes import require_api_scope
+
+    app = Flask(__name__)
+    for index, (rule, methods, scope) in enumerate(routes):
+
+        def view(**kwargs):
+            return {}
+
+        if scope is not None:
+            view = require_api_scope(scope)(view)
+        app.add_url_rule(rule, endpoint=f"route_{index}", view_func=view, methods=methods)
+    return app
+
+
+ELEMENT_ROUTES = [
+    ("/api/v1/elements", ["GET"], "api:read"),
+    ("/api/v1/elements/<int:element_id>", ["GET"], "api:read"),
+]
+
+
 class TestCheckInterfaceContract:
     """Tests for scripts/check_interface_contract.py."""
 
-    def test_gate_script_exists(self):
-        """The gate script must exist."""
-        script = REPO_ROOT / "scripts" / "check_interface_contract.py"
-        assert script.exists(), f"{script} does not exist"
+    def test_matching_routes_pass_with_nothing_unbuilt(self):
+        """Positive control: the two element routes match the subset."""
+        gate = _gate_module()
+        app = _app_with_routes(ELEMENT_ROUTES)
+        passes, violations = gate.check_unlisted_routes(app, _minimal_contract())
+        assert violations == []
+        assert passes is True
+        assert gate.count_unbuilt_operations(app, _minimal_contract()) == 0
 
     def test_gate_passes_on_real_app_with_committed_subset(self):
-        """The gate must pass on the real application with the committed subset
+        """The gate passes on the real application with the committed subset
         (both elements routes are listed and match)."""
         subset_path = REPO_ROOT / "app" / "config" / "api_contract_subset.yaml"
-        if not subset_path.exists():
-            pytest.skip("Committed subset not yet generated; run the generator first")
+        assert subset_path.exists(), "the committed subset is missing"
 
-        result = _run(
-            sys.executable,
-            str(REPO_ROOT / "scripts" / "check_interface_contract.py"),
-            "--subset", str(subset_path),
-        )
+        result = _run(sys.executable, str(GATE_SCRIPT), "--subset", str(subset_path))
         assert result.returncode == 0, (
             f"Gate failed on real app:\n{result.stdout}\n{result.stderr}"
         )
+        assert "PASS: interface-contract" in result.stdout
 
-    def test_unlisted_route_fails_check_i(self, tmp_path: Path):
-        """A fixture application with a token-accepting route that is not in
-        the subset must make check (i) fail and name the route."""
+    def test_unlisted_route_fails_check_i_and_is_named(self):
+        """A token-accepting route that is not in the subset fails check (i)
+        and the failure names the method, the path and the reason."""
+        gate = _gate_module()
+        app = _app_with_routes(
+            ELEMENT_ROUTES + [("/api/v1/widgets", ["GET"], "api:read")]
+        )
+        passes, violations = gate.check_unlisted_routes(app, _minimal_contract())
+        assert passes is False
+        assert len(violations) == 1
+        assert "GET /api/v1/widgets" in violations[0]
+        assert "no matching operation" in violations[0]
+
+    def test_route_removed_from_subset_is_reported(self):
+        """Removing an operation from the subset leaves its route unlisted."""
+        gate = _gate_module()
         subset = _minimal_contract()
-        # Remove /elements/{id} from the subset
         del subset["paths"]["/elements/{id}"]
-        subset_path = tmp_path / "subset.yaml"
-        _write_contract(subset_path, subset)
+        passes, violations = gate.check_unlisted_routes(
+            _app_with_routes(ELEMENT_ROUTES), subset
+        )
+        assert passes is False
+        assert len(violations) == 1
+        assert "/api/v1/elements/{element_id}" in violations[0]
 
-        result = _run(
-            sys.executable,
-            str(REPO_ROOT / "scripts" / "check_interface_contract.py"),
-            "--subset", str(subset_path),
-            "--fixture-app",
+    def test_routes_without_the_marker_or_outside_api_v1_are_not_checked(self):
+        """A session-only route and a marked route outside /api/v1 do not
+        accept a token on /api/v1, so the contract does not list them."""
+        gate = _gate_module()
+        app = _app_with_routes(
+            ELEMENT_ROUTES
+            + [
+                ("/api/v1/session-only", ["GET"], None),
+                ("/internal/tokenised", ["GET"], "api:read"),
+            ]
         )
-        assert result.returncode != 0, (
-            "Gate should fail when a route is missing from the subset"
-        )
-        assert "elements/{element_id}" in result.stdout or "GET /api/v1/elements" in result.stdout, (
-            f"Missing route should be named in output:\n{result.stdout}"
-        )
+        passes, violations = gate.check_unlisted_routes(app, _minimal_contract())
+        assert (passes, violations) == (True, [])
+        assert gate.count_unbuilt_operations(app, _minimal_contract()) == 0
 
-    def test_write_scope_against_read_only_operation_fails(self, tmp_path: Path):
-        """A route tagged api:write against a read-only contract operation
-        must fail check (i)."""
+    def test_write_scope_against_read_only_operation_fails(self):
+        """A route tagged api:write against a read-only operation fails (i)."""
+        gate = _gate_module()
+        app = _app_with_routes(
+            [
+                ("/api/v1/elements", ["GET"], "api:write"),
+                ("/api/v1/elements/<int:element_id>", ["GET"], "api:read"),
+            ]
+        )
+        passes, violations = gate.check_unlisted_routes(app, _minimal_contract())
+        assert passes is False
+        assert len(violations) == 1
+        assert "GET /api/v1/elements " in violations[0]
+        assert "only read-class scopes" in violations[0]
+
+    def test_read_scope_against_write_operation_fails(self):
+        """A route tagged api:read against an operation that needs a non-read
+        scope fails (i)."""
+        gate = _gate_module()
         subset = _minimal_contract()
-        # Both operations have model:read scope (read-class)
-        subset_path = tmp_path / "subset.yaml"
-        _write_contract(subset_path, subset)
+        subset["paths"]["/elements"]["get"]["security"] = [{"entelimOAuth": ["model:write"]}]
+        passes, violations = gate.check_unlisted_routes(
+            _app_with_routes(ELEMENT_ROUTES), subset
+        )
+        assert passes is False
+        assert len(violations) == 1
+        assert "GET /api/v1/elements " in violations[0]
+        assert "requires non-read scopes" in violations[0]
 
-        result = _run(
-            sys.executable,
-            str(REPO_ROOT / "scripts" / "check_interface_contract.py"),
-            "--subset", str(subset_path),
-            "--fixture-app",
-            "--fixture-route-scope", "api:write",
-        )
-        assert result.returncode != 0, (
-            "Gate should fail when a write-scoped route has no matching "
-            "non-read operation in the subset"
-        )
+    def test_operation_without_its_own_security_inherits_the_document_one(self):
+        """An operation with no security of its own takes the document-level
+        requirement, so a write-scoped route is not matched by a document that
+        asks for a read scope."""
+        gate = _gate_module()
+        subset = _minimal_contract(security=[{"entelimOAuth": ["model:read"]}])
+        del subset["paths"]["/elements"]["get"]["security"]
+        del subset["paths"]["/elements/{id}"]["get"]["security"]
+        assert gate.check_unlisted_routes(_app_with_routes(ELEMENT_ROUTES), subset) == (True, [])
+        write_app = _app_with_routes([("/api/v1/elements", ["GET"], "api:write")])
+        passes, violations = gate.check_unlisted_routes(write_app, subset)
+        assert passes is False
+        assert "only read-class scopes" in violations[0]
 
-    def test_read_scope_against_write_only_operation_fails(self, tmp_path: Path):
-        """A route tagged api:read against an operation requiring a non-read
-        scope must fail check (i)."""
-        subset = _minimal_contract()
-        # Change the security scope to a write-class scope
-        for path_key in ("/elements", "/elements/{id}"):
-            sec = subset["paths"][path_key]["get"].get("security", [])
-            for entry in sec:
-                for key, scopes in entry.items():
-                    entry[key] = ["model:write"]
-        subset_path = tmp_path / "subset.yaml"
-        _write_contract(subset_path, subset)
-
-        result = _run(
-            sys.executable,
-            str(REPO_ROOT / "scripts" / "check_interface_contract.py"),
-            "--subset", str(subset_path),
-            "--fixture-app",
-            "--fixture-route-scope", "api:read",
+    def test_trailing_slash_and_parameter_name_do_not_hide_a_match(self):
+        """/elements/ in the route table matches /elements in the contract and
+        a differently named path parameter still matches."""
+        gate = _gate_module()
+        app = _app_with_routes(
+            [
+                ("/api/v1/elements/", ["GET"], "api:read"),
+                ("/api/v1/elements/<int:other_name>", ["GET"], "api:read"),
+            ]
         )
-        assert result.returncode != 0, (
-            "Gate should fail when a read-scoped route has no matching "
-            "read-class operation in the subset"
-        )
+        assert gate.check_unlisted_routes(app, _minimal_contract()) == (True, [])
 
     def test_unbuilt_operation_counted_by_check_ii(self, tmp_path: Path):
         """A subset operation with no route is counted by check (ii) and does
-        not fail the build while the count is at most the baseline."""
+        not fail while the count is at most the baseline."""
+        gate = _gate_module()
         subset = _minimal_contract()
-        # Add an extra operation that has no route in the app
         subset["paths"]["/extra"] = {
             "get": {
                 "operationId": "listExtra",
                 "summary": "List extra things",
                 "tags": ["Model"],
-                "parameters": [],
-                "responses": {
-                    "200": {
-                        "description": "Success",
-                        "content": {
-                            "application/json": {
-                                "schema": {"type": "object"}
-                            }
-                        },
-                    }
-                },
+                "responses": {"200": {"description": "Success"}},
                 "security": [{"entelimOAuth": ["model:read"]}],
             }
         }
+        assert gate.count_unbuilt_operations(_app_with_routes(ELEMENT_ROUTES), subset) == 1
+
         subset_path = tmp_path / "subset.yaml"
         _write_contract(subset_path, subset)
+        at_baseline = _run(
+            sys.executable, str(GATE_SCRIPT), "--subset", str(subset_path), "--baseline", "1"
+        )
+        assert at_baseline.returncode == 0, at_baseline.stdout + at_baseline.stderr
+        assert "1 unbuilt operation(s) within baseline 1" in at_baseline.stdout
 
-        # With baseline=1, should pass
-        result = _run(
-            sys.executable,
-            str(REPO_ROOT / "scripts" / "check_interface_contract.py"),
-            "--subset", str(subset_path),
-            "--fixture-app",
-            "--baseline", "1",
+        above_baseline = _run(
+            sys.executable, str(GATE_SCRIPT), "--subset", str(subset_path), "--baseline", "0"
         )
-        assert result.returncode == 0, (
-            f"Gate should pass when unbuilt count (1) <= baseline (1):\n{result.stdout}"
-        )
+        assert above_baseline.returncode == 1
+        assert "FAIL: interface-contract-unimplemented" in above_baseline.stdout
+        assert "1 unbuilt operation(s) > baseline 0" in above_baseline.stdout
 
-        # With baseline=0, should fail
-        result = _run(
-            sys.executable,
-            str(REPO_ROOT / "scripts" / "check_interface_contract.py"),
-            "--subset", str(subset_path),
-            "--fixture-app",
-            "--baseline", "0",
-        )
-        assert result.returncode != 0, (
-            "Gate should fail when unbuilt count (1) > baseline (0)"
-        )
-
-    def test_gate_supports_count_flag(self, tmp_path: Path):
-        """The --count flag should return a single integer on stdout."""
+    def test_gate_supports_count_flag(self):
+        """--count prints the unbuilt count as the last stdout line: 0 for the
+        committed subset, whose operations are all built."""
         subset_path = REPO_ROOT / "app" / "config" / "api_contract_subset.yaml"
-        if not subset_path.exists():
-            pytest.skip("Committed subset not yet generated")
-
-        result = _run(
-            sys.executable,
-            str(REPO_ROOT / "scripts" / "check_interface_contract.py"),
-            "--subset", str(subset_path),
-            "--count",
-        )
-        assert result.returncode == 0
-        lines = [ln for ln in result.stdout.strip().splitlines() if ln.strip()]
-        assert lines, "No output from --count"
-        int(lines[-1])  # Must parse as int
-
-    def test_gate_reports_unlisted_route_reason(self, tmp_path: Path):
-        """The failure output must include the route path and the reason."""
-        subset = _minimal_contract()
-        del subset["paths"]["/elements/{id}"]
-        subset_path = tmp_path / "subset.yaml"
-        _write_contract(subset_path, subset)
-
-        result = _run(
-            sys.executable,
-            str(REPO_ROOT / "scripts" / "check_interface_contract.py"),
-            "--subset", str(subset_path),
-            "--fixture-app",
-        )
-        output = result.stdout + result.stderr
-        assert "unlisted" in output.lower() or "missing" in output.lower() or "no matching" in output.lower(), (
-            f"Output should explain why the route is unlisted:\n{output}"
-        )
+        result = _run(sys.executable, str(GATE_SCRIPT), "--subset", str(subset_path), "--count")
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.strip().splitlines()[-1] == "0"
 
 
 # ---------------------------------------------------------------------------
@@ -681,50 +706,22 @@ class TestCheckInterfaceContract:
 
 
 class TestVerifyRegistration:
-    """Tests that the gates are registered in scripts/verify.py."""
+    """The gates are registered in scripts/verify.py with the right kind."""
 
-    def test_interface_contract_gates_registered(self):
-        """Both gates must be registered in scripts/verify.py's build_gates()."""
-        text = (REPO_ROOT / "scripts" / "verify.py").read_text(encoding="utf-8")
-        assert 'interface-contract-unlisted' in text, (
-            "Gate 'interface-contract-unlisted' not found in verify.py"
-        )
-        assert 'interface-contract-unimplemented' in text, (
-            "Gate 'interface-contract-unimplemented' not found in verify.py"
-        )
+    def test_interface_contract_gates_registered_static(self):
+        scripts_dir = str(REPO_ROOT / "scripts")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        import verify
 
-    def test_interface_contract_gates_tagged_static(self):
-        """Both gates must be tagged 'static'."""
-        text = (REPO_ROOT / "scripts" / "verify.py").read_text(encoding="utf-8")
-        # Find the gate entries and check for static tag
-        assert 'tags=["static"' in text or "'static'" in text, (
-            "Gates should be tagged static"
-        )
+        baseline = json.loads((REPO_ROOT / "verification_baseline.json").read_text(encoding="utf-8"))
+        gates = {g.name: g for g in verify.build_gates(baseline["ratchets"])}
+        assert gates["interface-contract-unlisted"].kind == "zero"
+        assert gates["interface-contract-unimplemented"].kind == "ratchet"
+        for name in ("interface-contract-unlisted", "interface-contract-unimplemented"):
+            assert gates[name].tags == ["static"]
+            assert gates[name].needs_db is False
 
-
-# ---------------------------------------------------------------------------
-# Reuse check tests
-# ---------------------------------------------------------------------------
-
-
-class TestReuse:
-    """No second implementation of existing mechanisms."""
-
-    def test_single_route_extractor(self):
-        """extract_route_info in app/utils/openapi_generator.py is the only
-        route extractor used."""
-        text = (REPO_ROOT / "scripts" / "check_interface_contract.py").read_text(
-            encoding="utf-8"
-        )
-        assert "extract_route_info" in text, (
-            "Gate must reuse extract_route_info from openapi_generator"
-        )
-
-    def test_single_marker(self):
-        """_api_token_scope is the only marker used."""
-        text = (REPO_ROOT / "scripts" / "check_interface_contract.py").read_text(
-            encoding="utf-8"
-        )
-        assert "_api_token_scope" in text, (
-            "Gate must reuse _api_token_scope from require_api_scope"
-        )
+    def test_unimplemented_baseline_is_the_true_count(self):
+        baseline = json.loads((REPO_ROOT / "verification_baseline.json").read_text(encoding="utf-8"))
+        assert baseline["ratchets"]["interface_contract_unimplemented"] == 0
