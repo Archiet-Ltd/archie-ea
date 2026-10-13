@@ -8,10 +8,15 @@ Reuse
 -----
 * ``ComplianceRequirement`` (``app.models.compliance_models``) — the one
   requirement model, no second store.
-* ``RegulatoryFramework`` — the EU AI Act framework carries the per-class
-  obligation templates as ``ComplianceControl`` rows linked to requirements.
 * Evidence fields on ``ComplianceRequirement`` (``evidence_location``,
   ``last_verified_at``, ``implementation_status``) — no second evidence model.
+
+The EU AI Act ``RegulatoryFramework`` rows are NOT read here: the framework
+seed data (``RegulatoryFrameworkService``) contains no EU AI Act framework and
+no per-risk-class obligation controls, so there is no framework control list to
+reuse. The class->obligation template map below is the single source of the
+mapping. If per-class framework rows are ever seeded, the map should be read
+from them instead of this module.
 """
 
 from __future__ import annotations
@@ -30,9 +35,10 @@ RISK_CLASSES = ("unacceptable", "high", "limited", "minimal")
 # met for a system classified at each tier. They are stored as
 # ComplianceRequirement rows when the classification is accepted.
 #
-# The source is the EU AI Act RegulatoryFramework: we use the framework's own
-# control set rather than a second template list. Each risk class maps to a
-# set of control codes that produce ComplianceRequirement rows.
+# This dictionary IS the source of the class -> obligation mapping; it is not
+# read from RegulatoryFramework rows because no framework seed on this branch
+# carries an EU AI Act framework or per-risk-class obligation controls. When
+# such rows exist, read them instead (the mapping must have one source).
 CLASS_OBLIGATIONS = {
     "high": [
         {
