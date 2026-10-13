@@ -1,0 +1,3395 @@
+{
+ "comment": "Per-file run time of the backend tests, used by scripts/ci/test_sharding.py to balance the eight pytest shards. Regenerate with scripts/ci/update_shard_durations.py.",
+ "generated_at": "2026-10-13T19:13Z",
+ "source_runs": [
+  "38441287981",
+  "38439758466"
+ ],
+ "default_seconds_per_test": 0.36,
+ "files": {
+  "app/modules/account/tests/test_account.py": {
+   "seconds": 5.33,
+   "tests": 27
+  },
+  "app/modules/account/tests/test_account_routes.py": {
+   "seconds": 5.15,
+   "tests": 18
+  },
+  "app/modules/account/tests/test_account_v2.py": {
+   "seconds": 7.63,
+   "tests": 26
+  },
+  "app/modules/admin/tests/test_admin.py": {
+   "seconds": 0.19,
+   "tests": 22
+  },
+  "app/modules/admin/tests/test_admin_v2.py": {
+   "seconds": 0.24,
+   "tests": 32
+  },
+  "app/modules/ai_chat/tests/test_ai_chat.py": {
+   "seconds": 4.76,
+   "tests": 19
+  },
+  "app/modules/ai_chat/tests/test_ai_chat_v2.py": {
+   "seconds": 0.22,
+   "tests": 38
+  },
+  "app/modules/ai_chat/tests/test_copilot_tools.py": {
+   "seconds": 0.31,
+   "tests": 14
+  },
+  "app/modules/applications/tests/test_applications.py": {
+   "seconds": 4.47,
+   "tests": 31
+  },
+  "app/modules/architecture/tests/test_architecture.py": {
+   "seconds": 15.5,
+   "tests": 21
+  },
+  "app/modules/capabilities/tests/test_capabilities.py": {
+   "seconds": 8.93,
+   "tests": 24
+  },
+  "app/modules/capabilities/tests/test_maturity_read_helper.py": {
+   "seconds": 3.9,
+   "tests": 18
+  },
+  "app/modules/dashboard/tests/test_dashboard.py": {
+   "seconds": 5.43,
+   "tests": 7
+  },
+  "app/modules/dashboard/tests/test_dashboard_v2.py": {
+   "seconds": 0.52,
+   "tests": 43
+  },
+  "app/modules/duplicate_detection/tests/test_dedupe_v2.py": {
+   "seconds": 0.24,
+   "tests": 42
+  },
+  "app/modules/duplicate_detection/tests/test_duplicate_detection.py": {
+   "seconds": 4.88,
+   "tests": 6
+  },
+  "app/modules/governance/tests/test_governance.py": {
+   "seconds": 5.17,
+   "tests": 13
+  },
+  "app/modules/governance/tests/test_governance_v2.py": {
+   "seconds": 0.22,
+   "tests": 35
+  },
+  "app/modules/import_batch/tests/test_import_batch.py": {
+   "seconds": 5.6,
+   "tests": 13
+  },
+  "app/modules/import_batch/tests/test_import_batch_v2.py": {
+   "seconds": 0.24,
+   "tests": 38
+  },
+  "app/modules/intelligence/tests/test_accountability_for_element.py": {
+   "seconds": 2.08,
+   "tests": 3
+  },
+  "app/modules/intelligence/tests/test_api_routes.py": {
+   "seconds": 16.99,
+   "tests": 47
+  },
+  "app/modules/intelligence/tests/test_capability_projection_job.py": {
+   "seconds": 7.4,
+   "tests": 9
+  },
+  "app/modules/intelligence/tests/test_compliance_for_element.py": {
+   "seconds": 5.68,
+   "tests": 12
+  },
+  "app/modules/intelligence/tests/test_connector_allowlist.py": {
+   "seconds": 3.91,
+   "tests": 17
+  },
+  "app/modules/intelligence/tests/test_crosswalk_service.py": {
+   "seconds": 3.23,
+   "tests": 4
+  },
+  "app/modules/intelligence/tests/test_data_for_element.py": {
+   "seconds": 1.31,
+   "tests": 11
+  },
+  "app/modules/intelligence/tests/test_derivation_engine.py": {
+   "seconds": 0.14,
+   "tests": 24
+  },
+  "app/modules/intelligence/tests/test_derivation_run_record.py": {
+   "seconds": 2.93,
+   "tests": 13
+  },
+  "app/modules/intelligence/tests/test_derivation_runner.py": {
+   "seconds": 2.52,
+   "tests": 4
+  },
+  "app/modules/intelligence/tests/test_derivation_runner_persist.py": {
+   "seconds": 3.99,
+   "tests": 4
+  },
+  "app/modules/intelligence/tests/test_derived_relationship_schema.py": {
+   "seconds": 5.36,
+   "tests": 7
+  },
+  "app/modules/intelligence/tests/test_explanation.py": {
+   "seconds": 6.78,
+   "tests": 8
+  },
+  "app/modules/intelligence/tests/test_finder_delegation.py": {
+   "seconds": 5.77,
+   "tests": 8
+  },
+  "app/modules/intelligence/tests/test_impact_maturity.py": {
+   "seconds": 4.43,
+   "tests": 11
+  },
+  "app/modules/intelligence/tests/test_impact_route.py": {
+   "seconds": 6.05,
+   "tests": 13
+  },
+  "app/modules/intelligence/tests/test_invalidation.py": {
+   "seconds": 2.69,
+   "tests": 17
+  },
+  "app/modules/intelligence/tests/test_matcher_service.py": {
+   "seconds": 4.24,
+   "tests": 14
+  },
+  "app/modules/intelligence/tests/test_maturity_authority_readers.py": {
+   "seconds": 8.31,
+   "tests": 13
+  },
+  "app/modules/intelligence/tests/test_module_registration.py": {
+   "seconds": 0.02,
+   "tests": 3
+  },
+  "app/modules/intelligence/tests/test_one_impact_engine.py": {
+   "seconds": 31.57,
+   "tests": 8
+  },
+  "app/modules/intelligence/tests/test_plain_terms.py": {
+   "seconds": 6.95,
+   "tests": 71
+  },
+  "app/modules/intelligence/tests/test_portfolio_component_block.py": {
+   "seconds": 5.05,
+   "tests": 22
+  },
+  "app/modules/intelligence/tests/test_portfolio_component_for_element.py": {
+   "seconds": 0.74,
+   "tests": 5
+  },
+  "app/modules/intelligence/tests/test_programme_for_element.py": {
+   "seconds": 3.18,
+   "tests": 11
+  },
+  "app/modules/intelligence/tests/test_programme_plateau_gap.py": {
+   "seconds": 7.23,
+   "tests": 19
+  },
+  "app/modules/intelligence/tests/test_query_service.py": {
+   "seconds": 5.4,
+   "tests": 19
+  },
+  "app/modules/intelligence/tests/test_query_service_elements_map.py": {
+   "seconds": 12.97,
+   "tests": 34
+  },
+  "app/modules/intelligence/tests/test_reason_codes.py": {
+   "seconds": 0.28,
+   "tests": 52
+  },
+  "app/modules/intelligence/tests/test_recompute_job.py": {
+   "seconds": 1.78,
+   "tests": 9
+  },
+  "app/modules/intelligence/tests/test_risk_for_element.py": {
+   "seconds": 1.24,
+   "tests": 7
+  },
+  "app/modules/intelligence/tests/test_strategy_capability_maturity.py": {
+   "seconds": 1.67,
+   "tests": 5
+  },
+  "app/modules/intelligence/tests/test_strategy_for_element.py": {
+   "seconds": 2.1,
+   "tests": 11
+  },
+  "app/modules/intelligence/tests/test_ui_routes.py": {
+   "seconds": 15.98,
+   "tests": 61
+  },
+  "app/modules/intelligence/tests/test_value_streams_at_risk.py": {
+   "seconds": 15.3,
+   "tests": 42
+  },
+  "app/modules/intelligence/tests/test_value_streams_at_risk_page.py": {
+   "seconds": 10.7,
+   "tests": 21
+  },
+  "app/modules/intelligence/tests/test_yield_endpoint.py": {
+   "seconds": 12.19,
+   "tests": 19
+  },
+  "app/modules/monitoring/tests/test_health.py": {
+   "seconds": 7.9,
+   "tests": 19
+  },
+  "app/modules/oauth_provider/tests/test_mcp_flag.py": {
+   "seconds": 0.25,
+   "tests": 2
+  },
+  "app/modules/solutions_strategic/tests/test_solutions_strategic.py": {
+   "seconds": 4.38,
+   "tests": 6
+  },
+  "app/modules/vendors/tests/test_vendors.py": {
+   "seconds": 4.1,
+   "tests": 30
+  },
+  "tests/csp/test_csp_evaluator.py": {
+   "seconds": 46.84,
+   "tests": 4
+  },
+  "tests/journeys/test_journey_ai_chat_opens_at_greeting.py": {
+   "seconds": 55.27,
+   "tests": 10
+  },
+  "tests/journeys/test_journey_arb_member.py": {
+   "seconds": 14.01,
+   "tests": 3
+  },
+  "tests/journeys/test_journey_architecture_dashboard_labels.py": {
+   "seconds": 36.4,
+   "tests": 12
+  },
+  "tests/journeys/test_journey_architecture_journey_stage_feedback.py": {
+   "seconds": 7.92,
+   "tests": 2
+  },
+  "tests/journeys/test_journey_business_architect.py": {
+   "seconds": 10.13,
+   "tests": 3
+  },
+  "tests/journeys/test_journey_capability_search.py": {
+   "seconds": 13.36,
+   "tests": 3
+  },
+  "tests/journeys/test_journey_close_and_decide.py": {
+   "seconds": 8.98,
+   "tests": 4
+  },
+  "tests/journeys/test_journey_cto.py": {
+   "seconds": 9.27,
+   "tests": 4
+  },
+  "tests/journeys/test_journey_data_architect_stewardship.py": {
+   "seconds": 7.02,
+   "tests": 2
+  },
+  "tests/journeys/test_journey_enterprise_architect.py": {
+   "seconds": 4.7,
+   "tests": 2
+  },
+  "tests/journeys/test_journey_gap_link_plateau.py": {
+   "seconds": 5.84,
+   "tests": 1
+  },
+  "tests/journeys/test_journey_gap_to_work_package.py": {
+   "seconds": 9.26,
+   "tests": 4
+  },
+  "tests/journeys/test_journey_impact_analysis_breadcrumb.py": {
+   "seconds": 8.44,
+   "tests": 1
+  },
+  "tests/journeys/test_journey_new_solution_button.py": {
+   "seconds": 6.25,
+   "tests": 3
+  },
+  "tests/journeys/test_journey_persona_crud.py": {
+   "seconds": 9.37,
+   "tests": 10
+  },
+  "tests/journeys/test_journey_persona_modules.py": {
+   "seconds": 15.34,
+   "tests": 13
+  },
+  "tests/journeys/test_journey_persona_sections.py": {
+   "seconds": 6.17,
+   "tests": 7
+  },
+  "tests/journeys/test_journey_platform_admin.py": {
+   "seconds": 5.32,
+   "tests": 2
+  },
+  "tests/journeys/test_journey_portfolio_manager.py": {
+   "seconds": 6.7,
+   "tests": 4
+  },
+  "tests/journeys/test_journey_procurement.py": {
+   "seconds": 6.17,
+   "tests": 3
+  },
+  "tests/journeys/test_journey_risk_register.py": {
+   "seconds": 5.06,
+   "tests": 2
+  },
+  "tests/journeys/test_journey_security_and_data_architect.py": {
+   "seconds": 8.25,
+   "tests": 6
+  },
+  "tests/journeys/test_journey_sidebar_search_link_level.py": {
+   "seconds": 5.57,
+   "tests": 8
+  },
+  "tests/journeys/test_journey_sidebar_search_rendered.py": {
+   "seconds": 16.16,
+   "tests": 9
+  },
+  "tests/journeys/test_journey_sidebar_visible_area.py": {
+   "seconds": 26.28,
+   "tests": 19
+  },
+  "tests/journeys/test_journey_solution_architect.py": {
+   "seconds": 9.21,
+   "tests": 4
+  },
+  "tests/journeys/test_journey_solution_blueprint_tool.py": {
+   "seconds": 6.52,
+   "tests": 2
+  },
+  "tests/journeys/test_journey_vendor_catalogue_layout.py": {
+   "seconds": 45.27,
+   "tests": 13
+  },
+  "tests/journeys/test_login_registers_a_session.py": {
+   "seconds": 6.03,
+   "tests": 2
+  },
+  "tests/test_a05_prompt_version_history.py": {
+   "seconds": 4.84,
+   "tests": 3
+  },
+  "tests/test_aabl_migrate_genome.py": {
+   "seconds": 0.03,
+   "tests": 6
+  },
+  "tests/test_abacus_admin_routes_platform_admin.py": {
+   "seconds": 11.43,
+   "tests": 15
+  },
+  "tests/test_abacus_sync_job_lock.py": {
+   "seconds": 4.09,
+   "tests": 2
+  },
+  "tests/test_account_mail_flows.py": {
+   "seconds": 52.25,
+   "tests": 27
+  },
+  "tests/test_account_v2_sso_callback_audit_fix.py": {
+   "seconds": 2.95,
+   "tests": 1
+  },
+  "tests/test_action_tools.py": {
+   "seconds": 5.25,
+   "tests": 14
+  },
+  "tests/test_adm_phase_apis.py": {
+   "seconds": 3.13,
+   "tests": 8
+  },
+  "tests/test_adm_phase_viewpoints.py": {
+   "seconds": 5.36,
+   "tests": 6
+  },
+  "tests/test_admin_and_cost_consolidation.py": {
+   "seconds": 13.21,
+   "tests": 30
+  },
+  "tests/test_admin_change_account_type_preselect.py": {
+   "seconds": 2.04,
+   "tests": 3
+  },
+  "tests/test_admin_mfa_bypass_boot_guard.py": {
+   "seconds": 6.17,
+   "tests": 7
+  },
+  "tests/test_admin_nav_offers_only_permitted_links.py": {
+   "seconds": 9.13,
+   "tests": 7
+  },
+  "tests/test_admin_org_member_idor.py": {
+   "seconds": 46.3,
+   "tests": 46
+  },
+  "tests/test_admin_rbac_active_org_enforcement.py": {
+   "seconds": 54.99,
+   "tests": 4
+  },
+  "tests/test_admin_route_authorisation.py": {
+   "seconds": 3.5,
+   "tests": 2
+  },
+  "tests/test_admin_security_page_landmark.py": {
+   "seconds": 2.56,
+   "tests": 2
+  },
+  "tests/test_admin_session_limits.py": {
+   "seconds": 2.64,
+   "tests": 4
+  },
+  "tests/test_adr0003_tenancy_matrix.py": {
+   "seconds": 1.66,
+   "tests": 88
+  },
+  "tests/test_adr_service_tenancy.py": {
+   "seconds": 0.15,
+   "tests": 3
+  },
+  "tests/test_adversarial_ci_execution.py": {
+   "seconds": 0.22,
+   "tests": 3
+  },
+  "tests/test_agent_charter_and_run_records.py": {
+   "seconds": 8.45,
+   "tests": 20
+  },
+  "tests/test_agent_oversight_pause.py": {
+   "seconds": 1.56,
+   "tests": 9
+  },
+  "tests/test_agent_oversight_routes.py": {
+   "seconds": 5.08,
+   "tests": 15
+  },
+  "tests/test_agent_registry.py": {
+   "seconds": 1.1,
+   "tests": 12
+  },
+  "tests/test_aggregate_answers.py": {
+   "seconds": 1.88,
+   "tests": 21
+  },
+  "tests/test_ai_approval_handoff.py": {
+   "seconds": 3.27,
+   "tests": 11
+  },
+  "tests/test_ai_arb_submission_convergence.py": {
+   "seconds": 1.36,
+   "tests": 12
+  },
+  "tests/test_ai_chat_approval_execute.py": {
+   "seconds": 4.12,
+   "tests": 1
+  },
+  "tests/test_ai_chat_citations.py": {
+   "seconds": 3.49,
+   "tests": 25
+  },
+  "tests/test_ai_chat_context.py": {
+   "seconds": 2.42,
+   "tests": 20
+  },
+  "tests/test_ai_chat_feedback_tenancy.py": {
+   "seconds": 0.38,
+   "tests": 4
+  },
+  "tests/test_ai_chat_memory.py": {
+   "seconds": 0.06,
+   "tests": 11
+  },
+  "tests/test_ai_chat_models.py": {
+   "seconds": 0.11,
+   "tests": 13
+  },
+  "tests/test_ai_chat_no_provider_admin_state.py": {
+   "seconds": 4.62,
+   "tests": 7
+  },
+  "tests/test_ai_chat_opening_screen.py": {
+   "seconds": 0.04,
+   "tests": 8
+  },
+  "tests/test_ai_chat_persona_charter.py": {
+   "seconds": 3.08,
+   "tests": 20
+  },
+  "tests/test_ai_chat_persona_config.py": {
+   "seconds": 4.98,
+   "tests": 24
+  },
+  "tests/test_ai_chat_shell.py": {
+   "seconds": 6.02,
+   "tests": 19
+  },
+  "tests/test_ai_chat_stream_error.py": {
+   "seconds": 7.62,
+   "tests": 3
+  },
+  "tests/test_ai_chat_stream_errors.py": {
+   "seconds": 0.94,
+   "tests": 2
+  },
+  "tests/test_ai_chat_submit_entrypoints.py": {
+   "seconds": 18.54,
+   "tests": 12
+  },
+  "tests/test_ai_chat_tenancy.py": {
+   "seconds": 3.86,
+   "tests": 4
+  },
+  "tests/test_ai_chat_tool_counts.py": {
+   "seconds": 0.06,
+   "tests": 10
+  },
+  "tests/test_ai_context_lifecycle.py": {
+   "seconds": 55.27,
+   "tests": 45
+  },
+  "tests/test_ai_endpoints_bounded.py": {
+   "seconds": 8.09,
+   "tests": 8
+  },
+  "tests/test_ai_eval_harness.py": {
+   "seconds": 0.65,
+   "tests": 4
+  },
+  "tests/test_ai_insight_metrics.py": {
+   "seconds": 4.99,
+   "tests": 12
+  },
+  "tests/test_ai_model_selector_display.py": {
+   "seconds": 38.86,
+   "tests": 30
+  },
+  "tests/test_ai_prompt_duplicate_avoidance.py": {
+   "seconds": 0.33,
+   "tests": 5
+  },
+  "tests/test_ai_protocol_stub.py": {
+   "seconds": 9.79,
+   "tests": 9
+  },
+  "tests/test_ai_red_team_fence_escape.py": {
+   "seconds": 0.03,
+   "tests": 5
+  },
+  "tests/test_ai_system_release_gate.py": {
+   "seconds": 12.04,
+   "tests": 37
+  },
+  "tests/test_ai_wiring_ui.py": {
+   "seconds": 2.34,
+   "tests": 8
+  },
+  "tests/test_ai_write_approval.py": {
+   "seconds": 7.06,
+   "tests": 40
+  },
+  "tests/test_air_gap_runtime.py": {
+   "seconds": 3.09,
+   "tests": 11
+  },
+  "tests/test_analytics_consent.py": {
+   "seconds": 14.37,
+   "tests": 51
+  },
+  "tests/test_api_contract.py": {
+   "seconds": 9.88,
+   "tests": 5
+  },
+  "tests/test_api_token_migration.py": {
+   "seconds": 0.04,
+   "tests": 4
+  },
+  "tests/test_app_archimate_element.py": {
+   "seconds": 2.66,
+   "tests": 5
+  },
+  "tests/test_application_cost_accessor.py": {
+   "seconds": 7.43,
+   "tests": 66
+  },
+  "tests/test_application_delete_cascade.py": {
+   "seconds": 5.9,
+   "tests": 4
+  },
+  "tests/test_application_detail_shell.py": {
+   "seconds": 4.15,
+   "tests": 5
+  },
+  "tests/test_application_form_fields.py": {
+   "seconds": 1.82,
+   "tests": 2
+  },
+  "tests/test_application_import_csp.py": {
+   "seconds": 0.01,
+   "tests": 1
+  },
+  "tests/test_application_import_history.py": {
+   "seconds": 0.6,
+   "tests": 21
+  },
+  "tests/test_application_owner_writer.py": {
+   "seconds": 15.5,
+   "tests": 51
+  },
+  "tests/test_application_pattern_classifier_tenant.py": {
+   "seconds": 0.33,
+   "tests": 4
+  },
+  "tests/test_application_registration_check.py": {
+   "seconds": 6.78,
+   "tests": 14
+  },
+  "tests/test_application_technology_links.py": {
+   "seconds": 6.89,
+   "tests": 6
+  },
+  "tests/test_applications_area_qa_fixes.py": {
+   "seconds": 1.68,
+   "tests": 5
+  },
+  "tests/test_applications_list_shell.py": {
+   "seconds": 3.92,
+   "tests": 8
+  },
+  "tests/test_applications_portfolio_blockers.py": {
+   "seconds": 3.86,
+   "tests": 8
+  },
+  "tests/test_approval_governance.py": {
+   "seconds": 2.18,
+   "tests": 28
+  },
+  "tests/test_approval_inbox.py": {
+   "seconds": 4.0,
+   "tests": 12
+  },
+  "tests/test_approval_queue_consolidation.py": {
+   "seconds": 4.52,
+   "tests": 14
+  },
+  "tests/test_apqc_mapping_tenant_fence.py": {
+   "seconds": 11.56,
+   "tests": 29
+  },
+  "tests/test_arb_audit_mirror.py": {
+   "seconds": 0.34,
+   "tests": 2
+  },
+  "tests/test_arb_condition_event.py": {
+   "seconds": 4.27,
+   "tests": 13
+  },
+  "tests/test_arb_condition_evidence_contract.py": {
+   "seconds": 0.1,
+   "tests": 16
+  },
+  "tests/test_arb_condition_lifecycle_integration.py": {
+   "seconds": 11.03,
+   "tests": 3
+  },
+  "tests/test_arb_condition_lifecycle_service.py": {
+   "seconds": 0.12,
+   "tests": 20
+  },
+  "tests/test_arb_constraint_boot_safety.py": {
+   "seconds": 0.12,
+   "tests": 2
+  },
+  "tests/test_arb_create_review_config.py": {
+   "seconds": 1.35,
+   "tests": 4
+  },
+  "tests/test_arb_decision_authorization.py": {
+   "seconds": 0.24,
+   "tests": 1
+  },
+  "tests/test_arb_decision_event.py": {
+   "seconds": 10.13,
+   "tests": 9
+  },
+  "tests/test_arb_decision_governance.py": {
+   "seconds": 6.47,
+   "tests": 16
+  },
+  "tests/test_arb_decision_review_date.py": {
+   "seconds": 2.15,
+   "tests": 3
+  },
+  "tests/test_arb_ea_org_columns.py": {
+   "seconds": 0.14,
+   "tests": 29
+  },
+  "tests/test_arb_ea_tenant_isolation.py": {
+   "seconds": 0.72,
+   "tests": 7
+  },
+  "tests/test_arb_final_convergence.py": {
+   "seconds": 1.87,
+   "tests": 12
+  },
+  "tests/test_arb_form_data_adrs.py": {
+   "seconds": 6.89,
+   "tests": 1
+  },
+  "tests/test_arb_governance_ui_regressions.py": {
+   "seconds": 4.87,
+   "tests": 9
+  },
+  "tests/test_arb_qa_fixes.py": {
+   "seconds": 1.05,
+   "tests": 4
+  },
+  "tests/test_arb_queue_ai.py": {
+   "seconds": 5.21,
+   "tests": 21
+  },
+  "tests/test_arb_review_ai.py": {
+   "seconds": 0.83,
+   "tests": 5
+  },
+  "tests/test_arb_review_consolidation_acceptance.py": {
+   "seconds": 4.47,
+   "tests": 12
+  },
+  "tests/test_arb_shell.py": {
+   "seconds": 4.25,
+   "tests": 8
+  },
+  "tests/test_arb_status_chart_colors.py": {
+   "seconds": 0.05,
+   "tests": 7
+  },
+  "tests/test_arb_subject_adapters.py": {
+   "seconds": 7.46,
+   "tests": 22
+  },
+  "tests/test_arb_submission_entrypoints.py": {
+   "seconds": 1.6,
+   "tests": 12
+  },
+  "tests/test_arb_submission_event.py": {
+   "seconds": 72.87,
+   "tests": 18
+  },
+  "tests/test_arb_submission_service.py": {
+   "seconds": 13.37,
+   "tests": 13
+  },
+  "tests/test_arb_typed_adr_uses_live_decision_register.py": {
+   "seconds": 5.65,
+   "tests": 1
+  },
+  "tests/test_arb_waiver_expiry_batch_service.py": {
+   "seconds": 0.11,
+   "tests": 12
+  },
+  "tests/test_arb_waiver_expiry_scheduler.py": {
+   "seconds": 1.34,
+   "tests": 5
+  },
+  "tests/test_arch001_memory_telemetry.py": {
+   "seconds": 4.95,
+   "tests": 7
+  },
+  "tests/test_arch013_agent_status_contract.py": {
+   "seconds": 0.17,
+   "tests": 1
+  },
+  "tests/test_arch030_bulk_merge_or_skip.py": {
+   "seconds": 0.15,
+   "tests": 2
+  },
+  "tests/test_arch031_lifecycle_default.py": {
+   "seconds": 0.1,
+   "tests": 2
+  },
+  "tests/test_arch050_element_route_404.py": {
+   "seconds": 0.25,
+   "tests": 7
+  },
+  "tests/test_arch052_elements_pagination.py": {
+   "seconds": 0.99,
+   "tests": 4
+  },
+  "tests/test_arch064_payload_bounds.py": {
+   "seconds": 3.44,
+   "tests": 7
+  },
+  "tests/test_arch071_name_sanitization_coverage.py": {
+   "seconds": 0.01,
+   "tests": 2
+  },
+  "tests/test_arch126_traceability_report.py": {
+   "seconds": 0.68,
+   "tests": 3
+  },
+  "tests/test_archimate_backbone.py": {
+   "seconds": 2.69,
+   "tests": 7
+  },
+  "tests/test_archimate_backbone_sync.py": {
+   "seconds": 0.47,
+   "tests": 16
+  },
+  "tests/test_archimate_conformance_and_oef.py": {
+   "seconds": 4.71,
+   "tests": 32
+  },
+  "tests/test_archimate_dashboard_init_runtime.py": {
+   "seconds": 0.09,
+   "tests": 2
+  },
+  "tests/test_archimate_detail_display_fields.py": {
+   "seconds": 0.03,
+   "tests": 5
+  },
+  "tests/test_archimate_detail_external_ids.py": {
+   "seconds": 1.24,
+   "tests": 2
+  },
+  "tests/test_archimate_element_limit.py": {
+   "seconds": 0.49,
+   "tests": 28
+  },
+  "tests/test_archimate_element_patch.py": {
+   "seconds": 0.97,
+   "tests": 2
+  },
+  "tests/test_archimate_export_xml_escaping.py": {
+   "seconds": 0.01,
+   "tests": 1
+  },
+  "tests/test_archimate_impact_service_delegation.py": {
+   "seconds": 1.03,
+   "tests": 4
+  },
+  "tests/test_archimate_import_service.py": {
+   "seconds": 4.31,
+   "tests": 6
+  },
+  "tests/test_archimate_layer_casing.py": {
+   "seconds": 1.04,
+   "tests": 16
+  },
+  "tests/test_archimate_layer_nav.py": {
+   "seconds": 2.02,
+   "tests": 63
+  },
+  "tests/test_archimate_matrix_completeness.py": {
+   "seconds": 0.11,
+   "tests": 20
+  },
+  "tests/test_archimate_realization_targets.py": {
+   "seconds": 0.54,
+   "tests": 45
+  },
+  "tests/test_archimate_relationship_health_tenancy.py": {
+   "seconds": 0.17,
+   "tests": 1
+  },
+  "tests/test_archimate_relationship_normalizers.py": {
+   "seconds": 0.04,
+   "tests": 4
+  },
+  "tests/test_archimate_state.py": {
+   "seconds": 0.33,
+   "tests": 3
+  },
+  "tests/test_archimate_typed_field_create.py": {
+   "seconds": 0.66,
+   "tests": 4
+  },
+  "tests/test_archimate_validation_normalization.py": {
+   "seconds": 0.28,
+   "tests": 5
+  },
+  "tests/test_architecture_change_impact_service_tenancy.py": {
+   "seconds": 0.64,
+   "tests": 3
+  },
+  "tests/test_architecture_decision_elements.py": {
+   "seconds": 4.82,
+   "tests": 10
+  },
+  "tests/test_architecture_export_contract.py": {
+   "seconds": 0.09,
+   "tests": 18
+  },
+  "tests/test_architecture_export_database.py": {
+   "seconds": 0.29,
+   "tests": 2
+  },
+  "tests/test_architecture_export_json.py": {
+   "seconds": 0.67,
+   "tests": 1
+  },
+  "tests/test_architecture_export_response.py": {
+   "seconds": 0.07,
+   "tests": 4
+  },
+  "tests/test_architecture_journey_generalisation.py": {
+   "seconds": 3.49,
+   "tests": 12
+  },
+  "tests/test_architecture_journey_home.py": {
+   "seconds": 4.33,
+   "tests": 15
+  },
+  "tests/test_architecture_journey_hub_listing.py": {
+   "seconds": 3.73,
+   "tests": 8
+  },
+  "tests/test_architecture_journey_links_api.py": {
+   "seconds": 7.29,
+   "tests": 14
+  },
+  "tests/test_architecture_journey_workspace_ui_contract.py": {
+   "seconds": 0.03,
+   "tests": 5
+  },
+  "tests/test_architecture_repository_ui.py": {
+   "seconds": 0.14,
+   "tests": 9
+  },
+  "tests/test_architecture_route_500s.py": {
+   "seconds": 2.28,
+   "tests": 10
+  },
+  "tests/test_artefact_share.py": {
+   "seconds": 3.58,
+   "tests": 16
+  },
+  "tests/test_asset_cache_busting.py": {
+   "seconds": 0.6,
+   "tests": 10
+  },
+  "tests/test_audit_server_security.py": {
+   "seconds": 16.65,
+   "tests": 2
+  },
+  "tests/test_audit_trail_complete.py": {
+   "seconds": 5.72,
+   "tests": 13
+  },
+  "tests/test_auto_mapping_write_contract.py": {
+   "seconds": 0.6,
+   "tests": 10
+  },
+  "tests/test_availability_response_contracts.py": {
+   "seconds": 1.4,
+   "tests": 13
+  },
+  "tests/test_ba01_composer_autosave.py": {
+   "seconds": 1.9,
+   "tests": 5
+  },
+  "tests/test_ba02_maturity_frameworks_overview.py": {
+   "seconds": 1.92,
+   "tests": 4
+  },
+  "tests/test_ba12_framework_category_coverage.py": {
+   "seconds": 0.07,
+   "tests": 15
+  },
+  "tests/test_ba_tenant_and_authz.py": {
+   "seconds": 22.64,
+   "tests": 12
+  },
+  "tests/test_backbone_flush_listener.py": {
+   "seconds": 0.21,
+   "tests": 2
+  },
+  "tests/test_backbone_insert_ownership.py": {
+   "seconds": 0.43,
+   "tests": 51
+  },
+  "tests/test_backfill_arb_ea_tenancy.py": {
+   "seconds": 7.29,
+   "tests": 13
+  },
+  "tests/test_backfill_domain_elements.py": {
+   "seconds": 28.89,
+   "tests": 21
+  },
+  "tests/test_backfill_layer_tenancy_motivation_strategic.py": {
+   "seconds": 17.61,
+   "tests": 10
+  },
+  "tests/test_backfill_layer_tenancy_policy.py": {
+   "seconds": 10.33,
+   "tests": 8
+  },
+  "tests/test_backfill_layer_tenancy_roadmap_tasks.py": {
+   "seconds": 20.8,
+   "tests": 6
+  },
+  "tests/test_backfill_meaning_tenancy.py": {
+   "seconds": 0.14,
+   "tests": 3
+  },
+  "tests/test_backfill_review_queue_org.py": {
+   "seconds": 63.43,
+   "tests": 13
+  },
+  "tests/test_backfill_solution_risk_merge.py": {
+   "seconds": 1.92,
+   "tests": 4
+  },
+  "tests/test_background_mechanisms_gate.py": {
+   "seconds": 272.57,
+   "tests": 29
+  },
+  "tests/test_background_worker_tenancy.py": {
+   "seconds": 2.12,
+   "tests": 6
+  },
+  "tests/test_batch_import_history_api.py": {
+   "seconds": 0.28,
+   "tests": 17
+  },
+  "tests/test_batch_import_history_database.py": {
+   "seconds": 4.04,
+   "tests": 20
+  },
+  "tests/test_benchmark_scale_launcher.py": {
+   "seconds": 0.01,
+   "tests": 1
+  },
+  "tests/test_billing_access_control.py": {
+   "seconds": 32.04,
+   "tests": 11
+  },
+  "tests/test_billing_monelytics.py": {
+   "seconds": 4.96,
+   "tests": 20
+  },
+  "tests/test_billing_plans_and_checkout.py": {
+   "seconds": 29.59,
+   "tests": 37
+  },
+  "tests/test_blueprint_completeness.py": {
+   "seconds": 2.83,
+   "tests": 13
+  },
+  "tests/test_blueprint_composition_editor.py": {
+   "seconds": 14.18,
+   "tests": 14
+  },
+  "tests/test_blueprint_delete_confirmation.py": {
+   "seconds": 22.96,
+   "tests": 10
+  },
+  "tests/test_blueprint_governance_editor.py": {
+   "seconds": 14.46,
+   "tests": 13
+  },
+  "tests/test_blueprint_header_responsive.py": {
+   "seconds": 2.07,
+   "tests": 2
+  },
+  "tests/test_blueprint_name_collisions.py": {
+   "seconds": 5.34,
+   "tests": 10
+  },
+  "tests/test_boot_health.py": {
+   "seconds": 5.39,
+   "tests": 6
+  },
+  "tests/test_bounded_ai_endpoints.py": {
+   "seconds": 2.34,
+   "tests": 5
+  },
+  "tests/test_brand_home_navigation.py": {
+   "seconds": 1.92,
+   "tests": 2
+  },
+  "tests/test_brand_rename.py": {
+   "seconds": 4.35,
+   "tests": 25
+  },
+  "tests/test_breadcrumb_root_label.py": {
+   "seconds": 0.46,
+   "tests": 7
+  },
+  "tests/test_broken_surface_fetch_contracts.py": {
+   "seconds": 0.63,
+   "tests": 7
+  },
+  "tests/test_bulk_lifecycle.py": {
+   "seconds": 1.29,
+   "tests": 2
+  },
+  "tests/test_business_arch_ai.py": {
+   "seconds": 6.03,
+   "tests": 22
+  },
+  "tests/test_business_architect_persona.py": {
+   "seconds": 0.07,
+   "tests": 15
+  },
+  "tests/test_business_capability_tenancy.py": {
+   "seconds": 5.26,
+   "tests": 5
+  },
+  "tests/test_business_case.py": {
+   "seconds": 1.25,
+   "tests": 16
+  },
+  "tests/test_business_case_npv.py": {
+   "seconds": 0.11,
+   "tests": 6
+  },
+  "tests/test_business_function_capability_fk.py": {
+   "seconds": 329.7,
+   "tests": 6
+  },
+  "tests/test_business_model.py": {
+   "seconds": 0.1,
+   "tests": 15
+  },
+  "tests/test_buy_keeps_the_plan.py": {
+   "seconds": 7.94,
+   "tests": 19
+  },
+  "tests/test_c1_gap_tile_reconciliation.py": {
+   "seconds": 0.44,
+   "tests": 1
+  },
+  "tests/test_cache_org_scoping.py": {
+   "seconds": 0.02,
+   "tests": 2
+  },
+  "tests/test_cache_tenant_isolation.py": {
+   "seconds": 0.41,
+   "tests": 3
+  },
+  "tests/test_canvas_export.py": {
+   "seconds": 1.86,
+   "tests": 11
+  },
+  "tests/test_canvas_relationship_keys.py": {
+   "seconds": 1.2,
+   "tests": 38
+  },
+  "tests/test_canvas_templates.py": {
+   "seconds": 3.33,
+   "tests": 27
+  },
+  "tests/test_capability_archimate_backbone.py": {
+   "seconds": 0.23,
+   "tests": 2
+  },
+  "tests/test_capability_archimate_element.py": {
+   "seconds": 0.83,
+   "tests": 5
+  },
+  "tests/test_capability_catalog_backfill.py": {
+   "seconds": 0.63,
+   "tests": 12
+  },
+  "tests/test_capability_catalog_seeding_canonical_writer.py": {
+   "seconds": 0.16,
+   "tests": 2
+  },
+  "tests/test_capability_cutover_accepts_backfill_rows.py": {
+   "seconds": 0.33,
+   "tests": 3
+  },
+  "tests/test_capability_enterprise_actionability.py": {
+   "seconds": 0.27,
+   "tests": 4
+  },
+  "tests/test_capability_health_honesty.py": {
+   "seconds": 0.6,
+   "tests": 5
+  },
+  "tests/test_capability_heatmap_honesty.py": {
+   "seconds": 4.06,
+   "tests": 19
+  },
+  "tests/test_capability_line_of_sight.py": {
+   "seconds": 4.09,
+   "tests": 10
+  },
+  "tests/test_capability_map_a11y_csp.py": {
+   "seconds": 3.22,
+   "tests": 9
+  },
+  "tests/test_capability_map_area_qa_fixes.py": {
+   "seconds": 0.51,
+   "tests": 2
+  },
+  "tests/test_capability_map_cache_nonce_regression.py": {
+   "seconds": 3.58,
+   "tests": 6
+  },
+  "tests/test_capability_map_shell.py": {
+   "seconds": 8.14,
+   "tests": 14
+  },
+  "tests/test_capability_mapping_update_tenant_fence.py": {
+   "seconds": 0.81,
+   "tests": 2
+  },
+  "tests/test_capability_maturity_heatmap.py": {
+   "seconds": 1.55,
+   "tests": 3
+  },
+  "tests/test_capability_merge_report.py": {
+   "seconds": 1.03,
+   "tests": 2
+  },
+  "tests/test_capability_ownership.py": {
+   "seconds": 2.6,
+   "tests": 11
+  },
+  "tests/test_capability_projection.py": {
+   "seconds": 1.45,
+   "tests": 17
+  },
+  "tests/test_capability_realization_relationship.py": {
+   "seconds": 0.82,
+   "tests": 2
+  },
+  "tests/test_capability_simple_view.py": {
+   "seconds": 2.09,
+   "tests": 2
+  },
+  "tests/test_capability_strategic_fields.py": {
+   "seconds": 0.11,
+   "tests": 3
+  },
+  "tests/test_capability_tenancy_cutover.py": {
+   "seconds": 2.41,
+   "tests": 24
+  },
+  "tests/test_capability_visuals.py": {
+   "seconds": 0.72,
+   "tests": 26
+  },
+  "tests/test_check_raw_sql_tenancy_writes.py": {
+   "seconds": 124.27,
+   "tests": 7
+  },
+  "tests/test_check_untenanted_reads.py": {
+   "seconds": 23.64,
+   "tests": 19
+  },
+  "tests/test_chief_architect_p0.py": {
+   "seconds": 5.35,
+   "tests": 11
+  },
+  "tests/test_chief_architect_service_unit.py": {
+   "seconds": 0.01,
+   "tests": 2
+  },
+  "tests/test_chief_architect_workbench.py": {
+   "seconds": 7.66,
+   "tests": 22
+  },
+  "tests/test_ci_browser_matrix.py": {
+   "seconds": 2.89,
+   "tests": 16
+  },
+  "tests/test_ci_nav_verification_lifecycle.py": {
+   "seconds": 0.43,
+   "tests": 6
+  },
+  "tests/test_client_error_beacon.py": {
+   "seconds": 0.09,
+   "tests": 2
+  },
+  "tests/test_code_generator_html_escaping.py": {
+   "seconds": 1.26,
+   "tests": 6
+  },
+  "tests/test_common_scripts_contract.py": {
+   "seconds": 0.01,
+   "tests": 1
+  },
+  "tests/test_compliance_archimate_element.py": {
+   "seconds": 0.85,
+   "tests": 5
+  },
+  "tests/test_composer_audit_log.py": {
+   "seconds": 0.66,
+   "tests": 3
+  },
+  "tests/test_composer_diagram_link_mismatches.py": {
+   "seconds": 2.12,
+   "tests": 18
+  },
+  "tests/test_composer_frontend_static.py": {
+   "seconds": 0.1,
+   "tests": 17
+  },
+  "tests/test_composer_layered_viewpoint.py": {
+   "seconds": 4.44,
+   "tests": 15
+  },
+  "tests/test_composer_materialize_relationship.py": {
+   "seconds": 0.7,
+   "tests": 2
+  },
+  "tests/test_composer_relationship_health.py": {
+   "seconds": 0.73,
+   "tests": 1
+  },
+  "tests/test_composer_relationship_rules.py": {
+   "seconds": 0.68,
+   "tests": 12
+  },
+  "tests/test_composer_url_params_gate.py": {
+   "seconds": 5.79,
+   "tests": 9
+  },
+  "tests/test_concurrency.py": {
+   "seconds": 5.04,
+   "tests": 7
+  },
+  "tests/test_concurrent_application_create.py": {
+   "seconds": 4.45,
+   "tests": 2
+  },
+  "tests/test_conformance_domain_coverage.py": {
+   "seconds": 1.79,
+   "tests": 10
+  },
+  "tests/test_connector_config_tenant_scope.py": {
+   "seconds": 3.58,
+   "tests": 10
+  },
+  "tests/test_connector_credential_encryption.py": {
+   "seconds": 1.06,
+   "tests": 7
+  },
+  "tests/test_connector_orchestrator_allowlist_gate.py": {
+   "seconds": 0.83,
+   "tests": 5
+  },
+  "tests/test_connector_sync_mode_derivation.py": {
+   "seconds": 1.54,
+   "tests": 43
+  },
+  "tests/test_connector_sync_route_honesty.py": {
+   "seconds": 0.6,
+   "tests": 2
+  },
+  "tests/test_constants.py": {
+   "seconds": 0.25,
+   "tests": 56
+  },
+  "tests/test_content_test_selection.py": {
+   "seconds": 2.57,
+   "tests": 11
+  },
+  "tests/test_context_preview_reflects_assembly.py": {
+   "seconds": 0.04,
+   "tests": 2
+  },
+  "tests/test_contract_ai_extraction.py": {
+   "seconds": 2.08,
+   "tests": 7
+  },
+  "tests/test_contract_archimate_element.py": {
+   "seconds": 0.57,
+   "tests": 5
+  },
+  "tests/test_conversation_models.py": {
+   "seconds": 0.05,
+   "tests": 8
+  },
+  "tests/test_cost_fact_rls.py": {
+   "seconds": 3.6,
+   "tests": 2
+  },
+  "tests/test_cost_fact_store.py": {
+   "seconds": 5.86,
+   "tests": 29
+  },
+  "tests/test_count_reconciliation.py": {
+   "seconds": 4.62,
+   "tests": 14
+  },
+  "tests/test_create_programme_tool.py": {
+   "seconds": 0.84,
+   "tests": 5
+  },
+  "tests/test_cross_org_read_leaks.py": {
+   "seconds": 2.13,
+   "tests": 5
+  },
+  "tests/test_cross_tenant_documents.py": {
+   "seconds": 9.91,
+   "tests": 21
+  },
+  "tests/test_crosswalk_writer_gated_gate.py": {
+   "seconds": 0.06,
+   "tests": 7
+  },
+  "tests/test_csp_nonce.py": {
+   "seconds": 6.11,
+   "tests": 16
+  },
+  "tests/test_csp_smoke_leaves_no_background_work.py": {
+   "seconds": 3.89,
+   "tests": 2
+  },
+  "tests/test_csrf_and_bulk_delete_security.py": {
+   "seconds": 1.49,
+   "tests": 4
+  },
+  "tests/test_csrf_coverage.py": {
+   "seconds": 117.61,
+   "tests": 3
+  },
+  "tests/test_cto_scorecard_service.py": {
+   "seconds": 0.59,
+   "tests": 8
+  },
+  "tests/test_d_r5_1_gap_detect_divergence.py": {
+   "seconds": 0.73,
+   "tests": 1
+  },
+  "tests/test_d_r7_3_gap_detect_positive.py": {
+   "seconds": 0.79,
+   "tests": 1
+  },
+  "tests/test_dashboard_capability_coverage_agreement.py": {
+   "seconds": 0.91,
+   "tests": 1
+  },
+  "tests/test_dashboard_health_agreement.py": {
+   "seconds": 2.86,
+   "tests": 10
+  },
+  "tests/test_dashboard_health_integration.py": {
+   "seconds": 6.58,
+   "tests": 9
+  },
+  "tests/test_dashboard_health_score_honesty.py": {
+   "seconds": 2.69,
+   "tests": 2
+  },
+  "tests/test_dashboard_modes.py": {
+   "seconds": 8.35,
+   "tests": 7
+  },
+  "tests/test_dashboard_pipeline_unknown.py": {
+   "seconds": 2.52,
+   "tests": 7
+  },
+  "tests/test_data_architect_persona.py": {
+   "seconds": 0.29,
+   "tests": 3
+  },
+  "tests/test_data_entity_archimate_element.py": {
+   "seconds": 0.68,
+   "tests": 5
+  },
+  "tests/test_data_entity_archimate_sync.py": {
+   "seconds": 0.95,
+   "tests": 4
+  },
+  "tests/test_data_entity_crud_matrix.py": {
+   "seconds": 1.09,
+   "tests": 8
+  },
+  "tests/test_data_governance.py": {
+   "seconds": 17.63,
+   "tests": 18
+  },
+  "tests/test_data_models_dashboard_counts.py": {
+   "seconds": 0.24,
+   "tests": 2
+  },
+  "tests/test_data_stewardship_service.py": {
+   "seconds": 1.66,
+   "tests": 12
+  },
+  "tests/test_data_stewardship_slice2.py": {
+   "seconds": 6.53,
+   "tests": 27
+  },
+  "tests/test_data_subject_requests.py": {
+   "seconds": 18.13,
+   "tests": 15
+  },
+  "tests/test_db_session_binding.py": {
+   "seconds": 0.07,
+   "tests": 2
+  },
+  "tests/test_db_session_rollback_database.py": {
+   "seconds": 0.16,
+   "tests": 2
+  },
+  "tests/test_deadline_alert_service.py": {
+   "seconds": 0.86,
+   "tests": 10
+  },
+  "tests/test_decision_brief_service.py": {
+   "seconds": 75.09,
+   "tests": 28
+  },
+  "tests/test_decision_ledger_service_retired.py": {
+   "seconds": 0.02,
+   "tests": 4
+  },
+  "tests/test_decision_register_consolidation.py": {
+   "seconds": 8.83,
+   "tests": 27
+  },
+  "tests/test_decision_review_and_precedent.py": {
+   "seconds": 4.57,
+   "tests": 11
+  },
+  "tests/test_dedupe_entities.py": {
+   "seconds": 2.02,
+   "tests": 3
+  },
+  "tests/test_def003_capability_mapping_visible.py": {
+   "seconds": 4.02,
+   "tests": 2
+  },
+  "tests/test_def007_composer_draft_isolation.py": {
+   "seconds": 4.28,
+   "tests": 5
+  },
+  "tests/test_def009_arb_legacy_banner_copy.py": {
+   "seconds": 0.35,
+   "tests": 7
+  },
+  "tests/test_def010_workstream_create.py": {
+   "seconds": 5.49,
+   "tests": 5
+  },
+  "tests/test_def042_batch_import_paste_data.py": {
+   "seconds": 1.94,
+   "tests": 2
+  },
+  "tests/test_def050_vendor_acv_reads_real_contracts.py": {
+   "seconds": 1.81,
+   "tests": 1
+  },
+  "tests/test_def051_investment_matrix_currency.py": {
+   "seconds": 0.29,
+   "tests": 1
+  },
+  "tests/test_def055_arb_session_name_displayed.py": {
+   "seconds": 0.67,
+   "tests": 1
+  },
+  "tests/test_def056_value_stream_type_no_silent_default.py": {
+   "seconds": 0.28,
+   "tests": 1
+  },
+  "tests/test_def064_data_lineage_count_agreement.py": {
+   "seconds": 2.94,
+   "tests": 1
+  },
+  "tests/test_def067_equipment_delete_repro.py": {
+   "seconds": 9.24,
+   "tests": 2
+  },
+  "tests/test_def068_raid_resolve_button_quoting.py": {
+   "seconds": 1.12,
+   "tests": 1
+  },
+  "tests/test_def077_arb_agenda_no_leaked_pipeline_language.py": {
+   "seconds": 0.1,
+   "tests": 1
+  },
+  "tests/test_def078_add_to_roadmap_repro.py": {
+   "seconds": 1.01,
+   "tests": 2
+  },
+  "tests/test_delete_permission_parity.py": {
+   "seconds": 0.82,
+   "tests": 2
+  },
+  "tests/test_demand_triage.py": {
+   "seconds": 16.52,
+   "tests": 25
+  },
+  "tests/test_demo_blocker_fixes.py": {
+   "seconds": 1.46,
+   "tests": 6
+  },
+  "tests/test_deploy_backup_marker.py": {
+   "seconds": 0.17,
+   "tests": 8
+  },
+  "tests/test_deploy_capacity.py": {
+   "seconds": 0.28,
+   "tests": 17
+  },
+  "tests/test_deploy_log_evidence.py": {
+   "seconds": 0.23,
+   "tests": 4
+  },
+  "tests/test_deploy_script_contract.py": {
+   "seconds": 0.02,
+   "tests": 3
+  },
+  "tests/test_deploy_verified_fake_droplet.py": {
+   "seconds": 11.26,
+   "tests": 16
+  },
+  "tests/test_deploy_workflow.py": {
+   "seconds": 4.76,
+   "tests": 157
+  },
+  "tests/test_deploy_workflow_glue.py": {
+   "seconds": 28.24,
+   "tests": 10
+  },
+  "tests/test_deprecation_access_control.py": {
+   "seconds": 57.44,
+   "tests": 18
+  },
+  "tests/test_derivation_status.py": {
+   "seconds": 0.14,
+   "tests": 2
+  },
+  "tests/test_derived_facts_isolation.py": {
+   "seconds": 0.22,
+   "tests": 8
+  },
+  "tests/test_detect_content_only.py": {
+   "seconds": 2.62,
+   "tests": 35
+  },
+  "tests/test_document_chunk_embedding_tenant_isolation.py": {
+   "seconds": 4.75,
+   "tests": 2
+  },
+  "tests/test_domain_element_single_writer.py": {
+   "seconds": 3.57,
+   "tests": 11
+  },
+  "tests/test_double_mapped_tenancy.py": {
+   "seconds": 0.04,
+   "tests": 5
+  },
+  "tests/test_dropdown_menu_component.py": {
+   "seconds": 0.09,
+   "tests": 2
+  },
+  "tests/test_duplicate_detection_error_contract.py": {
+   "seconds": 5.31,
+   "tests": 8
+  },
+  "tests/test_duplicate_group_read_tenant_fence.py": {
+   "seconds": 0.97,
+   "tests": 2
+  },
+  "tests/test_duplicate_guard.py": {
+   "seconds": 4.65,
+   "tests": 8
+  },
+  "tests/test_duplicate_utils_fuzzy.py": {
+   "seconds": 0.01,
+   "tests": 2
+  },
+  "tests/test_ea_workflow_human_input_step.py": {
+   "seconds": 0.15,
+   "tests": 1
+  },
+  "tests/test_ea_workflows_error_path_rendering.py": {
+   "seconds": 1.14,
+   "tests": 2
+  },
+  "tests/test_ea_workflows_journeys.py": {
+   "seconds": 0.27,
+   "tests": 3
+  },
+  "tests/test_ea_workflows_shell.py": {
+   "seconds": 2.52,
+   "tests": 5
+  },
+  "tests/test_effort_bands.py": {
+   "seconds": 0.06,
+   "tests": 11
+  },
+  "tests/test_element_detail_add_relationship.py": {
+   "seconds": 1.34,
+   "tests": 2
+  },
+  "tests/test_end_of_support_exposure.py": {
+   "seconds": 13.44,
+   "tests": 25
+  },
+  "tests/test_entelim_home_screenshots.py": {
+   "seconds": 48.83,
+   "tests": 2
+  },
+  "tests/test_entelim_home_waitlist.py": {
+   "seconds": 6.62,
+   "tests": 19
+  },
+  "tests/test_enterprise_context_relationship_normalizers.py": {
+   "seconds": 0.01,
+   "tests": 1
+  },
+  "tests/test_enterprise_export_escaping.py": {
+   "seconds": 0.14,
+   "tests": 2
+  },
+  "tests/test_entity_history_trigger.py": {
+   "seconds": 1.27,
+   "tests": 14
+  },
+  "tests/test_entity_ingestion_honest_failures.py": {
+   "seconds": 3.14,
+   "tests": 4
+  },
+  "tests/test_error_digest.py": {
+   "seconds": 1.62,
+   "tests": 4
+  },
+  "tests/test_error_handlers.py": {
+   "seconds": 0.07,
+   "tests": 2
+  },
+  "tests/test_event_log.py": {
+   "seconds": 11.92,
+   "tests": 25
+  },
+  "tests/test_event_log_relay_locking.py": {
+   "seconds": 3.27,
+   "tests": 1
+  },
+  "tests/test_evidence_head_concurrency.py": {
+   "seconds": 6.09,
+   "tests": 4
+  },
+  "tests/test_executive_briefing_ai.py": {
+   "seconds": 3.79,
+   "tests": 15
+  },
+  "tests/test_executive_dashboard_risk_summary.py": {
+   "seconds": 0.17,
+   "tests": 2
+  },
+  "tests/test_executive_health_score_confidence.py": {
+   "seconds": 0.39,
+   "tests": 2
+  },
+  "tests/test_fabricated_data_checker.py": {
+   "seconds": 3.53,
+   "tests": 6
+  },
+  "tests/test_fast_init_model_tenancy.py": {
+   "seconds": 7.66,
+   "tests": 4
+  },
+  "tests/test_feature_flag_routes_platform_admin.py": {
+   "seconds": 6.59,
+   "tests": 10
+  },
+  "tests/test_finder_scores.py": {
+   "seconds": 2.46,
+   "tests": 3
+  },
+  "tests/test_footer_placement.py": {
+   "seconds": 128.55,
+   "tests": 2
+  },
+  "tests/test_formula_register.py": {
+   "seconds": 3.69,
+   "tests": 13
+  },
+  "tests/test_formula_registers_migration.py": {
+   "seconds": 350.74,
+   "tests": 3
+  },
+  "tests/test_framework_admin_only.py": {
+   "seconds": 2.41,
+   "tests": 8
+  },
+  "tests/test_framework_catalog_database.py": {
+   "seconds": 1.09,
+   "tests": 6
+  },
+  "tests/test_framework_catalogue.py": {
+   "seconds": 6.41,
+   "tests": 15
+  },
+  "tests/test_framework_extension_dashboard_honest.py": {
+   "seconds": 1.02,
+   "tests": 3
+  },
+  "tests/test_gantt_export_escaping.py": {
+   "seconds": 0.01,
+   "tests": 1
+  },
+  "tests/test_gap_analysis_sort.py": {
+   "seconds": 8.02,
+   "tests": 2
+  },
+  "tests/test_gap_count_same_population.py": {
+   "seconds": 4.73,
+   "tests": 5
+  },
+  "tests/test_gap_kind_enforcement.py": {
+   "seconds": 0.25,
+   "tests": 5
+  },
+  "tests/test_gap_register_consolidation.py": {
+   "seconds": 62.9,
+   "tests": 20
+  },
+  "tests/test_gap_register_plateau_link.py": {
+   "seconds": 3.58,
+   "tests": 22
+  },
+  "tests/test_gates_actually_fail.py": {
+   "seconds": 25.47,
+   "tests": 31
+  },
+  "tests/test_gateway_bypass_check.py": {
+   "seconds": 58.29,
+   "tests": 5
+  },
+  "tests/test_gateway_fields.py": {
+   "seconds": 3.77,
+   "tests": 14
+  },
+  "tests/test_gateway_provider_enforcement.py": {
+   "seconds": 1.05,
+   "tests": 19
+  },
+  "tests/test_gdpr_auth.py": {
+   "seconds": 13.34,
+   "tests": 12
+  },
+  "tests/test_gdpr_authz.py": {
+   "seconds": 3.16,
+   "tests": 11
+  },
+  "tests/test_generation_and_write_integrity.py": {
+   "seconds": 5.51,
+   "tests": 11
+  },
+  "tests/test_genome_ai_systems.py": {
+   "seconds": 27.39,
+   "tests": 83
+  },
+  "tests/test_genome_coverage.py": {
+   "seconds": 2.48,
+   "tests": 5
+  },
+  "tests/test_genome_data_slice.py": {
+   "seconds": 1.39,
+   "tests": 9
+  },
+  "tests/test_genome_drift.py": {
+   "seconds": 2.24,
+   "tests": 7
+  },
+  "tests/test_genome_emitter_xss.py": {
+   "seconds": 0.23,
+   "tests": 6
+  },
+  "tests/test_genome_patch_coherence.py": {
+   "seconds": 0.79,
+   "tests": 12
+  },
+  "tests/test_genome_patch_flow.py": {
+   "seconds": 2.35,
+   "tests": 9
+  },
+  "tests/test_genome_patch_grounding.py": {
+   "seconds": 0.83,
+   "tests": 9
+  },
+  "tests/test_genome_patch_references.py": {
+   "seconds": 0.04,
+   "tests": 7
+  },
+  "tests/test_genome_patch_state.py": {
+   "seconds": 0.12,
+   "tests": 3
+  },
+  "tests/test_genome_patch_synthesis.py": {
+   "seconds": 1.22,
+   "tests": 14
+  },
+  "tests/test_genome_roadmap.py": {
+   "seconds": 1.91,
+   "tests": 7
+  },
+  "tests/test_genome_to_bundle.py": {
+   "seconds": 0.04,
+   "tests": 6
+  },
+  "tests/test_governance_alignment_ranking.py": {
+   "seconds": 5.03,
+   "tests": 16
+  },
+  "tests/test_governance_and_workpackage_apis.py": {
+   "seconds": 4.29,
+   "tests": 21
+  },
+  "tests/test_governance_control_outcomes.py": {
+   "seconds": 1.16,
+   "tests": 3
+  },
+  "tests/test_governance_gate_reader_active_org.py": {
+   "seconds": 3.45,
+   "tests": 5
+  },
+  "tests/test_governance_notifier_escaping.py": {
+   "seconds": 0.24,
+   "tests": 1
+  },
+  "tests/test_governance_tools.py": {
+   "seconds": 3.67,
+   "tests": 18
+  },
+  "tests/test_h1_fact_sheet_linked_risks.py": {
+   "seconds": 0.55,
+   "tests": 3
+  },
+  "tests/test_h1_h2_risk_entity_links.py": {
+   "seconds": 1.04,
+   "tests": 5
+  },
+  "tests/test_h5_connector_dashboard_admin_only.py": {
+   "seconds": 0.39,
+   "tests": 2
+  },
+  "tests/test_h6_layer_elements_rel_count.py": {
+   "seconds": 1.29,
+   "tests": 2
+  },
+  "tests/test_h7_rationalization_plan_fraction.py": {
+   "seconds": 0.28,
+   "tests": 2
+  },
+  "tests/test_header_and_login_feedback.py": {
+   "seconds": 12.91,
+   "tests": 10
+  },
+  "tests/test_health_score_one_format.py": {
+   "seconds": 36.71,
+   "tests": 27
+  },
+  "tests/test_health_scorecard_inference_rel_tenant_fence.py": {
+   "seconds": 3.44,
+   "tests": 4
+  },
+  "tests/test_health_scorecard_missing_phase.py": {
+   "seconds": 2.75,
+   "tests": 6
+  },
+  "tests/test_high_findings_gate.py": {
+   "seconds": 5.61,
+   "tests": 6
+  },
+  "tests/test_history_service.py": {
+   "seconds": 2.56,
+   "tests": 17
+  },
+  "tests/test_hostile_input_pagination.py": {
+   "seconds": 7.93,
+   "tests": 85
+  },
+  "tests/test_hotfix_duplicate_group_actions.py": {
+   "seconds": 13.01,
+   "tests": 10
+  },
+  "tests/test_hotfix_risky_actions.py": {
+   "seconds": 38.13,
+   "tests": 52
+  },
+  "tests/test_humanize_key_filter.py": {
+   "seconds": 0.15,
+   "tests": 4
+  },
+  "tests/test_hybrid_mapping_api_500.py": {
+   "seconds": 1.52,
+   "tests": 7
+  },
+  "tests/test_impact_analysis_history_tenancy.py": {
+   "seconds": 10.8,
+   "tests": 20
+  },
+  "tests/test_impact_analysis_picker.py": {
+   "seconds": 16.53,
+   "tests": 8
+  },
+  "tests/test_impact_graph_dependency_lists.py": {
+   "seconds": 0.69,
+   "tests": 4
+  },
+  "tests/test_implementation_report_generate.py": {
+   "seconds": 0.17,
+   "tests": 3
+  },
+  "tests/test_import_history_filters.py": {
+   "seconds": 217.36,
+   "tests": 117
+  },
+  "tests/test_import_preview.py": {
+   "seconds": 7.82,
+   "tests": 5
+  },
+  "tests/test_import_restore.py": {
+   "seconds": 47.62,
+   "tests": 14
+  },
+  "tests/test_import_rollback_database.py": {
+   "seconds": 12.1,
+   "tests": 11
+  },
+  "tests/test_import_rollback_security.py": {
+   "seconds": 6.06,
+   "tests": 36
+  },
+  "tests/test_initiative_capability_links.py": {
+   "seconds": 2.88,
+   "tests": 12
+  },
+  "tests/test_initiative_goal_links.py": {
+   "seconds": 7.96,
+   "tests": 19
+  },
+  "tests/test_input_validation_400.py": {
+   "seconds": 3.46,
+   "tests": 15
+  },
+  "tests/test_interaction_census_coverage.py": {
+   "seconds": 1.99,
+   "tests": 4
+  },
+  "tests/test_interface_archimate_element.py": {
+   "seconds": 0.48,
+   "tests": 5
+  },
+  "tests/test_interface_gap_capability_gap_isolation.py": {
+   "seconds": 1.15,
+   "tests": 4
+  },
+  "tests/test_interface_gap_service.py": {
+   "seconds": 1.79,
+   "tests": 4
+  },
+  "tests/test_interface_plateau_pair.py": {
+   "seconds": 1.41,
+   "tests": 6
+  },
+  "tests/test_interface_programme_rollup.py": {
+   "seconds": 6.09,
+   "tests": 6
+  },
+  "tests/test_interface_register_service.py": {
+   "seconds": 5.09,
+   "tests": 6
+  },
+  "tests/test_interface_register_sidebar_access.py": {
+   "seconds": 2.7,
+   "tests": 4
+  },
+  "tests/test_isolation_sweep_retry.py": {
+   "seconds": 24.05,
+   "tests": 5
+  },
+  "tests/test_issue_tracking_assignee_tenant_fence.py": {
+   "seconds": 4.79,
+   "tests": 6
+  },
+  "tests/test_jira_admin_routes_platform_admin.py": {
+   "seconds": 9.34,
+   "tests": 13
+  },
+  "tests/test_jira_connector_controls.py": {
+   "seconds": 48.75,
+   "tests": 36
+  },
+  "tests/test_job_queue_one_service.py": {
+   "seconds": 1.45,
+   "tests": 8
+  },
+  "tests/test_jobs_worker_gating.py": {
+   "seconds": 6.43,
+   "tests": 11
+  },
+  "tests/test_junit_qualification_gate.py": {
+   "seconds": 6.86,
+   "tests": 15
+  },
+  "tests/test_kanban_assignee_tenant_fence.py": {
+   "seconds": 4.08,
+   "tests": 8
+  },
+  "tests/test_legal_pages.py": {
+   "seconds": 8.35,
+   "tests": 14
+  },
+  "tests/test_licence_unrecorded_usage.py": {
+   "seconds": 0.2,
+   "tests": 3
+  },
+  "tests/test_live_migration_code_patch_escaping.py": {
+   "seconds": 0.0,
+   "tests": 1
+  },
+  "tests/test_llm_boundary_gate.py": {
+   "seconds": 0.05,
+   "tests": 6
+  },
+  "tests/test_llm_env_isolation.py": {
+   "seconds": 0.01,
+   "tests": 1
+  },
+  "tests/test_llm_spend_per_organisation.py": {
+   "seconds": 0.6,
+   "tests": 6
+  },
+  "tests/test_lucid_import.py": {
+   "seconds": 1.29,
+   "tests": 82
+  },
+  "tests/test_lucidchart_connector_vault.py": {
+   "seconds": 0.24,
+   "tests": 2
+  },
+  "tests/test_m1_zero_denominator.py": {
+   "seconds": 0.2,
+   "tests": 3
+  },
+  "tests/test_m2_compliance_pages_crosslinked.py": {
+   "seconds": 0.04,
+   "tests": 3
+  },
+  "tests/test_m3_completeness_unified.py": {
+   "seconds": 0.38,
+   "tests": 2
+  },
+  "tests/test_m4_consolidation_orphaned_refs.py": {
+   "seconds": 0.12,
+   "tests": 2
+  },
+  "tests/test_manual_import_controls.py": {
+   "seconds": 195.67,
+   "tests": 114
+  },
+  "tests/test_manual_import_database.py": {
+   "seconds": 46.45,
+   "tests": 129
+  },
+  "tests/test_manual_import_security.py": {
+   "seconds": 11.53,
+   "tests": 211
+  },
+  "tests/test_meaning_archimate_sync.py": {
+   "seconds": 0.06,
+   "tests": 1
+  },
+  "tests/test_merge_tool.py": {
+   "seconds": 0.8,
+   "tests": 7
+  },
+  "tests/test_metamodel_properties.py": {
+   "seconds": 4.7,
+   "tests": 11
+  },
+  "tests/test_mfa_login_gate.py": {
+   "seconds": 17.91,
+   "tests": 22
+  },
+  "tests/test_mfa_service.py": {
+   "seconds": 1.04,
+   "tests": 14
+  },
+  "tests/test_migrate_connector_credentials.py": {
+   "seconds": 2.32,
+   "tests": 3
+  },
+  "tests/test_modal_focus_return.py": {
+   "seconds": 93.94,
+   "tests": 63
+  },
+  "tests/test_modal_shell_consistency.py": {
+   "seconds": 0.18,
+   "tests": 34
+  },
+  "tests/test_model_boot_registration.py": {
+   "seconds": 10.16,
+   "tests": 2
+  },
+  "tests/test_model_viewer_back_navigation.py": {
+   "seconds": 10.86,
+   "tests": 6
+  },
+  "tests/test_module_discoverability.py": {
+   "seconds": 0.04,
+   "tests": 4
+  },
+  "tests/test_module_screenshots.py": {
+   "seconds": 6.38,
+   "tests": 24
+  },
+  "tests/test_module_test_collection.py": {
+   "seconds": 0.05,
+   "tests": 2
+  },
+  "tests/test_modules_directory.py": {
+   "seconds": 528.44,
+   "tests": 29
+  },
+  "tests/test_motivation_bridge.py": {
+   "seconds": 4.84,
+   "tests": 6
+  },
+  "tests/test_motivation_bridge_org_scoping.py": {
+   "seconds": 1.74,
+   "tests": 5
+  },
+  "tests/test_motivation_traceability_routes.py": {
+   "seconds": 10.25,
+   "tests": 18
+  },
+  "tests/test_multi_org_account_session_forgery.py": {
+   "seconds": 0.9,
+   "tests": 1
+  },
+  "tests/test_multi_org_account_switch_reuse.py": {
+   "seconds": 0.27,
+   "tests": 1
+  },
+  "tests/test_multi_org_account_switching.py": {
+   "seconds": 2.8,
+   "tests": 3
+  },
+  "tests/test_my_applications_health_ai.py": {
+   "seconds": 3.66,
+   "tests": 10
+  },
+  "tests/test_my_applications_ownership_numbers.py": {
+   "seconds": 24.48,
+   "tests": 20
+  },
+  "tests/test_nav_counts_tenancy.py": {
+   "seconds": 1.56,
+   "tests": 5
+  },
+  "tests/test_nav_permission_driven.py": {
+   "seconds": 0.47,
+   "tests": 4
+  },
+  "tests/test_nav_route_verification.py": {
+   "seconds": 5.74,
+   "tests": 16
+  },
+  "tests/test_nav_verified_gate_honesty.py": {
+   "seconds": 94.84,
+   "tests": 4
+  },
+  "tests/test_navigation_route_coverage.py": {
+   "seconds": 1.15,
+   "tests": 2
+  },
+  "tests/test_neutral_journey_cards.py": {
+   "seconds": 46.8,
+   "tests": 48
+  },
+  "tests/test_no_native_dialogs.py": {
+   "seconds": 0.5,
+   "tests": 3
+  },
+  "tests/test_no_operational_intelligence_claim.py": {
+   "seconds": 2.51,
+   "tests": 2
+  },
+  "tests/test_no_signout_on_open.py": {
+   "seconds": 9.94,
+   "tests": 11
+  },
+  "tests/test_nonexistent_id_returns_404.py": {
+   "seconds": 7.78,
+   "tests": 17
+  },
+  "tests/test_notification_store_pr1.py": {
+   "seconds": 51.7,
+   "tests": 18
+  },
+  "tests/test_null_description_rendering.py": {
+   "seconds": 0.65,
+   "tests": 4
+  },
+  "tests/test_oef_export_direction_validation.py": {
+   "seconds": 0.52,
+   "tests": 2
+  },
+  "tests/test_oef_export_validation.py": {
+   "seconds": 0.04,
+   "tests": 6
+  },
+  "tests/test_oef_import_engine.py": {
+   "seconds": 6.88,
+   "tests": 13
+  },
+  "tests/test_oef_import_entry_point.py": {
+   "seconds": 1.93,
+   "tests": 10
+  },
+  "tests/test_oef_import_roundtrip.py": {
+   "seconds": 0.49,
+   "tests": 7
+  },
+  "tests/test_onboarding_modal.py": {
+   "seconds": 1.21,
+   "tests": 8
+  },
+  "tests/test_options_analysis_tenant_fence.py": {
+   "seconds": 4.85,
+   "tests": 7
+  },
+  "tests/test_org_admin_provisioning.py": {
+   "seconds": 0.1,
+   "tests": 11
+  },
+  "tests/test_org_admin_provisioning_database.py": {
+   "seconds": 2.06,
+   "tests": 10
+  },
+  "tests/test_org_credential_store.py": {
+   "seconds": 1.9,
+   "tests": 31
+  },
+  "tests/test_org_users_sort.py": {
+   "seconds": 10.36,
+   "tests": 2
+  },
+  "tests/test_organization.py": {
+   "seconds": 5.87,
+   "tests": 15
+  },
+  "tests/test_outcome_measurement_service.py": {
+   "seconds": 2.97,
+   "tests": 14
+  },
+  "tests/test_outcome_tenancy.py": {
+   "seconds": 1.98,
+   "tests": 4
+  },
+  "tests/test_page_guide_history_database.py": {
+   "seconds": 1.77,
+   "tests": 2
+  },
+  "tests/test_page_guide_history_policy.py": {
+   "seconds": 12.31,
+   "tests": 24
+  },
+  "tests/test_page_shell_macros.py": {
+   "seconds": 0.5,
+   "tests": 13
+  },
+  "tests/test_persona_charters_wave.py": {
+   "seconds": 0.54,
+   "tests": 5
+  },
+  "tests/test_phase_gate_initial_load.py": {
+   "seconds": 6.23,
+   "tests": 2
+  },
+  "tests/test_plain_language.py": {
+   "seconds": 7.56,
+   "tests": 50
+  },
+  "tests/test_plan_limit_guard.py": {
+   "seconds": 5.35,
+   "tests": 13
+  },
+  "tests/test_plateau_filter_roundtrip.py": {
+   "seconds": 4.09,
+   "tests": 6
+  },
+  "tests/test_platform_admin_isolation.py": {
+   "seconds": 9.46,
+   "tests": 4
+  },
+  "tests/test_platform_admin_organizations_authz.py": {
+   "seconds": 0.14,
+   "tests": 1
+  },
+  "tests/test_platform_admin_persona_tenancy.py": {
+   "seconds": 1.4,
+   "tests": 6
+  },
+  "tests/test_platform_slos.py": {
+   "seconds": 5.46,
+   "tests": 13
+  },
+  "tests/test_portfolio_crud_roundtrip.py": {
+   "seconds": 19.4,
+   "tests": 24
+  },
+  "tests/test_portfolio_delivery_chain.py": {
+   "seconds": 4.69,
+   "tests": 33
+  },
+  "tests/test_posture_decision_lens_and_org_apis.py": {
+   "seconds": 0.88,
+   "tests": 2
+  },
+  "tests/test_pr428_round3_r2_fixes.py": {
+   "seconds": 10.35,
+   "tests": 4
+  },
+  "tests/test_pr428_round4_r3_fixes.py": {
+   "seconds": 3.06,
+   "tests": 5
+  },
+  "tests/test_preview_secrets.py": {
+   "seconds": 0.57,
+   "tests": 6
+  },
+  "tests/test_probe_error_diagnostics.py": {
+   "seconds": 0.12,
+   "tests": 15
+  },
+  "tests/test_procurement_ai.py": {
+   "seconds": 10.66,
+   "tests": 19
+  },
+  "tests/test_procurement_compliance_database.py": {
+   "seconds": 0.37,
+   "tests": 1
+  },
+  "tests/test_procurement_missing_contract_value.py": {
+   "seconds": 2.17,
+   "tests": 6
+  },
+  "tests/test_procurement_pages.py": {
+   "seconds": 3.64,
+   "tests": 9
+  },
+  "tests/test_procurement_tools.py": {
+   "seconds": 1.4,
+   "tests": 8
+  },
+  "tests/test_procurement_utilization_honesty.py": {
+   "seconds": 1.54,
+   "tests": 9
+  },
+  "tests/test_product_inquiry.py": {
+   "seconds": 5.61,
+   "tests": 26
+  },
+  "tests/test_production_readiness_control_outcomes.py": {
+   "seconds": 20.22,
+   "tests": 11
+  },
+  "tests/test_production_readiness_coverage.py": {
+   "seconds": 6.79,
+   "tests": 10
+  },
+  "tests/test_production_watch_workflow.py": {
+   "seconds": 0.02,
+   "tests": 2
+  },
+  "tests/test_programme_risk_routes.py": {
+   "seconds": 9.14,
+   "tests": 8
+  },
+  "tests/test_programme_setup_service.py": {
+   "seconds": 6.72,
+   "tests": 10
+  },
+  "tests/test_programme_stakeholder_map.py": {
+   "seconds": 2.54,
+   "tests": 7
+  },
+  "tests/test_programme_wizard_gate.py": {
+   "seconds": 6.25,
+   "tests": 3
+  },
+  "tests/test_proof_assets.py": {
+   "seconds": 0.96,
+   "tests": 8
+  },
+  "tests/test_provider_register.py": {
+   "seconds": 0.55,
+   "tests": 10
+  },
+  "tests/test_public_content_pages.py": {
+   "seconds": 307.2,
+   "tests": 124
+  },
+  "tests/test_public_jsonld.py": {
+   "seconds": 49.89,
+   "tests": 5
+  },
+  "tests/test_public_site_pages.py": {
+   "seconds": 27.46,
+   "tests": 25
+  },
+  "tests/test_public_visitor_analytics.py": {
+   "seconds": 3.63,
+   "tests": 23
+  },
+  "tests/test_push_to_devops_tenant_fence.py": {
+   "seconds": 0.96,
+   "tests": 2
+  },
+  "tests/test_qa100_arch012_data_quality_filters.py": {
+   "seconds": 1.38,
+   "tests": 3
+  },
+  "tests/test_qa100_arch041_042_validation_errors.py": {
+   "seconds": 1.49,
+   "tests": 2
+  },
+  "tests/test_qa100_arch043_dynamic_link_gate.py": {
+   "seconds": 50.25,
+   "tests": 4
+  },
+  "tests/test_qa100_cm01_o02_o03.py": {
+   "seconds": 3.43,
+   "tests": 13
+  },
+  "tests/test_qa100_hidden_modules.py": {
+   "seconds": 0.18,
+   "tests": 6
+  },
+  "tests/test_qa100_remainder_findings.py": {
+   "seconds": 0.4,
+   "tests": 23
+  },
+  "tests/test_qa100_security_hardening.py": {
+   "seconds": 10.22,
+   "tests": 32
+  },
+  "tests/test_qa_persona_and_api_contract.py": {
+   "seconds": 0.75,
+   "tests": 7
+  },
+  "tests/test_query_budget.py": {
+   "seconds": 26.34,
+   "tests": 2
+  },
+  "tests/test_r32_ai_permission_gate.py": {
+   "seconds": 5.58,
+   "tests": 22
+  },
+  "tests/test_raci_stakeholder_create.py": {
+   "seconds": 6.64,
+   "tests": 2
+  },
+  "tests/test_raid_log.py": {
+   "seconds": 20.21,
+   "tests": 9
+  },
+  "tests/test_rate_limiting.py": {
+   "seconds": 0.03,
+   "tests": 6
+  },
+  "tests/test_rationalisation_discovery_service.py": {
+   "seconds": 20.27,
+   "tests": 33
+  },
+  "tests/test_rationalization_export_escaping.py": {
+   "seconds": 0.01,
+   "tests": 1
+  },
+  "tests/test_raw_sql_tenancy_services.py": {
+   "seconds": 1.52,
+   "tests": 12
+  },
+  "tests/test_rbac_and_sso_posture.py": {
+   "seconds": 5.78,
+   "tests": 17
+  },
+  "tests/test_reconcile_enum_members.py": {
+   "seconds": 0.33,
+   "tests": 4
+  },
+  "tests/test_reconcile_schema_typed_arb_surface.py": {
+   "seconds": 0.24,
+   "tests": 38
+  },
+  "tests/test_refine_frontend_tsx_escaping.py": {
+   "seconds": 0.01,
+   "tests": 1
+  },
+  "tests/test_refused_tool_call_audit.py": {
+   "seconds": 3.59,
+   "tests": 6
+  },
+  "tests/test_relationships_listing.py": {
+   "seconds": 0.75,
+   "tests": 1
+  },
+  "tests/test_release_artifact_contract.py": {
+   "seconds": 0.1,
+   "tests": 6
+  },
+  "tests/test_remaining_500_routes.py": {
+   "seconds": 1.73,
+   "tests": 6
+  },
+  "tests/test_remaining_register_tools.py": {
+   "seconds": 5.13,
+   "tests": 15
+  },
+  "tests/test_renewals_dashboard.py": {
+   "seconds": 0.7,
+   "tests": 2
+  },
+  "tests/test_request_tracing.py": {
+   "seconds": 0.43,
+   "tests": 6
+  },
+  "tests/test_require_roles_admin_active_org.py": {
+   "seconds": 2.82,
+   "tests": 3
+  },
+  "tests/test_review_queue_tenant_isolation.py": {
+   "seconds": 4.49,
+   "tests": 11
+  },
+  "tests/test_risk_archimate_element.py": {
+   "seconds": 0.58,
+   "tests": 5
+  },
+  "tests/test_risk_link_tenant_isolation.py": {
+   "seconds": 2.01,
+   "tests": 6
+  },
+  "tests/test_risk_register_severity_and_counts.py": {
+   "seconds": 1.31,
+   "tests": 2
+  },
+  "tests/test_risk_register_sort.py": {
+   "seconds": 13.63,
+   "tests": 2
+  },
+  "tests/test_risk_score_history.py": {
+   "seconds": 1.95,
+   "tests": 4
+  },
+  "tests/test_risk_score_http_journey.py": {
+   "seconds": 3.91,
+   "tests": 2
+  },
+  "tests/test_risk_store_agreement_after_backfill.py": {
+   "seconds": 1.46,
+   "tests": 2
+  },
+  "tests/test_roadmap_builder_routes.py": {
+   "seconds": 2.44,
+   "tests": 6
+  },
+  "tests/test_roadmap_modal_visibility.py": {
+   "seconds": 13.47,
+   "tests": 9
+  },
+  "tests/test_roadmap_task_tenant_isolation.py": {
+   "seconds": 0.24,
+   "tests": 3
+  },
+  "tests/test_role_required_active_org.py": {
+   "seconds": 3.8,
+   "tests": 4
+  },
+  "tests/test_ropa_relationship_labels.py": {
+   "seconds": 0.64,
+   "tests": 1
+  },
+  "tests/test_route_authorisation.py": {
+   "seconds": 6.32,
+   "tests": 2
+  },
+  "tests/test_route_ownership_gaps.py": {
+   "seconds": 3.09,
+   "tests": 5
+  },
+  "tests/test_route_reads_scoping.py": {
+   "seconds": 5.8,
+   "tests": 10
+  },
+  "tests/test_route_sweep_fixes.py": {
+   "seconds": 65.72,
+   "tests": 54
+  },
+  "tests/test_row_level_security.py": {
+   "seconds": 67.78,
+   "tests": 56
+  },
+  "tests/test_s06_similarity_write_path.py": {
+   "seconds": 0.32,
+   "tests": 3
+  },
+  "tests/test_s11_nav_discoverability.py": {
+   "seconds": 6.51,
+   "tests": 13
+  },
+  "tests/test_safe_xml.py": {
+   "seconds": 0.05,
+   "tests": 9
+  },
+  "tests/test_saml_service.py": {
+   "seconds": 0.87,
+   "tests": 9
+  },
+  "tests/test_saved_diagram_tenancy.py": {
+   "seconds": 1.87,
+   "tests": 5
+  },
+  "tests/test_scale_budgets.py": {
+   "seconds": 6.57,
+   "tests": 18
+  },
+  "tests/test_scheduler_tenant_isolation.py": {
+   "seconds": 4.1,
+   "tests": 18
+  },
+  "tests/test_schema_change_safety.py": {
+   "seconds": 10.06,
+   "tests": 2
+  },
+  "tests/test_schema_migrations.py": {
+   "seconds": 784.12,
+   "tests": 10
+  },
+  "tests/test_schema_reconciliation.py": {
+   "seconds": 59.03,
+   "tests": 17
+  },
+  "tests/test_scoring_configuration_platform_admin.py": {
+   "seconds": 4.5,
+   "tests": 5
+  },
+  "tests/test_scoring_configuration_service.py": {
+   "seconds": 2.32,
+   "tests": 7
+  },
+  "tests/test_search_text_normalisation.py": {
+   "seconds": 0.12,
+   "tests": 22
+  },
+  "tests/test_security_architect_role.py": {
+   "seconds": 0.03,
+   "tests": 7
+  },
+  "tests/test_security_genome_slice.py": {
+   "seconds": 2.96,
+   "tests": 5
+  },
+  "tests/test_security_hardening.py": {
+   "seconds": 0.79,
+   "tests": 25
+  },
+  "tests/test_security_rbac_require_permission_active_org.py": {
+   "seconds": 3.5,
+   "tests": 4
+  },
+  "tests/test_seed_demo_company.py": {
+   "seconds": 233.26,
+   "tests": 33
+  },
+  "tests/test_seed_demo_mappings.py": {
+   "seconds": 1.95,
+   "tests": 6
+  },
+  "tests/test_seed_strategic_demo.py": {
+   "seconds": 10.02,
+   "tests": 13
+  },
+  "tests/test_semantic_search_wiring.py": {
+   "seconds": 0.19,
+   "tests": 7
+  },
+  "tests/test_seo_geo_plumbing.py": {
+   "seconds": 23.79,
+   "tests": 11
+  },
+  "tests/test_service_status.py": {
+   "seconds": 4.81,
+   "tests": 11
+  },
+  "tests/test_servicenow_admin_routes_platform_admin.py": {
+   "seconds": 4.64,
+   "tests": 6
+  },
+  "tests/test_session_invalidation.py": {
+   "seconds": 20.93,
+   "tests": 16
+  },
+  "tests/test_settings_backup_reality.py": {
+   "seconds": 0.64,
+   "tests": 1
+  },
+  "tests/test_sidebar_audit_log_actor.py": {
+   "seconds": 0.01,
+   "tests": 2
+  },
+  "tests/test_sidebar_budgets.py": {
+   "seconds": 0.21,
+   "tests": 45
+  },
+  "tests/test_sidebar_editor_vendor_platform_admin.py": {
+   "seconds": 3.62,
+   "tests": 7
+  },
+  "tests/test_sidebar_render.py": {
+   "seconds": 16.82,
+   "tests": 25
+  },
+  "tests/test_sidebar_role_filtering.py": {
+   "seconds": 0.01,
+   "tests": 1
+  },
+  "tests/test_simple_parser_service.py": {
+   "seconds": 0.02,
+   "tests": 3
+  },
+  "tests/test_sitemap_crawl_health.py": {
+   "seconds": 14.54,
+   "tests": 3
+  },
+  "tests/test_smoke_console_diagnostics.py": {
+   "seconds": 7.09,
+   "tests": 7
+  },
+  "tests/test_smoke_database_contract.py": {
+   "seconds": 0.03,
+   "tests": 5
+  },
+  "tests/test_smoke_live_server_boot.py": {
+   "seconds": 0.01,
+   "tests": 1
+  },
+  "tests/test_smoke_persona_scope_contract.py": {
+   "seconds": 0.04,
+   "tests": 3
+  },
+  "tests/test_snapshot_cross_org_isolation.py": {
+   "seconds": 7.25,
+   "tests": 12
+  },
+  "tests/test_solution_archimate_polymorphic_fk.py": {
+   "seconds": 0.03,
+   "tests": 2
+  },
+  "tests/test_solution_blueprint_interaction_contract.py": {
+   "seconds": 0.07,
+   "tests": 6
+  },
+  "tests/test_solution_codegen_access_agreement.py": {
+   "seconds": 0.45,
+   "tests": 3
+  },
+  "tests/test_solution_phase_gate_service.py": {
+   "seconds": 0.61,
+   "tests": 2
+  },
+  "tests/test_solution_prompt_override_service.py": {
+   "seconds": 2.52,
+   "tests": 10
+  },
+  "tests/test_solution_prompt_overrides_platform_admin.py": {
+   "seconds": 4.59,
+   "tests": 8
+  },
+  "tests/test_solution_risk_remaining_writers.py": {
+   "seconds": 2.02,
+   "tests": 4
+  },
+  "tests/test_solution_risk_routes_canonical_writer.py": {
+   "seconds": 8.19,
+   "tests": 8
+  },
+  "tests/test_solutions_health_scorecard_agreement.py": {
+   "seconds": 7.67,
+   "tests": 13
+  },
+  "tests/test_solutions_lifecycle.py": {
+   "seconds": 20.85,
+   "tests": 17
+  },
+  "tests/test_solutions_list_shell.py": {
+   "seconds": 2.93,
+   "tests": 4
+  },
+  "tests/test_solutions_list_visibility.py": {
+   "seconds": 3.95,
+   "tests": 2
+  },
+  "tests/test_sse_headers.py": {
+   "seconds": 0.86,
+   "tests": 2
+  },
+  "tests/test_sso_configuration_validation.py": {
+   "seconds": 6.41,
+   "tests": 10
+  },
+  "tests/test_sso_id_token_verification.py": {
+   "seconds": 6.25,
+   "tests": 53
+  },
+  "tests/test_sso_mapping_tenant_isolation.py": {
+   "seconds": 0.32,
+   "tests": 4
+  },
+  "tests/test_sso_noauth_email_claim_fix.py": {
+   "seconds": 4.95,
+   "tests": 37
+  },
+  "tests/test_sso_provision_user_tenant_scope.py": {
+   "seconds": 0.41,
+   "tests": 3
+  },
+  "tests/test_stakeholder_ai.py": {
+   "seconds": 4.3,
+   "tests": 7
+  },
+  "tests/test_start_free_not_waiting_list.py": {
+   "seconds": 24.69,
+   "tests": 11
+  },
+  "tests/test_store_agreement_concepts.py": {
+   "seconds": 25.01,
+   "tests": 59
+  },
+  "tests/test_subresource_integrity.py": {
+   "seconds": 0.18,
+   "tests": 2
+  },
+  "tests/test_sweep_route_crashes.py": {
+   "seconds": 4.34,
+   "tests": 8
+  },
+  "tests/test_team_invite_acceptance.py": {
+   "seconds": 9.34,
+   "tests": 12
+  },
+  "tests/test_team_invite_follow_ups.py": {
+   "seconds": 8.18,
+   "tests": 13
+  },
+  "tests/test_teams_webhook_client_state.py": {
+   "seconds": 7.11,
+   "tests": 13
+  },
+  "tests/test_tech_radar_and_data_lineage.py": {
+   "seconds": 6.05,
+   "tests": 10
+  },
+  "tests/test_tech_radar_details.py": {
+   "seconds": 0.7,
+   "tests": 5
+  },
+  "tests/test_technology_backbone_tenancy.py": {
+   "seconds": 0.15,
+   "tests": 10
+  },
+  "tests/test_template_auth_guards.py": {
+   "seconds": 6.12,
+   "tests": 2
+  },
+  "tests/test_template_contracts.py": {
+   "seconds": 0.32,
+   "tests": 21
+  },
+  "tests/test_template_escaping.py": {
+   "seconds": 0.16,
+   "tests": 5
+  },
+  "tests/test_template_render_contract.py": {
+   "seconds": 6.94,
+   "tests": 22
+  },
+  "tests/test_tenant_isolation.py": {
+   "seconds": 2.3,
+   "tests": 18
+  },
+  "tests/test_tenant_isolation_matrix.py": {
+   "seconds": 1528.61,
+   "tests": 18
+  },
+  "tests/test_tenant_scoping_gate.py": {
+   "seconds": 19.52,
+   "tests": 10
+  },
+  "tests/test_tenant_scoping_leaks.py": {
+   "seconds": 4.05,
+   "tests": 9
+  },
+  "tests/test_test_alert_service_escaping.py": {
+   "seconds": 0.02,
+   "tests": 1
+  },
+  "tests/test_test_health_service_escaping.py": {
+   "seconds": 0.01,
+   "tests": 1
+  },
+  "tests/test_togaf_export_escaping.py": {
+   "seconds": 0.04,
+   "tests": 1
+  },
+  "tests/test_tool_catalogue.py": {
+   "seconds": 0.57,
+   "tests": 104
+  },
+  "tests/test_tool_mutates_flag.py": {
+   "seconds": 0.83,
+   "tests": 90
+  },
+  "tests/test_tool_risk_classifier.py": {
+   "seconds": 0.25,
+   "tests": 14
+  },
+  "tests/test_traceability_check.py": {
+   "seconds": 4.88,
+   "tests": 5
+  },
+  "tests/test_traceability_store_agreement.py": {
+   "seconds": 0.61,
+   "tests": 2
+  },
+  "tests/test_transformation_api.py": {
+   "seconds": 83.7,
+   "tests": 39
+  },
+  "tests/test_transformation_command_error_mapping.py": {
+   "seconds": 0.01,
+   "tests": 2
+  },
+  "tests/test_transformation_command_service.py": {
+   "seconds": 10.45,
+   "tests": 43
+  },
+  "tests/test_transformation_db_guards.py": {
+   "seconds": 69.42,
+   "tests": 32
+  },
+  "tests/test_transformation_evidence_service.py": {
+   "seconds": 36.5,
+   "tests": 40
+  },
+  "tests/test_transformation_execution_service.py": {
+   "seconds": 18.47,
+   "tests": 31
+  },
+  "tests/test_transformation_gate_service.py": {
+   "seconds": 10.9,
+   "tests": 55
+  },
+  "tests/test_transformation_option_service.py": {
+   "seconds": 23.81,
+   "tests": 18
+  },
+  "tests/test_transformation_programme_models.py": {
+   "seconds": 5.54,
+   "tests": 19
+  },
+  "tests/test_transformation_programme_service.py": {
+   "seconds": 19.08,
+   "tests": 30
+  },
+  "tests/test_transformation_room_public_journey.py": {
+   "seconds": 6.9,
+   "tests": 2
+  },
+  "tests/test_transformation_room_routes.py": {
+   "seconds": 13.99,
+   "tests": 6
+  },
+  "tests/test_transformation_room_templates.py": {
+   "seconds": 20.57,
+   "tests": 17
+  },
+  "tests/test_transformation_runtime_role.py": {
+   "seconds": 49.48,
+   "tests": 39
+  },
+  "tests/test_typed_arb_adr_model_routes.py": {
+   "seconds": 8.05,
+   "tests": 13
+  },
+  "tests/test_typed_arb_condition_html_routes.py": {
+   "seconds": 15.08,
+   "tests": 16
+  },
+  "tests/test_typed_arb_condition_routes.py": {
+   "seconds": 42.44,
+   "tests": 42
+  },
+  "tests/test_typed_arb_decision_engine.py": {
+   "seconds": 0.32,
+   "tests": 24
+  },
+  "tests/test_typed_arb_decision_routes.py": {
+   "seconds": 69.52,
+   "tests": 65
+  },
+  "tests/test_typed_arb_interactions.py": {
+   "seconds": 0.32,
+   "tests": 67
+  },
+  "tests/test_typed_arb_read_models.py": {
+   "seconds": 6.99,
+   "tests": 19
+  },
+  "tests/test_typed_arb_solution_ingresses.py": {
+   "seconds": 2.27,
+   "tests": 12
+  },
+  "tests/test_typed_arb_submission_adapter.py": {
+   "seconds": 2.51,
+   "tests": 11
+  },
+  "tests/test_typed_arb_submission_core.py": {
+   "seconds": 1.08,
+   "tests": 25
+  },
+  "tests/test_typed_arb_submission_integration.py": {
+   "seconds": 15.68,
+   "tests": 19
+  },
+  "tests/test_typed_arb_submission_routes.py": {
+   "seconds": 9.72,
+   "tests": 19
+  },
+  "tests/test_typed_arb_submission_service.py": {
+   "seconds": 268.58,
+   "tests": 73
+  },
+  "tests/test_typed_arb_templates.py": {
+   "seconds": 1.96,
+   "tests": 39
+  },
+  "tests/test_typed_property_service.py": {
+   "seconds": 7.57,
+   "tests": 15
+  },
+  "tests/test_unique_keys_per_organisation.py": {
+   "seconds": 0.45,
+   "tests": 5
+  },
+  "tests/test_unrendered_model_fields_gate.py": {
+   "seconds": 0.06,
+   "tests": 4
+  },
+  "tests/test_untyped_property_writes_gate.py": {
+   "seconds": 2.15,
+   "tests": 3
+  },
+  "tests/test_user_id_tenant_fence_sweep.py": {
+   "seconds": 2.98,
+   "tests": 5
+  },
+  "tests/test_user_id_writes_followup.py": {
+   "seconds": 11.49,
+   "tests": 25
+  },
+  "tests/test_user_label_tenant_fence.py": {
+   "seconds": 1.62,
+   "tests": 4
+  },
+  "tests/test_utils_rbac_require_role_active_org.py": {
+   "seconds": 3.68,
+   "tests": 3
+  },
+  "tests/test_v07_f05_null_and_titles.py": {
+   "seconds": 2.25,
+   "tests": 5
+  },
+  "tests/test_validation_gaps_from_qa_audit.py": {
+   "seconds": 20.46,
+   "tests": 3
+  },
+  "tests/test_value_stream_archimate_sync.py": {
+   "seconds": 0.44,
+   "tests": 3
+  },
+  "tests/test_value_stream_stage_definition.py": {
+   "seconds": 1.53,
+   "tests": 5
+  },
+  "tests/test_value_streams.py": {
+   "seconds": 5.38,
+   "tests": 11
+  },
+  "tests/test_value_streams_dropdown_api.py": {
+   "seconds": 0.78,
+   "tests": 2
+  },
+  "tests/test_vendor_and_maturity_route_500s.py": {
+   "seconds": 3.11,
+   "tests": 6
+  },
+  "tests/test_vendor_api_pagination_total.py": {
+   "seconds": 1.36,
+   "tests": 4
+  },
+  "tests/test_vendor_bulk_delete_fk_guard.py": {
+   "seconds": 1.29,
+   "tests": 2
+  },
+  "tests/test_vendor_consolidation_merge.py": {
+   "seconds": 1.22,
+   "tests": 19
+  },
+  "tests/test_vendor_deploy_archimate_writer.py": {
+   "seconds": 0.81,
+   "tests": 2
+  },
+  "tests/test_vendor_match_element_link.py": {
+   "seconds": 12.84,
+   "tests": 3
+  },
+  "tests/test_vendor_prediction_engine_retired.py": {
+   "seconds": 0.05,
+   "tests": 3
+  },
+  "tests/test_vendor_tenancy_policy.py": {
+   "seconds": 0.01,
+   "tests": 2
+  },
+  "tests/test_verifier_governance_gate_registry.py": {
+   "seconds": 0.01,
+   "tests": 1
+  },
+  "tests/test_verify_test_suite_timeout.py": {
+   "seconds": 0.01,
+   "tests": 1
+  },
+  "tests/test_viewpoint_diagram_search_scope.py": {
+   "seconds": 0.92,
+   "tests": 2
+  },
+  "tests/test_viewpoint_svg_escaping.py": {
+   "seconds": 0.01,
+   "tests": 1
+  },
+  "tests/test_visio_import.py": {
+   "seconds": 0.12,
+   "tests": 15
+  },
+  "tests/test_visual_generation_escaping.py": {
+   "seconds": 0.01,
+   "tests": 2
+  },
+  "tests/test_vs_comparison_hub.py": {
+   "seconds": 7.78,
+   "tests": 12
+  },
+  "tests/test_walkthrough_seed_contract.py": {
+   "seconds": 0.01,
+   "tests": 1
+  },
+  "tests/test_watchdog_deployment_lock.py": {
+   "seconds": 1.51,
+   "tests": 11
+  },
+  "tests/test_weasyprint_runtime.py": {
+   "seconds": 6.84,
+   "tests": 2
+  },
+  "tests/test_webhook_signature.py": {
+   "seconds": 0.05,
+   "tests": 9
+  },
+  "tests/test_webhook_tenant_isolation.py": {
+   "seconds": 0.41,
+   "tests": 5
+  },
+  "tests/test_whole_product_audit_workflow.py": {
+   "seconds": 22.46,
+   "tests": 10
+  },
+  "tests/test_work_package_archimate_element.py": {
+   "seconds": 1.37,
+   "tests": 7
+  },
+  "tests/test_work_package_bridge.py": {
+   "seconds": 7.17,
+   "tests": 8
+  },
+  "tests/test_work_package_bulk_delete_binding.py": {
+   "seconds": 0.38,
+   "tests": 2
+  },
+  "tests/test_work_package_consolidation.py": {
+   "seconds": 93.71,
+   "tests": 15
+  },
+  "tests/test_work_package_delete.py": {
+   "seconds": 11.37,
+   "tests": 2
+  },
+  "tests/test_work_package_fix_round1.py": {
+   "seconds": 15.43,
+   "tests": 14
+  },
+  "tests/test_work_package_resource_demand.py": {
+   "seconds": 0.64,
+   "tests": 10
+  },
+  "tests/test_work_package_round2.py": {
+   "seconds": 3.56,
+   "tests": 4
+  },
+  "tests/test_work_package_round3.py": {
+   "seconds": 371.23,
+   "tests": 24
+  },
+  "tests/test_work_package_round4.py": {
+   "seconds": 42.82,
+   "tests": 18
+  },
+  "tests/test_work_package_round5.py": {
+   "seconds": 18.28,
+   "tests": 10
+  },
+  "tests/test_work_package_round6.py": {
+   "seconds": 15.76,
+   "tests": 15
+  },
+  "tests/test_work_package_round8.py": {
+   "seconds": 4.72,
+   "tests": 8
+  },
+  "tests/test_work_package_round9.py": {
+   "seconds": 10.76,
+   "tests": 13
+  },
+  "tests/test_work_package_service.py": {
+   "seconds": 7.6,
+   "tests": 12
+  },
+  "tests/test_work_package_writer.py": {
+   "seconds": 15.74,
+   "tests": 21
+  },
+  "tests/test_work_package_writer_ratchet.py": {
+   "seconds": 152.32,
+   "tests": 12
+  },
+  "tests/test_workforce_transition_form.py": {
+   "seconds": 13.26,
+   "tests": 4
+  },
+  "tests/test_workforce_transition_retiring_roles.py": {
+   "seconds": 0.12,
+   "tests": 1
+  },
+  "tests/test_workforce_transition_service.py": {
+   "seconds": 0.24,
+   "tests": 2
+  }
+ }
+}

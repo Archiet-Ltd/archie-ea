@@ -207,10 +207,26 @@ class RoadmapWorkPackage(db.Model):
             return datetime.utcnow() > self.end_date
         return False
 
-    def get_critical_path_impact(self):
-        """Calculate impact on critical path"""
-        # This would be implemented with critical path method algorithm
-        return {"is_critical": False, "slack_days": 0, "impact_score": 0.0}
+    def get_critical_path_impact(self, organization_id=None):
+        """The critical path impact, computed by the one computation on the one
+        work package store: delegates to the copy this retired row was merged
+        into (``retired_into_id``). No constant answer.
+
+        The retired store has no organisation column, so the fence is applied
+        through the unified row's organisation: an unknown organisation
+        (``None``), or a copy that belongs to a different organisation,
+        returns the empty critical path."""
+        from app.services import work_package_service
+
+        if organization_id is None:
+            return work_package_service.empty_critical_path()
+        if self.retired_into_id:
+            copy = work_package_service.get_work_package(
+                self.retired_into_id, organization_id
+            )
+            if copy is not None:
+                return copy.get_critical_path_impact()
+        return work_package_service.empty_critical_path()
 
 
 class RoadmapDeliverable(TenantMixin, db.Model):

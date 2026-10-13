@@ -35,8 +35,8 @@
                 <h3 class="text-lg font-semibold">Connector Status</h3>
                 <p class="text-sm text-muted-foreground mt-1">
                     Last sync:
-                    {% if sn_config and sn_config.last_sync_at %}
-                        {{ sn_config.last_sync_at.strftime('%Y-%m-%d %H:%M UTC') }}
+                    {% if sn_config and sn_config.last_sync %}
+                        {{ sn_config.last_sync.strftime('%Y-%m-%d %H:%M UTC') }}
                     {% else %}
                         <em>Never</em>
                     {% endif %}
@@ -44,8 +44,8 @@
             </div>
             <span id="status-badge"
                 class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
-                {% if sn_config and sn_config.enabled %}bg-success/10 text-success-emphasis{% else %}bg-muted text-muted-foreground{% endif %}">
-                {% if sn_config and sn_config.enabled %}Enabled{% else %}Disabled{% endif %}
+                {% if cfg.get('enabled') %}bg-success/10 text-success-emphasis{% else %}bg-muted text-muted-foreground{% endif %}">
+                {% if cfg.get('enabled') %}Enabled{% else %}Disabled{% endif %}
             </span>
         </div>
         <div class="p-4 sm:p-6 flex gap-3 flex-wrap">
@@ -80,14 +80,14 @@
                 <div>
                     <label for="instance_url" class="block text-sm font-medium mb-1">Instance URL</label>
                     <input type="url" id="instance_url" name="instance_url"
-                        value="{{ sn_config.instance_url or '' if sn_config else '' }}"
+                        value="{{ cfg.get('instance_url', '') }}"
                         placeholder="https://your-instance.service-now.com"
                         class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
                 </div>
                 <div>
                     <label for="client_id" class="block text-sm font-medium mb-1">Client ID</label>
                     <input type="text" id="client_id" name="client_id"
-                        value="{{ sn_config.client_id or '' if sn_config else '' }}"
+                        value="{{ cfg.get('client_id', '') }}"
                         placeholder="OAuth2 client_id from ServiceNow Application Registry"
                         class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
                 </div>
@@ -97,10 +97,10 @@
                         <span class="ml-2 text-xs text-muted-foreground font-normal">(leave blank to keep existing)</span>
                     </label>
                     <input type="password" id="client_secret" name="client_secret"
-                        placeholder="••••••••••••"
+                        placeholder="{{ '••••••••' if has_secret else 'Enter client secret' }}"
                         class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono" autocomplete="new-password">
                     <p class="mt-1 text-xs text-muted-foreground">
-                        Stored encrypted with Fernet (AES-128-CBC). Never logged or returned in API responses.
+                        Stored encrypted with the organisation's own key in the credential store. Never logged or returned in API responses.
                     </p>
                 </div>
             </div>
@@ -118,7 +118,7 @@
                 <div>
                     <label for="ci_query_filter" class="block text-sm font-medium mb-1">CI Query Filter</label>
                     <input type="text" id="ci_query_filter" name="ci_query_filter"
-                        value="{{ (sn_config.field_mapping or {}).get('ci_query_filter', '') if sn_config else '' }}"
+                        value="{{ (cfg.get('field_mapping') or {}).get('ci_query_filter', '') }}"
                         placeholder="operational_status=1^install_status=1"
                         class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
                     <p class="mt-1 text-xs text-muted-foreground">ServiceNow encoded query for <code class="font-mono">cmdb_ci_appl</code> table.</p>
@@ -128,7 +128,7 @@
                     <textarea id="field_mapping" name="field_mapping" rows="6"
                         class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
                         placeholder='{"name": "name", "sys_class_name": "component_type", "u_business_owner": "business_owner"}'
-                    >{{ sn_config.field_mapping | tojson(indent=2) if sn_config and sn_config.field_mapping else '{}' }}</textarea>
+                    >{{ cfg.get('field_mapping', {}) | tojson(indent=2) }}</textarea>
                     <p class="mt-1 text-xs text-muted-foreground">
                         JSON object mapping ServiceNow field names → ApplicationComponent column names.
                         Defaults are: <code class="font-mono">name→name</code>, <code class="font-mono">sys_class_name→component_type</code>, <code class="font-mono">u_business_owner→business_owner</code>.
@@ -148,7 +148,7 @@
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" id="enabled" name="enabled" class="sr-only peer"
-                        {% if sn_config and sn_config.enabled %}checked{% endif %}>
+                        {% if cfg.get('enabled') %}checked{% endif %}>
                     <div class="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer
                         peer-checked:after:translate-x-full peer-checked:after:border-background
                         after:content-[''] after:absolute after:top-[2px] after:left-[2px]
