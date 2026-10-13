@@ -37,6 +37,70 @@
         actions_caller=_ps_actions
     ) }}
 
+    {# -- Critical path to the next plateau -------------------------------- #}
+    {% if critical_paths %}
+    <div data-testid="critical-path-panel" class="border border-border rounded-lg overflow-hidden">
+        <div class="px-4 py-3 bg-muted/50 border-b border-border">
+            <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <div>
+                    <div class="font-semibold text-sm text-foreground">Critical path to the next plateau</div>
+                    <div class="text-xs text-muted-foreground">The longest dependency chain of scheduled work packages, read from the one work package store</div>
+                </div>
+            </div>
+        </div>
+        <div class="divide-y divide-border">
+            {% for cp in critical_paths %}
+            <div data-testid="critical-path-plateau" class="px-4 py-3 space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-sm font-medium text-foreground">{{ cp.plateau_name or 'Plateau' }}</span>
+                    {% if cp.has_critical_path %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary">
+                        {{ cp.duration_days }} day critical path
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground">
+                        not scheduled
+                    </span>
+                    {% endif %}
+                </div>
+                {% if cp.has_critical_path %}
+                <div data-testid="critical-path-chain" class="flex items-center gap-1.5 flex-wrap text-xs">
+                    {% for node in cp.path %}
+                    <span class="px-2 py-0.5 rounded bg-background border border-border text-foreground">{{ node.name }}</span>
+                    {% if not loop.last %}<span class="text-muted-foreground" aria-hidden="true">→</span>{% endif %}
+                    {% endfor %}
+                </div>
+                <div data-testid="critical-path-blocking" class="flex items-center gap-1.5 flex-wrap text-xs text-muted-foreground">
+                    <span class="font-medium text-foreground">Blocking:</span>
+                    <span>{{ cp.blocking.name }}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>Owner: {{ cp.blocking.owner_name or '—' }}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>Ends {{ cp.blocking.end_date or '—' }}</span>
+                </div>
+                {% if cp.cycles %}
+                <div data-testid="critical-path-cycle" class="text-xs text-warning-emphasis">
+                    A dependency cycle was found and is not followed: work package ids {{ cp.cycles|tojson }}.
+                </div>
+                {% endif %}
+                {% if cp.ignored_dependencies %}
+                <div class="text-xs text-warning-emphasis">
+                    Dependency on another organisation's work package ignored: id{{ 's' if cp.ignored_dependencies|length != 1 else '' }}
+                    {{ cp.ignored_dependencies|map(attribute='dependency_id')|join(', ') }}.
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="text-xs text-muted-foreground">No scheduled work packages for this plateau yet.</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     {# -- Empty state ---------------------------------------------------- #}
     {% if not plateaus %}
     <div class="flex flex-col items-center justify-center py-20 text-center border border-dashed border-border rounded-lg">
