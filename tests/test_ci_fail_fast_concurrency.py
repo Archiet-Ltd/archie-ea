@@ -121,3 +121,18 @@ def test_no_deploy_workflow_cancels_in_progress():
 def test_every_workflow_parses():
     for path in WORKFLOWS.glob("*.yml"):
         assert yaml.safe_load(path.read_text(encoding="utf-8"))["jobs"], path.name
+
+
+def test_fast_gate_skips_on_unrelated_label_events_and_runs_for_ci_fast():
+    job = _ci()["jobs"]["fast_gate"]
+
+    def runs(action, labels):
+        ctx = {"github": {"event_name": "pull_request",
+                          "event": {"action": action,
+                                    "pull_request": {"labels": [{"name": x} for x in labels]}}},
+               "_labels": list(labels)}
+        return bool(_eval_github_expr(_strip_expr(str(job["if"])), ctx))
+
+    assert not runs("labeled", ["bug"])
+    assert runs("labeled", ["ci-fast"])
+    assert runs("synchronize", [])
