@@ -88,7 +88,7 @@ def login():
                     url_for("sso.sso_initiate", email=form.email.data)
                 )
         except Exception as _sso_exc:
-            _log.debug("SSO domain check failed (non-fatal): %s", _sso_exc)
+            _log.warning("SSO domain check failed; falling back to the password path", exc_info=True)
 
         user = _svc.authenticate(form.email.data, form.password.data)
         if user is not None:

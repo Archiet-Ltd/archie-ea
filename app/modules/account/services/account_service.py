@@ -22,6 +22,7 @@ from app.flask_email import send_email
 from app.jobs.tenant_safe_job import platform_scope
 from app.models import User
 from app.models.org_role import OrgRole
+from app.models.user import password_hash_is_current
 from app.services import session_registry
 
 _log = logging.getLogger(__name__)
@@ -94,6 +95,15 @@ class AccountService:
             and user.password_hash is not None
             and user.verify_password(password)
         ):
+            if not password_hash_is_current(user.password_hash):
+                # Upgrade a hash from an older method or cost while the plain
+                # password is in hand; never let a failed upgrade fail the sign-in.
+                try:
+                    user.password = password
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+                    _log.warning("password hash upgrade failed for user %s", user.id, exc_info=True)
             return user
         return None
 

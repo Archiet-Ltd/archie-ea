@@ -21,6 +21,8 @@ from urllib.parse import urlencode
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from app.models.user import PASSWORD_HASH_METHOD, password_hash_is_current
+
 logger = logging.getLogger(__name__)
 
 # Signing algorithms this service will ever accept for an id_token. "none"
@@ -80,7 +82,7 @@ _ORG_SSO_PROVIDER = "oidc"
 # Verified against when the address has no account or no password, so every
 # sign-in-form decision for a claimed domain costs one hash check and the
 # response time does not reveal which kind of account an address is.
-_DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_urlsafe(32))
+_DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_urlsafe(32), method=PASSWORD_HASH_METHOD)
 
 
 class SSONotConfiguredError(Exception):
@@ -155,6 +157,10 @@ class SSOService:
         check when, and only when, the submitted password is correct for that
         account. Exactly one password hash check runs for every address in a
         claimed domain. None means "carry on to the password check".
+
+        Only a password hash in the platform's current format is checked; an
+        account with any other format is treated as a wrong password here and
+        recovers through a password reset.
         """
         config = self.get_config_for_email(email)
         if config is None or not config.enabled:
@@ -173,14 +179,15 @@ class SSOService:
                 logger.debug("suppressed error in SSOService.config_for_login: %s", rollback_exc)
             return None
         stored_hash = getattr(user, "password_hash", None) if user is not None else None
-        # Exactly one hash check for every address in a claimed domain (see
-        # _DUMMY_PASSWORD_HASH). An account outside this organisation, or a
-        # platform administrator, may use the password path only when the
-        # password it submitted is right; anyone else, and anyone with a wrong
-        # password, is sent to the organisation's identity provider, so the
-        # answer does not reveal what kind of account an address holds.
-        password_ok = check_password_hash(stored_hash or _DUMMY_PASSWORD_HASH, password or "")
-        password_ok = password_ok and stored_hash is not None
+        # Only a hash in the platform's one current format is verified here; any
+        # other stored value (an older cost, a foreign format) is checked against
+        # the dummy instead and counts as a wrong password. So every address in a
+        # claimed domain costs exactly one check at one fixed cost, and no stored
+        # value can make this raise. Such an account recovers by password reset,
+        # which rewrites its hash in the current format.
+        usable = password_hash_is_current(stored_hash)
+        password_ok = check_password_hash(stored_hash if usable else _DUMMY_PASSWORD_HASH, password or "")
+        password_ok = password_ok and usable
         if (
             password_ok
             and user is not None
@@ -580,6 +587,10 @@ class SSOService:
           told that a sign-in method was connected.
         - An unknown address is created in *org*.
 
+        Any account this returns is confirmed: the organisation's identity
+        provider has asserted its address in one of the configured domains,
+        the same evidence a new account is created on.
+
         Args:
             org: :class:`app.models.organization.Organization` instance.
             userinfo: Dict of OIDC claims (``email``, ``sub``, ``name``, etc.).
@@ -651,6 +662,8 @@ class SSOService:
                 if linked.is_platform_admin:
                     raise SSONotConfiguredError(_MSG_PASSWORD_ONLY)
                 _refresh_names(linked)
+                if not linked.confirmed:
+                    linked.confirmed = True
                 db.session.commit()
                 return linked
 
@@ -691,6 +704,7 @@ class SSOService:
                 _refresh_names(user)
                 user.sso_provider = _ORG_SSO_PROVIDER
                 user.external_id = sub
+                user.confirmed = True
 
             db.session.commit()
 
@@ -713,6 +727,9 @@ class SSOService:
         event that carries neither the old subject nor the address; a failed
         audit write is logged and never undoes the reset.
 
+        The account stays activated: a reset never returns it to the state
+        of an invitation nobody has taken up.
+
         Raises:
             LookupError: no such user in organisation *org_id*.
             PermissionError: the user is a platform administrator.
@@ -731,6 +748,12 @@ class SSOService:
         previous_provider = user.sso_provider
         user.external_id = None
         user.sso_provider = None
+        # A linked account has been signed in by an identity provider, so it
+        # is in use. Clearing the link must never make it look like an
+        # invitation nobody has taken up (invitation_service.is_unactivated),
+        # whatever wrote the link: this organisation's SSO, a platform
+        # provider, or a link made before accounts were confirmed on sign-in.
+        user.confirmed = True
         db.session.commit()
 
         try:
