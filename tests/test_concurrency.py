@@ -65,7 +65,17 @@ def _lock_attr(cls):
 
 @pytest.fixture
 def component(app):
-    """A row to fight over, plus its organisation."""
+    """A row to fight over, plus its organisation.
+
+    Real, fully committed rows rather than db_session/make_org: every test
+    below opens independent raw sessions bound directly to db.engine (two
+    real connections, the same shape as two browser tabs) to prove
+    optimistic locking holds across genuinely separate transactions.
+    db_session captures one connection and keeps everything inside an
+    uncommitted SAVEPOINT on it; a row created that way would be invisible
+    to a second, independent connection — exactly the scenario these tests
+    need to be real. Deletes exactly what it created, by id, instead.
+    """
     from app import db
     from app.models.application_portfolio import ApplicationComponent
     from app.models.organization import Organization
@@ -78,7 +88,25 @@ def component(app):
         row = ApplicationComponent(name="Contended %s" % marker, organization_id=org.id)
         db.session.add(row)
         db.session.commit()
-        return {"id": row.id, "org_id": org.id, "marker": marker}
+        row_id, org_id = row.id, org.id
+
+    yield {"id": row_id, "org_id": org_id, "marker": marker}
+
+    with app.app_context():
+        from app.models.audit_log import AuditLog
+
+        # ApplicationComponent is an audited ("controlled") model: its insert
+        # above, and every raw-session UPDATE the tests in this file make to
+        # it, each write a soc2_audit_log row keyed on this record_id. Clear
+        # those first — soc2_audit_log is append-only by design (no FK from
+        # it blocks the component delete below, but leaving these rows is
+        # its own leak).
+        db.session.query(AuditLog).filter_by(
+            table_name="application_component", record_id=row_id
+        ).delete(synchronize_session=False)
+        db.session.query(ApplicationComponent).filter_by(id=row_id).delete()
+        db.session.query(Organization).filter_by(id=org_id).delete()
+        db.session.commit()
 
 
 def test_the_version_column_exists_and_starts_populated(app, component):
