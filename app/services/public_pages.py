@@ -1164,6 +1164,27 @@ class LandingSection:
     heading_html: Markup
     body_html: Markup
     cards: list[LandingCard] | None = None
+    # "callout" (a use-case page's own "The question" -- rendered as a
+    # left-ruled attention box, B-03) or "figure_band" (its "What Entelim
+    # answers" -- rendered beside the page's screenshot/recording when one
+    # exists, text-only otherwise, B-02's band shape). "default" for every
+    # other section on every page family, which keeps the plain prose/card
+    # band unchanged. See _SECTION_VARIANT_HEADINGS below.
+    variant: str = "default"
+
+
+# Use-case pages only (checked against page.family, never page.page_family,
+# same guard build_landing() uses for LANDING_FAMILIES): the exact, lowercased
+# plain-text heading that turns a section into the callout or figure-band
+# variant. A page whose second heading reads "What Entelim is building" (not
+# yet live) or something else entirely (e.g. the one longer FAQ-style use
+# case with no "The question" heading at all) simply keeps the default prose
+# band -- this table does not require every use-case file to share the same
+# shape, only recognises the two headings that do.
+_SECTION_VARIANT_HEADINGS: dict[str, str] = {
+    "the question": "callout",
+    "what entelim answers": "figure_band",
+}
 
 
 @dataclass
@@ -1409,7 +1430,8 @@ def build_landing(page: PublicPage) -> Landing | None:
     used_ids: set[str] = set()
     for index, h2 in enumerate(h2_nodes):
         heading = body[h2.inner_start:h2.inner_end]
-        base_id = h2.attrs.get("id") or _slugify(_plain_text(heading)) or "section"
+        heading_text = _plain_text(heading)
+        base_id = h2.attrs.get("id") or _slugify(heading_text) or "section"
         section_id, suffix = base_id, 2
         while section_id in used_ids:
             section_id = f"{base_id}-{suffix}"
@@ -1423,11 +1445,15 @@ def build_landing(page: PublicPage) -> Landing | None:
             if pages_by_url is None:
                 pages_by_url = _pages_by_url()
             cards = _link_list_cards(section_body.strip(), pages_by_url)
+        variant = "default"
+        if page.family == "function-per-segment":
+            variant = _SECTION_VARIANT_HEADINGS.get(heading_text.strip().lower(), "default")
         sections.append(LandingSection(
             id=section_id,
             heading_html=_fragment(heading) or Markup(""),
             body_html=_fragment(section_body) or Markup(""),
             cards=cards,
+            variant=variant,
         ))
 
     parent = _BREADCRUMB_PARENTS.get(page.family)

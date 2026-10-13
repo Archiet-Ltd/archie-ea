@@ -6,6 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
 url_slug: /use-cases/target-state-roadmap
+icon: flag
 ---
 
 # Show the path from today's estate to the target state, stage by stage

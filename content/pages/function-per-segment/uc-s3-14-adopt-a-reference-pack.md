@@ -8,6 +8,7 @@ roadmap_citation: "roadmap-v2.md 'Next: December 2026 to February 2027' — Ente
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
 url_slug: /use-cases/adopt-reference-pack
+icon: cloud-download
 ---
 
 # Adopt the standard shape of what we run on day one and map our own systems onto it

@@ -5,6 +5,15 @@ body into hero lead, intro and sections; link lists to cards; icons) and the
 landing branch of public/page.html (public/_partials/_landing.html): hero with
 icon, breadcrumb, H1, lead and two buttons; section bands; card grids; the
 closing action band. Every other page family keeps the document layout.
+
+B-03 (use-case question/answer layout, MP-B2): a use-case page's "The
+question" section renders as a left-ruled callout instead of a plain prose
+band, and its "What Entelim answers" section renders beside the page's own
+screenshot/recording when one exists (text-only, unchanged from the default
+band, when none does yet) -- see the ``variant``-specific tests below and
+``USE_CASE_ICONS`` for the per-use-case-file icon front matter that gives
+every use-case "Related" card its own, distinct icon the same way
+``MODULE_ICONS`` already does for modules.
 """
 
 from __future__ import annotations
@@ -54,6 +63,56 @@ MODULE_ICONS = {
     "solutions": "puzzle",
     "value-streams": "workflow",
     "vendors": "truck",
+}
+
+# Every use-case (function-per-segment) content file's own icon, keyed by its
+# filename stem (the internal uc-sN-NN-* slug, not the public url_slug) the
+# same way MODULE_ICONS above is keyed by a module file's stem. Each value is
+# distinct from every other entry here AND from every MODULE_ICONS value
+# (test_every_use_case_page_declares_a_known_icon asserts both), so a
+# "Related" grid mixing module and use-case cards can never repeat an icon.
+USE_CASE_ICONS = {
+    "uc-s1-01-canvas-dependencies": "git-branch",
+    "uc-s1-02-canvas-on-one-page": "layout-template",
+    "uc-s1-03-lean-canvas": "clipboard-list",
+    "uc-s1-04-revenue-stream-risk": "banknote",
+    "uc-s1-05-show-what-we-run": "presentation",
+    "uc-s1-06-single-point-of-failure": "zap-off",
+    "uc-s1-07-reference-packs": "package",
+    "uc-s1-08-website-first-look": "eye",
+    "uc-s1-09-website-full-profile": "book-user",
+    "uc-s2-01-what-breaks": "phone-call",
+    "uc-s2-02-no-owner": "user-x",
+    "uc-s2-03-duplicate-spend": "receipt",
+    "uc-s2-04-connect-your-tools": "github",
+    "uc-s2-05-one-system-two-tools": "shuffle",
+    "uc-s2-06-whats-changed": "history",
+    "uc-s2-07-twin-map": "map",
+    "uc-s2-08-risk-blast-radius": "flame",
+    "uc-s2-09-incident-feeds": "siren",
+    "uc-s2-10-what-i-own": "briefcase",
+    "uc-s2-11-connector-candidates": "cable",
+    "uc-s3-01-import-your-model": "file-up",
+    "uc-s3-02-leanix-ardoq-import": "arrow-left-right",
+    "uc-s3-03-servicenow-crosswalk": "table-2",
+    "uc-s3-04-value-streams-at-risk": "alert-triangle",
+    "uc-s3-05-business-case-for-the-cio": "piggy-bank",
+    "uc-s3-06-capability-maturity-heatmap": "thermometer",
+    "uc-s3-07-review-board": "users-round",
+    "uc-s3-08-risk-and-controls": "shield-off",
+    "uc-s3-09-programme-tracking": "list-checks",
+    "uc-s3-10-ai-assistant": "sparkles",
+    "uc-s3-11-derivation-yield": "percent",
+    "uc-s3-12-who-do-we-need": "user-plus",
+    "uc-s3-13-target-state-roadmap": "flag",
+    "uc-s3-14-adopt-a-reference-pack": "cloud-download",
+    "uc-s3-15-see-your-own-twin": "scan",
+    "uc-s4-01-what-happens-if": "server-off",
+    "uc-s4-02-set-up-in-an-afternoon": "clock",
+    "uc-s4-03-see-it-on-a-company-like-mine": "building-2",
+    "uc-s4-04-key-person-risk": "user-cog",
+    "uc-s4-05-contract-renewals": "calendar",
+    "uc-s4-06-what-we-can-and-cannot-tell": "eye-off",
 }
 
 
@@ -157,6 +216,53 @@ def test_section_ids_are_unique_and_keep_existing_ids(app):
         "<h2>Repeat</h2><p>b</p><h2>Repeat</h2><p>c</p><h2>Repeat</h2><p>d</p>",
     )
     assert [s.id for s in landing.sections] == ["custom-anchor", "repeat", "repeat-2", "repeat-3"]
+
+
+# ---------------------------------------------------------------------------
+# build_landing(): B-03 use-case section variants (callout / figure_band)
+# ---------------------------------------------------------------------------
+
+
+def test_use_case_question_and_answer_headings_get_their_own_variant(app):
+    landing = _landing(
+        app,
+        "<h1>T</h1><p>Lead.</p>"
+        "<h2>The question</h2><p>Q body.</p>"
+        "<h2>What Entelim answers</h2><p>A body.</p>"
+        "<h2>Related</h2><p>Not a list, stays prose.</p>",
+        family="function-per-segment",
+    )
+    assert [s.variant for s in landing.sections] == ["callout", "figure_band", "default"]
+
+
+def test_use_case_variant_match_is_exact_and_case_insensitive(app):
+    """Only the two known headings, matched on their own plain text (not a
+    substring), switch a use-case section's variant -- a page whose second
+    heading reads "What Entelim is building" (not yet live) or anything else
+    keeps the default prose band, and matching ignores case/whitespace."""
+    landing = _landing(
+        app,
+        "<h1>T</h1><p>Lead.</p>"
+        "<h2>  THE QUESTION  </h2><p>Q body.</p>"
+        "<h2>What Entelim is building</h2><p>Not live yet.</p>"
+        "<h2>The question, sort of</h2><p>Not an exact match.</p>",
+        family="function-per-segment",
+    )
+    assert [s.variant for s in landing.sections] == ["callout", "default", "default"]
+
+
+def test_section_variants_only_apply_to_use_case_pages(app):
+    """The same two headings on a module or comparison page never switch
+    variant -- build_landing() gates on page.family, not the heading text
+    alone."""
+    for family in ("module", "comparison"):
+        landing = _landing(
+            app,
+            "<h1>T</h1><p>Lead.</p><h2>The question</h2><p>a</p>"
+            "<h2>What Entelim answers</h2><p>b</p>",
+            family=family,
+        )
+        assert [s.variant for s in landing.sections] == ["default", "default"]
 
 
 # ---------------------------------------------------------------------------
@@ -360,6 +466,33 @@ def test_card_icons_follow_their_target_module(app):
     assert "Risk Register" in card
 
 
+def test_use_case_card_icon_follows_its_own_front_matter(app):
+    with app.test_client() as client:
+        html = client.get("/use-cases/duplicate-software-spend").data.decode()
+    hero = html[html.index('data-testid="landing-hero"'):html.index('class="landing-bands"')]
+    assert 'data-lucide="receipt"' in hero
+    card = html[html.index('href="/use-cases/what-breaks-and-who-gets-called" class="group flex'):]
+    card = card[:card.index("</a>")]
+    assert 'data-lucide="phone-call"' in card
+
+
+def test_no_two_cards_in_the_same_grid_share_an_icon(app):
+    """Acceptance criterion: no two cards in the same grid, on any module or
+    use-case page, show the same icon -- checked against every live card
+    grid on every module and use-case landing page, not only the two pages
+    named in the brief."""
+    with app.test_request_context():
+        for page in _landing_pages():
+            if page.family not in ("module", "function-per-segment"):
+                continue
+            landing = build_landing(page)
+            for section in landing.sections:
+                if not section.cards:
+                    continue
+                icons = [card.icon for card in section.cards]
+                assert len(icons) == len(set(icons)), (page.url, section.id, icons)
+
+
 @pytest.mark.parametrize(
     "url, list_tag, heading_text",
     [
@@ -488,6 +621,88 @@ def test_use_case_hero_names_its_segment(app):
     assert "/ Scale-ups" in hero
 
 
+# ---------------------------------------------------------------------------
+# B-03 rendering: "The question" callout and the "What Entelim answers" band
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "url, question_text",
+    [
+        (
+            "/use-cases/duplicate-software-spend",
+            "A SaaS spend review finds three tools doing the same job",
+        ),
+        (
+            "/use-cases/what-breaks-and-who-gets-called",
+            "The first ten minutes are spent figuring out who owns the failing component",
+        ),
+    ],
+)
+def test_use_case_question_renders_as_a_left_ruled_callout(app, url, question_text):
+    with app.test_client() as client:
+        html = client.get(url).data.decode()
+    assert 'data-testid="usecase-question-callout"' in html
+    marker = html.index('data-testid="usecase-question-callout"')
+    open_tag_start = html.rindex("<div", 0, marker)
+    open_tag = html[open_tag_start:html.index(">", open_tag_start) + 1]
+    assert "border-l-4" in open_tag
+    assert "border-warning" in open_tag
+    assert "bg-warning/5" in open_tag
+    assert "rounded-r-lg" in open_tag
+    callout = html[open_tag_start:html.index("</div>", marker)]
+    assert question_text in callout
+    # The callout sits inside the "The question" section band, after its own heading.
+    assert "<h2" in html[html.index('aria-labelledby="the-question"'):open_tag_start]
+
+
+def test_use_case_answer_band_is_text_only_when_no_figure_exists_yet(app):
+    """Neither target page has a captured screenshot or recording yet (both
+    USE_CASE_SCREENSHOT_CAPTURES and USE_CASE_VIDEO_CAPTURES are empty as of
+    this change), so "What Entelim answers" must render its real text with no
+    figure band and no broken or placeholder image."""
+    with app.test_client() as client:
+        html = client.get("/use-cases/duplicate-software-spend").data.decode()
+    assert 'data-testid="usecase-answer-figure-band"' not in html
+    assert 'data-testid="page-screenshot"' not in html
+    assert 'data-testid="page-recording"' not in html
+    assert "Find what you&#39;re paying for twice" in html or "Find what you're paying for twice" in html
+
+
+def test_use_case_answer_band_shows_the_figure_beside_the_text_when_one_exists(app, monkeypatch):
+    """Once a use-case page does have a captured screenshot, "What Entelim
+    answers" renders it in a side-by-side (5/7) band -- the B-02 figure-slot
+    shape -- instead of the page-top media slot module pages use, and the
+    figure is not duplicated in both places."""
+    from app.services import public_pages
+
+    fake_screenshot = {
+        "url": "/static/img/use-cases/duplicate-software-spend.webp",
+        "width": 1200,
+        "height": 800,
+        "mobile": None,
+        "alt": "Synthetic screenshot for this test only.",
+        "caption": "Synthetic caption for this test only.",
+    }
+
+    def _fake_get_page_screenshot(page):
+        return fake_screenshot if page.url == "/use-cases/duplicate-software-spend" else None
+
+    monkeypatch.setattr(public_pages, "get_page_screenshot", _fake_get_page_screenshot)
+    with app.test_client() as client:
+        html = client.get("/use-cases/duplicate-software-spend").data.decode()
+
+    assert 'data-testid="usecase-answer-figure-band"' in html
+    band_start = html.index('data-testid="usecase-answer-figure-band"')
+    band = html[band_start:html.index("data-testid=\"landing-closing\"")]
+    assert 'data-testid="page-screenshot"' in band
+    assert "lg:col-span-5" in band
+    assert "lg:col-span-7" in band
+    assert "Synthetic caption for this test only." in band
+    # Not duplicated at the top of the page, before the section loop.
+    assert 'data-testid="page-screenshot"' not in html[:band_start]
+
+
 def test_every_module_page_declares_a_known_icon():
     module_dir = CONTENT_ROOT / "modules"
     files = sorted(module_dir.glob("*.md"))
@@ -499,6 +714,28 @@ def test_every_module_page_declares_a_known_icon():
         assert len(icons) == 1, md_file.name
         assert icons[0] in known, (md_file.name, icons[0])
         assert icons[0] == MODULE_ICONS[md_file.stem], md_file.name
+
+
+def test_every_use_case_page_declares_a_known_icon():
+    use_case_dir = CONTENT_ROOT / "function-per-segment"
+    files = sorted(use_case_dir.glob("*.md"))
+    assert len(files) == 41
+    assert {f.stem for f in files} == set(USE_CASE_ICONS)
+    known = set(USE_CASE_ICONS.values())
+    assert len(known) == len(USE_CASE_ICONS), "USE_CASE_ICONS has a repeated icon value"
+    assert known.isdisjoint(set(MODULE_ICONS.values())), (
+        "a use-case icon repeats a module icon -- a Related grid mixing the two would collide"
+    )
+    for md_file in files:
+        front = md_file.read_text(encoding="utf-8").split("---", 2)[1]
+        icons = re.findall(r"^icon:\s*(\S+)\s*$", front, re.M)
+        assert len(icons) == 1, md_file.name
+        assert icons[0] in known, (md_file.name, icons[0])
+        assert icons[0] == USE_CASE_ICONS[md_file.stem], md_file.name
+        assert page_icon(PublicPage(
+            family="function-per-segment", slug=md_file.stem, url="/use-cases/x",
+            title="x", body_html=Markup(""), front_matter={"icon": icons[0]},
+        )) == icons[0], md_file.name
 
 
 @pytest.mark.parametrize("url", ["/terms", "/privacy", "/about", "/pricing", "/features"])

@@ -6,6 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
 url_slug: /use-cases/revenue-stream-risk
+icon: banknote
 ---
 
 # What must be true for the revenue stream we are betting on, and which of it is not ready?
