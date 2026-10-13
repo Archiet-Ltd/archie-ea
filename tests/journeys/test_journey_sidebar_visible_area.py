@@ -143,6 +143,11 @@ def test_a_long_label_wraps_instead_of_being_cut(app, client, browser):
     document = client.get(path).get_data(as_text=True)
     pg = _open(browser, client, document, path)
     try:
+        # The link sits in a group that starts collapsed for a role with many links: open it first.
+        toggle = pg.locator('#sidebar-nav [data-sidebar-group="goals"] button')
+        toggle.wait_for(state="visible", timeout=10000)
+        if toggle.get_attribute("aria-expanded") == "false":
+            toggle.click()
         link = pg.locator('#sidebar-nav a[title="Transformation programmes"] span.flex-1')
         link.wait_for(state="visible", timeout=10000)
         info = link.evaluate("""el => ({
@@ -238,12 +243,13 @@ def test_a_long_label_wraps_in_the_mobile_drawer_too(app, client, browser):
     "platform_admin",
 ])
 def test_no_zone_link_or_label_changed_for_any_persona(app, client, role):
-    """Repositioning and restyling the sidebar must not add, remove or rename a link,
-    or change a zone's membership or order, for any of the eleven personas."""
+    """Repositioning and restyling the sidebar must not add, remove or rename a link for any of
+    the eleven personas. The links are displayed in the sidebar's question-shaped groups
+    (get_sidebar_groups), in that order; the zones stay the model everything else reads."""
     import html as html_module
     import re
 
-    from app.utils.role_access import get_sidebar_zones
+    from app.utils.role_access import get_sidebar_groups, get_sidebar_zones
 
     class _StubUser:
         """Same shape get_sidebar_zones() reads: enterprise_role, is_admin(), is_platform_admin, is_org_admin, can()."""
@@ -276,9 +282,17 @@ def test_no_zone_link_or_label_changed_for_any_persona(app, client, role):
     rendered_labels = [html_module.unescape(label) for _, label in rendered_hrefs]
 
     expected_labels = []
-    for zone in get_sidebar_zones(_StubUser(role)):
-        for link in zone["links"]:
+    for group in get_sidebar_groups(_StubUser(role)):
+        for link in group["links"]:
             if link["endpoint"] in app.view_functions:
                 expected_labels.append(link["label"])
 
     assert rendered_labels == expected_labels, (role, rendered_labels, expected_labels)
+
+    # Grouping only moves links: none is added, removed or renamed relative to the zones.
+    zone_links = {}
+    for zone in get_sidebar_zones(_StubUser(role)):
+        for link in zone["links"]:
+            if link["endpoint"] in app.view_functions:
+                zone_links.setdefault(link["endpoint"], link["label"])
+    assert sorted(rendered_labels) == sorted(zone_links.values()), (role, rendered_labels, zone_links)
