@@ -466,6 +466,9 @@ else:
     # existing Technology-layer ArchiMateElement catalogue.
     from .tech_radar import TechRadarEntry  # noqa: F401
 
+    # Platform-level security finding register (no organisation column).
+    from .security_finding import SecurityFinding  # noqa: F401
+
     # ARCH-123 (Data Lineage) builds entirely on the existing
     # ArchiMateRelationship model (type="DataFlow" between DataObject
     # elements) — no new table required; see

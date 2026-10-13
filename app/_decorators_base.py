@@ -67,6 +67,20 @@ def admin_required(f):
     return decorated_function
 
 
+def may_read_governance_gates(user):
+    """Nav-visibility check for sidebar/role_access.py: whether to SHOW the
+    gate-policy/security-finding-tracker link at all, not an authorisation
+    decision -- the route itself is the real gate
+    (``governance_gate_reader_required`` below), which is active-org-scoped.
+    This stays a global flag check on purpose: it only decides whether a link
+    renders, and an over-eager link just 403s at the route rather than
+    leaking anything."""
+    return bool(
+        user.can(Permission.ADMINISTER)
+        or getattr(user, "enterprise_role", None) == "security_architect"
+    )
+
+
 def governance_gate_reader_required(f):
     """Allow gate-policy readers without granting configuration authority.
 
