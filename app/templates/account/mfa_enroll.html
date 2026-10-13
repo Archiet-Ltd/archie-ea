@@ -8,11 +8,20 @@
   <h1 class="text-xl font-semibold text-foreground">Set up two-factor authentication</h1>
   <p class="mt-2 text-sm text-muted-foreground">
     Administrator accounts require a code from an authenticator app (Google
-    Authenticator, 1Password, Authy or similar) on every sign-in. Scan this
-    code or enter the key manually, then confirm with the code it shows.
+    Authenticator, 1Password, Authy or similar) on every sign-in. Scan the
+    QR code below with your authenticator app, or enter the setup key
+    manually, then confirm with the code it shows.
   </p>
 
   <div class="mt-6 rounded-md border border-border bg-muted/30 p-4">
+    {% set qr_src = provisioning_uri | qr_svg_data_uri %}
+    {% if qr_src %}
+    <div class="flex justify-center">
+      <img src="{{ qr_src }}" width="216" height="216" data-testid="mfa-qr-code"
+           alt="QR code that adds this account to your authenticator app"
+           class="rounded-sm bg-white p-2" referrerpolicy="no-referrer">
+    </div>
+    {% endif %}
     <p class="text-xs text-muted-foreground">Setup key (enter manually if you cannot scan a QR code):</p>
     <code class="mt-1 block break-all text-sm font-mono" data-testid="mfa-setup-key">{{ secret }}</code>
     <p class="mt-3 text-xs text-muted-foreground">Or open this link on a device with your authenticator app:</p>
