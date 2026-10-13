@@ -208,9 +208,17 @@ class RoadmapWorkPackage(db.Model):
         return False
 
     def get_critical_path_impact(self):
-        """Calculate impact on critical path"""
-        # This would be implemented with critical path method algorithm
-        return {"is_critical": False, "slack_days": 0, "impact_score": 0.0}
+        """The critical path impact, computed by the one computation on the one
+        work package store: delegates to the copy this retired row was merged
+        into (``retired_into_id``). No constant answer."""
+        from app.services import work_package_service
+        from app.models.unified_work_package import UnifiedWorkPackage
+
+        if self.retired_into_id:
+            copy = UnifiedWorkPackage.query.filter_by(id=self.retired_into_id).first()
+            if copy is not None:
+                return copy.get_critical_path_impact()
+        return work_package_service.empty_critical_path()
 
 
 class RoadmapDeliverable(TenantMixin, db.Model):

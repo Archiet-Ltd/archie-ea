@@ -755,6 +755,358 @@ def legacy_id(wp: UnifiedWorkPackage, table: str) -> Optional[int]:
     return None
 
 
+# --- owner/approver panel and critical path (transformation planning) -------
+# The owner/approver panel reads the one ownership record
+# (``ApplicationOwner.get_display_rows_*``) and the one approval queue, so there
+# is no second owner reader and no second approver reader. The critical path is
+# the one computation over this store's rows and its ``work_dependencies``: the
+# retired store's stub delegates here (see RoadmapWorkPackage.get_critical_path_impact).
+
+_WP_APPROVAL_ENTITY = "work_package"
+_ELEMENT_CAPABILITY = "capability"
+_ELEMENT_APPLICATION = "application"
+
+
+def empty_critical_path() -> Dict[str, Any]:
+    """The canonical empty critical path result, shared by the model stubs."""
+    return {
+        "plateau_id": None,
+        "plateau_name": None,
+        "has_critical_path": False,
+        "path": [],
+        "duration_days": 0,
+        "blocking": None,
+        "cycles": [],
+        "ignored_dependencies": [],
+    }
+
+
+def _capability_ids_of(wp: UnifiedWorkPackage) -> List[int]:
+    """The capability ids a work package changes: its list when it has one,
+    falling back to its primary capability id. Order is kept, duplicates are
+    dropped."""
+    ids = []
+    for raw in wp.capability_ids or []:
+        try:
+            ids.append(int(raw))
+        except (TypeError, ValueError):
+            continue
+    if not ids and wp.capability_id:
+        try:
+            ids.append(int(wp.capability_id))
+        except (TypeError, ValueError):
+            pass
+    seen = set()
+    return [i for i in ids if not (i in seen or seen.add(i))]
+
+
+def _application_row(application_id: int, organization_id: int):
+    from app.models.application_portfolio import ApplicationComponent
+
+    return ApplicationComponent.query.filter_by(
+        id=application_id, organization_id=organization_id
+    ).first()
+
+
+def _approval_rows_for(organization_id: int):
+    """The pending and approved rows of the one approval queue for this
+    organisation, oldest first. Rejected and expired rows never appear."""
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+
+    return (
+        AIChatCRUDApproval.query.filter(
+            AIChatCRUDApproval.organization_id == organization_id,
+            AIChatCRUDApproval.status.in_(
+                [ApprovalStatus.PENDING, ApprovalStatus.APPROVED]
+            ),
+        )
+        .order_by(AIChatCRUDApproval.created_at, AIChatCRUDApproval.id)
+        .all()
+    )
+
+
+def _approval_dict(row) -> Dict[str, Any]:
+    return {
+        "id": row.id,
+        "summary": row.summary,
+        "status": row.status.value,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+    }
+
+
+def _element_entry(kind: str, element_id: int, element_name: Optional[str], owners: list):
+    return {
+        "kind": kind,
+        "element_id": element_id,
+        "element_name": element_name,
+        "has_owner": bool(owners),
+        "owners": owners,
+        "pending_approvals": [],
+        "approved_approvals": [],
+    }
+
+
+def owner_and_approval_panel(
+    work_package: Optional[UnifiedWorkPackage], organization_id: int
+) -> Dict[str, Any]:
+    """The owner/approver panel for a work package: for every element it
+    changes -- each capability it lists and the application component it is
+    linked to -- the recorded owners (or a no-owner flag) plus the pending and
+    approved approvals of the work package and of each element. Every read is
+    fenced to ``organization_id``; another organisation's owners, element rows
+    and approvals never appear. Approvals come from the one approval queue and
+    owners from the one ownership record reader."""
+    from app.models.application_owner import ApplicationOwner
+    from app.models.unified_capability import UnifiedCapability
+
+    if work_package is None or organization_id is None:
+        return {
+            "work_package": {"id": None, "name": None},
+            "elements": [],
+            "work_package_approvals": {"pending": [], "approved": []},
+        }
+
+    elements: List[Dict[str, Any]] = []
+    approval_filters = [(_WP_APPROVAL_ENTITY, work_package.id)]
+
+    cap_ids = _capability_ids_of(work_package)
+    cap_names = {}
+    if cap_ids:
+        for cap in UnifiedCapability.query.filter(
+            UnifiedCapability.id.in_(cap_ids),
+            UnifiedCapability.organization_id == organization_id,
+        ).all():
+            cap_names[cap.id] = cap.name
+    for cap_id in cap_ids:
+        owners = ApplicationOwner.get_display_rows_for_element(
+            _ELEMENT_CAPABILITY, cap_id, organization_id
+        )
+        elements.append(_element_entry(_ELEMENT_CAPABILITY, cap_id, cap_names.get(cap_id), owners))
+        approval_filters.append((_ELEMENT_CAPABILITY, cap_id))
+
+    if work_package.application_component_id:
+        app_id = work_package.application_component_id
+        app_row = _application_row(app_id, organization_id)
+        owners = ApplicationOwner.get_display_rows_for_application(app_id, organization_id)
+        elements.append(
+            _element_entry(_ELEMENT_APPLICATION, app_id, app_row.name if app_row else None, owners)
+        )
+        approval_filters.append((_ELEMENT_APPLICATION, app_id))
+
+    watched = set(approval_filters)
+    by_entity: Dict[tuple, List[Dict[str, Any]]] = {}
+    for row in _approval_rows_for(organization_id):
+        key = (row.entity_type, row.entity_id)
+        if key not in watched:
+            continue
+        by_entity.setdefault(key, []).append(_approval_dict(row))
+
+    wp_entry = by_entity.get((_WP_APPROVAL_ENTITY, work_package.id), [])
+    for element in elements:
+        key = (element["kind"], element["element_id"])
+        entries = by_entity.get(key, [])
+        element["pending_approvals"] = [d for d in entries if d["status"] == "pending"]
+        element["approved_approvals"] = [d for d in entries if d["status"] == "approved"]
+
+    return {
+        "work_package": {"id": work_package.id, "name": work_package.name},
+        "elements": elements,
+        "work_package_approvals": {
+            "pending": [d for d in wp_entry if d["status"] == "pending"],
+            "approved": [d for d in wp_entry if d["status"] == "approved"],
+        },
+    }
+
+
+# --- critical path to a plateau ---------------------------------------------
+
+
+def _planned_duration_days(wp: UnifiedWorkPackage) -> int:
+    if wp.start_date and wp.end_date:
+        return max((wp.end_date - wp.start_date).days, 0)
+    return wp.duration_days or 0
+
+
+def _path_node(wp: UnifiedWorkPackage, organization_id: int) -> Dict[str, Any]:
+    from app.models.user import User
+
+    owner_name = None
+    if wp.owner_id:
+        owner = User.query.filter_by(
+            id=wp.owner_id, organization_id=organization_id
+        ).first()
+        if owner is not None:
+            owner_name = (
+                "%s %s" % (owner.first_name or "", owner.last_name or "")
+            ).strip() or owner.email
+    return {
+        "id": wp.id,
+        "name": wp.name,
+        "status": wp.status,
+        "start_date": wp.start_date.date().isoformat() if wp.start_date else None,
+        "end_date": wp.end_date.date().isoformat() if wp.end_date else None,
+        "duration_days": _planned_duration_days(wp),
+        "owner_id": wp.owner_id,
+        "owner_name": owner_name,
+    }
+
+
+def _canonicalise_cycles(raw_cycles: List[List[int]]) -> List[List[int]]:
+    """Deduplicate reported cycles: the same loop read in any rotation or
+    direction is one cycle, reported once in the order it was first seen."""
+    def rotated(seq: List[int], offset: int) -> List[int]:
+        return seq[offset:] + seq[:offset]
+
+    seen = set()
+    out = []
+    for cycle in raw_cycles:
+        if not cycle:
+            continue
+        nodes = cycle[:-1]  # the closing node repeats the first
+        if len(nodes) < 2:
+            continue
+        forwards = min(tuple(rotated(nodes, i)) for i in range(len(nodes)))
+        backwards = min(
+            tuple(rotated(list(reversed(nodes)), i)) for i in range(len(nodes))
+        )
+        canonical = min(forwards, backwards)
+        if canonical not in seen:
+            seen.add(canonical)
+            out.append(nodes)
+    return out
+
+
+def critical_path_for_plateau(
+    plateau_id: int, organization_id: int
+) -> Dict[str, Any]:
+    """The critical path to a plateau: the longest dependency chain of this
+    organisation's work packages that realise it (plus their dependencies),
+    the chain's total planned duration, and the blocking item -- the chain's
+    last work package, whose end date gates the plateau -- with its owner.
+    A recompute after the blocking package's planned end date moves returns a
+    new duration, because nothing is cached.
+
+    Dependencies that name no work package of this organisation (including
+    another organisation's work package) are ignored and reported, never
+    followed. A cycle in ``work_dependencies`` is reported, never followed,
+    and the computation always terminates. This is the one computation; the
+    retired store's stub delegates here."""
+    from app.models.implementation_migration import Plateau
+
+    result = empty_critical_path()
+    result["plateau_id"] = plateau_id
+    if organization_id is None:
+        return result
+    plateau = Plateau.query.filter_by(
+        id=plateau_id, organization_id=organization_id
+    ).first()
+    if plateau is None:
+        return result
+    result["plateau_name"] = plateau.name
+    root_ids = plateau_work_package_ids([plateau_id], organization_id).get(
+        plateau_id, set()
+    )
+    if not root_ids:
+        return result
+
+    rows = query_for(organization_id).all()
+    by_id = {row.id: row for row in rows}
+
+    # The dependency closure stays inside this organisation: an id with no row
+    # here is another organisation's work package (or a stale id) and is
+    # reported, never followed.
+    closure = set(root_ids)
+    ignored = []
+    pending = list(root_ids)
+    while pending:
+        node_id = pending.pop()
+        node = by_id.get(node_id)
+        if node is None:
+            continue
+        for dep_id in _dependency_ids(node):
+            if dep_id in by_id:
+                if dep_id not in closure:
+                    closure.add(dep_id)
+                    pending.append(dep_id)
+            else:
+                ignored.append(dep_id)
+
+    memo: Dict[int, tuple] = {}
+    state: Dict[int, int] = {}
+    raw_cycles: List[List[int]] = []
+
+    def _best(node_id: int, trail: List[int]):
+        """(duration, path ids) of the longest path ending at ``node_id``, or
+        None when a dependency cycle cuts the branch off."""
+        if state.get(node_id) == 2:
+            return memo[node_id]
+        if state.get(node_id) == 1:
+            if node_id in trail:
+                raw_cycles.append(trail[trail.index(node_id):] + [node_id])
+            return None
+        state[node_id] = 1
+        node = by_id[node_id]
+        best_len = _planned_duration_days(node)
+        best_chain = [node_id]
+        for dep_id in _dependency_ids(node):
+            if dep_id not in closure:
+                continue
+            sub = _best(dep_id, trail + [node_id])
+            if sub is None:
+                continue
+            sub_len, sub_chain = sub
+            candidate = _planned_duration_days(node) + sub_len
+            if candidate > best_len:
+                best_len = candidate
+                best_chain = sub_chain + [node_id]
+        state[node_id] = 2
+        memo[node_id] = (best_len, best_chain)
+        return memo[node_id]
+
+    overall = None
+    for root_id in sorted(root_ids):
+        if root_id not in by_id:
+            continue
+        got = _best(root_id, [])
+        if got is None:
+            continue
+        length, chain = got
+        if overall is None or length > overall[0]:
+            overall = (length, chain)
+
+    result["cycles"] = _canonicalise_cycles(raw_cycles)
+    result["ignored_dependencies"] = [
+        {"dependency_id": dep_id, "reason": "no such work package in this organisation"}
+        for dep_id in sorted(set(ignored))
+    ]
+    if overall is None:
+        return result
+    length, chain = overall
+    nodes = [by_id[i] for i in chain]
+    result["path"] = [_path_node(w, organization_id) for w in nodes]
+    result["duration_days"] = length
+    result["blocking"] = result["path"][-1]
+    result["has_critical_path"] = True
+    return result
+
+
+def critical_paths_for_roadmap(organization_id: int) -> List[Dict[str, Any]]:
+    """One critical path entry per plateau of this organisation, ordered by
+    sequence then name -- what the plateau roadmap screen's critical path
+    panel renders. Another organisation's plateaus never appear. A plateau
+    with no scheduled work package reports an empty path."""
+    from app.models.implementation_migration import Plateau
+
+    plateaus = (
+        Plateau.query.filter_by(organization_id=organization_id)
+        .order_by(
+            Plateau.sequence_order.is_(None), Plateau.sequence_order, Plateau.name
+        )
+        .all()
+    )
+    return [critical_path_for_plateau(p.id, organization_id) for p in plateaus]
+
+
 def get_by_source(table: str, source_id: int, organization_id: int) -> Optional[UnifiedWorkPackage]:
     """The unified row copied from (table, source_id), inside this organisation."""
     return query_for(organization_id).filter(
