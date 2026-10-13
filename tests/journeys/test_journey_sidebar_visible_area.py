@@ -127,7 +127,13 @@ def test_a_no_match_search_still_says_so_after_the_layout_change(app, client, br
     try:
         pg.fill('input[x-ref="searchInput"]', "zzzznomatch")
         results = pg.locator('[data-testid="sidebar-search-results"]')
-        expect(results).to_contain_text('No pages match "zzzznomatch"')
+        results.wait_for(state="visible", timeout=10000)
+        # module_search.js debounces 250ms, and this test's own route handler serves
+        # /api/sidebar/search synchronously in the same thread, so a fixed sleep here always ends
+        # before the browser applies the response. Wait on the settled state instead, as the
+        # sibling journey does (test_journey_sidebar_search_rendered.py:221).
+        results.locator("p", has_text="Searching").wait_for(state="hidden", timeout=5000)
+        assert 'No pages match "zzzznomatch"' in results.inner_text()
         assert results.get_by_role("button", name="Search everywhere (Ctrl+K)").is_visible()
 
         pg.click('button[title="Clear search"]')
