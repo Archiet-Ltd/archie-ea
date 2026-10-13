@@ -41,6 +41,8 @@ def index():
         state=state,
         rings=RADAR_RINGS,
         ring_labels=RADAR_RING_LABELS,
+        sunsets=service.sunset_entries(),
+        today=date.today(),
     )
 
 
@@ -60,6 +62,14 @@ def api_state():
             ]
             for ring, rows in state["rings"].items()
         },
+        "sunsets": [
+            {
+                **row["entry"].to_dict(),
+                "applications": row["affected"]["applications"],
+                "applications_reason": row["affected"]["reason"],
+            }
+            for row in service.sunset_entries()
+        ],
     })
 
 
@@ -131,4 +141,78 @@ def classify():
                              RADAR_RING_LABELS.get(ring, ring)),
         "success",
     )
+    return redirect(url_for("tech_radar.index"))
+
+
+@tech_radar_bp.route("/sunset", methods=["POST"])
+@login_required
+@require_roles("admin", "administrator", "architect", "enterprise_architect", "cto", "platform_admin")
+def sunset():
+    """Retire a technology standard: move it to the hold ring with a sunset
+    date and (optionally) the standard that replaces it, then notify the owners
+    of every application running it. The affected applications and owners are
+    listed on the radar page after the redirect."""
+    element_id = request.form.get("archimate_element_id", type=int)
+    replacement_id = request.form.get("replacement_element_id", type=int)
+    rationale = request.form.get("rationale") or ""
+    raw_date = (request.form.get("sunset_date") or "").strip()
+
+    def _fail(message, status):
+        if _wants_json():
+            return jsonify({"success": False, "error": message}), status
+        flash(message, "error")
+        return redirect(url_for("tech_radar.index")), status
+
+    try:
+        sunset_date = date.fromisoformat(raw_date) if raw_date else None
+    except ValueError:
+        sunset_date = None
+    if not element_id or sunset_date is None:
+        return _fail("Choose a technology and a sunset date.", 400)
+
+    try:
+        result = service.sunset(
+            element_id,
+            sunset_date,
+            replacement_id,
+            rationale,
+            current_user.id,
+            notify_url=url_for("tech_radar.index"),
+        )
+    except ValueError as exc:
+        return _fail(str(exc), 400)
+    except Exception:  # noqa: BLE001
+        from app import db
+
+        db.session.rollback()
+        logger.exception("tech radar sunset failed for element %s", element_id)
+        return _fail("Could not save the sunset", 500)
+
+    entry = result["entry"]
+    applications = result["affected"]["applications"]
+    notified = result["notified"].get("notified_users", 0)
+    if _wants_json():
+        return jsonify({
+            "success": True,
+            "entry": entry.to_dict(),
+            "applications": applications,
+            "applications_reason": result["affected"]["reason"],
+            "notified_users": notified,
+        })
+
+    name = entry.element.name if entry.element else "Technology"
+    if applications:
+        flash(
+            "%s moved to Hold with a sunset date. %d %s running it; %d %s notified."
+            % (
+                name,
+                len(applications),
+                "application is" if len(applications) == 1 else "applications are",
+                notified,
+                "owner" if notified == 1 else "owners",
+            ),
+            "success",
+        )
+    else:
+        flash("%s moved to Hold with a sunset date. %s" % (name, service.NO_APPLICATIONS_REASON), "success")
     return redirect(url_for("tech_radar.index"))

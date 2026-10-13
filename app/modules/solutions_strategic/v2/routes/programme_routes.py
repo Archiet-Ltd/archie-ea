@@ -302,13 +302,142 @@ def solution_conformance(solution_id):
         ConformanceReviewer,
     )
 
-    solution = db.session.get(Solution, solution_id)
+    solution = Solution.query.filter(Solution.id == solution_id).first()
     if solution is None:
         return render_template("errors/404.html"), 404
     review = ConformanceReviewer.review(solution_id)
     return render_template(
-        "solutions/conformance_review.html", solution=solution, review=review,
+        "solutions/conformance_review.html",
+        solution=solution,
+        review=review,
+        interfaces=ConformanceReviewer.interface_results(solution_id),
     )
+
+
+def _wants_json() -> bool:
+    if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return True
+    accept = request.accept_mimetypes
+    return accept["application/json"] > accept["text/html"]
+
+
+@solution_design_bp.route("/<int:solution_id>/conformance/interfaces/check", methods=["POST"])
+@login_required
+def solution_conformance_check_interfaces(solution_id):
+    """Check the chosen interfaces against the integration pattern catalogue.
+    Each result is stored on the interface and shown on the conformance page."""
+    from flask import flash, url_for
+
+    from app.modules.solutions_strategic.v2.services.conformance_reviewer import (
+        ConformanceReviewer,
+    )
+
+    if request.is_json:
+        flow_ids = (request.get_json(silent=True) or {}).get("interface_ids") or []
+    else:
+        flow_ids = request.form.getlist("interface_ids")
+    try:
+        flow_ids = [int(i) for i in flow_ids]
+    except (TypeError, ValueError):
+        flow_ids = []
+
+    if not flow_ids:
+        result = {"success": False, "error": "Choose at least one interface of this solution to check."}
+    else:
+        try:
+            result = ConformanceReviewer.check_interfaces(solution_id, flow_ids)
+        except Exception:  # noqa: BLE001
+            db.session.rollback()
+            logger.exception("interface check failed for solution %s", solution_id)
+            result = {"success": False, "error": "The interface check could not be completed."}
+
+    not_found = result.get("error") == "Solution not found."
+    if _wants_json():
+        return jsonify(result), (200 if result.get("success") else (404 if not_found else 400))
+    if not_found:
+        return render_template("errors/404.html"), 404
+    if result.get("success"):
+        flash(
+            "%d checked: %d %s the catalogue, %d %s a rule."
+            % (
+                len(result["checked"]),
+                result["conforming"], "conforms to" if result["conforming"] == 1 else "conform to",
+                result["breaching"], "breaches" if result["breaching"] == 1 else "breach",
+            ),
+            "success",
+        )
+    else:
+        flash(result.get("error") or "The interface check could not be completed.", "error")
+    return redirect(url_for("solution_design.solution_conformance", solution_id=solution_id) + "#interfaces")
+
+
+@solution_design_bp.route("/<int:solution_id>/reference-architecture", methods=["GET"])
+@login_required
+def solution_reference_architecture(solution_id):
+    """State the solution context; see the matching reference architecture,
+    why it fits and the controls it provides; apply it."""
+    from app.models.integration_pattern import REFERENCE_CONTEXT_LABELS, REFERENCE_CONTEXT_OPTIONS
+    from app.modules.solutions_strategic.v2.services import reference_architecture_service as ras
+
+    solution = Solution.query.filter(Solution.id == solution_id).first()
+    if solution is None:
+        return render_template("errors/404.html"), 404
+    context = ras.clean_context(request.args)
+    return render_template(
+        "solutions/reference_architecture.html",
+        solution=solution,
+        context=context,
+        options=REFERENCE_CONTEXT_OPTIONS,
+        labels=REFERENCE_CONTEXT_LABELS,
+        recommendation=ras.recommend(context),
+        applied=ras.applied(solution_id),
+    )
+
+
+@solution_design_bp.route("/<int:solution_id>/reference-architecture/apply", methods=["POST"])
+@login_required
+def solution_reference_architecture_apply(solution_id):
+    """Apply a reference architecture: its components are added to the solution."""
+    from flask import flash, url_for
+
+    from app.modules.solutions_strategic.v2.services import reference_architecture_service as ras
+
+    payload = request.get_json(silent=True) if request.is_json else request.form
+    payload = payload or {}
+    try:
+        pattern_id = int(payload.get("pattern_id") or 0)
+    except (TypeError, ValueError):
+        pattern_id = 0
+    context = ras.clean_context(payload)
+    if not pattern_id:
+        result = {"success": False, "error": "Choose a reference architecture to apply."}
+    else:
+        try:
+            result = ras.apply(solution_id, pattern_id, context, current_user.id)
+        except Exception:  # noqa: BLE001
+            db.session.rollback()
+            logger.exception("reference architecture apply failed for solution %s", solution_id)
+            result = {"success": False, "error": "The reference architecture could not be applied."}
+
+    not_found = result.get("error") == "Solution not found."
+    if _wants_json():
+        return jsonify(result), (200 if result.get("success") else (404 if not_found else 400))
+    if not_found:
+        return render_template("errors/404.html"), 404
+    if result.get("success"):
+        flash(
+            "%s applied: %d %s added%s."
+            % (
+                result["pattern_name"], result["added"],
+                "component" if result["added"] == 1 else "components",
+                (", %d already in the solution" % result["skipped"]) if result["skipped"] else "",
+            ),
+            "success",
+        )
+    else:
+        flash(result.get("error"), "error")
+    params = {k: v for k, v in context.items() if v}
+    return redirect(url_for("solution_design.solution_reference_architecture", solution_id=solution_id, **params))
 
 
 @solution_design_bp.route("/<int:solution_id>/conformance/api", methods=["GET"])

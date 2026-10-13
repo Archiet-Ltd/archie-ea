@@ -77,6 +77,72 @@ class GovernanceNotifier:
                 logger.debug("rollback after push failure also failed: %s", rb_exc)
             return {"pushed": 0, "notified_users": 0, "emailed": False, "error": str(exc)}
 
+    @classmethod
+    def notify_users(
+        cls,
+        user_ids: Sequence[int],
+        message: str,
+        url: str,
+        subject: str,
+        send_email: bool = True,
+    ) -> Dict[str, Any]:
+        """Tell named people about one event: an in-app Notification each
+        (deduped as push_findings is) and one email to them, logged instead of
+        sent when SMTP is not configured. Used when the audience is known by
+        name -- the owners of the applications a change affects -- rather than
+        by role.
+
+        Only users of the caller's organisation are reached: an id belonging to
+        another organisation is dropped, never notified. Returns
+        ``{"notified_users", "emailed"}``. Never raises; the caller commits.
+        """
+        try:
+            from flask import g
+
+            from app.models.user import User
+
+            ids = sorted({int(uid) for uid in (user_ids or []) if uid})
+            if not ids:
+                return {"notified_users": 0, "emailed": 0}
+            org_id = getattr(g, "current_org_id", None)
+            if org_id is None:
+                return {"notified_users": 0, "emailed": 0, "reason": "no organisation"}
+            users = User.query.filter(
+                User.id.in_(ids), User.organization_id == org_id
+            ).all()
+            notified = cls._create_notifications([u.id for u in users], message, url)
+            emailed = 0
+            if send_email:
+                emailed = cls._email_users(
+                    [u.email for u in users if getattr(u, "email", None)], subject, message, url
+                )
+            db.session.flush()
+            return {"notified_users": notified, "emailed": emailed}
+        except Exception as exc:  # noqa: BLE001 — a notification must never break the caller
+            logger.error("GovernanceNotifier.notify_users failed (caller unaffected): %s", exc)
+            return {"notified_users": 0, "emailed": 0, "error": str(exc)}
+
+    @staticmethod
+    def _email_users(recipients, subject, message, url) -> int:
+        """One email to the named recipients (_safe_send_email logs it instead
+        when SMTP is not configured). Returns how many were sent to."""
+        if not recipients:
+            return 0
+        try:
+            from flask import current_app
+
+            from app._bootstrap._digest_emails import _safe_send_email
+
+            html = (
+                f"<p>{escape(message)}</p>"
+                f"<p><a href=\"{escape(url)}\">Open in Entelim</a></p>"
+            )
+            sent = _safe_send_email(current_app._get_current_object(), subject, recipients, html)
+            return len(recipients) if sent else 0
+        except Exception as exc:
+            logger.debug("notify_users email skipped: %s", exc)
+            return 0
+
     # ------------------------------------------------------------------ #
     # Internals                                                           #
     # ------------------------------------------------------------------ #

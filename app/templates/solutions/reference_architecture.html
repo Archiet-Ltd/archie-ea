@@ -1,0 +1,147 @@
+{% extends "layouts/admin_base.html" %}
+{% from "components/page_header.html" import page_header %}
+
+{% block title %}Reference Architecture — {{ solution.name }}{% endblock %}
+
+{% block content %}
+<div class="p-6 space-y-6 mx-auto max-w-5xl">
+    {{ page_header(
+        title='Reference Architecture',
+        description='State what the solution handles, how fast it must respond and where it runs. The pattern catalogue recommends the reference architecture that fits, explains the fit and lists the controls it provides. Applying it adds its components to this solution.',
+        breadcrumbs=[
+            {'label': 'Dashboard', 'href': url_for('main.index')},
+            {'label': 'Solutions', 'href': url_for('solution_design.list_solutions')},
+            {'label': solution.name, 'href': '/solutions/' ~ solution.id},
+            {'label': 'Reference architecture'}
+        ]
+    ) }}
+
+    {# ── Applied (persisted) ───────────────────────────────────────── #}
+    <section class="border border-border rounded-xl bg-card" data-testid="refarch-applied">
+        <div class="px-4 py-3 border-b border-border">
+            <h2 class="text-sm font-semibold text-foreground">Applied to this solution</h2>
+        </div>
+        {% if applied %}
+        <ul class="divide-y divide-border">
+            {% for a in applied %}
+            <li class="px-4 py-3 space-y-1" data-testid="refarch-applied-{{ a.pattern_id }}">
+                <p class="text-sm font-medium text-foreground">{{ a.pattern_name }}</p>
+                <p class="text-xs text-muted-foreground">Components: {% for c in a.components %}{{ c.name }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+                <p class="text-xs text-muted-foreground">Controls inherited: {% if a.controls %}{{ a.controls | join(', ') }}{% else %}—{% endif %}</p>
+                <p class="text-2xs text-muted-foreground/80">Components are marked for review in the solution design.</p>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="px-4 py-6 text-sm text-muted-foreground">No reference architecture has been applied to this solution yet.</p>
+        {% endif %}
+    </section>
+
+    {# ── Context ───────────────────────────────────────────────────── #}
+    <section class="border border-border rounded-xl bg-card">
+        <div class="px-4 py-3 border-b border-border">
+            <h2 class="text-sm font-semibold text-foreground">Solution context</h2>
+        </div>
+        <form method="GET" action="{{ url_for('solution_design.solution_reference_architecture', solution_id=solution.id) }}"
+              class="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            {% for dimension, values in options.items() %}
+            <label class="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                {{ labels[dimension] }}
+                <select name="{{ dimension }}" data-testid="refarch-context-{{ dimension }}"
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground">
+                    <option value="" {% if not context[dimension] %}selected{% endif %}>Not stated</option>
+                    {% for v in values %}
+                    <option value="{{ v }}" {% if context[dimension] == v %}selected{% endif %}>{{ labels[v] }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            {% endfor %}
+            <div class="md:col-span-3">
+                <button type="submit" data-testid="refarch-recommend"
+                    class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
+                    Recommend
+                </button>
+            </div>
+        </form>
+    </section>
+
+    {# ── Recommendation ────────────────────────────────────────────── #}
+    <section class="space-y-3" data-testid="refarch-candidates">
+        {% if recommendation.reason %}
+        <div class="border border-border rounded-xl bg-card p-6 text-sm text-muted-foreground">{{ recommendation.reason }}</div>
+        {% else %}
+        {% if not recommendation.stated %}
+        <p class="text-sm text-muted-foreground">No context stated yet, so the reference architectures below are listed by name, not ranked.</p>
+        {% endif %}
+        {% for c in recommendation.candidates %}
+        <div class="border border-border rounded-xl bg-card p-4 space-y-3" data-testid="refarch-candidate-{{ c.id }}">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                    {% if loop.first and recommendation.stated %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Recommended</span>
+                    {% endif %}
+                    <h3 class="text-sm font-semibold text-foreground mt-1">{{ c.name }}</h3>
+                    <p class="text-xs text-muted-foreground mt-0.5">{{ c.description or '—' }}</p>
+                </div>
+                <form method="POST" action="{{ url_for('solution_design.solution_reference_architecture_apply', solution_id=solution.id) }}" class="shrink-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="pattern_id" value="{{ c.id }}">
+                    {% for dimension in options %}{% if context[dimension] %}<input type="hidden" name="{{ dimension }}" value="{{ context[dimension] }}">{% endif %}{% endfor %}
+                    <button type="submit" data-testid="refarch-apply-{{ c.id }}" {% if not c.components %}disabled{% endif %}
+                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
+                        Apply to solution
+                    </button>
+                </form>
+            </div>
+
+            {% if recommendation.stated %}
+            <div>
+                <p class="text-xs font-semibold text-foreground">Why it fits</p>
+                <ul class="mt-1 space-y-0.5">
+                    {% for f in c.fit.facts %}
+                    <li class="text-xs {% if f.matches == false %}text-destructive{% else %}text-muted-foreground{% endif %}">{{ f.explanation }}</li>
+                    {% endfor %}
+                </ul>
+                <p class="text-xs text-muted-foreground mt-1">
+                    Evidence: {{ c.fit.matched }} of {{ c.fit.stated }} stated facts match the pattern's own description of where it fits.
+                    Confidence: {{ c.fit.confidence or '—' }}.
+                    Assumes the stated context is accurate; facts not stated are not used.
+                </p>
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <p class="text-xs font-semibold text-foreground">Controls it provides</p>
+                    {% if c.controls %}
+                    <ul class="mt-1 space-y-0.5">
+                        {% for ctl in c.controls %}
+                        <li class="text-xs text-muted-foreground"><span class="text-foreground">{{ ctl.name }}</span>{% if ctl.description %} — {{ ctl.description }}{% endif %}</li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-xs text-muted-foreground mt-1">Not recorded: the catalogue lists no controls for this pattern.</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-foreground">Components it adds</p>
+                    {% if c.components %}
+                    <ul class="mt-1 space-y-0.5">
+                        {% for comp in c.components %}
+                        <li class="text-xs text-muted-foreground">{{ comp.name }} ({{ comp.type | plain_name(current_user) }})</li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-xs text-muted-foreground mt-1">Not recorded: the catalogue lists no components, so it cannot be applied.</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% if c.approval_status and c.approval_status != 'approved' %}
+            <p class="text-xs text-warning-emphasis">Conditional use: {{ c.approval_notes or '—' }}</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
