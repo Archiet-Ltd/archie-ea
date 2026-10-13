@@ -60,6 +60,8 @@ CAPACITY_NOT_AVAILABLE_REASON = validate_reason_code("capacity_not_available")
 # accountability_for_element. This reason code is kept in the closed
 # vocabulary for backward compatibility but is no longer produced.
 OWNERSHIP_READER_NOT_BUILT_REASON = validate_reason_code("ownership_reader_not_built")
+NO_OUTCOME_RECORDED_REASON = validate_reason_code("no_outcome_recorded")
+NO_CRITICALITY_RECORDED_REASON = validate_reason_code("no_criticality_recorded")
 NO_DATA_RECORDED_REASON = validate_reason_code("no_data_recorded")
 NO_STEWARD_RECORDED_REASON = validate_reason_code("no_steward_recorded")
 NO_LINEAGE_RECORDED_REASON = validate_reason_code("no_lineage_recorded")
@@ -1704,6 +1706,249 @@ class IntelligenceQueryService:
         return {"work_packages": wp_payloads, "reasons": [], "elements": all_elements}
 
     @staticmethod
+    def strategy_for_element(
+        element_id: int,
+        *,
+        max_depth: int = 3,
+        include_derived: bool = True,
+    ) -> Dict[str, Any]:
+        """L2, "what are we trying to achieve, and how's it tracking?": every
+        ``PortfolioInitiative`` seeded directly on the picked element
+        (``archimate_element_id`` FK), each with the SAME blast-radius
+        traversal L1/L5/L6 already run -- no second traversal algorithm.
+
+        Tenant-safety note, verified not assumed: ``PortfolioInitiative``
+        carries no ``TenantMixin``/``organization_id`` of its own, the same
+        gap ``UnifiedWorkPackage`` has (L5 brief). This method never lists
+        initiatives independently of an element -- every row it returns is
+        filtered by ``archimate_element_id == element_id``, and
+        ``element_id`` is only ever reached here after the element itself
+        was confirmed to belong to the caller's tenant (below). A
+        cross-tenant initiative cannot share a seed element id with the
+        wrong org's element, since ``archimate_elements.id`` is a real
+        primary key each row of which belongs to exactly one tenant. This
+        does not make ``PortfolioInitiative`` itself tenant-safe for any
+        OTHER read path against it -- a separate, pre-existing gap, not
+        fixed here (same category already flagged once for
+        ``UnifiedWorkPackage`` in the L5 brief).
+
+        Budget variance is read from the model's own ``total_budget``/
+        ``spent_to_date`` fields directly -- ``PortfolioInitiative`` has no
+        wrapping helper method to avoid, unlike L5's
+        ``calculate_budget_variance()``, but the same not-computed-vs-
+        measured-zero discipline still applies: variance is only reported
+        when ``total_budget`` is a real positive number, else the row
+        carries the honest ``no_budget_recorded`` reason.
+
+        Outcomes (T-WIRE-5): after each initiative's blast radius, the set of
+        Goal elements reached by an explicit or non-stale derived Realization
+        is collected. Two batched selects across all initiatives -- Goals by
+        archimate_element_id, then MotivationOutcome by goal_id -- attach the
+        recorded outcome rows to each initiative. When no Goal is reached, or
+        no Goal has an outcome row, ``outcomes`` is ``None`` and
+        ``outcomes_reason`` is ``"no_outcome_recorded"``. Every value is
+        carried as recorded; no status is derived and no text value is parsed.
+        """
+        from app.models import ArchiMateElement
+        from app.models.archimate_motivation import MotivationOutcome
+        from app.models.enterprise_intelligence import PortfolioInitiative
+        from app.models.motivation import Goal
+
+        org_id = current_org_id()
+
+        with record_query_latency("strategy_for_element") as scope:
+            scope.organization_id = org_id
+
+            if org_id is None:
+                return {
+                    "initiatives": [],
+                    "reasons": [NO_TENANT_CONTEXT_REASON],
+                    "elements": {},
+                }
+
+            element = db.session.execute(
+                db.select(ArchiMateElement).where(ArchiMateElement.id == element_id)
+            ).scalar_one_or_none()
+            if element is None:
+                return {
+                    "initiatives": [],
+                    "reasons": [ELEMENT_NOT_FOUND_REASON],
+                    "elements": {},
+                }
+
+            seed_initiatives = (
+                db.session.execute(
+                    db.select(PortfolioInitiative).where(
+                        PortfolioInitiative.archimate_element_id == element_id
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            if not seed_initiatives:
+                return {
+                    "initiatives": [],
+                    "reasons": [NO_INITIATIVE_LINKED_REASON],
+                    "elements": {},
+                }
+
+            all_elements: Dict[str, Dict[str, Any]] = {}
+            initiative_payloads: List[Dict[str, Any]] = []
+            # Per-initiative goal element ids, collected for the batched
+            # Goal-then-Outcome selects after the loop.
+            initiative_goal_element_ids: List[set] = []
+
+            for initiative in seed_initiatives:
+                blast = IntelligenceQueryService.cross_layer_impact(
+                    element_id,
+                    include_derived=include_derived,
+                    max_depth=max_depth,
+                    with_owner=True,
+                )
+                all_elements.update(blast.get("elements") or {})
+
+                # Decision A: Goal elements reached by an explicit Realization
+                # row or a non-stale derived one, taken from the already-resolved
+                # identity map.
+                goal_element_ids: set = set()
+                for row in blast.get("rows", []):
+                    row_element_id = row.get("element_id")
+                    if row_element_id is None:
+                        continue
+                    elem = blast.get("elements", {}).get(str(row_element_id), {})
+                    if elem.get("type") != "Goal":
+                        continue
+                    rel = row.get("relation", {})
+                    if rel.get("type") != "Realization":
+                        continue
+                    kind = rel.get("kind")
+                    if kind == "explicit":
+                        goal_element_ids.add(row_element_id)
+                    elif kind == "derived" and not rel.get("stale"):
+                        goal_element_ids.add(row_element_id)
+                initiative_goal_element_ids.append(goal_element_ids)
+
+                if initiative.total_budget and initiative.total_budget > 0:
+                    total_budget = float(initiative.total_budget)
+                    spent_to_date = float(initiative.spent_to_date or 0.0)
+                    budget_variance_pct = (spent_to_date - total_budget) / total_budget * 100
+                    budget_reason = None
+                else:
+                    budget_variance_pct = None
+                    budget_reason = NO_BUDGET_RECORDED_REASON
+
+                initiative_payloads.append(
+                    {
+                        "initiative_id": initiative.id,
+                        "name": initiative.name,
+                        "status": initiative.status,
+                        "priority": initiative.priority,
+                        "health_status": initiative.health_status,
+                        "completion_percentage": initiative.completion_percentage,
+                        "start_date": initiative.start_date.isoformat()
+                        if initiative.start_date
+                        else None,
+                        "target_end_date": initiative.target_end_date.isoformat()
+                        if initiative.target_end_date
+                        else None,
+                        "executive_sponsor": initiative.executive_sponsor,
+                        "program_manager": initiative.program_manager,
+                        "budget_variance_pct": budget_variance_pct,
+                        "budget_reason": budget_reason,
+                        "success_metrics": [
+                            {
+                                "metric_name": m.metric_name,
+                                "metric_type": m.metric_type,
+                                "target_value": m.target_value,
+                                "actual_value": m.actual_value,
+                                "status": m.status,
+                            }
+                            for m in initiative.success_metrics
+                        ],
+                        "affected_rows": blast.get("rows", []),
+                        "affected_summary": blast.get("summary", {}),
+                    }
+                )
+
+            # Decision B: two batched selects across all initiatives.
+            all_goal_element_ids = sorted(set().union(*initiative_goal_element_ids))
+            goal_by_element_id: Dict[int, Any] = {}
+            outcomes_by_goal_id: Dict[int, List[Dict[str, Any]]] = {}
+            if all_goal_element_ids:
+                goal_rows = (
+                    db.session.execute(
+                        db.select(Goal.id, Goal.archimate_element_id, Goal.name)
+                        .where(Goal.archimate_element_id.in_(all_goal_element_ids))
+                        .order_by(Goal.id)
+                    )
+                    .all()
+                )
+                for g_id, g_el_id, g_name in goal_rows:
+                    goal_by_element_id[g_el_id] = {"id": g_id, "name": g_name}
+
+                goal_ids = sorted({g["id"] for g in goal_by_element_id.values()})
+                if goal_ids:
+                    outcome_rows = (
+                        db.session.execute(
+                            db.select(MotivationOutcome)
+                            .where(MotivationOutcome.goal_id.in_(goal_ids))
+                            .order_by(MotivationOutcome.id)
+                        )
+                        .scalars()
+                        .all()
+                    )
+                    for oc in outcome_rows:
+                        outcomes_by_goal_id.setdefault(oc.goal_id, []).append(oc)
+
+            # Decision C: attach outcomes to each initiative payload.
+            for i, payload in enumerate(initiative_payloads):
+                goal_eids = initiative_goal_element_ids[i]
+                if not goal_eids:
+                    payload["outcomes"] = None
+                    payload["outcomes_reason"] = NO_OUTCOME_RECORDED_REASON
+                    continue
+
+                # Collect outcomes for every Goal in this initiative's set,
+                # ordered by goal element id then outcome id.
+                all_outcomes: List[Dict[str, Any]] = []
+                for g_eid in sorted(goal_eids):
+                    goal = goal_by_element_id.get(g_eid)
+                    if goal is None:
+                        continue
+                    for oc in outcomes_by_goal_id.get(goal["id"], []):
+                        all_outcomes.append(
+                            {
+                                "outcome_id": oc.id,
+                                "name": oc.name,
+                                "goal_element_id": g_eid,
+                                "goal_name": goal["name"],
+                                "realization_status": oc.realization_status,
+                                "achievement_level": oc.achievement_level,
+                                "target_value": oc.target_value,
+                                "current_value": oc.current_value,
+                                "baseline_value": oc.baseline_value,
+                                "measurement_unit": oc.measurement_unit,
+                                "target_date": oc.target_date.isoformat()
+                                if oc.target_date
+                                else None,
+                                "achieved_date": oc.achieved_date.isoformat()
+                                if oc.achieved_date
+                                else None,
+                                "truth_class": "authoritative_fact",
+                            }
+                        )
+
+                if all_outcomes:
+                    payload["outcomes"] = all_outcomes
+                    payload["outcomes_reason"] = None
+                else:
+                    payload["outcomes"] = None
+                    payload["outcomes_reason"] = NO_OUTCOME_RECORDED_REASON
+
+        return {"initiatives": initiative_payloads, "reasons": [], "elements": all_elements}
+
+    @staticmethod
     def accountability_for_element(element_id: int) -> Dict[str, Any]:
         """L4, "who's accountable for ___, and can they take on more?":
 
@@ -2091,20 +2336,19 @@ class IntelligenceQueryService:
     # ------------------------------------------------------------------ #
     # T-S1: value streams at risk -- the curated path (DA-S1). Helpers are
     # staticmethods immediately above the method itself, inside the class,
-    # per the implementation plan's free-region rule for this file (plan
-    # § 5.2) -- not module-level functions near ``_not_computed_counts``.
-    # ------------------------------------------------------------------ #
 
     @staticmethod
     def _value_stream_tenant_predicate(model, organization_id: int):
-        """The explicit ``organization_id ==`` predicate applied at three
+        """The explicit ``organization_id ==`` predicate applied at six
         call sites on this path -- the tenant's own ``ValueStream`` select,
-        the ``CapabilityValueStreamMapping`` select, and the not-found
-        resolver's ``ValueStream`` select in ``routes/api.py`` -- isolated
-        as its own seam -- the same pattern as
-        ``derived_facts._apply_default_staleness_filter`` -- so the
-        cross-tenant mutation-proof test can monkeypatch exactly this one
-        function to a no-op and confirm the named test goes red, without
+        the ``CapabilityValueStreamMapping`` select, the not-found resolver's
+        ``ValueStream`` select in ``routes/api.py``, Path C's two
+        ``ArchiMateElement`` selects (the initiative select and the metric
+        select, T-S4), and the capability identity select's OUTER JOIN back
+        to ``ArchiMateElement`` -- isolated as its own seam -- the
+        same pattern as ``derived_facts._apply_default_staleness_filter`` --
+        so the cross-tenant mutation-proof test can monkeypatch exactly this
+        one function to a no-op and confirm the named test goes red, without
         editing source under test or inlining the predicate separately at
         each call site.
 
@@ -2114,11 +2358,15 @@ class IntelligenceQueryService:
         checked by stream membership (``ValueStreamStage.value_stream_id ==
         CapabilityValueStreamMapping.value_stream_id``), not by calling this
         function a fourth time. See ``value_streams_at_risk``'s own
-        docstring for why.
+        docstring for why. Likewise, Path C writes no predicate on
+        ``PortfolioInitiative`` or ``InitiativeSuccessMetric`` -- neither
+        carries a tenant column, and the inner join through the
+        fenced ``ArchiMateElement`` this function does scope **is** their
+        predicate.
 
-        All three models this function is actually called with already carry
-        ``TenantMixin``, so this predicate is defence in depth inside a
-        request and is what keeps a caller correct when called with no
+        Every model this function is actually called with directly already
+        carries ``TenantMixin``, so this predicate is defence in depth inside
+        a request and is what keeps a caller correct when called with no
         ambient request context (a job, a CLI command, a test looping
         tenants in one session), where the ORM listener would otherwise
         no-op entirely.
@@ -2154,13 +2402,19 @@ class IntelligenceQueryService:
         explicit-relationship walk) and no ``include_derived`` /
         ``include_stale`` / ``max_depth`` parameter -- those belong to T-S3.
 
-        Five batched selects regardless of row count, in this order,
-        following ``_resolve_owners_batch``'s own collect-then-resolve shape:
-        value streams for the tenant (narrowed by ``value_stream_id`` when
-        given); mapping rows for those value-stream ids, joined to
+        Five batched selects for the curated path, plus at most two for
+        initiatives and their metrics, regardless of row count, in this
+        order, following ``_resolve_owners_batch``'s own collect-then-resolve
+        shape: value streams for the tenant (narrowed by ``value_stream_id``
+        when given); mapping rows for those value-stream ids, joined to
         ``ValueStreamStage`` for the stage id and name; capability identity
-        for the distinct capability ids; maturity through the accessor;
-        the helper's own owner/element map select. Never one select per row.
+        for the distinct capability ids, now also reading
+        ``archimate_element_id`` as a fourth column -- through an OUTER JOIN
+        back to ``ArchiMateElement`` carrying the same tenant predicate Path C
+        uses, so a stored element id that does not resolve inside the
+        fence comes back null rather than echoing a foreign or deleted
+        integer; maturity through the accessor; the helper's own
+        owner/element map select. Never one select per row.
 
         Tenancy (design § 3.2, § 9): ``ValueStream`` and
         ``CapabilityValueStreamMapping`` carry the strict, explicit predicate
@@ -2225,7 +2479,79 @@ class IntelligenceQueryService:
 
         Invariant: ``capabilities_below_threshold + capabilities_with_no_maturity
         <= capabilities_considered``.
+
+        Importance (T-WIRE-5): each value-stream row gains
+        ``strategic_importance`` (as recorded on ``ValueStream``) and
+        ``importance_reason`` (``"no_criticality_recorded"`` when null).
+        Each capability entry gains ``strategic_importance`` and
+        ``business_criticality`` (as recorded on ``UnifiedCapability``) and
+        ``importance_reason`` (``"no_criticality_recorded"`` when both are
+        null). These ride on the existing selects; no new statement is added.
+        ``at_risk``, the threshold, every count and the row order are
+        unchanged.
+
+        Path C (T-S4, DA-S3): initiatives and their success metrics, attached
+        to each value-stream row and each capability entry through
+        ``PortfolioInitiative.archimate_element_id``. Two batched selects at
+        most, both starting from the tenant-fenced ``ArchiMateElement``
+        (``select_from``) and joining OUTWARD with inner joins only, never
+        the reverse and never an outer join, because neither
+        ``PortfolioInitiative`` nor ``InitiativeSuccessMetric`` carries a
+        tenant column -- the join through the fenced element **is** their
+        predicate. Select 5, issued only when at least one element id is
+        known (the union of every row's ``value_stream.archimate_element_id``
+        and every resolved capability's ``archimate_element_id``): the
+        element id and ``PortfolioInitiative``, joined on
+        ``PortfolioInitiative.archimate_element_id == ArchiMateElement.id``.
+        Select 6, issued only when select 5 returned at least one initiative:
+        ``InitiativeSuccessMetric``, from ``ArchiMateElement`` joined to
+        ``PortfolioInitiative`` on the element id and to
+        ``InitiativeSuccessMetric`` on ``initiative_id`` -- both joins kept
+        even though the initiative ids are already fenced, because DA-S3
+        rule 2 makes the two-hop join itself the metric's predicate, not an
+        optimisation to drop. Results are grouped in memory by element id,
+        then by initiative id; never one select per row or per initiative.
+
+        Reason rules, exhaustive. For a capability entry:
+        ``capability_not_linked_to_model`` when the capability's
+        ``archimate_element_id`` is null; otherwise ``no_initiative_linked``
+        when no initiative joined through the fenced element; otherwise
+        ``null``. For a row: ``value_stream_not_linked_to_model`` when the
+        stream's ``archimate_element_id`` is null; otherwise
+        ``no_initiative_linked`` when nothing joined; otherwise ``null``. For
+        an initiative: ``no_success_metric_recorded`` when its metrics list
+        is empty; otherwise ``null``. "Null" for a capability entry already
+        covers a stored element id that does not resolve inside the tenant's
+        fence (another organisation's element, a deleted one) -- the
+        identity select's own OUTER JOIN carries the same predicate,
+        so that case is folded into ``capability_not_linked_to_model`` at the
+        source rather than surfacing a foreign integer and reaching
+        ``no_initiative_linked`` instead; a value stream's own element is
+        always this tenant's, created by its own insert listener, so the
+        equivalent case never arises for a row. ``no_initiative_linked``
+        itself stays reserved for an element that DOES resolve but has
+        nothing joined to it -- deliberately indistinguishable from a
+        foreign or deleted element id reaching Path C's own two selects by
+        some other route, since the fence there is not an existence oracle
+        either. Each initiatives list carries its
+        own reason beside it (``capabilities[].initiatives_reason``,
+        ``rows[].value_stream_initiatives_reason``,
+        ``initiatives[].success_metrics_reason``): T-S1's ``reason`` key
+        stays reserved for capability linkage on a row and maturity on a
+        capability entry, never repurposed for a second meaning. An
+        initiative with no element link is never counted, keyed or reasoned
+        about anywhere in the payload (ADR-S4) -- no
+        ``excluded_unlinked_count``, no ``initiative_not_linked_to_model``.
+
+        An assessment is a row whose ``assessed_by`` is set; a column
+        default (``assessed_at``, and here, the initiative's and metric's own
+        ``created_at`` / ``updated_at``) is never serialised as evidence of
+        anything. The same rule applies to a metric: it is measured when its
+        ``actual_value`` is not null; ``completion_percentage`` and the
+        initiative's timestamps are not in the payload for the same reason.
         """
+        from app.models import ArchiMateElement
+        from app.models.enterprise_intelligence import InitiativeSuccessMetric, PortfolioInitiative
         from app.models.unified_capability import (
             CapabilityValueStreamMapping,
             UnifiedCapability,
@@ -2256,6 +2582,7 @@ class IntelligenceQueryService:
                     "capabilities_below_threshold": 0,
                     "capabilities_with_no_maturity": 0,
                     "value_streams_not_linked_to_model": 0,
+                    "initiative_link_basis": "archimate_element_id",
                 }
                 reasons = [validate_reason_code("no_value_stream_recorded")]
             else:
@@ -2286,22 +2613,57 @@ class IntelligenceQueryService:
 
                 identity_by_id: Dict[int, Dict[str, Any]] = {}
                 if capability_ids:
-                    identity_stmt = db.select(
-                        UnifiedCapability.id,
-                        UnifiedCapability.name,
-                        UnifiedCapability.code,
-                    ).where(
-                        UnifiedCapability.id.in_(capability_ids),
-                        # Permissive predicate, written out in full (§ 3.2):
-                        # a tenant's own mapping row may name a shared
-                        # catalogue capability, and that mapping is honoured.
-                        db.or_(
-                            UnifiedCapability.organization_id == organization_id,
-                            UnifiedCapability.organization_id.is_(None),
-                        ),
+                    # archimate_element_id is read through an OUTER
+                    # JOIN back to ArchiMateElement carrying the same tenant
+                    # predicate Path C uses, not off the raw column. A shared
+                    # catalogue capability's stored archimate_element_id can
+                    # point at another organisation's element (or a deleted
+                    # one); echoing that raw integer would leak that SOME
+                    # element with that id exists, even though no name or
+                    # record ever does. When the join does not resolve under
+                    # the fence -- absent, foreign or deleted, indistinguishable
+                    # on purpose -- ArchiMateElement.id comes back null, and
+                    # this capability serialises archimate_element_id: null,
+                    # the same as a capability with no element at all.
+                    identity_stmt = (
+                        db.select(
+                            UnifiedCapability.id,
+                            UnifiedCapability.name,
+                            UnifiedCapability.code,
+                            UnifiedCapability.strategic_importance,
+                            UnifiedCapability.business_criticality,
+                            ArchiMateElement.id,
+                        )
+                        .select_from(UnifiedCapability)
+                        .outerjoin(
+                            ArchiMateElement,
+                            db.and_(
+                                UnifiedCapability.archimate_element_id == ArchiMateElement.id,
+                                IntelligenceQueryService._value_stream_tenant_predicate(
+                                    ArchiMateElement, organization_id
+                                ),
+                            ),
+                        )
+                        .where(
+                            UnifiedCapability.id.in_(capability_ids),
+                            # Permissive predicate, written out in full (§ 3.2):
+                            # a tenant's own mapping row may name a shared
+                            # catalogue capability, and that mapping is honoured.
+                            db.or_(
+                                UnifiedCapability.organization_id == organization_id,
+                                UnifiedCapability.organization_id.is_(None),
+                            ),
+                        )
                     )
-                    for cap_id, name, code in db.session.execute(identity_stmt).all():
-                        identity_by_id[cap_id] = {"id": cap_id, "name": name, "code": code}
+                    for cap_id, name, code, strategic_importance, business_criticality, cap_element_id in db.session.execute(identity_stmt).all():
+                        identity_by_id[cap_id] = {
+                            "id": cap_id,
+                            "name": name,
+                            "code": code,
+                            "archimate_element_id": cap_element_id,
+                            "strategic_importance": strategic_importance,
+                            "business_criticality": business_criticality,
+                        }
 
                 # Maturity through the helper -- never off the columns.
                 # Strict predicate, required kwarg: a shared catalogue row's
@@ -2309,6 +2671,116 @@ class IntelligenceQueryService:
                 maturity_by_id = CapabilityHeatmapService().maturity_for_capability_ids(
                     capability_ids, organization_id=organization_id
                 )
+
+                # -- Path C (T-S4, DA-S3): initiatives and their success
+                # metrics, at most two more batched selects, both starting
+                # from the tenant-fenced ArchiMateElement and joining
+                # outward with inner joins only. See this method's own
+                # docstring for the full shape and the reason rules.
+                element_ids: set = set()
+                for vs in value_streams:
+                    if vs.archimate_element_id is not None:
+                        element_ids.add(vs.archimate_element_id)
+                for identity in identity_by_id.values():
+                    if identity["archimate_element_id"] is not None:
+                        element_ids.add(identity["archimate_element_id"])
+
+                initiatives_by_element: Dict[int, List[Dict[str, Any]]] = {}
+                if element_ids:
+                    initiative_stmt = (
+                        db.select(ArchiMateElement.id, PortfolioInitiative)
+                        .select_from(ArchiMateElement)
+                        .join(
+                            PortfolioInitiative,
+                            PortfolioInitiative.archimate_element_id == ArchiMateElement.id,
+                        )
+                        .where(
+                            ArchiMateElement.id.in_(element_ids),
+                            IntelligenceQueryService._value_stream_tenant_predicate(
+                                ArchiMateElement, organization_id
+                            ),
+                        )
+                        .order_by(PortfolioInitiative.id)
+                    )
+                    initiative_rows = db.session.execute(initiative_stmt).all()
+
+                    initiative_ids = sorted({pi.id for _eid, pi in initiative_rows})
+                    metrics_by_initiative: Dict[int, List[Dict[str, Any]]] = {}
+                    if initiative_ids:
+                        metric_stmt = (
+                            db.select(InitiativeSuccessMetric)
+                            .select_from(ArchiMateElement)
+                            .join(
+                                PortfolioInitiative,
+                                PortfolioInitiative.archimate_element_id == ArchiMateElement.id,
+                            )
+                            .join(
+                                InitiativeSuccessMetric,
+                                InitiativeSuccessMetric.initiative_id == PortfolioInitiative.id,
+                            )
+                            .where(
+                                PortfolioInitiative.id.in_(initiative_ids),
+                                IntelligenceQueryService._value_stream_tenant_predicate(
+                                    ArchiMateElement, organization_id
+                                ),
+                            )
+                            .order_by(InitiativeSuccessMetric.id)
+                        )
+                        for metric in db.session.execute(metric_stmt).scalars().all():
+                            metrics_by_initiative.setdefault(metric.initiative_id, []).append(
+                                {
+                                    "metric_name": metric.metric_name,
+                                    "metric_type": metric.metric_type,
+                                    "baseline_value": metric.baseline_value,
+                                    "target_value": metric.target_value,
+                                    "actual_value": metric.actual_value,
+                                    "unit_of_measure": metric.unit_of_measure,
+                                    "status": metric.status,
+                                }
+                            )
+
+                    for element_id, pi in initiative_rows:
+                        metrics = metrics_by_initiative.get(pi.id, [])
+                        initiatives_by_element.setdefault(element_id, []).append(
+                            {
+                                "id": pi.id,
+                                "name": pi.name,
+                                "code": pi.code,
+                                "status": pi.status,
+                                "health_status": pi.health_status,
+                                "expected_roi_percentage": (
+                                    float(pi.expected_roi_percentage)
+                                    if pi.expected_roi_percentage is not None
+                                    else None
+                                ),
+                                "business_value_score": pi.business_value_score,
+                                "risk_score": pi.risk_score,
+                                "strategic_alignment_score": pi.strategic_alignment_score,
+                                "success_metrics": metrics,
+                                "success_metrics_reason": (
+                                    None
+                                    if metrics
+                                    else validate_reason_code("no_success_metric_recorded")
+                                ),
+                            }
+                        )
+
+                def _initiatives_for_element(element_id, not_linked_reason):
+                    """Reason rules for an initiatives list, exhaustive (see
+                    the method docstring): no element -> *not_linked_reason*
+                    (the caller's own "not linked to model" member -- a
+                    capability and a row each have their own); an element
+                    with nothing joined -> no_initiative_linked, the same
+                    member and deliberately indistinguishable from a foreign
+                    or deleted element id, since the fence is not an
+                    existence oracle; otherwise the real list and no reason.
+                    """
+                    if element_id is None:
+                        return [], validate_reason_code(not_linked_reason)
+                    found = initiatives_by_element.get(element_id, [])
+                    if not found:
+                        return [], validate_reason_code("no_initiative_linked")
+                    return found, None
 
                 mappings_by_vs: Dict[int, List[Tuple[Any, Any]]] = {}
                 for mapping, stage in mapping_rows:
@@ -2371,17 +2843,34 @@ class IntelligenceQueryService:
                                 at_risk_ids_in_row.add(mapping.capability_id)
                                 capabilities_below_threshold_ids.add(mapping.capability_id)
 
+                        cap_element_id = identity["archimate_element_id"]
+                        cap_initiatives, cap_initiatives_reason = _initiatives_for_element(
+                            cap_element_id, "capability_not_linked_to_model"
+                        )
+
+                        cap_strategic_importance = identity.get("strategic_importance")
+                        cap_business_criticality = identity.get("business_criticality")
+                        cap_importance_reason = (
+                            NO_CRITICALITY_RECORDED_REASON
+                            if cap_strategic_importance is None and cap_business_criticality is None
+                            else None
+                        )
+
                         capability_rows.append(
                             {
                                 "id": identity["id"],
                                 "name": identity["name"],
                                 "code": identity["code"],
+                                "archimate_element_id": cap_element_id,
                                 "current_maturity": current,
                                 "target_maturity": target,
                                 "under_target": under_target,
                                 "target_gap": target_gap,
                                 "maturity_source": "unified_capabilities",
                                 "at_risk": at_risk,
+                                "strategic_importance": cap_strategic_importance,
+                                "business_criticality": cap_business_criticality,
+                                "importance_reason": cap_importance_reason,
                                 "dependency": {
                                     "link_kind": "curated",
                                     "support_type": mapping.support_type,
@@ -2401,6 +2890,8 @@ class IntelligenceQueryService:
                                     ),
                                 },
                                 "reason": cap_reason,
+                                "initiatives": cap_initiatives,
+                                "initiatives_reason": cap_initiatives_reason,
                             }
                         )
 
@@ -2410,6 +2901,9 @@ class IntelligenceQueryService:
                         else None
                     )
 
+                    vs_initiatives, vs_initiatives_reason = _initiatives_for_element(
+                        vs.archimate_element_id, "value_stream_not_linked_to_model"
+                    )
                     risk_reasons = []
                     if at_risk_ids_in_row:
                         risk_reasons.append("capability_below_threshold")
@@ -2420,6 +2914,11 @@ class IntelligenceQueryService:
                     risk_reasons.sort()
 
                     at_risk_count = len(at_risk_ids_in_row)
+                    vs_importance_reason = (
+                        NO_CRITICALITY_RECORDED_REASON
+                        if vs.strategic_importance is None
+                        else None
+                    )
                     rows.append(
                         {
                             "value_stream": {
@@ -2427,11 +2926,15 @@ class IntelligenceQueryService:
                                 "name": vs.name,
                                 "code": vs.code,
                                 "archimate_element_id": vs.archimate_element_id,
+                                "strategic_importance": vs.strategic_importance,
                             },
                             "at_risk_capability_count": at_risk_count,
                             "risk_reasons": risk_reasons,
                             "capabilities": capability_rows,
                             "reason": row_reason,
+                            "value_stream_initiatives": vs_initiatives,
+                            "value_stream_initiatives_reason": vs_initiatives_reason,
+                            "importance_reason": vs_importance_reason,
                         }
                     )
                     if at_risk_count > 0:
@@ -2444,6 +2947,7 @@ class IntelligenceQueryService:
                     "capabilities_below_threshold": len(capabilities_below_threshold_ids),
                     "capabilities_with_no_maturity": len(capabilities_with_no_maturity_ids),
                     "value_streams_not_linked_to_model": value_streams_not_linked_to_model,
+                    "initiative_link_basis": "archimate_element_id",
                 }
                 reasons = []
 
@@ -2456,146 +2960,5 @@ class IntelligenceQueryService:
             "reasons": reasons,
         }
 
-    @staticmethod
-    def strategy_for_element(
-        element_id: int,
-        *,
-        max_depth: int = 3,
-        include_derived: bool = True,
-    ) -> Dict[str, Any]:
-        """L2, "what are we trying to achieve, and how's it tracking?": every
-        ``PortfolioInitiative`` seeded directly on the picked element
-        (``archimate_element_id`` FK), each with the SAME blast-radius
-        traversal L1/L5/L6 already run -- no second traversal algorithm.
-
-        Tenant-safety note, verified not assumed: ``PortfolioInitiative``
-        carries no ``TenantMixin``/``organization_id`` of its own, the same
-        gap ``UnifiedWorkPackage`` has (L5 brief). This method never lists
-        initiatives independently of an element -- every row it returns is
-        filtered by ``archimate_element_id == element_id``, and
-        ``element_id`` is only ever reached here after the element itself
-        was confirmed to belong to the caller's tenant (below). A
-        cross-tenant initiative cannot share a seed element id with the
-        wrong org's element, since ``archimate_elements.id`` is a real
-        primary key each row of which belongs to exactly one tenant.
-
-        Budget variance is read from the model's own ``total_budget``/
-        ``spent_to_date`` fields directly -- ``PortfolioInitiative`` has no
-        wrapping helper method to avoid, but the same not-computed-vs-
-        measured-zero discipline still applies: variance is only reported
-        when ``total_budget`` is a real positive number, else the row
-        carries the honest ``no_budget_recorded`` reason.
-
-        When the picked element is a Capability, each initiative row carries
-        the capability's maturity block from the T-MAT-1 helper.
-        """
-        from app.models import ArchiMateElement
-        from app.models.enterprise_intelligence import PortfolioInitiative
-
-        org_id = current_org_id()
-
-        with record_query_latency("strategy_for_element") as scope:
-            scope.organization_id = org_id
-
-            if org_id is None:
-                return {
-                    "initiatives": [],
-                    "reasons": [NO_TENANT_CONTEXT_REASON],
-                    "elements": {},
-                }
-
-            element = db.session.execute(
-                db.select(ArchiMateElement).where(ArchiMateElement.id == element_id)
-            ).scalar_one_or_none()
-            if element is None:
-                return {
-                    "initiatives": [],
-                    "reasons": [ELEMENT_NOT_FOUND_REASON],
-                    "elements": {},
-                }
-
-            seed_initiatives = (
-                db.session.execute(
-                    db.select(PortfolioInitiative).where(
-                        PortfolioInitiative.archimate_element_id == element_id
-                    )
-                )
-                .scalars()
-                .all()
-            )
-
-            if not seed_initiatives:
-                return {
-                    "initiatives": [],
-                    "reasons": [NO_INITIATIVE_LINKED_REASON],
-                    "elements": {},
-                }
-
-            # Capability maturity block: one call when the element is a Capability.
-            capability_maturity = None
-            if (element.type or "") == "Capability":
-                capability_maturity = CapabilityHeatmapService().maturity_for_elements(
-                    [element_id], organization_id=org_id
-                ).get(element_id)
-
-            all_elements: Dict[str, Dict[str, Any]] = {}
-            initiative_payloads: List[Dict[str, Any]] = []
-            for initiative in seed_initiatives:
-                blast = IntelligenceQueryService.cross_layer_impact(
-                    element_id,
-                    include_derived=include_derived,
-                    max_depth=max_depth,
-                    with_owner=True,
-                )
-                all_elements.update(blast.get("elements") or {})
-
-                if initiative.total_budget and initiative.total_budget > 0:
-                    total_budget = float(initiative.total_budget)
-                    spent_to_date = float(initiative.spent_to_date or 0.0)
-                    budget_variance_pct = (spent_to_date - total_budget) / total_budget * 100
-                    budget_reason = None
-                else:
-                    budget_variance_pct = None
-                    budget_reason = NO_BUDGET_RECORDED_REASON
-
-                payload = {
-                    "initiative_id": initiative.id,
-                    "name": initiative.name,
-                    "status": initiative.status,
-                    "priority": initiative.priority,
-                    "health_status": initiative.health_status,
-                    "completion_percentage": initiative.completion_percentage,
-                    "start_date": initiative.start_date.isoformat()
-                    if initiative.start_date
-                    else None,
-                    "target_end_date": initiative.target_end_date.isoformat()
-                    if initiative.target_end_date
-                    else None,
-                    "executive_sponsor": initiative.executive_sponsor,
-                    "program_manager": initiative.program_manager,
-                    "budget_variance_pct": budget_variance_pct,
-                    "budget_reason": budget_reason,
-                    "success_metrics": [
-                        {
-                            "metric_name": m.metric_name,
-                            "metric_type": m.metric_type,
-                            "target_value": m.target_value,
-                            "actual_value": m.actual_value,
-                            "status": m.status,
-                        }
-                        for m in initiative.success_metrics
-                    ],
-                    "affected_rows": blast.get("rows", []),
-                    "affected_summary": blast.get("summary", {}),
-                }
-                if capability_maturity is not None:
-                    payload["capability_maturity"] = capability_maturity
-                initiative_payloads.append(payload)
-
-        return {
-            "initiatives": initiative_payloads,
-            "reasons": [],
-            "elements": all_elements,
-        }
 
 __all__ = ["IntelligenceQueryService"]

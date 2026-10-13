@@ -158,6 +158,77 @@ def _mapping(
     return mapping
 
 
+def _element(db_session, org_id, name, type_="ApplicationComponent", layer="application"):
+    from app.models import ArchiMateElement
+
+    element = ArchiMateElement(name=name, type=type_, layer=layer, organization_id=org_id)
+    db_session.add(element)
+    db_session.flush()
+    return element
+
+
+def _initiative(
+    db_session,
+    archimate_element_id,
+    name,
+    code,
+    status="Active",
+    health_status=None,
+    expected_roi_percentage=None,
+    business_value_score=None,
+    risk_score=None,
+    strategic_alignment_score=None,
+):
+    """``code`` must carry a ``uuid`` suffix from the caller
+    (``_org_suffix()``), never a bare literal -- ``portfolio_initiatives.code``
+    is globally unique on a table with no tenant column, on a shared
+    database."""
+    from app.models.enterprise_intelligence import PortfolioInitiative
+
+    initiative = PortfolioInitiative(
+        name=name,
+        code=code,
+        archimate_element_id=archimate_element_id,
+        status=status,
+        health_status=health_status,
+        expected_roi_percentage=expected_roi_percentage,
+        business_value_score=business_value_score,
+        risk_score=risk_score,
+        strategic_alignment_score=strategic_alignment_score,
+    )
+    db_session.add(initiative)
+    db_session.flush()
+    return initiative
+
+
+def _metric(
+    db_session,
+    initiative_id,
+    metric_name,
+    metric_type="KPI",
+    baseline_value=None,
+    target_value=None,
+    actual_value=None,
+    unit_of_measure=None,
+    status=None,
+):
+    from app.models.enterprise_intelligence import InitiativeSuccessMetric
+
+    metric = InitiativeSuccessMetric(
+        initiative_id=initiative_id,
+        metric_name=metric_name,
+        metric_type=metric_type,
+        baseline_value=baseline_value,
+        target_value=target_value,
+        actual_value=actual_value,
+        unit_of_measure=unit_of_measure,
+        status=status,
+    )
+    db_session.add(metric)
+    db_session.flush()
+    return metric
+
+
 def _without_latency(payload):
     out = dict(payload)
     out["summary"] = {k: v for k, v in payload["summary"].items() if k != "latency_ms"}
@@ -691,7 +762,7 @@ def test_stage_of_a_different_own_value_stream_is_nulled(app, db_session, make_o
     assert row["at_risk_capability_count"] == 1
 
 
-def test_null_owner_stage_is_populated_at_method_level(app, db_session, make_org):
+def test_null_owner_stage_is_populated_at_method_level(app, db_session, make_org, relax_not_null):
     """A tenant's own mapping on a stage whose
     ``organization_id`` is null (the legacy shape the tenancy backfill
     exists to repair) is listed, counted, and -- called with no ambient
@@ -704,7 +775,7 @@ def test_null_owner_stage_is_populated_at_method_level(app, db_session, make_org
 
     org = make_org("vsr-ac4a")
     vs = _value_stream(db_session, org.id, "VS", f"VSR-AC4A-{_org_suffix()}")
-    _relax_not_null(db_session, "unified_value_stream_stages", "organization_id")
+    relax_not_null("unified_value_stream_stages", "organization_id")
     null_owner_stage = ValueStreamStage(
         name="Null Owner Stage", value_stream_id=vs.id, stage_order=1, organization_id=None,
     )
@@ -727,7 +798,9 @@ def test_null_owner_stage_is_populated_at_method_level(app, db_session, make_org
     }
 
 
-def test_route_null_owner_stage_is_listed_and_counted(app, db_session, make_org, client, login_as):
+def test_route_null_owner_stage_is_listed_and_counted(
+    app, db_session, make_org, client, login_as, relax_not_null
+):
     """The route-level variant of the null-owner-stage case above. Inside a
     real request the tenant-isolation listener adds its own organisation
     criterion to the outer join's ``ON`` clause for ``ValueStreamStage`` (a
@@ -740,7 +813,7 @@ def test_route_null_owner_stage_is_listed_and_counted(app, db_session, make_org,
     org = make_org("vsr-ac4d")
     user = _user(db_session, org.id)
     vs = _value_stream(db_session, org.id, "VS", f"VSR-AC4D-{_org_suffix()}")
-    _relax_not_null(db_session, "unified_value_stream_stages", "organization_id")
+    relax_not_null("unified_value_stream_stages", "organization_id")
     null_owner_stage = ValueStreamStage(
         name="Route Null Owner Stage", value_stream_id=vs.id, stage_order=1, organization_id=None,
     )
@@ -835,7 +908,9 @@ def test_route_threshold_and_value_stream_id_validation(app, db_session, make_or
         assert resp.get_json()["error"]["code"] == "INVALID_PARAMETER"
 
 
-def test_route_no_tenant_context_returns_400(app, db_session, make_org, client, login_as):
+def test_route_no_tenant_context_returns_400(
+    app, db_session, make_org, client, login_as, relax_not_null
+):
     """A LOGGED-IN user whose organisation is ``None`` gets
     the real 400 ``NO_TENANT_CONTEXT`` branch, distinct from the anonymous
     ``@login_required`` redirect this test used to conflate with it (see
@@ -844,7 +919,7 @@ def test_route_no_tenant_context_returns_400(app, db_session, make_org, client, 
     ``User.organization_id`` is ``NOT NULL`` at the schema level and
     ``_assign_default_organization``'s ``before_insert`` listener fills in a
     fallback whenever it is left unset, so a persisted user can never
-    genuinely hold a null organisation through the ORM as-is. ``_relax_not_null``
+    genuinely hold a null organisation through the ORM as-is. ``relax_not_null``
     reproduces the real, already-deployed shape this scenario needs (see its
     own docstring) for the rest of this test's transaction only, so the
     organisation-less user is genuinely persisted -- flask-login's loader then
@@ -859,7 +934,7 @@ def test_route_no_tenant_context_returns_400(app, db_session, make_org, client, 
 
     login_as(client, user)
 
-    _relax_not_null(db_session, "users", "organization_id")
+    relax_not_null("users", "organization_id")
     user.organization_id = None
     db_session.flush()
 
@@ -1139,9 +1214,16 @@ def test_every_reason_string_in_a_realistic_payload_is_a_closed_vocabulary_membe
     for row in result["rows"]:
         if row["reason"] is not None:
             assert row["reason"] in REASON_CODES
+        if row["value_stream_initiatives_reason"] is not None:
+            assert row["value_stream_initiatives_reason"] in REASON_CODES
         for cap in row["capabilities"]:
             if cap["reason"] is not None:
                 assert cap["reason"] in REASON_CODES
+            if cap["initiatives_reason"] is not None:
+                assert cap["initiatives_reason"] in REASON_CODES
+            for initiative in cap["initiatives"]:
+                if initiative["success_metrics_reason"] is not None:
+                    assert initiative["success_metrics_reason"] in REASON_CODES
 
 
 # --- Acceptance item 18 -----------------------------------------------------------
@@ -1169,8 +1251,8 @@ def test_dependency_object_exact_key_set_and_no_forbidden_keys(app, db_session, 
     result = IntelligenceQueryService.value_streams_at_risk(org.id)
 
     row = result["rows"][0]
-    assert "initiatives" not in row
-    assert "value_stream_initiatives" not in row
+    assert "value_stream_initiatives" in row
+    assert "initiatives" in row["capabilities"][0]
     assert "initiatives" not in result
 
     dependency = row["capabilities"][0]["dependency"]
@@ -1185,6 +1267,49 @@ def test_dependency_object_exact_key_set_and_no_forbidden_keys(app, db_session, 
     assert forbidden.isdisjoint(dependency.keys())
     assert dependency["link_kind"] == "curated"
     assert dependency["stage"] == {"id": stage.id, "name": stage.name}
+
+
+def test_capability_row_and_summary_exact_key_sets(app, db_session, make_org):
+    """The dependency object's key set was already pinned above; this
+    pins the three key sets that wrap it -- a capability entry (fifteen
+    keys, the original twelve plus T-WIRE-5's strategic_importance,
+    business_criticality and importance_reason), a row (seven keys, T-S4's
+    six plus T-WIRE-5's importance_reason) and the top-level summary (the
+    seven counters plus latency_ms, added once after every row is built)."""
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-ts4-keysets")
+    vs = _value_stream(db_session, org.id, "VS", f"VSR-TS4KEYSETS-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(db_session, org.id, "Cap", f"VSR-TS4KEYSETS-CAP-{_org_suffix()}", current=2, target=4)
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+
+    row = result["rows"][0]
+    assert set(row.keys()) == {
+        "value_stream", "at_risk_capability_count", "capabilities", "reason",
+        "value_stream_initiatives", "value_stream_initiatives_reason",
+        "importance_reason",
+    }
+    assert set(row["value_stream"].keys()) == {
+        "id", "name", "code", "archimate_element_id", "strategic_importance",
+    }
+
+    cap_row = row["capabilities"][0]
+    assert set(cap_row.keys()) == {
+        "id", "name", "code", "archimate_element_id", "current_maturity",
+        "target_maturity", "maturity_source", "at_risk", "dependency", "reason",
+        "initiatives", "initiatives_reason",
+        "strategic_importance", "business_criticality", "importance_reason",
+    }
+
+    assert set(result["summary"].keys()) == {
+        "value_streams_considered", "value_streams_at_risk", "capabilities_considered",
+        "capabilities_below_threshold", "capabilities_with_no_maturity",
+        "value_streams_not_linked_to_model", "initiative_link_basis", "latency_ms",
+    }
 
 
 def test_dependency_object_reports_assessment_fields_honestly(app, db_session, make_org):
@@ -1244,6 +1369,7 @@ def test_dependency_object_reports_assessment_fields_honestly(app, db_session, m
 def test_route_ignores_graph_only_parameters(app, db_session, make_org, client, login_as):
     org = make_org("vsr-ac18-route")
     user = _user(db_session, org.id)
+    _value_stream(db_session, org.id, "VS", f"VSR-AC18ROUTE-{_org_suffix()}")
     db_session.commit()
 
     login_as(client, user)
@@ -1254,8 +1380,10 @@ def test_route_ignores_graph_only_parameters(app, db_session, make_org, client, 
     assert resp.status_code == 200
     data = resp.get_json()["data"]
     assert "initiatives" not in data
+    assert data["rows"], "expected at least one row for the per-row assertion to be meaningful"
     for row in data["rows"]:
         assert "initiatives" not in row
+        assert "value_stream_initiatives" in row
 
 
 # --- Acceptance item 19 ------------------------------------------------------------
@@ -1284,6 +1412,33 @@ def select_counter(app):
         event.remove(db.engine, "before_cursor_execute", counter)
 
 
+class _AllStatementCounter:
+    """Records every statement, not only ``SELECT`` -- ``test_query_path_issues_no_write``
+    (T-S4, acceptance item 4) needs to see an ``INSERT`` / ``UPDATE`` / ``DELETE``
+    if the query path ever issued one, which ``_SelectStatementCounter`` above
+    is deliberately blind to."""
+
+    def __init__(self):
+        self.statements = []
+
+    def __call__(self, conn, cursor, statement, parameters, context, executemany):
+        self.statements.append(statement)
+
+
+@pytest.fixture
+def all_statement_counter(app):
+    from sqlalchemy import event
+
+    from app.extensions import db
+
+    counter = _AllStatementCounter()
+    event.listen(db.engine, "before_cursor_execute", counter)
+    try:
+        yield counter
+    finally:
+        event.remove(db.engine, "before_cursor_execute", counter)
+
+
 def test_four_batched_selects_regardless_of_row_count(app, db_session, make_org, select_counter):
     """This measures the method called with NO request
     context (no ``g.current_org_id``, no ``tenant_ctx``) -- the shape a CLI
@@ -1293,6 +1448,11 @@ def test_four_batched_selects_regardless_of_row_count(app, db_session, make_org,
     growth assertion measured INSIDE a request context, where that extra
     statement per execute is present and the count is correspondingly
     higher but still constant under row growth.
+
+    Five, not four (T-S4): every ``ValueStream`` in this scenario carries an
+    element from the ``after_insert`` listener, so Path C's initiative select
+    (select 5) is always issued -- but no initiative is ever seeded here, so
+    it always returns nothing and the metric select (select 6) never fires.
     """
     from app.modules.intelligence.services.query_service import IntelligenceQueryService
 
@@ -1389,6 +1549,584 @@ def test_statement_count_constant_inside_tenant_context(
         big_count_in_context = len(select_counter.statements)
 
     assert big_count_in_context == small_count_in_context, select_counter.statements
+
+
+# =================================================================================
+# T-S4: initiatives and success metrics (Path C)
+# =================================================================================
+
+
+def test_capability_initiatives_and_metrics_attached(app, db_session, make_org):
+    """One initiative with two metrics on a capability's element: the
+    initiative key set is exactly the eleven keys, the metric key set
+    exactly the seven, strings verbatim, ``expected_roi_percentage`` a
+    float, both reasons null, ordered by id.
+    """
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-ts4-cap-init")
+    vs = _value_stream(db_session, org.id, "VS", f"VSR-TS4CAP-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(db_session, org.id, "Cap", f"VSR-TS4CAP-CAP-{_org_suffix()}", current=2, target=4)
+    element = _element(db_session, org.id, "Cap Element", type_="Capability", layer="Strategy")
+    cap.archimate_element_id = element.id
+    db_session.flush()
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+
+    initiative = _initiative(
+        db_session, element.id, "Demonstration: Init", f"VSR-TS4CAP-INI-{_org_suffix()}",
+        status="Active", health_status="Amber", expected_roi_percentage=12.5,
+        business_value_score=70, risk_score=40, strategic_alignment_score=80,
+    )
+    _metric(
+        db_session, initiative.id, "Metric A", metric_type="KPI",
+        baseline_value="4.2", target_value="1.0", actual_value="3.1",
+        unit_of_measure="%", status="At Risk",
+    )
+    _metric(
+        db_session, initiative.id, "Metric B", metric_type="KPI",
+        baseline_value="78", target_value="95", actual_value=None,
+        unit_of_measure="%", status=None,
+    )
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    cap_row = result["rows"][0]["capabilities"][0]
+    assert cap_row["archimate_element_id"] == element.id
+    assert cap_row["initiatives_reason"] is None
+    assert len(cap_row["initiatives"]) == 1
+    ini = cap_row["initiatives"][0]
+    assert set(ini.keys()) == {
+        "id", "name", "code", "status", "health_status", "expected_roi_percentage",
+        "business_value_score", "risk_score", "strategic_alignment_score",
+        "success_metrics", "success_metrics_reason",
+    }
+    assert ini["id"] == initiative.id
+    assert ini["name"] == "Demonstration: Init"
+    assert ini["code"] == initiative.code
+    assert ini["status"] == "Active"
+    assert ini["health_status"] == "Amber"
+    assert ini["expected_roi_percentage"] == 12.5
+    assert isinstance(ini["expected_roi_percentage"], float)
+    assert ini["business_value_score"] == 70
+    assert ini["risk_score"] == 40
+    assert ini["strategic_alignment_score"] == 80
+    assert ini["success_metrics_reason"] is None
+    assert len(ini["success_metrics"]) == 2
+    assert [m["metric_name"] for m in ini["success_metrics"]] == ["Metric A", "Metric B"]
+    m1 = ini["success_metrics"][0]
+    assert set(m1.keys()) == {
+        "metric_name", "metric_type", "baseline_value", "target_value",
+        "actual_value", "unit_of_measure", "status",
+    }
+    assert m1["baseline_value"] == "4.2"
+    assert m1["target_value"] == "1.0"
+    assert m1["actual_value"] == "3.1"
+    assert m1["unit_of_measure"] == "%"
+    assert m1["status"] == "At Risk"
+    m2 = ini["success_metrics"][1]
+    assert m2["actual_value"] is None
+    assert m2["status"] is None
+
+
+def test_value_stream_initiative_attached_to_row_not_capability(app, db_session, make_org):
+    """An initiative tied to the value stream's OWN element (not a
+    capability's) appears in ``value_stream_initiatives``, and the
+    capability entry -- whose own element was never set -- correctly gets
+    ``capability_not_linked_to_model``, not the row's initiative."""
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-ts4-vs-init")
+    vs = _value_stream(db_session, org.id, "VS", f"VSR-TS4VS-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(db_session, org.id, "Cap", f"VSR-TS4VS-CAP-{_org_suffix()}", current=2, target=4)
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.flush()
+
+    initiative = _initiative(
+        db_session, vs.archimate_element_id, "Demonstration: Stream Init",
+        f"VSR-TS4VS-INI-{_org_suffix()}",
+    )
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    row = result["rows"][0]
+    assert row["value_stream_initiatives_reason"] is None
+    assert len(row["value_stream_initiatives"]) == 1
+    assert row["value_stream_initiatives"][0]["id"] == initiative.id
+
+    cap_row = row["capabilities"][0]
+    assert cap_row["initiatives"] == []
+    assert cap_row["initiatives_reason"] == "capability_not_linked_to_model"
+
+
+def test_capability_without_element_reports_capability_not_linked_to_model(app, db_session, make_org):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-ts4-cap-noel")
+    vs = _value_stream(db_session, org.id, "VS", f"VSR-TS4CAPNOEL-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(db_session, org.id, "Cap", f"VSR-TS4CAPNOEL-CAP-{_org_suffix()}", current=2, target=4)
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    cap_row = result["rows"][0]["capabilities"][0]
+    assert cap_row["archimate_element_id"] is None
+    assert cap_row["initiatives"] == []
+    assert cap_row["initiatives_reason"] == "capability_not_linked_to_model"
+
+
+def test_value_stream_without_element_reports_value_stream_not_linked_to_model(app, db_session, make_org):
+    """A ``ValueStream`` inserted in a test always gets an element from the
+    ``after_insert`` listener; to test a stream with no element,
+    ``archimate_element_id`` is set to ``None`` after the insert and
+    flushed (constraint 19)."""
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-ts4-vs-noel")
+    vs = _value_stream(db_session, org.id, "VS", f"VSR-TS4VSNOEL-{_org_suffix()}")
+    vs.archimate_element_id = None
+    db_session.flush()
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(db_session, org.id, "Cap", f"VSR-TS4VSNOEL-CAP-{_org_suffix()}", current=2, target=4)
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    row = result["rows"][0]
+    assert row["value_stream"]["archimate_element_id"] is None
+    assert row["value_stream_initiatives"] == []
+    assert row["value_stream_initiatives_reason"] == "value_stream_not_linked_to_model"
+
+
+def test_element_with_no_initiative_reports_no_initiative_linked(app, db_session, make_org):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-ts4-noinit")
+    vs = _value_stream(db_session, org.id, "VS", f"VSR-TS4NOINIT-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(db_session, org.id, "Cap", f"VSR-TS4NOINIT-CAP-{_org_suffix()}", current=2, target=4)
+    cap_element = _element(db_session, org.id, "Cap Element", type_="Capability", layer="Strategy")
+    cap.archimate_element_id = cap_element.id
+    db_session.flush()
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    row = result["rows"][0]
+    # The value stream's own listener-created element has no initiative.
+    assert row["value_stream_initiatives"] == []
+    assert row["value_stream_initiatives_reason"] == "no_initiative_linked"
+    # Neither does the capability's own element.
+    cap_row = row["capabilities"][0]
+    assert cap_row["initiatives"] == []
+    assert cap_row["initiatives_reason"] == "no_initiative_linked"
+
+
+def test_initiative_with_no_metric_reports_no_success_metric_recorded(app, db_session, make_org):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-ts4-nometric")
+    vs = _value_stream(db_session, org.id, "VS", f"VSR-TS4NOMETRIC-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(db_session, org.id, "Cap", f"VSR-TS4NOMETRIC-CAP-{_org_suffix()}", current=2, target=4)
+    cap_element = _element(db_session, org.id, "Cap Element", type_="Capability", layer="Strategy")
+    cap.archimate_element_id = cap_element.id
+    db_session.flush()
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    _initiative(
+        db_session, cap_element.id, "Demonstration: No Metric Init",
+        f"VSR-TS4NOMETRIC-INI-{_org_suffix()}",
+    )
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    ini = result["rows"][0]["capabilities"][0]["initiatives"][0]
+    assert ini["success_metrics"] == []
+    assert ini["success_metrics_reason"] == "no_success_metric_recorded"
+
+
+def test_initiative_on_another_tenants_element_never_appears_and_mutation_proof(
+    app, db_session, make_org, monkeypatch
+):
+    """Two scenarios by which a foreign element id can reach Path C's ``IN``
+    list: (a) tenant A's own mapping names a SHARED catalogue capability
+    (``organization_id`` null) whose ``archimate_element_id`` is tenant B's
+    own element; (b) A's own capability, by data anomaly, names B's element
+    directly. Both must be invisible: B's initiative's name, code and its
+    metric's name absent from the serialised payload, and the raw
+    foreign element id itself never echoed either -- the identity select's
+    own OUTER JOIN carries the same tenant predicate, so both capability
+    entries serialise ``archimate_element_id: null`` and, since the element
+    is therefore null rather than merely empty of initiatives, both report
+    ``capability_not_linked_to_model`` rather than ``no_initiative_linked``.
+
+    Then, inside ``pytest.raises(AssertionError)``, neuter the shared
+    ``_value_stream_tenant_predicate`` seam and show the same assertion
+    fails -- the same seam, and the same proof shape, as the item-10 proof.
+    """
+    import json
+
+    from sqlalchemy import true as sa_true
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org_a = make_org("vsr-ts4-foreign-a")
+    org_b = make_org("vsr-ts4-foreign-b")
+
+    b_element = _element(db_session, org_b.id, "B Element", type_="Capability", layer="Strategy")
+    b_initiative = _initiative(
+        db_session, b_element.id, "Demonstration: B's Initiative",
+        f"VSR-TS4FOREIGN-BINI-{_org_suffix()}",
+    )
+    _metric(db_session, b_initiative.id, "B's Metric")
+
+    vs_a = _value_stream(db_session, org_a.id, "VS A", f"VSR-TS4FOREIGN-VSA-{_org_suffix()}")
+    stage_a = _stage(db_session, org_a.id, vs_a.id, "Stage A", 1)
+
+    # (a) shared catalogue capability naming B's element.
+    shared_cap = _capability(
+        db_session, None, "Shared Cap", f"VSR-TS4FOREIGN-SHARED-{_org_suffix()}", current=1, target=3
+    )
+    shared_cap.archimate_element_id = b_element.id
+    db_session.flush()
+    _mapping(db_session, org_a.id, shared_cap.id, vs_a.id, stage_a.id)
+
+    # (b) A's own capability naming B's element directly (a data anomaly).
+    own_cap = _capability(
+        db_session, org_a.id, "Own Cap", f"VSR-TS4FOREIGN-OWN-{_org_suffix()}", current=1, target=3
+    )
+    own_cap.archimate_element_id = b_element.id
+    db_session.flush()
+    _mapping(db_session, org_a.id, own_cap.id, vs_a.id, stage_a.id)
+
+    db_session.commit()
+
+    def _answer_and_serialised():
+        result = IntelligenceQueryService.value_streams_at_risk(org_a.id)
+        return result, json.dumps(result)
+
+    result, serialised = _answer_and_serialised()
+    row = next(r for r in result["rows"] if r["value_stream"]["id"] == vs_a.id)
+    shared_entry = next(c for c in row["capabilities"] if c["id"] == shared_cap.id)
+    own_entry = next(c for c in row["capabilities"] if c["id"] == own_cap.id)
+
+    # The identity select's own OUTER JOIN carries the same tenant
+    # predicate, so a stored archimate_element_id that does not resolve
+    # inside the fence comes back null -- never a foreign integer, even
+    # though it never carried a name or record either.
+    assert shared_entry["archimate_element_id"] is None
+    assert own_entry["archimate_element_id"] is None
+    assert shared_entry["initiatives"] == []
+    assert shared_entry["initiatives_reason"] == "capability_not_linked_to_model"
+    assert own_entry["initiatives"] == []
+    assert own_entry["initiatives_reason"] == "capability_not_linked_to_model"
+    assert "Demonstration: B's Initiative" not in serialised
+    assert b_initiative.code not in serialised
+    assert "B's Metric" not in serialised
+
+    # Mutation: neuter the shared predicate -- B's initiative now leaks
+    # through, because the two Path C selects rely on exactly this seam.
+    monkeypatch.setattr(
+        IntelligenceQueryService,
+        "_value_stream_tenant_predicate",
+        staticmethod(lambda model, organization_id: sa_true()),
+    )
+    with pytest.raises(AssertionError):
+        _mutated_result, mutated_serialised = _answer_and_serialised()
+        assert "Demonstration: B's Initiative" not in mutated_serialised
+
+    monkeypatch.undo()
+    _restored_result, restored_serialised = _answer_and_serialised()
+    assert "Demonstration: B's Initiative" not in restored_serialised
+
+
+def test_metric_of_foreign_initiative_never_appears(app, db_session, make_org):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org_a = make_org("vsr-ts4-foreignmetric-a")
+    org_b = make_org("vsr-ts4-foreignmetric-b")
+
+    b_element = _element(db_session, org_b.id, "B Element", type_="Capability", layer="Strategy")
+    b_initiative = _initiative(
+        db_session, b_element.id, "Demonstration: B Metric Initiative",
+        f"VSR-TS4FOREIGNMETRIC-BINI-{_org_suffix()}",
+    )
+    _metric(db_session, b_initiative.id, "B's Own Metric")
+
+    vs_a = _value_stream(db_session, org_a.id, "VS A", f"VSR-TS4FOREIGNMETRIC-VSA-{_org_suffix()}")
+    stage_a = _stage(db_session, org_a.id, vs_a.id, "Stage A", 1)
+    cap_a = _capability(
+        db_session, org_a.id, "Cap A", f"VSR-TS4FOREIGNMETRIC-CAPA-{_org_suffix()}", current=1, target=3
+    )
+    cap_a.archimate_element_id = b_element.id
+    db_session.flush()
+    _mapping(db_session, org_a.id, cap_a.id, vs_a.id, stage_a.id)
+    db_session.commit()
+
+    import json
+
+    result = IntelligenceQueryService.value_streams_at_risk(org_a.id)
+    serialised = json.dumps(result)
+    assert "B's Own Metric" not in serialised
+
+    # cap_a's stored archimate_element_id names org B's element, which
+    # does not resolve inside org A's fence -- the identity select's own
+    # OUTER JOIN nulls it, so it never reaches element_ids at all.
+    cap_row = result["rows"][0]["capabilities"][0]
+    assert cap_row["archimate_element_id"] is None
+    assert cap_row["initiatives_reason"] == "capability_not_linked_to_model"
+
+
+def test_path_c_statements_are_inner_joins_from_the_fenced_element(app, db_session, make_org, select_counter):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-ts4-structural")
+    vs = _value_stream(db_session, org.id, "VS", f"VSR-TS4STRUCT-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(db_session, org.id, "Cap", f"VSR-TS4STRUCT-CAP-{_org_suffix()}", current=1, target=3)
+    element = _element(db_session, org.id, "Cap Element", type_="Capability", layer="Strategy")
+    cap.archimate_element_id = element.id
+    db_session.flush()
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    initiative = _initiative(
+        db_session, element.id, "Demonstration: Struct Init", f"VSR-TS4STRUCT-INI-{_org_suffix()}"
+    )
+    _metric(db_session, initiative.id, "Struct Metric")
+    db_session.commit()
+
+    select_counter.statements.clear()
+    IntelligenceQueryService.value_streams_at_risk(org.id)
+    statements = select_counter.statements
+
+    path_c_statements = [
+        s for s in statements
+        if "archimate_elements" in s.lower() and "portfolio_initiatives" in s.lower()
+    ]
+    assert len(path_c_statements) == 2, statements
+
+    for stmt in path_c_statements:
+        upper = stmt.upper()
+        assert "FROM ARCHIMATE_ELEMENTS" in upper, stmt
+        assert "JOIN PORTFOLIO_INITIATIVES" in upper, stmt
+        assert "ARCHIMATE_ELEMENTS.ORGANIZATION_ID" in upper, stmt
+        assert "LEFT OUTER JOIN" not in upper, stmt
+
+    metric_stmt = next(s for s in path_c_statements if "initiative_success_metrics" in s.lower())
+    assert "JOIN INITIATIVE_SUCCESS_METRICS" in metric_stmt.upper()
+    # Pin the narrowing WHERE clause itself -- dropping
+    # `PortfolioInitiative.id.in_(initiative_ids)` from the metric select
+    # would still compile and still join through the fenced element, but
+    # would then return every fenced initiative's metrics, not only the
+    # ones select 5 actually found.
+    assert "PORTFOLIO_INITIATIVES.ID IN" in metric_stmt.upper(), metric_stmt
+
+
+def test_initiative_without_element_is_absent_and_uncounted(app, db_session, make_org):
+    """ADR-S4: an initiative with no element link is never counted, keyed or
+    reasoned about anywhere in the payload -- no ``excluded_unlinked_count``,
+    no ``initiative_not_linked_to_model``."""
+    from app.models.enterprise_intelligence import PortfolioInitiative
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-ts4-noelement-init")
+    vs = _value_stream(db_session, org.id, "VS", f"VSR-TS4NOELINIT-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(db_session, org.id, "Cap", f"VSR-TS4NOELINIT-CAP-{_org_suffix()}", current=1, target=3)
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+
+    orphan_initiative = PortfolioInitiative(
+        name="Demonstration: Orphan Initiative",
+        code=f"VSR-TS4NOELINIT-ORPHAN-{_org_suffix()}",
+        archimate_element_id=None,
+    )
+    db_session.add(orphan_initiative)
+    db_session.flush()
+    db_session.commit()
+
+    import json
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    serialised = json.dumps(result)
+    assert "Demonstration: Orphan Initiative" not in serialised
+    assert orphan_initiative.code not in serialised
+    assert "excluded_unlinked_count" not in serialised
+    assert "initiative_not_linked_to_model" not in serialised
+    assert result["summary"]["initiative_link_basis"] == "archimate_element_id"
+
+
+def test_capability_on_two_stages_carries_identical_initiatives_on_each_entry(app, db_session, make_org):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-ts4-twostages")
+    vs = _value_stream(db_session, org.id, "VS", f"VSR-TS4TWOSTAGES-{_org_suffix()}")
+    stage_a = _stage(db_session, org.id, vs.id, "Stage A", 1)
+    stage_b = _stage(db_session, org.id, vs.id, "Stage B", 2)
+    cap = _capability(db_session, org.id, "Cap", f"VSR-TS4TWOSTAGES-CAP-{_org_suffix()}", current=1, target=3)
+    element = _element(db_session, org.id, "Cap Element", type_="Capability", layer="Strategy")
+    cap.archimate_element_id = element.id
+    db_session.flush()
+    _mapping(db_session, org.id, cap.id, vs.id, stage_a.id, support_type="primary")
+    _mapping(db_session, org.id, cap.id, vs.id, stage_b.id, support_type="secondary")
+    initiative = _initiative(
+        db_session, element.id, "Demonstration: Two Stages Init", f"VSR-TS4TWOSTAGES-INI-{_org_suffix()}"
+    )
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    row = result["rows"][0]
+    assert len(row["capabilities"]) == 2
+    for cap_row in row["capabilities"]:
+        assert cap_row["initiatives_reason"] is None
+        assert len(cap_row["initiatives"]) == 1
+        assert cap_row["initiatives"][0]["id"] == initiative.id
+
+
+def test_query_path_issues_no_write(app, db_session, make_org, all_statement_counter):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-ts4-nowrite")
+    vs = _value_stream(db_session, org.id, "VS", f"VSR-TS4NOWRITE-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(db_session, org.id, "Cap", f"VSR-TS4NOWRITE-CAP-{_org_suffix()}", current=1, target=3)
+    element = _element(db_session, org.id, "Cap Element", type_="Capability", layer="Strategy")
+    cap.archimate_element_id = element.id
+    db_session.flush()
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    initiative = _initiative(
+        db_session, element.id, "Demonstration: No Write Init", f"VSR-TS4NOWRITE-INI-{_org_suffix()}"
+    )
+    _metric(db_session, initiative.id, "No Write Metric")
+    db_session.commit()
+
+    all_statement_counter.statements.clear()
+    IntelligenceQueryService.value_streams_at_risk(org.id)
+
+    # An empty capture (e.g. the listener silently swallowing every
+    # statement) would pass the write-free assertion below vacuously --
+    # pin that the call actually issued statements to inspect.
+    assert all_statement_counter.statements, "expected at least one SELECT to be captured"
+
+    write_verbs = ("INSERT", "UPDATE", "DELETE")
+    writes = [
+        s for s in all_statement_counter.statements
+        if s.strip().upper().startswith(write_verbs)
+    ]
+    assert writes == [], writes
+
+
+def test_path_c_adds_at_most_two_selects_constant_under_growth(app, db_session, make_org, select_counter):
+    """Six statements with initiatives and metrics present, unchanged after
+    adding a stream, four mappings, two initiatives and three metrics."""
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-ts4-pathc-growth")
+    org_id = org.id
+    vs1 = _value_stream(db_session, org_id, "VS1", f"VSR-TS4PATHCGROWTH-1-{_org_suffix()}")
+    stage1 = _stage(db_session, org_id, vs1.id, "Stage 1", 1)
+    element1 = _element(db_session, org_id, "Element 1", type_="Capability", layer="Strategy")
+    cap1 = _capability(db_session, org_id, "Cap1", f"VSR-TS4PATHCGROWTH-CAP1-{_org_suffix()}", current=1, target=3)
+    cap1.archimate_element_id = element1.id
+    db_session.flush()
+    _mapping(db_session, org_id, cap1.id, vs1.id, stage1.id)
+    initiative1 = _initiative(
+        db_session, element1.id, "Demonstration: Growth Init 1", f"VSR-TS4PATHCGROWTH-INI1-{_org_suffix()}"
+    )
+    _metric(db_session, initiative1.id, "Growth Metric 1")
+    db_session.commit()
+
+    select_counter.statements.clear()
+    IntelligenceQueryService.value_streams_at_risk(org_id)
+    small_count = len(select_counter.statements)
+
+    # Grow: a third value stream, four mappings, two initiatives, three metrics.
+    vs2 = _value_stream(db_session, org_id, "VS2", f"VSR-TS4PATHCGROWTH-2-{_org_suffix()}")
+    stage2 = _stage(db_session, org_id, vs2.id, "Stage 2", 1)
+    more_caps = []
+    for i in range(4):
+        cap = _capability(
+            db_session, org_id, f"Cap Extra {i}", f"VSR-TS4PATHCGROWTH-EXTRA-{i}-{_org_suffix()}",
+            current=1, target=5,
+        )
+        more_caps.append(cap)
+        _mapping(db_session, org_id, cap.id, vs2.id, stage2.id)
+    element2 = _element(db_session, org_id, "Element 2", type_="Capability", layer="Strategy")
+    more_caps[0].archimate_element_id = element2.id
+    db_session.flush()
+    initiative2 = _initiative(
+        db_session, element2.id, "Demonstration: Growth Init 2", f"VSR-TS4PATHCGROWTH-INI2-{_org_suffix()}"
+    )
+    initiative3 = _initiative(
+        db_session, vs2.archimate_element_id, "Demonstration: Growth Init 3",
+        f"VSR-TS4PATHCGROWTH-INI3-{_org_suffix()}",
+    )
+    _metric(db_session, initiative2.id, "Growth Metric 2")
+    _metric(db_session, initiative2.id, "Growth Metric 3")
+    _metric(db_session, initiative3.id, "Growth Metric 4")
+    db_session.commit()
+
+    select_counter.statements.clear()
+    IntelligenceQueryService.value_streams_at_risk(org_id)
+    big_count = len(select_counter.statements)
+
+    assert small_count == 6, select_counter.statements
+    assert big_count == small_count, select_counter.statements
+
+
+def test_route_serialises_initiatives_and_metrics(app, db_session, make_org, client, login_as):
+    org = make_org("vsr-ts4-route-serialise")
+    user = _user(db_session, org.id)
+    vs = _value_stream(db_session, org.id, "VS", f"VSR-TS4ROUTESER-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage", 1)
+    cap = _capability(db_session, org.id, "Cap", f"VSR-TS4ROUTESER-CAP-{_org_suffix()}", current=1, target=3)
+    element = _element(db_session, org.id, "Cap Element", type_="Capability", layer="Strategy")
+    cap.archimate_element_id = element.id
+    db_session.flush()
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    initiative = _initiative(
+        db_session, element.id, "Demonstration: Route Init", f"VSR-TS4ROUTESER-INI-{_org_suffix()}",
+        expected_roi_percentage=9.5,
+    )
+    _metric(db_session, initiative.id, "Route Metric", actual_value="42")
+    db_session.commit()
+
+    login_as(client, user)
+    resp = client.get("/api/v1/intelligence/value-streams-at-risk")
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]
+    cap_row = data["rows"][0]["capabilities"][0]
+    ini = cap_row["initiatives"][0]
+    assert isinstance(ini["id"], int)
+    assert isinstance(ini["name"], str)
+    assert isinstance(ini["expected_roi_percentage"], float)
+    metric = ini["success_metrics"][0]
+    assert isinstance(metric["actual_value"], str)
+
+
+def test_value_stream_id_narrowing_narrows_initiatives(app, db_session, make_org):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-ts4-narrow-init")
+    vs1 = _value_stream(db_session, org.id, "VS1", f"VSR-TS4NARROWINI-1-{_org_suffix()}")
+    vs2 = _value_stream(db_session, org.id, "VS2", f"VSR-TS4NARROWINI-2-{_org_suffix()}")
+    initiative1 = _initiative(
+        db_session, vs1.archimate_element_id, "Demonstration: Narrow Init 1",
+        f"VSR-TS4NARROWINI-INI1-{_org_suffix()}",
+    )
+    initiative2 = _initiative(
+        db_session, vs2.archimate_element_id, "Demonstration: Narrow Init 2",
+        f"VSR-TS4NARROWINI-INI2-{_org_suffix()}",
+    )
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id, value_stream_id=vs1.id)
+    assert len(result["rows"]) == 1
+    row = result["rows"][0]
+    assert row["value_stream"]["id"] == vs1.id
+    ids = {i["id"] for i in row["value_stream_initiatives"]}
+    assert ids == {initiative1.id}
+    assert initiative2.id not in ids
 
 
 # --- T-MAT-3: under_target, target_gap and risk_reasons ---------------------------------------
@@ -1659,3 +2397,220 @@ def test_statement_count_constant_five_inside_tenant_context(
         big_count_in_context = len(select_counter.statements)
 
     assert big_count_in_context == small_count_in_context, select_counter.statements
+
+# ---------------------------------------------------------------------------
+# T-WIRE-5: importance columns on value-stream rows and capability entries
+# ---------------------------------------------------------------------------
+
+def test_value_stream_strategic_importance_carried(app, db_session, make_org):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-importance-vs")
+    vs = _value_stream(db_session, org.id, "Critical Stream",
+                       f"VSR-IMPORTANCE-VS-{_org_suffix()}")
+    vs.strategic_importance = "critical"
+    stage = _stage(db_session, org.id, vs.id, "Stage 1")
+    cap = _capability(db_session, org.id, "Cap A", f"VSR-IMPORTANCE-CAP-{_org_suffix()}")
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    row = result["rows"][0]
+    assert row["value_stream"]["strategic_importance"] == "critical"
+    assert row["importance_reason"] is None
+
+
+def test_value_stream_null_importance_gives_reason(app, db_session, make_org):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-importance-null")
+    vs = _value_stream(db_session, org.id, "Null Importance Stream",
+                       f"VSR-IMPORTANCE-NULL-{_org_suffix()}")
+    assert vs.strategic_importance is None
+    stage = _stage(db_session, org.id, vs.id, "Stage 1")
+    cap = _capability(db_session, org.id, "Cap A", f"VSR-IMPORTANCE-NULL-CAP-{_org_suffix()}")
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    row = result["rows"][0]
+    assert row["value_stream"]["strategic_importance"] is None
+    assert row["importance_reason"] == "no_criticality_recorded"
+
+
+def test_capability_importance_both_set(app, db_session, make_org):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-importance-cap-both")
+    vs = _value_stream(db_session, org.id, "Stream",
+                       f"VSR-IMPORTANCE-CAP-BOTH-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage 1")
+    cap = _capability(db_session, org.id, "Cap A", f"VSR-IMPORTANCE-CAP-BOTH-CAP-{_org_suffix()}")
+    cap.strategic_importance = "high"
+    cap.business_criticality = "mission_critical"
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    cap_entry = result["rows"][0]["capabilities"][0]
+    assert cap_entry["strategic_importance"] == "high"
+    assert cap_entry["business_criticality"] == "mission_critical"
+    assert cap_entry["importance_reason"] is None
+
+
+def test_capability_importance_one_set_one_null(app, db_session, make_org):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-importance-cap-one")
+    vs = _value_stream(db_session, org.id, "Stream",
+                       f"VSR-IMPORTANCE-CAP-ONE-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage 1")
+    cap = _capability(db_session, org.id, "Cap A", f"VSR-IMPORTANCE-CAP-ONE-CAP-{_org_suffix()}")
+    cap.strategic_importance = None
+    cap.business_criticality = "mission_critical"
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    cap_entry = result["rows"][0]["capabilities"][0]
+    assert cap_entry["strategic_importance"] is None
+    assert cap_entry["business_criticality"] == "mission_critical"
+    # Only one is set, so reason is None (not both null)
+    assert cap_entry["importance_reason"] is None
+
+
+def test_capability_importance_both_null_gives_reason(app, db_session, make_org):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-importance-cap-null")
+    vs = _value_stream(db_session, org.id, "Stream",
+                       f"VSR-IMPORTANCE-CAP-NULL-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage 1")
+    cap = _capability(db_session, org.id, "Cap A", f"VSR-IMPORTANCE-CAP-NULL-CAP-{_org_suffix()}")
+    assert cap.strategic_importance is None
+    assert cap.business_criticality is None
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    cap_entry = result["rows"][0]["capabilities"][0]
+    assert cap_entry["strategic_importance"] is None
+    assert cap_entry["business_criticality"] is None
+    assert cap_entry["importance_reason"] == "no_criticality_recorded"
+
+
+def test_at_risk_and_counts_unchanged_by_importance(app, db_session, make_org):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-importance-unchanged")
+    vs = _value_stream(db_session, org.id, "Stream",
+                       f"VSR-IMPORTANCE-UNCHANGED-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage 1")
+    cap = _capability(db_session, org.id, "Cap A",
+                      f"VSR-IMPORTANCE-UNCHANGED-CAP-{_org_suffix()}",
+                      current=2, target=4)
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    # Run without importance words
+    result_without = IntelligenceQueryService.value_streams_at_risk(org.id)
+
+    # Set importance and run again
+    vs.strategic_importance = "critical"
+    cap.strategic_importance = "high"
+    cap.business_criticality = "mission_critical"
+    db_session.commit()
+
+    result_with = IntelligenceQueryService.value_streams_at_risk(org.id)
+
+    # at_risk, threshold, summary counts, row order must be identical
+    # (excluding latency_ms which varies between runs)
+    assert result_with["threshold"] == result_without["threshold"]
+    assert result_with["threshold_basis"] == result_without["threshold_basis"]
+    for key in result_with["summary"]:
+        if key == "latency_ms":
+            continue
+        assert result_with["summary"][key] == result_without["summary"][key]
+    assert len(result_with["rows"]) == len(result_without["rows"])
+    for rw, rwo in zip(result_with["rows"], result_without["rows"]):
+        assert rw["at_risk_capability_count"] == rwo["at_risk_capability_count"]
+        assert rw["reason"] == rwo["reason"]
+        assert rw["value_stream"]["id"] == rwo["value_stream"]["id"]
+        assert len(rw["capabilities"]) == len(rwo["capabilities"])
+        for cw, cwo in zip(rw["capabilities"], rwo["capabilities"]):
+            assert cw["at_risk"] == cwo["at_risk"]
+            assert cw["current_maturity"] == cwo["current_maturity"]
+            assert cw["target_maturity"] == cwo["target_maturity"]
+            assert cw["reason"] == cwo["reason"]
+
+
+def test_shared_catalogue_capability_importance_not_listed(app, db_session, make_org, monkeypatch):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-importance-shared")
+    vs = _value_stream(db_session, org.id, "Stream",
+                       f"VSR-IMPORTANCE-SHARED-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage 1")
+
+    # Create a shared catalogue capability (organization_id IS NULL)
+    from app.models.unified_capability import UnifiedCapability
+    shared_cap = UnifiedCapability(
+        name="Shared Cap",
+        code=f"VSR-IMPORTANCE-SHARED-CAP-{_org_suffix()}",
+        organization_id=None,
+        strategic_importance="critical",
+        business_criticality="mission_critical",
+    )
+    db_session.add(shared_cap)
+    db_session.flush()
+
+    _mapping(db_session, org.id, shared_cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    # The shared catalogue capability should appear (permissive predicate)
+    assert len(result["rows"][0]["capabilities"]) == 1
+    cap_entry = result["rows"][0]["capabilities"][0]
+    # Its importance is carried as recorded
+    assert cap_entry["strategic_importance"] == "critical"
+    assert cap_entry["business_criticality"] == "mission_critical"
+
+
+def test_importance_keys_in_every_capability_entry(app, db_session, make_org):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-importance-keys")
+    vs = _value_stream(db_session, org.id, "Stream",
+                       f"VSR-IMPORTANCE-KEYS-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage 1")
+    cap = _capability(db_session, org.id, "Cap A", f"VSR-IMPORTANCE-KEYS-CAP-{_org_suffix()}")
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    cap_entry = result["rows"][0]["capabilities"][0]
+    assert "strategic_importance" in cap_entry
+    assert "business_criticality" in cap_entry
+    assert "importance_reason" in cap_entry
+
+    row = result["rows"][0]
+    assert "strategic_importance" in row["value_stream"]
+    assert "importance_reason" in row
+
+
+def test_fabrication_no_invented_importance_word(app, db_session, make_org):
+    import json
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("vsr-importance-fab")
+    vs = _value_stream(db_session, org.id, "Stream",
+                       f"VSR-IMPORTANCE-FAB-{_org_suffix()}")
+    stage = _stage(db_session, org.id, vs.id, "Stage 1")
+    cap = _capability(db_session, org.id, "Cap A", f"VSR-IMPORTANCE-FAB-CAP-{_org_suffix()}")
+    _mapping(db_session, org.id, cap.id, vs.id, stage.id)
+    db_session.commit()
+
+    result = IntelligenceQueryService.value_streams_at_risk(org.id)
+    payload_str = json.dumps(result, default=str)
+    # No invented importance word for null columns
+    assert '"strategic_importance": "medium"' not in payload_str

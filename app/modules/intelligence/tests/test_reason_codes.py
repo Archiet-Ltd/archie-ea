@@ -1,7 +1,7 @@
 """T-001 acceptance criterion 13: the DE-14 reason-code vocabulary is closed.
 
 Mapping:
-    13 -> test_reason_codes_has_exactly_forty_three_members,
+    13 -> test_reason_codes_has_exactly_fifty_three_members,
           test_unknown_reason_code_is_rejected_not_passed_through
 
 T-004 (US-1) added two members -- ``no_tenant_context`` and
@@ -20,7 +20,13 @@ but no longer produced by the accountability endpoint). Role-gating added ``fina
 at risk, curated path) added four more -- ``no_value_stream_recorded``,
 ``no_capability_linked``, ``value_stream_not_linked_to_model`` and
 ``dependency_direction_unknown`` -- of which T-S1 emits only the first two;
-the other two are reserved for T-S3's graph path. The maturity read helper
+``value_stream_not_linked_to_model`` is also emitted by T-S4 (on a different
+key -- see reason_codes.py's own comment), and
+the other two are reserved for T-S3's graph path. T-S4 (initiatives and
+success metrics) added two more -- ``capability_not_linked_to_model`` and
+``no_success_metric_recorded``. T-WIRE-5 (strategy outcomes and importance)
+added two more -- ``no_outcome_recorded`` and ``no_criticality_recorded``.
+The maturity read helper
 added two more -- ``no_maturity_target_recorded`` (a current level recorded
 with no target to compare it against) and ``no_capability_in_chain``
 (reserved for a later reader whose chain resolves to no Capability element
@@ -43,10 +49,10 @@ updated in lockstep -- this ``_EXPECTED`` list has drifted out of sync with
 reality more than once already (found and corrected multiple times,
 independently, by different lenses' briefs each adding a member without
 re-deriving the true count); merging branches that each added members
-independently (L2/L4/role-gating, T-S1, the maturity read helper, the
-programme lens's own plateau/gap pair, and the Portfolio-block additions) is
-the same class of drift, resolved here by re-deriving the real count (39)
-rather than trusting any one side's own stale number.
+independently (L2/L4/role-gating, T-S1, T-S4, T-WIRE-5, the maturity read
+helper, the programme lens's own plateau/gap pair, and the Portfolio-block
+additions) is the same class of drift, resolved here by re-deriving the real
+count (53) rather than trusting any one side's own stale number.
 """
 
 from __future__ import annotations
@@ -63,10 +69,10 @@ from app.modules.intelligence.services.reason_codes import (
 # sdd-v2.md § API-8's original sixteen, T-004's two additions, T-005's one
 # addition (p95_above_highest_bucket, D3), the Portfolio, Programme and
 # Strategy lenses' four additions, the Accountability lens's two plus its
-# withdrawal reason, role-gating's addition, T-S1's four additions, the
-# programme lens's own plateau/gap pair, the maturity read helper's two
-# additions, the Portfolio-block's four additions and the connection
-# explanation's four.
+# withdrawal reason, role-gating's addition, T-S1's four additions, T-S4's
+# two additions, the programme lens's own plateau/gap pair, the maturity
+# read helper's two additions, the Portfolio-block's four additions, the
+# connection explanation's four and T-WIRE-5's two additions.
 _EXPECTED = {
     "no_ownership_recorded",
     "no_maturity_recorded",
@@ -99,6 +105,10 @@ _EXPECTED = {
     "no_capability_linked",
     "value_stream_not_linked_to_model",
     "dependency_direction_unknown",
+    "capability_not_linked_to_model",
+    "no_success_metric_recorded",
+    "no_outcome_recorded",
+    "no_criticality_recorded",
     "no_data_recorded",
     "no_steward_recorded",
     "no_lineage_recorded",
@@ -120,8 +130,8 @@ _EXPECTED = {
 }
 
 
-def test_reason_codes_has_exactly_forty_nine_members():
-    assert len(REASON_CODES) == 49
+def test_reason_codes_has_exactly_fifty_three_members():
+    assert len(REASON_CODES) == 53
     assert REASON_CODES == frozenset(_EXPECTED)
 
 

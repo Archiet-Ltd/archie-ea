@@ -272,3 +272,34 @@ def login_as(app):
                 delattr(g, cached)
 
     return _login
+
+
+@pytest.fixture
+def relax_not_null(db_session):
+    """Drop a ``NOT NULL`` constraint for the rest of THIS test's own
+    transaction only -- rolled back at teardown along with everything else
+    ``db_session`` touches, per this fixture's own rollback contract, since
+    PostgreSQL DDL is transactional.
+
+    A fresh ``db.create_all()`` schema always applies a model's current
+    ``nullable=False`` (``TenantMixin.organization_id``, ``User.organization_id``
+    and others); a "legacy null-owner row" or "row with no organisation"
+    scenario is about a REAL, already-deployed database that predates that
+    constraint (or an un-hardened migration), which cannot otherwise be
+    constructed against a schema built from the current models. This
+    recreates exactly that shape for one test, not a schema change that
+    survives it.
+
+    One home for this helper, reused across test modules rather than each
+    one hand-rolling its own copy:
+
+        def test_something(db_session, relax_not_null):
+            relax_not_null("unified_value_stream_stages", "organization_id")
+            ...
+    """
+    from app.extensions import db
+
+    def _relax(table: str, column: str) -> None:
+        db_session.execute(db.text(f"ALTER TABLE {table} ALTER COLUMN {column} DROP NOT NULL"))
+
+    return _relax

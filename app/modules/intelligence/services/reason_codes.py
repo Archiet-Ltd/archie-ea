@@ -14,11 +14,14 @@ from __future__ import annotations
 # sdd-v2.md § API-8 — the original sixteen members, the two T-004 additions,
 # the one T-005 addition, the Portfolio, Programme and Strategy lenses' four
 # additions, the Accountability lens's two plus its withdrawal reason,
-# role-gating's addition, the four T-S1 additions, the programme lens's own
-# plateau/gap pair, the two maturity-read-helper additions, the
-# Portfolio-block's three additions, the licence-sync addition and the four
-# connection-explanation additions below (forty-three total), exactly,
-# nothing invented.
+# role-gating's addition, the four T-S1 additions, the two T-S4 additions,
+# the programme lens's own plateau/gap pair, the two maturity-read-helper
+# additions, the Portfolio-block's three additions, the licence-sync
+# addition, the four connection-explanation additions, the baseline-drift
+# engine's model-dimension addition, the Operational lens's own addition and
+# the two T-WIRE-5 (strategy outcomes and importance) additions below
+# (fifty-three total, re-derived rather than trusted from any one side's own
+# stale count), exactly, nothing invented.
 REASON_CODES = frozenset(
     {
         "no_ownership_recorded",
@@ -108,13 +111,40 @@ REASON_CODES = frozenset(
         # conditions the original vocabulary has no member for. T-S1 emits
         # the first two -- no value stream recorded for this tenant, and a
         # value stream with no capability recorded against it by any path.
-        # The other two are reserved for T-S3, which adds the graph path
-        # (an explicit or derived dependency) this task deliberately does
-        # not read -- they are not reachable until that task lands.
+        # ``value_stream_not_linked_to_model`` is emitted on two different
+        # keys by two different tasks: T-S4 emits it on
+        # ``rows[].value_stream_initiatives_reason`` (the stream's element is
+        # what the initiative join needs), and T-S3 emits it on the row's own
+        # ``reason`` (the graph path needs the same element and has none to
+        # walk from). ``dependency_direction_unknown`` is reserved for T-S3,
+        # which adds the graph path (an explicit or derived dependency) this
+        # task deliberately does not read -- it is not reachable until that
+        # task lands.
         "no_value_stream_recorded",
         "no_capability_linked",
         "value_stream_not_linked_to_model",
         "dependency_direction_unknown",
+        # T-S4 (initiatives and success metrics) additions: two absence
+        # conditions Path C needs that no existing member states.
+        # ``capability_not_linked_to_model`` is the mirror of
+        # ``value_stream_not_linked_to_model`` for a capability entry -- the
+        # capability has no element, so no initiative can be tied to it.
+        # ``no_success_metric_recorded`` is for an initiative that IS tied to
+        # the model but carries no success metric row. Deliberately NOT
+        # added here: a member for "initiative has no element link" --
+        # ADR-S4 keeps that condition unreachable from any payload, so no
+        # reason code, count or key describes it anywhere.
+        "capability_not_linked_to_model",
+        "no_success_metric_recorded",
+        # T-WIRE-5 (strategy outcomes and importance) additions: two absence
+        # conditions the strategy lens and the value-streams-at-risk answer
+        # need that no existing member states. ``no_outcome_recorded`` is
+        # emitted when an initiative's goal set is empty or no Goal in it
+        # has an outcome row. ``no_criticality_recorded`` is emitted when a
+        # value stream or capability entry has no strategic_importance (and,
+        # for a capability, no business_criticality either) recorded.
+        "no_outcome_recorded",
+        "no_criticality_recorded",
         # L7 (Data lens) additions: Ask's Data lens lists the DataObject rows
         # linked to the picked element. Most elements have none, an honest
         # absence; an object with neither a steward nor an owner recorded is a
