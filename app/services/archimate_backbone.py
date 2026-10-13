@@ -199,7 +199,15 @@ def sync_archimate_element(obj: Any, *, session=None, provenance: Optional[Dict]
         return None
 
     if getattr(obj, "archimate_element_id", None):
-        return None  # already on the backbone
+        # Idempotence guard: a row that already carries archimate_element_id
+        # is left alone -- unless the linked element row has been deleted, in
+        # which case the pointer is stale and we treat it as unlinked.
+        from app.models.archimate_core import ArchiMateElement
+        existing = session.get(ArchiMateElement, obj.archimate_element_id)
+        if existing is not None:
+            return None  # already on the backbone
+        # Dangling pointer: clear it so the code below creates a fresh element.
+        obj.archimate_element_id = None
 
     # Re-entry guard: prevent the before_flush hook from creating a second
     # element when create_backbone_element flushes while this object is

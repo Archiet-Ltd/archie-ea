@@ -598,6 +598,10 @@ class DataEntity(TenantMixin, db.Model):
             element = ArchiMateElement.query.get(self.archimate_element_id)
             if element:
                 return element
+            # The linked element was deleted; clear the stale pointer so the
+            # shared writer creates a fresh one (its idempotence guard would
+            # otherwise return None because archimate_element_id is still set).
+            self.archimate_element_id = None
 
         # The one element writer -- the same helper the flush listener and the
         # backfill command use -- so an entity reached through this path carries
