@@ -38,6 +38,8 @@ import pyotp
 import pytest
 from flask import session, url_for
 
+from tests import _isolation_sweep as sweep
+
 MODULE_V1 = "app.modules.account.routes.account_routes"
 MODULE_V2 = "app.modules.account.v2.routes.account_routes"
 MODULES = [MODULE_V1, MODULE_V2]
@@ -907,6 +909,16 @@ def test_every_outcome_writes_one_cross_org_audit_event(
 
     caplog.set_level(logging.DEBUG)
     org = make_org("b10")
+
+    from app.models.subscription import Subscription, SubscriptionPlan, SubscriptionStatus
+
+    # More than three people share this organisation; an unlimited plan keeps the
+    # seat check out of a test that is not about it.
+    db_session.add(Subscription(
+        organization_id=org.id, plan=SubscriptionPlan.enterprise,
+        status=SubscriptionStatus.active, seats_purchased=0,
+    ))
+    db_session.flush()
     linked_sub = f"okta-linked-{_uid()}"
     linked = _make_account(db_session, org, "b10-linked", external_id=linked_sub, sso_provider="okta")
     active = _make_account(db_session, org, "b10-active")
@@ -1015,6 +1027,8 @@ def test_sso_sign_in_completed_through_mfa_is_audited_with_the_provider(
     )
     azure_claims = _azure(admin.email, oid=azure_oid)
     monkeypatch.setattr(v2, "_get_sso_oauth", lambda: _FakeOAuth(azure_claims))
+    # One app context spans the test; drop the first client's cached user so this client starts anonymous.
+    sweep._clear_g()
     client2 = app.test_client()
     resp2 = _http_callback(client2, azure_claims, provider="azure")
     assert _path(resp2) == _endpoint_path(app, "account.mfa_challenge")
@@ -1044,7 +1058,6 @@ def test_v1_sso_sign_in_completed_through_mfa_is_audited_with_the_provider(monke
     from app.models.organization import Organization
     from app.models.user import User
     from app.modules.account.routes import account_routes as v1
-    from app.security.audit import AuditEvent
 
     v1_app = _v1_forced_app(monkeypatch)
     with v1_app.app_context():
@@ -1074,6 +1087,7 @@ def test_v1_sso_sign_in_completed_through_mfa_is_audited_with_the_provider(monke
     with v1_app.app_context():
         new_user = User.query.filter_by(email=address).first()
         new_user_id, org_id = new_user.id, new_user.organization_id
+        events_before = len(_login_attempt_events())
         db.session.remove()
 
     try:
@@ -1084,15 +1098,19 @@ def test_v1_sso_sign_in_completed_through_mfa_is_audited_with_the_provider(monke
             assert "_mfa_pending_sso_provider" not in sess
 
         with v1_app.app_context():
-            events = [
-                json.loads(e.details)
-                for e in AuditEvent.query.filter_by(action="login_attempt").order_by(AuditEvent.id).all()
-            ]
+            events = _login_attempt_events()[events_before:]
             db.session.remove()
         assert len(events) == 1
         assert events[0]["method"] == "sso:okta"
     finally:
         with v1_app.app_context():
+            from app.models.audit_log import AuditLog
+
+            # This disposable account's own audit rows reference it; remove them first,
+            # scoped strictly to this test's user and organisation.
+            AuditLog.query.filter(
+                (AuditLog.user_id == new_user_id) | (AuditLog.organization_id == org_id)
+            ).delete(synchronize_session=False)
             OrgRole.query.filter_by(user_id=new_user_id).delete()
             User.query.filter_by(id=new_user_id).delete()
             Organization.query.filter_by(id=org_id).delete()
@@ -1156,6 +1174,8 @@ def test_password_sign_in_after_an_unfinished_sso_mfa_step_is_audited_as_passwor
     # Cross-check: a stale _mfa_pending_sso_provider key beside a
     # password-only pending login is never honoured.
     password_only = _make_account(db_session, org, "f3-password-only")
+    # One app context spans the test; drop the first client's cached user so this client starts anonymous.
+    sweep._clear_g()
     client2 = app.test_client()
     with client2.session_transaction() as sess:
         sess["_mfa_pending_user_id"] = password_only.id
@@ -1184,6 +1204,16 @@ def test_refused_sign_in_records_the_targeted_account(
 
     _enable_sso(db_session)
     org = make_org("f4")
+
+    from app.models.subscription import Subscription, SubscriptionPlan, SubscriptionStatus
+
+    # More than three people share this organisation; an unlimited plan keeps the
+    # seat check out of a test that is not about it.
+    db_session.add(Subscription(
+        organization_id=org.id, plan=SubscriptionPlan.enterprise,
+        status=SubscriptionStatus.active, seats_purchased=0,
+    ))
+    db_session.flush()
 
     # Platform admin, linked branch.
     oid = f"oid-{_uid()}"
