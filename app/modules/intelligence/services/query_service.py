@@ -320,6 +320,7 @@ def _resolve_application_owners_batch(
             db.session.execute(
                 db.select(ApplicationComponent)
                 .where(ApplicationComponent.archimate_element_id.in_(app_component_ids))
+                .where(ApplicationComponent.organization_id == org_id)
                 .order_by(ApplicationComponent.id)
             )
             .scalars()
