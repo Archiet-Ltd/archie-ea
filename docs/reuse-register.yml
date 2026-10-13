@@ -1,0 +1,319 @@
+# The reuse register: one canonical implementation per concept, and what must not be created beside it.
+# Checked by scripts/check_reuse_register.py (gate: reuse-register, tag: static). Read it BEFORE writing a helper:
+#     python scripts/check_reuse_register.py --entries
+#
+# status:
+#   active        canonical.path exists and defines every canonical.symbols item (checked on every run).
+#   pending       the canonical implementation is merged in another pull request (pending_branch); only the
+#                 must_not_create patterns are enforced until it lands, then promote the entry to active.
+#   undetermined  several implementations compete and no owner has been chosen. Nothing is enforced; the
+#                 candidates are listed so the choice can be made once, by the role that owns the concept.
+#
+# canonical.symbols:  `name` (module-level function or class), `Class.method`, or a Jinja `macro` name.
+# pending_symbols:    symbols expected in canonical.path once the pending pull request merges.
+# must_not_create:    regexes run line by line over `scope` (default app/) and `suffixes` (default .py). A match
+#                     outside canonical.path and known_exceptions is a hit. Hits that existed when the register
+#                     was introduced are recorded per file in scripts/reuse_register_baseline.json, which can
+#                     only fall; any further hit fails the gate and prints this entry.
+# known_exceptions:   a file (or a directory ending in /) that legitimately holds a look-alike, with a reason.
+#                     Add one only with a reason a reviewer accepts. A line marker `reuse-ok: <reason>` also works.
+#
+# Adding a concept: find the existing implementation first (grep), name it here, then add the patterns that
+# describe the second copy a builder would otherwise write. Do not register a canonical that is not the
+# one the product uses: mark the concept undetermined instead.
+
+version: 1
+entries:
+
+  - id: capability-visibility
+    concept: A capability looked up by id and caller's organisation
+    status: active
+    canonical:
+      path: app/models/unified_capability.py
+      symbols: [UnifiedCapability.visible_to_organization]
+    reuse: >
+      Call UnifiedCapability.visible_to_organization(capability_id, organization_id). It returns the capability
+      only when the caller's organisation can see it (own row, or shared reference row) and None otherwise,
+      including when the organisation is None. Do not write another visibility lookup or inline the filter.
+    must_not_create:
+      - id: visibility-helper
+        regex: 'def\s+_?(get_|find_|load_)?(visible|accessible)_(capabilit\w*|to_org\w*)\s*\('
+
+  - id: name-matching
+    concept: Name and code matching for duplicates (normaliser, SQL folding, duplicate lookup)
+    status: active
+    canonical:
+      path: app/utils/duplicate_guard.py
+      symbols: [normalize_name, folded_column, find_duplicate_by_name]
+    reuse: >
+      Python side: duplicate_guard.normalize_name. SQL side: duplicate_guard.folded_column(column), the one
+      folding expression, so the preview, the 409 and the code lookup agree on what "the same" means. Look up
+      an existing record with find_duplicate_by_name. Do not write a second normaliser, casefold helper or
+      lower(btrim(...)) expression.
+    must_not_create:
+      - id: normaliser
+        regex: 'def\s+_?(normali[sz]e|casefold|fold|canonical)_?(name|code|label|title|text|key)s?\s*\('
+      - id: sql-fold
+        regex: 'def\s+_?folded?_(column|name|expr\w*)\s*\('
+      - id: duplicate-lookup
+        regex: 'def\s+_?(find|get|lookup)_(existing_|duplicate_|similar_)?(duplicate|dupe)\w*\s*\('
+
+  - id: ai-system-profile
+    concept: Is an element an AI system, and who owns it
+    status: active
+    canonical:
+      path: app/modules/enterprise_genome/services/ai_system_profile.py
+      symbols: [is_ai_system, _read_owner]
+    reuse: >
+      is_ai_system(element) decides whether an element is an AI system; _read_owner(element) is the one reader
+      of an AI system's recorded owner. Import them; do not recompute the classification or re-read the owner
+      property in a new helper.
+    must_not_create:
+      - id: ai-system-test
+        regex: 'def\s+_?is_ai_(system|element|component)\w*\s*\('
+      - id: ai-owner-reader
+        regex: 'def\s+_?(read|get|load|resolve)_(ai_(system_)?)?owner\s*\('
+
+  - id: owner-display
+    concept: Owner records shown as display rows (name, email, role) for an application or element
+    status: active
+    canonical:
+      path: app/models/application_owner.py
+      symbols:
+        - ApplicationOwner.get_display_rows_for_applications
+        - ApplicationOwner.get_display_rows_for_application
+        - ApplicationOwner.get_display_rows_for_element
+      # The brief's single converter and batch readers are in a pull request that has not merged.
+    pending_symbols: [ApplicationOwner.display_rows_for_owner_rows]
+    reuse: >
+      Read owners through ApplicationOwner's display-row readers (batch for lists, never one query per row).
+      A user with no name shows a dash, never an email address. Do not write another owner-row converter,
+      and look an owner up by the id its writer stores (element, capability, data entity and application
+      ids are different numbers that overlap).
+    must_not_create:
+      - id: owner-row-converter
+        regex: 'def\s+_?(owner|owners)_(display|rows?|to_dict|as_dict|view)\w*\s*\('
+      - id: display-rows-reader
+        regex: 'def\s+_?(get_)?display_rows_for\w*\s*\('
+
+  - id: ai-chat-approval
+    concept: Approving or rejecting an AI chat change request (the approval gate)
+    status: active
+    canonical:
+      path: app/modules/ai_chat/services/ai_chat_approval_service.py
+      symbols:
+        - AIChatApprovalService.approve_and_execute
+        - AIChatApprovalService.reject_approval
+    reuse: >
+      Every approval goes through AIChatApprovalService.approve_and_execute / reject_approval so the approver is
+      recorded, the audit log is written, only a PENDING request can be claimed and self-approval is refused.
+      Never call approval.approve(...) or approval.reject(...) on the model from a route or another service.
+    must_not_create:
+      - id: approval-path
+        regex: 'def\s+_?(approve_and_execute|reject_approval|approve_and_run|execute_approval\w*|approve_pending\w*)\s*\('
+      - id: model-approve-call
+        regex: 'approval\.(approve|reject)\('
+    known_exceptions:
+      - path: app/models/ai_chat_crud_approval.py
+        reason: defines the model methods the service calls; the service is the only intended caller
+
+  - id: current-org-id
+    concept: The caller's active organisation id
+    status: active
+    canonical:
+      path: app/middleware/tenant_context.py
+      symbols: [current_org_id]
+    reuse: >
+      from app.middleware.tenant_context import current_org_id. It is the ACTIVE organisation (switched-organisation
+      users included), never current_user.organization_id. It is None outside a tenant request: a read then
+      returns nothing and a write refuses. Do not write a per-module _org_id / _current_org_id helper.
+    must_not_create:
+      - id: org-id-helper
+        regex: 'def\s+_?(get_|resolve_|caller_|active_|current_|request_)?(current_|active_|caller_)?org(anization)?_id\s*\('
+    known_exceptions:
+      - path: app/utils/tenant_sql.py
+        reason: raw-SQL variant that returns None with no application context at all (getattr on flask.g raises when unbound); org_scope builds on it
+
+  - id: archimate-element-writer
+    concept: Creating an ArchiMate element (the one element writer)
+    status: active
+    canonical:
+      path: app/services/archimate_backbone.py
+      symbols: [create_backbone_element, sync_archimate_element]
+    pending_symbols: [ensure_archimate_element]
+    reuse: >
+      Create or find an element through archimate_backbone (create_backbone_element, sync_archimate_element) so
+      the organisation, layer and provenance are set in one place. Do not construct ArchiMateElement(...) in a
+      route or service, and do not add another ensure/create element helper.
+    must_not_create:
+      - id: element-helper
+        regex: 'def\s+_?(ensure|create|get_or_create|make|upsert)_(archimate_|backbone_)?element\w*\s*\('
+      - id: element-construction
+        regex: 'ArchiMateElement\('
+    known_exceptions:
+      - path: app/models/archimate_core.py
+        reason: defines the model
+      - path: app/models/process_data.py
+        reason: DataEntity and process model methods ensure_archimate_element predate the backbone writer
+
+  - id: critical-path
+    concept: Critical path over the unified work package store
+    status: pending
+    pending_branch: critical_path_for_plateau (work_package_service, under review)
+    canonical:
+      path: app/services/work_package_service.py
+      symbols: [critical_path_for_plateau]
+    reuse: >
+      One critical path over the unified store: work_package_service.critical_path_for_plateau. Do not add another
+      critical-path walk or cycle detector over work packages. Older copies in roadmap_builder_service and
+      roadmap_automation read the retired store and are listed below as known exceptions.
+    must_not_create:
+      - id: critical-path-walk
+        regex: 'def\s+_?(compute_|calculate_|find_|get_|identify_|build_)?critical_path\w*\s*\('
+    known_exceptions:
+      - path: app/modules/solutions_strategic/v2/services/roadmap_builder_service.py
+        reason: retired-store legacy copy, to be removed with the store
+      - path: app/modules/solutions_strategic/v2/services/roadmap_automation.py
+        reason: retired-store legacy copy, to be removed with the store
+
+  - id: entity-matching
+    concept: Matching an incoming record to an existing one by identifier or name
+    status: active
+    canonical:
+      path: app/modules/intelligence/services/matcher_service.py
+      symbols: [MatcherService.match_by_name, MatcherService.match_by_identifier, MatcherService.match]
+    reuse: >
+      MatcherService.match / match_by_name / match_by_identifier take the organisation explicitly and return
+      candidates with a reason. Do not write another find-by-name matcher for imports or proposals.
+    must_not_create:
+      - id: name-matcher
+        regex: 'def\s+_?(match|find|lookup|resolve)_(\w+_)?by_name\s*\('
+
+  - id: impact-answer
+    concept: What breaks if this element changes or fails (impact answer)
+    status: active
+    canonical:
+      path: app/modules/intelligence/services/query_service.py
+      symbols: [IntelligenceQueryService.cross_layer_impact]
+    reuse: >
+      IntelligenceQueryService.cross_layer_impact is the one tenant-fenced impact walk. Reshape its rows for your
+      screen (see ArchiMateImpactService) instead of writing a second traversal over relationships.
+    must_not_create:
+      - id: impact-walk
+        regex: 'def\s+_?(compute|calculate|get|find|build|walk|trace)_(downstream_|upstream_|cross_layer_)?(impact|blast_radius|dependents)\w*\s*\('
+    known_exceptions:
+      - path: app/services/archimate_impact_service.py
+        reason: delegates to cross_layer_impact and reshapes the rows for its callers
+      - path: app/services/architecture_change_impact_service.py
+        reason: delegates the walk to cross_layer_impact
+
+  - id: capability-maturity
+    concept: A capability's current and target maturity
+    status: active
+    canonical:
+      path: app/models/unified_capability.py
+      symbols:
+        - UnifiedCapability.maturity_for_source
+        - UnifiedCapability.maturity_for_sources
+        - UnifiedCapability.maturity_for_capability_ids
+    reuse: >
+      Read current maturity through the UnifiedCapability maturity accessors, which return the no_maturity_recorded
+      reason code (never 0) when nothing was assessed. Do not read a source model's superseded maturity columns
+      or compute a new maturity score.
+    must_not_create:
+      - id: maturity-accessor
+        regex: 'def\s+_?(get_|read_|current_)?(capability_)?maturity_(for|of|level|score)\w*\s*\('
+      - id: maturity-score
+        regex: 'def\s+_?(calculate|compute)_(\w+_)?maturity\w*\s*\('
+
+  - id: empty-state
+    concept: Empty state shown when a list or page has no data
+    status: active
+    canonical:
+      path: app/templates/components/empty_state.html
+      symbols: [empty_state]
+    reuse: >
+      {% from 'components/empty_state.html' import empty_state %} (see DESIGN.md). Do not define another
+      empty_state macro or inline an empty-state block; two macros with incompatible signatures 500 the page
+      that imports the wrong one.
+    must_not_create:
+      - id: empty-state-macro
+        regex: '{%-?\s*macro\s+(empty_state\w*|render_empty\w*|no_data\w*)\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+    known_exceptions:
+      - path: app/templates/macros/page_shell.html
+        reason: second empty_state macro (icon, headline, body) predating the register; to be merged into the canonical one
+
+  - id: loading-state
+    concept: Loading and skeleton states
+    status: active
+    canonical:
+      path: app/templates/components/loading_state.html
+      symbols: [loading_inline, loading_overlay, loading_skeleton]
+    reuse: >
+      Use components/loading_state.html (inline, overlay, skeleton) and components/skeleton.html (table, list, card,
+      text, avatar). Do not define another loading or skeleton macro.
+    must_not_create:
+      - id: loading-macro
+        regex: '{%-?\s*macro\s+(loading\w*|skeleton\w*|spinner\w*)\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+    known_exceptions:
+      - path: app/templates/components/skeleton.html
+        reason: the skeleton family (table, list, card, text, avatar) is the companion canonical file
+
+  - id: outbox-test-cleanup
+    concept: Purging outbox events between tests
+    status: pending
+    pending_branch: tests/_outbox_cleanup.py (test-isolation fix, under review)
+    canonical:
+      path: tests/_outbox_cleanup.py
+      symbols: [purge_outbox_events]
+    reuse: >
+      Import purge_outbox_events from tests/_outbox_cleanup.py in test fixtures and teardown. Do not write another
+      outbox-purging helper in a test module.
+    must_not_create:
+      - id: outbox-purge
+        regex: 'def\s+_?(purge|clean|clear|delete|reset|flush)_?(\w+_)?outbox\w*\s*\('
+        scope: [tests]
+
+  - id: health-score
+    concept: Health score (architecture, capability, initiative, executive dashboard)
+    status: undetermined
+    candidates:
+      - app/modules/capabilities/services/capability_health_service.py (capability health with applications)
+      - app/modules/architecture/services/archimate_metrics_service.py (calculate_overall_health_score)
+      - app/modules/architecture/services/unified_archimate_services.py (two calculate_overall_health_score)
+      - app/modules/dashboard/v2/services/executive_dashboard_service.py (_get_health_score, format_health_score)
+      - app/modules/solutions_strategic/v2/services/gap_analysis_service.py (calculate_health_score)
+      - app/modules/solutions_strategic/v2/services/execution_tracking_service.py (_calculate_health_score)
+    note: six computations of "health" with different inputs and scales; the product-manager picks the owner.
+
+  - id: search
+    concept: Search across the model
+    status: undetermined
+    candidates:
+      - app/services/enterprise_search_service.py (EnterpriseSearchService.search, used by one route module)
+      - app/services/apqc_hierarchy_service.py (search_processes)
+      - app/services/conversation_history.py (search_conversations)
+      - app/services/faiss_apqc_service.py and chromadb_apqc_service.py (similarity search)
+    note: only EnterpriseSearchService spans entity types, but it is wired to one route module, so it is not yet shown to be the product's search.
+
+  - id: export
+    concept: Exporting a model or view (file formats)
+    status: undetermined
+    candidates:
+      - app/services/composer_export_formats.py (Mermaid, Lucid, Archi, canvas viewpoint export)
+      - app/services/archimate_export_service.py (saved viewpoint export)
+      - app/services/archimate_xml_export_service.py (export_to_xml)
+    note: three export services by format family; one dispatcher has not been chosen.
+
+  - id: owner-record
+    concept: The owner of an application, capability or element (the record itself, as opposed to its display rows)
+    status: undetermined
+    candidates:
+      - app/models/application_owner.py (ApplicationOwner; row-level owner of an element or application)
+      - ApplicationOwnership (organisation-unit ownership; a separate model)
+      - an owner text column on the element
+    note: the store-agreement gate already reports these disagreeing; the consolidation branch decides.
