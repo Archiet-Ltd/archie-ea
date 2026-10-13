@@ -249,9 +249,11 @@ OVERSIGHT_POST_POLICY = {
 for _allowed in OVERSIGHT_POST_POLICY.values():
     _allowed.add("platform_admin")
 
-# AI Systems Register routes: release (admin_required); assess, classify and
-# the owner write routes (permission_required(GENERAL)). These are tested with a real element id
-# seeded in the fixture below.
+# AI Systems Register routes: release (admin_required); assess, classify,
+# grounding-source propose/accept/refuse and the owner write routes
+# (permission_required(GENERAL)). These are tested with a real element id
+# (and, for the grounding accept/refuse routes, a real approval id) seeded in
+# the fixture below.
 AI_SYSTEMS_RELEASE_PERMITTED = {"platform_admin"}
 AI_SYSTEMS_ASSESS_PERMITTED = {
     "solution_architect", "enterprise_architect", "business_architect",
@@ -262,6 +264,10 @@ AI_SYSTEMS_ASSESS_PERMITTED = {
 }
 AI_SYSTEMS_CLASSIFY_PERMITTED = AI_SYSTEMS_ASSESS_PERMITTED
 AI_SYSTEMS_OWNER_WRITE_PERMITTED = AI_SYSTEMS_ASSESS_PERMITTED
+# The three grounding-source routes share the same permission_required(GENERAL)
+# gate as the classification routes: any archetype with general permission can
+# propose, accept or refuse a grounding source.
+AI_SYSTEMS_GROUNDING_SOURCE_PERMITTED = AI_SYSTEMS_ASSESS_PERMITTED
 
 # The versioned Transformation Room collection is portfolio data.  These are
 # the persisted enterprise roles admitted by TransformationProgrammeService;
@@ -1174,6 +1180,42 @@ def seeded_ai_system_element(seeded):
         return el.id
 
 
+@pytest.fixture
+def seeded_grounding_approval(seeded, seeded_ai_system_element):
+    """A pending grounding-source approval in the seeded org, so the
+    grounding-source accept and refuse POST routes have a real approval id in
+    the URL. Function-scoped: every probe gets its own pending approval, so a
+    permitted archetype's accept never leaves a decided approval for the next
+    probe to hit."""
+    from app import create_app, db
+    from app.models.models import ArchiMateElement
+    from app.modules.enterprise_genome.services.ai_system_grounding import (
+        propose_grounding_source,
+    )
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        element = db.session.get(ArchiMateElement, seeded_ai_system_element)
+        data_entity = ArchiMateElement(
+            name="Auth-matrix probe data entity",
+            type="DataObject",
+            layer="application",
+            organization_id=org_id,
+            custom_properties={},
+        )
+        db.session.add(data_entity)
+        db.session.flush()
+        approval = propose_grounding_source(
+            element=element,
+            data_entity_id=data_entity.id,  # a real data entity of this org
+            organization_id=org_id,
+            proposed_by_user_id=None,
+        )
+        db.session.commit()
+        return approval.id
+
+
 @pytest.mark.parametrize("archetype", ARCHETYPES)
 def test_ai_system_release_route_authorisation(
     archetype, page, live_server, seeded, seeded_ai_system_element
@@ -1254,6 +1296,65 @@ def test_ai_system_classify_route_authorisation(
         max_redirects=0,
     )
     _expect_gate(response, archetype, AI_SYSTEMS_CLASSIFY_PERMITTED, "classify")
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_ai_system_grounding_source_propose_route_authorisation(
+    archetype, page, live_server, seeded, seeded_ai_system_element
+):
+    """POST /genome/ai-systems/<id>/grounding-source/propose is
+    permission_required(GENERAL), the same gate as the classification routes."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.post(
+        live_server + "/genome/ai-systems/%d/grounding-source/propose"
+        % seeded_ai_system_element,
+        form={"csrf_token": _csrf_token(page), "data_entity_id": "1"},
+        max_redirects=0,
+    )
+    _expect_gate(
+        response, archetype, AI_SYSTEMS_GROUNDING_SOURCE_PERMITTED,
+        "grounding source propose",
+    )
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_ai_system_grounding_source_accept_route_authorisation(
+    archetype, page, live_server, seeded, seeded_ai_system_element,
+    seeded_grounding_approval,
+):
+    """POST /genome/ai-systems/<id>/grounding-source/<approval_id>/accept is
+    permission_required(GENERAL), the same gate as the classification routes."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.post(
+        live_server + "/genome/ai-systems/%d/grounding-source/%d/accept"
+        % (seeded_ai_system_element, seeded_grounding_approval),
+        form={"csrf_token": _csrf_token(page)},
+        max_redirects=0,
+    )
+    _expect_gate(
+        response, archetype, AI_SYSTEMS_GROUNDING_SOURCE_PERMITTED,
+        "grounding source accept",
+    )
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_ai_system_grounding_source_refuse_route_authorisation(
+    archetype, page, live_server, seeded, seeded_ai_system_element,
+    seeded_grounding_approval,
+):
+    """POST /genome/ai-systems/<id>/grounding-source/<approval_id>/refuse is
+    permission_required(GENERAL), the same gate as the classification routes."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.post(
+        live_server + "/genome/ai-systems/%d/grounding-source/%d/refuse"
+        % (seeded_ai_system_element, seeded_grounding_approval),
+        form={"csrf_token": _csrf_token(page)},
+        max_redirects=0,
+    )
+    _expect_gate(
+        response, archetype, AI_SYSTEMS_GROUNDING_SOURCE_PERMITTED,
+        "grounding source refuse",
+    )
 
 
 @pytest.mark.parametrize("archetype", ARCHETYPES)
