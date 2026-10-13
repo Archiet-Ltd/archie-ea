@@ -17,8 +17,9 @@ from __future__ import annotations
 # role-gating's addition, the four T-S1 additions, the programme lens's own
 # plateau/gap pair, the two maturity-read-helper additions, the
 # Portfolio-block's three additions, the licence-sync addition and the four
-# connection-explanation additions below (forty-three total), exactly,
-# nothing invented.
+# connection-explanation additions and the strategy answer's addition below
+# (fifty total, re-derived rather than trusted from any one side's own stale
+# count), exactly, nothing invented.
 REASON_CODES = frozenset(
     {
         "no_ownership_recorded",
@@ -115,6 +116,10 @@ REASON_CODES = frozenset(
         "no_capability_linked",
         "value_stream_not_linked_to_model",
         "dependency_direction_unknown",
+        # Strategy answer: the live initiative record (the one the Portfolio
+        # screens use) has no ArchiMate element link, so it cannot be read
+        # from an element and the answer says so instead of matching by name.
+        "initiative_not_element_linked",
         # L7 (Data lens) additions: Ask's Data lens lists the DataObject rows
         # linked to the picked element. Most elements have none, an honest
         # absence; an object with neither a steward nor an owner recorded is a

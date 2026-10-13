@@ -803,13 +803,18 @@ def strategy_for_element(element_id: int):
     )
 
     initiatives = result["initiatives"]
-    _redact_financial_fields(initiatives, ("budget_variance_pct",), "budget_reason")
+    _redact_financial_fields(
+        initiatives,
+        ("budget_variance_pct", "forecast_cost", "expected_roi_percentage"),
+        "budget_reason",
+    )
 
     return success_response(
         {
             "initiatives": initiatives,
             "reasons": result.get("reasons") or [],
             "elements": result.get("elements") or {},
+            "live_initiatives": result.get("live_initiatives") or {},
         }
     )
 

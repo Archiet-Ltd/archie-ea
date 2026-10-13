@@ -44,6 +44,7 @@ NO_TENANT_CONTEXT_REASON = validate_reason_code("no_tenant_context")
 ELEMENT_NOT_FOUND_REASON = validate_reason_code("element_not_found")
 DERIVATION_NOT_COMPUTED_REASON = validate_reason_code("derivation_not_computed")
 NO_RISK_RECORDED_REASON = validate_reason_code("no_risk_recorded")
+INITIATIVE_NOT_ELEMENT_LINKED_REASON = validate_reason_code("initiative_not_element_linked")
 NO_APPLICATION_COMPONENT_REASON = validate_reason_code("no_application_component")
 NO_WORK_PACKAGE_RECORDED_REASON = validate_reason_code("no_work_package_recorded")
 NOT_COSTED_REASON = validate_reason_code("not_costed")
@@ -1704,6 +1705,198 @@ class IntelligenceQueryService:
         return {"work_packages": wp_payloads, "reasons": [], "elements": all_elements}
 
     @staticmethod
+    def strategy_for_element(
+        element_id: int,
+        *,
+        max_depth: int = 3,
+        include_derived: bool = True,
+    ) -> Dict[str, Any]:
+        """L2, "what are we trying to achieve, and how's it tracking?": every
+        ``PortfolioInitiative`` seeded directly on the picked element
+        (``archimate_element_id`` FK), each with the SAME blast-radius
+        traversal L1/L5/L6 already run -- no second traversal algorithm.
+
+        Tenant-safety note, verified not assumed: ``PortfolioInitiative``
+        carries no ``TenantMixin``/``organization_id`` of its own, the same
+        gap ``UnifiedWorkPackage`` has (L5 brief). This method never lists
+        initiatives independently of an element -- every row it returns is
+        filtered by ``archimate_element_id == element_id``, and
+        ``element_id`` is only ever reached here after the element itself
+        was confirmed to belong to the caller's tenant (below). A
+        cross-tenant initiative cannot share a seed element id with the
+        wrong org's element, since ``archimate_elements.id`` is a real
+        primary key each row of which belongs to exactly one tenant. This
+        does not make ``PortfolioInitiative`` itself tenant-safe for any
+        OTHER read path against it -- a separate, pre-existing gap, not
+        fixed here (same category already flagged once for
+        ``UnifiedWorkPackage`` in the L5 brief).
+
+        Budget variance is read from the model's own ``total_budget``/
+        ``spent_to_date`` fields directly -- ``PortfolioInitiative`` has no
+        wrapping helper method to avoid, unlike L5's
+        ``calculate_budget_variance()``, but the same not-computed-vs-
+        measured-zero discipline still applies: variance is only reported
+        when ``total_budget`` is a real positive number, else the row
+        carries the honest ``no_budget_recorded`` reason.
+
+        Each initiative also carries ``forecast_cost`` and
+        ``expected_roi_percentage`` as recorded (``Numeric`` cast to
+        ``float``), beside the budget and spend; nothing is computed from
+        them, no variance or ratio between the forecast and the budget.
+        ``forecast_reason`` is ``no_budget_recorded`` when nobody forecast a
+        cost. The three 1-100 self-ratings are listed in ``self_ratings`` with
+        their scale, as recorded, never combined or ranked. A missing rating
+        is null with no reason of its own: the one named exception to the
+        rule that an absence carries a reason, kept so one initiative reads
+        the same shape here as on the value-stream answer.
+
+        ``live_initiatives`` is a constant block on every branch: the
+        ``EnterpriseInitiative`` record the Portfolio screens use has no
+        ArchiMate element link (an ``archimate_element_id`` column would make
+        the read possible), so it is not read and is never matched by name,
+        code or title.
+        """
+        from app.models import ArchiMateElement
+        from app.models.enterprise_intelligence import PortfolioInitiative
+
+        live_initiatives = {
+            "rows": None,
+            "reason": INITIATIVE_NOT_ELEMENT_LINKED_REASON,
+            "source": "enterprise_initiatives",
+        }
+
+        org_id = current_org_id()
+
+        with record_query_latency("strategy_for_element") as scope:
+            scope.organization_id = org_id
+
+            if org_id is None:
+                return {
+                    "initiatives": [],
+                    "reasons": [NO_TENANT_CONTEXT_REASON],
+                    "elements": {},
+                    "live_initiatives": live_initiatives,
+                }
+
+            element = db.session.execute(
+                db.select(ArchiMateElement).where(ArchiMateElement.id == element_id)
+            ).scalar_one_or_none()
+            if element is None:
+                return {
+                    "initiatives": [],
+                    "reasons": [ELEMENT_NOT_FOUND_REASON],
+                    "elements": {},
+                    "live_initiatives": live_initiatives,
+                }
+
+            seed_initiatives = (
+                db.session.execute(
+                    db.select(PortfolioInitiative).where(
+                        PortfolioInitiative.archimate_element_id == element_id
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            if not seed_initiatives:
+                return {
+                    "initiatives": [],
+                    "reasons": [NO_INITIATIVE_LINKED_REASON],
+                    "elements": {},
+                    "live_initiatives": live_initiatives,
+                }
+
+            all_elements: Dict[str, Dict[str, Any]] = {}
+            initiative_payloads: List[Dict[str, Any]] = []
+            for initiative in seed_initiatives:
+                blast = IntelligenceQueryService.cross_layer_impact(
+                    element_id,
+                    include_derived=include_derived,
+                    max_depth=max_depth,
+                    with_owner=True,
+                )
+                all_elements.update(blast.get("elements") or {})
+
+                if initiative.total_budget and initiative.total_budget > 0:
+                    # total_budget/spent_to_date are Numeric (Decimal) columns,
+                    # unlike UnifiedWorkPackage's Float cost fields -- cast to
+                    # float before arithmetic so the response carries a plain
+                    # JSON number, not a string (Flask's JSON provider
+                    # serialises Decimal as str, which would silently break
+                    # every numeric consumer of this field, front end
+                    # included).
+                    total_budget = float(initiative.total_budget)
+                    spent_to_date = float(initiative.spent_to_date or 0.0)
+                    budget_variance_pct = (spent_to_date - total_budget) / total_budget * 100
+                    budget_reason = None
+                else:
+                    budget_variance_pct = None
+                    budget_reason = NO_BUDGET_RECORDED_REASON
+
+                initiative_payloads.append(
+                    {
+                        "initiative_id": initiative.id,
+                        "name": initiative.name,
+                        "status": initiative.status,
+                        "priority": initiative.priority,
+                        "health_status": initiative.health_status,
+                        "completion_percentage": initiative.completion_percentage,
+                        "start_date": initiative.start_date.isoformat()
+                        if initiative.start_date
+                        else None,
+                        "target_end_date": initiative.target_end_date.isoformat()
+                        if initiative.target_end_date
+                        else None,
+                        "executive_sponsor": initiative.executive_sponsor,
+                        "program_manager": initiative.program_manager,
+                        "budget_variance_pct": budget_variance_pct,
+                        "budget_reason": budget_reason,
+                        "forecast_cost": (
+                            float(initiative.forecast_cost)
+                            if initiative.forecast_cost is not None
+                            else None
+                        ),
+                        "expected_roi_percentage": (
+                            float(initiative.expected_roi_percentage)
+                            if initiative.expected_roi_percentage is not None
+                            else None
+                        ),
+                        "forecast_reason": (
+                            None
+                            if initiative.forecast_cost is not None
+                            else NO_BUDGET_RECORDED_REASON
+                        ),
+                        "self_ratings": {
+                            "business_value_score": initiative.business_value_score,
+                            "risk_score": initiative.risk_score,
+                            "strategic_alignment_score": initiative.strategic_alignment_score,
+                            "scale": "1-100",
+                            "truth_class": "authoritative_fact",
+                        },
+                        "success_metrics": [
+                            {
+                                "metric_name": m.metric_name,
+                                "metric_type": m.metric_type,
+                                "target_value": m.target_value,
+                                "actual_value": m.actual_value,
+                                "status": m.status,
+                            }
+                            for m in initiative.success_metrics
+                        ],
+                        "affected_rows": blast.get("rows", []),
+                        "affected_summary": blast.get("summary", {}),
+                    }
+                )
+
+        return {
+            "initiatives": initiative_payloads,
+            "reasons": [],
+            "elements": all_elements,
+            "live_initiatives": live_initiatives,
+        }
+
+    @staticmethod
     def accountability_for_element(element_id: int) -> Dict[str, Any]:
         """L4, "who's accountable for ___, and can they take on more?":
 
@@ -2454,148 +2647,6 @@ class IntelligenceQueryService:
             "rows": rows,
             "summary": summary,
             "reasons": reasons,
-        }
-
-    @staticmethod
-    def strategy_for_element(
-        element_id: int,
-        *,
-        max_depth: int = 3,
-        include_derived: bool = True,
-    ) -> Dict[str, Any]:
-        """L2, "what are we trying to achieve, and how's it tracking?": every
-        ``PortfolioInitiative`` seeded directly on the picked element
-        (``archimate_element_id`` FK), each with the SAME blast-radius
-        traversal L1/L5/L6 already run -- no second traversal algorithm.
-
-        Tenant-safety note, verified not assumed: ``PortfolioInitiative``
-        carries no ``TenantMixin``/``organization_id`` of its own, the same
-        gap ``UnifiedWorkPackage`` has (L5 brief). This method never lists
-        initiatives independently of an element -- every row it returns is
-        filtered by ``archimate_element_id == element_id``, and
-        ``element_id`` is only ever reached here after the element itself
-        was confirmed to belong to the caller's tenant (below). A
-        cross-tenant initiative cannot share a seed element id with the
-        wrong org's element, since ``archimate_elements.id`` is a real
-        primary key each row of which belongs to exactly one tenant.
-
-        Budget variance is read from the model's own ``total_budget``/
-        ``spent_to_date`` fields directly -- ``PortfolioInitiative`` has no
-        wrapping helper method to avoid, but the same not-computed-vs-
-        measured-zero discipline still applies: variance is only reported
-        when ``total_budget`` is a real positive number, else the row
-        carries the honest ``no_budget_recorded`` reason.
-
-        When the picked element is a Capability, each initiative row carries
-        the capability's maturity block from the T-MAT-1 helper.
-        """
-        from app.models import ArchiMateElement
-        from app.models.enterprise_intelligence import PortfolioInitiative
-
-        org_id = current_org_id()
-
-        with record_query_latency("strategy_for_element") as scope:
-            scope.organization_id = org_id
-
-            if org_id is None:
-                return {
-                    "initiatives": [],
-                    "reasons": [NO_TENANT_CONTEXT_REASON],
-                    "elements": {},
-                }
-
-            element = db.session.execute(
-                db.select(ArchiMateElement).where(ArchiMateElement.id == element_id)
-            ).scalar_one_or_none()
-            if element is None:
-                return {
-                    "initiatives": [],
-                    "reasons": [ELEMENT_NOT_FOUND_REASON],
-                    "elements": {},
-                }
-
-            seed_initiatives = (
-                db.session.execute(
-                    db.select(PortfolioInitiative).where(
-                        PortfolioInitiative.archimate_element_id == element_id
-                    )
-                )
-                .scalars()
-                .all()
-            )
-
-            if not seed_initiatives:
-                return {
-                    "initiatives": [],
-                    "reasons": [NO_INITIATIVE_LINKED_REASON],
-                    "elements": {},
-                }
-
-            # Capability maturity block: one call when the element is a Capability.
-            capability_maturity = None
-            if (element.type or "") == "Capability":
-                capability_maturity = CapabilityHeatmapService().maturity_for_elements(
-                    [element_id], organization_id=org_id
-                ).get(element_id)
-
-            all_elements: Dict[str, Dict[str, Any]] = {}
-            initiative_payloads: List[Dict[str, Any]] = []
-            for initiative in seed_initiatives:
-                blast = IntelligenceQueryService.cross_layer_impact(
-                    element_id,
-                    include_derived=include_derived,
-                    max_depth=max_depth,
-                    with_owner=True,
-                )
-                all_elements.update(blast.get("elements") or {})
-
-                if initiative.total_budget and initiative.total_budget > 0:
-                    total_budget = float(initiative.total_budget)
-                    spent_to_date = float(initiative.spent_to_date or 0.0)
-                    budget_variance_pct = (spent_to_date - total_budget) / total_budget * 100
-                    budget_reason = None
-                else:
-                    budget_variance_pct = None
-                    budget_reason = NO_BUDGET_RECORDED_REASON
-
-                payload = {
-                    "initiative_id": initiative.id,
-                    "name": initiative.name,
-                    "status": initiative.status,
-                    "priority": initiative.priority,
-                    "health_status": initiative.health_status,
-                    "completion_percentage": initiative.completion_percentage,
-                    "start_date": initiative.start_date.isoformat()
-                    if initiative.start_date
-                    else None,
-                    "target_end_date": initiative.target_end_date.isoformat()
-                    if initiative.target_end_date
-                    else None,
-                    "executive_sponsor": initiative.executive_sponsor,
-                    "program_manager": initiative.program_manager,
-                    "budget_variance_pct": budget_variance_pct,
-                    "budget_reason": budget_reason,
-                    "success_metrics": [
-                        {
-                            "metric_name": m.metric_name,
-                            "metric_type": m.metric_type,
-                            "target_value": m.target_value,
-                            "actual_value": m.actual_value,
-                            "status": m.status,
-                        }
-                        for m in initiative.success_metrics
-                    ],
-                    "affected_rows": blast.get("rows", []),
-                    "affected_summary": blast.get("summary", {}),
-                }
-                if capability_maturity is not None:
-                    payload["capability_maturity"] = capability_maturity
-                initiative_payloads.append(payload)
-
-        return {
-            "initiatives": initiative_payloads,
-            "reasons": [],
-            "elements": all_elements,
         }
 
 __all__ = ["IntelligenceQueryService"]
