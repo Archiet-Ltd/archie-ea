@@ -269,6 +269,9 @@ def work_package_detail(work_package_id):
             work_package=work_package,
             deliverables=deliverables,
             events=events,
+            owner_panel=work_package_service.owner_and_approval_panel(
+                work_package, _org_id()
+            ),
         )
 
     except HTTPException:

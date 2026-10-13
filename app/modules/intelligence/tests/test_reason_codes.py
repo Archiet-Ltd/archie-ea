@@ -14,8 +14,9 @@ lens (L3) added ``no_application_component``; the Programme lens (L5) added
 two more -- ``no_work_package_recorded`` and ``not_costed``. The Strategy
 lens (L2) added ``no_budget_recorded``; the Accountability lens (L4) added
 ``no_ownership_records``/``capacity_not_available``, later
-``ownership_reader_not_built`` when its read was withdrawn per external
-review. Role-gating added ``financial_data_restricted``. T-S1 (value streams
+``ownership_reader_not_built`` (added when the read was withdrawn per
+external review; kept in the closed vocabulary for backward compatibility
+but no longer produced by the accountability endpoint). Role-gating added ``financial_data_restricted``. T-S1 (value streams
 at risk, curated path) added four more -- ``no_value_stream_recorded``,
 ``no_capability_linked``, ``value_stream_not_linked_to_model`` and
 ``dependency_direction_unknown`` -- of which T-S1 emits only the first two;
