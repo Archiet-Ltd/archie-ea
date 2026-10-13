@@ -360,6 +360,99 @@ def test_card_icons_follow_their_target_module(app):
     assert "Risk Register" in card
 
 
+@pytest.mark.parametrize(
+    "url, list_tag, heading_text",
+    [
+        ("/vs/leanix", "<ul>", "What Entelim already does"),
+        ("/modules/industry-apqc", "<ol>", "How it works in Entelim"),
+    ],
+)
+def test_landing_prose_lists_keep_their_marker_class(app, url, list_tag, heading_text):
+    """A section whose body stays prose (not a card grid) must render its
+    `<ul>`/`<ol>` inside a wrapper that still carries `prose max-w-none` --
+    that class is what supplies the Tailwind typography plugin's
+    `list-style-type: disc`/`decimal`. Dropping it, as the landing wrappers
+    once did, renders every bullet and numbered step with no marker even
+    though the `<ul>`/`<ol>` markup itself is unchanged.
+    """
+    with app.test_client() as client:
+        html = client.get(url).data.decode()
+    assert heading_text in html, url
+    list_index = html.index(list_tag, html.index(heading_text))
+    wrapper_start = html.rfind('<div class="public-page-content', 0, list_index)
+    assert wrapper_start != -1, (url, "no public-page-content wrapper before the list")
+    wrapper_tag_end = html.index(">", wrapper_start)
+    wrapper_open_tag = html[wrapper_start:wrapper_tag_end]
+    classes = re.search(r'class="([^"]*)"', wrapper_open_tag).group(1).split()
+    assert "prose" in classes, (url, wrapper_open_tag)
+    assert "max-w-none" in classes, (url, wrapper_open_tag)
+
+
+def test_landing_bands_all_carry_prose_on_their_content_wrapper(app):
+    """Every `.public-page-content` wrapper inside a page's `landing-bands`
+    (intro band and every section band) carries `prose max-w-none`, not
+    only the ones a specific regression happened to be caught on.
+    """
+    with app.test_client() as client:
+        html = client.get("/modules/industry-apqc").data.decode()
+    bands = html[html.index('class="landing-bands"'):html.index('data-testid="landing-closing"')]
+    wrapper_classes = re.findall(r'<div class="(public-page-content[^"]*)"', bands)
+    assert len(wrapper_classes) >= 5, "expected an intro band plus several section bands"
+    for class_attr in wrapper_classes:
+        classes = class_attr.split()
+        assert "prose" in classes, class_attr
+        assert "max-w-none" in classes, class_attr
+
+
+def test_pages_by_url_is_cached_across_calls(app, monkeypatch):
+    """build_landing() must not re-run load_all_pages() -- markdown and
+    bleach over every content file -- on every call. The cached
+    `_pages_by_url()` map is keyed on a content-file mtime fingerprint, so
+    two calls with no content change must reuse the same map and must not
+    call load_all_pages() again.
+    """
+    from app.services import public_pages
+
+    public_pages._pages_by_url_for_fingerprint.cache_clear()
+    calls: list[int] = []
+    real_load_all_pages = public_pages.load_all_pages
+
+    def _counting_load_all_pages():
+        calls.append(1)
+        return real_load_all_pages()
+
+    monkeypatch.setattr(public_pages, "load_all_pages", _counting_load_all_pages)
+    with app.test_request_context():
+        first = public_pages._pages_by_url()
+        second = public_pages._pages_by_url()
+    assert len(calls) == 1, "load_all_pages() ran again on an unchanged content tree"
+    assert first is second
+
+
+def test_landing_route_reuses_cached_pages_by_url_across_requests(app, monkeypatch):
+    """The actual regression: every request to a module/use-case/comparison
+    page whose sections contain a link-list pays for a full content reload.
+    Three requests across two pages must load all content files at most
+    once, not once per request.
+    """
+    from app.services import public_pages
+
+    public_pages._pages_by_url_for_fingerprint.cache_clear()
+    calls: list[int] = []
+    real_load_all_pages = public_pages.load_all_pages
+
+    def _counting_load_all_pages():
+        calls.append(1)
+        return real_load_all_pages()
+
+    monkeypatch.setattr(public_pages, "load_all_pages", _counting_load_all_pages)
+    with app.test_client() as client:
+        assert client.get("/modules/industry-apqc").status_code == 200
+        assert client.get("/modules/industry-apqc").status_code == 200
+        assert client.get("/vs/leanix").status_code == 200
+    assert len(calls) <= 1, f"load_all_pages() ran {len(calls)} times across 3 requests, expected at most 1"
+
+
 def test_waiting_list_page_hero_points_at_the_form(app):
     page = next(p for p in _landing_pages() if p.cta == "waiting_list")
     with app.test_client() as client:

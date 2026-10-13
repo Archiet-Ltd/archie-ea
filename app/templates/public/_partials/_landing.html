@@ -44,7 +44,7 @@
   {% if landing.intro_html %}
   <section class="landing-band">
     <div class="public-container">
-      <div class="public-page-content">{{ landing.intro_html }}</div>
+      <div class="public-page-content prose max-w-none">{{ landing.intro_html }}</div>
     </div>
   </section>
   {% endif %}
@@ -52,7 +52,7 @@
   {% for s in landing.sections %}
   <section class="landing-band" aria-labelledby="{{ s.id }}">
     <div class="public-container">
-      <div class="public-page-content"><h2 id="{{ s.id }}">{{ s.heading_html }}</h2>{% if not s.cards %}{{ s.body_html }}{% endif %}</div>
+      <div class="public-page-content prose max-w-none"><h2 id="{{ s.id }}">{{ s.heading_html }}</h2>{% if not s.cards %}{{ s.body_html }}{% endif %}</div>
       {% if s.cards %}
       <ul role="list" class="mx-auto mt-8 grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {% for c in s.cards %}

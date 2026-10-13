@@ -19,6 +19,7 @@ Directory layout maps to URL families:
 
 from __future__ import annotations
 
+import functools
 import json
 import re
 from dataclasses import dataclass, field
@@ -663,6 +664,33 @@ def load_all_pages() -> list[PublicPage]:
             pages.append(_load_page(md_file, family, slug, url))
 
     return pages
+
+
+def _content_fingerprint() -> tuple[tuple[str, int], ...]:
+    """Mtime fingerprint of every content file, used to invalidate the
+    cached URL-to-page map in ``_pages_by_url()`` below without re-running
+    markdown + bleach over every content file on each call."""
+    if not CONTENT_ROOT.is_dir():
+        return ()
+    return tuple(sorted(
+        (str(p), p.stat().st_mtime_ns) for p in CONTENT_ROOT.rglob("*.md")
+    ))
+
+
+@functools.lru_cache(maxsize=1)
+def _pages_by_url_for_fingerprint(fingerprint: tuple[tuple[str, int], ...]) -> dict[str, PublicPage]:
+    return {p.url: p for p in load_all_pages()}
+
+
+def _pages_by_url() -> dict[str, PublicPage]:
+    """URL-to-page map, cached per process and invalidated whenever a
+    content file is added, removed or edited (the fingerprint argument is
+    the cache key). ``build_landing()`` calls this instead of rebuilding
+    ``load_all_pages()`` -- markdown and bleach over every content file --
+    on every landing-page request; a cache miss costs one ``stat()`` per
+    content file to compute the fingerprint, not a full reparse.
+    """
+    return _pages_by_url_for_fingerprint(_content_fingerprint())
 
 
 def load_feed_pages() -> list[PublicPage]:
@@ -1393,7 +1421,7 @@ def build_landing(page: PublicPage) -> Landing | None:
         cards = None
         if "<ul" in section_body:
             if pages_by_url is None:
-                pages_by_url = {p.url: p for p in load_all_pages()}
+                pages_by_url = _pages_by_url()
             cards = _link_list_cards(section_body.strip(), pages_by_url)
         sections.append(LandingSection(
             id=section_id,
