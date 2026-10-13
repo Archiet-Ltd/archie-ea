@@ -326,3 +326,42 @@ def test_lowercase_and_legacy_relationship_spellings_match_canonical_derivation_
     assert row["type"] == "Access"
     assert row["relationship_chain"] == [10, 20]
     assert row["rule_id"] == "table:Serving:Access"
+
+
+# --- Layer invariance: compute_derived never reads an element's "layer" -----
+
+
+def test_compute_derived_output_is_invariant_under_element_layer():
+    """compute_derived reads only element ids and relationship
+    source/target/type/id -- never an element's "layer" -- so the same
+    three-element "Serving" chain must produce byte-identical derived rows
+    regardless of what layer string each element carries: each of the seven
+    ArchiMateLayer.ALL values applied uniformly, a mixed-layer chain (one
+    element per layer), and a value that is not a layer at all.
+    """
+    from app.models.constants import ArchiMateLayer
+
+    def _chain(layers):
+        elements = [
+            {"id": 1, "name": "E1", "type": "ApplicationComponent", "layer": layers[0]},
+            {"id": 2, "name": "E2", "type": "ApplicationComponent", "layer": layers[1]},
+            {"id": 3, "name": "E3", "type": "ApplicationComponent", "layer": layers[2]},
+        ]
+        relationships = [_rel(10, 1, 2, "Serving"), _rel(20, 2, 3, "Serving")]
+        return ArchiMateDerivationService().compute_derived(elements, relationships)
+
+    baseline = _chain(["application", "application", "application"])
+    assert len(baseline) == 1, (
+        "the two-hop Serving+Serving chain must derive exactly one row "
+        f"(1 -> 3); a vacuous baseline would make every comparison below "
+        f"pass trivially: {baseline}"
+    )
+
+    for layer in ArchiMateLayer.ALL:
+        assert _chain([layer, layer, layer]) == baseline
+
+    mixed_layer_chain = ["motivation", "strategy", "physical"]
+    assert _chain(mixed_layer_chain) == baseline
+
+    not_a_layer_at_all = ["banana", "banana", "banana"]
+    assert _chain(not_a_layer_at_all) == baseline

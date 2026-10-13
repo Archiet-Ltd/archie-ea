@@ -23,6 +23,43 @@ from app.models.solution_reasoning import SolutionAIReasoningState
 logger = logging.getLogger(__name__)
 
 
+def _orphan_link_choice(orphan_layer, connected_layers, valid_relationships):
+    """Which connected layer an orphan links to, and with what relationship type.
+
+    ``connected_layers`` is an ordered sequence of the layers that have at
+    least one connected element. Returns ``(chosen_layer, relationship_type)``,
+    or ``(None, None)`` when no valid pairing exists.
+
+    Same layer first; otherwise the first connected layer for which one of
+    association, realization, serving has a matrix entry, in that order.
+    The relationship type is then the first of association, composition,
+    aggregation, realization with a matrix entry for the orphan's layer and
+    the chosen layer, defaulting to association.
+    """
+    chosen_layer = None
+    if orphan_layer in connected_layers:
+        chosen_layer = orphan_layer
+    else:
+        for try_layer in connected_layers:
+            for rtype in ("association", "realization", "serving"):
+                if valid_relationships.get((rtype, orphan_layer, try_layer), False):
+                    chosen_layer = try_layer
+                    break
+            if chosen_layer is not None:
+                break
+
+    if chosen_layer is None:
+        return None, None
+
+    relationship_type = "Association"
+    for rtype in ("association", "composition", "aggregation", "realization"):
+        if valid_relationships.get((rtype, orphan_layer, chosen_layer), False):
+            relationship_type = rtype.capitalize()
+            break
+
+    return chosen_layer, relationship_type
+
+
 class SolutionAIOrchestrator:
     """
     Orchestrates AI services around solution design.
@@ -4433,6 +4470,7 @@ CRITICAL -- TRACEABILITY:
         in the solution has at least one connection, improving traceability score.
         """
         from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship, VALID_RELATIONSHIPS
+        from app.models.constants import ArchiMateLayer
         from app.models.solution_models import SolutionArchiMateElement
 
         junctions = SolutionArchiMateElement.query.filter_by(solution_id=solution_id).all()
@@ -4460,12 +4498,14 @@ CRITICAL -- TRACEABILITY:
         ).all()
         el_by_id = {e.id: e for e in elements}
 
-        # Group connected elements by layer for linking targets
+        # Group connected elements by layer for linking targets. Canonicalised
+        # so two elements genuinely on the same layer, stored under different
+        # spellings of the same layer name, land in the same bucket.
         connected_by_layer = {}
         for eid in connected:
             el = el_by_id.get(eid)
             if el:
-                layer = (el.layer or '').lower()
+                layer = ArchiMateLayer.canonical(el.layer or '')
                 connected_by_layer.setdefault(layer, []).append(el)
 
         linked = 0
@@ -4473,28 +4513,16 @@ CRITICAL -- TRACEABILITY:
             orphan = el_by_id.get(oid)
             if not orphan:
                 continue
-            layer = (orphan.layer or '').lower()
-            targets = connected_by_layer.get(layer, [])
-            if not targets:
-                # Fall back to any connected element with a valid relationship type
-                for try_layer in connected_by_layer:
-                    for rtype in ['association', 'realization', 'serving']:
-                        if VALID_RELATIONSHIPS.get((rtype, layer, try_layer), False):
-                            targets = connected_by_layer[try_layer]
-                            break
-                    if targets:
-                        break
-            if not targets:
+            layer = ArchiMateLayer.canonical(orphan.layer or '')
+            chosen_layer, rel_type = _orphan_link_choice(
+                layer, list(connected_by_layer.keys()), VALID_RELATIONSHIPS
+            )
+            if chosen_layer is None:
                 continue
-
-            target = targets[0]
-            tl = (target.layer or '').lower()
-            # Find a valid relationship type for this layer pair
-            rel_type = 'Association'
-            for rtype in ['association', 'composition', 'aggregation', 'realization']:
-                if VALID_RELATIONSHIPS.get((rtype, layer, tl), False):
-                    rel_type = rtype.capitalize()
-                    break
+            # Every element in connected_by_layer[chosen_layer] was bucketed
+            # under its own canonicalised layer above, so chosen_layer already
+            # is that target's canonical layer.
+            target = connected_by_layer[chosen_layer][0]
 
             self._create_validated_relationship(rel_type.lower(), orphan, target)
             linked += 1

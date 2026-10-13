@@ -209,7 +209,7 @@ class ArchiMateLayer:
     APPLICATION = "application"
     TECHNOLOGY = "technology"
     PHYSICAL = "physical"
-    IMPLEMENTATION = "implementation"
+    IMPLEMENTATION = "implementation_migration"
     MOTIVATION = "motivation"
 
     ALL = [STRATEGY, BUSINESS, APPLICATION, TECHNOLOGY, PHYSICAL, IMPLEMENTATION, MOTIVATION]
@@ -244,6 +244,39 @@ class ArchiMateLayer:
         key = layer.strip().lower()
         key = re.sub(r"[\s\-]+", "_", key)
         return cls.ALIASES.get(key.replace("_", " "), cls.ALIASES.get(key, key))
+
+    @classmethod
+    def canonical(cls, value):
+        """Resolve a stored ``archimate_elements.layer`` value onto this
+        class's vocabulary.
+
+        Casing on newly written rows is already handled by the column type
+        in ``app/models/models.py``; this only folds the one legacy word
+        ``"implementation"`` onto ``IMPLEMENTATION``
+        (``"implementation_migration"``). Every other string is returned
+        stripped and lower-cased, unchanged otherwise, and a non-string is
+        returned untouched. This is deliberately not a general-purpose
+        layer normaliser.
+
+        Two other normalisers elsewhere in the product touch the same word,
+        and only one of them actually opposes this one. The ArchiMate CRUD
+        route's layer aliases fold this exact pair the other way, listing
+        ``"implementation_migration"`` as one more spelling of
+        ``"implementation"``. The architecture validation service's own
+        layer aliases map the long-form, punctuated spellings (``"implementation
+        & migration"`` and its ``"and"``/``"&"``/``"/"`` variants) onto
+        ``"implementation"`` too, but never list ``"implementation_migration"``
+        itself, so it passes that spelling through unchanged rather than
+        folding this pair either direction. Reconciling all of these onto one
+        shared spelling is a separate, already-recorded piece of work this
+        function does not attempt.
+        """
+        if not isinstance(value, str):
+            return value
+        stripped = value.strip().lower()
+        if stripped == "implementation":
+            return cls.IMPLEMENTATION
+        return stripped
 
 
 class ArchiMateRelationshipType:

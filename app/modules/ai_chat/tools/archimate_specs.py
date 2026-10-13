@@ -34,8 +34,12 @@ from __future__ import annotations
 
 from typing import Dict
 
-# Layer names match app/models/archimate_core.py::_ELEMENT_TYPE_LAYER so that
-# the coverage gate compares like with like.
+# The "layer" field here is descriptive only. scripts/check_ai_layer_coverage.py
+# matches element-type keys between this table and _ELEMENT_TYPE_LAYER in
+# app/models/archimate_core.py; it never compares the two "layer" values, so
+# they are free to disagree, and currently do for the five Implementation &
+# Migration types (this table says "implementation";
+# _ELEMENT_TYPE_LAYER says "implementation_migration").
 ELEMENT_SPECS: Dict[str, dict] = {
     # ----------------------------------------------------------------- #
     # Motivation — why the architecture exists.                          #
