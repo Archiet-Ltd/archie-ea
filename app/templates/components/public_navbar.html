@@ -1,21 +1,28 @@
 {# Simple public navbar without sidebar toggle
    smoke-coverage-ok: brand_name variable with default fallback; backward-compatible, no visual change for existing pages.
 #}
-<header class="flex items-center justify-between h-16 px-6 bg-background border-b border-border">
+{# One link list for both the desktop nav and the narrow-screen menu panel below --
+   the exact six links the desktop nav has always shown, in the same order. #}
+{% set public_nav_links = [
+    ("Features", "/features"),
+    ("Use cases", "/use-cases"),
+    ("Compare", "/vs"),
+    ("Pricing", "/pricing"),
+    ("About", "/about"),
+    ("Docs", "/docs"),
+] %}
+<header class="flex items-center justify-between h-16 px-4 sm:px-6 bg-background border-b border-border">
     <div class="flex items-center gap-8">
         <!-- Logo/Brand -->
         <a href="{{ url_for('main.index') }}" class="flex items-center hover:opacity-90 transition-opacity" aria-label="{{ brand_name|default(config.APP_NAME) }} home">
             <img src="{{ url_for('static', filename='brand/entelim-logo.svg') }}" alt="{{ brand_name|default(config.APP_NAME) }}" class="h-8">
         </a>
 
-        <!-- Primary public nav: hidden on narrow screens, the footer carries these links there -->
+        <!-- Primary public nav: hidden on narrow screens, the menu button/panel below carries these links there -->
         <nav aria-label="Primary" class="hidden md:flex items-center gap-6">
-            <a href="/features" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
-            <a href="/use-cases" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Use cases</a>
-            <a href="/vs" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Compare</a>
-            <a href="/pricing" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
-            <a href="/about" class="text-sm text-muted-foreground hover:text-foreground transition-colors">About</a>
-            <a href="/docs" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Docs</a>
+            {% for label, href in public_nav_links %}
+            <a href="{{ href }}" class="text-sm text-muted-foreground hover:text-foreground transition-colors">{{ label }}</a>
+            {% endfor %}
         </nav>
     </div>
 
@@ -59,15 +66,36 @@
             </div>
         {% else %}
             <!-- Unauthenticated User Links -->
-            <a href="{{ url_for('account.login') }}" class="text-sm font-medium text-foreground hover:text-primary transition-colors">
+            <a href="{{ url_for('account.login') }}" class="hidden sm:inline-flex text-sm font-medium text-foreground hover:text-primary transition-colors">
                 Sign In
             </a>
             <a href="{{ url_for('account.register') }}" class="public-btn bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
                 Sign Up
             </a>
         {% endif %}
+
+        <!-- Narrow-screen menu button: opens publicMenuPanel below with the same links as the Primary nav -->
+        <button type="button" id="publicMenuBtn" aria-controls="publicMenuPanel" aria-expanded="false"
+            aria-label="Menu" class="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg text-foreground
+            hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <i data-lucide="menu" id="publicMenuIconOpen" class="h-5 w-5"></i>
+            <i data-lucide="x" id="publicMenuIconClose" class="h-5 w-5 hidden"></i>
+        </button>
     </div>
 </header>
+
+<!-- Narrow-screen menu panel: same links as the Primary nav, plus Sign In for a signed-out visitor.
+     Pushes the page down (no overlay, no fixed positioning) -- no focus trap needed. -->
+<div id="publicMenuPanel" class="md:hidden hidden border-b border-border bg-background">
+    <nav aria-label="Menu">
+        {% for label, href in public_nav_links %}
+        <a href="{{ href }}" class="block px-6 py-3 text-base text-foreground hover:bg-muted">{{ label }}</a>
+        {% endfor %}
+        {% if not current_user.is_authenticated %}
+        <a href="{{ url_for('account.login') }}" class="block px-6 py-3 text-base text-foreground hover:bg-muted">Sign In</a>
+        {% endif %}
+    </nav>
+</div>
 
 <script>
     // Simple vanilla JS dropdown for user menu
@@ -88,6 +116,54 @@
         });
     }
     {% endif %}
+
+    // Narrow-screen menu button/panel for the public header. Guarded so a
+    // page without the button (none today, but defensive) does nothing.
+    const publicMenuBtn = document.getElementById('publicMenuBtn');
+    const publicMenuPanel = document.getElementById('publicMenuPanel');
+
+    if (publicMenuBtn && publicMenuPanel) {
+        const setPublicMenuOpen = (open, returnFocus) => {
+            publicMenuPanel.classList.toggle('hidden', !open);
+            publicMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            // Icons are already <svg> by the time a user can click (lucide.createIcons()
+            // below runs synchronously on page load) -- toggle their hidden class by id
+            // rather than re-running createIcons.
+            const openIcon = document.getElementById('publicMenuIconOpen');
+            const closeIcon = document.getElementById('publicMenuIconClose');
+            if (openIcon) openIcon.classList.toggle('hidden', open);
+            if (closeIcon) closeIcon.classList.toggle('hidden', !open);
+            if (!open && returnFocus) publicMenuBtn.focus();
+        };
+
+        publicMenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = publicMenuBtn.getAttribute('aria-expanded') === 'true';
+            setPublicMenuOpen(!isOpen, false);
+        });
+
+        // Choosing a link closes the panel.
+        publicMenuPanel.addEventListener('click', (e) => {
+            if (e.target.closest('a')) {
+                setPublicMenuOpen(false, false);
+            }
+        });
+
+        // Escape closes it and returns focus to the button.
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && publicMenuBtn.getAttribute('aria-expanded') === 'true') {
+                setPublicMenuOpen(false, true);
+            }
+        });
+
+        // Resizing to 768px (md) or wider closes it -- the button and panel
+        // are hidden there anyway, but this keeps aria-expanded/state in sync.
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 768 && publicMenuBtn.getAttribute('aria-expanded') === 'true') {
+                setPublicMenuOpen(false, false);
+            }
+        });
+    }
 
     // Initialize Lucide icons
     if (typeof lucide !== 'undefined') {
