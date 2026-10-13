@@ -194,20 +194,16 @@ def _cleanup(app, org_ids):
     """Delete everything the app-context tests created.
 
     An organisation cannot be deleted while the append-only transformation
-    outbox holds element events for it, so the delete runs with the app's own
-    repair flag enabled -- the same escape hatch the app's envelope-repair
-    flows use (app/models/transformation_db_guards.py) -- scoped to this
-    deletion only.
+    outbox holds element events for it, so the outbox rows go first through
+    the shared teardown helper (the app's repair flag does not delete them:
+    the trigger returns NULL for a DELETE and the row is skipped).
     """
     from app import db
     from sqlalchemy import text
+    from tests._outbox_cleanup import purge_outbox_events
 
     with app.app_context():
-        db.session.execute(text("SELECT set_config('archie.signed_envelope_repair', 'on', true)"))
-        db.session.execute(
-            text("DELETE FROM transformation_outbox_events WHERE organization_id = ANY(:ids)"),
-            {"ids": list(org_ids)},
-        )
+        purge_outbox_events(db.session, org_ids)
         for table, column in (
             ("unified_capabilities", "organization_id"),
             ("work_packages", "organization_id"),
@@ -955,6 +951,75 @@ def test_backfill_application_component_parity(app):
                 assert orm_el.layer == sql_el.layer == "Application"
             finally:
                 fresh.close()
+    finally:
+        _cleanup(app, [org_id])
+
+
+@pytest.mark.timeout(120)
+def test_cli_backfill_application_and_capability_use_shared_writer(app):
+    """`flask backfill-archimate-elements` gives an application and a capability
+    that have no element exactly one element each, written by the shared writer
+    (provenance in custom_properties, the row's own description), and a row the
+    writer refuses does not stall the run (fails on 7e7ff671, where the command
+    built the elements by hand without provenance)."""
+    from app import db
+    from app.commands.backfill_archimate_elements import backfill_archimate_elements_command
+    from sqlalchemy import text
+
+    orgs = _seed_orgs(app, ["cli-bf"])
+    org_id = orgs["cli-bf"]
+    try:
+        app_id = _seed_application(app, org_id, "CLI App", "CLI application description")
+        cap_id = _seed_capability(app, org_id, "CLI Capability", "CLI capability description")
+        # A nameless application cannot be mirrored: the writer raises for it.
+        refused_id = _seed_application(app, org_id, "", None)
+
+        result = app.test_cli_runner().invoke(backfill_archimate_elements_command, [])
+        assert result.exit_code == 0, result.output
+
+        with app.app_context():
+            rows = db.session.execute(
+                text(
+                    "SELECT e.type, e.layer, e.description, e.custom_properties "
+                    "FROM application_components a JOIN archimate_elements e "
+                    "ON e.id = a.archimate_element_id WHERE a.id = :i"
+                ),
+                {"i": app_id},
+            ).mappings().all()
+            assert len(rows) == 1
+            assert rows[0]["type"] == "ApplicationComponent"
+            assert rows[0]["description"] == "CLI application description"
+            assert rows[0]["custom_properties"] == {"source_model": "ApplicationComponent"}
+
+            rows = db.session.execute(
+                text(
+                    "SELECT e.type, e.description, e.custom_properties "
+                    "FROM business_capability c JOIN archimate_elements e "
+                    "ON e.id = c.archimate_element_id WHERE c.id = :i"
+                ),
+                {"i": cap_id},
+            ).mappings().all()
+            assert len(rows) == 1
+            assert rows[0]["description"] == "CLI capability description"
+            assert rows[0]["custom_properties"] == {"source_model": "BusinessCapability"}
+
+            # One element per row, none for the refused row, none duplicated.
+            assert db.session.execute(
+                text("SELECT archimate_element_id FROM application_components WHERE id = :i"),
+                {"i": refused_id},
+            ).scalar() is None
+            assert db.session.execute(
+                text("SELECT count(*) FROM archimate_elements WHERE organization_id = :o"),
+                {"o": org_id},
+            ).scalar() == 2
+
+            # A second run changes nothing.
+            result = app.test_cli_runner().invoke(backfill_archimate_elements_command, [])
+            assert result.exit_code == 0, result.output
+            assert db.session.execute(
+                text("SELECT count(*) FROM archimate_elements WHERE organization_id = :o"),
+                {"o": org_id},
+            ).scalar() == 2
     finally:
         _cleanup(app, [org_id])
 

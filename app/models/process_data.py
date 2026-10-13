@@ -589,24 +589,14 @@ class DataEntity(TenantMixin, db.Model):
         return f"<DataEntity {self.name} ({self.entity_type})>"
 
     def ensure_archimate_element(self):
-        """Ensure this data entity has an ArchiMate element (Data Object)."""
-        from app.services.archimate_backbone import sync_archimate_element
+        """Ensure this data entity has an ArchiMate element (Data Object).
 
-        if self.archimate_element_id:
-            from .archimate_core import ArchiMateElement  # Local import to avoid circular dependency
+        The one element writer handles the stale-pointer case (linked element
+        deleted) itself, so this delegates straight to it.
+        """
+        from app.services.archimate_backbone import ensure_archimate_element
 
-            element = ArchiMateElement.query.get(self.archimate_element_id)
-            if element:
-                return element
-            # The linked element was deleted; clear the stale pointer so the
-            # shared writer creates a fresh one (its idempotence guard would
-            # otherwise return None because archimate_element_id is still set).
-            self.archimate_element_id = None
-
-        # The one element writer -- the same helper the flush listener and the
-        # backfill command use -- so an entity reached through this path carries
-        # the same type, layer, description and provenance as any other.
-        return sync_archimate_element(self)
+        return ensure_archimate_element(self)
 
 
 # DataEntity's ArchiMate element is now created by the shared

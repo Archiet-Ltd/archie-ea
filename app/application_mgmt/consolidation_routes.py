@@ -825,11 +825,20 @@ def confirm_vendor_matches():
                 if app.archimate_element_id:
                     archimate_element = archimate_by_id.get(app.archimate_element_id)
 
-                # Create ArchiMate element if it doesn't exist
+                # Create ArchiMate element if it doesn't exist. The prefetch above is
+                # capped, so a miss does not mean the row has no element: the shared
+                # helper falls back to the row's own pointer.
                 if not archimate_element:
-                    from app.services.archimate_backbone import sync_archimate_element
-                    archimate_element = sync_archimate_element(app)
-                    if archimate_element is not None:
+                    from app.services.archimate_backbone import ensure_archimate_element
+                    pointer_before = app.archimate_element_id
+                    archimate_element = ensure_archimate_element(app)
+                    if archimate_element is None:
+                        current_app.logger.warning(
+                            "Vendor match for application %s skipped: no ArchiMate element could be resolved",
+                            application_id,
+                        )
+                        continue
+                    if archimate_element.id != pointer_before:
                         archimate_element.properties = (  # untyped-property-write-ok: vendor matching metadata stored in legacy properties field
                             json.dumps(
                                 {

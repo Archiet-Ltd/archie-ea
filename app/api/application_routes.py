@@ -1662,9 +1662,10 @@ def api_confirm_vendor_matches():
                     )
 
                 if not archimate_element:
-                    from app.services.archimate_backbone import sync_archimate_element
-                    archimate_element = sync_archimate_element(app_obj)
-                    if archimate_element is not None:
+                    from app.services.archimate_backbone import ensure_archimate_element
+                    pointer_before = app_obj.archimate_element_id
+                    archimate_element = ensure_archimate_element(app_obj)
+                    if archimate_element is not None and archimate_element.id != pointer_before:
                         archimate_element.properties = (  # untyped-property-write-ok: vendor matching metadata stored in legacy properties field
                             json.dumps(
                                 {

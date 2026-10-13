@@ -154,9 +154,11 @@ def backfill_archimate_elements_command(dry_run, motivation_only):
         if not dry_run:
             batch_size = 100
             app_created = 0
+            app_failed = set()  # rows the writer refused: never re-select them
             while True:
                 batch = ApplicationComponent.query.filter(
-                    ApplicationComponent.archimate_element_id.is_(None)
+                    ApplicationComponent.archimate_element_id.is_(None),
+                    ApplicationComponent.id.notin_(app_failed),
                 ).limit(batch_size).all()
                 if not batch:
                     break
@@ -166,15 +168,17 @@ def backfill_archimate_elements_command(dry_run, motivation_only):
                         if element is not None:
                             app_created += 1
                     except Exception:
-                        pass
+                        app_failed.add(app_comp.id)
                 db.session.commit()
             click.echo(f"  → Created {app_created} ApplicationComponent elements")
             total_created += app_created
 
             cap_created = 0
+            cap_failed = set()  # rows the writer refused: never re-select them
             while True:
                 batch = BusinessCapability.query.filter(
-                    BusinessCapability.archimate_element_id.is_(None)
+                    BusinessCapability.archimate_element_id.is_(None),
+                    BusinessCapability.id.notin_(cap_failed),
                 ).limit(batch_size).all()
                 if not batch:
                     break
@@ -184,7 +188,7 @@ def backfill_archimate_elements_command(dry_run, motivation_only):
                         if element is not None:
                             cap_created += 1
                     except Exception:
-                        pass
+                        cap_failed.add(cap.id)
                 db.session.commit()
             click.echo(f"  → Created {cap_created} Capability elements")
             total_created += cap_created

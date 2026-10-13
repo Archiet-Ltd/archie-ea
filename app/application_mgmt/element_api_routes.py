@@ -205,11 +205,10 @@ def create_application_element(app_id):
         db.session.flush()
 
         # Create archimate element for the app if not exists
-        if not app_obj.archimate_element_id:
-            from app.services.archimate_backbone import sync_archimate_element
-            app_element = sync_archimate_element(app_obj)
-            if app_element is not None:
-                app_element.architecture_id = arch_model.id
+        from app.services.archimate_backbone import ensure_archimate_element
+        app_element = ensure_archimate_element(app_obj)
+        if app_element is not None and not app_element.architecture_id:
+            app_element.architecture_id = arch_model.id
 
     # Validate ArchiMate type
     valid_types = [

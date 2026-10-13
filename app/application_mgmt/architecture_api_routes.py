@@ -302,9 +302,9 @@ def api_create_architecture_element(id):
             db.session.flush()
 
         if app_arch_element is None:
-            from app.services.archimate_backbone import sync_archimate_element
-            app_arch_element = sync_archimate_element(app_obj)
-            if app_arch_element is not None:
+            from app.services.archimate_backbone import ensure_archimate_element
+            app_arch_element = ensure_archimate_element(app_obj)
+            if app_arch_element is not None and not app_arch_element.architecture_id:
                 app_arch_element.architecture_id = arch_model.id
 
         new_element = ArchiMateElement(

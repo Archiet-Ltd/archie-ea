@@ -1,8 +1,8 @@
 """Every code path that creates an ArchiMate element for the five domain types
 goes through the one shared writer (sync_archimate_element in
-app/services/archimate_backbone.py).  No route or service constructs
-ArchiMateElement directly and assigns archimate_element_id on one of the five
-models.
+app/services/archimate_backbone.py).  The routes and services listed in the
+static test at the end of this file no longer construct ArchiMateElement
+directly to link one of the five models.
 
 The five domain types are:
   - ApplicationComponent
@@ -268,10 +268,33 @@ def test_vendor_matching_api_routes_uses_shared_writer(
 # ============================================================================
 
 
+def _delete_element_leaving_pointer(db_session, element):
+    """Delete an element row with raw SQL and foreign-key enforcement off, so the
+    owning row's archimate_element_id keeps pointing at the now-missing row.
+
+    This is the state the repair exists for. Clearing the pointer first (as an
+    ORM delete would force) tests nothing: an unlinked row was always repaired.
+    """
+    from sqlalchemy import text
+
+    element_id = element.id
+    db_session.flush()
+    db_session.expunge(element)
+    db_session.execute(text("SET LOCAL session_replication_role = replica"))
+    try:
+        db_session.execute(
+            text("DELETE FROM archimate_elements WHERE id = :i"), {"i": element_id}
+        )
+    finally:
+        db_session.execute(text("SET LOCAL session_replication_role = DEFAULT"))
+    assert db_session.get(ArchiMateElement, element_id) is None
+    return element_id
+
+
 def test_data_entity_dangling_pointer_gets_fresh_element(
     db_session, make_org, tenant_ctx,
 ):
-    """A DataEntity whose archimate_element_id points at a deleted element
+    """A DataEntity whose archimate_element_id still points at a deleted element
     gets a fresh element from ensure_archimate_element (fails on 7e7ff671
     where the idempotence guard returns None for a stale pointer)."""
     from app.models.process_data import DataDomain, DataEntity
@@ -289,28 +312,69 @@ def test_data_entity_dangling_pointer_gets_fresh_element(
         )
         db_session.add(entity)
         db_session.flush()
-        assert entity.archimate_element_id is not None
+        stale_id = entity.archimate_element_id
+        assert stale_id is not None
 
-        # Delete the element to create a dangling pointer.
-        element = db_session.get(ArchiMateElement, entity.archimate_element_id)
-        assert element is not None
-        # Clear the FK on the entity first so the delete can proceed.
-        entity.archimate_element_id = None
-        db_session.flush()
-        db_session.delete(element)
-        db_session.flush()
+        _delete_element_leaving_pointer(db_session, db_session.get(ArchiMateElement, stale_id))
+        assert entity.archimate_element_id == stale_id, "the pointer must still be dangling"
 
-        # Now ensure_archimate_element must create a fresh element.
         fresh = entity.ensure_archimate_element()
         assert fresh is not None, (
             "ensure_archimate_element must return a fresh element, not None"
         )
-        assert fresh.id != element.id, (
-            "the fresh element must be a new row, not the deleted one"
-        )
+        assert fresh.id != stale_id, "the fresh element must be a new row"
+        assert entity.archimate_element_id == fresh.id, "the pointer must be repaired"
         assert fresh.custom_properties == {"source_model": "DataEntity"}, (
             "the fresh element must carry the shared writer's provenance"
         )
+
+
+def test_application_component_dangling_pointer_gets_fresh_element(
+    db_session, make_org, tenant_ctx,
+):
+    """The same repair for an ApplicationComponent, through the shared writer
+    (fails on 7e7ff671: sync_archimate_element returns None for a stale pointer)."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.services.archimate_backbone import sync_archimate_element
+
+    org = make_org("sw-dangle-app")
+    with tenant_ctx(org.id):
+        application = ApplicationComponent(name="Dangle App", organization_id=org.id)
+        db_session.add(application)
+        db_session.flush()
+        stale_id = application.archimate_element_id
+        assert stale_id is not None
+
+        _delete_element_leaving_pointer(db_session, db_session.get(ArchiMateElement, stale_id))
+        assert application.archimate_element_id == stale_id, "the pointer must still be dangling"
+
+        fresh = sync_archimate_element(application)
+        assert fresh is not None and fresh.id != stale_id
+        assert application.archimate_element_id == fresh.id
+        assert fresh.custom_properties == {"source_model": "ApplicationComponent"}
+
+
+def test_ensure_archimate_element_returns_the_existing_element(
+    db_session, make_org, tenant_ctx,
+):
+    """sync_archimate_element returns None for an already-linked row; the helper
+    callers dereference must return the linked element instead (the consolidation
+    route crashed on exactly that None)."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.services.archimate_backbone import ensure_archimate_element, sync_archimate_element
+
+    org = make_org("sw-ensure-existing")
+    with tenant_ctx(org.id):
+        application = ApplicationComponent(name="Linked App", organization_id=org.id)
+        db_session.add(application)
+        db_session.flush()
+        linked_id = application.archimate_element_id
+        assert linked_id is not None
+
+        assert sync_archimate_element(application) is None
+        element = ensure_archimate_element(application)
+        assert element is not None and element.id == linked_id
+        assert application.archimate_element_id == linked_id
 
 
 # ============================================================================
@@ -319,13 +383,18 @@ def test_data_entity_dangling_pointer_gets_fresh_element(
 
 
 def test_no_direct_element_construction_outside_backbone():
-    """No file under app/ except archimate_backbone.py constructs
-    ArchiMateElement within fifteen lines of assigning archimate_element_id
-    on one of the five domain models.
+    """None of the eight files rerouted onto the shared writer constructs
+    ArchiMateElement within fifteen lines of a domain model name and an
+    archimate_element_id.
 
-    This is a grep-based static test that scans the source tree.  It fails
-    when a new route or service creates an element directly instead of using
-    the shared writer.
+    This is a grep-based static test.  It scans app/ but only reports matches
+    inside ``target_files`` below, so it guards those files against regressing;
+    it does NOT prove that no other file under app/ builds an element by hand.
+    Two such sites are known and out of its scope: the work-package route in
+    app/main/routes_application_roadmap.py (links a WorkPackage, not one of the
+    five models) and the journey reasoning orchestrator, whose construction
+    already fails and is swallowed.  Add a file to ``target_files`` when it is
+    rerouted.
     """
     # Files that were rerouted in this fix round.  Each must use the shared
     # writer instead of constructing ArchiMateElement directly.
@@ -379,7 +448,7 @@ def test_no_direct_element_construction_outside_backbone():
         lineno = int(lineno_str)
         # Check if any of the five domain model names and archimate_element_id
         # appear within 15 lines of this ArchiMateElement construction
-        with open(filepath) as f:
+        with open(filepath, encoding="utf-8") as f:
             file_lines = f.readlines()
         start = max(0, lineno - 16)
         end = min(len(file_lines), lineno + 14)

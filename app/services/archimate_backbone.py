@@ -268,6 +268,29 @@ def sync_archimate_element(obj: Any, *, session=None, provenance: Optional[Dict]
         _SYNCING.pop(guard_key, None)
 
 
+def ensure_archimate_element(obj: Any, *, session=None, provenance: Optional[Dict] = None, flush=True):
+    """Return the ArchiMate element that mirrors ``obj``, creating it if absent.
+
+    ``sync_archimate_element`` returns None both when ``obj`` is not a mirrored
+    type and when it is already linked (its idempotence guard), so a caller that
+    needs the element itself cannot dereference its result directly. This is the
+    one place that resolves the difference: a freshly created element, else the
+    element the row already points at (read from the database by primary key, not
+    from any size-limited prefetch), else None.
+    """
+    from app import db
+    from app.models.archimate_core import ArchiMateElement
+
+    session = session or db.session
+    element = sync_archimate_element(obj, session=session, provenance=provenance, flush=flush)
+    if element is not None:
+        return element
+    element_id = getattr(obj, "archimate_element_id", None)
+    if element_id:
+        return session.get(ArchiMateElement, element_id)
+    return None
+
+
 # ============================================================================
 # Session-level flush listeners — the one place new records join the backbone.
 # Registered once at app startup via register_archimate_listeners().
