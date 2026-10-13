@@ -282,20 +282,20 @@ jobs:
   # references that id, and because "Tests (pytest + coverage)" is the
   # required-check name branch protection was configured against.
   #
-  # Splitting: no per-test duration history exists for this suite (producing
-  # one means running the full two-hour suite once first, which defeats the
-  # purpose), and a plain hash of each test file's path was measured to put
-  # 1,194 of 6,690 tests in one bucket against an 836 average — 43% over,
-  # already enough on its own to miss the 30-minute target. Instead,
-  # scripts/ci/test_sharding.py has every shard collect the full test set (as
-  # pytest always does before filtering), group items by file, and run the
-  # same deterministic greedy bin-pack by file size that every shard process
-  # computes independently and agrees on. Measured on this suite: 836-837
-  # tests per shard, within 0.1% of even, and it re-derives file sizes from
-  # the real collection every run rather than a committed file that goes
-  # stale. All tests in one file stay in one shard, so file-local shared
-  # state (a module- or class-scoped fixture) is never split across two
-  # database sessions; it does not protect against state shared ACROSS files.
+  # Splitting: scripts/ci/test_sharding.py has every shard collect the full
+  # test set (as pytest always does before filtering), group items by file,
+  # and run the same deterministic greedy longest-first bin-pack that every
+  # shard process computes independently and agrees on. The weight of a file
+  # is its measured run time from the committed tests/shard_durations.json
+  # (regenerate with scripts/ci/update_shard_durations.py, which reads the
+  # junit files of recent runs); a file not in the table is weighted by its
+  # test count times the median seconds per test, so a new file always lands
+  # in exactly one shard. Balancing by test count alone left one shard at
+  # 72 minutes while the rest ran 27-43. The "Shard balance report" step in
+  # the tests job below warns when the table has drifted. All tests in one
+  # file stay in one shard, so file-local shared state (a module- or
+  # class-scoped fixture) is never split across two database sessions; it
+  # does not protect against state shared ACROSS files.
   tests-shard:
     name: Tests (pytest + coverage) — shard ${{ matrix.shard }}
     needs: changes
@@ -531,6 +531,12 @@ jobs:
         run: >-
           python scripts/ci/check_junit_qualification.py
           shard-artifacts/tests-shard-*/backend-tests-*.xml
+      - name: Shard balance report
+        # Warns (never fails) when a shard ran more than 25% off what the
+        # committed duration table predicted; see scripts/ci/check_shard_balance.py.
+        if: always()
+        continue-on-error: true
+        run: python scripts/ci/check_shard_balance.py shard-artifacts/tests-shard-*/backend-tests-*.xml
       - name: Combine coverage and summarize
         if: always()
         run: |
