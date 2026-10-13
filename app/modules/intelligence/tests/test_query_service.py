@@ -582,13 +582,18 @@ def test_sec09_tenant_check_blocks_real_cross_tenant_resolution(app, db_session,
 
 
 def test_mutation_proof_sec09_real_path(app, db_session, make_org, monkeypatch):
-    """Companion mutation proof for the test above: disabling the REAL,
-    unmodified ``_sec09_tenant_check`` -- not an upstream seam -- makes the
-    same real, reachable scenario leak org B's unit name, through
-    ``_resolve_owners_batch``, the only owner-resolution implementation left
-    in production after NEW-3's cleanup. This is the correct SEC-09
-    traceability evidence (B2 fix).
+    """Companion mutation proof for the test above. The owner chain now has
+    four independent tenant fences: the component check
+    (``_sec09_tenant_check``), the ownership predicate, the unit
+    predicate and the post-fetch unit check. Disabling ONLY the component
+    check no longer leaks org B's unit name, because the others still hold;
+    disabling all four, the
+    real functions and not an upstream seam, makes the same real, reachable
+    scenario leak through ``_resolve_owners_batch``. That shows the scenario
+    is real and that each fence is doing work (SEC-09 traceability, B2 fix).
     """
+    import sqlalchemy as sa
+
     from app.modules.intelligence.services import query_service
 
     org_a = make_org("qs-sec09-mut-a")
@@ -609,11 +614,23 @@ def test_mutation_proof_sec09_real_path(app, db_session, make_org, monkeypatch):
     owner, _reason = results[target.id]
     assert owner is None
 
-    # 2) Disable ONLY _sec09_tenant_check (the real function, not a seam
-    # upstream of it) -- the same real scenario now leaks org B's unit.
+    # 2) Disable ONLY _sec09_tenant_check: the other three fences still hold,
+    # so nothing leaks (defence in depth).
     monkeypatch.setattr(
         query_service, "_sec09_tenant_check", lambda component_org_id, org_id: True
     )
+    with app.test_request_context("/"):
+        from flask import g
+
+        g.current_org_id = org_b.id
+        still_guarded = query_service._resolve_owners_batch([target.id], org_a.id)
+    assert still_guarded[target.id][0] is None
+
+    # 3) Disable all four fences -- the same real scenario now leaks org B's
+    # unit name.
+    monkeypatch.setattr(query_service, "_ownership_tenant_predicate", lambda org_id: sa.true())
+    monkeypatch.setattr(query_service, "_unit_tenant_predicate", lambda org_id: sa.true())
+    monkeypatch.setattr(query_service, "_unit_belongs_to_org", lambda unit_org_id, org_id: True)
     with app.test_request_context("/"):
         from flask import g
 
