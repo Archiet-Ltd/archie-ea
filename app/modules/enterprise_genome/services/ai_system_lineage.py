@@ -25,21 +25,21 @@ def get_providers_for_system(element_id: int, organization_id: int) -> list[dict
     empty list when none are linked. Scoped to *organization_id* so a caller
     from another org never sees the relationship.
 
-    Both directions are considered (system -> provider and provider -> system)
-    so the relationship direction does not matter for the query.
+    Direction matters: the AI system is the *source* of the Serving or Flow
+    relationship that points at a provider. A consumer application is the
+    source of a relationship that points AT the system, so it can never be
+    read as a provider. A provider is an element registered in the provider
+    register — it carries the ``provider_register`` marker; element type
+    alone never marks a provider.
     """
     from app.models.models import ArchiMateElement, ArchiMateRelationship
 
-    # Find relationships where the system is source or target
+    # The system is the source of the provider link; consumers point at the
+    # system (they are the source, the system is the target).
     rels = (
         ArchiMateRelationship.query.filter(
-            (
-                (ArchiMateRelationship.source_id == element_id)
-                | (ArchiMateRelationship.target_id == element_id)
-            ),
-            ArchiMateRelationship.type.in_(
-                ("serving", "association", "composition", "aggregation", "access")
-            ),
+            ArchiMateRelationship.source_id == element_id,
+            ArchiMateRelationship.type.in_(("serving", "flow")),
         )
         .filter(ArchiMateRelationship.organization_id == organization_id)
         .all()
@@ -49,7 +49,7 @@ def get_providers_for_system(element_id: int, organization_id: int) -> list[dict
     seen: set[int] = set()
 
     for rel in rels:
-        peer_id = rel.target_id if rel.source_id == element_id else rel.source_id
+        peer_id = rel.target_id
         if peer_id in seen:
             continue
         seen.add(peer_id)
@@ -60,12 +60,12 @@ def get_providers_for_system(element_id: int, organization_id: int) -> list[dict
         ).first()
         if peer is None:
             continue
-        # A provider is an ApplicationComponent with a provider-like marker
+        # A provider is an element registered in the provider register: it
+        # carries the provider_register marker. Element type alone (e.g. an
+        # ApplicationComponent) never marks a provider — a consumer application
+        # is an ApplicationComponent too.
         props = peer.custom_properties or {}
-        is_provider = (
-            props.get("provider_register") is True
-            or peer.type in ("ApplicationComponent",)
-        )
+        is_provider = props.get("provider_register") is True
         if is_provider:
             providers.append({
                 "id": peer.id,
@@ -147,16 +147,14 @@ def get_systems_using_provider(
     from app.models.application_owner import ApplicationOwner
     from app.models.models import ArchiMateElement, ArchiMateRelationship
 
-    # Find all relationships where the provider is linked
+    # Direction: an AI system uses a provider when it is the source of a
+    # Serving or Flow relationship pointing AT the provider. Consumers point at
+    # the AI system, never at the provider, so only relationships where the
+    # provider is the target can name a system that uses it.
     rels = (
         ArchiMateRelationship.query.filter(
-            (
-                (ArchiMateRelationship.source_id == provider_element_id)
-                | (ArchiMateRelationship.target_id == provider_element_id)
-            ),
-            ArchiMateRelationship.type.in_(
-                ("serving", "association", "composition", "aggregation", "access")
-            ),
+            ArchiMateRelationship.target_id == provider_element_id,
+            ArchiMateRelationship.type.in_(("serving", "flow")),
         )
         .filter(ArchiMateRelationship.organization_id == organization_id)
         .all()
@@ -167,11 +165,7 @@ def get_systems_using_provider(
     seen: set[int] = set()
 
     for rel in rels:
-        peer_id = (
-            rel.target_id
-            if rel.source_id == provider_element_id
-            else rel.source_id
-        )
+        peer_id = rel.source_id
         if peer_id in seen:
             continue
         seen.add(peer_id)

@@ -1167,6 +1167,69 @@ def test_lineage_not_recorded_renders_not_recorded(db_session, org):
     assert providers == [] or providers is None
 
 
+def test_lineage_direction_consumer_application_is_not_a_provider(db_session, org):
+    """A consumer application pointing at the AI system must never appear as
+    its provider; only a provider-register element in the provider direction
+    does. Element type alone never marks a provider. Fails on the old
+    direction-blind read (any ApplicationComponent peer was a provider)."""
+    from app.models.models import ArchiMateElement
+
+    el = register_ai_system(db_session, org.id, name="Direction System",
+                             provider="openai", model_id="gpt-4o")
+    consumer = ArchiMateElement(
+        name="Consumer App",
+        type="ApplicationComponent",
+        layer="application",
+        organization_id=org.id,
+        custom_properties={},
+    )
+    db_session.add(consumer)
+    plain = ArchiMateElement(
+        name="Plain Component",
+        type="ApplicationComponent",
+        layer="application",
+        organization_id=org.id,
+        custom_properties={},
+    )
+    db_session.add(plain)
+    prov = _create_provider_element(db_session, org.id, "OpenAI")
+    db_session.flush()
+
+    # Provider direction: the system points at its provider (system -> provider).
+    _link_elements(db_session, el.id, prov.id, "serving", org_id=org.id)
+    # Consumer direction: the consumer points at the system (consumer -> system).
+    _link_elements(db_session, consumer.id, el.id, "serving", org_id=org.id)
+    # An unmarked ApplicationComponent pointed at by the system in the provider
+    # direction is still not a provider: the marker decides, not the type.
+    _link_elements(db_session, el.id, plain.id, "serving", org_id=org.id)
+    db_session.flush()
+
+    from app.modules.enterprise_genome.services.ai_system_lineage import (
+        get_providers_for_system,
+    )
+
+    providers = get_providers_for_system(el.id, org.id)
+    pnames = {p["name"] for p in providers}
+    assert "OpenAI" in pnames, "a provider-register element must appear as a provider"
+    assert "Consumer App" not in pnames, (
+        "a consumer application that merely points at the system must not be "
+        "reported as its provider"
+    )
+    assert "Plain Component" not in pnames, (
+        "an ApplicationComponent without the provider marker is not a provider"
+    )
+
+    # The same direction rule keeps the 'systems using provider X' list clean:
+    # only the AI system that points at the provider is listed, never an
+    # ApplicationComponent peer on the consumer side.
+    from app.modules.enterprise_genome.services.ai_system_lineage import (
+        get_systems_using_provider,
+    )
+
+    users = get_systems_using_provider(prov.id, org.id)
+    assert [u["name"] for u in users] == ["Direction System"]
+
+
 # --- Obligations --------------------------------------------------------------
 
 
