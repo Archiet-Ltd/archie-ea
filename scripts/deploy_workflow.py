@@ -88,6 +88,9 @@ REQUIRED_CHECKS = (
 # Jobs in ci.yml that are deliberately not required, with the reason. Adding a
 # name here is a decision to let a deploy proceed while that job is red.
 EXCLUDED_CHECKS = {
+    "Detect changed paths": (
+        "routes PR jobs only; on push every job runs regardless of its result"
+    ),
     "Build immutable release image": (
         "builds and pushes a GHCR image, which production does not run: it deploys "
         "a bind-mounted source checkout (see the header of scripts/deploy_verified.sh). "
@@ -112,6 +115,12 @@ EXCLUDED_CHECKS = {
     "Browser journeys \u2014 other": (
         "a dedicated job for census, ai-protocol and guide-history journeys; "
         "the aggregate \"Browser journeys (one per archetype)\" is the required check."
+    ),
+    "Content page tests": (
+        "runs only on pull requests whose changes are all content "
+        "(is_content_only=true); it never runs on a push to main, so it can "
+        "never gate a deploy. The page tests it runs are also covered by the "
+        "required pytest shards on every non-content run."
     ),
 }
 CHECK_APP_SLUG = "github-actions"

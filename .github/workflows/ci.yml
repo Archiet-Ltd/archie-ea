@@ -67,6 +67,118 @@ env:
   BANDIT_VERSION: "1.9.4"
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Path detection: identify content-only PRs so heavy jobs can skip.
+  # ---------------------------------------------------------------------------
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    outputs:
+      is_content_only: ${{ steps.detect.outputs.is_content_only }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Detect content-only changes
+        id: detect
+        # Run the detector as it exists on the base branch, so a pull request
+        # cannot change the rules that decide which of its own checks are skipped.
+        # The checked-out copy is the fallback only for the first introduction:
+        # the base branch exists but has no detector yet. If the base branch
+        # cannot be resolved at all, nothing is trusted and everything runs.
+        run: |
+          BASE="${GITHUB_BASE_REF:-main}"
+          if git show "origin/${GITHUB_BASE_REF:-main}:scripts/ci/detect_content_only.py" > /tmp/detect_content_only.py 2>/dev/null; then
+            python /tmp/detect_content_only.py
+          elif git rev-parse --verify --quiet "origin/${BASE}" >/dev/null; then
+            python scripts/ci/detect_content_only.py
+          else
+            echo "is_content_only=false" | tee -a "${GITHUB_OUTPUT:-/dev/null}"
+          fi
+
+  # A content-only PR skips the eight pytest shards and the browser jobs, but
+  # the public-page and template tests must still run (a content change can
+  # break them, and they would otherwise sit in the skipped shards and let the
+  # regression pass unseen). This light job runs ONLY when the detector says the
+  # diff is content-only: a Postgres service like the tests-shard job, then
+  # pytest on the files scripts/ci/content_test_selection.py computes. It is
+  # deliberately not a required check (see EXCLUDED_CHECKS in
+  # scripts/deploy_workflow.py): on a push to main this job does not run.
+  content-page-tests:
+    name: Content page tests
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only == 'true') && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: public.ecr.aws/docker/library/postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_test
+        ports: ["5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Create an isolated virtual environment for this job's dependencies
+        # Same reason as tests-shard: a self-hosted runner's leftover ~/.local
+        # site-packages must not shadow this job's dependencies.
+        run: |
+          python -m venv --clear .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Resolve the postgres service's mapped port
+        run: |
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || {
+            echo "::warning::pip install from the cache failed; retrying without it"
+            pip install --no-cache-dir -r requirements.txt
+          }
+          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+      - name: Create schema
+        run: |
+          python -c "import psycopg2" 2>/dev/null || pip install psycopg2-binary
+          flask --app manage init-db
+          flask --app manage schema-upgrade
+          flask --app manage reconcile-schema
+      - name: Apply the capability provenance migration
+        run: flask --app manage apply-unified-capability-provenance-migration
+      - name: Install Chromium for the browser tests in the selection
+        run: python -m playwright install --with-deps chromium
+      - name: Run the public page tests
+        # The selection is computed, not hand-picked: every test file outside
+        # tests/smoke that refers to public pages or templates, or fetches a
+        # public route, plus the template contract test. No --maxfail: the
+        # whole run is recorded in content-tests.xml so the merge gate can
+        # accept failures only when every failing id is a known failure.
+        run: |
+          python scripts/ci/content_test_selection.py > content-tests.txt
+          wc -l content-tests.txt
+          xargs -r pytest -q -o xfail_strict=true --junitxml=content-tests.xml < content-tests.txt
+      - name: Upload the content test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: content-tests-junit
+          path: content-tests.xml
+          if-no-files-found: ignore
+
   secret-scan:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
@@ -186,7 +298,8 @@ jobs:
   # database sessions; it does not protect against state shared ACROSS files.
   tests-shard:
     name: Tests (pytest + coverage) — shard ${{ matrix.shard }}
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     # Same-repository runs (push/dispatch and same-repo PRs) select a runner
     # via repository variables: vars.CI_FAST_RUNNER takes precedence when the
     # PR carries the ci-fast label, vars.CI_SHARD_RUNNER routes to a managed
@@ -349,8 +462,8 @@ jobs:
 
   tests:
     name: Tests (pytest + coverage)
-    needs: tests-shard
-    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) }}
+    needs: [tests-shard, changes]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     # Same runner selection as tests-shard above: vars.CI_FAST_RUNNER takes
     # precedence when the PR carries the ci-fast label, vars.CI_SHARD_RUNNER
     # routes to a managed pool when set, otherwise the job falls back to the
@@ -577,8 +690,9 @@ jobs:
 
   smoke-main:
     name: Browser journeys — main shard ${{ matrix.shard }}
+    needs: changes
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     strategy:
       fail-fast: false
       matrix:
@@ -654,8 +768,9 @@ jobs:
 
   smoke-adversarial:
     name: Browser journeys — adversarial
+    needs: changes
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     services:
       postgres:
         image: public.ecr.aws/docker/library/postgres:16
@@ -725,8 +840,9 @@ jobs:
 
   smoke-other:
     name: Browser journeys — other
+    needs: changes
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     services:
       postgres:
         image: public.ecr.aws/docker/library/postgres:16
@@ -815,8 +931,8 @@ jobs:
 
   smoke:
     name: Browser journeys (one per archetype)
-    needs: [smoke-main, smoke-adversarial, smoke-other]
-    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) }}
+    needs: [smoke-main, smoke-adversarial, smoke-other, changes]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -864,8 +980,9 @@ jobs:
 
   browser-compatibility:
     name: Browser compatibility (${{ matrix.browser }})
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
     strategy:
       fail-fast: false
       matrix:
@@ -959,8 +1076,9 @@ jobs:
 
   walkthrough:
     name: Level 10 archetype walkthrough
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
     # docs/TESTING_STANDARD.md level 10: not "does it break?" but "can this
     # archetype do their job, and could they have FOUND the page?". It runs as a
     # non-admin per persona, measures geometry at a fixed viewport rather than
