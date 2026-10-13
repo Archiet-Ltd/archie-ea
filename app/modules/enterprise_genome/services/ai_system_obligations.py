@@ -147,7 +147,7 @@ def attach_obligations(
     created: list[int] = []
 
     for tmpl in templates:
-        # Skip if already attached (by element + title, scoped through element)
+        # Skip if already attached (by element + title, scoped through element)  # tenant-scoping-ok: scoped through element.id, an element of organization_id
         existing = ComplianceRequirement.query.filter_by(
             archimate_element_id=element.id,
             title=tmpl["title"],
