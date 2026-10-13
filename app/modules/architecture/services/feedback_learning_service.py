@@ -16,11 +16,12 @@ from typing import Dict, List, Optional
 from sqlalchemy.dialects.postgresql import JSON
 
 from app import db
+from app.models.mixins import TenantMixin
 
 logger = logging.getLogger(__name__)
 
 
-class ExtractionFeedback(db.Model):
+class ExtractionFeedback(TenantMixin, db.Model):
     """Store user feedback on extracted elements."""
 
     __tablename__ = "extraction_feedback"

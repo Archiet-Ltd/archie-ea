@@ -165,6 +165,17 @@ _DERIVABLE_ORG = {
          WHERE u.id = s.organization_unit_id
            AND u.organization_id IS NULL
     """,
+    # A learned correction belongs to the organisation of the user who made it. user_id has no
+    # foreign key and can be NULL or name a user with no organisation; such a row stays NULL
+    # (hidden from every organisation, reported), never guessed. See _PROVENANCE_ONLY.
+    "extraction_feedback": """
+        UPDATE extraction_feedback f
+           SET organization_id = u.organization_id
+          FROM users u
+         WHERE f.user_id = u.id
+           AND f.organization_id IS NULL
+           AND u.organization_id IS NOT NULL
+    """,
     # An options analysis belongs to the organisation that owns the capability it
     # analyses: capability_id is NOT NULL and points at business_capability, which
     # is already tenant-fenced. An analysis whose capability itself has no
@@ -463,7 +474,8 @@ _PURGE_ORPHANS = {}
 # assignment below. With exactly one organisation there is no other one it
 # could belong to, so the ordinary single-organisation rule still applies.
 _PROVENANCE_ONLY = {
-    "application_ownership", "options_analysis", "organization_units", "stakeholder_inputs",
+    "application_ownership", "extraction_feedback", "options_analysis", "organization_units",
+    "stakeholder_inputs",
     # Every table above whose _DERIVABLE_ORG entry can leave
     # a genuine remainder (a row whose own attribution columns are all NULL,
     # or all point at rows that are themselves unattributed) -- the fenced,
