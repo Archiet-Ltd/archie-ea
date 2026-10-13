@@ -15,6 +15,18 @@ _PROPERTY_TEMPLATE_META = {
 }
 
 
+# Property keys that only the AI system release gate may write, and the writer
+# sources it uses. Any other writer (the generic element-update routes, imports,
+# the journey) is refused for these keys, so the gate is the only authority on
+# a system's risk class and release state.
+GATE_OWNED_KEYS = frozenset({"ai_system_risk_class", "ai_system_release_state"})
+GATE_SOURCES = frozenset({"classification_approval", "release_gate"})
+
+
+class ReservedPropertyError(ValueError):
+    """Raised when a property reserved for the release gate is written by anyone else."""
+
+
 class PropertyValidationError(ValueError):
     """Raised when a typed property value cannot be stored."""
 
@@ -169,6 +181,10 @@ class PropertyService:
         return entry
 
     def _set_record_property(self, record, *, archimate_type, key, value, source="user"):
+        if key in GATE_OWNED_KEYS and source not in GATE_SOURCES:
+            raise ReservedPropertyError(
+                f"'{key}' is set by the AI system release gate and cannot be written directly."
+            )
         props = dict(getattr(record, "acm_properties", None) or {})
         entry = self._coerce_value(
             archimate_type=archimate_type,
@@ -198,6 +214,9 @@ class PropertyService:
     def merge_element_properties(self, element, updates, source="user"):
         """Write multiple element properties through the canonical writer."""
         for key, value in (updates or {}).items():
+            if key in GATE_OWNED_KEYS and source not in GATE_SOURCES:
+                logger.warning("Ignoring write to gate-owned property '%s' (source=%s)", key, source)
+                continue
             self.set_element_property(element, key, value, source=source)
         return getattr(element, "acm_properties", None) or {}
 

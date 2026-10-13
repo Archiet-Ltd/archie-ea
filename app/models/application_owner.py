@@ -123,7 +123,7 @@ class ApplicationOwner(db.Model):
     # Element types this record may own via element_type/element_id.
     # Capability is the first; a later element type is added here, not as a
     # new owner table.
-    ELEMENT_TYPES = ["capability", "data_entity"]
+    ELEMENT_TYPES = ["capability", "data_entity", "ai_system"]
 
     @property
     def is_primary(self):
