@@ -69,11 +69,15 @@ import os
 import re
 import sys
 
+import hygiene_text
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 ALLOW = re.compile(r"macro-kwargs-ok:")
 
-JINJA_COMMENT = re.compile(r"\{#.*?#\}", re.S)
+# Shared with check_public_repo_hygiene.py and the other checkers that mask
+# the same shape -- see hygiene_text's own module docstring.
+JINJA_COMMENT = hygiene_text.JINJA_COMMENT_RE
 MACRO_DEF = re.compile(r"\{%-?\s*macro\s+(\w+)\s*\(")
 FROM_IMPORT = re.compile(r"{%-?\s*from\s+['\"]([^'\"]+)['\"]\s+import\s+([^%]+?)-?%}")
 IDENT = re.compile(r"\w+$")

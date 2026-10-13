@@ -46,6 +46,8 @@ import re
 import sys
 from pathlib import Path
 
+import hygiene_text
+
 ROOTS = ("app/templates", "app/modules")
 SKIP_DIRS = {
     ".git", "__pycache__", "node_modules", ".worktrees", ".claude",
@@ -67,9 +69,6 @@ def _is_partial(path: Path) -> bool:
     return "partials" in path.parts
 
 
-_COMMENT = re.compile(r"\{#.*?#\}|<!--.*?-->", re.S)
-
-
 def _mask_comments(text: str) -> str:
     """Blank out `{# ... #}` / `<!-- ... -->` comment bodies, preserving every
     other character (including newlines) so offsets/line numbers still line
@@ -80,12 +79,12 @@ def _mask_comments(text: str) -> str:
     live in a {% block breadcrumb %} above" -- is itself template-shaped text
     and was matched as a second live source, corrupting the very
     justification comment the escape hatch relies on.
-    """
-    def _blank(m: re.Match) -> str:
-        s = m.group(0)
-        return "".join(c if c == "\n" else " " for c in s)
 
-    return _COMMENT.sub(_blank, text)
+    The pattern and the blanking primitive live in hygiene_text, shared
+    with the checkers below that need the identical comment shape or the
+    identical length-preserving blank.
+    """
+    return hygiene_text.mask(text, hygiene_text.HTML_OR_JINJA_COMMENT_RE)
 
 
 def _sources(text: str) -> list[tuple[int, str]]:

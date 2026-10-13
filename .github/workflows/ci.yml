@@ -214,6 +214,9 @@ jobs:
     # failures and silently skips CSS verification.
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0     # public-repo-hygiene-commit-messages needs origin/main
+                              # and the base branch resolvable, not just the merge commit
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}

@@ -56,6 +56,8 @@ import os
 import re
 import sys
 
+import hygiene_text
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ALLOW = re.compile(r"placeholder-copy-ok:[ \t]*\S")
 
@@ -88,8 +90,12 @@ ELEMENT = re.compile(
     r"<(label|th|button|h1|h2|h3|h4)\b[^>]*>(.*?)</\1>", re.S | re.I
 )
 ARIA = re.compile(r'aria-label\s*=\s*"([^"]*)"', re.I)
-TAGS = re.compile(r"<[^>]+>")
-JINJA = re.compile(r"\{\{.*?\}\}|\{%.*?%\}", re.S)
+# The tag and Jinja-expression/statement patterns live in hygiene_text,
+# shared with check_public_repo_hygiene.py, which needed the identical
+# Jinja pattern (its own tag pattern is a distinct, looser shape -- see
+# hygiene_text's own docstring for why the two are kept apart).
+TAGS = hygiene_text.HTML_TAG_RE
+JINJA = hygiene_text.JINJA_EXPR_OR_STMT_RE
 
 
 def _visible_text(fragment: str) -> str:

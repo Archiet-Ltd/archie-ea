@@ -47,6 +47,8 @@ import os
 import re
 import sys
 
+import hygiene_text
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 ALLOW = re.compile(r"control-label-ok:")
@@ -60,8 +62,10 @@ RUNTIME_NAME = re.compile(r"\bx-text\b|\bx-html\b|:aria-label\s*=|\baria-label\s
 STATIC_NAME = re.compile(r"\baria-label\s*=|\btitle\s*=")
 LABELLEDBY = re.compile(r'\baria-labelledby\s*=\s*"([^"]*)"')
 
-JINJA_STMT = re.compile(r"\{%.*?%\}|\{#.*?#\}", re.S)
-TAGS = re.compile(r"<[^>]*>", re.S)
+# The tag and Jinja-statement/comment patterns live in hygiene_text, shared
+# with check_input_labels.py, which needed the identical pair.
+JINJA_STMT = hygiene_text.JINJA_STMT_OR_COMMENT_RE
+TAGS = hygiene_text.HTML_TAG_RE_LOOSE
 
 
 def templates(root: str) -> list[str]:

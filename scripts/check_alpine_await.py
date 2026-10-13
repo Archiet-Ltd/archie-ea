@@ -62,6 +62,8 @@ import os
 import re
 import sys
 
+import hygiene_text
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".worktrees"}
@@ -75,7 +77,9 @@ ATTR_RE = re.compile(
 
 # Jinja regions are masked before attribute parsing: a Jinja filter argument may
 # legally contain the same quote character that delimits the HTML attribute.
-JINJA_RE = re.compile(r"\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\}", re.S)
+# Shared with check_public_repo_hygiene.py and the other checkers that mask
+# the same shape -- see hygiene_text's own module docstring.
+JINJA_RE = hygiene_text.JINJA_ANY_RE
 
 AWAIT_RE = re.compile(r"(?<![\w$.])await(?![\w$])")
 # Only the executable forms of `async`: `async foo(`, `async (`, `async x =>`,

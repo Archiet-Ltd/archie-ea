@@ -1903,7 +1903,7 @@ class DecisionBriefService:
         if not unknowns.issubset(acknowledged):
             raise BlockedByEvidence("brief_unknowns_unacknowledged")
         if not acknowledged.issubset(unknowns):
-            raise ValueError("acknowledged unknown code is not present on the brief")
+            raise ValueError("acknowledged unknown code is not present on the decision brief")
         if not set(assertions["acknowledged_superseded_evidence_ids"]).issubset(
             set(evidence_ids)
         ):

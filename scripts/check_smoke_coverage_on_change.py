@@ -52,6 +52,7 @@ diff shapes and checking `find_unverified()`'s return value directly, since
 the real function reads live git state that a unit test cannot control.
 """
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -69,17 +70,53 @@ def _run(cmd: list[str]) -> str:
     return proc.stdout.strip()
 
 
-def _base_ref() -> str:
-    """The ref to diff against. Prefers the merge-base with origin/main (so a
-    long-lived branch isn't blamed for files main already changed elsewhere),
-    falls back to origin/main directly, then HEAD~1 for a repo with no
-    fetched origin (a fresh clone, or an offline sandbox)."""
+def resolve_base_ref(strict: bool = False) -> tuple[str | None, str]:
+    """The ref to diff against, and a reason when none could be resolved.
+    Shared by this script's own diff (below, non-strict) and by another
+    gate elsewhere in this suite that needs the same resolution but a
+    stricter guarantee (imported directly, not run as a subprocess).
+
+    Non-strict (default -- this script's own use): prefers the merge-base
+    with origin/main, so a long-lived branch isn't blamed for files main
+    already changed elsewhere; falls back to origin/main directly; then to
+    HEAD~1 for a repo with no fetched origin (a fresh clone, or an offline
+    sandbox). Always resolves to something -- a diff-coverage question
+    needs *some* comparison point even in a degraded clone, and the
+    question "did this file change" degrades gracefully with a worse base,
+    it does not become meaningless.
+
+    Strict: the range actually under review, not a best-effort comparison
+    point -- prefers ``origin/$GITHUB_BASE_REF`` (set inside a pull
+    request), else ``origin/main``, and never falls back to HEAD~1:
+    resolving anyway in a shallow or origin-less clone would silently
+    narrow "the commits under review" to "the one commit before HEAD",
+    which is not the same claim and cannot be allowed to pass by accident.
+    Returns ``(None, reason)`` instead, so a caller that needs the range to
+    mean what it says can skip with the reason rather than pass on a guess.
+    """
+    if strict:
+        base_ref = os.environ.get("GITHUB_BASE_REF")
+        base = f"origin/{base_ref}" if base_ref else "origin/main"
+        if _run(["git", "rev-parse", "--verify", "--quiet", base]):
+            return base, ""
+        return None, (
+            f"{base} does not resolve in this clone (shallow clone, or no "
+            f"matching remote-tracking branch) -- cannot determine which "
+            f"commits are under review"
+        )
     merge_base = _run(["git", "merge-base", "HEAD", "origin/main"])
     if merge_base:
-        return merge_base
+        return merge_base, ""
     if _run(["git", "rev-parse", "--verify", "origin/main"]):
-        return "origin/main"
-    return "HEAD~1"
+        return "origin/main", ""
+    return "HEAD~1", ""
+
+
+def _base_ref() -> str:
+    """The ref this script's own CLI diffs against -- see resolve_base_ref's
+    non-strict mode, which always resolves to something."""
+    ref, _reason = resolve_base_ref(strict=False)
+    return ref
 
 
 def _changed_files(base: str) -> set[str]:

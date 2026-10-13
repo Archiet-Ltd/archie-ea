@@ -486,7 +486,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 69 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 71 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -559,6 +559,8 @@ to reconfirm the count before trusting it:**
 | `nav-verified` | a new sidebar route with no test loading it | ratchet @ 0, carries no tags |
 | `docs-drift` | CLAUDE.md/DELIVERY_CONTRACT.md gate claims disagreeing with build_gates() | must be 0 |
 | `public-repo-hygiene` | a docs/buckets/ directory or path reference in this public repository | must be 0 |
+| `public-repo-hygiene-record-ids` | a review-record-id token or pipeline role word, in a comment, docstring or string literal under app/scripts/tests/templates/static JS | ratchet @ 667 |
+| `public-repo-hygiene-commit-messages` | a review-record-id token, pipeline role word, attribution trailer, generated-with footer, or assistant product name anywhere in a commit message | must be 0 over the commits under review |
 | `background-mechanisms` | a background-work mechanism (rq, celery, apscheduler, thread, process pool, detached subprocess) missing from `docs/background-mechanisms.yml`, or a stale entry | ratchet @ 29 thread instances in 22 files; keyed on file, kind and function |
 | `unregistered-checks` | a scripts/check_\*.py with no Gate(...) entry (F500-008) | ratchet @ 33 |
 
@@ -566,9 +568,11 @@ Per-line escape hatches, each of which makes the exception reviewable rather tha
 silent — every one greppable as `<name>-ok` in `scripts/verify.py`/`scripts/check_*.py`:
 `fabricated-ok`, `air-gap-ok`, `tenancy-ok`, `tenant-scoping-ok`, `llm-boundary-ok`,
 `raw-fetch-ok`, `shell-ok`, `breadcrumb-ok`, `stale-model-ok`, `error-signalling-ok`,
-`silent-data-ok`, `ui-contract-ok`, `fetch-guard-ok`, `token-migration-ok`,
-`is-admin-called-ok`
-(design-tokens only), each taking `: <reason>` where the gate requires one.
+`silent-data-ok`, `ui-contract-ok`, `fetch-guard-ok`, `token-migration-ok`
+(design-tokens only), `is-admin-called-ok`, `hygiene-ok` (public-repo-hygiene
+and its record-id/role-word and commit-message extensions; a commit-message
+hit takes it on the same line — a trailer cannot be excused), each taking
+`: <reason>` where the gate requires one.
 
 `pre-commit install` gives the same feedback at commit time on changed files only.
 Rationale for the whole design — and why compiler/type-checker enforcement was

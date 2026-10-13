@@ -37,6 +37,8 @@ import pathlib
 import re
 import sys
 
+import hygiene_text
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 TEMPLATES = ROOT / "app" / "templates"
 STATIC_JS = ROOT / "app" / "static" / "js"
@@ -54,37 +56,14 @@ def _blank_comments(text: str, jinja: bool) -> str:
     macros/form_macros.html showing example <form> markup. Documentation that
     names an anti-pattern is not an instance of it — flagging it trains readers
     to ignore the checker, which is the only thing that makes a checker useless.
+
+    The scan and the blanking primitive live in hygiene_text, shared with
+    the checkers below that need the identical length-preserving blank;
+    see that module's own docstring for why this checker's own
+    character-scan comment detection stays here rather than moving to the
+    regex-span detection a sibling checker uses instead.
     """
-    out = list(text)
-
-    def blank(a, b):
-        for k in range(a, min(b, len(out))):
-            if out[k] != "\n":
-                out[k] = " "
-
-    spans = []
-    i, n = 0, len(text)
-    while i < n:
-        if jinja and text.startswith("{#", i):
-            j = text.find("#}", i + 2)
-            j = n if j == -1 else j + 2
-            spans.append((i, j))
-            i = j
-        elif text.startswith("/*", i):
-            j = text.find("*/", i + 2)
-            j = n if j == -1 else j + 2
-            spans.append((i, j))
-            i = j
-        elif text.startswith("//", i):
-            j = text.find("\n", i)
-            j = n if j == -1 else j
-            spans.append((i, j))
-            i = j
-        else:
-            i += 1
-    for a, b in spans:
-        blank(a, b)
-    return "".join(out)
+    return hygiene_text.blank_comments(text, jinja)
 
 
 # The reason must be on the SAME line as the marker. With \s* the class matched

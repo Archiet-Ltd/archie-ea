@@ -84,7 +84,7 @@ not represented as qualification evidence.
 |---|---|---|
 | UX / frontend architect (lint only — see note) | `ui`, `a11y` | 25 (no gate carries `a11y`) |
 | security architect | `security`, `airgap` | 18 |
-| QA / test lead | `qa`, `runtime` | 8 |
+| QA / test lead | `qa`, `runtime` | 10 |
 | software / technical architect | `architecture`, `correctness` | 3 (`correctness` plus one `architecture` gate) |
 | data architect | `schema`, `db` | 2 (`db` only; no gate carries `schema`) |
 | CTO / delivery lead | `process`, `deps` | 2 (`deps` only; no gate carries `process`) |

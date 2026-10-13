@@ -44,6 +44,8 @@ import os
 import re
 import sys
 
+import hygiene_text
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 ALLOW = re.compile(r"input-label-ok:")
@@ -56,8 +58,10 @@ HAS_NAME = re.compile(r"\baria-label\s*=|\btitle\s*=|:aria-label\s*=|\baria-labe
 # Input types with no user-visible field to label.
 SKIP_TYPES = ("hidden", "submit", "button", "reset", "image")
 
-JINJA_STMT = re.compile(r"\{%.*?%\}|\{#.*?#\}", re.S)
-TAGS = re.compile(r"<[^>]*>", re.S)
+# The tag and Jinja-statement/comment patterns live in hygiene_text, shared
+# with check_control_labels.py, which needed the identical pair.
+JINJA_STMT = hygiene_text.JINJA_STMT_OR_COMMENT_RE
+TAGS = hygiene_text.HTML_TAG_RE_LOOSE
 
 
 def open_tags(src: str, tag: str):

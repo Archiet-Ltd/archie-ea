@@ -61,6 +61,11 @@ def _route_prefixes() -> list[str]:
     prefixes: set[str] = set()
     for rule in app.url_map.iter_rules():
         # Static prefix = everything before the first '<...>' converter.
+        # Byte-identical to hygiene_text.HTML_TAG_RE, not imported from it:
+        # that constant names an HTML tag; this is a Flask route converter
+        # (<int:id>) inside a url_map rule string, an unrelated grammar that
+        # happens to share the shape -- coupling the two would repoint an
+        # HTML-focused change at this file's own, unrelated parsing.
         static = re.split(r"<[^>]+>", rule.rule, maxsplit=1)[0]
         if static:
             prefixes.add(static)

@@ -69,6 +69,8 @@ import os
 import re
 import sys
 
+import hygiene_text
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".worktrees"}
@@ -81,8 +83,10 @@ ATTR_RE = re.compile(
     re.S,
 )
 
-JINJA_COMMENT_RE = re.compile(r"\{#.*?#\}", re.S)
-JINJA_RE = re.compile(r"\{\{.*?\}\}|\{%.*?%\}", re.S)
+# Shared with check_public_repo_hygiene.py and the other checkers that mask
+# the same two shapes -- see hygiene_text's own module docstring.
+JINJA_COMMENT_RE = hygiene_text.JINJA_COMMENT_RE
+JINJA_RE = hygiene_text.JINJA_EXPR_OR_STMT_RE
 
 TOJSON_RE = re.compile(r"\|\s*tojson\b|\btojson\s*\(")
 

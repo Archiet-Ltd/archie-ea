@@ -51,6 +51,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
 
+# scripts/ itself, not the repository root: this script is standalone (run
+# directly as `python scripts/verify.py`), so its own directory is not
+# guaranteed to already be on sys.path the way it is for the interpreter's
+# own entry-point script. Needed to import a sibling scripts/check_*.py
+# module directly below, rather than running it as a subprocess, so its
+# return value (not just its process exit code) is usable here.
+_SCRIPTS_DIR = str(Path(__file__).resolve().parent)
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+from check_smoke_coverage_on_change import resolve_base_ref as _resolve_smoke_coverage_base_ref
+
 def _force_utf8_console() -> None:
     """Make this script's own output survive a non-UTF-8 Windows console.
 
@@ -868,15 +879,10 @@ def gate_docs_drift() -> Result:
 
 
 def gate_public_repo_hygiene() -> Result:
-    """No private-planning-bucket directory or path reference in this public
-    repository (see scripts/check_public_repo_hygiene.py's own docstring
-    for the exact pattern). Gated at ZERO.
-
-    21 Sep 2026: found 82 tracked files (17,550 lines) of the orchestrator
-    repository's private planning artifacts committed directly here, plus
-    scattered path references to that structure in comments and docstrings
-    across the tree that survived even after the files themselves were
-    removed. See scripts/check_public_repo_hygiene.py.
+    """No private-planning-path directory tracked in this repository, and
+    no tracked source file contains a reference to that path structure --
+    see scripts/check_public_repo_hygiene.py's own docstring (PATTERN) for
+    the exact string matched. Zero tolerance.
     """
     proc = _run([sys.executable, "scripts/check_public_repo_hygiene.py", "--count"])
     try:
@@ -888,6 +894,88 @@ def gate_public_repo_hygiene() -> Result:
     if count:
         detail = _run([sys.executable, "scripts/check_public_repo_hygiene.py"]).stdout[-1800:]
     return Result("public-repo-hygiene", PASS if count == 0 else FAIL, detail, count, 0)
+
+
+def gate_public_repo_hygiene_record_ids(baseline: int) -> Result:
+    """Catches a review-record-id token or a process word in a comment,
+    docstring or string literal under app/, scripts/, tests/, templates or
+    static JS -- see scripts/check_public_repo_hygiene.py's own docstring
+    and RECORD_ID_PATTERN/ROLE_WORDS comments for the exact shape of each
+    and the full allowlist reasoning.
+
+    RATCHET, not zero: the record-id shape cannot always be told apart from
+    this codebase's own permanent business-reference-number conventions by
+    pattern alone, and "orchestrator" is also this codebase's own
+    architecture vocabulary beyond the specific phrases PRODUCT_TERMS
+    allowlists -- see scripts/check_public_repo_hygiene.py's docstring.
+    """
+    proc = _run([sys.executable, "scripts/check_public_repo_hygiene.py", "--rule", "content", "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("public-repo-hygiene-record-ids", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = ""
+    if count > baseline:
+        detail = _run([sys.executable, "scripts/check_public_repo_hygiene.py", "--rule", "content"]).stdout[-1800:]
+    return Result("public-repo-hygiene-record-ids", PASS if count <= baseline else FAIL, detail, count, baseline)
+
+
+def _resolve_hygiene_commit_range() -> tuple[str | None, str]:
+    """The range of commits actually under review: ``origin/$GITHUB_BASE_REF..HEAD``
+    inside a pull request, else ``origin/main..HEAD`` on a full clone, else no
+    range at all -- never a guess, never something that would pass by construction.
+
+    A full-history count cannot be a ratchet here: GitHub's squash merge appends
+    its own attribution trailers to the merge commit after every gate has
+    already run on the pull request, so history keeps moving under a baseline
+    that was never meant to describe it, and every multi-author merge would force
+    the baseline up again. Scoping to the commits under review sidesteps that
+    entirely: a `push` to the default branch resolves ``origin/main..HEAD`` to
+    nothing (HEAD already is the just-merged commit), so the gate passes on zero
+    commits by construction -- correct, because the default branch is not what a
+    review is over.
+
+    The base ref itself is resolved by the strict mode of
+    ``check_smoke_coverage_on_change.resolve_base_ref`` (imported above, not
+    run as a subprocess): one resolver, two modes, rather than two
+    independent implementations of "what ref does this diff run against"
+    drifting apart -- see that function's own docstring for both.
+    """
+    base, reason = _resolve_smoke_coverage_base_ref(strict=True)
+    if base is None:
+        return None, reason
+    return f"{base}..HEAD", ""
+
+
+def gate_public_repo_hygiene_commit_messages() -> Result:
+    """A pipeline role word, an attribution trailer, a generated-with
+    footer line, or an assistant coding tool's own product name anywhere in
+    the message, in a commit message itself (not the diff), among the
+    commits under review.
+
+    ZERO, not a ratchet, and scoped to a range rather than full history -- see
+    ``_resolve_hygiene_commit_range``'s own docstring for why counting all of
+    history cannot be a stable measurement here. SKIPs, rather than passing,
+    when the range cannot be determined (e.g. a shallow clone with no
+    ``origin/main``): a gate that silently measures zero commits because it
+    could not find any is not the same thing as a clean review.
+    """
+    rev_range, reason = _resolve_hygiene_commit_range()
+    if rev_range is None:
+        return Result("public-repo-hygiene-commit-messages", SKIP, reason)
+    proc = _run([sys.executable, "scripts/check_public_repo_hygiene.py",
+                 "--rule", "commits", "--range", rev_range, "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("public-repo-hygiene-commit-messages", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = ""
+    if count:
+        detail = _run([sys.executable, "scripts/check_public_repo_hygiene.py",
+                        "--rule", "commits", "--range", rev_range]).stdout[-1800:]
+    return Result("public-repo-hygiene-commit-messages", PASS if count == 0 else FAIL, detail, count, 0)
 
 
 def gate_unregistered_checks(baseline: int) -> Result:
@@ -1979,6 +2067,22 @@ def build_gates(baseline: dict) -> list[Gate]:
              "zero", gate_public_repo_hygiene,
              remediation="run scripts/check_public_repo_hygiene.py; remove the "
                          "content/reference, or mark the line 'hygiene-ok: <reason>'",
+             tags=["static", "qa"]),
+        Gate("public-repo-hygiene-record-ids",
+             "no new review-record-id token or pipeline role word in app/scripts/tests/templates/static JS",
+             "ratchet",
+             lambda: gate_public_repo_hygiene_record_ids(baseline.get("public_repo_hygiene_record_ids", 676)),
+             remediation="run scripts/check_public_repo_hygiene.py --rule content; reword the "
+                         "line, or mark it 'hygiene-ok: <reason>'",
+             tags=["static", "qa"]),
+        Gate("public-repo-hygiene-commit-messages",
+             "no pipeline role word, attribution trailer, generated-with footer, or "
+             "assistant product name anywhere in a commit message under review",
+             "zero",
+             gate_public_repo_hygiene_commit_messages,
+             remediation="run scripts/check_public_repo_hygiene.py --rule commits --range "
+                         "<base>..HEAD; reword the commit message (a trailer cannot be excused "
+                         "with hygiene-ok:)",
              tags=["static", "qa"]),
         Gate("background-mechanisms",
              "every background-work mechanism is listed in the one register",
