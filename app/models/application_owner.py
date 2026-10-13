@@ -177,27 +177,30 @@ class ApplicationOwner(db.Model):
         return result.get(application_id, [])
 
     @classmethod
-    def _resolve_user_names(cls, owner_rows, organization_id):
-        """Given a list of ApplicationOwner rows, return ``{user_id: user}``
-        for their users, tenant-fenced."""
-        from app.models.user import User
+    def display_rows_for_owner_rows(cls, owner_rows, organization_id, users=None):
+        """The ONE conversion from ApplicationOwner rows to display dicts.
 
-        user_ids = list({row.user_id for row in owner_rows if row.user_id is not None})
-        if not user_ids:
-            return {}
-        return {
-            user.id: user
-            for user in db.session.execute(
-                db.select(User)
-                .where(User.organization_id == organization_id)
-                .where(User.id.in_(user_ids))
-            ).scalars()
-        }
+        Accepts rows of any key (application, capability, ...) so a caller with
+        mixed keys does a single tenant-fenced user read for all of them. A
+        caller that already holds the ``{user_id: User}`` map passes it as
+        ``users`` and no read is made. A person with no recorded name is shown
+        as a dash, never as their email address.
+        """
+        owner_rows = list(owner_rows)
+        if users is None:
+            user_ids = list({row.user_id for row in owner_rows if row.user_id is not None})
+            users = {}
+            if user_ids:
+                from app.models.user import User
 
-    @classmethod
-    def _owner_rows_to_display(cls, owner_rows, users):
-        """Convert ApplicationOwner rows to display dicts using the given
-        ``{user_id: User}`` map."""
+                users = {
+                    user.id: user
+                    for user in db.session.execute(
+                        db.select(User)
+                        .where(User.organization_id == organization_id)
+                        .where(User.id.in_(user_ids))
+                    ).scalars()
+                }
         display_rows = []
         for row in owner_rows:
             user = users.get(row.user_id)
@@ -208,7 +211,7 @@ class ApplicationOwner(db.Model):
             display_rows.append({
                 "id": row.id,
                 "user_id": row.user_id,
-                "user_name": full_name or (user.email if user else "Unknown"),
+                "user_name": full_name or "—",
                 "user_email": user.email if user else None,
                 "ownership_type": row.ownership_type,
                 "ownership_type_label": cls.OWNERSHIP_LABELS.get(
@@ -219,6 +222,19 @@ class ApplicationOwner(db.Model):
                 "assigned_by": row.assigned_by,
             })
         return display_rows
+
+    @classmethod
+    def _group_display_rows(cls, grouped_rows, all_owner_rows, organization_id):
+        """Display rows for a ``{key: [owner rows]}`` grouping, with one user
+        read for every row in it (through the one public converter)."""
+        display_by_id = {
+            shown["id"]: shown
+            for shown in cls.display_rows_for_owner_rows(all_owner_rows, organization_id)
+        }
+        return {
+            key: [display_by_id[row.id] for row in rows]
+            for key, rows in grouped_rows.items()
+        }
 
     @classmethod
     def get_display_rows_for_applications(cls, application_ids, organization_id):
@@ -236,11 +252,7 @@ class ApplicationOwner(db.Model):
         """Read multiple applications' owners with tenant-fenced user display data."""
         owners_by_app = cls.get_owners_for_applications_batch(application_ids, organization_id)
         all_owner_rows = [o for rows in owners_by_app.values() for o in rows]
-        users = cls._resolve_user_names(all_owner_rows, organization_id)
-        return {
-            app_id: cls._owner_rows_to_display(rows, users)
-            for app_id, rows in owners_by_app.items()
-        }
+        return cls._group_display_rows(owners_by_app, all_owner_rows, organization_id)
 
     @classmethod
     def get_display_rows_for_application(cls, application_id, organization_id):
@@ -297,11 +309,7 @@ class ApplicationOwner(db.Model):
         """Read multiple elements' owners with tenant-fenced user display data."""
         owners_by_eid = cls.get_owners_for_elements_batch(element_type, element_ids, organization_id)
         all_owner_rows = [o for rows in owners_by_eid.values() for o in rows]
-        users = cls._resolve_user_names(all_owner_rows, organization_id)
-        return {
-            eid: cls._owner_rows_to_display(rows, users)
-            for eid, rows in owners_by_eid.items()
-        }
+        return cls._group_display_rows(owners_by_eid, all_owner_rows, organization_id)
 
     @classmethod
     def get_display_rows_for_element(cls, element_type, element_id, organization_id):

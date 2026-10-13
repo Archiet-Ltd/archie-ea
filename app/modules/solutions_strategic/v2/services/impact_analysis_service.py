@@ -60,7 +60,9 @@ class ImpactAnalysisService:
                 include_derived=False,
                 max_depth=3,
                 direction="downstream",
-                with_owner=True,
+                # Scoring and storage never read owners; the page call below
+                # resolves them for the rows it returns.
+                with_owner=False,
             )
         else:
             full_result = None

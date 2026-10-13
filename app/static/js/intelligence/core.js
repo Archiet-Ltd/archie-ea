@@ -244,9 +244,9 @@
         return (payload.initiatives || []).map(initiativeModel);
     }
 
-    /* L4: owners of the element's ApplicationComponent. Resolves
-       ApplicationOwner records through the tenant-safe batch reader and
-       returns them as the owners array. No max_depth/include_derived --
+    /* L4: the element's own owners first, then the owners of the elements it
+       affects. Resolves ApplicationOwner records through the tenant-safe
+       batch reader and returns them as the owners array. No max_depth/include_derived --
        this lens is a pure ownership lookup, not a blast-radius traversal,
        unlike every other lens. */
     function fetchAccountability(elementId) {

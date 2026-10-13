@@ -9,6 +9,7 @@ ensure reliable test execution while covering the acceptance criteria.
 """
 
 import pytest
+from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
 
@@ -146,8 +147,10 @@ def cross_org_owners(seeded, live_server):
         db.session.add(owner_b)
         db.session.commit()
 
-        # Create an element in org A with no owner, to confirm the
-        # cross-org query does not pick up org B's owner.
+        # Org A: a seed element related to a second element that has no owner
+        # of its own. Org B's application component and capability owner are
+        # both recorded against ORG A's element id, so only the tenant fence
+        # stands between them and org A's rows.
         el_a = ArchiMateElement(
             name="Org A Isolated", type="ApplicationComponent",
             layer="application", organization_id=org_a_id,
@@ -160,8 +163,33 @@ def cross_org_owners(seeded, live_server):
             archimate_element_id=el_a.id,
         )
         db.session.add(comp_a)
+        el_a_child = ArchiMateElement(
+            name="Org A Child", type="ApplicationComponent",
+            layer="application", organization_id=org_a_id,
+        )
+        db.session.add(el_a_child)
+        db.session.flush()
+        db.session.add(ArchiMateRelationship(
+            type="Serving", source_id=el_a.id, target_id=el_a_child.id,
+            organization_id=org_a_id,
+        ))
+        foreign_comp = ApplicationComponent(
+            name="Org B App on org A element", organization_id=org_b.id,
+            archimate_element_id=el_a_child.id,
+        )
+        db.session.add(foreign_comp)
+        db.session.flush()
+        db.session.add(ApplicationOwner(
+            application_id=foreign_comp.id, user_id=user_b.id,
+            ownership_type="Business Owner", organization_id=org_b.id,
+        ))
+        db.session.add(ApplicationOwner(
+            element_type="capability", element_id=el_a_child.id, user_id=user_b.id,
+            ownership_type="primary", organization_id=org_b.id,
+        ))
         db.session.commit()
 
+        out["org_a_child_id"] = el_a_child.id
         out["org_b_element_id"] = el_b.id
         out["org_a_element_id"] = el_a.id
         out["org_b_owner_name"] = "OrgB Owner"
@@ -294,9 +322,9 @@ def test_impact_analysis_owners_field_renders_names_or_dash(page, live_server, s
 
     Seeds an ApplicationOwner for one child element whose person name
     differs from the legacy ownership chain. On the old template
-    (e235cc06) the Owner cell shows the legacy owner or —, so the
+    the Owner cell shows the legacy owner or —, so the
     assertion that the cell contains the ApplicationOwner's name fails.
-    On the new template (ad312b04) the cell shows the joined owner
+    On the new template the cell shows the joined owner
     names from the owners list, so the assertion passes."""
     _login(page, live_server, seeded["emails"]["cto"])
 
@@ -367,27 +395,27 @@ def test_impact_analysis_owners_field_renders_names_or_dash(page, live_server, s
 
     # Click the search result button.
     search_results = page.locator("button", has_text=pagination_graph["root_name"])
-    if search_results.count() > 0:
-        search_results.first.click()
-        page.wait_for_timeout(1000)
+    expect(search_results.first).to_be_visible()
+    search_results.first.click()
+    page.wait_for_timeout(1000)
 
     # Click Analyze Impact.
     analyze_button = page.locator("button", has_text="Analyze Impact")
-    if analyze_button.count() > 0:
-        analyze_button.click()
-        # Wait for analysis to complete and results to render.
-        page.wait_for_timeout(8000)
+    expect(analyze_button).to_be_visible()
+    analyze_button.click()
+    # Wait for analysis to complete and results to render.
+    expect(page.locator("body")).to_contain_text(owner_name, timeout=PAGE_TIMEOUT)
 
     # Check the rendered Owner cell for the owned element.
     # The cell should contain the ApplicationOwner's name.
-    # On the old template (e235cc06) this shows the legacy owner or —,
-    # so the assertion fails. On the new template (ad312b04) it shows
+    # On the old template this shows the legacy owner or —,
+    # so the assertion fails. On the new template it shows
     # the joined owner names, so the assertion passes.
     page_text = page.locator("body").inner_text()
     assert owner_name in page_text, (
         "Owner name '%s' not found anywhere on the rendered page. "
         "On the old template the cell shows the legacy owner or —, "
-        "so this assertion is expected to fail on e235cc06." % owner_name
+        "so this assertion is expected to fail on the previous template." % owner_name
     )
 
     # Also verify a dash is shown for rows with no owner.
@@ -416,21 +444,24 @@ def test_cross_org_owners_never_leak(page, live_server, seeded, cross_org_owners
     indirect = data.get("indirect_dependencies") or []
     rows = direct + indirect
 
-    # No row should contain org B's owner name.
+    # The walk must reach org A's own child, so the check below looks at a row.
+    child_rows = [r for r in rows if r["id"] == cross_org_owners["org_a_child_id"]]
+    assert len(child_rows) == 1, "org A's related element is missing from the analysis"
+
+    # Org B's owner rows name org A's element id; none of them may surface.
     org_b_owner_name = cross_org_owners["org_b_owner_name"]
     for row in rows:
-        for owner in row.get("owners", []):
-            assert owner.get("name") != org_b_owner_name, (
-                "Org B owner '%s' leaked into org A's response" % org_b_owner_name
-            )
+        assert row.get("owners") == [], (
+            "Org B owner '%s' leaked into org A's response: %r" % (org_b_owner_name, row.get("owners"))
+        )
 
 
 def test_ask_impact_list_shows_owner_name(page, live_server, seeded, pagination_graph):
     """The Ask impact list renders the ApplicationOwner's name for an
     element that has an ApplicationOwner record. On the old JS
-    (e235cc06) the ownerName is derived from row.owner (legacy), which
+    the ownerName is derived from row.owner (legacy), which
     is None for this element, so the owner field shows a missing badge.
-    On the new JS (ad312b04) the ownerName is derived from row.owners,
+    On the new JS the ownerName is derived from row.owners,
     which contains the ApplicationOwner's name."""
     _login(page, live_server, seeded["emails"]["cto"])
 
@@ -453,20 +484,17 @@ def test_ask_impact_list_shows_owner_name(page, live_server, seeded, pagination_
 
     # Click the search result.
     search_results = page.locator("#ask-picker-listbox [role=option]")
-    if search_results.count() > 0:
-        search_results.first.click()
-        # Wait for the impact analysis to complete.
-        page.wait_for_timeout(8000)
+    expect(search_results.first).to_be_visible()
+    search_results.first.click()
+    # Wait for the impact analysis to complete.
+    expect(page.locator("#ask-results")).to_contain_text(owner_name, timeout=PAGE_TIMEOUT)
 
     # Check the rendered owner name in the Ask results.
-    # On the old JS (e235cc06) the ownerName is null (legacy owner is
+    # On the old JS the ownerName is null (legacy owner is
     # None), so the owner field shows a "missing" badge. On the new JS
-    # (ad312b04) the ownerName is "Alice Owner", so the owner field
+    # the ownerName is "Alice Owner", so the owner field
     # shows the name.
-    page_text = page.locator("#ask-results").inner_text() if page.locator("#ask-results").count() > 0 else ""
-    if page_text:
-        assert owner_name in page_text, (
-            "Owner name '%s' not found in Ask impact list. "
-            "On the old JS the ownerName is null (legacy owner is None), "
-            "so this assertion is expected to fail on e235cc06." % owner_name
-        )
+    page_text = page.locator("#ask-results").inner_text()
+    assert owner_name in page_text, (
+        "Owner name '%s' not found in Ask impact list" % owner_name
+    )

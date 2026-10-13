@@ -837,85 +837,155 @@ def test_owner_fetch_query_count(app, db_session, make_org):
         )
 
 
-def test_capability_owner_does_not_leak_to_application_row(app, db_session, make_org):
-    """A capability owner whose element_id equals an application-element id
-    in the same organisation must NOT appear on the application's impact row.
+def _unified_capability(db_session, org_id, element, name="Cap"):
+    from app.models.unified_capability import UnifiedCapability
 
-    The batch owner lookup must filter by element_type so a capability owner
-    (element_type='capability') is never attached to an ApplicationComponent
-    row that happens to share the same element_id value."""
-    org = make_org("cap-owner-leak")
-    # Create an application element and a capability element that share
-    # the same numeric id (impossible with real PKs, so we use different
-    # orgs to get different PKs and verify the element_type filter).
-    app_el = _element(db_session, org.id, "App", etype="ApplicationComponent")
-    cap_el = _element(db_session, org.id, "Cap", etype="Capability", layer="business")
-    _relationship(db_session, org.id, app_el, cap_el)
+    cap = UnifiedCapability(
+        name=name, organization_id=org_id, level=1, archimate_element_id=element.id,
+    )
+    db_session.add(cap)
+    db_session.flush()
+    return cap
 
-    # Create an ApplicationComponent for the app element.
-    _application_component(db_session, org.id, app_el.id, name="App Component")
 
-    # Create a capability owner with element_type='capability' and
-    # element_id set to the app element's id (simulating a collision).
-    user = _make_user(db_session, org, "Cap", "Owner")
-    _application_owner(db_session, org, "capability", app_el.id, user, "primary")
-    db_session.commit()
-
+def _impact(app, org_id, seed_id, **kwargs):
     from app.modules.intelligence.services.query_service import IntelligenceQueryService
 
     with app.test_request_context("/"):
         from flask import g
 
-        g.current_org_id = org.id
-        result = IntelligenceQueryService.cross_layer_impact(
-            app_el.id, include_derived=False, max_depth=3, with_owner=True
+        g.current_org_id = org_id
+        return IntelligenceQueryService.cross_layer_impact(
+            seed_id, include_derived=False, max_depth=3, with_owner=True, **kwargs
         )
 
-    rows = result.get("rows") or []
-    # The app element's row must have empty owners — the capability owner
-    # with the same element_id must not leak through.
+
+def test_capability_owner_is_found_by_the_capability_id_not_the_element_id(app, db_session, make_org):
+    """Capability owners are written against UnifiedCapability.id. The row of
+    the capability ArchiMate element carries that owner, and an owner stored
+    against a number that equals the ELEMENT id is not attached to it."""
+    org = make_org("cap-owner-keyed")
+    seed = _element(db_session, org.id, "Seed")
+    cap_el = _element(db_session, org.id, "Cap", etype="Capability", layer="business")
+    _relationship(db_session, org.id, seed, cap_el)
+    cap = _unified_capability(db_session, org.id, cap_el)
+    right = _make_user(db_session, org, "Right", "Person")
+    wrong = _make_user(db_session, org, "Wrong", "Person")
+    _application_owner(db_session, org, "capability", cap.id, right, "primary")
+    # Keyed by the element id of the row under test: must NOT be shown on it.
+    _application_owner(db_session, org, "capability", cap_el.id, wrong, "primary")
+    db_session.commit()
+    assert cap.id != cap_el.id, "precondition: the two id spaces must differ"
+
+    rows = _impact(app, org.id, seed.id)["rows"]
+    row = [r for r in rows if r["element_id"] == cap_el.id]
+    assert len(row) == 1
+    assert [o["name"] for o in row[0]["owners"]] == ["Right Person"]
+
+
+def test_capability_owner_does_not_leak_to_application_row(app, db_session, make_org):
+    """An owner of type capability stored against the numeric id of an
+    application element is not attached to that application row."""
+    org = make_org("cap-owner-leak")
+    seed = _element(db_session, org.id, "Seed")
+    app_el = _element(db_session, org.id, "App", etype="ApplicationComponent")
+    _relationship(db_session, org.id, seed, app_el)
+    _application_component(db_session, org.id, app_el.id, name="App Component")
+    user = _make_user(db_session, org, "Cap", "Owner")
+    _application_owner(db_session, org, "capability", app_el.id, user, "primary")
+    db_session.commit()
+
+    rows = _impact(app, org.id, seed.id)["rows"]
     app_row = [r for r in rows if r["element_id"] == app_el.id]
-    if app_row:
-        assert app_row[0]["owners"] == [], (
-            f"App element {app_el.id} should have no owners, "
-            f"got {app_row[0]['owners']}"
-        )
+    assert len(app_row) == 1, "the application row must be in the walk"
+    assert app_row[0]["owners"] == []
 
 
 def test_two_organisation_owner_isolation_with_capability_owner(app, db_session, make_org):
-    """Organisation B's capability owner never appears in organisation A's
-    impact walk, even when element_ids coincide."""
+    """Organisation B records written against organisation A elements never
+    appear on organisation A rows: an application component and a capability
+    in B that point at A elements, with owners in B."""
     org_a = make_org("cap-iso-a")
     org_b = make_org("cap-iso-b")
 
     a1 = _element(db_session, org_a.id, "A1")
     a2 = _element(db_session, org_a.id, "A2")
+    a3 = _element(db_session, org_a.id, "A3", etype="Capability", layer="business")
     _relationship(db_session, org_a.id, a1, a2)
+    _relationship(db_session, org_a.id, a1, a3)
 
-    b1 = _element(db_session, org_b.id, "B1")
-    b2 = _element(db_session, org_b.id, "B2", etype="Capability", layer="business")
-    _relationship(db_session, org_b.id, b1, b2)
-
-    # Create a capability owner for org B's element.
     user_b = _make_user(db_session, org_b, "OrgB", "CapOwner")
-    _application_owner(db_session, org_b, "capability", b2.id, user_b, "primary")
+    comp_b = _application_component(db_session, org_b.id, a2.id, name="B app on A element")
+    _application_owner(db_session, org_b, None, None, user_b, "primary", application_id=comp_b.id)
+    cap_b = _unified_capability(db_session, org_b.id, a3, name="B cap on A element")
+    _application_owner(db_session, org_b, "capability", cap_b.id, user_b, "primary")
     db_session.commit()
 
-    from app.modules.intelligence.services.query_service import IntelligenceQueryService
-
-    with app.test_request_context("/"):
-        from flask import g
-
-        g.current_org_id = org_a.id
-        result = IntelligenceQueryService.cross_layer_impact(
-            a1.id, include_derived=False, max_depth=3, with_owner=True
-        )
-
-    rows = result.get("rows") or []
+    rows = _impact(app, org_a.id, a1.id)["rows"]
+    assert {r["element_id"] for r in rows} == {a2.id, a3.id}
     for row in rows:
-        assert row["owners"] == [], (
-            f"Org A row {row['element_id']} leaked owners: {row['owners']}"
-        )
+        assert row["owners"] == [], f"Org A row {row['element_id']} leaked owners: {row['owners']}"
+
+
+def test_row_reason_follows_the_owners(app, db_session, make_org):
+    """A row with an owner carries no absence reason; a row without one says so."""
+    org = make_org("reason-follows-owners")
+    seed = _element(db_session, org.id, "Seed")
+    owned = _element(db_session, org.id, "Owned")
+    bare = _element(db_session, org.id, "Bare")
+    _relationship(db_session, org.id, seed, owned)
+    _relationship(db_session, org.id, seed, bare)
+    comp = _application_component(db_session, org.id, owned.id, name="Owned app")
+    _application_owner(db_session, org, None, None, _make_user(db_session, org), "primary", application_id=comp.id)
+    db_session.commit()
+
+    by_id = {r["element_id"]: r for r in _impact(app, org.id, seed.id)["rows"]}
+    assert by_id[owned.id]["owners"] and by_id[owned.id]["reason"] is None
+    assert by_id[bare.id]["owners"] == [] and by_id[bare.id]["reason"] == "no_ownership_recorded"
+
+
+def test_owner_without_a_name_is_never_shown_as_an_email(app, db_session, make_org):
+    from app.models.user import User
+
+    org = make_org("owner-no-name")
+    seed = _element(db_session, org.id, "Seed")
+    child = _element(db_session, org.id, "Child")
+    _relationship(db_session, org.id, seed, child)
+    comp = _application_component(db_session, org.id, child.id, name="Child app")
+    nameless = User(email="nameless.person@example.com", organization_id=org.id)
+    db_session.add(nameless)
+    db_session.flush()
+    _application_owner(db_session, org, None, None, nameless, "primary", application_id=comp.id)
+    db_session.commit()
+
+    row = [r for r in _impact(app, org.id, seed.id)["rows"] if r["element_id"] == child.id][0]
+    assert len(row["owners"]) == 1
+    assert "@" not in row["owners"][0]["name"]
+    assert "nameless" not in str(row["owners"])
+
+
+def test_latency_ms_includes_the_owner_fetch(app, db_session, make_org, monkeypatch):
+    """The reported latency covers the owner block, so a slow owner fetch is
+    visible to the latency tests."""
+    import time
+
+    from app.modules.intelligence.services import query_service
+
+    org = make_org("latency-owner")
+    seed = _element(db_session, org.id, "Seed")
+    child = _element(db_session, org.id, "Child")
+    _relationship(db_session, org.id, seed, child)
+    db_session.commit()
+
+    real = query_service._resolve_application_owners_batch
+
+    def slow(*args, **kwargs):
+        time.sleep(0.4)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(query_service, "_resolve_application_owners_batch", slow)
+    result = _impact(app, org.id, seed.id)
+    assert result["summary"]["latency_ms"] >= 400.0
 
 
 def test_large_impact_walk_with_owners_within_budget(app, db_session, make_org):
@@ -967,3 +1037,48 @@ def test_large_impact_walk_with_owners_within_budget(app, db_session, make_org):
     for row in result["rows"]:
         assert "owners" in row, f"Row {row['element_id']} missing owners field"
         assert isinstance(row["owners"], list), f"Row {row['element_id']} owners is not a list"
+
+
+def test_accountability_names_the_element_own_owner_when_only_the_root_is_owned(app, db_session, make_org):
+    """Only the root has an owner: the answer names that owner (the rows of the
+    walk never include the seed) and carries no no_ownership_records reason."""
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("accountability-root-only")
+    root = _element(db_session, org.id, "Root")
+    child = _element(db_session, org.id, "Child")
+    _relationship(db_session, org.id, root, child)
+    comp = _application_component(db_session, org.id, root.id, name="Root app")
+    _application_owner(db_session, org, None, None, _make_user(db_session, org, "Rita", "Root"), "primary", application_id=comp.id)
+    db_session.commit()
+
+    with app.test_request_context("/"):
+        from flask import g
+
+        g.current_org_id = org.id
+        result = IntelligenceQueryService.accountability_for_element(root.id)
+
+    assert [o["name"] for o in result["owners"]] == ["Rita Root"]
+    assert result["reasons"] == []
+
+
+def test_accountability_lists_own_owner_before_affected_owners(app, db_session, make_org):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("accountability-order")
+    root = _element(db_session, org.id, "Root")
+    child = _element(db_session, org.id, "Child")
+    _relationship(db_session, org.id, root, child)
+    root_comp = _application_component(db_session, org.id, root.id, name="Root app")
+    child_comp = _application_component(db_session, org.id, child.id, name="Child app")
+    _application_owner(db_session, org, None, None, _make_user(db_session, org, "Zed", "Child"), "primary", application_id=child_comp.id)
+    _application_owner(db_session, org, None, None, _make_user(db_session, org, "Amy", "Root"), "primary", application_id=root_comp.id)
+    db_session.commit()
+
+    with app.test_request_context("/"):
+        from flask import g
+
+        g.current_org_id = org.id
+        result = IntelligenceQueryService.accountability_for_element(root.id)
+
+    assert [o["name"] for o in result["owners"]] == ["Amy Root", "Zed Child"]

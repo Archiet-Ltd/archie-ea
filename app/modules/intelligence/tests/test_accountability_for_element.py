@@ -59,7 +59,7 @@ def _application_owner(db_session, org, application_id, user, ownership_type="pr
 
 
 def test_returns_empty_owners_for_nonexistent_element(app, db_session, make_org):
-    """A non-existent element id returns empty owners with no_ownership_records."""
+    """A non-existent element id reports element_not_found with no owners."""
     from app.modules.intelligence.services.query_service import IntelligenceQueryService
 
     org = make_org("accountability-lens-nonexistent")
@@ -73,11 +73,11 @@ def test_returns_empty_owners_for_nonexistent_element(app, db_session, make_org)
 
     assert result["owners"] == []
     assert result["capacity_not_available"] is True
-    assert "no_ownership_records" in result["reasons"]
+    assert result["reasons"] == ["element_not_found"]
 
 
 def test_returns_empty_owners_with_no_tenant_context(app, db_session, make_org):
-    """No tenant context returns empty owners with no_ownership_records."""
+    """No tenant context reports the no-tenant reason, not an empty-ownership claim."""
     from app.modules.intelligence.services.query_service import IntelligenceQueryService
 
     with app.test_request_context("/"):
@@ -87,7 +87,7 @@ def test_returns_empty_owners_with_no_tenant_context(app, db_session, make_org):
         result = IntelligenceQueryService.accountability_for_element(1)
 
     assert result["owners"] == []
-    assert result["reasons"] == ["no_ownership_records"]
+    assert result["reasons"] == ["no_tenant_context"]
 
 
 def test_returns_owners_from_application_owner_records(app, db_session, make_org):
