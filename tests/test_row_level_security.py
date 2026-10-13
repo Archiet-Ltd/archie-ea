@@ -27,8 +27,12 @@ from __future__ import annotations
 
 import contextlib
 import importlib.util
+import inspect
+import json
 import os
 import re
+import subprocess
+import sys
 import uuid
 from pathlib import Path
 
@@ -377,22 +381,105 @@ def _load_all_model_modules():
             importlib.import_module(f"app.models.{info.name}")
 
 
+def _model_walk_table_sets():
+    """Collect every ``TenantMixin`` / ``HybridTenantMixin`` table in a child process.
+
+    ``_load_all_model_modules`` imports every ``app.models`` submodule to find every
+    mixin subclass, including modules such as ``app.models.adm_kanban_junctions`` that
+    nothing else imports and whose tables nothing creates in a test database. Running
+    that walk in this pytest process would leave those mapped classes (and the backrefs
+    they add to ``User``) registered in ``db.Model.registry`` for every later test in
+    the same run -- see ``test_model_walk_leaves_the_orm_unchanged`` below, and the
+    ``UndefinedTable`` failure this isolates against.
+
+    So the walk runs in a fresh Python subprocess instead. ``inspect.getsource`` ships
+    the exact body of ``_load_all_model_modules`` and ``_concrete_mixin_tables`` into
+    that subprocess, so there is still one definition of each, executed out-of-process;
+    this function only parses the two table-name sets back out of its stdout.
+    """
+    child_source = "\n".join(
+        [
+            "import contextlib",
+            "import json",
+            "",
+            inspect.getsource(_load_all_model_modules),
+            inspect.getsource(_concrete_mixin_tables),
+            "",
+            "try:",
+            "    _load_all_model_modules()",
+            "except Exception:",
+            "    from app import create_app",
+            "",
+            '    app = create_app("testing")',
+            "    with app.app_context():",
+            "        _load_all_model_modules()",
+            "",
+            "from app.models.mixins.core import HybridTenantMixin, TenantMixin",
+            "",
+            "print(json.dumps({",
+            '    "tenant": sorted(_concrete_mixin_tables(TenantMixin)),',
+            '    "hybrid": sorted(_concrete_mixin_tables(HybridTenantMixin)),',
+            "}))",
+        ]
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", child_source],
+        capture_output=True,
+        text=True,
+        cwd=REPO,
+        timeout=180,
+        env=os.environ.copy(),
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout.strip().splitlines()[-1])
+    tenant, hybrid = set(payload["tenant"]), set(payload["hybrid"])
+    assert tenant, "model walk subprocess returned no tenant tables"
+    assert hybrid, "model walk subprocess returned no hybrid tables"
+    return tenant, hybrid
+
+
 def test_every_tenant_and_hybrid_model_is_listed_or_excluded():
     """The literal table lists cannot drift from the models unnoticed: the union of every
     fencing revision must cover every ``TenantMixin`` / ``HybridTenantMixin`` table."""
     from app import db
-    from app.models.mixins.core import HybridTenantMixin, TenantMixin
 
-    _load_all_model_modules()
+    tenant_tables, hybrid_tables = _model_walk_table_sets()
     revisions = _fencing_revisions()
     assert "20261008_row_level_security.py" in revisions
-    _assert_every_model_is_fenced(
-        _concrete_mixin_tables(TenantMixin), _concrete_mixin_tables(HybridTenantMixin), revisions
-    )
+    _assert_every_model_is_fenced(tenant_tables, hybrid_tables, revisions)
     listed_tenant, listed_hybrid = set(MIGRATION.TENANT_TABLES), set(MIGRATION.HYBRID_TABLES)
     assert not (listed_tenant & listed_hybrid)
     assert set(MIGRATION.EXCLUDED) == {"unified_capabilities"}
     assert db is not None
+
+
+def test_model_walk_leaves_the_orm_unchanged():
+    """The subprocess isolation actually works: running the walk never adds the
+    ``adm_kanban_junctions`` models (or any other mapped class or table) to this
+    pytest process's SQLAlchemy mapper registry or ``db.metadata``, and never imports
+    that module into ``sys.modules`` here. Put the walk back in-process (call
+    ``_load_all_model_modules()`` directly in this test, before calling
+    ``_model_walk_table_sets()``) and this fails, naming the tables it adds."""
+    from app import db
+
+    mappers_before = sorted(m.class_.__name__ for m in db.Model.registry.mappers)
+    tables_before = sorted(db.metadata.tables)
+    imported_before = "app.models.adm_kanban_junctions" in sys.modules
+
+    tenant_tables, hybrid_tables = _model_walk_table_sets()
+
+    assert tenant_tables
+    assert hybrid_tables
+
+    new_mappers = sorted(
+        set(m.class_.__name__ for m in db.Model.registry.mappers) - set(mappers_before)
+    )
+    new_tables = sorted(set(db.metadata.tables) - set(tables_before))
+    assert not new_mappers, f"model walk left new classes mapped: {new_mappers}"
+    assert not new_tables, f"model walk added tables to db.metadata: {new_tables}"
+    assert ("app.models.adm_kanban_junctions" in sys.modules) == imported_before, (
+        "model walk imported app.models.adm_kanban_junctions into this process"
+    )
 
 
 def test_a_mixin_table_missing_from_every_fencing_revision_fails_the_guard():
