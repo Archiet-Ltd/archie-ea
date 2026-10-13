@@ -700,6 +700,85 @@ def gate_canonical_store(baseline: int) -> Result:
                   detail, count, baseline)
 
 
+def gate_reuse_macro_names(baseline: int) -> Result:
+    """No NEW Jinja macro name defined in a second template file. RATCHET.
+
+    Two macros sharing one name across two files are indistinguishable at an
+    import site: a `{% from 'x.html' import name %}` binds silently to
+    whichever file it names, so the same call text is correct against one
+    definition and wrong against the other, with no error until the
+    mismatched call actually runs. Counts macro NAMES, not the definitions
+    behind them -- see reuse-macro-definitions for the count that also
+    catches a further copy of a name already duplicated. Static, source-
+    level, no app boot needed. See scripts/check_reuse.py's module docstring
+    for the pattern, scope and exclusions, which are the same ones recorded
+    in the register.
+    """
+    proc = _run([sys.executable, "scripts/check_reuse.py", "--rule", "RG-1", "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("reuse-macro-names", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = "" if count <= baseline else "run scripts/check_reuse.py --rule RG-1 to list them"
+    return Result("reuse-macro-names", PASS if count <= baseline else FAIL,
+                  detail, count, baseline)
+
+
+def gate_reuse_macro_definitions(baseline: int) -> Result:
+    """No rise in the definitions behind an already-duplicated macro name. RATCHET.
+
+    reuse-macro-names counts distinct names, so a name already defined in
+    two files can gain a third, fourth or fourteenth copy for free -- the
+    name count does not move. This counts every definition that belongs to
+    a duplicated name (over the same map reuse-macro-names already builds),
+    so that further copy is not free either. A marker is honoured here only
+    for a name with a matching register concept: the canonical for a name
+    with no concept is only ever a guess, so a marker anchored to it would
+    go live or fall dormant as files are added, and every definition of
+    such a name counts, always. For a registered name the escape hatch
+    still applies PER DEFINITION, not per name: a definition carrying a
+    valid marker does not count, but the canonical definition and every
+    other, unmarked definition still do -- one accepted copy removes
+    exactly one from this count, however many siblings the same name still
+    has. Static, source-level, no app boot needed.
+    """
+    proc = _run([sys.executable, "scripts/check_reuse.py", "--rule", "RG-1b", "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("reuse-macro-definitions", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = "" if count <= baseline else "run scripts/check_reuse.py --rule RG-1b to list them"
+    return Result("reuse-macro-definitions", PASS if count <= baseline else FAIL,
+                  detail, count, baseline)
+
+
+def gate_reuse_diagram_libraries(baseline: int) -> Result:
+    """No NEW page-level reference to a diagram library outside the canonical renderer's pages. RATCHET.
+
+    Counts page-level library REFERENCES (a `<script src="...">` or
+    equivalent text, including inside a comment), not drawing engines: a
+    JavaScript file that draws using a library tag already present on the
+    page from elsewhere adds a second engine this count cannot see -- that
+    is a real, disclosed gap (see docs/reuse-register.yml's RG-2 detail),
+    not a claim this gate catches every second renderer. A page that
+    actually loads the canonical renderer (a real `src`/`href`/`filename`
+    reference to `archimate/composer_renderer.js`, not a comment mentioning
+    it) may still reference `joint` and `dagre` -- the canonical renderer is
+    built on them.
+    """
+    proc = _run([sys.executable, "scripts/check_reuse.py", "--rule", "RG-2", "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("reuse-diagram-libraries", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = "" if count <= baseline else "run scripts/check_reuse.py --rule RG-2 to list them"
+    return Result("reuse-diagram-libraries", PASS if count <= baseline else FAIL,
+                  detail, count, baseline)
+
+
 def gate_dead_interactions() -> Result:
     """No control that looks like it works and does nothing. Gated at ZERO.
 
@@ -1916,6 +1995,27 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="run scripts/check_canonical_store.py; choose the canonical "
                          "class and repoint callers, or mark 'canonical-store-ok: <reason>'",
              tags=["static"]),
+        Gate("reuse-macro-names", "no NEW Jinja macro name defined in a second template file (RG-1)",
+             "ratchet", lambda: gate_reuse_macro_names(baseline.get("reuse_macro_names", 19)),
+             remediation="run scripts/check_reuse.py --rule RG-1; use the canonical macro, "
+                         "add a register specialisation, or mark 'reuse-ok: <concept-id> <reason>'",
+             tags=["static"]),
+        Gate("reuse-macro-definitions",
+             "no rise in the definitions behind an already-duplicated macro name (RG-1b)",
+             "ratchet", lambda: gate_reuse_macro_definitions(baseline.get("reuse_macro_definitions", 50)),
+             remediation="run scripts/check_reuse.py --rule RG-1b; use the canonical macro, "
+                         "add a register specialisation, or -- for a name that already has a "
+                         "register concept -- mark this one definition "
+                         "'reuse-ok: <concept-id> <reason>' to stop it counting; a marker on a "
+                         "name with no concept is never honoured, so register the concept first",
+             tags=["static"]),
+        Gate("reuse-diagram-libraries",
+             "no NEW page loads a diagram library outside the canonical ArchiMate renderer (RG-2)",
+             "ratchet", lambda: gate_reuse_diagram_libraries(baseline.get("reuse_diagram_libraries", 16)),
+             remediation="run scripts/check_reuse.py --rule RG-2; draw through "
+                         "ComposerRenderer, add a register specialisation, or mark "
+                         "'reuse-ok: <concept-id> <reason>'",
+             tags=["static"]),
         Gate("fetch-guards", "no fetch parsed without checking the response", "ratchet",
              lambda: gate_fetch_guards(baseline.get("fetch_guards", 107)),
              remediation="run scripts/check_fetch_guards.py; add if (!resp.ok) throw, "
@@ -2125,22 +2225,47 @@ def load_baseline() -> dict:
 
 
 def save_baseline(ratchets: dict, note: str) -> None:
-    BASELINE_PATH.write_text(
-        json.dumps(
-            {
-                "_comment": (
-                    "Ratchet baselines for scripts/verify.py. Lowering a number is routine "
-                    "(run --update-baseline after a cleanup). Raising one is a deliberate "
-                    "regression and must be justified in review."
-                ),
-                "_note": note,
-                "ratchets": ratchets,
-            },
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
+    """Write verification_baseline.json, keeping every existing top-level key
+    -- including ``_note`` itself.
+
+    Previously this wrote a fixed ``{_comment, _note, ratchets}`` object,
+    which silently deleted any OTHER top-level key on the very next
+    ``--update-baseline`` run. That was fixed for ``_note2``, ``_note3`` and
+    friends, but ``_note`` (no number) is itself a real, hand-written, dated
+    key in the live file today -- and this function still unconditionally
+    overwrote exactly that one. An existing ``_note`` is never touched here;
+    the routine dated stamp this call itself wants to leave goes under its
+    own key, ``_last_baseline_update``, so it can never collide with a
+    hand-written reason.
+    """
+    existing: dict = {}
+    if BASELINE_PATH.exists():
+        try:
+            existing = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            existing = {}
+    payload = {k: v for k, v in existing.items() if k != "ratchets"}
+    payload.setdefault(
+        "_comment",
+        "Ratchet baselines for scripts/verify.py. Lowering a number is routine "
+        "(run --update-baseline after a cleanup). Raising one is a deliberate "
+        "regression and must be justified in review.",
     )
+    payload["_last_baseline_update"] = note
+    payload["ratchets"] = ratchets
+    BASELINE_PATH.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def _baseline_diff(old: dict, new: dict) -> tuple[dict, dict]:
+    """(lowered, raised): key -> (old value, new value), for every key in *new*.
+
+    Split out of the ``--update-baseline`` branch of ``main`` so a rise and a
+    fall are computed by one function a test can call directly, without
+    running the gate suite that produces *new* in a real invocation.
+    """
+    lowered = {k: (old.get(k, new[k]), new[k]) for k in new if new[k] < old.get(k, new[k])}
+    raised = {k: (old.get(k, new[k]), new[k]) for k in new if new[k] > old.get(k, new[k])}
+    return lowered, raised
 
 
 # ---------------------------------------------------------------- main
@@ -2204,11 +2329,13 @@ def main(argv: list[str] | None = None) -> int:
             elif r.measured is not None:
                 measured[r.name.replace("-", "_")] = r.measured
         new = {**baseline, **{k: v for k, v in measured.items() if k in baseline}}
-        lowered = {k: (baseline[k], new[k]) for k in new if new[k] < baseline.get(k, new[k])}
+        lowered, raised = _baseline_diff(baseline, new)
         save_baseline(new, f"updated {time.strftime('%Y-%m-%d')}")
         print(f"baseline written to {BASELINE_PATH.name}")
         for key, (old, cur) in lowered.items():
             print(f"  lowered {key}: {old} -> {cur}")
+        for key, (old, cur) in raised.items():
+            print(f"  RAISED {key}: {old} -> {cur}  -- justify this in review, do not merge silently")
         return 0
 
     failed = [r for r in results if r.status == FAIL]

@@ -486,7 +486,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 69 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 72 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -525,6 +525,9 @@ to reconfirm the count before trusting it:**
 | `dynamic-link-prefixes` | a concatenated href/fetch whose literal prefix is a dead route | ratchet @ 0, boot-only |
 | `store-agreement` | two surfaces answering one question with different numbers | ratchet @ 4, boot-only |
 | `canonical-store` | a table gaining a second mapped SQLAlchemy model class | ratchet @ 0 |
+| `reuse-macro-names` | a Jinja macro name defined in a second template file (RG-1) | ratchet @ 19 |
+| `reuse-macro-definitions` | a rise in definitions behind an already-duplicated macro name (RG-1b) | ratchet @ 50 |
+| `reuse-diagram-libraries` | a page-level reference to a diagram library outside the canonical ArchiMate renderer's pages (RG-2) | ratchet @ 16 |
 | `fetch-guards` | a `fetch()` parsed without checking the response | ratchet @ 0 |
 | `ui-contract` | a native dialog / `onclick=` / typeless button / arbitrary `px` (DESIGN.md) | ratchet @ 0 |
 | `unrendered-model-fields` | a detail-view template never rendering a real Text/JSON model field | ratchet @ 387 |
