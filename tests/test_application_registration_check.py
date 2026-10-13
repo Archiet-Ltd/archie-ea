@@ -115,6 +115,49 @@ def test_other_organisation_never_sees_matches(two_orgs):
     assert body["matches"] == []
 
 
+def _soft_delete(db_session, app_id):
+    from datetime import datetime
+
+    from app.models.application_portfolio import ApplicationComponent
+
+    row = db_session.get(ApplicationComponent, app_id)
+    row.deleted_at = datetime.utcnow()
+    db_session.flush()
+
+
+def test_soft_deleted_application_is_not_a_match_by_code_or_name(two_orgs, db_session):
+    _, client, user = two_orgs["a"]
+    app_id = _create(client, user, name="Orbit Billing Platform", application_code="ORB-1")
+    assert [
+        m["id"]
+        for m in _check(client, name="x-unrelated", application_code="ORB-1").get_json()["matches"]
+    ] == [app_id]
+    _soft_delete(db_session, app_id)
+    assert (
+        _check(client, name="Zephyr Gateway", application_code="ORB-1").get_json()["matches"] == []
+    )
+    assert _check(client, name="Orbit Billing Platform").get_json()["matches"] == []
+    assert _check(client, name="Orbit Billing Platform v2").get_json()["matches"] == []
+
+
+def test_application_code_matches_across_interior_whitespace(two_orgs):
+    _, client, user = two_orgs["a"]
+    app_id = _create(client, user, name="Ledger Core", application_code="LEDGER  CORE")
+    for typed in ("ledger core", " Ledger   Core "):
+        matches = _check(client, name="Zephyr Gateway", application_code=typed).get_json()[
+            "matches"
+        ]
+        assert [(m["id"], m["match"]) for m in matches] == [(app_id, "same_code")]
+
+
+def test_no_organisation_context_returns_nothing_not_everything(app, db_session, monkeypatch):
+    from app.modules.applications.services import registration_check_service as svc
+
+    monkeypatch.setattr(svc, "current_org_id", lambda: None)
+    with pytest.raises(RuntimeError):
+        svc.find_registration_matches("Orbit", "ORB-1")
+
+
 def test_failed_check_is_an_error_not_an_empty_list(two_orgs, monkeypatch):
     _, client, _ = two_orgs["a"]
 
@@ -149,4 +192,7 @@ def test_read_only_role_is_refused_the_check_and_the_create(app, db_session, mak
     assert resp.status_code == 403
     # the create route is gated the same way, so the check never offers more than the save allows
     _clear_login_cache()
-    assert client.post("/applications/create", json={"name": "Refused %s" % role_name}).status_code == 403
+    assert (
+        client.post("/applications/create", json={"name": "Refused %s" % role_name}).status_code
+        == 403
+    )

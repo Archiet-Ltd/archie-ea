@@ -590,21 +590,51 @@ function applicationCreateForm() {
     matches: null,
     checkError: '',
     confirmedDistinct: false,
+    // True from the first keystroke until the lookup for the current text has
+    // answered; submit waits for it so a stale or missing answer never passes.
+    checking: false,
+    // Set once the person has been told the lookup failed and pressed save again.
+    checkFailureAcknowledged: false,
     _checkTimer: null,
     _checkSeq: 0,
+    _checkPromise: null,
+    _checkArgs: null,
 
     scheduleCheck() {
       clearTimeout(this._checkTimer);
+      this._checkTimer = null;
       this.confirmedDistinct = false;
+      this.checkFailureAcknowledged = false;
+      // The previous answer belongs to the previous text: drop it now.
+      this.matches = null;
+      this.renderMatches();
       const name = this.form.name.trim();
       const code = this.form.application_code.trim();
       if (!name && !code) {
-        this.matches = null;
-        this.renderMatches();
+        this._checkSeq++;
+        this.checking = false;
+        this._checkArgs = null;
         this.checkError = '';
         return;
       }
-      this._checkTimer = setTimeout(() => this.runCheck(name, code), 300);
+      this.checking = true;
+      this._checkArgs = [name, code];
+      this._checkTimer = setTimeout(() => {
+        this._checkTimer = null;
+        this._checkPromise = this.runCheck(name, code);
+      }, 300);
+    },
+
+    // Resolves once the lookup for the text now in the form has answered: runs
+    // a still-waiting lookup at once and awaits one already in flight.
+    async settleCheck() {
+      if (this._checkTimer) {
+        clearTimeout(this._checkTimer);
+        this._checkTimer = null;
+        const [name, code] = this._checkArgs || ['', ''];
+        this._checkPromise = this.runCheck(name, code);
+      }
+      if (this._checkPromise) await this._checkPromise;
     },
 
     async runCheck(name, code) {
@@ -622,6 +652,8 @@ function applicationCreateForm() {
         this.matches = null;
         this.renderMatches();
         this.checkError = 'The duplicate check could not run. Check the application list before saving.';
+      } finally {
+        if (seq === this._checkSeq) this.checking = false;
       }
     },
 
@@ -686,6 +718,14 @@ function applicationCreateForm() {
         this.fieldErrors = { name: 'Application name is required.' };
         this.errorMsg = 'Application name is required.';
         this.$nextTick(() => document.getElementById('ca-name')?.focus());
+        return;
+      }
+      // A lookup still waiting or in flight must answer before the form is judged.
+      await this.settleCheck();
+      if (this.checkError && !this.checkFailureAcknowledged) {
+        // The lookup failed: say so and let the next press save without it.
+        this.checkFailureAcknowledged = true;
+        this.errorMsg = this.checkError + ' Press Add Application again to save without it.';
         return;
       }
       if (this.needsConfirmation && !this.confirmedDistinct) {

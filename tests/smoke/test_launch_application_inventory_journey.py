@@ -196,3 +196,76 @@ def test_registering_a_lookalike_application_shows_the_existing_one_first(browse
         dialog.locator("#ca-name").fill(name)
     expect(dialog.locator("#ca-duplicate-check")).not_to_contain_text("already exist")
     context.close()
+
+
+def _open_dialog(page, base):
+    _open_portfolio(page, base)
+    page.get_by_test_id("btn-add-application").click()
+    dialog = page.locator("#modal-create")
+    expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
+    return dialog
+
+
+def test_saving_straight_after_typing_waits_for_the_duplicate_check(browser, live_server):
+    org = create_fresh_org("application_manager")
+    name = "Quay Ledger %s" % org["suffix"]
+    context, page = _new_page(browser)
+    sign_in(page, live_server, org["emails"]["application_manager"])
+    _register(page, live_server, name)
+
+    creates = []
+    page.on("request", lambda r: creates.append(r) if r.url.endswith("/applications/create") and r.method == "POST" else None)
+    dialog = _open_dialog(page, live_server)
+    # Type and press save at once, inside the lookup's wait: it must not save unchecked.
+    dialog.locator("#ca-name").fill(name + " v2")
+    dialog.get_by_role("button", name="Add Application", exact=True).click()
+    expect(dialog.get_by_text("Confirm that none of the similar applications")).to_be_visible(
+        timeout=PAGE_TIMEOUT)
+    assert creates == [], "saved before the duplicate check answered"
+
+    # Editing from a matching name to an unrelated one drops the earlier answer.
+    dialog.locator("#ca-name").fill("Zephyr Telemetry %s" % org["suffix"])
+    with page.expect_navigation(timeout=PAGE_TIMEOUT):
+        dialog.get_by_role("button", name="Add Application", exact=True).click()
+    context.close()
+
+
+def test_same_name_shows_the_open_it_message_and_is_refused_without_a_tick(browser, live_server):
+    org = create_fresh_org("application_manager")
+    name = "Dock Ledger %s" % org["suffix"]
+    context, page = _new_page(browser)
+    sign_in(page, live_server, org["emails"]["application_manager"])
+    _register(page, live_server, name)
+
+    dialog = _open_dialog(page, live_server)
+    dialog.locator("#ca-name").fill(name.upper())
+    panel = dialog.locator("#ca-duplicate-check")
+    expect(panel).to_contain_text("same name", timeout=PAGE_TIMEOUT)
+    assert dialog.locator("#ca-confirm-distinct").count() == 0 or not dialog.locator("#ca-confirm-distinct").is_visible()
+    with page.expect_response(
+        lambda r: r.url.endswith("/applications/create") and r.request.method == "POST",
+        timeout=PAGE_TIMEOUT,
+    ) as created:
+        dialog.get_by_role("button", name="Add Application", exact=True).click()
+    assert created.value.status == 409
+    context.close()
+
+
+def test_a_failed_duplicate_check_is_reported_and_the_next_press_saves(browser, live_server):
+    org = create_fresh_org("application_manager")
+    name = "Berth Ledger %s" % org["suffix"]
+    context, page = _new_page(browser)
+    sign_in(page, live_server, org["emails"]["application_manager"])
+    page.route("**/applications/api/registration-check*",
+               lambda route: route.fulfill(status=500, content_type="application/json",
+                                           body='{"success": false, "error": "down"}'))
+    dialog = _open_dialog(page, live_server)
+    dialog.locator("#ca-name").fill(name)
+    dialog.get_by_role("button", name="Add Application", exact=True).click()
+    expect(dialog.get_by_text("Press Add Application again to save without it")).to_be_visible(
+        timeout=PAGE_TIMEOUT)
+    with page.expect_navigation(timeout=PAGE_TIMEOUT):
+        dialog.get_by_role("button", name="Add Application", exact=True).click()
+    _open_portfolio(page, live_server)
+    expect(_rows(page, name)).to_have_count(1, timeout=PAGE_TIMEOUT)
+    context.close()

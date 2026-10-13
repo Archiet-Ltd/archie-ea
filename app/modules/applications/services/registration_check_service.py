@@ -21,6 +21,11 @@ APPLICATION_ELEMENT_TYPE = "ApplicationComponent"
 MAX_MATCHES = 8
 
 
+def _normalize_code(value: str) -> str:
+    """Trim, collapse interior whitespace and lowercase (mirrors the SQL side)."""
+    return " ".join(str(value).split()).lower()
+
+
 def _entry(app: ApplicationComponent, match: str, reason: str) -> Dict[str, Any]:
     return {
         "id": app.id,
@@ -54,8 +59,16 @@ def find_registration_matches(
             db.session.query(ApplicationComponent)
             .filter(
                 ApplicationComponent.organization_id == org_id,
-                db.func.lower(db.func.btrim(ApplicationComponent.application_code))
-                == normalize_name(code),
+                ApplicationComponent.deleted_at.is_(None),
+                db.func.lower(
+                    db.func.regexp_replace(
+                        db.func.btrim(ApplicationComponent.application_code),
+                        r"\s+",
+                        " ",
+                        "g",
+                    )
+                )
+                == _normalize_code(code),
             )
             .limit(MAX_MATCHES)
             .all()
@@ -64,9 +77,7 @@ def find_registration_matches(
             found[app.id] = _entry(app, "same_code", "Same application code")
 
     if name and name.strip():
-        result = MatcherService.match_by_name(
-            name, APPLICATION_ELEMENT_TYPE, org_id=org_id
-        )
+        result = MatcherService.match_by_name(name, APPLICATION_ELEMENT_TYPE, org_id=org_id)
         element_ids: List[int] = []
         if result.evidence and result.evidence.get("candidate_ids"):
             element_ids = list(result.evidence["candidate_ids"])
@@ -77,6 +88,7 @@ def find_registration_matches(
                 db.session.query(ApplicationComponent)
                 .filter(
                     ApplicationComponent.organization_id == org_id,
+                    ApplicationComponent.deleted_at.is_(None),
                     ApplicationComponent.archimate_element_id.in_(element_ids),
                 )
                 .all()
