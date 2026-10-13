@@ -1438,6 +1438,112 @@ def test_grounding_source_propose_creates_approval_record(db_session, org):
     assert "ai_system_grounding_source" not in props
 
 
+def test_grounding_source_propose_rejects_missing_entity(db_session, org):
+    """Proposing a data entity id that does not exist in the organisation is
+    refused and creates no approval row. Fails on the old unvalidated write."""
+    el = register_ai_system(db_session, org.id, name="Missing Entity System",
+                             provider="openai", model_id="gpt-4o")
+    db_session.flush()
+
+    from app.modules.enterprise_genome.services.ai_system_grounding import (
+        propose_grounding_source,
+    )
+
+    with pytest.raises(ValueError, match="not in this organisation"):
+        propose_grounding_source(
+            element=el,
+            data_entity_id=999_999,
+            organization_id=org.id,
+            proposed_by_user_id=None,
+        )
+    db_session.flush()
+
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+    count = AIChatCRUDApproval.query.filter_by(
+        entity_type="ai_system_grounding_source",
+        entity_id=el.id,
+        organization_id=org.id,
+    ).count()
+    assert count == 0, "no approval row may be created for a missing data entity"
+
+
+def test_grounding_source_propose_rejects_foreign_entity(db_session, make_org):
+    """A data entity owned by another organisation cannot be proposed as a
+    grounding source. Fails on the old unvalidated write."""
+    org_a = make_org("grnd-for-a")
+    org_b = make_org("grnd-for-b")
+
+    el_a = register_ai_system(db_session, org_a.id, name="A Foreign System",
+                               provider="openai", model_id="gpt-4o")
+    de_b = _create_data_entity(db_session, org_b.id, "B's Entity")
+    db_session.flush()
+
+    from app.modules.enterprise_genome.services.ai_system_grounding import (
+        propose_grounding_source,
+    )
+
+    with pytest.raises(ValueError, match="not in this organisation"):
+        propose_grounding_source(
+            element=el_a,
+            data_entity_id=de_b.id,
+            organization_id=org_a.id,
+            proposed_by_user_id=None,
+        )
+    db_session.flush()
+
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+    count = AIChatCRUDApproval.query.filter_by(
+        entity_type="ai_system_grounding_source",
+        entity_id=el_a.id,
+        organization_id=org_a.id,
+    ).count()
+    assert count == 0, "no approval row may be created for a foreign data entity"
+
+
+def test_grounding_source_propose_route_refuses_foreign_entity(
+    app, db_session, make_org, client, login_as
+):
+    """POSTing another organisation's data entity id to the propose route
+    records nothing. Fails on the old unvalidated write."""
+    from app.models.user import Role, User
+
+    org_a = make_org("grnd-route-a")
+    org_b = make_org("grnd-route-b")
+    arch_role = Role.query.filter_by(name="Architect").first()
+    if arch_role is None:
+        pytest.skip("no Architect role seeded")
+    arch = User(
+        email=f"arch-gs-foreign-{uuid.uuid4().hex[:8]}@example.test",
+        first_name="GSForeign",
+        organization_id=org_a.id,
+        confirmed=True,
+        role=arch_role,
+    )
+    arch.password = uuid.uuid4().hex
+    db_session.add(arch)
+    el_a = register_ai_system(db_session, org_a.id, name="Route Foreign System",
+                               provider="openai", model_id="gpt-4o")
+    de_b = _create_data_entity(db_session, org_b.id, "B's Route Entity")
+    db_session.flush()
+
+    login_as(client, arch)
+    r = client.post(
+        f"/genome/ai-systems/{el_a.id}/grounding-source/propose",
+        data={"data_entity_id": de_b.id},
+    )
+    assert r.status_code == 302, (
+        "foreign data entity proposal should flash and redirect, got %s" % r.status_code
+    )
+
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+    count = AIChatCRUDApproval.query.filter_by(
+        entity_type="ai_system_grounding_source",
+        entity_id=el_a.id,
+        organization_id=org_a.id,
+    ).count()
+    assert count == 0, "the route must not create an approval for a foreign entity"
+
+
 def test_grounding_source_approve_writes_property(db_session, org):
     """Approving a grounding source writes the proposed-use property. Fails on main."""
     from app.models.models import ArchiMateElement

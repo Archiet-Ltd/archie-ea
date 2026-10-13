@@ -42,14 +42,28 @@ def propose_grounding_source(
     queue.
 
     Returns the ``AIChatCRUDApproval`` record.
+
+    Refuses (``ValueError``) when the AI system element is not in
+    *organization_id*, and when *data_entity_id* is not an element of that
+    organisation — a grounding source must name a real entity the org owns.
     """
     from app.modules.ai_chat.services.ai_chat_approval_service import (
         create_approval_record,
     )
+    from app.models.models import ArchiMateElement
 
     if getattr(element, "organization_id", None) != organization_id:
         raise ValueError(
             "Grounding source proposals are scoped to the element's own organisation"
+        )
+
+    data_entity = ArchiMateElement.query.filter_by(
+        id=data_entity_id,
+        organization_id=organization_id,
+    ).first()
+    if data_entity is None:
+        raise ValueError(
+            f"Grounding source data entity {data_entity_id} is not in this organisation"
         )
 
     payload = {
