@@ -261,6 +261,13 @@ def _register_optional_standalone(app):
             "agent_registry_bp",
             None,
         ),
+        # R1-B55: AI design conformance review (deviations and the board's
+        # recorded decision on an AI system's design).
+        (
+            "app.modules.ai_chat.routes.ai_design_review_routes",
+            "ai_design_review_bp",
+            None,
+        ),
         # R1-B85: supported-estate share, open exceptions and the
         # store-agreement disagreement panel for the CTO (and the business
         # architect, for the disagreement panel).

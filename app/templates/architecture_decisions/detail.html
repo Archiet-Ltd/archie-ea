@@ -73,6 +73,16 @@
         {% endif %}
     </div>
 
+    {% if decision.ai_system_id %}
+    <div class="mb-6 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm" data-testid="ai-design-review-link">
+        <i data-lucide="clipboard-check" class="h-4 w-4 text-muted-foreground shrink-0"></i>
+        <span class="text-muted-foreground">Board review of an AI system design</span>
+        <a href="{{ url_for('ai_design_review.detail', review_id=decision.id) }}" class="font-medium text-primary hover:underline">
+            Pattern: {{ ((decision.ai_design_review or {}).get('declaration') or {}).get('pattern') or 'none named' }}
+        </a>
+    </div>
+    {% endif %}
+
     {% if decision.superseded_by %}
     <div class="mb-6 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">
         <i data-lucide="arrow-right-circle" class="h-4 w-4 text-muted-foreground shrink-0"></i>

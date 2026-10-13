@@ -1,0 +1,65 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+
+{% block title %}{{ review.title }} — AI design reviews — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6 max-w-3xl space-y-6">
+  {{ page_shell(
+      title=review.title,
+      subtitle=(review.decision_id or '') ~ (' · ' ~ system.name if system else ''),
+      breadcrumb=[('Home', url_for('main.index')), ('AI design reviews', url_for('ai_design_review.index')), (review.title, None)]
+  ) }}
+
+  <div class="rounded-lg border border-border bg-card p-4" data-testid="review-status-panel">
+    <p class="text-sm text-muted-foreground">Status</p>
+    <p class="text-lg font-semibold text-foreground" data-testid="review-status">{{ review.status }}</p>
+    {% if decided %}
+    <p class="text-sm text-foreground mt-1" data-testid="review-outcome">
+      {% if review.status == 'accepted' %}Accepted{% else %}Rejected{% endif %}
+      {% if review.decided_at %} on {{ review.decided_at.strftime('%Y-%m-%d') }}{% endif %}.
+      {{ review.rationale if review.status == 'accepted' else review.rejection_reason }}
+    </p>
+    {% endif %}
+  </div>
+
+  <div class="rounded-lg border border-border bg-card p-4">
+    <h2 class="text-sm font-semibold text-muted-foreground mb-2">Design</h2>
+    {% if review.context %}<p class="text-sm text-foreground whitespace-pre-line">{{ review.context }}</p>{% endif %}
+    <p class="text-sm text-foreground mt-2" data-testid="declared-pattern">Pattern: {{ declaration.get('pattern') or 'none named' }}</p>
+  </div>
+
+  <div class="rounded-lg border border-border bg-card p-4" data-testid="deviations-panel">
+    <h2 class="text-sm font-semibold text-muted-foreground mb-2">
+      {% if decided %}Deviations listed when it was decided{% else %}Deviations{% endif %}
+    </h2>
+    {% if deviations %}
+    <ul class="space-y-1 text-sm text-destructive">
+      {% for deviation in deviations %}
+      <li data-testid="deviation-{{ deviation.code }}"><span class="font-medium">{{ deviation.area }}</span>: {{ deviation.message }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-foreground" data-testid="no-deviations">No deviations from the pattern list, the fencing rule or the oversight requirements.</p>
+    {% endif %}
+  </div>
+
+  {% if not decided and can_decide %}
+  <div class="rounded-lg border border-border bg-card p-4">
+    <h2 class="text-sm font-semibold text-muted-foreground mb-2">Record the board's decision</h2>
+    <form method="post" action="{{ url_for('ai_design_review.decision', review_id=review.id) }}" class="space-y-2" data-testid="decision-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="text-xs text-muted-foreground">Decision
+        <select name="decision" class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+          <option value="accept">Accept</option><option value="reject">Reject</option>
+        </select>
+      </label>
+      <label class="text-xs text-muted-foreground">Rationale{% if deviations %} (required: deviations are listed){% endif %}
+        <textarea name="rationale" rows="3" class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"></textarea>
+      </label>
+      <button type="submit" data-testid="record-decision-button" class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">Record decision</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

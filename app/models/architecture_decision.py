@@ -102,6 +102,19 @@ class ArchitectureDecision(TenantMixin, db.Model):
     reviewed_at = db.Column(db.DateTime, nullable=True)
     reviewed_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
 
+    # AI design conformance review (R1-B55, TB-0338, PB-0235). A board decision
+    # on an AI system's design is this same row, linked to the AI system (an
+    # ArchiMateElement the AI systems register models). ``ai_design_review``
+    # holds the submitted design declaration and, once the board decides, the
+    # deviations that were listed at that moment. Both are nullable so
+    # ``reconcile-schema`` adds them (ADR-0002); every other decision leaves
+    # them NULL.
+    ai_system_id = db.Column(
+        db.Integer, db.ForeignKey("archimate_elements.id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+    ai_design_review = db.Column(db.JSON, nullable=True)  # unrendered-field-ok: the declaration and listed deviations are shown on the AI design review page, which the register detail links to
+
     # Relationships
     created_by = db.relationship("User", foreign_keys=[created_by_id])
     decided_by = db.relationship("User", foreign_keys=[decided_by_id])
@@ -150,6 +163,8 @@ class ArchitectureDecision(TenantMixin, db.Model):
             "review_outcome": self.review_outcome,
             "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
             "reviewed_by_id": self.reviewed_by_id,
+            "ai_system_id": self.ai_system_id,
+            "ai_design_review": self.ai_design_review,
         }
 
     @property

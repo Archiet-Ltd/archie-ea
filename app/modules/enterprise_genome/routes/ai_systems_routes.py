@@ -10,6 +10,14 @@ Blueprint: ``ai_systems_genome_bp``, url_prefix ``/genome``.
                                             refuses with the named reason when
                                             a high-risk system has no accepted
                                             assessment.
+  GET  /genome/ai-systems/<id>/evaluation   the system's evaluation plan, latest
+                                            run and what the release check
+                                            says (R1-B55).
+  POST /genome/ai-systems/<id>/evaluation/plan   set the test set and thresholds.
+  POST /genome/ai-systems/<id>/evaluation/run    record a measured run.
+  POST /genome/ai-systems/<id>/release-check     ask whether the release gate
+                                            would pass now, naming the
+                                            missing or failing metric.
   POST /genome/ai-systems/<id>/assess       queue an assessment proposal for
                                             one system (org-scoped).
   POST /genome/ai-systems/<id>/classify     queue a risk classification proposal.
@@ -277,6 +285,180 @@ def ai_system_release(element_id):
 
     db.session.commit()
     return redirect(url_for("ai_systems_genome.ai_systems"))
+
+
+# --- Evaluation plans, runs and the release check (R1-B55) -------------------
+
+
+def _form_number(name):
+    """``(present, value)`` for a form field: ``present`` is False when the
+    field was not posted at all (leave the stored value as it is); a posted
+    blank is ``(True, "")`` (an explicit clear)."""
+    if name not in request.form:
+        return False, None
+    return True, request.form.get(name, "").strip()
+
+
+def _parse_whole(raw):
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+@ai_systems_genome_bp.route("/ai-systems/<int:element_id>/evaluation")
+@login_required
+def ai_system_evaluation(element_id):
+    """The evaluation page for one AI system: plan, latest run, and the release
+    check's answer. Org-scoped; another organisation's id answers 404."""
+    from app.modules.ai_chat.services import ai_evaluation_service as evaluation
+    from app.modules.enterprise_genome.services.ai_system_classification import (
+        release_refusal_reason,
+    )
+    from app.modules.enterprise_genome.services.ai_system_profile import profile_from_element
+
+    org_id = _current_org_id()
+    element = _org_scoped_element(element_id, org_id)
+    if element is None:
+        abort(404)
+    summary = evaluation.summaries_for([element_id], org_id)[element_id]
+    plan, run = summary["plan"], summary["run"]
+    return render_template(
+        "enterprise_genome/ai_system_evaluation.html",
+        system=profile_from_element(element),
+        plan=plan,
+        run=run,
+        findings=evaluation.metric_findings(plan, run) if plan and run else [],
+        refusal=release_refusal_reason(element, org_id),
+        metrics=evaluation.METRICS,
+        can_write=_may_write(current_user),
+    )
+
+
+@ai_systems_genome_bp.route("/ai-systems/<int:element_id>/evaluation/plan", methods=["POST"])
+@login_required
+@permission_required(Permission.GENERAL)
+def ai_system_evaluation_plan(element_id):
+    """Set the system's test set and thresholds. A field that is not posted
+    keeps its stored value; a posted blank threshold removes that threshold."""
+    from app.modules.ai_chat.services import ai_evaluation_service as evaluation
+
+    org_id = _current_org_id()
+    if org_id is None:
+        abort(403)
+    if _org_scoped_element(element_id, org_id) is None:
+        abort(404)
+    existing = evaluation.get_plan(element_id, org_id)
+
+    present, name = _form_number("test_set_name")
+    if not present:
+        name = existing.test_set_name if existing else ""
+    present, size_raw = _form_number("test_set_size")
+    size = existing.test_set_size if (not present and existing) else _parse_whole(size_raw)
+
+    thresholds = dict(existing.thresholds or {}) if existing else {}
+    problem = None
+    for metric in evaluation.METRICS:
+        present, raw = _form_number("threshold_" + metric)
+        if not present:
+            continue
+        if raw == "":
+            thresholds.pop(metric, None)
+            continue
+        try:
+            thresholds[metric] = float(raw)
+        except ValueError:
+            problem = f"The threshold for {metric} must be a number."
+
+    try:
+        if problem:
+            raise evaluation.EvaluationError(problem)
+        evaluation.set_plan(
+            element_id=element_id,
+            organization_id=org_id,
+            test_set_name=name,
+            test_set_size=size,
+            thresholds=thresholds,
+            user_id=current_user.id,
+        )
+        db.session.commit()
+        flash("Evaluation plan saved.", "success")
+    except evaluation.EvaluationError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    return redirect(url_for("ai_systems_genome.ai_system_evaluation", element_id=element_id))
+
+
+@ai_systems_genome_bp.route("/ai-systems/<int:element_id>/evaluation/run", methods=["POST"])
+@login_required
+@permission_required(Permission.GENERAL)
+def ai_system_evaluation_run(element_id):
+    """Record a measured run against the system's current plan."""
+    from app.modules.ai_chat.services import ai_evaluation_service as evaluation
+
+    org_id = _current_org_id()
+    if org_id is None:
+        abort(403)
+    if _org_scoped_element(element_id, org_id) is None:
+        abort(404)
+
+    measured, problem = {}, None
+    for metric in evaluation.METRICS:
+        raw = request.form.get("metric_" + metric, "").strip()
+        if raw == "":
+            continue  # not measured in this run
+        try:
+            measured[metric] = float(raw)
+        except ValueError:
+            problem = f"The measured value for {metric} must be a number."
+
+    try:
+        if problem:
+            raise evaluation.EvaluationError(problem)
+        run = evaluation.record_run(
+            element_id=element_id,
+            organization_id=org_id,
+            metrics=measured,
+            cases_run=_parse_whole(request.form.get("cases_run", "").strip()),
+            notes=request.form.get("notes"),
+            user_id=current_user.id,
+        )
+        db.session.commit()
+        flash(f"Evaluation run {run.id} recorded.", "success")
+    except evaluation.EvaluationError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    return redirect(url_for("ai_systems_genome.ai_system_evaluation", element_id=element_id))
+
+
+@ai_systems_genome_bp.route("/ai-systems/<int:element_id>/release-check", methods=["POST"])
+@login_required
+@permission_required(Permission.GENERAL)
+def ai_system_release_check(element_id):
+    """Ask whether the release gate would pass now. Changes nothing: it answers
+    with the same refusal the release route would give, naming the missing or
+    failing evaluation metric (409 JSON for an API client, a flash for a
+    browser form)."""
+    from app.modules.enterprise_genome.services.ai_system_classification import (
+        release_refusal_reason,
+    )
+
+    org_id = _current_org_id()
+    if org_id is None:
+        abort(403)
+    element = _org_scoped_element(element_id, org_id)
+    if element is None:
+        abort(404)
+    reason = release_refusal_reason(element, org_id)
+    if _wants_json():
+        if reason:
+            return jsonify({"ready": False, "error": reason}), 409
+        return jsonify({"ready": True})
+    if reason:
+        flash(reason, "error")
+    else:
+        flash("Ready to release: every gate check passes.", "success")
+    return redirect(url_for("ai_systems_genome.ai_system_evaluation", element_id=element_id))
 
 
 @ai_systems_genome_bp.route("/ai-systems/<int:element_id>/assess", methods=["POST"])

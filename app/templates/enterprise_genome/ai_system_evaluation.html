@@ -1,0 +1,111 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+
+{% block title %}{{ system.name }} — Evaluation — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6 max-w-3xl space-y-6">
+  {{ page_shell(
+      title=system.name ~ ' — evaluation',
+      subtitle='The test set and thresholds this AI system must meet before it can be released, and the latest run against them.',
+      breadcrumb=[('Home', url_for('main.index')), ('AI Systems Register', url_for('ai_systems_genome.ai_systems')), (system.name, None)]
+  ) }}
+
+  <div class="rounded-lg border border-border bg-card p-4" data-testid="release-check-panel">
+    <p class="text-sm text-muted-foreground">Release check</p>
+    {% if refusal %}
+    <p class="text-sm text-destructive mt-1" data-testid="release-refusal">{{ refusal }}</p>
+    {% else %}
+    <p class="text-sm text-foreground mt-1" data-testid="release-ready">Every release check passes.</p>
+    {% endif %}
+    {% if can_write %}
+    <form method="post" action="{{ url_for('ai_systems_genome.ai_system_release_check', element_id=system.archimate_element_id) }}" class="mt-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" data-testid="release-check-button" class="inline-flex items-center rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">Check release readiness</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="rounded-lg border border-border bg-card p-4" data-testid="evaluation-plan-panel">
+    <h2 class="text-sm font-semibold text-muted-foreground mb-2">Evaluation plan</h2>
+    {% if plan %}
+    <p class="text-sm text-foreground" data-testid="plan-summary">
+      Version {{ plan.version }} · test set {{ plan.test_set_name }} ({{ plan.test_set_size }} cases)
+    </p>
+    <ul class="mt-2 text-sm text-foreground" data-testid="plan-thresholds">
+      {% for metric, spec in metrics.items() %}
+      {% if plan.thresholds.get(metric) is not none %}
+      <li>{{ spec[2] }}: {{ 'at least' if spec[0] == 'min' else 'at most' }} {{ '%g' % plan.thresholds[metric] }}</li>
+      {% endif %}
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-muted-foreground" data-testid="plan-empty">No plan yet. Name a test set and set at least one threshold.</p>
+    {% endif %}
+    {% if can_write %}
+    <form method="post" action="{{ url_for('ai_systems_genome.ai_system_evaluation_plan', element_id=system.archimate_element_id) }}" class="mt-3 grid grid-cols-2 gap-2" data-testid="plan-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="text-xs text-muted-foreground">Test set name
+        <input type="text" name="test_set_name" maxlength="200" value="{{ plan.test_set_name if plan else '' }}" class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+      </label>
+      <label class="text-xs text-muted-foreground">Test set size (cases)
+        <input type="number" name="test_set_size" min="1" step="1" value="{{ plan.test_set_size if plan else '' }}" class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+      </label>
+      {% for metric, spec in metrics.items() %}
+      <label class="text-xs text-muted-foreground">{{ spec[2] }} ({{ 'minimum' if spec[0] == 'min' else 'maximum' }})
+        <input type="number" name="threshold_{{ metric }}" min="0" {% if spec[1] %}max="{{ spec[1] }}"{% endif %} step="any" value="{{ '%g' % plan.thresholds[metric] if plan and plan.thresholds.get(metric) is not none else '' }}" class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+      </label>
+      {% endfor %}
+      <div class="col-span-2">
+        <button type="submit" data-testid="save-plan-button" class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">Save plan</button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="rounded-lg border border-border bg-card p-4" data-testid="evaluation-run-panel">
+    <h2 class="text-sm font-semibold text-muted-foreground mb-2">Latest run</h2>
+    {% if run %}
+    <p class="text-sm text-foreground" data-testid="run-summary">
+      Run {{ run.id }} · plan version {{ run.plan_version }} · {{ run.cases_run }} cases · model {{ run.model_id or '—' }}
+    </p>
+    <ul class="mt-2 text-sm text-foreground" data-testid="run-metrics">
+      {% for metric, spec in metrics.items() %}
+      {% if run.metrics.get(metric) is not none %}
+      <li>{{ spec[2] }}: {{ '%g' % run.metrics[metric] }}</li>
+      {% endif %}
+      {% endfor %}
+    </ul>
+    {% if findings %}
+    <ul class="mt-2 text-sm text-destructive" data-testid="run-findings">
+      {% for finding in findings %}<li>{{ finding }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+    {% else %}
+    <p class="text-sm text-muted-foreground" data-testid="run-empty">No run recorded yet.</p>
+    {% endif %}
+    {% if can_write and plan %}
+    <form method="post" action="{{ url_for('ai_systems_genome.ai_system_evaluation_run', element_id=system.archimate_element_id) }}" class="mt-3 grid grid-cols-2 gap-2" data-testid="run-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="text-xs text-muted-foreground">Cases run
+        <input type="number" name="cases_run" min="1" step="1" value="{{ plan.test_set_size }}" class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+      </label>
+      <span></span>
+      {% for metric, spec in metrics.items() %}
+      <label class="text-xs text-muted-foreground">{{ spec[2] }} measured
+        <input type="number" name="metric_{{ metric }}" min="0" {% if spec[1] %}max="{{ spec[1] }}"{% endif %} step="any" class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+      </label>
+      {% endfor %}
+      <label class="col-span-2 text-xs text-muted-foreground">Notes
+        <textarea name="notes" rows="2" class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"></textarea>
+      </label>
+      <div class="col-span-2">
+        <button type="submit" data-testid="record-run-button" class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">Record run</button>
+      </div>
+    </form>
+    {% elif can_write %}
+    <p class="mt-3 text-sm text-muted-foreground">Save the plan before recording a run.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
