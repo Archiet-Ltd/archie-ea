@@ -1,20 +1,27 @@
+{# This page shows a sign-in secret; no third-party analytics. #}
+{% set suppress_public_analytics = true %}
 {% extends 'layouts/public_base.html' %}
 {% block title %}Set up two-factor authentication{% endblock %}
 {% from 'components/accessibility_helpers.html' import skip_to_main, live_region with context %}
 
 {% block content %}
+{% set qr_src = provisioning_uri | qr_svg_data_uri %}
 {{ live_region('mfa-status') }}
 <main id="main-content" class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12">
   <h1 class="text-xl font-semibold text-foreground">Set up two-factor authentication</h1>
   <p class="mt-2 text-sm text-muted-foreground">
     Administrator accounts require a code from an authenticator app (Google
-    Authenticator, 1Password, Authy or similar) on every sign-in. Scan the
-    QR code below with your authenticator app, or enter the setup key
+    Authenticator, 1Password, Authy or similar) on every sign-in.
+    {% if qr_src %}
+    Scan the QR code below with your authenticator app, or enter the setup key
     manually, then confirm with the code it shows.
+    {% else %}
+    Enter the setup key below in your authenticator app, or open the link below on a device
+    that has the app, then confirm with the code it shows.
+    {% endif %}
   </p>
 
   <div class="mt-6 rounded-md border border-border bg-muted/30 p-4">
-    {% set qr_src = provisioning_uri | qr_svg_data_uri %}
     {% if qr_src %}
     <div class="flex justify-center">
       <img src="{{ qr_src }}" width="216" height="216" data-testid="mfa-qr-code"
@@ -22,7 +29,7 @@
            class="rounded-sm bg-white p-2" referrerpolicy="no-referrer">
     </div>
     {% endif %}
-    <p class="text-xs text-muted-foreground">Setup key (enter manually if you cannot scan a QR code):</p>
+    <p class="text-xs text-muted-foreground">{% if qr_src %}Setup key (enter manually if you cannot scan a QR code):{% else %}Setup key:{% endif %}</p>
     <code class="mt-1 block break-all text-sm font-mono" data-testid="mfa-setup-key">{{ secret }}</code>
     <p class="mt-3 text-xs text-muted-foreground">Or open this link on a device with your authenticator app:</p>
     <code class="mt-1 block break-all text-xs font-mono">{{ provisioning_uri }}</code>

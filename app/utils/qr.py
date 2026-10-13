@@ -27,9 +27,9 @@ def qr_svg_data_uri(data: str) -> str:
     try:
         import segno
 
-        # error="m" (never segno.make / the default make_qr behaviour that
-        # can pick a Micro QR for short input): a Micro QR is not readable
-        # by authenticator apps, which expect an ordinary QR symbol.
+        # error="m" (never segno.make, only segno.make_qr): make_qr always
+        # produces a regular QR symbol; segno.make can choose a Micro QR,
+        # which authenticator apps cannot read.
         qr = segno.make_qr(data, error="m")
         return qr.svg_data_uri(scale=6, border=4, dark="#000", light="#fff")
     except Exception as exc:
