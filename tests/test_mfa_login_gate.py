@@ -1032,8 +1032,7 @@ def test_enrolment_page_falls_back_to_the_setup_key_when_qr_render_fails(
     error), the page must never promise a QR code it does not show: no
     image element, no "QR"/"scan" wording anywhere in <main>, and the
     setup key and raw link still carry the real credential. Without the
-    failure, the same route still renders the QR sentence and the image
-    (T-001 AC 5)."""
+    failure, the normal QR case still renders."""
     import segno
 
     org = make_org("mfa-qr-render-fails")

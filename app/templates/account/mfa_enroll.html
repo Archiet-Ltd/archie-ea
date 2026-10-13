@@ -26,7 +26,7 @@
     <div class="flex justify-center">
       <img src="{{ qr_src }}" width="216" height="216" data-testid="mfa-qr-code"
            alt="QR code that adds this account to your authenticator app"
-           class="rounded-sm bg-white p-2" referrerpolicy="no-referrer">
+           class="rounded-sm bg-background p-2" referrerpolicy="no-referrer">
     </div>
     {% endif %}
     <p class="text-xs text-muted-foreground">{% if qr_src %}Setup key (enter manually if you cannot scan a QR code):{% else %}Setup key:{% endif %}</p>
