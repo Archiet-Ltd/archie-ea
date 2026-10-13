@@ -57,6 +57,9 @@ entries:
         regex: 'def\s+_?folded?_(column|name|expr\w*)\s*\('
       - id: duplicate-lookup
         regex: 'def\s+_?(find|get|lookup)_(existing_|duplicate_|similar_)?(duplicate|dupe)\w*\s*\('
+    known_exceptions:
+      - path: app/modules/intelligence/services/matcher_service.py
+        reason: MatcherService is the canonical entity matcher (entity-matching entry); its _normalise_name is its own candidate-key helper
 
   - id: ai-system-profile
     concept: Is an element an AI system, and who owns it
@@ -83,8 +86,7 @@ entries:
         - ApplicationOwner.get_display_rows_for_applications
         - ApplicationOwner.get_display_rows_for_application
         - ApplicationOwner.get_display_rows_for_element
-      # The brief's single converter and batch readers are in a pull request that has not merged.
-    pending_symbols: [ApplicationOwner.display_rows_for_owner_rows]
+        - ApplicationOwner.display_rows_for_owner_rows
     reuse: >
       Read owners through ApplicationOwner's display-row readers (batch for lists, never one query per row).
       A user with no name shows a dash, never an email address. Do not write another owner-row converter,
@@ -95,6 +97,11 @@ entries:
         regex: 'def\s+_?(owner|owners)_(display|rows?|to_dict|as_dict|view)\w*\s*\('
       - id: display-rows-reader
         regex: 'def\s+_?(get_)?display_rows_for\w*\s*\('
+    known_exceptions:
+      - path: app/services/work_package_service.py
+        reason: >
+          reproduces the nameless-owner dash rule through User.full_name();
+          follow-up: route through ApplicationOwner.display_rows_for_owner_rows
 
   - id: ai-chat-approval
     concept: Approving or rejecting an AI chat change request (the approval gate)
@@ -129,7 +136,7 @@ entries:
       returns nothing and a write refuses. Do not write a per-module _org_id / _current_org_id helper.
     must_not_create:
       - id: org-id-helper
-        regex: 'def\s+_?(get_|resolve_|caller_|active_|current_|request_)?(current_|active_|caller_)?org(anization)?_id\s*\('
+        regex: 'def\s+(?:_?(?:get_|resolve_|caller_|active_|current_|request_)(?:current_|active_|caller_)?|_(?:current_|active_|caller_)?)org(?:anization)?_id\s*\('
     known_exceptions:
       - path: app/utils/tenant_sql.py
         reason: raw-SQL variant that returns None with no application context at all (getattr on flask.g raises when unbound); org_scope builds on it
@@ -148,7 +155,7 @@ entries:
       - id: element-helper
         regex: 'def\s+_?(ensure|create|get_or_create|make|upsert)_(archimate_|backbone_)?element\w*\s*\('
       - id: element-construction
-        regex: 'ArchiMateElement\('
+        regex: 'ArchiMateElement\s*\('
     known_exceptions:
       - path: app/models/archimate_core.py
         reason: defines the model
@@ -157,8 +164,7 @@ entries:
 
   - id: critical-path
     concept: Critical path over the unified work package store
-    status: pending
-    pending_branch: critical_path_for_plateau (work_package_service, under review)
+    status: active
     canonical:
       path: app/services/work_package_service.py
       symbols: [critical_path_for_plateau]
@@ -187,6 +193,9 @@ entries:
     must_not_create:
       - id: name-matcher
         regex: 'def\s+_?(match|find|lookup|resolve)_(\w+_)?by_name\s*\('
+    known_exceptions:
+      - path: app/utils/duplicate_guard.py
+        reason: find_duplicate_by_name is the canonical duplicate lookup of the name-matching entry
 
   - id: impact-answer
     concept: What breaks if this element changes or fails (impact answer)

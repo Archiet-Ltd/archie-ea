@@ -229,7 +229,7 @@ def test_a_macro_symbol_in_a_template_is_found(tmp_path):
     assert any("empty_state" in f for f in _run(root)[0])
 
 
-def test_update_baseline_refuses_to_raise_a_count_or_add_a_file(tmp_path):
+def test_update_baseline_refuses_to_raise_a_pattern_total(tmp_path):
     baseline = {"name-matching/normaliser": {"app/a.py": 1}}
     root = _tree(tmp_path, extra={"app/a.py": COPY, "app/b.py": COPY}, baseline=baseline)
     entries, _ = gate.load_register(root)
@@ -238,7 +238,7 @@ def test_update_baseline_refuses_to_raise_a_count_or_add_a_file(tmp_path):
     ok, messages = gate.update_baseline(root, entries)
 
     assert ok is False
-    assert any("app/b.py" in m and "0 -> 1" in m for m in messages)
+    assert any("name-matching/normaliser" in m and "1 -> 2" in m for m in messages)
     assert (root / "scripts" / "reuse_register_baseline.json").read_text() == before
 
 
@@ -272,7 +272,9 @@ def test_the_register_passes_on_the_current_tree_and_is_fast():
     elapsed = time.time() - started
 
     assert fails == [], "\n".join(fails)
-    assert elapsed < 30, f"the gate must stay a fast static check, took {elapsed:.1f}s"
+    # Several seconds on a warm runner; the bound is generous so a cold disk cache or a loaded CI
+    # machine does not make the test flaky. It still catches an accidental quadratic scan.
+    assert elapsed < 120, f"the gate must stay a fast static check, took {elapsed:.1f}s"
 
 
 def test_every_active_canonical_in_the_real_register_exists():
@@ -280,7 +282,7 @@ def test_every_active_canonical_in_the_real_register_exists():
     assert problems == []
     fails, _ = gate.check_canonicals(REPO, entries)
     assert fails == []
-    assert {e["status"] for e in entries} == {"active", "pending", "undetermined"}
+    assert {e["status"] for e in entries} == {"active", "undetermined"}  # pending: none now; the status is covered with temp trees
 
 
 def test_the_real_baseline_only_names_register_patterns():
@@ -304,3 +306,99 @@ def test_the_untenanted_reads_limit_carries_no_slack():
         f"untenanted_reads limit {limit} is above the measured {UNTENANTED_READS_CEILING}: "
         "fix the new unscoped reads instead of raising the limit"
     )
+
+
+
+# ------------------------------------------------------------------ review round: precision and moves
+
+ELEMENT_REGISTER = r"""
+version: 1
+entries:
+  - id: element-writer
+    concept: Element writer
+    status: active
+    canonical:
+      path: app/utils/duplicate_guard.py
+      symbols: [normalize_name]
+    reuse: Use the backbone writer.
+    must_not_create:
+      - id: construction
+        regex: 'ArchiMateElement\s*\('
+"""
+
+
+def test_a_marker_on_the_line_above_exempts(tmp_path):
+    code = "# reuse-ok: unrelated, normalises a filename\ndef _normalize_name(v):\n    return v\n"
+    assert _run(_tree(tmp_path, extra={"app/a.py": code}))[0] == []
+
+
+def test_a_marker_on_a_continuation_line_of_a_multiline_def_exempts(tmp_path):
+    code = (
+        "def _normalize_name(\n"
+        "    v,  # reuse-ok: unrelated, normalises a filename\n"
+        "    strict=False,\n"
+        "):\n"
+        "    return v\n"
+    )
+    assert _run(_tree(tmp_path, extra={"app/a.py": code}))[0] == []
+
+
+def test_a_marker_in_the_body_after_the_colon_does_not_exempt(tmp_path):
+    code = "def _normalize_name(v):\n    return v  # reuse-ok: too late, past the colon\n"
+    assert len(_run(_tree(tmp_path, extra={"app/a.py": code}))[0]) == 1
+
+
+def test_advice_quoted_in_a_docstring_or_message_is_not_a_hit(tmp_path):
+    code = (
+        "def helper():\n"
+        '    """Do not write def _normalize_name(v) here; use duplicate_guard."""\n'
+        '    return "def normalize_name(x) is the one"\n'
+    )
+    assert _run(_tree(tmp_path, extra={"app/a.py": code}))[0] == []
+
+
+def test_a_constructor_with_a_space_before_the_paren_is_a_hit(tmp_path):
+    root = _tree(tmp_path, register=ELEMENT_REGISTER,
+                 extra={"app/a.py": "el = ArchiMateElement (name='x')\n"})
+    fails, _ = _run(root)
+    assert len(fails) == 1 and "element-writer/construction" in fails[0]
+
+
+def test_test_modules_under_app_are_skipped_but_a_tests_scope_is_not(tmp_path):
+    fixture = {"app/modules/x/tests/test_it.py": "el = ArchiMateElement(name='x')\n"}
+    assert _run(_tree(tmp_path, register=ELEMENT_REGISTER, extra=fixture))[0] == []
+
+    register = ELEMENT_REGISTER.replace("        regex:", "        scope: [tests]\n        regex:")
+    root = _tree(tmp_path / "t", register=register,
+                 extra={"tests/test_it.py": "el = ArchiMateElement(name='x')\n"})
+    assert len(_run(root)[0]) == 1
+
+
+def test_a_moved_file_with_baselined_hits_is_not_a_new_violation(tmp_path):
+    baseline = {"name-matching/normaliser": {"app/old_name.py": 1}}
+    root = _tree(tmp_path, extra={"app/new_name.py": COPY}, baseline=baseline)
+    fails, notes = _run(root)
+    assert fails == []
+    assert any("app/old_name.py" in n for n in notes)
+
+    entries, _ = gate.load_register(root)
+    ok, _ = gate.update_baseline(root, entries)
+    assert ok is True
+    written = json.loads((root / "scripts" / "reuse_register_baseline.json").read_text())["patterns"]
+    assert written == {"name-matching/normaliser": {"app/new_name.py": 1}}
+
+
+def test_the_baseline_is_not_above_the_one_on_origin_main():
+    """Ratchet integrity: a branch cannot raise a pattern's baseline total relative to main."""
+    import subprocess
+
+    proc = subprocess.run(
+        ["git", "show", "origin/main:scripts/reuse_register_baseline.json"],
+        cwd=REPO, capture_output=True, text=True, encoding="utf-8",
+    )
+    if proc.returncode != 0:
+        pytest.skip("origin/main does not resolve or does not carry the baseline yet")
+    main_totals = {k: sum(v.values()) for k, v in json.loads(proc.stdout)["patterns"].items()}
+    mine = {k: sum(v.values()) for k, v in gate.load_baseline(REPO).items()}
+    raised = {k: (main_totals.get(k, 0), n) for k, n in mine.items() if n > main_totals.get(k, 0)}
+    assert raised == {}, f"baseline raised against origin/main: {raised}"

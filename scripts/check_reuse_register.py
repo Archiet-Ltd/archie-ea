@@ -25,9 +25,8 @@ What it checks
 (b) Every ``must_not_create`` regex is run over its scope (default: ``app/**/*.py``).
     A match in any file other than the canonical file or a ``known_exceptions`` path is
     a *hit*. Hits that already existed are recorded per pattern and per file in
-    ``scripts/reuse_register_baseline.json``; a file may hold no more hits of a pattern
-    than its baseline says, and a file with no baseline entry may hold none. So a new
-    copy fails even in a file that already had an old one.
+    ``scripts/reuse_register_baseline.json``; the total for a pattern may not exceed its
+    baseline total, so a new copy fails wherever it is added (a moved file with baselined hits is not one).
 (c) A failure prints the register entry: what to reuse, and where it lives.
 
 Entries in status ``pending`` name a canonical implementation that is merged in another
@@ -39,7 +38,7 @@ enforce nothing: the register says plainly that no one owner has been chosen.
 The baseline
 ------------
 ``--update-baseline`` rewrites the baseline to the current hit counts and REFUSES to
-raise any count or add any file: lowering is routine after a cleanup, raising is done by
+raise any pattern's total: lowering is routine after a cleanup, raising is done by
 fixing the code, or by a ``known_exceptions`` entry (with a reason) in the register,
 which shows up in review. A baseline higher than the tree is reported as slack (the
 count may be lowered) but is not a failure, so a cleanup in one pull request never breaks
@@ -47,12 +46,16 @@ another.
 
 Exemptions
 ----------
-``reuse-ok: <reason>`` on the matching line, for a definition that only looks like a
+``reuse-ok: <reason>`` on the matching line, the line above it, or any line up to the colon that
+ends a multi-line def, for a definition that only looks like a
 second copy. A bare marker with no reason does not exempt.
 
 Proven-against: a ``def normalize_name(`` added to a new file under app/ -- the gate
 names the ``name-matching`` entry and fails; a canonical symbol renamed -- the gate
 fails on the entry. Both are pinned in tests/test_check_reuse_register.py.
+
+String and docstring contents are masked before matching, so advice quoted in prose is not a hit. Test
+modules (a ``tests`` path segment under app/) are skipped unless a pattern's scope starts with tests.
 
 Static: reads source text and the register only. No imports of the application, no
 database.
@@ -63,8 +66,10 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import io
 import re
 import sys
+import tokenize
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -216,6 +221,7 @@ def _files(root: Path, scope: str, suffix: str, _cache: dict):
         _cache[key] = [] if not base.exists() else [
             p for p in sorted(base.rglob(f"*{suffix}"))
             if SKIP_PARTS.isdisjoint(p.relative_to(root).parts)
+            and (scope.split("/")[0] == "tests" or "tests" not in p.relative_to(root).parts)
         ]
     return _cache[key]
 
@@ -227,6 +233,43 @@ def _is_exception(rel: str, entry) -> bool:
         path = x["path"]
         if rel == path or (path.endswith("/") and rel.startswith(path)):
             return True
+    return False
+
+
+def mask_strings(text: str) -> str:
+    """Blank the contents of string tokens (docstrings, messages) so advice quoted in prose is not a hit.
+
+    Offsets are preserved (newlines kept), so match positions still index the original text.
+    """
+    starts, pos = [0], 0
+    for line in text.split(NL):
+        pos += len(line) + 1
+        starts.append(pos)
+    chars = list(text)
+    fstring_middle = getattr(tokenize, "FSTRING_MIDDLE", None)
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+            if tok.type == tokenize.STRING or (fstring_middle is not None and tok.type == fstring_middle):
+                a = starts[tok.start[0] - 1] + tok.start[1]
+                b = starts[tok.end[0] - 1] + tok.end[1]
+                for i in range(a, min(b, len(chars))):
+                    if chars[i] != NL:
+                        chars[i] = " "
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return text
+    return "".join(chars)
+
+
+def _exempt(lines: list[str], idx: int) -> bool:
+    """`reuse-ok: <reason>` on the line before the match, or on any line from the match to the first
+    line ending in a colon (a black-formatted multi-line def), the convention of check_untenanted_reads."""
+    if idx > 0 and MARKER.search(lines[idx - 1]):
+        return True
+    for line in lines[idx:idx + 20]:
+        if MARKER.search(line):
+            return True
+        if line.rstrip().endswith(":"):
+            break
     return False
 
 
@@ -254,15 +297,20 @@ def find_hits(root: Path, entries):
         if not applicable:
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
+        lines = None
+        masked = None
         for e, p, rx, _, _ in applicable:
-            # Whole-text search (C speed), then the matched line is judged for comments and markers.
-            for m in rx.finditer(text):
-                start = text.rfind(NL, 0, m.start()) + 1
-                end = text.find(NL, m.start())
-                line = text[start:end if end != -1 else len(text)]
-                if line.lstrip().startswith(("#", "{#")) or MARKER.search(line):
+            # Whole-text search (C speed); only a file with a raw match pays for masking and line splitting.
+            if not rx.search(text):
+                continue
+            if masked is None:
+                masked = mask_strings(text) if path.suffix == ".py" else text
+                lines = text.split(NL)
+            for m in rx.finditer(masked):
+                n = masked.count(NL, 0, m.start()) + 1
+                line = lines[n - 1]
+                if line.lstrip().startswith(("#", "{#")) or _exempt(lines, n - 1):
                     continue
-                n = text.count(NL, 0, m.start()) + 1
                 bucket = hits[(e["id"], p["id"])].setdefault(rel, [])
                 if n not in bucket:
                     bucket.append(n)
@@ -291,19 +339,22 @@ def compare(entries, hits, baseline) -> tuple[list[str], list[str]]:
     for (eid, pid), files in sorted(hits.items()):
         base = baseline.get(f"{eid}/{pid}", {})
         e = by_id[eid]
-        for rel, lines in sorted(files.items()):
-            allowed = base.get(rel, 0)
-            if len(lines) > allowed:
-                where = ", ".join(f"{rel}:{n}" for n in sorted(lines)[-(len(lines) - allowed):])
-                canon = e.get("canonical") or {}
-                fails.append(
-                    f"[{eid}/{pid}] {len(lines)} match(es) in {rel}, baseline allows {allowed} ({where}).\n"
-                    f"      concept: {e['concept']}\n"
-                    f"      reuse:   {str(e.get('reuse', '')).strip()}\n"
-                    f"      where:   {canon.get('path', '?')} ({', '.join(canon.get('symbols') or [])})\n"
-                    f"      If this is genuinely not a second copy, add a known_exceptions entry with a "
-                    f"reason to docs/reuse-register.yml, or `# reuse-ok: <reason>` on the line."
-                )
+        total, allowed_total = sum(len(v) for v in files.values()), sum(base.values())
+        if total <= allowed_total:
+            continue  # a moved or renamed file with baselined hits is not a new copy
+        excess = [(rel, lines) for rel, lines in sorted(files.items()) if len(lines) > base.get(rel, 0)]
+        where = ", ".join(
+            f"{rel}:{n}" for rel, lines in excess for n in sorted(lines)[-(len(lines) - base.get(rel, 0)):]
+        )
+        canon = e.get("canonical") or {}
+        fails.append(
+            f"[{eid}/{pid}] {total} match(es), baseline allows {allowed_total}; new or grown in: {where}.\n"
+            f"      concept: {e['concept']}\n"
+            f"      reuse:   {str(e.get('reuse', '')).strip()}\n"
+            f"      where:   {canon.get('path', '?')} ({', '.join(canon.get('symbols') or [])})\n"
+            f"      If this is genuinely not a second copy, add a known_exceptions entry with a "
+            f"reason to docs/reuse-register.yml, or `# reuse-ok: <reason>` on or just above the line."
+        )
     current = counts_of(hits)
     for key, files in sorted(baseline.items()):
         for rel, n in sorted(files.items()):
@@ -324,10 +375,9 @@ def update_baseline(root: Path, entries, baseline_path: Path | None = None):
     messages = []
     if old is not None:
         for key, files in current.items():
-            for rel, n in files.items():
-                before = old.get(key, {}).get(rel, 0)
-                if n > before:
-                    messages.append(f"refused: {key} {rel} would rise {before} -> {n}")
+            total, before = sum(files.values()), sum(old.get(key, {}).values())
+            if total > before:
+                messages.append(f"refused: {key} would rise {before} -> {total}")
         if messages:
             messages.append("The baseline only falls. Reuse the canonical implementation, or add a "
                             "known_exceptions entry with a reason to the register.")
