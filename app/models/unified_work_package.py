@@ -251,9 +251,27 @@ class UnifiedWorkPackage(TenantMixin, db.Model):
         return False
 
     def get_critical_path_impact(self):
-        """Calculate critical path impact based on dependencies"""
-        # This would be implemented to calculate critical path impact
-        return 0.0
+        """The critical path impact of this work package: the critical path of
+        the plateau it realises, read from the one work package store by the
+        one computation. A work package that realises several plateaus reports
+        the one whose path is longest; one that realises none reports an empty
+        path. No constant answer."""
+        from app.services import work_package_service
+
+        if not self.organization_id:
+            return work_package_service.empty_critical_path()
+        links = work_package_service.plateau_and_gap_links([self], self.organization_id)
+        plateau_ids = links[self.id]["plateau_ids"]
+        if not plateau_ids:
+            return work_package_service.empty_critical_path()
+        best = None
+        for plateau_id in plateau_ids:
+            path = work_package_service.critical_path_for_plateau(
+                plateau_id, self.organization_id
+            )
+            if best is None or path["duration_days"] > best["duration_days"]:
+                best = path
+        return best
 
     # === ArchiMate 3.2 Compliance Methods ===
     def to_archimate_json(self):
