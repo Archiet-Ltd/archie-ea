@@ -241,6 +241,7 @@ scripts/check_*.py
 !scripts/check_duplicate_breadcrumb.py
 !scripts/check_raw_html_escaping.py
 !scripts/check_smoke_coverage_on_change.py
+!scripts/check_wiring_rows.py
 !scripts/check_composer_url_params.py
 !scripts/check_crosswalk_writer_gated.py
 !scripts/check_is_admin_called.py

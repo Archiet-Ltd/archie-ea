@@ -1,0 +1,1390 @@
+# Intelligence wiring register. One row per fact-bearing model column family the product stores, and who
+# reads it. A new column in the families named under `pipeline_rule` needs a row here, or an entry under
+# `not_intelligence` with a reason.
+
+schema_version: 1
+updated: '2026-09-23'
+rows:
+- id: IW-01
+  fact: Capability maturity, current and target, with assessment date
+  model: UnifiedCapability
+  table: unified_capabilities
+  fields:
+  - current_maturity_level
+  - target_maturity_level
+  - maturity_assessment_date
+  data_class: B
+  writers:
+  - app/modules/capabilities/routes/maturity_routes.py (assessment workflow)
+  - capability edit routes
+  - app/modules/vendors/services/seed_apqc_vendor_mapping.py
+  - capability_heatmap_service projection
+  pages:
+  - dashboard capability-heatmap (maturity_management.maturity_heatmap)
+  - maturity_management.frameworks_overview
+  - capability fact sheet
+  - capability_maturity/*
+  engines:
+  - capability_heatmap_service (get_maturity_heatmap
+  - get_gap_alerts)
+  - capability_health_service (maturity_gap into health_score)
+  - architecture_monitoring_service (_capture_capabilities_snapshot
+  - _analyze_capability_drift; null compared as 0)
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L1, L2, L3, L5, Operational, canvases, both gap services
+    rule: one helper on CapabilityHeatmapService returns current, target, assessed, assessed_on, under_target, target_gap per element id; every engine attaches the block, adds nothing to any count
+    reason_code: no_maturity_recorded
+- id: IW-02
+  fact: Dated maturity assessment events with five dimension levels
+  model: CapabilityMaturityAssessment
+  table: capability_maturity_assessment
+  fields:
+  - assessment_date
+  - maturity_level
+  - people_maturity
+  - process_maturity
+  - technology_maturity
+  - data_maturity
+  - governance_maturity
+  - target_maturity_level
+  - confidence_score
+  data_class: B
+  writers:
+  - maturity_routes.py assessment workflow
+  pages:
+  - maturity_routes per-capability assessment list
+  engines: []
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: none beyond IW-01
+    rule: the latest event's date travels as assessed_on through the IW-01 helper; dimension levels are listed on the capability page only until a lens question asks for a dimension
+    reason_code: no_maturity_recorded
+- id: IW-03
+  fact: Application health status as recorded by its owner
+  model: ApplicationComponent
+  table: application_components
+  fields:
+  - health_status
+  data_class: B
+  writers:
+  - app/modules/my_applications app_form (owner edit)
+  pages:
+  - my_applications.dashboard
+  - my_applications.health_overview (folded)
+  - applications/dashboard.html
+  engines: []
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L3 Portfolio
+    rule: portfolio_component_for_element carries health_status as recorded (healthy, at_risk, critical) with truth_class authoritative_fact; null carries the reason
+    reason_code: 'new: no_health_recorded'
+- id: IW-04
+  fact: Rationalisation disposition and its governed dimension scores
+  model: ApplicationRationalizationScore
+  table: application_rationalization_scores
+  fields:
+  - overall_health_score
+  - technical_health_score
+  - business_value_score
+  - cost_efficiency_score
+  - vendor_risk_score
+  - disposition
+  - disposition_confidence
+  - priority_score
+  data_class: B
+  writers:
+  - app/services/rationalization_scoring_service.py (the one governed score
+  - vision section 4)
+  pages:
+  - unified_applications.rationalization_dashboard
+  - dashboard_pages.rationalization_scorecard
+  engines:
+  - rationalization_scoring_service (writer and reader)
+  - architecture_monitoring_service via capability_health_service
+  lens: L3 Portfolio (deep link to the page that owns it)
+  status: wired
+  proposed: null
+- id: IW-05
+  fact: Application annual cost and TCO as entered
+  model: ApplicationComponent
+  table: application_components
+  fields:
+  - total_cost_of_ownership
+  - license_cost
+  - license_cost_annual
+  - maintenance_cost
+  - infrastructure_cost
+  - support_cost
+  - implementation_cost
+  - development_cost_annual
+  data_class: B
+  writers:
+  - app/modules/applications/routes/update_routes.py
+  - app/modules/applications/routes/rationalization_api_routes.py (enrich)
+  - batch import (app/modules/import_batch/services/)
+  - app/modules/vendors/connectors/servicenow_connector.py
+  pages:
+  - applications/dashboard.html
+  - applications/fact_sheet.html
+  - applications/list_simple.html
+  - applications/rationalization/enrich.html
+  engines:
+  - rationalization_scoring_service (total_cost_of_ownership
+  - license_cost
+  - annual_cost)
+  - tco_calculation_service (five cost components)
+  lens: none (L3 deep-links to the page)
+  status: unwired_shown
+  proposed:
+    lens: L3 Portfolio
+    rule: portfolio_component_for_element carries total_cost_of_ownership and the five entered components as recorded, one currency label, no total computed from partial components
+    reason_code: 'new: no_cost_recorded'
+- id: IW-06
+  fact: Application cost by fiscal period with budget and variance
+  model: ApplicationCost
+  table: application_costs
+  fields:
+  - fiscal_year
+  - total_cost
+  - total_budget
+  - variance
+  - license_cost
+  - subscription_cost
+  - infrastructure_cost
+  - user_count
+  - cost_per_user
+  data_class: B
+  writers:
+  - none found in routes; generic tree CRUD and seeds only
+  pages:
+  - none found
+  engines: []
+  lens: none
+  status: unwired_unshown
+  proposed:
+    lens: L3 Portfolio
+    rule: 'latest fiscal-period row for the component: total_cost, total_budget, variance as recorded; variance shown only when both inputs are recorded'
+    reason_code: 'new: no_cost_recorded'
+- id: IW-07
+  fact: Work package estimated and actual cost, dates, status, owner
+  model: UnifiedWorkPackage
+  table: unified_work_packages
+  fields:
+  - estimated_cost
+  - actual_cost
+  - start_date
+  - end_date
+  - status
+  - progress_percentage
+  - owner_id
+  - archimate_element_id
+  data_class: B
+  writers:
+  - enterprise.work_packages routes
+  - roadmap routes
+  - Jira sync (services/jira_connector_service.py)
+  - interface_register work_package_service
+  pages:
+  - enterprise.work_packages
+  - main.capability_roadmap
+  - adm_kanban_view.index
+  engines: []
+  lens: L5 Programme (programme_for_element; cost variance only when estimated_cost > 0, else not_costed)
+  status: wired
+  proposed: null
+- id: IW-08
+  fact: Initiative budget, spend, health, completion, dates, sponsor
+  model: PortfolioInitiative
+  table: portfolio_initiatives
+  fields:
+  - total_budget
+  - spent_to_date
+  - health_status
+  - completion_percentage
+  - start_date
+  - target_end_date
+  - executive_sponsor
+  - program_manager
+  - archimate_element_id
+  data_class: B
+  writers:
+  - app/commands/seed_strategic_demo.py
+  - generic tree CRUD (cannot set archimate_element_id)
+  pages:
+  - strategic seed pages
+  engines: []
+  lens: L2 Strategy (strategy_for_element; budget variance only when total_budget > 0, else no_budget_recorded)
+  status: wired
+  proposed: null
+- id: IW-09
+  fact: Vendor contract value, annual cost, renewal date and terms, contract and vendor risk
+  model: VendorContract
+  table: vendor_contracts
+  fields:
+  - contract_value
+  - annual_cost
+  - start_date
+  - end_date
+  - renewal_date
+  - auto_renewal
+  - notice_period_days
+  - renewal_status
+  - status
+  - vendor_risk
+  - contract_risk
+  - exit_complexity
+  - application_id
+  - vendor_id
+  data_class: B
+  writers:
+  - app/modules/procurement/crud_routes.py
+  - app/modules/procurement/routes.py
+  pages:
+  - procurement.renewals_dashboard
+  - procurement.contracts_list
+  - procurement contract_detail
+  - applications/dashboard.html
+  engines: []
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L1 Impact (renewal window), L6 Risk (contract_risk)
+    rule: 'for an impact row whose element resolves to a component with contracts: list contracts whose renewal_date or end_date falls within the caller''s window (parameter, default 90 days), each with annual_cost and renewal_status as recorded; L6 lists contract_risk and vendor_risk as authoritative_fact rows beside Risk rows'
+    reason_code: 'new: no_contract_recorded'
+- id: IW-10
+  fact: Licence entitlement, deployment and use quantities, unit cost, compliance position
+  model: LicenseEntitlement
+  table: license_entitlements
+  fields:
+  - quantity_entitled
+  - quantity_deployed
+  - quantity_used
+  - unit_cost
+  - compliance_status
+  - application_id
+  - contract_id
+  data_class: B
+  writers:
+  - app/modules/procurement/crud_routes.py
+  pages:
+  - procurement.licenses_list
+  - procurement license_detail
+  - procurement.compliance_dashboard (folded)
+  engines: []
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L3 Portfolio
+    rule: 'portfolio_component_for_element lists entitlements: quantity_entitled, quantity_used, compliance_status as recorded; shelfware = quantity_used < quantity_entitled stated as the two numbers, never a saving figure'
+    reason_code: 'new: no_licence_recorded'
+- id: IW-11
+  fact: Organisation unit annual and IT budget
+  model: OrganizationUnit
+  table: organization_units
+  fields:
+  - annual_budget
+  - it_budget
+  - cost_center_code
+  data_class: B
+  writers:
+  - none found in routes
+  pages:
+  - none found
+  engines: []
+  lens: none
+  status: unwired_unshown
+  proposed:
+    lens: L4 Accountability
+    rule: 'deferred: no lens question asks a unit''s budget; listed as recorded on the accountability row only if a use case claims it for a use case'
+    reason_code: no_budget_recorded (reuse)
+- id: IW-12
+  fact: Application lifecycle status, go-live, planned retirement and end-of-life dates
+  model: ApplicationComponent
+  table: application_components
+  fields:
+  - lifecycle_status
+  - go_live_date
+  - planned_retirement_date
+  - end_of_life_date
+  - technology_age_years
+  data_class: B
+  writers:
+  - applications update_routes.py
+  - batch import
+  - servicenow_connector.py
+  - app/services/eol_sync_service.py
+  pages:
+  - applications/dashboard.html
+  - applications/list_simple.html
+  - applications/fact_sheet.html
+  - my_applications.roadmap_impact (folded)
+  engines:
+  - rationalization_scoring_service (lifecycle_status
+  - planned_retirement_date
+  - end_of_life_date)
+  - gap_discovery_service (lifecycle gaps)
+  - genome drift_detector (retiring-but-mapped finding)
+  lens: none (Operational lens will carry the consistency finding when lands)
+  status: unwired_shown
+  proposed:
+    lens: L1 Impact
+    rule: each impact row whose element resolves to a component carries lifecycle {status, planned_retirement_date, end_of_life_date} as recorded and a flag retiring = status in (deprecated, retired) or end_of_life_date <= today + window; whole-answer list retiring_element_ids[]; no count changes
+    reason_code: 'new: no_lifecycle_recorded'
+- id: IW-13
+  fact: Technology node, device and system-software end of life, decommission, support and licence expiry
+  model: Node, Device, SystemSoftware
+  table: technology_nodes, technology_devices, technology_system_software
+  fields:
+  - eol_date
+  - decommission_date
+  - support_contract_expiry
+  - license_expiry_date
+  - license_cost_annual
+  - archimate_element_id
+  data_class: B
+  writers:
+  - archimate_crud routes (field_configs.py)
+  - eol_sync_service.py
+  pages:
+  - archimate_crud.dashboard technology detail
+  engines: []
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L1 Impact, L6 Risk
+    rule: same lifecycle block as IW-12 keyed by the technology row's archimate_element_id; eol_date <= today + window flags the row; L6 lists a past eol_date as an authoritative_fact row (no Risk row is created)
+    reason_code: 'new: no_lifecycle_recorded'
+- id: IW-14
+  fact: Vendor product end of life and compliance standards (shared catalogue)
+  model: VendorProduct
+  table: vendor_products
+  fields:
+  - end_of_life_date
+  - compliance_standards
+  - technology_maturity
+  data_class: C
+  writers:
+  - vendor seeds
+  - vendor_onboarding_service.py
+  pages:
+  - unified_applications.vendor_detail
+  engines:
+  - rationalization_scoring_service (end_of_life_date
+  - compliance_standards through the component's vendor_product_id)
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L1 Impact
+    rule: joins IW-12's lifecycle block as vendor_end_of_life_date through ApplicationComponent.vendor_product_id only; the catalogue row is never listed without a tenant mapping
+    reason_code: 'new: no_vendor_mapping_recorded'
+- id: IW-15
+  fact: Technology standard sunset date (tech radar ring)
+  model: TechnologyStandard
+  table: technology_standards
+  fields:
+  - sunset_date
+  - owner_id
+  data_class: B
+  writers:
+  - tech_radar routes
+  pages:
+  - tech_radar.index (dark)
+  engines: []
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L6 Risk
+    rule: for a Technology-layer element with an explicit relationship to a standard, list sunset_date as recorded; past sunset is a flag, never a Risk row
+    reason_code: 'new: no_standard_recorded'
+- id: IW-16
+  fact: Element plateau classification (Baseline, Target, Transition)
+  model: ArchiMateElement
+  table: archimate_elements
+  fields:
+  - plateau
+  - is_baseline
+  data_class: A
+  writers:
+  - element CRUD
+  - Composer
+  - importers
+  pages:
+  - archimate_crud.dashboard
+  - main.capability_roadmap
+  engines: []
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L5 Programme
+    rule: every lens row already carries the element; add plateau as recorded so a Target element in an Impact chain reads as target-state, not current; nothing filtered by it
+    reason_code: 'new: no_plateau_recorded'
+- id: IW-17
+  fact: Plateau record with target date and baseline plateau; Gap record with kind, type, resolution status and the plateaus it sits between
+  model: Plateau, Gap
+  table: plateaus, gaps
+  fields:
+  - Plateau.target_date
+  - Plateau.baseline_plateau_id
+  - Plateau.archimate_element_id
+  - Gap.gap_kind
+  - Gap.gap_type
+  - Gap.resolution_status
+  - Gap.originating_plateau_id
+  - Gap.target_plateau_id
+  - Gap.estimated_cost
+  - Gap.owner
+  - Gap.archimate_element_id
+  data_class: B
+  writers:
+  - app/services/gap_register_service.py
+  - interface_register plateau_pair_service.py
+  - capabilities roadmap_routes.py
+  - unified_enterprise_routes.py
+  pages:
+  - enterprise.gap_analysis (canonical Gap register)
+  - main.capability_roadmap
+  engines: []
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L5 Programme
+    rule: programme_for_element adds per work package plateau {id, name, target_date} through UnifiedWorkPackage.plateau_id and gap {id, kind, resolution_status} through gap_id, both as recorded; a plateau_transition gap lists its two plateaus
+    reason_code: 'new: no_plateau_recorded, no_gap_recorded'
+- id: IW-18
+  fact: Work package plateau and gap links, risk level and mitigation
+  model: UnifiedWorkPackage
+  table: unified_work_packages
+  fields:
+  - plateau_id
+  - gap_id
+  - risk_level
+  - risk_mitigation
+  - priority
+  - work_dependencies
+  data_class: B
+  writers:
+  - as IW-07
+  pages:
+  - enterprise.work_packages
+  - adm_kanban_view.index
+  engines: []
+  lens: none (L5 carries IW-07's fields only)
+  status: unwired_shown
+  proposed:
+    lens: L5 Programme, L6 Risk
+    rule: L5 row gains risk_level and priority as recorded and the IW-17 plateau and gap blocks; L6 lists a work package's risk_level as an authoritative_fact row when the package is seeded on the picked element
+    reason_code: no_work_package_recorded (reuse)
+- id: IW-19
+  fact: Benefit with baseline, target, owner and the work package that delivers it
+  model: Benefit
+  table: benefits
+  fields:
+  - baseline_value
+  - baseline_date
+  - target_date
+  - owner_id
+  - work_package_id
+  - outcome_commitment_id
+  data_class: B
+  writers:
+  - transformation_room services
+  pages:
+  - transformation programme pages
+  engines: []
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L5 Programme
+    rule: programme_for_element lists benefits by work_package_id with baseline_value, target_date, owner as recorded
+    reason_code: 'new: no_benefit_recorded'
+- id: IW-20
+  fact: Demand with estimated cost, value and urgency ratings, converted risk and work package
+  model: Demand
+  table: demands
+  fields:
+  - estimated_cost
+  - business_value_score
+  - urgency_score
+  - converted_to_risk_id
+  - work_package_id
+  - owner_id
+  data_class: B
+  writers:
+  - portfolio demand routes
+  pages:
+  - portfolio demand pages
+  engines: []
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L5 Programme
+    rule: programme_for_element lists demands by work_package_id with estimated_cost as recorded; the 1-5 ratings are listed with their scale, never combined
+    reason_code: 'new: no_demand_recorded'
+- id: IW-21
+  fact: Live initiative record of the Portfolio screens
+  model: EnterpriseInitiative
+  table: enterprise_initiatives
+  fields:
+  - budget and status fields
+  - linked_strategic_initiative_id
+  data_class: B
+  writers:
+  - app/modules/portfolio/routes/portfolio_write_routes.py
+  pages:
+  - portfolio.index
+  engines: []
+  lens: none (no element link exists)
+  status: unwired_shown
+  proposed:
+    lens: L2 Strategy
+    rule: after the nullable archimate_element_id lands (a separate change), strategy_for_element reads it beside PortfolioInitiative with the same row shape; no automatic match
+    reason_code: 'new: initiative_not_element_linked'
+- id: IW-22
+  fact: Risk likelihood, impact, status, owner, mitigation, element mirror
+  model: Risk
+  table: risks
+  fields:
+  - likelihood
+  - impact
+  - status
+  - owner
+  - mitigation_plan
+  - archimate_element_id
+  data_class: B
+  writers:
+  - app/modules/architecture/routes/risk_routes.py
+  - app/services/risk_service.py
+  - archimate_backbone (Assessment mirror)
+  pages:
+  - risk.risk_register
+  - solutions/risk_heat_map.html
+  engines:
+  - executive_dashboard_service (risk posture)
+  - capability_health_service (risks)
+  lens: L6 Risk (risk_for_element; likelihood x impact shown per row, max along the chain as a display label)
+  status: wired
+  proposed: null
+- id: IW-23
+  fact: Risk linked to an application, solution or programme rather than an element
+  model: RiskEntityLink
+  table: risk_entity_links
+  fields:
+  - risk_id
+  - entity_type
+  - entity_id
+  data_class: B
+  writers:
+  - risk_service.py
+  pages:
+  - risk.risk_register
+  engines: []
+  lens: 'none (risk_for_element docstring: not resolved)'
+  status: unwired_shown
+  proposed:
+    lens: L6 Risk
+    rule: resolve entity_type application through ApplicationComponent.archimate_element_id and seed the same traversal; solution and programme links without an element mirror are listed with the reason, never dropped
+    reason_code: 'new: risk_link_unresolvable'
+- id: IW-24
+  fact: Recorded application risk ratings (technical, business, vendor, obsolescence)
+  model: ApplicationComponent
+  table: application_components
+  fields:
+  - technical_risk
+  - business_risk
+  - vendor_risk
+  - obsolescence_risk
+  data_class: B
+  writers:
+  - applications update_routes.py
+  - rationalization enrich
+  pages:
+  - applications/fact_sheet.html
+  - applications/rationalization.html
+  - dashboard/rationalization_scorecard.html
+  engines:
+  - rationalization_scoring_service (technical_risk
+  - business_risk
+  - vendor_risk)
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L6 Risk
+    rule: risk_for_element adds recorded_ratings {technical, business, vendor, obsolescence} as authoritative_fact for the picked element's component; they sit beside Risk rows and enter no score
+    reason_code: no_risk_recorded (reuse)
+- id: IW-25
+  fact: Compliance requirement per element and framework, control, and compliance gaps with risk level and remediation
+  model: ComplianceRequirement, ComplianceGap, RegulatoryFramework, ComplianceControl
+  table: compliance_requirements, compliance_gaps, regulatory_frameworks, compliance_controls
+  fields:
+  - ComplianceRequirement.archimate_element_id
+  - framework_id
+  - control_id
+  - risk_if_not_met
+  - ComplianceGap.risk_level
+  - remediation_action
+  - remediation_target_date
+  data_class: B
+  writers:
+  - app/services/compliance/requirement_generator_service.py
+  - compliance_checker_service.py
+  - solutions_strategic journey_v2_routes.py
+  pages:
+  - application_mgmt.compliance_frameworks_dashboard
+  - solutions/partials/_governance_compliance.html
+  engines: []
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L6 Risk
+    rule: 'risk_for_element adds control_gaps[]: ComplianceGap rows whose requirement''s archimate_element_id is in the answer''s element set, each with framework, control_code, risk_level, remediation_target_date as recorded; a framework filter on the same answer'
+    reason_code: 'new: no_compliance_mapping_recorded'
+- id: IW-26
+  fact: Application compliance tags and GDPR flag
+  model: ApplicationComponent
+  table: application_components
+  fields:
+  - compliance_tags
+  - gdpr_compliant
+  - compliance_requirements
+  - pii_data_processed
+  - data_classification
+  data_class: B
+  writers:
+  - applications update_routes.py
+  pages:
+  - applications/fact_sheet.html
+  engines: []
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L6 Risk
+    rule: listed on the IW-25 block as recorded tags; a tag is never turned into a requirement row
+    reason_code: 'new: no_compliance_mapping_recorded'
+- id: IW-27
+  fact: Application availability target, recovery objectives, and criticality
+  model: ApplicationComponent
+  table: application_components
+  fields:
+  - sla_availability_percentage
+  - availability_target
+  - rto_hours
+  - rpo_hours
+  - criticality
+  - business_criticality
+  - strategic_importance
+  data_class: B
+  writers:
+  - applications update_routes.py
+  - batch import
+  - servicenow_connector.py
+  pages:
+  - applications/fact_sheet.html
+  - applications/dashboard.html
+  - solutions/partials/_quality_sla.html
+  engines:
+  - rationalization_scoring_service (business_criticality
+  - criticality)
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L1 Impact, Operational
+    rule: impact rows carry criticality and recovery {rto_hours, rpo_hours, availability_target} as recorded; whole-answer critical_element_ids[] lists rows with criticality in (mission_critical, critical); the Operational answer shows availability_target as the comparison basis for a future telemetry source
+    reason_code: 'new: no_criticality_recorded, no_recovery_objective_recorded, no_sla_recorded'
+- id: IW-28
+  fact: Technology and integration service levels and criticality
+  model: TechnologyCollaborationFull, TechnologyProcess, Resource, IntegrationMetadata, IntegrationContract
+  table: technology_collaborations_full, technology_processes, archimate_resources, integration_metadata, integration_contracts
+  fields:
+  - sla_percentage
+  - sla_target_minutes
+  - Resource.criticality
+  - Resource.lifecycle_status
+  - Resource.annual_cost
+  - IntegrationMetadata.sla_availability_percentage
+  - business_criticality
+  - IntegrationContract.sla_latency_ms
+  - sla_availability
+  data_class: B
+  writers:
+  - archimate_crud routes
+  - interface_register routes
+  pages:
+  - archimate_crud.dashboard
+  - interface_register index and comparison
+  engines: []
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L1 Impact, Operational
+    rule: same criticality and sla blocks as IW-27 keyed by each row's archimate_element_id; Resource.lifecycle_status joins IW-12's lifecycle block
+    reason_code: 'new: no_sla_recorded, no_criticality_recorded'
+- id: IW-29
+  fact: Capability strategic importance and criticality
+  model: UnifiedCapability, CapabilityValueStreamMapping
+  table: unified_capabilities, capability_value_stream_mapping
+  fields:
+  - strategic_importance
+  - business_criticality
+  - value_stream_criticality
+  - stage_criticality
+  data_class: B
+  writers:
+  - capability edit routes
+  - value_stream_service.upsert_mapping_cell
+  pages:
+  - capability_map.index
+  - capabilities/capability_fact_sheet.html
+  - value_streams/index.html
+  engines: []
+  lens: none on this tree (value_streams_at_risk on a separate branch reads the mapping for membership)
+  status: unwired_shown
+  proposed:
+    lens: L2 Strategy
+    rule: value stream rows and the IW-01 capability block carry strategic_importance and stage_criticality as recorded; at_risk keeps its existing definition, no weight is applied
+    reason_code: 'new: no_criticality_recorded'
+- id: IW-30
+  fact: Application ownership by organisation unit, with unit hierarchy
+  model: ApplicationOwnership, OrganizationUnit
+  table: application_ownership, organization_units
+  fields:
+  - ownership_type
+  - ownership_percentage
+  - primary_contact
+  - start_date
+  - end_date
+  - OrganizationUnit.name
+  - head_of_unit
+  - parent_unit_id
+  data_class: B
+  writers:
+  - frozen; write_path none until D-08 (reuse register ownership)
+  pages:
+  - organization.index
+  engines: []
+  lens: L1 Impact (_resolve_owners_batch attaches owner unit to rows), L4 Accountability (accountability_for_element)
+  status: wired
+  proposed: null
+- id: IW-31
+  fact: Application owner person and role (the canonical owner store)
+  model: ApplicationOwner
+  table: application_owners
+  fields:
+  - user_id
+  - role
+  - ownership_type
+  data_class: B
+  writers:
+  - A-11 Owners section on the application record
+  pages:
+  - application record Owners section
+  - my_applications.dashboard
+  engines: []
+  lens: none on this tree (the A-12 shared reader is the designed read)
+  status: unwired_shown
+  proposed:
+    lens: L1 Impact, L4 Accountability
+    rule: both lenses read owners through the A-12 reader (person and role from ApplicationOwner, unit only when an ownership row is current); no second resolution chain
+    reason_code: no_ownership_recorded (reuse)
+- id: IW-32
+  fact: RACI assignment of a stakeholder to a capability
+  model: EnterpriseRaciAssignment
+  table: enterprise_raci_assignments
+  fields:
+  - capability_id
+  - raci
+  - stakeholder
+  data_class: B
+  writers:
+  - app/modules/organization/service.py (RACI page)
+  - app/services/raci_service.py
+  pages:
+  - organization/raci.html
+  - organization.index
+  engines: []
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L4 Accountability
+    rule: accountability_for_element for a Capability element (through unified_capabilities.archimate_element_id) lists RACI rows {stakeholder, raci} as recorded; a capability with rows but no A is flagged as a listed absence, not a defect
+    reason_code: 'new: no_raci_recorded'
+- id: IW-33
+  fact: Which organisation units use an application, how many people, how critical
+  model: ApplicationUsage
+  table: application_usage
+  fields:
+  - organization_unit_id
+  - usage_type
+  - user_count
+  - criticality
+  - usage_frequency
+  data_class: B
+  writers:
+  - none found in routes
+  pages:
+  - none found
+  engines: []
+  lens: none
+  status: unwired_unshown
+  proposed:
+    lens: L1 Impact, L4 Accountability
+    rule: 'impact answer adds affected_units[]: units with a usage row on any component in the answer, with user_count and criticality as recorded'
+    reason_code: 'new: no_usage_recorded'
+- id: IW-34
+  fact: Application user counts as entered
+  model: ApplicationComponent
+  table: application_components
+  fields:
+  - user_count
+  - average_daily_users
+  - concurrent_users_max
+  - user_base_size
+  data_class: B
+  writers:
+  - applications update_routes.py
+  - batch import
+  pages:
+  - applications/dashboard.html
+  - applications/list_simple.html
+  engines:
+  - rationalization_scoring_service (user_count)
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L1 Impact
+    rule: impact rows that resolve to a component carry user_count as recorded, labelled entered; no sum across the answer
+    reason_code: 'new: no_usage_recorded'
+- id: IW-35
+  fact: Explicit ArchiMate relationships with provenance
+  model: ArchiMateRelationship
+  table: archimate_relationships
+  fields:
+  - type
+  - source_id
+  - target_id
+  - derived_from
+  - connection_spec
+  data_class: A
+  writers:
+  - Composer
+  - element CRUD
+  - Open Exchange and CSV import
+  - ServiceNow and Jira connectors
+  - canvas fill-in
+  pages:
+  - archimate.composer_page
+  - archimate_crud.dashboard
+  - twin map
+  - worked-out connections
+  engines:
+  - derivation_runner
+  - genome drift_detector
+  - all six lens traversals
+  lens: L1, L2, L3, L5, L6 (traversal); Operational (relationships added and removed, designed)
+  status: wired
+  proposed: null
+- id: IW-36
+  fact: Derived relationships with rule, chain, confidence and staleness
+  model: ArchiMateDerivedRelationship, DerivationRun
+  table: archimate_derived_relationships, derivation_runs
+  fields:
+  - rule_id
+  - chain_element_ids
+  - confidence
+  - stale
+  - stale_since
+  - computed_at
+  data_class: A (derived over A)
+  writers:
+  - derivation_runner.py
+  pages:
+  - worked-out connections screen
+  - Ask proof drawer
+  - yield endpoint
+  engines:
+  - derivation engine (writer)
+  - derived_facts reader
+  lens: all lenses (include_derived); Operational (stale rows, designed); canvases (nothing_realises, designed)
+  status: wired
+  proposed: null
+- id: IW-37
+  fact: Application-to-capability mapping (coverage)
+  model: UnifiedApplicationCapabilityMapping
+  table: unified_application_capability_mappings
+  fields:
+  - application_id
+  - capability_id
+  - coverage_percentage
+  - start_date
+  - end_date
+  data_class: B
+  writers:
+  - capability mapping routes
+  - batch import
+  - seed_apqc_vendor_mapping.py
+  pages:
+  - capability_map.index
+  - hybrid mapping dashboard (dark)
+  engines:
+  - gap_discovery_service
+  - ai_gap_detection_service
+  - architecture_monitoring_service (_capture_coverage_snapshot)
+  - capability_heatmap_service
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L3 Portfolio, L5 Programme
+    rule: 'rule: a component''s capabilities are the Capability elements in its blast radius plus its direct mapping rows, each with the IW-01 maturity block; no coverage percentage is recomputed by a lens'
+    reason_code: no_capability_in_chain
+- id: IW-38
+  fact: Entered dependency and integration counts on the application record
+  model: ApplicationComponent
+  table: application_components
+  fields:
+  - dependencies_count
+  - number_of_integrations
+  - interfaces_count
+  data_class: B
+  writers:
+  - applications update_routes.py
+  pages:
+  - applications/dashboard.html
+  engines:
+  - rationalization_scoring_service (dependencies_count)
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: none
+    rule: 'not carried: the relationship table answers the same question; the scorer''s read of the entered count is a repoint candidate for a later change (count explicit relationships of the mirrored element instead)'
+    reason_code: n/a
+- id: IW-39
+  fact: Value streams, stages and capability mapping
+  model: ValueStream, ValueStreamStage, CapabilityValueStreamMapping
+  table: value_streams, value_stream_stages, capability_value_stream_mapping
+  fields:
+  - ValueStream.archimate_element_id
+  - strategic_importance
+  - business_owner
+  - stage order
+  - capability_id
+  data_class: B
+  writers:
+  - app/modules/capabilities/services/value_stream_service.py
+  pages:
+  - value_stream.index
+  - intelligence_ui.ask (strategy card)
+  engines: []
+  lens: L2 Strategy (value_streams_at_risk, a separate branch; read verified in section 2, method not present)
+  status: wired
+  proposed: null
+- id: IW-40
+  fact: Initiative success metrics with baseline, target, actual and status
+  model: InitiativeSuccessMetric
+  table: initiative_success_metrics
+  fields:
+  - metric_type
+  - target_value
+  - actual_value
+  - baseline_value
+  - baseline_date
+  - target_date
+  - status
+  data_class: B
+  writers:
+  - seed_strategic_demo.py
+  - tree CRUD
+  pages:
+  - strategic seed pages
+  engines: []
+  lens: L2 Strategy (strategy_for_element success_metrics[])
+  status: wired
+  proposed: null
+- id: IW-41
+  fact: Outcome target, current and baseline values and realisation status
+  model: MotivationOutcome
+  table: motivation_outcomes
+  fields:
+  - target_value
+  - current_value
+  - baseline_value
+  - target_date
+  - achieved_date
+  - realization_status
+  - achievement_level
+  data_class: B
+  writers:
+  - motivation routes
+  - archimate_backbone
+  pages:
+  - archimate_crud.dashboard?layer=motivation
+  engines: []
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L2 Strategy
+    rule: strategy_for_element lists Outcomes reached by explicit or non-stale derived Realization from the picked element with realization_status, target_value, current_value as recorded; at_risk is the recorded status, not a computation
+    reason_code: 'new: no_outcome_recorded'
+- id: IW-42
+  fact: Assessment element carrying the Risk mirror and other assessment results
+  model: MotivationAssessment
+  table: motivation_assessments
+  fields:
+  - assessment_type
+  - impact_level
+  - result_score
+  - assessment_date
+  - next_assessment_date
+  data_class: B
+  writers:
+  - archimate_backbone (Risk mirror)
+  - motivation routes
+  pages:
+  - archimate_crud.dashboard?layer=motivation
+  engines: []
+  lens: none (L6 reads Risk directly; canvases read the mirror, designed)
+  status: unwired_shown
+  proposed:
+    lens: canvases (high_risk flag), L6
+    rule: 'rule: high_risk = a Risk whose Assessment has an explicit relationship to the entry with risk_level high or critical; non-risk assessment_type rows are listed by type with result_score as recorded text'
+    reason_code: no_risk_recorded
+- id: IW-43
+  fact: Architecture baseline snapshots and drift alerts
+  model: MonitoringBaseline, MonitoringAlert
+  table: monitoring_baselines, monitoring_alerts
+  fields:
+  - capabilities_snapshot
+  - coverage_snapshot
+  - health_snapshot
+  - gap_snapshot
+  - vendor_snapshot
+  - alert severity
+  - affected_element_id
+  - acknowledged_by
+  data_class: A (derived over A and B; vendor snapshot C)
+  writers:
+  - architecture_monitoring_service (capture_baseline
+  - analyze_drift
+  - trigger_scan)
+  pages:
+  - monitoring API (dark by flag)
+  engines:
+  - architecture_monitoring_service
+  lens: Operational (compare_to_baseline seam; designed /, not on this tree)
+  status: wired
+  proposed: null
+- id: IW-44
+  fact: Model-consistency findings (orphaned, unsupported capability, retiring-but-mapped, unrealised motivation, near-duplicate)
+  model: none (computed at request time by detect_model_drift)
+  table: none
+  fields:
+  - finding type
+  - statement
+  - spec_hash
+  - elements[].archimate_element_id
+  data_class: A (derived)
+  writers:
+  - none; request-time
+  pages:
+  - /genome/model-health
+  engines:
+  - genome drift_detector
+  lens: Operational (consistency_findings, designed)
+  status: wired
+  proposed: null
+- id: IW-45
+  fact: Initiative self-rated scores and forecast cost
+  model: PortfolioInitiative
+  table: portfolio_initiatives
+  fields:
+  - business_value_score
+  - risk_score
+  - strategic_alignment_score
+  - forecast_cost
+  - expected_roi_percentage
+  data_class: B
+  writers:
+  - seed_strategic_demo.py
+  - tree CRUD
+  pages:
+  - strategic seed pages
+  engines: []
+  lens: none (strategy_for_element carries IW-08's fields only)
+  status: unwired_shown
+  proposed:
+    lens: L2 Strategy
+    rule: forecast_cost listed as recorded beside total_budget and spent_to_date; the three 1-100 self-ratings are listed with their scale as authoritative_fact and never combined or ranked
+    reason_code: no_budget_recorded (reuse)
+- id: IW-46
+  fact: Review-board scores per review item
+  model: ARBReviewItem
+  table: arb_review_items
+  fields:
+  - compliance_score
+  - risk_score
+  - quality_score
+  - overall_score
+  - impacted_element_ids
+  data_class: B
+  writers:
+  - ARB routes
+  pages:
+  - arb.dashboard
+  - arb.reviews
+  engines:
+  - executive_dashboard_service
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L6 Risk
+    rule: risk_for_element lists open review items whose impacted_element_ids include the picked element with their recorded scores and scale; no aggregation
+    reason_code: no_risk_recorded (reuse)
+- id: IW-47
+  fact: Vendor mapping risk, concentration, lock-in, spend and contract end per capability
+  model: VendorProductCapability and sibling mapping rows in capability_to_vendor_mapping.py
+  table: capability_to_vendor_mapping tables
+  fields:
+  - vendor_risk_level
+  - concentration_risk
+  - lock_in_risk
+  - annual_spend
+  - contract_end_date
+  - end_of_life_risk
+  - dependency_level
+  - alternative_vendor_available
+  data_class: B (mapping rows; the product row they point at is C)
+  writers:
+  - vendor mapping routes
+  - seed_apqc_vendor_mapping.py
+  pages:
+  - unified_applications.vendors
+  - vendors/ advanced tools
+  engines:
+  - architecture_monitoring_service (_capture_vendor_snapshot through VendorProductCapability)
+  - rationalization_scoring_service (VendorConcentrationAnalysis)
+  lens: none
+  status: unwired_shown
+  proposed:
+    lens: L6 Risk, L3 Portfolio
+    rule: for a Capability element, list vendor mappings with vendor_risk_level, concentration_risk, lock_in_risk, contract_end_date as recorded; single-vendor = exactly one mapping row, stated as the count
+    reason_code: 'new: no_vendor_mapping_recorded'
+- id: IW-48
+  fact: Duplicate and consolidation candidates with similarity scores
+  model: DuplicateGroup and consolidation rows (application_duplicate_detection.py, application_consolidation.py, consolidation_list.py)
+  table: duplicate detection and consolidation tables
+  fields:
+  - overall_similarity_score
+  - confidence_level
+  - target_date
+  - decommission_date
+  - migration_cost
+  data_class: B (derived by the duplicate detector)
+  writers:
+  - duplicate detection service
+  - consolidation routes
+  pages:
+  - unified_duplicate.simple_dashboard
+  - consolidation_list.dashboard
+  engines: []
+  lens: L3 Portfolio (deep link only)
+  status: wired
+  proposed: null
+- id: IW-49
+  fact: Capability profile on an element (canvas zone membership)
+  model: ArchiMateElement
+  table: archimate_elements
+  fields:
+  - acm_properties.profile
+  - custom_properties
+  data_class: A
+  writers:
+  - PATCH element route (designed)
+  - Composer zone drop
+  pages:
+  - business_model.index
+  - business_case.index (designed)
+  engines: []
+  lens: canvases (project_canvas, designed)
+  status: wired
+  proposed: null
+- id: IW-67
+  fact: Pricing as published on the value proposition (Revenue Streams attribute of the canvases)
+  model: ArchiMateElement
+  table: archimate_elements
+  fields:
+  - acm_properties.pricing_as_published
+  - acm_properties.revenue_model
+  data_class: A
+  writers:
+  - canvas fill-in PATCH (designed)
+  - 'company-context intake approval: a queue row a person approves (designed)'
+  pages:
+  - business_model.index (designed)
+  - the Review list partial (designed)
+  engines: []
+  lens: canvases (project_canvas attribute zone Revenue Streams, designed)
+  status: wired
+  proposed: null
+not_intelligence:
+- id: IW-50
+  fact: Duplicate maturity columns outside the authority
+  where:
+  - business_capabilities.py:80-84
+  - capabilities.py:125-127 and 250
+  - capability_gap_analysis.py:218-223
+  - capability_models.py:422-424
+  - solution_models.py:86-87 and 1086-1087
+  - framework_configuration.py:257
+  - industry_apqc.py:233
+  - manufacturing_capability.py:156-161 and 371
+  - process_data.py:114
+  - apqc_process.py:48
+  - capability_to_vendor_mapping.py:88 and 192
+  reason: The authority is unified_capabilities (ADR-005-v2, RG-5b); section 3 forbids any lens reading these; several carry defaults (1 or 3) that would fabricate a level.
+- id: IW-51
+  fact: Capability gap detail rows with defaulted levels and priority scores
+  where:
+  - capability_gap_analysis.py CapabilityGapDetail (current_maturity default 1
+  - required_maturity_level default 3
+  - four impact scores default 3)
+  reason: Defaults stand in for measurements; makes the helper's under_target the one maturity gap; AIGapDetectionService's import of this class is marked dead-code-ok. Retire or repoint is a separate decision.
+- id: IW-52
+  fact: Text owner columns
+  where:
+  - ApplicationComponent.application_owner
+  - business_owner
+  - technical_owner; UnifiedCapability.business_owner
+  - capability_owner
+  - it_owner; BusinessDomain.domain_owner; VendorContract.contract_owner; Gap.owner
+  reason: The ownership register entry forbids reading a text column as the owner; the A-12 reader is the only owner read. Risk.owner stays on the L6 row as the recorded mitigation owner text, never resolved to a person.
+- id: IW-53
+  fact: Legacy JSON dependency lists
+  where:
+  - capabilities.py depends_on
+  - models.py upstream_dependencies and downstream_dependents
+  - capability_gap_analysis.py dependent_capabilities and dependencies
+  - application_rationalization.py integration_dependencies
+  - consolidation_list.py dependencies
+  - implementation_planning.py work_dependencies
+  reason: A second dependency store beside archimate_relationships; the derivation and impact-analysis register entries forbid a second walker. UnifiedWorkPackage.work_dependencies stays listed (IW-18) as package sequencing, not architecture dependency.
+- id: IW-54
+  fact: Hand-entered stand-ins for measured operations data
+  where:
+  - ApplicationComponent.current_uptime_percentage
+  - availability_actual
+  - current_response_time_ms
+  - current_throughput_tps; capability_to_vendor_mapping.py uptime_percentage
+  - incident_count_90days
+  - last_incident_date; application_lifecycle.py utilisation percentages; IntegrationMetadata.current_uptime_percentage
+  reason: Class D measurements typed into class B columns; forbids copying incidents or telemetry into model tables, and the Operational adapter contract is the only path for them. Recorded targets (IW-27, IW-28) stay; measured actuals do not.
+- id: IW-55
+  fact: Self-rated value, satisfaction and ROI figures on the application record
+  where:
+  - ApplicationComponent.roi_score
+  - user_satisfaction_score
+  - performance_rating
+  - business_value
+  - defect_density
+  reason: Numbers without a documented formula (vision section 6 condition 2); the rationalisation score's own dimension rows are their governed home.
+- id: IW-56
+  fact: Consolidation savings, payback, NPV and ROI estimates
+  where:
+  - application_consolidation.py savings and npv columns
+  - application_duplicate_detection.py roi_percentage and payback_period_months
+  - consolidation.py roi_percentage
+  - ai_gap_detection_service.py BASE_SAVINGS_PER_APP_USD
+  reason: Estimates from a declared constant, marked fabricated-ok in code; a lens carrying them would present an estimate as a fact.
+- id: IW-57
+  fact: Business case appraisal figures
+  where:
+  - BusinessCase.capex
+  - opex_annual
+  - tco_3yr
+  - roi_percentage
+  - payback_months
+  - NPV property
+  reason: Entered appraisal of one case; keeps them on the record and the projection computes nothing from them.
+- id: IW-58
+  fact: Manufacturing domain KPIs and maturities
+  where:
+  - manufacturing_capability.py
+  - manufacturing_domain.py (OEE
+  - utilisation
+  - safety and environmental scores
+  - industry_4_0_maturity_level)
+  reason: Domain-template metrics with default values; no use case in the ICP register asks a manufacturing question; the demonstration tenant's mismatch is.
+- id: IW-59
+  fact: EA-practice framework adoption cost and maturity
+  where:
+  - framework.py
+  - framework_configuration.py cost
+  - maturity_level
+  - compliance_score columns
+  reason: Facts about the architecture practice's own tooling, not about the estate.
+- id: IW-60
+  fact: The product's own AI and import spend
+  where:
+  - ai_audit_log.py estimated_cost_usd
+  - batch_import.py cost_usd and budget_limit_usd
+  - import_session.py estimated_cost_usd
+  reason: Product operating telemetry, not an estate fact.
+- id: IW-61
+  fact: AI suggestion confidence and review thresholds
+  where:
+  - RelationshipSuggestion.confidence
+  - ArchitectureInferenceRelationship.confidence
+  - ai_suggestion.py
+  - confidence_review.py
+  - batch_import confidence columns
+  reason: ai_hypothesis truth class; enters a lens only after human approval, and then as the accepted relationship row (Release 4).
+- id: IW-62
+  fact: Solution-design and review-board working records
+  where:
+  - solution_models.py
+  - solution_sad_models.py
+  - solution_lifecycle_models.py
+  - roadmap_models.py
+  - adm_*.py
+  - architecture_review_board.py other than ARBReviewItem scores (IW-46)
+  reason: Working records of one solution or review; the board reads the L1 answer, the lenses do not read the board.
+- id: IW-63
+  fact: Policy-monitoring risk scores and baselines
+  where:
+  - policy_monitoring.py risk_score
+  - baseline_id
+  - baseline_value
+  reason: Surface folded into the compliance frameworks dashboard (, group C5); its store is not the drift baseline store.
+- id: IW-64
+  fact: Data catalogue quality scores
+  where:
+  - data_governance.py overall_quality_score and six dimension scores
+  reason: No lens question claims data quality; data architecture and lineage are dark surfaces until a use case claims them.
+- id: IW-65
+  fact: Fast-init twin columns
+  where:
+  - application_component_fast.py
+  reason: A boot-mode mirror of ApplicationComponent's columns, not a second store.
+- id: IW-66
+  fact: Company-context run cost and telemetry
+  where:
+  - company_context_run.py CompanyContextRun.cost_usd, cost_by_call_type, input_tokens, output_tokens, model_calls, general_knowledge_calls, calls_by_type, model_time_seconds, key_scope, plan, provider, model, bound_hit, model_pass_reason (designed)
+  reason: The product's own model spend and run telemetry, the same reason as IW-60; reported on the monthly summary by key scope and by plan, never carried by a lens.
+- id: IW-68
+  fact: Source provenance typed properties on elements approved from the company-context intake
+  where:
+  - acm_property_templates rows source_band, source_page_url, source_read_at, source_run_id seeded for every element type (designed); values in archimate_elements.acm_properties
+  reason: Provenance rendered by the badge, the drawer and every export; a label that follows the element for as long as it exists, never a lens value.
+- id: IW-69
+  fact: Organisation onboarding state from the company-context intake
+  where:
+  - 'organization.py Organization.settings[company_context]: source_url, last_read_at, last_completed_run_id, segment, segment_answered_by_id, segment_answered_at, template_family, guided_order, answers, dismissal_memory_cleared_at, demonstration, demonstration_of, demonstration_generated_at, demonstration_delete_after, demonstration_presenter_id (written only by profile.py, designed and)'
+  reason: Onboarding state of the tenant, not an estate fact; the segment orders the guided path and enters no lens; the demonstration flag is read only by the banner, the export menu, the before-the-call page, the retention job and the demonstration bounds.
+- id: IW-70
+  fact: Step-zero and connector proposals and decisions on the intake run record
+  where:
+  - company_context_run.py CompanyContextRun.step_zero, step_zero_decisions, connector_candidates, connector_decisions, candidates_returned, candidates_dropped, general_knowledge_skipped, wholesale_decision, identity_confirmed (designed)
+  reason: Suggestions on the run record until a person acts (SRS v5 section 3 truth class); no lens reads a run; a confirmed proposal takes effect only through the existing questionnaire, template choice, fill-in and connector screens.
+pipeline_rule:
+  statement: 'A new fact-bearing field (any column in a model under app/models or app/modules/*/models whose name matches the fact families: maturity, assessment, health, cost, budget, tco, spend, licence, renewal, contract, vendor, lifecycle, eol, retire, decommission, risk, compliance, control, sla, availability, rto, rpo, criticality, owner, raci, usage, plateau, gap, roadmap, milestone, baseline, drift, score) is not merged without a row in this register that is either wired (lens or engine named, reason code named) or listed under not_intelligence with a reason.'

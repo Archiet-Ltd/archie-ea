@@ -461,6 +461,50 @@ def gate_unrendered_model_fields(baseline: int) -> Result:
                   detail, count, baseline)
 
 
+def gate_wiring_rows(baseline: int | None) -> Result:
+    """A fact-bearing model column (maturity, cost, licence, risk, owner, plateau, and the other families
+    docs/intelligence-wiring-register.yml's `pipeline_rule.statement` names) with no row in that register.
+    RATCHET.
+
+    A new such column reaching main with no row is exactly the gap the register exists to prevent: a fact a
+    lens or a derivation engine could read, with nobody having recorded whether it is wired, unwired, or
+    deliberately not intelligence. Read scripts/check_wiring_rows.py's own docstring for the full disclosed
+    scope before triaging. Hatch: `wiring-ok: IW-nn <reason>` on the column's def line.
+    """
+    if baseline is None:
+        return Result("wiring-rows", FAIL,
+                      "no wiring_rows key in verification_baseline.json; "
+                      "run scripts/verify.py --gate wiring-rows --update-baseline")
+    proc = _run([sys.executable, "scripts/check_wiring_rows.py", "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("wiring-rows", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = "" if count <= baseline else "run scripts/check_wiring_rows.py --list to list them"
+    verdict = PASS if count <= baseline else FAIL
+
+    # Added-findings check via --base (defect 5: a deletion-plus-addition is invisible to the ratchet).
+    base_proc = _run([sys.executable, "scripts/check_wiring_rows.py", "--base", "--count"])
+    if base_proc.returncode == 0:
+        detail = detail + ("; " if detail else "") + "0 added since merge-base"
+    elif base_proc.returncode == 3:
+        stderr = base_proc.stderr.strip() or "unknown error"
+        detail = detail + ("; " if detail else "") + f"added-findings check skipped: {stderr}"
+    elif base_proc.returncode == 1:
+        # FAIL: new columns added without register rows.
+        list_proc = _run([sys.executable, "scripts/check_wiring_rows.py", "--base"])
+        evidence = list_proc.stdout[-1800:] if list_proc.stdout else ""
+        detail = f"{count} added since merge-base: {evidence}"
+        verdict = FAIL
+    else:
+        return Result("wiring-rows", FAIL,
+                      f"could not parse added count (exit {base_proc.returncode}): "
+                      f"{base_proc.stderr[:300]}")
+    return Result("wiring-rows", verdict,
+                  detail, count, baseline)
+
+
 def gate_ui_contract(baseline: int) -> Result:
     """The UI/UX audit's finish-level rules, ratcheted so they cannot regress.
 
@@ -1931,6 +1975,13 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="run scripts/check_unrendered_model_fields.py; render the field, "
                          "or mark 'unrendered-field-ok: <reason>' on its column line",
              tags=["static", "ui"]),
+Gate("wiring-rows", "a fact-bearing model column with no row in the intelligence wiring register",
+              "ratchet", lambda: gate_wiring_rows(baseline.get("wiring_rows")),
+              remediation="run scripts/check_wiring_rows.py --list; add a row (wired, or not_intelligence "
+                          "with a reason) to docs/intelligence-wiring-register.yml, or mark "
+                          "'wiring-ok: IW-nn <reason>' on the column line; "
+                          "scripts/check_wiring_rows.py --base origin/main names what this change added",
+              tags=["static"]),
         Gate("error-signalling", "no API error path that answers 200", "zero",
              gate_error_signalling,
              remediation="run scripts/check_error_signalling.py; return an explicit "

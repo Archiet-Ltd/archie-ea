@@ -214,6 +214,8 @@ jobs:
     # failures and silently skips CSS verification.
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0          # full history so wiring-rows can diff against the merge base
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
