@@ -80,7 +80,7 @@ def _make_user(db_session, org, email, *, password=None, external_id=None,
 
 def _issue_reset_token(db_session, user):
     """Issue a password-reset token for ``user`` outside a request, the way
-    TS-36 and TS-41 both need one in hand. Shared rather than duplicated."""
+    TS-36 needs one in hand. Shared rather than duplicated."""
     from app.jobs.tenant_safe_job import platform_scope
     from app.models.account_token import PURPOSE_PASSWORD_RESET, AccountToken
 
@@ -117,14 +117,19 @@ def _users_with_email(db_session, email):
     return db_session.query(User).filter(func.lower(User.email) == email.lower()).all()
 
 
-def _anonymous_client(app):
-    """A client with no session, and no signed-in user cached on ``g``."""
+def _forget_cached_user():
+    """Drop any signed-in user cached on ``g`` so the next request is judged on its session cookie alone."""
     from flask import g, has_app_context
 
     if has_app_context():
         for cached in ("_login_user", "_current_user", "current_org_id", "current_org"):
             if hasattr(g, cached):
                 delattr(g, cached)
+
+
+def _anonymous_client(app):
+    """A client with no session, and no signed-in user cached on ``g``."""
+    _forget_cached_user()
     return app.test_client()
 
 
@@ -970,11 +975,17 @@ def test_claimed_domain_check_costs_the_same_for_every_stored_hash_format(app, d
     from app.services.sso_service import SSOService
     from werkzeug.security import generate_password_hash
     from app.models.subscription import Subscription, SubscriptionPlan, SubscriptionStatus
+    from app.models.user import PASSWORD_HASH_METHOD, password_hash_is_current
+
+    assert password_hash_is_current(PASSWORD_HASH_METHOD + "$onlysalt") is False
+    assert password_hash_is_current(PASSWORD_HASH_METHOD) is False
+    assert password_hash_is_current(PASSWORD_HASH_METHOD + "$salt$") is True
+    assert password_hash_is_current(None) is False
 
     org = make_org("scope-hash-uniform")
     claimed = _domain("hashformat")
     _configure_sso(db_session, org, claimed)
-    # Six accounts in one organisation: an unlimited plan keeps the seat
+    # Seven accounts in one organisation: an unlimited plan keeps the seat
     # check out of a test that is not about it, as TS-32 also needs.
     db_session.add(Subscription(
         organization_id=org.id, plan=SubscriptionPlan.enterprise,
@@ -990,6 +1001,8 @@ def test_claimed_domain_check_costs_the_same_for_every_stored_hash_format(app, d
     legacy_600_admin.password_hash = generate_password_hash(_PASSWORD, method=_LEGACY_600K)
     foreign_admin = _make_user(db_session, org, f"foreign@{claimed}", is_platform_admin=True)
     foreign_admin.password_hash = _FOREIGN_HASH
+    incomplete_admin = _make_user(db_session, org, f"incomplete@{claimed}", is_platform_admin=True)
+    incomplete_admin.password_hash = PASSWORD_HASH_METHOD + "$onlysalt"
     nopass_admin = _make_user(db_session, org, f"nopass@{claimed}", is_platform_admin=True)
     legacy_member = _make_user(db_session, org, f"member@{claimed}")
     legacy_member.password_hash = generate_password_hash(_PASSWORD, method=_LEGACY_260K)
@@ -997,7 +1010,7 @@ def test_claimed_domain_check_costs_the_same_for_every_stored_hash_format(app, d
 
     addresses = [
         current_admin.email, legacy_260_admin.email, legacy_600_admin.email,
-        foreign_admin.email, nopass_admin.email, legacy_member.email,
+        foreign_admin.email, incomplete_admin.email, nopass_admin.email, legacy_member.email,
         f"newcomer@{claimed}",
     ]
 
@@ -1301,20 +1314,31 @@ def test_reset_keeps_accounts_linked_before_this_change_activated(db_session, ma
 
 
 # --------------------------------------------------------------------------- #
-# TS-41  D-2, runbook Case 2b proved end to end                               #
+# TS-41  D-2, runbook Case 2b proved end to end, including the authenticator  #
+# step                                                                        #
 # --------------------------------------------------------------------------- #
 
 
 def test_password_less_admin_recovers_through_their_own_mailbox_before_sso_is_disabled(
-    app, db_session, make_org, mail_on, login_as,
+    app, db_session, make_org, mail_on, monkeypatch,
 ):
+    # This admin is an organisation administrator, so sign-in requires an
+    # authenticator code (mfa_service.required_for). This test completes that
+    # step once for an admin enrolling for the first time and again for one
+    # already enrolled, checking the settings page on the same session each time.
     import secrets
+    import time
+    from urllib.parse import urlsplit
 
+    import pyotp
+    from werkzeug.security import check_password_hash
+
+    import app.flask_email as flask_email
+    from app.flask_email import mail_available
     from app.jobs.tenant_safe_job import platform_scope
     from app.models.account_token import PURPOSE_PASSWORD_RESET, AccountToken
     from app.models.org_role import OrgRole
     from app.models.user import Role
-    from app.modules.account.services.account_service import AccountService
     from app.modules.admin.services.admin_user_service import AdminUserService
     from app.services.sso_service import SSOService
 
@@ -1331,8 +1355,14 @@ def test_password_less_admin_recovers_through_their_own_mailbox_before_sso_is_di
     OrgRole.set_role(org.id, admin.id, "org_admin", granted_by_id=admin.id)
     db_session.commit()
 
+    assert admin.password_hash is None
+    assert admin.mfa_enabled is not True
     assert SSOService().config_for_login(admin.email, "anything") is not None
 
+    # Runbook step 1: mail check first.
+    assert mail_available(app) is True
+
+    # Runbook step 2: give the admin a password nobody knows, while SSO is on.
     AdminUserService.set_user_password(admin, secrets.token_urlsafe(32))
 
     def _reset_token_count():
@@ -1342,30 +1372,87 @@ def test_password_less_admin_recovers_through_their_own_mailbox_before_sso_is_di
             ).count()
 
     before = _reset_token_count()
+
+    # Runbook step 3: the admin's own mailbox, redeemed through the link that
+    # would actually have been mailed, captured at the transport boundary.
+    sent = []
+    monkeypatch.setattr(flask_email, "deliver_email_after_response", lambda **kw: sent.append(kw))
+
     anon = _anonymous_client(app)
     reset_resp = anon.post("/account/reset-password", data={"email": admin.email})
     assert reset_resp.status_code == 200
     assert _reset_token_count() == before + 1
+    assert len(sent) == 1
+    assert sent[0]["recipient"] == admin.email
 
     new_password = "N3w!Str0ngPassw0rd"
-    raw = _issue_reset_token(db_session, admin)
-    success, message = AccountService.reset_password(raw, new_password)
-    assert success, message
+    reset_path = urlsplit(sent[0]["reset_link"]).path
+    assert reset_path.startswith("/account/reset-password/")
+    reset_client = _anonymous_client(app)
+    reset_submit = reset_client.post(
+        reset_path, data={"password": new_password, "password2": new_password},
+        follow_redirects=False,
+    )
+    assert reset_submit.status_code in (302, 303)
+    assert reset_submit.headers["Location"].endswith("/account/login")
+    assert check_password_hash(_reload(db_session, admin.id).password_hash, new_password)
 
+    # SSO still on: the correct new password still goes to the identity provider.
     sso_client = _anonymous_client(app)
     sso_resp = _post_login(sso_client, admin.email, new_password)
     assert sso_resp.status_code in (302, 303)
     assert "/auth/sso/initiate" in sso_resp.headers.get("Location", "")
+    assert _session_user_id(sso_client) is None
 
+    # Runbook step 4: disable the organisation's single sign-on configuration.
     config.enabled = False
     db_session.commit()
 
+    # Runbook step 5, first sign-in: the admin has never set up an
+    # authenticator, so the password alone does not finish the sign-in.
     password_client = _anonymous_client(app)
-    password_resp = _post_login(password_client, admin.email, new_password)
-    assert password_resp.status_code in (302, 303)
-    assert "/auth/sso/initiate" not in password_resp.headers.get("Location", "")
-    assert "Invalid email or password." not in password_resp.get_data(as_text=True)
+    resp = _post_login(password_client, admin.email, new_password)
+    assert resp.status_code in (302, 303)
+    assert "/account/mfa-challenge" in resp.headers["Location"]
+    assert _session_user_id(password_client) is None
 
-    admin_client = app.test_client()
-    login_as(admin_client, admin)
-    assert admin_client.get("/admin/sso").status_code == 200
+    page = password_client.get("/account/mfa-challenge")
+    assert page.status_code == 200
+    with password_client.session_transaction() as sess:
+        secret = sess["_mfa_enroll_secret"]
+    assert secret in page.get_data(as_text=True)
+
+    done = password_client.post(
+        "/account/mfa-challenge", data={"code": pyotp.TOTP(secret).now()},
+        follow_redirects=False,
+    )
+    assert done.status_code in (302, 303)
+    assert "/account/mfa-challenge" not in done.headers["Location"]
+    assert _session_user_id(password_client) == str(admin.id)
+
+    reloaded = _reload(db_session, admin.id)
+    assert reloaded.mfa_enabled is True
+    assert reloaded.mfa_secret == secret
+
+    _forget_cached_user()
+    assert password_client.get("/admin/sso").status_code == 200
+
+    # Runbook step 5, the common case: an admin who already set one up.
+    second_client = _anonymous_client(app)
+    second_login = _post_login(second_client, admin.email, new_password)
+    assert second_login.status_code in (302, 303)
+    assert "/account/mfa-challenge" in second_login.headers["Location"]
+    assert _session_user_id(second_client) is None
+
+    # A different time step from the one used to enrol, so this does not
+    # depend on whether a code may be reused; verify_code tolerates one
+    # step either side.
+    next_code = pyotp.TOTP(secret).at(int(time.time()) + 30)
+    second_done = second_client.post(
+        "/account/mfa-challenge", data={"code": next_code}, follow_redirects=False,
+    )
+    assert second_done.status_code in (302, 303)
+    assert _session_user_id(second_client) == str(admin.id)
+
+    _forget_cached_user()
+    assert second_client.get("/admin/sso").status_code == 200

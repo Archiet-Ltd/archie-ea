@@ -21,8 +21,15 @@ PASSWORD_HASH_METHOD = "scrypt:32768:8:1"
 
 
 def password_hash_is_current(stored_hash):
-    """True when ``stored_hash`` was written with PASSWORD_HASH_METHOD."""
-    return bool(stored_hash) and stored_hash.split("$", 1)[0] == PASSWORD_HASH_METHOD
+    """True when ``stored_hash`` was written with PASSWORD_HASH_METHOD and is
+    complete enough that checking it always runs the full hash: method, salt
+    and hash, separated by ``$``. A value with the right method but missing a
+    part is not current, so it is checked against the dummy like any other
+    unrecognised value."""
+    if not isinstance(stored_hash, str) or not stored_hash:
+        return False
+    parts = stored_hash.split("$", 2)
+    return len(parts) == 3 and parts[0] == PASSWORD_HASH_METHOD
 
 
 # ── Enterprise RBAC role constants (ENT-068, updated NS-001) ─────────────────────────

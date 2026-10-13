@@ -52,20 +52,26 @@ single sign-on enabled.
 
 Nobody can complete a single sign-on sign-in, for example because the identity provider was replaced, its
 certificate changed, the temporary-identifier message appears, or the identity provider's page fails. The admin
-needs another way in to fix the SSO settings page. Never disable single sign-on while the admin has no password:
-with single sign-on disabled, an account without a password cannot sign in at all.
+needs another way in to fix the SSO settings page. Never disable single sign-on until the admin has set their own
+password from an e-mailed link (step 3): with single sign-on disabled, an account without a password cannot sign
+in at all.
 
-1. Check whether the admin has a password:
+1. Check that this server can send e-mail, and whether the admin has a password:
 
    ```python
    from app import db
+   from app.flask_email import mail_available
    from app.models.user import User
 
+   mail_available()
    user = db.session.get(User, <user id>)
    user.password_hash is not None
    ```
 
-   If this is `True`, go to step 4.
+   If `mail_available()` is `False`, stop here and keep single sign-on enabled: the admin's way back in depends on
+   an e-mailed link. If the admin already has a password, skip step 2 but still do step 3: a password set before
+   single sign-on was turned on may be forgotten, and it cannot be tried at the sign-in form while single sign-on
+   is enabled.
 2. Give the admin a password that nobody knows, while single sign-on is still enabled. Do not print or record the
    value:
 
@@ -78,8 +84,8 @@ with single sign-on disabled, an account without a password cannot sign in at al
 
    While single sign-on is enabled this password does not change how the admin signs in.
 3. Ask the admin to use "Forgot password?" on the sign-in page with their own address and set their own password
-   from the e-mailed link. Then confirm the step-1 check again, after `db.session.refresh(user)`. This needs
-   outgoing e-mail; if the server cannot send e-mail, stop here and keep single sign-on enabled.
+   from the e-mailed link. Wait until the admin confirms they have done so, then run `db.session.refresh(user)` and
+   repeat the step-1 password check. Go on only when it is `True`.
 4. Disable the organisation's single sign-on configuration:
 
    ```python
@@ -92,8 +98,13 @@ with single sign-on disabled, an account without a password cannot sign in at al
    ```
 
    Members with a password can now sign in with it.
-5. The admin signs in with their password, fixes the configuration on the SSO settings page, and confirms it with
-   "Test sign-in".
+5. The admin signs in with their password. Because they are an administrator, the next screen asks for a code from
+   their authenticator app. An admin who has signed in before already has it set up and enters the current code. An
+   admin who has never set one up is shown a setup key and QR code first: they add it to an authenticator app
+   (for example Microsoft Authenticator or Google Authenticator) and enter the code it shows. If the admin has set
+   one up before but no longer has access to it, re-enable single sign-on with `config.enabled = True` and
+   `db.session.commit()` and stop: this runbook does not replace an authenticator. Once signed in, the admin fixes
+   the configuration on the SSO settings page and confirms it with "Test sign-in".
 6. If the identity provider was replaced, or the organisation moved between OIDC and SAML, the admin uses "Reset
    single sign-on" on their own row on the Team page before going on.
 7. The admin re-enables single sign-on from the SSO settings page, and repairs any other member through Case 1.
