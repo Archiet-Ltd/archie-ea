@@ -969,10 +969,18 @@ def test_claimed_domain_check_costs_the_same_for_every_stored_hash_format(app, d
     import app.services.sso_service as sso_service
     from app.services.sso_service import SSOService
     from werkzeug.security import generate_password_hash
+    from app.models.subscription import Subscription, SubscriptionPlan, SubscriptionStatus
 
     org = make_org("scope-hash-uniform")
     claimed = _domain("hashformat")
     _configure_sso(db_session, org, claimed)
+    # Six accounts in one organisation: an unlimited plan keeps the seat
+    # check out of a test that is not about it, as TS-32 also needs.
+    db_session.add(Subscription(
+        organization_id=org.id, plan=SubscriptionPlan.enterprise,
+        status=SubscriptionStatus.active, seats_purchased=0,
+    ))
+    db_session.flush()
 
     current_admin = _make_user(db_session, org, f"current@{claimed}", password=_PASSWORD,
                                is_platform_admin=True)
