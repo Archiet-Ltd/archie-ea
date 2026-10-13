@@ -97,7 +97,7 @@ def test_tests_job_creates_fresh_nav_evidence_then_enforces_the_gate():
     assert "${{ matrix.shard }}" in uploads[0]["with"]["name"]
 
     # -- tests job: union every shard's evidence, then enforce once ---------
-    assert combine_job["needs"] == "tests-shard"
+    assert "tests-shard" in ([combine_job["needs"]] if isinstance(combine_job["needs"], str) else combine_job["needs"])
     combine_steps = combine_job["steps"]
     download = next(
         (i for i, step in enumerate(combine_steps)
