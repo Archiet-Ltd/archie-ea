@@ -63,6 +63,12 @@ POLICY = {
     "/my-applications/list":   {"application_manager"},
     "/my-applications/health": {"application_manager"},
     "/applications/ownership-coverage": {"cto", "portfolio_manager"},
+    # The duplicate lookup in the Add Application dialog carries the same
+    # @require_roles("admin", "architect") as the create route it precedes.
+    # Every archetype holds the Architect role (platform_admin the
+    # Administrator role), so every archetype reaches it; the read-only
+    # Viewer role, which is refused, is pinned in tests/test_application_registration_check.py.
+    "/applications/api/registration-check": set(ARCHETYPES),
     "/ai-chat":                set(ARCHETYPES),
     # Ask and Twin map: both pages carry @login_required and no role gate, so
     # every archetype is expected to reach them. Stating that in two rows is
