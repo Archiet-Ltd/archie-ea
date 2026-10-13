@@ -136,3 +136,41 @@ def test_fast_gate_skips_on_unrelated_label_events_and_runs_for_ci_fast():
     assert not runs("labeled", ["bug"])
     assert runs("labeled", ["ci-fast"])
     assert runs("synchronize", [])
+
+
+def _actionlint_step():
+    steps = _ci()["jobs"]["fast_gate"]["steps"]
+    found = [s for s in steps if "actionlint" in str(s.get("run", "")) and "actionlint" in s.get("name", "").lower()]
+    assert len(found) == 1, "fast_gate must have exactly one actionlint step"
+    return found[0]
+
+
+def test_fast_gate_lints_every_workflow_with_a_pinned_checksummed_actionlint():
+    import re
+
+    step = _actionlint_step()
+    env, run = step["env"], step["run"]
+    assert re.fullmatch(r"\d+\.\d+\.\d+", env["ACTIONLINT_VERSION"]), "version must be pinned exactly"
+    assert re.fullmatch(r"[0-9a-f]{64}", env["ACTIONLINT_SHA256"])
+    assert "github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/" in run
+    assert "sha256sum --check" in run and "ACTIONLINT_SHA256" in run
+    assert "set -euo pipefail" in run
+    assert ".github/workflows/*.yml" in run
+    assert not re.search(r"\|\s*(ba)?sh", run), "never pipe a download into a shell"
+    assert "continue-on-error" not in step
+    # the checksum check must come before the archive is unpacked or run
+    assert run.index("sha256sum") < run.index("tar -x") < run.index("/actionlint\" -color")
+
+
+def test_actionlint_runs_on_workflow_only_changes():
+    wf = _ci()
+    triggers = wf.get("on") or wf.get(True)
+    for event in ("push", "pull_request"):
+        assert "paths" not in triggers[event] and "paths-ignore" not in triggers[event]
+    fast = wf["jobs"]["fast_gate"]
+    assert "needs" not in fast and "changes" not in str(fast["if"])
+    # a workflow-only pull request (not labeled) is not skipped
+    ctx = {"github": {"event_name": "pull_request",
+                      "event": {"action": "synchronize", "pull_request": {"labels": []}}},
+           "_labels": []}
+    assert _eval_github_expr(_strip_expr(str(fast["if"])), ctx)

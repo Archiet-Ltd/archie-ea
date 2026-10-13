@@ -224,6 +224,23 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install ruff only
         run: python -m pip install "ruff==${RUFF_VERSION}"
+      - name: Lint every workflow file (pinned actionlint, checksum verified)
+        # An invalid workflow file is rejected by GitHub as a whole: no job runs
+        # and nothing marks the PR red. Lint them here, on every run (this job
+        # has no path filter, so a workflow-only change is covered). The release
+        # tarball is fetched from the official release for the pinned version and
+        # its SHA-256 is checked against the published value before it is
+        # unpacked; a mismatch fails the step. Bump version and hash together.
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
+          ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+        run: |
+          set -euo pipefail
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl --fail --location --retry 3 --silent --show-error             --output "${RUNNER_TEMP}/${archive}"             "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          echo "${ACTIONLINT_SHA256}  ${RUNNER_TEMP}/${archive}" | sha256sum --check --strict -
+          tar -xzf "${RUNNER_TEMP}/${archive}" -C "${RUNNER_TEMP}" actionlint
+          "${RUNNER_TEMP}/actionlint" -color .github/workflows/*.yml
       - name: Compile + fast ratchets
         run: python scripts/verify.py --tag fast
 
@@ -1157,7 +1174,7 @@ jobs:
       - name: Start the app
         run: |
           nohup python -m flask --app manage run --no-reload --port 5001 > /tmp/walkthrough-server.log 2>&1 &
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             curl -sf -o /dev/null http://127.0.0.1:5001/account/login && break
             sleep 5
           done
@@ -1216,7 +1233,8 @@ jobs:
       - name: Prove production Compose cannot rebuild or shadow application code
         shell: bash
         run: |
-          export ARCHIE_IMAGE="ghcr.io/example/archie@sha256:$(printf '0%.0s' {1..64})"
+          ARCHIE_IMAGE="ghcr.io/example/archie@sha256:$(printf '0%.0s' {1..64})"
+          export ARCHIE_IMAGE
           export SECRET_KEY="release-compose-contract-only"
           docker compose -f docker-compose.yml -f deploy/docker-compose.production.yml --profile email config --format json > /tmp/production-compose.json
           python - <<'PY'
