@@ -14,6 +14,7 @@ from flask import Blueprint, abort, render_template, request
 from flask_login import current_user, login_required
 
 from app import db
+from app.middleware.tenant_context import current_org_id
 
 logger = logging.getLogger(__name__)
 
@@ -51,15 +52,18 @@ def index():
         initiatives_serving_no_objective,
     )
 
-    all_initiatives = (
-        db.session.query(EnterpriseInitiative)
-        .order_by(EnterpriseInitiative.name)
-        .all()
-    )
     unlinked = initiatives_serving_no_objective()
     unlinked_ids = {i.id for i in unlinked}
     only_unlinked = request.args.get("filter") == "no-objective"
-    initiatives = unlinked if only_unlinked else all_initiatives
+    if only_unlinked:
+        initiatives = unlinked
+    else:
+        initiatives = (
+            db.session.query(EnterpriseInitiative)
+            .filter(EnterpriseInitiative.organization_id == current_org_id())
+            .order_by(EnterpriseInitiative.name)
+            .all()
+        )
 
     rows = []
     total_budget = total_spent = 0.0
@@ -118,7 +122,12 @@ def detail(initiative_id):
     from app.models.strategic import StrategicInitiative
     from app.models.vendor.vendor_organization import EnterpriseInitiative
 
-    initiative = db.session.get(EnterpriseInitiative, initiative_id)
+    initiative = db.session.execute(
+        db.select(EnterpriseInitiative).where(
+            EnterpriseInitiative.id == initiative_id,
+            EnterpriseInitiative.organization_id == current_org_id(),
+        )
+    ).scalar_one_or_none()
     if initiative is None:
         abort(404)
 
@@ -131,9 +140,11 @@ def detail(initiative_id):
     from app.modules.portfolio.services.initiative_goal_links import (
         CONTRIBUTION_LEVELS,
         list_links,
+        list_programme_goals,
     )
 
     goal_links = list_links(initiative.id)
+    programme_goals = list_programme_goals(initiative.id)
     linked_goal_ids = {g["goal_id"] for g in goal_links}
     available_goals = [
         g
@@ -179,6 +190,7 @@ def detail(initiative_id):
         assumptions=assumptions,
         demands=demands,
         goal_links=goal_links,
+        programme_goals=programme_goals,
         available_goals=available_goals,
         contribution_levels=CONTRIBUTION_LEVELS,
         work_packages=list(initiative.migration_work_packages),

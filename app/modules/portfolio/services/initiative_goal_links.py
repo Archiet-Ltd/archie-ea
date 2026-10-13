@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from app import db
+from app.middleware.tenant_context import current_org_id
 from app.models.motivation import Goal, initiative_goals
 from app.models.strategic import strategic_initiative_goals
 from app.models.vendor.vendor_organization import EnterpriseInitiative
@@ -29,19 +30,24 @@ class InitiativeGoalLinkError(Exception):
 
 
 def _load(initiative_id: int, goal_id: Optional[int] = None):
-    # A select, not Session.get: get() returns an identity-map hit without
-    # emitting SQL, which skips the organisation filter.
+    # The caller's organisation, named explicitly: the automatic tenant filter
+    # is off when no organisation is resolved, and a select (not Session.get)
+    # is used because get() can return an identity-map hit without SQL.
+    org_id = current_org_id()
+    if org_id is None:
+        raise InitiativeGoalLinkError("Initiative not found.", 404)
     initiative = db.session.execute(
-        db.select(EnterpriseInitiative).where(EnterpriseInitiative.id == initiative_id)
+        db.select(EnterpriseInitiative).where(
+            EnterpriseInitiative.id == initiative_id,
+            EnterpriseInitiative.organization_id == org_id,
+        )
     ).scalar_one_or_none()
     if initiative is None:
         raise InitiativeGoalLinkError("Initiative not found.", 404)
     goal = None
     if goal_id is not None:
         goal = db.session.execute(
-            db.select(Goal).where(
-                Goal.id == goal_id, Goal.organization_id == initiative.organization_id
-            )
+            db.select(Goal).where(Goal.id == goal_id, Goal.organization_id == org_id)
         ).scalar_one_or_none()
         if goal is None:
             raise InitiativeGoalLinkError("That goal could not be found.", 404)
@@ -64,6 +70,24 @@ def list_links(initiative_id: int) -> List[Dict[str, Any]]:
         {"goal_id": goal.id, "name": goal.name, "contribution_level": level}
         for goal, level in rows
     ]
+
+
+def list_programme_goals(initiative_id: int) -> List[Dict[str, Any]]:
+    """Goals the initiative serves through its transformation programme."""
+    initiative, _ = _load(initiative_id)
+    if initiative.linked_strategic_initiative_id is None:
+        return []
+    rows = db.session.execute(
+        db.select(Goal)
+        .join(strategic_initiative_goals, strategic_initiative_goals.c.goal_id == Goal.id)
+        .where(
+            strategic_initiative_goals.c.strategic_initiative_id
+            == initiative.linked_strategic_initiative_id,
+            Goal.organization_id == initiative.organization_id,
+        )
+        .order_by(Goal.name)
+    ).scalars()
+    return [{"goal_id": g.id, "name": g.name} for g in rows]
 
 
 def add_link(initiative_id: int, goal_id: int, contribution_level: Optional[str] = None):
@@ -107,24 +131,37 @@ def remove_link(initiative_id: int, goal_id: int) -> None:
 
 
 def initiatives_serving_no_objective() -> List[EnterpriseInitiative]:
-    """Initiatives with no goal link in either junction.
+    """The caller's initiatives with no goal link in either junction.
 
-    Tenant scoping comes from EnterpriseInitiative's own mixin; the goal rows
-    are checked through the initiative ids, which are already the caller's.
+    Scoped explicitly to the caller's organisation; with no resolved
+    organisation nothing is returned. NOT EXISTS rather than NOT IN so a NULL
+    in a junction column cannot empty the result.
     """
-    linked_directly = db.select(initiative_goals.c.initiative_id)
-    programmes_with_goals = db.select(strategic_initiative_goals.c.strategic_initiative_id)
+    org_id = current_org_id()
+    if org_id is None:
+        return []
+    direct = (
+        db.select(db.literal(1))
+        .select_from(initiative_goals)
+        .where(initiative_goals.c.initiative_id == EnterpriseInitiative.id)
+        .exists()
+    )
+    via_programme = (
+        db.select(db.literal(1))
+        .select_from(strategic_initiative_goals)
+        .where(
+            strategic_initiative_goals.c.strategic_initiative_id
+            == EnterpriseInitiative.linked_strategic_initiative_id
+        )
+        .exists()
+    )
     return list(
         db.session.execute(
             db.select(EnterpriseInitiative)
             .where(
-                EnterpriseInitiative.id.not_in(linked_directly),
-                db.or_(
-                    EnterpriseInitiative.linked_strategic_initiative_id.is_(None),
-                    EnterpriseInitiative.linked_strategic_initiative_id.not_in(
-                        programmes_with_goals
-                    ),
-                ),
+                EnterpriseInitiative.organization_id == org_id,
+                ~direct,
+                ~via_programme,
             )
             .order_by(EnterpriseInitiative.name)
         ).scalars()

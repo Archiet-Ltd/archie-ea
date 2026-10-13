@@ -81,7 +81,17 @@
       </li>
       {% endfor %}
     </ul>
-    {% else %}
+    {% endif %}
+    {% if programme_goals %}
+    <ul class="divide-y">
+      {% for pg in programme_goals %}
+      <li class="py-2 text-sm font-medium">{{ pg.name }}
+        <span class="ml-2 text-xs font-normal text-muted-foreground">via the programme</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if not goal_links and not programme_goals %}
     <p class="text-sm text-muted-foreground">No objective recorded &mdash; this initiative is not yet tied to a goal.</p>
     {% endif %}
     {% if available_goals %}
@@ -113,7 +123,7 @@
         Link goal
       </button>
     </form>
-    {% elif not goal_links %}
+    {% elif not goal_links and not programme_goals %}
     <p class="text-xs text-muted-foreground mt-2">No goals exist yet to link to.</p>
     {% endif %}
   </div>
