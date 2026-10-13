@@ -230,6 +230,19 @@
         + (_ob_counts.get('capabilities', 0) or 0)
         + (_ob_counts.get('vendors', 0) or 0)
     ) %}
+    {# Superseded, not removed: the five-screen onboarding flow
+       (app/modules/onboarding/) now owns first-login, entered via a redirect
+       at the dashboard.overview landing route using this exact same gating
+       condition (onboarding_completed_at IS NULL and an empty workspace) --
+       so in the normal flow a genuinely-new user never reaches this page in
+       a state where this modal would fire; completing the new flow sets the
+       same onboarding_completed_at field this condition reads. Left as a
+       safety net for any other admin page a first-login user might land on
+       directly (deep link, bookmark) rather than disabled outright, because
+       tests/test_onboarding_modal.py asserts this exact markup for a
+       genuinely-new user, the correct-role-preselection behaviour and the
+       full assignable-role list -- gating it off here would have broken
+       those three tests without updating them in the same change. #}
     {% if current_user.is_authenticated and not current_user.onboarding_completed_at and _workspace_is_empty %}
     <div x-data="{
             {# The localStorage read is load-bearing: the server persist in
@@ -238,79 +251,7 @@
             showOnboarding: !localStorage.getItem('archie_onboarding_ts'),
             step: 1,
             selectedRole: '{{ current_user.enterprise_role or 'solution_architect' }}',
-            roleCards: {
-                solution_architect: [
-                    {icon: 'compass', title: 'Architecture Journey', desc: 'Walk through TOGAF ADM phases with guided steps', href: '/architecture-journey/'},
-                    {icon: 'wrench', title: 'Solutions', desc: 'Create and manage solution architecture documents', href: '/solutions/'},
-                    {icon: 'pen-tool', title: 'ArchiMate Composer', desc: 'Build architecture diagrams visually', href: '/archimate/composer'},
-                ],
-                enterprise_architect: [
-                    {icon: 'package', title: 'Application Portfolio', desc: 'View and manage all applications in the estate', href: '/applications/'},
-                    {icon: 'map', title: 'Capability Map', desc: 'Explore business capability landscape', href: '/capability-map/'},
-                    {icon: 'table', title: 'ArchiMate Elements', desc: 'Browse and manage architecture elements', href: '/architecture/dashboard'},
-                ],
-                business_architect: [
-                    {icon: 'map', title: 'Capability Map', desc: 'Explore the business capability landscape', href: '/capability-map/'},
-                    {icon: 'git-branch', title: 'Value Streams', desc: 'Map end-to-end value delivery and its stages', href: '/value-streams/'},
-                    {icon: 'package', title: 'Application Portfolio', desc: 'See which applications support each capability', href: '/applications/'},
-                ],
-                arb_member: [
-                    {icon: 'shield-check', title: 'ARB Dashboard', desc: 'Review pending architecture decisions', href: '/arb/dashboard'},
-                    {icon: 'wrench', title: 'Solutions', desc: 'Browse solution designs under review', href: '/solutions/'},
-                    {icon: 'git-branch', title: 'ARB Sessions', desc: 'View all governance review sessions', href: '/arb/sessions'},
-                ],
-                portfolio_manager: [
-                    {icon: 'git-merge', title: 'Rationalization', desc: 'Analyse application portfolio for optimization', href: '/dashboard/rationalization'},
-                    {icon: 'building-2', title: 'Vendor Dashboard', desc: 'Manage vendor relationships', href: '/vendors/'},
-                    {icon: 'package', title: 'Applications', desc: 'Browse the full application portfolio', href: '/applications/'},
-                ],
-                platform_admin: [
-                    {icon: 'building-2', title: 'Organizations', desc: 'Set up tenant organizations', href: '/admin/organizations'},
-                    {icon: 'users', title: 'Users', desc: 'Manage platform users and roles', href: '/admin/users'},
-                    {icon: 'key', title: 'API Settings', desc: 'Configure LLM and integration keys', href: '/admin/api-settings'},
-                ],
-                cto: [
-                    {icon: 'layout-dashboard', title: 'Architecture Health', desc: 'Monitor portfolio health and strategic alignment', href: '/dashboard/overview'},
-                    {icon: 'git-merge', title: 'Rationalization', desc: 'Application lifecycle and consolidation pipeline', href: '/dashboard/rationalization'},
-                    {icon: 'wrench', title: 'Solutions', desc: 'Track solutions from design to approval', href: '/solutions/'},
-                ],
-                application_manager: [
-                    {icon: 'package', title: 'Application Portfolio', desc: 'Manage all applications in the estate', href: '/applications/'},
-                    {icon: 'git-merge', title: 'Rationalization', desc: 'Analyse portfolio for consolidation opportunities', href: '/dashboard/rationalization'},
-                    {icon: 'building-2', title: 'Vendor Dashboard', desc: 'Track vendor relationships and contracts', href: '/vendors/'},
-                ],
-                procurement: [
-                    {icon: 'building-2', title: 'Vendor Dashboard', desc: 'Review vendor relationships and spend', href: '/vendors/'},
-                    {icon: 'package', title: 'Application Portfolio', desc: 'See which applications are in use', href: '/applications/'},
-                    {icon: 'git-merge', title: 'Rationalization', desc: 'Identify consolidation and cost-saving opportunities', href: '/dashboard/rationalization'},
-                ],
-            },
-            primaryCTA: {
-                solution_architect: {label: 'Start Architecture Journey', href: '/architecture-journey/'},
-                enterprise_architect: {label: 'View Application Portfolio', href: '/applications/'},
-                business_architect: {label: 'Open the Capability Map', href: '/capability-map/'},
-                arb_member: {label: 'Go to ARB Dashboard', href: '/arb/dashboard'},
-                portfolio_manager: {label: 'Open Rationalization', href: '/dashboard/rationalization'},
-                platform_admin: {label: 'Manage Organizations', href: '/admin/organizations'},
-                cto: {label: 'View Architecture Health', href: '/dashboard/overview'},
-                application_manager: {label: 'View Application Portfolio', href: '/applications/'},
-                procurement: {label: 'Go to Vendor Dashboard', href: '/vendors/'},
-                security_architect: {label: 'Open Regulatory Compliance', href: '/dashboard/compliance'},
-                data_architect: {label: 'Open Data Architecture', href: '/architecture/data-architecture'},
-            },
-            roleLabels: {
-                solution_architect: 'Solution Architect',
-                enterprise_architect: 'Enterprise Architect',
-                business_architect: 'Business Architect',
-                arb_member: 'ARB Member',
-                portfolio_manager: 'Portfolio Manager',
-                cto: 'CTO / CIO',
-                application_manager: 'Application Manager',
-                procurement: 'Procurement',
-                platform_admin: 'Platform Admin',
-                security_architect: 'Security Architect',
-                data_architect: 'Data Architect',
-            },
+            {% include 'partials/_role_personalization_js.html' %}
             /* Promise chain, not async/await: Alpine attribute expressions are
                evaluated by the CSP-safe interpreter (app/static/js/csp/csp-evaluator.js),
                which cannot parse `async` and throws on `await`. */

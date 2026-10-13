@@ -21,6 +21,7 @@ other adopter of this pattern in the suite.
 """
 
 from __future__ import annotations
+import datetime
 
 import uuid
 
@@ -68,7 +69,7 @@ def _grant_admin(db_session, user):
     db_session.flush()
 
 
-def _make_user(db_session, make_org, label, enterprise_role="platform_admin", admin=True):
+def _make_user(db_session, make_org, label, enterprise_role="platform_admin", admin=True, onboarding_completed=True):
     from app.models.user import User
 
     org = make_org(f"dash-{label}")
@@ -79,6 +80,7 @@ def _make_user(db_session, make_org, label, enterprise_role="platform_admin", ad
         last_name="Tester",
         organization_id=org.id,
         confirmed=True,
+        onboarding_completed_at=datetime.datetime.utcnow() if onboarding_completed else None,
         enterprise_role=enterprise_role,
         is_org_admin=True,
     )
@@ -459,7 +461,7 @@ def test_invite_step_ignores_other_orgs_users(app, db_session, make_org):
             first_name="Crowd",
             last_name="Tester",
             organization_id=org_b.id,
-            confirmed=True,
+            confirmed=True, onboarding_completed_at=datetime.datetime.utcnow(),
             enterprise_role="platform_admin",
         )
         db_session.add(crowd_user)
@@ -507,3 +509,75 @@ def test_welcome_banner_dismiss_persists_server_side(app, db_session, make_org):
     assert second.status_code == 200
     second_html = second.get_data(as_text=True)
     assert 'data-testid="welcome-banner"' not in second_html
+
+
+def test_workspace_setup_prompt_shown_until_onboarding_is_complete(app, db_session, make_org):
+    """An account whose workspace already has data (this fixture gives it
+    six applications) skips dashboard.overview's redirect into the
+    five-screen flow entirely -- restore-onboarding-workspace-setup's own
+    finding. Without a dashboard-level prompt, such an account would never
+    see role choice, key features or admin setup. Shown while
+    onboarding_completed_at is unset; gone once it is set."""
+    from sqlalchemy import insert
+
+    from app.models.application_capability import ApplicationCapabilityMapping
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.business_capabilities import BusinessCapability
+
+    user, org = _make_user(db_session, make_org, "workspace-prompt", onboarding_completed=False)
+
+    from flask import g
+
+    g.current_org_id = org.id
+
+    apps = []
+    for i in range(6):
+        app_component = ApplicationComponent(
+            name=f"Prompt Test App {i}-{uuid.uuid4().hex[:6]}",
+            organization_id=org.id,
+        )
+        db_session.add(app_component)
+        apps.append(app_component)
+    db_session.flush()
+
+    cap_name = f"Prompt Test Capability {uuid.uuid4().hex[:6]}"
+    elem_id = db_session.execute(
+        insert(ArchiMateElement.__table__).values(
+            name=cap_name, type="Capability", layer="Strategy", organization_id=org.id
+        )
+    ).inserted_primary_key[0]
+    db_session.flush()
+
+    capability = BusinessCapability(
+        name=cap_name, level=1, organization_id=org.id, archimate_element_id=elem_id,
+    )
+    db_session.add(capability)
+    db_session.flush()
+
+    db_session.add(
+        ApplicationCapabilityMapping(
+            application_component_id=apps[0].id,
+            business_capability_id=capability.id,
+            organization_id=org.id,
+        )
+    )
+    db_session.flush()
+
+    client = app.test_client()
+    _login(client, user.id)
+
+    resp = client.get("/dashboard/overview")
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:2000]
+    html = resp.get_data(as_text=True)
+    assert 'data-testid="health-score-value"' in html, "expected data mode -- the redirect above must not have fired"
+    assert 'data-testid="workspace-setup-prompt"' in html
+    assert "/onboarding/workspace-setup" in html
+
+    user.onboarding_completed_at = datetime.datetime.utcnow()
+    db_session.add(user)
+    db_session.flush()
+
+    resp2 = client.get("/dashboard/overview")
+    assert resp2.status_code == 200
+    assert 'data-testid="workspace-setup-prompt"' not in resp2.get_data(as_text=True)

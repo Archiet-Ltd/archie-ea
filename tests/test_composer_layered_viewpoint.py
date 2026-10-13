@@ -24,6 +24,9 @@ must be proven -- not assumed -- that it still only ever returns the calling
 tenant's own rows.
 """
 
+import datetime
+
+
 
 def test_composer_sidebar_link_carries_viewpoint_query_param(app, db_session, make_org, login_as):
     """The REAL, live sidebar (``app/utils/role_access.py::get_sidebar_zones``,
@@ -46,7 +49,7 @@ def test_composer_sidebar_link_carries_viewpoint_query_param(app, db_session, ma
         first_name="Composer",
         last_name="Tester",
         organization_id=org.id,
-        confirmed=True,
+        confirmed=True, onboarding_completed_at=datetime.datetime.utcnow(),
         enterprise_role="enterprise_architect",
     )
     db_session.add(user)
@@ -365,7 +368,7 @@ def test_dashboard_layer_tab_links_carry_correct_layer_param(app, db_session, ma
         first_name="Layer",
         last_name="Tabs",
         organization_id=org.id,
-        confirmed=True,
+        confirmed=True, onboarding_completed_at=datetime.datetime.utcnow(),
         enterprise_role="enterprise_architect",
     )
     db_session.add(user)
@@ -547,7 +550,7 @@ def test_layer_filter_unknown_value_is_rejected_by_api_route(app, db_session, ma
         first_name="Layer",
         last_name="Unknown",
         organization_id=org.id,
-        confirmed=True,
+        confirmed=True, onboarding_completed_at=datetime.datetime.utcnow(),
         enterprise_role="enterprise_architect",
     )
     db_session.add(user)
