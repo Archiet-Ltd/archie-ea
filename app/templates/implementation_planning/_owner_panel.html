@@ -31,7 +31,7 @@
             {% if element.owners %}
             <ul class="text-xs text-muted-foreground space-y-1">
                 {% for owner in element.owners %}
-                <li>{{ owner.user_name }} <span class="text-muted-foreground">({{ owner.ownership_type_label }})</span></li>
+                <li>{{ owner.user_name if owner.user_name != owner.user_email else '—' }} <span class="text-muted-foreground">({{ owner.ownership_type_label }})</span></li>
                 {% endfor %}
             </ul>
             {% endif %}

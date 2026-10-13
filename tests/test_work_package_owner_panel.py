@@ -188,29 +188,80 @@ def test_panel_on_a_work_package_with_no_linked_elements_is_an_empty_roster(
 
 
 def test_other_organisations_owners_and_approvals_never_appear(two_orgs, db_session):
+    from app.models.application_owner import ApplicationOwner
     from app.services import work_package_service as svc
 
     a, b = two_orgs["a"], two_orgs["b"]
     cap_a = _capability(db_session, a, "A cap")
-    cap_b = _capability(db_session, b, "B cap")
-    wp_a = _wp(db_session, a, "A package")
+    app_a = _application(db_session, a, "A app")
+    wp_a = _wp(db_session, a, "A package", application_component_id=app_a.id)
     wp_a.capability_ids = [cap_a.id]
-    wp_b = _wp(db_session, b, "B package")
-    wp_b.capability_ids = [cap_b.id]
     db_session.flush()
     _set_owner(cap_a, two_orgs["owner_a"], a)
-    _set_owner(cap_b, two_orgs["user_b"], b)
-    _approval(db_session, a, "capability", cap_a.id, "A's approval")
-    _approval(db_session, b, "capability", cap_b.id, "B secret approval")
-    _approval(db_session, b, "work_package", wp_b.id, "B work package approval")
+    _approval(db_session, a, "capability", cap_a.id, "Approval of the caller")
+    # foreign rows that name the CALLER's ids: only the organisation predicate
+    # keeps them out
+    foreign_owner = ApplicationOwner(
+        element_type="capability", element_id=cap_a.id, user_id=two_orgs["user_b"].id,
+        ownership_type="primary", organization_id=b.id,
+    )
+    foreign_app_owner = ApplicationOwner(
+        application_id=app_a.id, user_id=two_orgs["user_b"].id,
+        ownership_type="primary", organization_id=b.id,
+    )
+    db_session.add_all([foreign_owner, foreign_app_owner])
+    db_session.flush()
+    _approval(db_session, b, "capability", cap_a.id, "B secret approval")
+    _approval(db_session, b, "application", app_a.id, "B application approval")
+    _approval(db_session, b, "work_package", wp_a.id, "B work package approval")
+    # the foreign rows exist and point at the caller's ids
+    assert ApplicationOwner.query.filter_by(organization_id=b.id).count() == 2
 
     panel = svc.owner_and_approval_panel(wp_a, a.id)
     dumped = json.dumps(panel)
     assert "Owna Test" in dumped
-    assert "A's approval" in dumped
+    assert "Approval of the caller" in dumped
     assert "B secret approval" not in dumped
+    assert "B application approval" not in dumped
     assert "B work package approval" not in dumped
     assert "Pmb Test" not in dumped
+
+
+def test_panel_for_an_unknown_organisation_is_empty(two_orgs, db_session):
+    from app.services import work_package_service as svc
+
+    a = two_orgs["a"]
+    cap = _capability(db_session, a, "Cap")
+    wp = _wp(db_session, a, "Package")
+    wp.capability_ids = [cap.id]
+    db_session.flush()
+    _set_owner(cap, two_orgs["owner_a"], a)
+    _approval(db_session, a, "work_package", wp.id, "Pending thing")
+    assert svc.owner_and_approval_panel(wp, a.id)["elements"] != []  # it exists
+
+    panel = svc.owner_and_approval_panel(wp, None)
+
+    assert panel["elements"] == []
+    assert panel["work_package_approvals"] == {"pending": [], "approved": []}
+
+
+def test_nameless_owner_shows_a_dash_never_the_email(two_orgs, db_session, client, login_as):
+    a = two_orgs["a"]
+    nameless = _user(db_session, a, "nameless", role="enterprise_architect")
+    nameless.first_name = None
+    nameless.last_name = None
+    db_session.flush()
+    cap = _capability(db_session, a, "Orphan cap")
+    wp = _wp(db_session, a, "Nameless owner package")
+    wp.capability_ids = [cap.id]
+    db_session.flush()
+    _set_owner(cap, nameless, a)
+
+    login_as(client, two_orgs["user_a"])
+    html = client.get(f"/implementation/work-packages/{wp.id}").get_data(as_text=True)
+
+    assert "Owner recorded" in html
+    assert nameless.email not in html
 
 
 # -- the work package detail screen -----------------------------------------

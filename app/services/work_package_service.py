@@ -808,21 +808,23 @@ def _application_row(application_id: int, organization_id: int):
     ).first()
 
 
-def _approval_rows_for(organization_id: int):
+def _approval_rows_for(organization_id: int, entity_types=None, entity_ids=None):
     """The pending and approved rows of the one approval queue for this
-    organisation, oldest first. Rejected and expired rows never appear."""
+    organisation, oldest first, optionally narrowed to the given entity types
+    and ids. Rejected and expired rows never appear."""
     from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
 
-    return (
-        AIChatCRUDApproval.query.filter(
-            AIChatCRUDApproval.organization_id == organization_id,
-            AIChatCRUDApproval.status.in_(
-                [ApprovalStatus.PENDING, ApprovalStatus.APPROVED]
-            ),
-        )
-        .order_by(AIChatCRUDApproval.created_at, AIChatCRUDApproval.id)
-        .all()
+    query = AIChatCRUDApproval.query.filter(
+        AIChatCRUDApproval.organization_id == organization_id,
+        AIChatCRUDApproval.status.in_(
+            [ApprovalStatus.PENDING, ApprovalStatus.APPROVED]
+        ),
     )
+    if entity_types is not None:
+        query = query.filter(AIChatCRUDApproval.entity_type.in_(list(entity_types)))
+    if entity_ids is not None:
+        query = query.filter(AIChatCRUDApproval.entity_id.in_(list(entity_ids)))
+    return query.order_by(AIChatCRUDApproval.created_at, AIChatCRUDApproval.id).all()
 
 
 def _approval_dict(row) -> Dict[str, Any]:
@@ -895,7 +897,11 @@ def owner_and_approval_panel(
 
     watched = set(approval_filters)
     by_entity: Dict[tuple, List[Dict[str, Any]]] = {}
-    for row in _approval_rows_for(organization_id):
+    for row in _approval_rows_for(
+        organization_id,
+        entity_types={t for t, _ in watched},
+        entity_ids={i for _, i in watched},
+    ):
         key = (row.entity_type, row.entity_id)
         if key not in watched:
             continue
@@ -927,18 +933,30 @@ def _planned_duration_days(wp: UnifiedWorkPackage) -> int:
     return wp.duration_days or 0
 
 
-def _path_node(wp: UnifiedWorkPackage, organization_id: int) -> Dict[str, Any]:
+def _owner_display_name(owner) -> Optional[str]:
+    """The owner's name via the one User.full_name; None for a nameless user
+    (the screen shows a dash), never the email address."""
+    if owner is None or not (owner.first_name or owner.last_name):
+        return None
+    return owner.full_name()
+
+
+def _users_by_id(owner_ids, organization_id: Optional[int]) -> Dict[int, Any]:
+    """One lookup of the owners, inside this organisation."""
     from app.models.user import User
 
-    owner_name = None
-    if wp.owner_id:
-        owner = User.query.filter_by(
-            id=wp.owner_id, organization_id=organization_id
-        ).first()
-        if owner is not None:
-            owner_name = (
-                "%s %s" % (owner.first_name or "", owner.last_name or "")
-            ).strip() or owner.email
+    ids = {i for i in owner_ids if i}
+    if not ids or organization_id is None:
+        return {}
+    return {
+        user.id: user
+        for user in User.query.filter(
+            User.id.in_(ids), User.organization_id == organization_id
+        ).all()
+    }
+
+
+def _path_node(wp: UnifiedWorkPackage, users: Dict[int, Any]) -> Dict[str, Any]:
     return {
         "id": wp.id,
         "name": wp.name,
@@ -947,39 +965,148 @@ def _path_node(wp: UnifiedWorkPackage, organization_id: int) -> Dict[str, Any]:
         "end_date": wp.end_date.date().isoformat() if wp.end_date else None,
         "duration_days": _planned_duration_days(wp),
         "owner_id": wp.owner_id,
-        "owner_name": owner_name,
+        "owner_name": _owner_display_name(users.get(wp.owner_id)),
     }
 
 
-def _canonicalise_cycles(raw_cycles: List[List[int]]) -> List[List[int]]:
-    """Deduplicate reported cycles: the same loop read in any rotation or
-    direction is one cycle, reported once in the order it was first seen.
-    A self-loop (a work package that depends on itself) is reported as a
-    single-element cycle."""
-    def rotated(seq: List[int], offset: int) -> List[int]:
-        return seq[offset:] + seq[:offset]
-
-    seen = set()
-    out = []
-    for cycle in raw_cycles:
-        if not cycle:
+def _strongly_connected_components(
+    node_ids: List[int], edges: Dict[int, List[int]]
+) -> List[List[int]]:
+    """Tarjan's algorithm with an explicit stack (no recursion limit). A
+    component is emitted after every component it depends on."""
+    index: Dict[int, int] = {}
+    low: Dict[int, int] = {}
+    on_stack = set()
+    stack: List[int] = []
+    out: List[List[int]] = []
+    counter = 0
+    for start in node_ids:
+        if start in index:
             continue
-        nodes = cycle[:-1]  # the closing node repeats the first
-        if not nodes:
-            continue
-        if len(nodes) == 1:
-            # self-loop: the canonical form is the single node id
-            canonical = tuple(nodes)
-        else:
-            forwards = min(tuple(rotated(nodes, i)) for i in range(len(nodes)))
-            backwards = min(
-                tuple(rotated(list(reversed(nodes)), i)) for i in range(len(nodes))
-            )
-            canonical = min(forwards, backwards)
-        if canonical not in seen:
-            seen.add(canonical)
-            out.append(nodes)
+        work = [(start, iter(edges.get(start, ())))]
+        index[start] = low[start] = counter
+        counter += 1
+        stack.append(start)
+        on_stack.add(start)
+        while work:
+            node, deps = work[-1]
+            advanced = False
+            for dep in deps:
+                if dep not in index:
+                    index[dep] = low[dep] = counter
+                    counter += 1
+                    stack.append(dep)
+                    on_stack.add(dep)
+                    work.append((dep, iter(edges.get(dep, ()))))
+                    advanced = True
+                    break
+                if dep in on_stack:
+                    low[node] = min(low[node], index[dep])
+            if advanced:
+                continue
+            work.pop()
+            if work:
+                parent = work[-1][0]
+                low[parent] = min(low[parent], low[node])
+            if low[node] == index[node]:
+                comp = []
+                while True:
+                    member = stack.pop()
+                    on_stack.discard(member)
+                    comp.append(member)
+                    if member == node:
+                        break
+                out.append(comp)
     return out
+
+
+def _compute_critical_path(
+    plateau, root_ids, by_id: Dict[int, UnifiedWorkPackage], organization_id: int,
+    users: Optional[Dict[int, Any]] = None,
+) -> Dict[str, Any]:
+    """The critical path of one plateau over the organisation's work packages
+    already loaded in ``by_id``. Iterative: a chain of any length terminates.
+
+    Dependencies naming no work package of this organisation are ignored and
+    reported. A dependency cycle (including a work package that depends on
+    itself) is reported once as the set of packages in the loop and its
+    internal edges are not followed. The path beside a cycle therefore does
+    not depend on row ids: ties go to the chain whose package names sort
+    first."""
+    result = empty_critical_path()
+    result["plateau_id"] = plateau.id
+    result["plateau_name"] = plateau.name
+    root_ids = {i for i in root_ids if i in by_id}
+    if not root_ids:
+        return result
+
+    # The dependency closure stays inside this organisation: an id with no row
+    # here is another organisation's work package (or a stale id) and is
+    # reported, never followed.
+    closure = set(root_ids)
+    ignored = []
+    pending = list(root_ids)
+    while pending:
+        node = by_id[pending.pop()]
+        for dep_id in _dependency_ids(node):
+            if dep_id in by_id:
+                if dep_id not in closure:
+                    closure.add(dep_id)
+                    pending.append(dep_id)
+            else:
+                ignored.append(dep_id)
+
+    edges = {
+        node_id: [d for d in _dependency_ids(by_id[node_id]) if d in closure]
+        for node_id in closure
+    }
+    components = _strongly_connected_components(sorted(closure), edges)
+    component_of = {}
+    cycles = []
+    for number, comp in enumerate(components):
+        for member in comp:
+            component_of[member] = number
+        if len(comp) > 1 or comp[0] in edges[comp[0]]:
+            cycles.append(sorted(comp))
+    cycles.sort()
+
+    def _key(length: int, chain: List[int]):
+        # longer first; on a tie the chain whose names sort first, then ids
+        return (-length, [by_id[i].name or "" for i in chain], chain)
+
+    best: Dict[int, tuple] = {}
+    for comp in components:  # dependencies are emitted before dependants
+        for node_id in comp:
+            own = _planned_duration_days(by_id[node_id])
+            choice = (own, [node_id])
+            for dep_id in edges[node_id]:
+                if component_of[dep_id] == component_of[node_id]:
+                    continue  # the cycle's own edges are never followed
+                dep_len, dep_chain = best[dep_id]
+                candidate = (own + dep_len, dep_chain + [node_id])
+                if _key(*candidate) < _key(*choice):
+                    choice = candidate
+            best[node_id] = choice
+
+    overall = None
+    for root_id in sorted(root_ids):
+        if overall is None or _key(*best[root_id]) < _key(*overall):
+            overall = best[root_id]
+
+    result["cycles"] = cycles
+    result["ignored_dependencies"] = [
+        {"dependency_id": dep_id, "reason": "no such work package in this organisation"}
+        for dep_id in sorted(set(ignored))
+    ]
+    length, chain = overall
+    nodes = [by_id[i] for i in chain]
+    if users is None:
+        users = _users_by_id([w.owner_id for w in nodes], organization_id)
+    result["path"] = [_path_node(w, users) for w in nodes]
+    result["duration_days"] = length
+    result["blocking"] = result["path"][-1]
+    result["has_critical_path"] = True
+    return result
 
 
 def critical_path_for_plateau(
@@ -990,13 +1117,9 @@ def critical_path_for_plateau(
     the chain's total planned duration, and the blocking item -- the chain's
     last work package, whose end date gates the plateau -- with its owner.
     A recompute after the blocking package's planned end date moves returns a
-    new duration, because nothing is cached.
-
-    Dependencies that name no work package of this organisation (including
-    another organisation's work package) are ignored and reported, never
-    followed. A cycle in ``work_dependencies`` is reported, never followed,
-    and the computation always terminates. This is the one computation; the
-    retired store's stub delegates here."""
+    new duration, because nothing is cached. This is the one computation; the
+    retired store's stub delegates here. An unknown organisation, or a plateau
+    of another organisation, yields the empty critical path."""
     from app.models.implementation_migration import Plateau
 
     result = empty_critical_path()
@@ -1008,92 +1131,14 @@ def critical_path_for_plateau(
     ).first()
     if plateau is None:
         return result
-    result["plateau_name"] = plateau.name
     root_ids = plateau_work_package_ids([plateau_id], organization_id).get(
         plateau_id, set()
     )
     if not root_ids:
+        result["plateau_name"] = plateau.name
         return result
-
-    rows = query_for(organization_id).all()
-    by_id = {row.id: row for row in rows}
-
-    # The dependency closure stays inside this organisation: an id with no row
-    # here is another organisation's work package (or a stale id) and is
-    # reported, never followed.
-    closure = set(root_ids)
-    ignored = []
-    pending = list(root_ids)
-    while pending:
-        node_id = pending.pop()
-        node = by_id.get(node_id)
-        if node is None:
-            continue
-        for dep_id in _dependency_ids(node):
-            if dep_id in by_id:
-                if dep_id not in closure:
-                    closure.add(dep_id)
-                    pending.append(dep_id)
-            else:
-                ignored.append(dep_id)
-
-    memo: Dict[int, tuple] = {}
-    state: Dict[int, int] = {}
-    raw_cycles: List[List[int]] = []
-
-    def _best(node_id: int, trail: List[int]):
-        """(duration, path ids) of the longest path ending at ``node_id``, or
-        None when a dependency cycle cuts the branch off."""
-        if state.get(node_id) == 2:
-            return memo[node_id]
-        if state.get(node_id) == 1:
-            if node_id in trail:
-                raw_cycles.append(trail[trail.index(node_id):] + [node_id])
-            return None
-        state[node_id] = 1
-        node = by_id[node_id]
-        best_len = _planned_duration_days(node)
-        best_chain = [node_id]
-        for dep_id in _dependency_ids(node):
-            if dep_id not in closure:
-                continue
-            sub = _best(dep_id, trail + [node_id])
-            if sub is None:
-                continue
-            sub_len, sub_chain = sub
-            candidate = _planned_duration_days(node) + sub_len
-            if candidate > best_len:
-                best_len = candidate
-                best_chain = sub_chain + [node_id]
-        state[node_id] = 2
-        memo[node_id] = (best_len, best_chain)
-        return memo[node_id]
-
-    overall = None
-    for root_id in sorted(root_ids):
-        if root_id not in by_id:
-            continue
-        got = _best(root_id, [])
-        if got is None:
-            continue
-        length, chain = got
-        if overall is None or length > overall[0]:
-            overall = (length, chain)
-
-    result["cycles"] = _canonicalise_cycles(raw_cycles)
-    result["ignored_dependencies"] = [
-        {"dependency_id": dep_id, "reason": "no such work package in this organisation"}
-        for dep_id in sorted(set(ignored))
-    ]
-    if overall is None:
-        return result
-    length, chain = overall
-    nodes = [by_id[i] for i in chain]
-    result["path"] = [_path_node(w, organization_id) for w in nodes]
-    result["duration_days"] = length
-    result["blocking"] = result["path"][-1]
-    result["has_critical_path"] = True
-    return result
+    by_id = {row.id: row for row in query_for(organization_id).all()}
+    return _compute_critical_path(plateau, root_ids, by_id, organization_id)
 
 
 def critical_paths_for_roadmap(organization_id: Optional[int]) -> List[Dict[str, Any]]:
@@ -1101,7 +1146,9 @@ def critical_paths_for_roadmap(organization_id: Optional[int]) -> List[Dict[str,
     sequence then name -- what the plateau roadmap screen's critical path
     panel renders. Another organisation's plateaus never appear. A plateau
     with no scheduled work package reports an empty path. An unknown
-    organisation shows nothing and issues no query."""
+    organisation shows nothing and issues no query. The organisation's work
+    packages, plateau links and owners are each read once, however many
+    plateaus there are."""
     from app.models.implementation_migration import Plateau
 
     if organization_id is None:
@@ -1113,7 +1160,24 @@ def critical_paths_for_roadmap(organization_id: Optional[int]) -> List[Dict[str,
         )
         .all()
     )
-    return [critical_path_for_plateau(p.id, organization_id) for p in plateaus]
+    if not plateaus:
+        return []
+    roots = plateau_work_package_ids([p.id for p in plateaus], organization_id)
+    by_id = {row.id: row for row in query_for(organization_id).all()}
+    users = _users_by_id([row.owner_id for row in by_id.values()], organization_id)
+    out = []
+    for plateau in plateaus:
+        root_ids = roots.get(plateau.id, set())
+        if not root_ids:
+            entry = empty_critical_path()
+            entry["plateau_id"] = plateau.id
+            entry["plateau_name"] = plateau.name
+            out.append(entry)
+            continue
+        out.append(
+            _compute_critical_path(plateau, root_ids, by_id, organization_id, users)
+        )
+    return out
 
 
 def get_by_source(table: str, source_id: int, organization_id: int) -> Optional[UnifiedWorkPackage]:
