@@ -1,0 +1,324 @@
+# Page reading rules for the company-context intake (static data, schema-tested).
+#
+# Every scalar below is a plain string, list or number. No tenant value, no
+# customer, employer or prospect name, no owner, cost, contract, maturity,
+# headcount, salary or person key anywhere in this file. The fetched pages
+# are classified against `purposes` in the order listed; `intake_zones` is the
+# page-class table of the model-call record copied row for row.
+
+two_part_suffixes:
+  - co.uk
+  - org.uk
+  - ac.uk
+  - gov.uk
+  - com.au
+  - net.au
+  - org.au
+  - co.nz
+  - co.jp
+  - co.kr
+  - co.in
+  - co.za
+  - co.il
+  - co.id
+  - com.br
+  - com.mx
+  - com.ar
+  - com.sg
+  - com.hk
+  - com.tr
+
+# Fetch order (FR-CX-2). max_pages caps what the fetcher requests per purpose.
+purposes:
+  - key: home
+    path_patterns: ["^/?(?:index\\.html)?$"]
+    link_text_patterns: [home]
+    conventional_paths: ["/"]
+    max_pages: 1
+  - key: about
+    path_patterns: ["^/?(?:about|company|mission|team)(?:/|$)"]
+    link_text_patterns: [about, company, mission, who we are, what we do]
+    conventional_paths: ["/about"]
+    max_pages: 1
+  - key: product
+    path_patterns: ["^/?(?:product|platform|features|solutions)(?:/|$)"]
+    link_text_patterns: [product, platform, features, solutions]
+    conventional_paths: ["/product", "/features"]
+    max_pages: 3
+  - key: pricing
+    path_patterns: ["^/?(?:pricing|plans|rates)(?:/|$)"]
+    link_text_patterns: [pricing, plans, rates]
+    conventional_paths: ["/pricing"]
+    max_pages: 1
+  - key: customers
+    path_patterns: ["^/?(?:customers|case-studies|case studies|industries|clients)(?:/|$)"]
+    link_text_patterns: [customers, case studies, case-studies, industries, clients]
+    conventional_paths: ["/customers"]
+    max_pages: 2
+  - key: partners
+    path_patterns: ["^/?(?:partners|integrations|marketplace|ecosystem)(?:/|$)"]
+    link_text_patterns: [partners, integrations, marketplace, ecosystem, partner]
+    conventional_paths: ["/partners"]
+    max_pages: 2
+  - key: careers
+    path_patterns: ["^/?(?:careers|jobs|openings|join-us|join us)(?:/|$)"]
+    link_text_patterns: [careers, jobs, openings, join us, join-us, we are hiring, we're hiring]
+    conventional_paths: ["/careers"]
+    max_pages: 11
+  - key: engineering
+    path_patterns: ["^/?(?:engineering|blog|insights|news|tech)(?:/|$)"]
+    link_text_patterns: [engineering, blog, insights, news, technology]
+    conventional_paths: ["/engineering", "/blog"]
+    max_pages: 4
+  - key: documentation
+    path_patterns: ["^/?(?:docs|documentation|guides|help-center|developer)(?:/|$)"]
+    link_text_patterns: [docs, documentation, guides, help center, help-center, developers, developer]
+    conventional_paths: ["/docs"]
+    max_pages: 2
+  - key: security
+    path_patterns: ["^/?(?:security|trust|compliance)(?:/|$)"]
+    link_text_patterns: [security, trust, compliance]
+    conventional_paths: ["/security"]
+    max_pages: 1
+  - key: privacy
+    path_patterns: ["^/?(?:privacy|privacy-policy|data-protection|datenschutz)(?:/|$)"]
+    link_text_patterns: [privacy, privacy policy, privacy-policy, data protection, data-protection]
+    conventional_paths: ["/privacy"]
+    max_pages: 2
+  - key: comparison
+    path_patterns: ["^(?=/)"]
+    link_text_patterns: [vs, versus, alternative, compare, comparison, switch from, switch-from, migrate from, migrate-from]
+    conventional_paths: []
+    max_pages: 3
+  - key: support
+    path_patterns: ["^/?(?:support|help|faq|contact)(?:/|$)"]
+    link_text_patterns: [support, help, faq, contact]
+    conventional_paths: ["/support"]
+    max_pages: 1
+  - key: strategy
+    path_patterns: ["^/?(?:strategy|investors|investor-relations|annual-report|mission)(?:/|$)"]
+    link_text_patterns: [strategy, investors, investor relations, investor-relations, annual report, annual-report]
+    conventional_paths: ["/strategy", "/investors"]
+    max_pages: 2
+
+# Pages never fetched for reading (FR-CX-2): they sit on the excluded list or
+# carry no reading value. The fetcher never requests a path below.
+excluded_paths:
+  - team
+  - people
+  - leadership
+  - staff
+  - board
+  - authors
+  - login
+  - app
+  - account
+  - cart
+  - search
+  - calendar
+
+# Query strings are not part of a page identity: a URL with a query is never
+# fetched as its own page.
+excluded_query_strings: true
+
+# Vendors without a published pack that appear on careers and integrations
+# pages. A name here becomes an estate component row, never a step-zero row.
+# Product names only.
+long_tail_vendors:
+  - name: Loomboard
+    aliases:
+      - loomboard
+      - loom board
+  - name: Cobalt Cloud
+    aliases:
+      - cobalt cloud
+      - cobaltcloud
+  - name: Northwind Analytics
+    aliases:
+      - northwind analytics
+      - northwind
+  - name: Kepler Telemetry
+    aliases:
+      - kepler telemetry
+      - kepler
+  - name: Ferrous Kiosk
+    aliases:
+      - ferrous kiosk
+      - ferrous
+  - name: Sable Messaging
+    aliases:
+      - sable messaging
+      - sable
+  - name: Apricot Works
+    aliases:
+      - apricot works
+      - apricot
+  - name: Elderberry Labs
+    aliases:
+      - elderberry labs
+      - elderberry
+  - name: Marigold Search
+    aliases:
+      - marigold search
+      - marigold
+  - name: Bluestone Forms
+    aliases:
+      - bluestone forms
+      - bluestone
+  - name: Hedgehog Fleet
+    aliases:
+      - hedgehog fleet
+      - hedgehog
+  - name: Willowview CRM
+    aliases:
+      - willowview crm
+      - willowview
+  - name: Cedarlink ID
+    aliases:
+      - cedarlink id
+      - cedarlink
+  - name: Ostrich Relay
+    aliases:
+      - ostrich relay
+      - ostrich
+  - name: Peregrine API
+    aliases:
+      - peregrine api
+      - peregrine
+
+# The page-class table of the model-call record (D-18) copied row for row for
+# the eleven page classes sent to the model. Each purpose names the calls it
+# gets (A, B or both) and the boxes allowed in that call's zone table, each
+# box with the element type and profile of its FR-CX-11 row.
+intake_zones:
+  - purpose: home
+    calls: [A, B]
+    boxes:
+      - box_key: customer_segment
+        element_type: Stakeholder
+        profile: customer_segment
+      - box_key: problem
+        element_type: Driver
+        profile: problem
+      - box_key: value_proposition
+        element_type: Value
+        profile: value_proposition
+      - box_key: channel
+        element_type: BusinessInterface
+        profile: channel
+      - box_key: key_metric
+        element_type: Outcome
+        profile: key_metric
+      - box_key: market_driver
+        element_type: Driver
+        profile: market_driver
+  - purpose: about
+    calls: [A, B]
+    boxes:
+      - box_key: key_metric
+        element_type: Outcome
+        profile: key_metric
+      - box_key: objective
+        element_type: Goal
+        profile: objective
+      - box_key: market_driver
+        element_type: Driver
+        profile: market_driver
+      - box_key: reason
+        element_type: Driver
+        profile: reason
+  - purpose: product
+    calls: [A]
+    boxes:
+      - box_key: customer_segment
+        element_type: Stakeholder
+        profile: customer_segment
+      - box_key: problem
+        element_type: Driver
+        profile: problem
+      - box_key: value_proposition
+        element_type: Value
+        profile: value_proposition
+      - box_key: solution_feature
+        element_type: Requirement
+        profile: solution_feature
+  - purpose: pricing
+    calls: [A]
+    boxes:
+      - box_key: customer_segment
+        element_type: Stakeholder
+        profile: customer_segment
+      - box_key: channel
+        element_type: BusinessInterface
+        profile: channel
+      - box_key: revenue_model
+        element_type: Value
+        profile: value_proposition
+  - purpose: customers
+    calls: [A]
+    boxes:
+      - box_key: customer_segment
+        element_type: Stakeholder
+        profile: customer_segment
+      - box_key: customer_relationship
+        element_type: BusinessService
+        profile: customer_relationship
+      - box_key: key_metric
+        element_type: Outcome
+        profile: key_metric
+  - purpose: partners
+    calls: [A]
+    boxes:
+      - box_key: channel
+        element_type: BusinessInterface
+        profile: channel
+      - box_key: key_partner
+        element_type: BusinessActor
+        profile: key_partner
+  - purpose: support
+    calls: [A]
+    boxes:
+      - box_key: customer_relationship
+        element_type: BusinessService
+        profile: customer_relationship
+  - purpose: documentation
+    calls: [A]
+    boxes:
+      - box_key: solution_feature
+        element_type: Requirement
+        profile: solution_feature
+  - purpose: comparison
+    calls: [B]
+    boxes:
+      - box_key: existing_alternative
+        element_type: Assessment
+        profile: existing_alternative
+  - purpose: strategy
+    calls: [B]
+    boxes:
+      - box_key: objective
+        element_type: Goal
+        profile: objective
+      - box_key: reason
+        element_type: Driver
+        profile: reason
+      - box_key: market_driver
+        element_type: Driver
+        profile: market_driver
+  - purpose: engineering
+    calls: [B]
+    boxes:
+      - box_key: market_driver
+        element_type: Driver
+        profile: market_driver
+
+# Purposes and page kinds that are fetched but never sent to the model: they
+# feed the deterministic rules only.
+never_sent:
+  - careers
+  - security
+  - privacy
+  - documentation_integrations
+  - engineering_index
+
+pages_to_model_max: 12
