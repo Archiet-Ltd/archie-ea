@@ -1323,6 +1323,44 @@ def test_failed_account_creation_is_audited_and_raised(app, db_session, monkeypa
     assert events[0]["target_user_id"] is None
 
 
+def test_failed_slug_lookup_before_account_creation_is_audited_and_raised(app, db_session, monkeypatch):
+    """F10"""
+    import sqlalchemy.exc
+    from app import db
+    from app.models.organization import Organization
+    from app.models.user import User
+    from app.modules.account.services.account_service import AccountService
+
+    _enable_sso(db_session)
+    address = f"f10-{_uid()}@example.com"
+    sub = f"okta-{_uid()}"
+    claims = _okta(address, sub, verified=True)
+
+    orgs_before = Organization.query.count()
+    events_before = len(_sso_events())
+
+    class _FailingLookup:
+        def filter_by(self, **kwargs):
+            return self
+
+        def first(self):
+            db.session.execute(db.text("SELECT 1 / 0"))
+
+    with monkeypatch.context() as m:
+        m.setattr(Organization, "query", _FailingLookup())
+        with pytest.raises(sqlalchemy.exc.DBAPIError):
+            AccountService.sign_in_external_identity("okta", claims)
+
+    assert User.find_by_email(address) is None
+    assert Organization.query.count() == orgs_before
+
+    events = _sso_events()[events_before:]
+    assert len(events) == 1
+    assert events[0]["outcome"] == "failed_account_creation"
+    assert events[0]["user_id"] is None
+    assert events[0]["target_user_id"] is None
+
+
 @pytest.mark.parametrize("module_path", MODULES)
 def test_service_account_is_never_signed_in_through_sso(
     app, db_session, make_org, module_path, monkeypatch, pinned_tenant

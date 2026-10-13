@@ -345,6 +345,16 @@ class AccountService:
                         confirmed=True,
                     )
                 except Exception:
+                    # A failure before _create_own_workspace's own rollback (the
+                    # slug lookup) can leave the transaction aborted; clear it so
+                    # the audit row below can be written.
+                    try:
+                        db.session.rollback()
+                    except Exception:
+                        _log.warning(
+                            "Rollback failed before recording a failed account creation",
+                            exc_info=True,
+                        )
                     AccountService._audit_external_sign_in(provider, FAILED_ACCOUNT_CREATION)
                     raise
                 return done(SIGNED_IN_NEW, user)

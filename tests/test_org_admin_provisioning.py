@@ -69,6 +69,12 @@ def provisioning(monkeypatch):
     class Organization(SimpleNamespace):
         kind = 'organization'
         query = Query('organization')
+        # Registration bounds a generated slug by the slug column's length,
+        # read from the model's table; this mirrors Organization.slug,
+        # String(100).
+        __table__ = SimpleNamespace(
+            c=SimpleNamespace(slug=SimpleNamespace(type=SimpleNamespace(length=100)))
+        )
 
     class Session:
         failed_role = False
