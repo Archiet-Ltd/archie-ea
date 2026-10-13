@@ -33,6 +33,7 @@ from flask import jsonify
 __all__ = [
     "normalize_name",
     "find_duplicate_by_name",
+    "folded_column",
     "lock_name_for_write",
     "duplicate_conflict_response",
     "allow_duplicate_requested",
@@ -46,6 +47,19 @@ def normalize_name(value: Any) -> str:
     if value is None:
         return ""
     return " ".join(str(value).split()).casefold()
+
+
+def folded_column(column):
+    """SQL twin of ``normalize_name``: collapse whitespace, trim, lowercase.
+
+    The one folding expression for name and code comparisons in SQL, so the
+    preview, the 409 and the code lookup agree on what "the same" means.
+    """
+    from app import db
+
+    return db.func.lower(
+        db.func.btrim(db.func.regexp_replace(column, r"\s+", " ", "g"))
+    )
 
 
 def find_duplicate_by_name(
@@ -79,10 +93,9 @@ def find_duplicate_by_name(
     if not normalized:
         return None
 
-    from app import db
 
     column = getattr(model, name_field)
-    query = model.query.filter(db.func.lower(db.func.btrim(column)) == normalized)
+    query = model.query.filter(folded_column(column) == normalized)
 
     if organization_id is not None and hasattr(model, "organization_id"):
         # Only apply it where the middleware has not already — otherwise this is

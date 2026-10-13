@@ -335,6 +335,34 @@ def application_create():
         return redirect(url_for("unified_applications.application_list"))
 
 
+@unified_applications_bp.route("/api/registration-check", methods=["GET"])
+@login_required
+@require_roles("admin", "architect")
+def api_registration_check():
+    """Existing applications a new registration may duplicate.
+
+    Read before the create call so the person can open an existing record
+    instead of adding a second one. A failure answers 500, never an empty list:
+    "no matches" must mean the check ran and found none.
+    """
+    from app.modules.applications.services.registration_check_service import (
+        find_registration_matches,
+    )
+
+    name = (request.args.get("name") or "").strip()[:255]
+    code = (request.args.get("application_code") or "").strip()[:50]
+    if not name and not code:
+        return jsonify({"success": True, "matches": []})
+    try:
+        matches = find_registration_matches(name, code)
+    except Exception:
+        current_app.logger.error("Registration duplicate check failed", exc_info=True)
+        return jsonify({"success": False, "error": "The duplicate check could not run."}), 500
+    for entry in matches:
+        entry["url"] = url_for("unified_applications.application_detail", id=entry["id"])
+    return jsonify({"success": True, "matches": matches})
+
+
 @unified_applications_bp.route("/<int:id>")
 @login_required
 def application_detail(id):
