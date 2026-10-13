@@ -1137,8 +1137,9 @@ class AIChatApprovalService:
 
         The automatic tenant filter does nothing when no organisation is
         active, so an unset organisation is refused here as not found rather
-        than read through an unfiltered query; and the reviewer must belong to
-        the organisation that is active.
+        than read through an unfiltered query. That the reviewer belongs to the
+        active organisation is settled by ``_acting_user`` (it loads the user
+        inside the active organisation), as it is for approve and reject.
         """
         from app.middleware.tenant_context import current_org_id
 
@@ -1146,7 +1147,7 @@ class AIChatApprovalService:
         if actor_error:
             return None, None, actor_error
         org_id = current_org_id()
-        if org_id is None or actor.organization_id != org_id:
+        if org_id is None:
             return None, None, {
                 "success": False,
                 "code": "NOT_FOUND",
