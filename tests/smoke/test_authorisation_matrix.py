@@ -63,6 +63,12 @@ POLICY = {
     "/my-applications/list":   {"application_manager"},
     "/my-applications/health": {"application_manager"},
     "/applications/ownership-coverage": {"cto", "portfolio_manager"},
+    # The duplicate lookup in the Add Application dialog carries the same
+    # @require_roles("admin", "architect") as the create route it precedes.
+    # Every archetype holds the Architect role (platform_admin the
+    # Administrator role), so every archetype reaches it; the read-only
+    # Viewer role, which is refused, is pinned in tests/test_application_registration_check.py.
+    "/applications/api/registration-check": set(ARCHETYPES),
     "/ai-chat":                set(ARCHETYPES),
     # Ask and Twin map: both pages carry @login_required and no role gate, so
     # every archetype is expected to reach them. Stating that in two rows is
@@ -222,6 +228,17 @@ for _allowed in POLICY.values():
 
 ACCOUNT_POST_POLICY = {
     "/account/switch-organization": set(ARCHETYPES),
+}
+
+# Initiative goal links: add is @login_required only, like the sibling
+# portfolio write routes -- deliberately open to every signed-in persona; the
+# boundary that matters is the organisation, enforced in the service and
+# covered by tests/test_initiative_goal_links.py. An empty form is posted so
+# the route answers (redirect) before it looks anything up. The remove route
+# carries the same decorator; it needs a real link to answer 302, so its
+# boundary is pinned in the isolation tests instead.
+GOAL_LINK_POST_POLICY = {
+    "/portfolio/initiatives/0/goals": set(ARCHETYPES),
 }
 
 OVERSIGHT_POST_POLICY = {
@@ -730,6 +747,25 @@ def test_account_switch_organization_authorisation(
             "csrf_token": csrf,
         },
         max_redirects=0,
+    )
+    expected = ALLOWED if archetype in allowed else DENIED
+    actual = ALLOWED if response.status < 400 else DENIED
+    assert actual == expected, (
+        "%s reached %s: expected %s, got %s" % (archetype, path, expected, actual)
+    )
+
+
+@pytest.mark.parametrize("path,allowed", GOAL_LINK_POST_POLICY.items())
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_initiative_goal_link_post_authorisation(
+    archetype, path, allowed, page, live_server, seeded
+):
+    """The goal-link add route is login_required-open to every persona."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.post(
+        live_server + path, form={"csrf_token": csrf}, max_redirects=0
     )
     expected = ALLOWED if archetype in allowed else DENIED
     actual = ALLOWED if response.status < 400 else DENIED
