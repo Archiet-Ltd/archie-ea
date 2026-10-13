@@ -139,10 +139,31 @@
         publicMenuBtn.addEventListener('click', () => {
             // No stopPropagation here: letting the click bubble to the
             // document-level listener above lets it close the signed-in
-            // user dropdown too, so the two never end up open at once.
+            // user dropdown when it is already open (dropdown open, then
+            // Menu). The opposite order -- Menu open, then the avatar --
+            // goes through the listener added below on #userMenuBtn, which
+            // closes this panel instead: see that listener for why
+            // stopPropagation() in the user-menu handler above does not
+            // stop it.
             const isOpen = publicMenuBtn.getAttribute('aria-expanded') === 'true';
             setPublicMenuOpen(!isOpen, false);
         });
+
+        // Closing the panel from the avatar (Menu open, then the avatar):
+        // the user-menu handler above calls stopPropagation(), so a click on
+        // #userMenuBtn never bubbles to the document-level listener that
+        // would otherwise close this panel on an outside click.
+        // stopPropagation() only stops the click bubbling past this element;
+        // it does not stop a second listener registered directly on the same
+        // element, so this one still runs and closes the panel when open.
+        const userMenuBtnForPanel = document.getElementById('userMenuBtn');
+        if (userMenuBtnForPanel) {
+            userMenuBtnForPanel.addEventListener('click', () => {
+                if (publicMenuBtn.getAttribute('aria-expanded') === 'true') {
+                    setPublicMenuOpen(false, false);
+                }
+            });
+        }
 
         // Choosing a link closes the panel.
         publicMenuPanel.addEventListener('click', (e) => {
