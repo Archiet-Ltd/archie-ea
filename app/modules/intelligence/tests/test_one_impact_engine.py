@@ -759,24 +759,35 @@ def test_accountability_returns_owners_from_walk(app, db_session, make_org):
 
 
 def test_owner_fetch_query_count(app, db_session, make_org):
-    """Owner fetch issues a bounded number of queries, independent of page size.
-    The batch resolution uses a constant number of queries regardless of how
-    many rows are on the page."""
+    """The owner fetch adds a small constant number of reads at every page
+    size: one batched ApplicationOwner read plus one batched user-name read.
+
+    The delta between with_owner=True and with_owner=False is measured at
+    ONE page size — totals are never compared across page sizes, because
+    other per-page work issues reads that vary with the page size and would
+    drown the signal.  The same delta must hold at page sizes 2, 10 and 50:
+    if user-name resolution ran once per row, the delta would grow with the
+    page and this test would fail."""
     import sqlalchemy as sa
 
     org = make_org("owner-query-count")
     root = _element(db_session, org.id, "Root")
+    user = _make_user(db_session, org, "Diana", "Owner")
     children = []
     for i in range(10):
         child = _element(db_session, org.id, f"Child-{i}")
         _relationship(db_session, org.id, root, child)
+        comp = _application_component(db_session, org.id, child.id, name=f"App-{i}")
+        _application_owner(db_session, org, None, None, user, "primary", application_id=comp.id)
         children.append(child)
     db_session.commit()
 
     from app.modules.intelligence.services.query_service import IntelligenceQueryService
 
-    def _count_queries(org_id, page_size):
-        """Run cross_layer_impact and count queries."""
+    def _count_queries(org_id, page_size, with_owner):
+        """Run cross_layer_impact and count its data reads (the tenant
+        middleware's per-read `set_config` statements excluded — they are
+        infrastructure, not reads of the owner fetch)."""
         with app.test_request_context("/"):
             from flask import g
 
@@ -785,7 +796,8 @@ def test_owner_fetch_query_count(app, db_session, make_org):
             queries = []
 
             def _listener(conn, cur, stmt, params, context, executemany):
-                queries.append(stmt)
+                if not str(stmt).startswith("SELECT set_config"):
+                    queries.append(stmt)
 
             sa.event.listen(sa.engine.Engine, "before_cursor_execute", _listener)
             try:
@@ -793,7 +805,7 @@ def test_owner_fetch_query_count(app, db_session, make_org):
                     root.id,
                     include_derived=False,
                     max_depth=3,
-                    with_owner=True,
+                    with_owner=with_owner,
                     page_size=page_size,
                 )
             finally:
@@ -801,18 +813,28 @@ def test_owner_fetch_query_count(app, db_session, make_org):
 
             return len(queries)
 
-    # Count queries with a small page and a large page — the owner fetch
-    # should issue the same number of queries regardless.
-    query_count_small = _count_queries(org.id, 2)
-    query_count_large = _count_queries(org.id, 10)
+    # The first read of the test session carries connection-setup work (an
+    # extra archimate_elements read) that would otherwise land on the first
+    # measurement and not the rest; discard one warm-up call before counting.
+    _count_queries(org.id, page_size=None, with_owner=False)
 
-    # The query count should be bounded and similar regardless of page size.
-    # The owner resolution adds at most 2 queries (one for ApplicationOwner,
-    # one for User resolution) regardless of page size.
-    assert abs(query_count_small - query_count_large) <= 2, (
-        f"Query count differs too much between page_size=2 ({query_count_small}) "
-        f"and page_size=10 ({query_count_large})"
-    )
+    deltas = []
+    for page_size in (2, 10, 50):
+        without_owners = _count_queries(org.id, page_size, with_owner=False)
+        with_owners = _count_queries(org.id, page_size, with_owner=True)
+        deltas.append(with_owners - without_owners)
+
+    # The owner fetch is constant: the ApplicationComponent and enterprise
+    # ApplicationOwnership lookups in the batch owner reader, then the
+    # ApplicationComponent lookup, the one batched ApplicationOwner read and
+    # the one batched user-name read — five reads at every page size, never
+    # one more per row.
+    for page_size, delta in zip((2, 10, 50), deltas):
+        assert delta == 5, (
+            f"owner fetch added {delta} reads at page_size={page_size}, "
+            f"expected the constant 5; if the delta grows with the page the "
+            f"user-name resolution is running once per row"
+        )
 
 
 def test_capability_owner_does_not_leak_to_application_row(app, db_session, make_org):
