@@ -140,6 +140,7 @@ def backfill_archimate_elements_command(dry_run, motivation_only):
     if not motivation_only:
         from app.models.application_portfolio import ApplicationComponent
         from app.models.business_capabilities import BusinessCapability
+        from app.services.archimate_backbone import sync_archimate_element
 
         apps_missing = ApplicationComponent.query.filter(
             ApplicationComponent.archimate_element_id.is_(None)
@@ -160,21 +161,12 @@ def backfill_archimate_elements_command(dry_run, motivation_only):
                 if not batch:
                     break
                 for app_comp in batch:
-                    ae = ArchiMateElement(
-                        # ArchiMateElement.name is String(100); source names can be
-                        # longer, which would raise mid-batch and abort the backfill.
-                        name=(app_comp.name or "")[:100],
-                        type="ApplicationComponent",
-                        layer="Application",
-                        description=app_comp.description or f"Application: {app_comp.name}",
-                        # No request context here, so before_flush will not stamp
-                        # this — inherit the organisation of the row it mirrors.
-                        organization_id=getattr(app_comp, "organization_id", None),
-                    )
-                    db.session.add(ae)
-                    db.session.flush()
-                    app_comp.archimate_element_id = ae.id
-                    app_created += 1
+                    try:
+                        element = sync_archimate_element(app_comp)
+                        if element is not None:
+                            app_created += 1
+                    except Exception:
+                        pass
                 db.session.commit()
             click.echo(f"  → Created {app_created} ApplicationComponent elements")
             total_created += app_created
@@ -187,17 +179,12 @@ def backfill_archimate_elements_command(dry_run, motivation_only):
                 if not batch:
                     break
                 for cap in batch:
-                    ae = ArchiMateElement(
-                        name=(cap.name or "")[:100],
-                        type="Capability",
-                        layer="Strategy",
-                        description=cap.description or f"Capability: {cap.name}",
-                        organization_id=getattr(cap, "organization_id", None),
-                    )
-                    db.session.add(ae)
-                    db.session.flush()
-                    cap.archimate_element_id = ae.id
-                    cap_created += 1
+                    try:
+                        element = sync_archimate_element(cap)
+                        if element is not None:
+                            cap_created += 1
+                    except Exception:
+                        pass
                 db.session.commit()
             click.echo(f"  → Created {cap_created} Capability elements")
             total_created += cap_created
