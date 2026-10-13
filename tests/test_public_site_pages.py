@@ -110,6 +110,97 @@ def test_home_page_navbar_links_key_site_pages(app):
             assert f'href="/{slug}"' in html, f"navbar missing link to /{slug}"
 
 
+# ── Narrow-screen menu button (B-06) ────────────────────────────────────────
+#
+# Below 768px the public header has no way to reach the primary nav links at
+# all (F-13): the desktop <nav aria-label="Primary"> is hidden with `hidden
+# md:flex` and nothing replaces it. These tests check the markup the three
+# shared-navbar pages below render, independent of viewport (CSS visibility
+# is covered by the browser check in the build report). The navbar is shared,
+# so the same assertions hold on the home page, a module page and /pricing.
+NAV_MENU_CHECK_PATHS = ["/", "/modules/arb", "/pricing"]
+
+
+@pytest.mark.parametrize("path", NAV_MENU_CHECK_PATHS)
+def test_navbar_menu_button_controls_panel(app, path):
+    """The menu button exists, names the panel it controls, starts closed,
+    and has the accessible name "Menu"; the panel it names exists too."""
+    import re
+
+    with app.test_client() as client:
+        html = client.get(path).data.decode()
+        button_match = re.search(r'<button\b[^>]*id="publicMenuBtn"[^>]*>', html)
+        assert button_match, f"{path}: no button#publicMenuBtn found"
+        button_html = button_match.group(0)
+        assert 'aria-controls="publicMenuPanel"' in button_html, (
+            f'{path}: button missing aria-controls="publicMenuPanel"'
+        )
+        assert 'aria-expanded="false"' in button_html, (
+            f'{path}: button\'s initial aria-expanded is not "false"'
+        )
+        assert 'aria-label="Menu"' in button_html, (
+            f'{path}: button\'s accessible name is not "Menu"'
+        )
+        assert re.search(r'id="publicMenuPanel"', html), (
+            f"{path}: no element with id=\"publicMenuPanel\" found"
+        )
+
+
+@pytest.mark.parametrize("path", NAV_MENU_CHECK_PATHS)
+def test_navbar_menu_panel_lists_the_same_links(app, path):
+    """The narrow-screen panel's <nav aria-label="Menu"> carries exactly the
+    same hrefs, in the same order, as the desktop <nav aria-label="Primary">
+    -- plus the sign-in URL last, since the request is anonymous."""
+    import re
+
+    with app.test_client() as client:
+        html = client.get(path).data.decode()
+
+        primary_match = re.search(
+            r'<nav aria-label="Primary".*?</nav>', html, re.DOTALL
+        )
+        assert primary_match, f"{path}: no <nav aria-label=\"Primary\"> found"
+        primary_hrefs = re.findall(r'<a href="([^"]+)"', primary_match.group(0))
+
+        menu_match = re.search(r'<nav aria-label="Menu".*?</nav>', html, re.DOTALL)
+        assert menu_match, f"{path}: no <nav aria-label=\"Menu\"> found"
+        menu_hrefs = re.findall(r'<a href="([^"]+)"', menu_match.group(0))
+
+        assert menu_hrefs == primary_hrefs + ["/account/login"], (
+            f"{path}: menu panel hrefs {menu_hrefs!r} do not equal the primary "
+            f"nav's hrefs {primary_hrefs!r} plus the sign-in URL last"
+        )
+
+
+@pytest.mark.parametrize("path", NAV_MENU_CHECK_PATHS)
+def test_primary_nav_unchanged_shape(app, path):
+    """The desktop <nav aria-label="Primary"> still renders at least one
+    link, each <a> still written with href as its first attribute -- the
+    one link list feeding both navs did not change what the desktop nav
+    renders. The exact count is not pinned here: a separate test
+    (test_navbar_menu_panel_lists_the_same_links) already proves the menu
+    panel's link list matches the primary nav's exactly, so drift between
+    the two is caught regardless of how many links there are."""
+    import re
+
+    with app.test_client() as client:
+        html = client.get(path).data.decode()
+        primary_match = re.search(
+            r'<nav aria-label="Primary".*?</nav>', html, re.DOTALL
+        )
+        assert primary_match, f"{path}: no <nav aria-label=\"Primary\"> found"
+        primary_html = primary_match.group(0)
+        links = re.findall(r"<a\b[^>]*>", primary_html)
+        assert len(links) >= 1, (
+            f"{path}: expected at least one link in the primary nav, found none"
+        )
+        for link in links:
+            assert link.startswith('<a href="'), (
+                f"{path}: a primary-nav link does not have href as its first "
+                f"attribute: {link!r}"
+            )
+
+
 def test_signup_redirects_to_real_register_form(app):
     """/signup is a 301 to the real sign-up page; no second form is built."""
     with app.test_client() as client:
