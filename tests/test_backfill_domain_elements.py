@@ -780,58 +780,60 @@ def test_backfill_flush_failure_clears_pending_map(app):
 
 def test_backfill_reentry_guard_is_per_session(app):
     """The re-entry guard is keyed by (session_id, obj_id); a rollback in one
-    session does not clear the guard for another session (fails when the guard
-    is module-global: a rollback in session A clears the guard for session B,
-    causing session B to create duplicate elements)."""
+    session clears only that session's guard entries and leaves the other
+    session's held entry in place (fails when the guard is module-global or
+    the rollback clears the whole map)."""
     from app import db
     from app.models.implementation_migration import WorkPackage
     from app.services import archimate_backbone
+
+    def _hold_guard(session, obj):
+        key = (id(session), id(obj))
+        if isinstance(archimate_backbone._SYNCING, dict):
+            archimate_backbone._SYNCING[key] = True
+        else:
+            archimate_backbone._SYNCING.add(key)
+        return key
 
     orgs = _seed_orgs(app, ["bf-reentry"])
     org_id = orgs["bf-reentry"]
     try:
         with app.app_context():
-            # Session A: create a work package and roll back.
             session_a = db.session.session_factory()
+            session_b = db.session.session_factory()
             try:
+                # Session A holds a re-entry guard entry for its work package,
+                # as it would while sync_archimate_element is mid-flight.
                 wp_a = WorkPackage(
                     name="Session A WP",
                     context="application",
                     organization_id=org_id,
                 )
                 session_a.add(wp_a)
-                session_a.flush()
-                # Rollback should clear only session A's _SYNCING keys.
-                session_a.rollback()
-            finally:
-                session_a.close()
+                key_a = _hold_guard(session_a, wp_a)
 
-            # Session B: create a work package; it must get exactly one element.
-            session_b = db.session.session_factory()
-            try:
+                # Session B also holds one, then rolls back. Under the fixed
+                # guard only session B's keys are cleared; session A's held
+                # entry must survive the other session's rollback.
                 wp_b = WorkPackage(
                     name="Session B WP",
                     context="application",
                     organization_id=org_id,
                 )
                 session_b.add(wp_b)
-                session_b.flush()
-                assert wp_b.archimate_element_id is not None, (
-                    "session B must get an element despite session A's rollback"
-                )
-                session_b.commit()
+                key_b = _hold_guard(session_b, wp_b)
 
-                # Verify exactly one element was created for session B's WP.
-                from app.models.archimate_core import ArchiMateElement
-                elements = session_b.query(ArchiMateElement).filter(
-                    ArchiMateElement.organization_id == org_id,
-                    ArchiMateElement.type == "WorkPackage",
-                ).all()
-                assert len(elements) == 1, (
-                    "exactly one element for session B, not a duplicate "
-                    "caused by a stale guard from session A"
+                session_b.rollback()
+
+                assert key_b not in archimate_backbone._SYNCING, (
+                    "session B's rollback must clear only session B's guard entries"
+                )
+                assert key_a in archimate_backbone._SYNCING, (
+                    "session A's guard entry must survive session B's rollback"
                 )
             finally:
+                archimate_backbone._SYNCING.clear()
+                session_a.close()
                 session_b.close()
     finally:
         _cleanup(app, [org_id])
