@@ -238,7 +238,7 @@ def test_update_baseline_refuses_to_raise_a_pattern_total(tmp_path):
     ok, messages = gate.update_baseline(root, entries)
 
     assert ok is False
-    assert any("name-matching/normaliser" in m and "1 -> 2" in m for m in messages)
+    assert any("name-matching/normaliser" in m and "app/b.py" in m for m in messages)
     assert (root / "scripts" / "reuse_register_baseline.json").read_text() == before
 
 
@@ -388,17 +388,90 @@ def test_a_moved_file_with_baselined_hits_is_not_a_new_violation(tmp_path):
     assert written == {"name-matching/normaliser": {"app/new_name.py": 1}}
 
 
-def test_the_baseline_is_not_above_the_one_on_origin_main():
-    """Ratchet integrity: a branch cannot raise a pattern's baseline total relative to main."""
+def test_one_marker_does_not_clear_a_block(tmp_path):
+    """Probe A: a marker four lines below, on an unrelated statement, exempts nothing above it."""
+    code = (
+        "a = ArchiMateElement(1)\nb = ArchiMateElement(2)\nc = 1\nd = 2  # reuse-ok: other\n"
+    )
+    fails, _ = _run(_tree(tmp_path, register=ELEMENT_REGISTER, extra={"app/a.py": code}))
+    assert len(fails) == 1 and "app/a.py:1" in fails[0] and "app/a.py:2" in fails[0]
+
+
+def test_a_marker_far_below_with_no_colon_does_not_exempt(tmp_path):
+    """Probe B: nineteen lines later is not the same statement."""
+    code = "a = ArchiMateElement(1)\n" + "x = 1\n" * 18 + "y = 2  # reuse-ok: far away\n"
+    assert len(_run(_tree(tmp_path, register=ELEMENT_REGISTER, extra={"app/a.py": code}))[0]) == 1
+
+
+def test_a_marker_on_the_previous_code_line_does_not_exempt(tmp_path):
+    """Probe C: only a comment-only line above counts."""
+    code = "q = 1  # reuse-ok: q only\na = ArchiMateElement(1)\n"
+    assert len(_run(_tree(tmp_path, register=ELEMENT_REGISTER, extra={"app/a.py": code}))[0]) == 1
+
+
+def test_a_multiline_call_is_exempt_by_a_marker_inside_its_brackets(tmp_path):
+    code = "a = ArchiMateElement(\n    name='x',  # reuse-ok: fixture\n)\nb = ArchiMateElement(2)\n"
+    fails, _ = _run(_tree(tmp_path, register=ELEMENT_REGISTER, extra={"app/a.py": code}))
+    assert len(fails) == 1 and "app/a.py:4" in fails[0]
+
+
+def test_cleanup_elsewhere_does_not_make_room_for_a_new_copy(tmp_path):
+    """Slack absorption: old.py baselined at 2 now has 1; a new copy in another file still fails."""
+    baseline = {"name-matching/normaliser": {"app/old.py": 2}}
+    root = _tree(tmp_path, extra={"app/old.py": COPY, "app/new_route.py": COPY}, baseline=baseline)
+    fails, _ = _run(root)
+    assert len(fails) == 1 and "app/new_route.py" in fails[0]
+
+    entries, _ = gate.load_register(root)
+    ok, messages = gate.update_baseline(root, entries)
+    assert ok is False and any("app/new_route.py" in m for m in messages)
+
+
+def test_a_rename_is_forgiven_only_up_to_the_vanished_files_hits(tmp_path):
+    baseline = {"name-matching/normaliser": {"app/gone.py": 1}}
+    one = _tree(tmp_path, extra={"app/renamed.py": COPY}, baseline=baseline)
+    assert _run(one)[0] == []
+    two = _tree(tmp_path / "t", extra={"app/renamed.py": COPY, "app/extra.py": COPY}, baseline=baseline)
+    assert len(_run(two)[0]) == 1
+
+
+def _main_baseline_totals():
+    """Pattern totals of the baseline on origin/main: None when there is no remote to ask,
+    {} when main carries no baseline file yet (the first merge)."""
     import subprocess
 
-    proc = subprocess.run(
-        ["git", "show", "origin/main:scripts/reuse_register_baseline.json"],
-        cwd=REPO, capture_output=True, text=True, encoding="utf-8",
-    )
+    def show():
+        return subprocess.run(
+            ["git", "show", "origin/main:scripts/reuse_register_baseline.json"],
+            cwd=REPO, capture_output=True, text=True, encoding="utf-8",
+        )
+
+    proc = show()
     if proc.returncode != 0:
-        pytest.skip("origin/main does not resolve or does not carry the baseline yet")
-    main_totals = {k: sum(v.values()) for k, v in json.loads(proc.stdout)["patterns"].items()}
+        # CI checks out depth 1 with no origin/main; fetch it once before deciding.
+        fetch = subprocess.run(
+            ["git", "fetch", "--depth=1", "origin", "main:refs/remotes/origin/main"],
+            cwd=REPO, capture_output=True, text=True, encoding="utf-8",
+        )
+        if fetch.returncode != 0:
+            return None
+        proc = show()
+        if proc.returncode != 0:
+            return {}
+    return {k: sum(v.values()) for k, v in json.loads(proc.stdout)["patterns"].items()}
+
+
+def test_the_baseline_is_not_above_the_one_on_origin_main():
+    """Ratchet integrity: a branch cannot raise a pattern's baseline total relative to main.
+
+    Skipped only when there is no remote to fetch from. When main has no baseline file yet (the first
+    merge) every total is compared with zero and the test passes: the file is being introduced, and
+    the gate itself bounds it by the tree."""
+    main_totals = _main_baseline_totals()
+    if main_totals is None:
+        pytest.skip("no remote to fetch origin/main from")
+    if not main_totals:
+        return
     mine = {k: sum(v.values()) for k, v in gate.load_baseline(REPO).items()}
     raised = {k: (main_totals.get(k, 0), n) for k, n in mine.items() if n > main_totals.get(k, 0)}
     assert raised == {}, f"baseline raised against origin/main: {raised}"

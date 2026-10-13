@@ -25,8 +25,9 @@ What it checks
 (b) Every ``must_not_create`` regex is run over its scope (default: ``app/**/*.py``).
     A match in any file other than the canonical file or a ``known_exceptions`` path is
     a *hit*. Hits that already existed are recorded per pattern and per file in
-    ``scripts/reuse_register_baseline.json``; the total for a pattern may not exceed its
-    baseline total, so a new copy fails wherever it is added (a moved file with baselined hits is not one).
+    ``scripts/reuse_register_baseline.json``; a file may hold no more hits of a pattern than its own
+    baseline, except that growth is forgiven up to the baselined hits of files that no longer exist
+    (a rename). A cleanup elsewhere never makes room for a new copy.
 (c) A failure prints the register entry: what to reuse, and where it lives.
 
 Entries in status ``pending`` name a canonical implementation that is merged in another
@@ -38,7 +39,7 @@ enforce nothing: the register says plainly that no one owner has been chosen.
 The baseline
 ------------
 ``--update-baseline`` rewrites the baseline to the current hit counts and REFUSES to
-raise any pattern's total: lowering is routine after a cleanup, raising is done by
+let a pattern grow (renames excepted): lowering is routine after a cleanup, raising is done by
 fixing the code, or by a ``known_exceptions`` entry (with a reason) in the register,
 which shows up in review. A baseline higher than the tree is reported as slack (the
 count may be lowered) but is not a failure, so a cleanup in one pull request never breaks
@@ -260,15 +261,19 @@ def mask_strings(text: str) -> str:
     return "".join(chars)
 
 
-def _exempt(lines: list[str], idx: int) -> bool:
-    """`reuse-ok: <reason>` on the line before the match, or on any line from the match to the first
-    line ending in a colon (a black-formatted multi-line def), the convention of check_untenanted_reads."""
-    if idx > 0 and MARKER.search(lines[idx - 1]):
+def _exempt(lines: list[str], masked_lines: list[str], idx: int, col: int) -> bool:
+    """`reuse-ok: <reason>` on the match, on a comment-only line directly above it, or on a later line of
+    the same statement: a multi-line def or call, followed only while the bracket opened at the match is
+    still open (the check_untenanted_reads convention). One marker never covers a following block."""
+    if idx > 0 and lines[idx - 1].lstrip().startswith(("#", "{#")) and MARKER.search(lines[idx - 1]):
         return True
-    for line in lines[idx:idx + 20]:
-        if MARKER.search(line):
+    depth = 0
+    for i in range(idx, min(idx + 60, len(lines))):
+        if MARKER.search(lines[i]):
             return True
-        if line.rstrip().endswith(":"):
+        seg = masked_lines[i][col:] if i == idx else masked_lines[i]
+        depth += sum(seg.count(c) for c in "([") - sum(seg.count(c) for c in ")]")
+        if depth <= 0:
             break
     return False
 
@@ -306,10 +311,12 @@ def find_hits(root: Path, entries):
             if masked is None:
                 masked = mask_strings(text) if path.suffix == ".py" else text
                 lines = text.split(NL)
+                mlines = masked.split(NL)
             for m in rx.finditer(masked):
                 n = masked.count(NL, 0, m.start()) + 1
                 line = lines[n - 1]
-                if line.lstrip().startswith(("#", "{#")) or _exempt(lines, n - 1):
+                col = m.start() - (masked.rfind(NL, 0, m.start()) + 1)
+                if line.lstrip().startswith(("#", "{#")) or _exempt(lines, mlines, n - 1, col):
                     continue
                 bucket = hits[(e["id"], p["id"])].setdefault(rel, [])
                 if n not in bucket:
@@ -332,23 +339,30 @@ def load_baseline(root: Path, baseline: Path | None = None) -> dict:
     return json.loads(path.read_text(encoding="utf-8")).get("patterns", {})
 
 
-def compare(entries, hits, baseline) -> tuple[list[str], list[str]]:
+def excess_of(root: Path, files: dict, base: dict) -> dict[str, int]:
+    """{file: hits above its own baseline} for one pattern, or {} when the excess is only a move.
+
+    The per-file baseline is the rule. Excess is forgiven only up to the baselined hits of files that no
+    longer exist (a rename), so an in-place cleanup elsewhere never makes room for a new copy."""
+    growth = {rel: len(v) - base.get(rel, 0) for rel, v in files.items() if len(v) > base.get(rel, 0)}
+    moved = sum(n for rel, n in base.items() if not (root / rel).exists())
+    return {} if sum(growth.values()) <= moved else growth
+
+
+def compare(entries, hits, baseline, root: Path) -> tuple[list[str], list[str]]:
     """(violations, slack notes) for rule (b) and (c)."""
     by_id = {e["id"]: e for e in entries}
     fails, slack = [], []
     for (eid, pid), files in sorted(hits.items()):
         base = baseline.get(f"{eid}/{pid}", {})
         e = by_id[eid]
-        total, allowed_total = sum(len(v) for v in files.values()), sum(base.values())
-        if total <= allowed_total:
-            continue  # a moved or renamed file with baselined hits is not a new copy
-        excess = [(rel, lines) for rel, lines in sorted(files.items()) if len(lines) > base.get(rel, 0)]
-        where = ", ".join(
-            f"{rel}:{n}" for rel, lines in excess for n in sorted(lines)[-(len(lines) - base.get(rel, 0)):]
-        )
+        growth = excess_of(root, files, base)
+        if not growth:
+            continue
+        where = ", ".join(f"{rel}:{n}" for rel in sorted(growth) for n in sorted(files[rel])[-growth[rel]:])
         canon = e.get("canonical") or {}
         fails.append(
-            f"[{eid}/{pid}] {total} match(es), baseline allows {allowed_total}; new or grown in: {where}.\n"
+            f"[{eid}/{pid}] new or grown in: {where} (baseline allows {sum(base.values())} in total, per file).\n"
             f"      concept: {e['concept']}\n"
             f"      reuse:   {str(e.get('reuse', '')).strip()}\n"
             f"      where:   {canon.get('path', '?')} ({', '.join(canon.get('symbols') or [])})\n"
@@ -375,9 +389,9 @@ def update_baseline(root: Path, entries, baseline_path: Path | None = None):
     messages = []
     if old is not None:
         for key, files in current.items():
-            total, before = sum(files.values()), sum(old.get(key, {}).values())
-            if total > before:
-                messages.append(f"refused: {key} would rise {before} -> {total}")
+            grown = excess_of(root, {r: [0] * n for r, n in files.items()}, old.get(key, {}))
+            if grown:
+                messages.append(f"refused: {key} would rise in {', '.join(sorted(grown))}")
         if messages:
             messages.append("The baseline only falls. Reuse the canonical implementation, or add a "
                             "known_exceptions entry with a reason to the register.")
@@ -406,7 +420,7 @@ def run(root: Path, register: Path | None = None, baseline: Path | None = None):
         return problems, []
     fails, notes = check_canonicals(root, entries)
     hits = find_hits(root, entries)
-    more, slack = compare(entries, hits, load_baseline(root, baseline))
+    more, slack = compare(entries, hits, load_baseline(root, baseline), root)
     return fails + more, notes + slack
 
 
