@@ -398,6 +398,83 @@ class BillingService:
         return billing_plans.effective_plan(sub)
 
     @classmethod
+    def _invoiceable(cls, plan_key: str, interval: str):
+        """Like _purchasable, but for the platform-admin invoice-billing
+        path (R1-B95 PR 2): a plan the self-serve checkout refuses (today,
+        only Enterprise -- "sold by annual contract, contact sales") can
+        still be invoiced by net terms once an administrator starts that
+        contract, since invoice billing never goes through the self-serve
+        page _purchasable guards. Any plan with a configured price for
+        *interval* qualifies, purchasable or not; a plan with no price
+        configured at all (not just not self-serve) still raises.
+        """
+        plan = billing_plans.get_plan(plan_key)
+        if plan.key != plan_key:
+            raise BillingError("Choose a plan from the list.")
+        if interval not in billing_plans.INTERVALS:
+            raise BillingError("Choose monthly or annual billing.")
+        price_id = billing_plans.price_id_for(plan.key, interval)
+        if not price_id:
+            raise BillingNotConfigured(
+                f"The {plan.name} {'annual' if interval == 'year' else 'monthly'} price is "
+                "not set up on this installation."
+            )
+        return plan, price_id
+
+    @classmethod
+    def start_invoice_billing(
+        cls,
+        org,
+        plan_key: str,
+        interval: str,
+        seats: Optional[int] = None,
+        days_until_due: int = 30,
+    ):
+        """Start net-terms invoice billing for *org* (R1-B95 PR 2, TB-0193):
+        an enterprise organisation invoiced instead of paying by card.
+
+        Creates a real Stripe subscription directly (not through hosted
+        checkout, which only ever offers a card) with
+        ``collection_method="send_invoice"`` and the given
+        ``days_until_due`` (30 for the brief's net-30 case). Stripe emails
+        the customer an invoice for each billing period rather than
+        charging a card on file; this platform never touches the
+        settlement itself, the same posture as the existing card path.
+
+        Refuses when the organisation already has a live subscription --
+        same rule as create_checkout_session, enforced here too so this
+        platform-admin path cannot silently override an org's existing,
+        self-managed subscription.
+
+        The caller must hold platform-admin authority; this method itself
+        does not check it (see billing_routes.py/admin_routes.py callers).
+        """
+        api = _api()
+        plan, price_id = cls._invoiceable(plan_key, interval)
+        quantity = cls._quantity(plan, seats)
+        sub = billing_plans.ensure_subscription(org)
+        if cls.has_live_subscription(sub):
+            raise BillingError(
+                "Your organisation already has a subscription. Cancel or change it first."
+            )
+        customer_id = cls.create_customer(org)
+        stripe_sub = _call(
+            api.Subscription.create,
+            customer=customer_id,
+            items=[{"price": price_id, "quantity": quantity}],
+            collection_method="send_invoice",
+            days_until_due=days_until_due,
+            metadata={"org_id": str(org.id), "plan": plan.key},
+        )
+        cls._apply_subscription(sub, stripe_sub)
+        db.session.commit()
+        logger.info(
+            "Invoice billing started for org %s: plan %s/%s, net-%s",
+            org.id, plan.key, interval, days_until_due,
+        )
+        return billing_plans.effective_plan(sub)
+
+    @classmethod
     def price_summary(cls, plan_key: str, interval: str) -> Optional[Dict]:
         """The configured price as the provider holds it, or None when unknown."""
         try:
@@ -760,3 +837,15 @@ class BillingService:
         if period_end is not None:
             sub.current_period_end = period_end
         sub.cancel_at_period_end = bool(_field(obj, "cancel_at_period_end", False) or _field(obj, "cancel_at"))
+
+        # R1-B95 PR 2 (TB-0193): mirror Stripe's own collection_method/
+        # days_until_due rather than inferring them, so a subscription
+        # provider events apply to later (e.g. a dunning-triggered switch
+        # back to charge_automatically) stays in sync without this module
+        # having to special-case that transition.
+        collection_method = _field(obj, "collection_method")
+        if isinstance(collection_method, str):
+            sub.collection_method = collection_method
+        days_until_due = _field(obj, "days_until_due")
+        if isinstance(days_until_due, int):
+            sub.days_until_due = days_until_due
