@@ -24,6 +24,8 @@ import uuid
 
 import pytest
 
+from tests import _isolation_sweep as sweep
+
 _PASSWORD = "Str0ng!Passw0rd"
 SENDER = "no-reply@example.com"
 
@@ -117,19 +119,9 @@ def _users_with_email(db_session, email):
     return db_session.query(User).filter(func.lower(User.email) == email.lower()).all()
 
 
-def _forget_cached_user():
-    """Drop any signed-in user cached on ``g`` so the next request is judged on its session cookie alone."""
-    from flask import g, has_app_context
-
-    if has_app_context():
-        for cached in ("_login_user", "_current_user", "current_org_id", "current_org"):
-            if hasattr(g, cached):
-                delattr(g, cached)
-
-
 def _anonymous_client(app):
     """A client with no session, and no signed-in user cached on ``g``."""
-    _forget_cached_user()
+    sweep._clear_g()
     return app.test_client()
 
 
@@ -398,7 +390,7 @@ def test_login_does_not_redirect_another_orgs_user_to_the_claiming_idp(app, db_s
     """The registered (v2) login."""
     from app.services.sso_service import SSOService
 
-    claimed = _domain("victimcorp")
+    claimed = _domain("claimedcorp")
     org_x = make_org("scope-claiming")
     org_y = make_org("scope-holding")
     config = _configure_sso(db_session, org_x, claimed)
@@ -441,7 +433,7 @@ def test_v1_login_does_not_redirect_another_orgs_user_to_the_claiming_idp(monkey
     v1_app.config["WTF_CSRF_ENABLED"] = False
     assert "app.modules.account.routes.account_routes" in v1_app.view_functions["account.login"].__module__
 
-    claimed = _domain("victimcorp-v1")
+    claimed = _domain("claimedcorp-v1")
     with v1_app.app_context():
         suffix = uuid.uuid4().hex[:10]
         org_x = Organization(name=f"Test v1-claiming {suffix}", slug=f"test-v1-claiming-{suffix}")
@@ -630,7 +622,7 @@ def test_cross_org_member_in_a_claimed_domain_is_still_refused(db_session, make_
     belongs to another organisation, is refused and that account unchanged."""
     from app.services.sso_service import SSONotConfiguredError, SSOService
 
-    claimed = _domain("victimcorp")
+    claimed = _domain("claimedcorp")
     home = make_org("scope-home")
     claiming = make_org("scope-claimer")
     _configure_sso(db_session, claiming, claimed)
@@ -1434,7 +1426,7 @@ def test_password_less_admin_recovers_through_their_own_mailbox_before_sso_is_di
     assert reloaded.mfa_enabled is True
     assert reloaded.mfa_secret == secret
 
-    _forget_cached_user()
+    sweep._clear_g()
     assert password_client.get("/admin/sso").status_code == 200
 
     # Runbook step 5, the common case: an admin who already set one up.
@@ -1454,5 +1446,5 @@ def test_password_less_admin_recovers_through_their_own_mailbox_before_sso_is_di
     assert second_done.status_code in (302, 303)
     assert _session_user_id(second_client) == str(admin.id)
 
-    _forget_cached_user()
+    sweep._clear_g()
     assert second_client.get("/admin/sso").status_code == 200
