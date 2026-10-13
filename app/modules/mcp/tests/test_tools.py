@@ -453,8 +453,8 @@ class TestLensToolParity:
         assert mcp_result["success"] is True
         assert rest_data["data"]["initiatives"] == mcp_result["data"]["initiatives"]
 
-    def test_ask_accountability_returns_withdrawn_reason(self, client, db_session, make_org, login_as):
-        """ask_accountability returns ownership_reader_not_built on every call."""
+    def test_ask_accountability_returns_honest_empty_reason(self, client, db_session, make_org, login_as):
+        """An element with no owner record gets the honest-empty reason from REST and MCP alike."""
         org = make_org("mcp")
         user = _make_user(db_session, org, "mcp-acct@example.com")
         element = _make_element(db_session, org.id, "acct-test")
@@ -469,9 +469,10 @@ class TestLensToolParity:
 
         assert rest_data["success"] is True
         assert mcp_result["success"] is True
-        # Both carry the withdrawn reason
-        assert "ownership_reader_not_built" in str(rest_data["data"]["reasons"])
-        assert "ownership_reader_not_built" in str(mcp_result["data"]["reasons"])
+        # The reader is built: no owner records is the honest-empty case
+        assert "no_ownership_records" in str(rest_data["data"]["reasons"])
+        assert "no_ownership_records" in str(mcp_result["data"]["reasons"])
+        assert "ownership_reader_not_built" not in str(mcp_result["data"]["reasons"])
         assert rest_data["data"]["owners"] == []
         assert mcp_result["data"]["owners"] == []
 

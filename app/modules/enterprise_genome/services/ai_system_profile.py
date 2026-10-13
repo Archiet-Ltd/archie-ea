@@ -12,6 +12,11 @@ module owns:
   * ``model_currency`` — current / stale / retired — reusing the model-currency
     facts already in ``app.modules.ai_chat.services.model_defaults``.
 
+New fields (risk class, release state) are stored as typed properties on the
+element's ``acm_properties``, not in ``custom_properties`` — see
+``ai_system_classification.py``. The owner is read from the one owner record
+(``ApplicationOwner``), not from a profile key.
+
 Model currency reuses the stale-models denylist
 -------------------------------------------------
 The stale-models denylist lives, as prose, in the module docstring of
@@ -43,6 +48,7 @@ AI_SYSTEM_ELEMENT_TYPE = "ApplicationComponent"
 AI_SYSTEM_ELEMENT_LAYER = "application"
 
 UNKNOWN = "unknown"
+NOT_SET = "not set"
 
 # --- Controlled vocabularies (the profile's enums) --------------------------
 AUTONOMY_LEVELS = (
@@ -120,13 +126,26 @@ def _norm_enum(value, allowed: tuple[str, ...]) -> str:
     return v if v in allowed else UNKNOWN
 
 
+def is_ai_system(element) -> bool:
+    """True when *element* is a registered AI system: an ApplicationComponent
+    carrying the ``ai_system`` profile marker."""
+    if getattr(element, "type", None) != AI_SYSTEM_ELEMENT_TYPE:
+        return False
+    props = getattr(element, "custom_properties", None) or {}
+    return isinstance(props, dict) and AI_SYSTEM_MARKER in props
+
+
 def profile_from_element(element) -> dict:
     """Project one AI-system ``ArchiMateElement`` into a typed profile dict.
 
-    Reads only ``custom_properties`` (plus the element's own ``name``); never
-    invents a value. Governance sub-fields default to ``"unknown"`` when the
-    element carries no recorded value, so a system with no governance recorded
-    is visibly ungoverned-unknown rather than falsely "approved".
+    Reads ``custom_properties`` for the original profile fields and
+    ``acm_properties`` for the typed-property fields (risk class, release
+    state). The owner is read from the one owner record
+    (``ApplicationOwner``), never from a profile key.
+
+    Never invents a value. Governance sub-fields default to ``"unknown"`` when
+    the element carries no recorded value, so a system with no governance
+    recorded is visibly ungoverned-unknown rather than falsely "approved".
     """
     props = element.custom_properties or {}
     ai = props.get(AI_SYSTEM_MARKER) or {}
@@ -158,6 +177,15 @@ def profile_from_element(element) -> dict:
             "human_review": _tri(gov.get("human_review")),
         },
         "model_currency": model_currency(model_id),
+        # New fields: read from typed properties (acm_properties), not custom_properties.
+        "risk_class": _read_risk_class(element),
+        "release_state": _read_release_state(element),
+        # The release gate surfaced as data: the refusal reason (shown on the
+        # register page when a high-risk system has no accepted assessment)
+        # and whether the required assessment has been accepted.
+        "release_blocked_reason": _read_release_blocked_reason(element),
+        "assessment_accepted": _read_assessment_accepted(element),
+        "owner": _read_owner(element),
     }
     profile["risk_flags"] = risk_flags(profile)
     return profile
@@ -231,3 +259,97 @@ def build_custom_properties(
         ai["governance"] = gov
 
     return {AI_SYSTEM_MARKER: ai}
+
+
+# --- Typed-property readers (risk class, release state, owner) --------------
+
+
+def _read_risk_class(element) -> str:
+    """Read the risk class through the one gate reader
+    (``ai_system_classification.get_classification``), so the register shows
+    exactly the values the gate would act on: a verbatim copy planted by any
+    other writer is not shown as the gate's class.
+
+    Returns the risk tier or ``"not set"`` if none recorded.
+    """
+    from .ai_system_classification import RISK_TIERS, get_classification
+
+    risk = get_classification(element)
+    return risk if risk in RISK_TIERS else NOT_SET
+
+
+def _read_release_state(element) -> str:
+    """Read the release state through the one gate reader
+    (``ai_system_classification.get_release_state``).
+
+    Returns ``"draft"``, ``"released"``, or ``"not set"``.
+    """
+    from .ai_system_classification import get_release_state
+
+    return get_release_state(element)
+
+
+def _read_release_blocked_reason(element):
+    """Why the release gate refuses this system, or ``None`` when it can be
+    released. One message source shared with the release route's HTTP response
+    (``ai_system_classification.release_refusal_reason``), so the page and the
+    route can never show different reasons."""
+    from .ai_system_classification import release_refusal_reason
+
+    org_id = getattr(element, "organization_id", None)
+    if org_id is None:
+        return None
+    return release_refusal_reason(element, org_id)
+
+
+def _read_assessment_accepted(element):
+    """Assessment acceptance state for the register.
+
+    ``True`` when an assessment has been accepted, ``False`` when one is
+    required (accepted class is high) but missing, ``None`` when the system is
+    not high-risk and needs no assessment. Scoped to the element's own
+    organisation."""
+    from .ai_system_classification import assessment_accepted_for
+
+    org_id = getattr(element, "organization_id", None)
+    if org_id is None:
+        return None
+    return assessment_accepted_for(element, org_id)
+
+
+def _read_owner(element) -> dict:
+    """Read the owner from the one owner record (ApplicationOwner).
+
+    Returns a dict with ``user_id``, ``ownership_type``, ``user_name`` or
+    ``None`` if no owner is recorded. Never reads from custom_properties.
+    """
+    from app.models.application_owner import ApplicationOwner
+
+    org_id = getattr(element, "organization_id", None)
+    if org_id is None:
+        return None
+
+    owners = ApplicationOwner.get_owners_for_element(
+        element_type="ai_system",
+        element_id=element.id,
+        organization_id=org_id,
+    )
+    if not owners:
+        return None
+
+    # Return the primary owner, or the first owner if no primary.
+    primary = None
+    for o in owners:
+        if o.ownership_type == "primary":
+            primary = o
+            break
+    if primary is None:
+        primary = owners[0]
+
+    return {
+        "user_id": primary.user_id,
+        "ownership_type": primary.ownership_type,
+        "user_name": getattr(primary.user, "display_name", None)
+        or f"{getattr(primary.user, 'first_name', '') or ''} {getattr(primary.user, 'last_name', '') or ''}".strip()
+        or None,
+    }

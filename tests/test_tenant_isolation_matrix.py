@@ -97,6 +97,15 @@ INTENTIONALLY_GLOBAL = {
         "organisation only (PropertyService.template_query, the model's own "
         "comment) — TenantMixin would hide the shared NULL rows from everyone"
     ),
+    "Notification": (
+        "rows belong to a recipient user and are fenced by user_id, not purely "
+        "by organization_id — the bell queries by user_id and legacy rows for "
+        "a user with no organisation stay NULL on purpose; the row-level "
+        "security policy in 20261011_notif_rls admits a NULL-org row whose "
+        "owning user belongs to the session organisation, which a plain "
+        "TenantMixin with_loader_criteria filter (organization_id == "
+        "current org) would hide from that user's own bell"
+    ),
     "LLMInteraction": (
         "queried by user_id (implies one tenant), by pipeline_stage_id -> "
         "architecture_id (same), or by an explicit organization_id filter in "
@@ -291,6 +300,9 @@ def test_bulk_delete_is_tenant_filtered(app):
         ApplicationComponent.query.filter(
             ApplicationComponent.name == "bulk-target %s" % marker
         ).delete(synchronize_session=False)
+        from tests._outbox_cleanup import purge_outbox_events
+
+        purge_outbox_events(db.session, [a_id, b_id])
         Organization.query.filter(Organization.id.in_([a_id, b_id])).delete(
             synchronize_session=False)
         db.session.commit()

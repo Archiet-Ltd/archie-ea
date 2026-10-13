@@ -42,6 +42,12 @@ class ApplicationComplianceControl(TenantMixin, db.Model):
     verified_date = db.Column(db.DateTime)
     verified_by_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
 
+    # ArchiMate mirror: every domain record must have exactly one element node.
+    archimate_element_id = db.Column(
+        db.Integer, db.ForeignKey("archimate_elements.id", ondelete="SET NULL"),
+        index=True, nullable=True,
+    )
+
     # Audit trail
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(
@@ -84,3 +90,10 @@ class ApplicationComplianceControl(TenantMixin, db.Model):
 
     def __repr__(self):
         return f"<AppCompliance {self.application_id}:{self.control.control_code if self.control else self.control_id} [{self.implementation_status}]>"
+
+    @property
+    def control_name(self):
+        """Synthetic display name for the ArchiMate element mirror."""
+        if self.application_id:
+            return f"App-{self.application_id}-Control-{self.control_id}"
+        return f"ComplianceControl-{self.control_id}"

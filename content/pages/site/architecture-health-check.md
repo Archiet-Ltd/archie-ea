@@ -76,29 +76,37 @@ If you would rather have the tool set up for your team to run, see the [Team ann
 
 ## Frequently asked questions
 
-### How long does an architecture health check take?
+### How long does an architecture health check take, and what if we are slow to respond?
 
-The report is delivered within two weeks of kickoff. Kickoff follows a short scoping call where we agree what to import. How quickly you can send the files is the main thing that moves the start date, so send them as soon as the call is booked.
+The report is delivered within two weeks of kickoff, which follows a short scoping call where we agree what to import. The analysis runs on your files and your answers, so the date moves with them. Agree a date for the files on the scoping call, name one person to answer questions, and send what you have as soon as the call is booked.
 
-### What data do you need?
+### What if our landscape turns out to be more complex than expected?
 
-A list of your applications is enough, as a spreadsheet. Owner, cost and lifecycle stage make the analysis more useful. An existing Archi or ArchiMate Open Exchange model and a list of contracts are optional extras that add sections to the report.
+The price is fixed for the scope we agree on the scoping call: what to import and which systems matter most. If your landscape is larger than you first described, we say so on that call and agree the scope before kickoff, so the $4,500 never changes halfway through. The report always shows what the data could and could not support.
 
-### What if our data is incomplete?
+### What if we don't have an existing ArchiMate model?
 
-The report shows gaps as gaps. If an application has no owner, no cost or no contract date, the report says so and counts it. Entelim does not guess a value to fill a blank, so a gap in your data becomes a finding you can act on.
+You do not need one. A spreadsheet listing your applications is enough to start, and owner, cost and lifecycle stage make the analysis more useful. An Archi or ArchiMate Open Exchange file and a contracts list are optional extras that add sections. Where data is missing, the report counts the gap as a finding and never fills it with a guess.
 
-### What happens to our data after the report?
+### How is this different from just using the free plan?
 
-The model stays in your Entelim workspace, which you control, and you can export it as an ArchiMate Open Exchange file at any time. Read the [privacy page](/privacy) for how Entelim handles personal data.
+The analyses are the ones Entelim runs for you on any plan, and the free Community plan covers one organisation and up to three people, so you can load your own data and ask the same questions. The health check is the service around them: we scope, load and check the data, run the analysis, write the report and take your team through it, to a date.
 
-### Can we self-host Entelim afterwards?
+### What is in the report, and what stays in the product?
 
-Yes. Entelim is open source under AGPL-3.0, and self-hosting is free. You can export your model as an ArchiMate Open Exchange file and import it into a self-hosted copy. A commercial licence and supported self-hosting are available if you want Entelim run for you.
+The written report covers the application inventory, what breaks if each critical system fails, duplicate and overlapping applications, applications with no owner, TIME scores, and renewals where you give us contracts. The model itself stays in your workspace, where you keep working in it, export it as ArchiMate Open Exchange, or load it into a self-hosted copy under AGPL-3.0.
 
-### Is the price fixed?
+### Can we extend the engagement afterwards?
 
-Yes. The health check is $4,500, one time, for the scope above. It is separate from any Entelim plan. See the [pricing page](/pricing) for the plans.
+The health check is a fixed scope, and the model stays in your workspace when it ends. You can carry on yourselves on the free plan or a paid plan, or add the [Team annual plan with onboarding](/team-annual-onboarding) if you want your people trained to keep the model current. If you want more analysis than the agreed scope, ask on the read-out call.
+
+### Do you sign an NDA, and how is our data handled?
+
+Everyone we authorise to handle personal data is bound by a duty of confidentiality, set out in our [data processing agreement](/data-processing-agreement). If you want a mutual NDA signed before any file is sent, say so when you request the health check: nothing is imported until after the scoping call. See the [privacy page](/privacy) for how Entelim handles personal data.
+
+### What exactly is fixed for $4,500, and is anything guaranteed?
+
+Scope and price are fixed: the scoping call, the import, the analysis, the written report and the read-out call, with no hourly billing and no subscription attached. Every finding is checked against your data before it goes into the report, and a thin section means thin data, which the report says plainly. The [pricing page](/pricing) covers the plans, which are separate.
 
 ## Request the health check
 
