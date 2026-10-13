@@ -730,7 +730,11 @@ def test_backfill_flush_failure_clears_pending_map(app):
             )
             db.session.add(wp3)
 
-            sid = id(db.session)
+            # The backbone keys _PENDING and _SYNCING by the id of the
+            # underlying Session passed to the flush events, never by the
+            # Flask-SQLAlchemy scoped-session proxy. Key the assertion the
+            # same way so it is not vacuously true.
+            sid = id(db.session.registry())
             # The flush fails because of the unique constraint violation.
             with pytest.raises(Exception):
                 db.session.flush()
