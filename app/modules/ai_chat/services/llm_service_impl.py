@@ -124,6 +124,119 @@ def _scrub_prompt(prompt: str) -> str:
     return prompt
 
 
+# The AI controls in app/ai (audit trail, cost monitor, data classifier) run once
+# around every model call that goes through this service, including the calls
+# made straight to _call_llm_with_failover. Key and provider failover inside one
+# call does not run them again. A control that fails logs and lets the call go
+# on: a broken audit write must not take the product's AI features down, and
+# the failure is visible in the log.
+_AI_CONTROL_FEATURE = "model_call"
+
+
+def _ai_call_identity() -> Tuple[Optional[int], Optional[int]]:
+    """(organisation id, user id) of the caller, where there is one."""
+    from app.utils.tenant_sql import current_org_id
+
+    org_id = current_org_id()
+    user_id = None
+    try:
+        from flask import has_request_context
+        from flask_login import current_user
+
+        if has_request_context() and getattr(current_user, "is_authenticated", False):
+            user_id = getattr(current_user, "id", None)
+            if org_id is None:
+                org_id = getattr(current_user, "organization_id", None)
+    except Exception:  # no login manager in some scripts
+        user_id = None
+    return org_id, user_id
+
+
+def _ai_controls_before(prompt: str, provider: str, model: str) -> Dict[str, Any]:
+    """Classify the prompt and open the call's audit record. Returns the call context."""
+    org_id, user_id = _ai_call_identity()
+    ctx: Dict[str, Any] = {
+        "organization_id": org_id,
+        "user_id": user_id,
+        "provider": provider,
+        "model": model,
+        "correlation_id": None,
+    }
+    try:
+        from app.ai.audit_trail import ai_audit_trail
+        from app.ai.data_classifier import ai_data_classifier
+
+        classification = ai_data_classifier.classify_text(prompt or "")
+        ctx["correlation_id"] = ai_audit_trail.log_ai_request(
+            feature=_AI_CONTROL_FEATURE,
+            prompt=prompt or "",
+            user_id=user_id,
+            metadata={"provider": provider, "model": model},
+            organization_id=org_id,
+        )
+        ai_audit_trail.log_data_classification(
+            prompt or "",
+            classification,
+            feature=_AI_CONTROL_FEATURE,
+            correlation_id=ctx["correlation_id"],
+            organization_id=org_id,
+        )
+    except Exception as exc:
+        logger.error("AI controls could not record the model call request: %s", exc)
+    return ctx
+
+
+def _ai_controls_after(ctx: Dict[str, Any], response_text: str, interaction: Any) -> None:
+    """Record the call's cost and close its audit record."""
+    try:
+        from app.ai.audit_trail import ai_audit_trail
+        from app.ai.cost_monitor import CostUnit, ai_cost_monitor
+
+        tokens_in = getattr(interaction, "token_count_input", None)
+        tokens_out = getattr(interaction, "token_count_output", None)
+        tokens = None if tokens_in is None and tokens_out is None else (tokens_in or 0) + (tokens_out or 0)
+        raw_cost = getattr(interaction, "cost", None)
+        cost = float(raw_cost) if raw_cost is not None else None
+        provider = getattr(interaction, "provider", None) or ctx["provider"]
+        model = getattr(interaction, "model_name", None) or ctx["model"]
+        ai_cost_monitor.record_cost(
+            _AI_CONTROL_FEATURE,
+            cost if cost is not None else 0.0,
+            CostUnit.REQUEST,
+            user_id=ctx["user_id"],
+            metadata={"provider": provider, "model": model, "tokens": tokens, "cost_known": cost is not None},
+            organization_id=ctx["organization_id"],
+        )
+        ai_audit_trail.log_ai_response(
+            ctx["correlation_id"],
+            _AI_CONTROL_FEATURE,
+            response_text or "",
+            tokens_used=tokens,
+            cost=cost,
+            metadata={"provider": provider, "model": model},
+            organization_id=ctx["organization_id"],
+        )
+    except Exception as exc:
+        logger.error("AI controls could not record the model call result: %s", exc)
+
+
+def _ai_controls_error(ctx: Dict[str, Any], error: Exception) -> None:
+    """Close the call's audit record with the failure."""
+    try:
+        from app.ai.audit_trail import ai_audit_trail
+
+        ai_audit_trail.log_ai_error(
+            ctx["correlation_id"],
+            _AI_CONTROL_FEATURE,
+            str(error)[:500],
+            error_type=type(error).__name__,
+            metadata={"provider": ctx["provider"], "model": ctx["model"]},
+            organization_id=ctx["organization_id"],
+        )
+    except Exception as exc:
+        logger.error("AI controls could not record the model call failure: %s", exc)
+
+
 class LLMService:
     """
     Service for interacting with LLM providers (Hugging Face default, OpenAI, Anthropic, Azure).
@@ -1784,7 +1897,26 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
 
         # Track providers already tried across recursive fallback calls to prevent looping
         if _already_tried is None:
-            _already_tried = []
+            # The outermost call: run the AI controls once around the whole call,
+            # key and provider failover included, then make the call itself.
+            controls = _ai_controls_before(prompt, provider, model)
+            try:
+                response_text, interaction = LLMService._call_llm_with_failover(
+                    prompt=prompt,
+                    model=model,
+                    provider=provider,
+                    max_tokens=max_tokens,
+                    pipeline_stage_id=pipeline_stage_id,
+                    _already_tried=[],
+                    timeout=timeout,
+                )
+            except Exception as exc:
+                _ai_controls_error(controls, exc)
+                raise
+            _ai_controls_after(controls, response_text, interaction)
+            return response_text, interaction
+
+        # Track providers already tried across recursive fallback calls to prevent looping
         _already_tried = list(_already_tried) + [provider]
 
         # Get all available API keys

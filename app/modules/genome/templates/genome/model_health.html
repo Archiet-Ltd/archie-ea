@@ -25,6 +25,105 @@
     </div>
     {% endif %}
 
+    {% macro _pct(row) %}{% if row.share is none %}—{% else %}{{ '%.0f'|format(row.share * 100) }}%{% endif %}{% endmacro %}
+    {% macro _day(value) %}{% if value %}{{ value[:10] }}{% else %}—{% endif %}{% endmacro %}
+    <section class="bg-card border border-border rounded-lg p-4 space-y-4" id="model-freshness" aria-labelledby="model-freshness-heading">
+        <h2 id="model-freshness-heading" class="text-lg font-semibold">Freshness</h2>
+        {% if freshness_error %}
+        <p class="text-sm text-destructive" role="alert">{{ freshness_error }}</p>
+        {% elif freshness %}
+        {% set el = freshness.elements %}
+        <p class="text-sm">
+            <span class="text-2xl font-semibold" data-testid="freshness-share">{{ _pct(el) }}</span>
+            of elements confirmed or synchronised in the last {{ freshness.window_days }} days
+        </p>
+        {% if el.total == 0 %}
+        <p class="text-sm text-muted-foreground">This organisation has no elements yet.</p>
+        {% elif el.share is none %}
+        <p class="text-sm text-muted-foreground">Not recorded: {{ freshness.not_recorded_reason }}</p>
+        {% endif %}
+        <dl class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+            <div><dt class="text-muted-foreground">Elements</dt><dd class="font-medium">{{ el.total }}</dd></div>
+            <div><dt class="text-muted-foreground">Within {{ freshness.window_days }} days</dt><dd class="font-medium">{{ el.fresh }}</dd></div>
+            <div><dt class="text-muted-foreground">Older</dt><dd class="font-medium">{{ el.stale }}</dd></div>
+            <div><dt class="text-muted-foreground">No date recorded</dt><dd class="font-medium">{{ el.not_recorded }}</dd></div>
+        </dl>
+        {% set rel = freshness.relationships %}
+        <p class="text-sm">Relationships changed in the last {{ freshness.window_days }} days:
+            <span class="font-medium">{{ _pct(rel) }}</span> of {{ rel.total }}.</p>
+        <p class="text-xs text-muted-foreground">An element's date is the latest of {{ freshness.basis|join(', ') }}.</p>
+
+        <div>
+            <h3 class="text-sm font-semibold mb-2">Owners with the stalest records</h3>
+            {% if freshness.stalest_owners %}
+            <ol class="text-sm list-decimal pl-5 space-y-1" data-testid="stalest-owners">
+                {% for row in freshness.stalest_owners %}
+                <li><span class="font-medium">{{ row.owner }}</span> — oldest {{ _day(row.oldest) }},
+                    {{ row.stale }} of {{ row.total }} older than {{ freshness.window_days }} days</li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <p class="text-sm text-muted-foreground">No owner has a record older than {{ freshness.window_days }} days.</p>
+            {% endif %}
+        </div>
+
+        {% if freshness.by_layer %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <caption class="text-left text-sm font-semibold mb-2">By layer</caption>
+                <thead><tr class="text-left text-muted-foreground">
+                    <th scope="col" class="py-1 pr-3">Layer</th><th scope="col" class="py-1 pr-3">Fresh share</th>
+                    <th scope="col" class="py-1 pr-3">Elements</th><th scope="col" class="py-1 pr-3">Older</th>
+                    <th scope="col" class="py-1 pr-3">No date recorded</th><th scope="col" class="py-1">Oldest</th>
+                </tr></thead>
+                <tbody>
+                {% for row in freshness.by_layer %}
+                <tr class="border-t border-border">
+                    <th scope="row" class="py-1 pr-3 font-medium">{{ row.layer|capitalize }}</th><td class="py-1 pr-3">{{ _pct(row) }}</td>
+                    <td class="py-1 pr-3">{{ row.total }}</td><td class="py-1 pr-3">{{ row.stale }}</td>
+                    <td class="py-1 pr-3">{{ row.not_recorded }}</td><td class="py-1">{{ _day(row.oldest) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if freshness.by_owner or freshness.no_owner.total %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm" data-testid="freshness-by-owner">
+                <caption class="text-left text-sm font-semibold mb-2">By owner</caption>
+                <thead><tr class="text-left text-muted-foreground">
+                    <th scope="col" class="py-1 pr-3">Owner</th><th scope="col" class="py-1 pr-3">Fresh share</th>
+                    <th scope="col" class="py-1 pr-3">Elements</th><th scope="col" class="py-1 pr-3">Older</th>
+                    <th scope="col" class="py-1 pr-3">No date recorded</th><th scope="col" class="py-1">Oldest</th>
+                </tr></thead>
+                <tbody>
+                {% for row in freshness.by_owner %}
+                <tr class="border-t border-border">
+                    <th scope="row" class="py-1 pr-3 font-medium">{{ row.owner }}</th><td class="py-1 pr-3">{{ _pct(row) }}</td>
+                    <td class="py-1 pr-3">{{ row.total }}</td><td class="py-1 pr-3">{{ row.stale }}</td>
+                    <td class="py-1 pr-3">{{ row.not_recorded }}</td><td class="py-1">{{ _day(row.oldest) }}</td>
+                </tr>
+                {% endfor %}
+                {% if freshness.no_owner.total %}
+                {% set row = freshness.no_owner %}
+                <tr class="border-t border-border">
+                    <th scope="row" class="py-1 pr-3 font-medium">No owner recorded</th><td class="py-1 pr-3">{{ _pct(row) }}</td>
+                    <td class="py-1 pr-3">{{ row.total }}</td><td class="py-1 pr-3">{{ row.stale }}</td>
+                    <td class="py-1 pr-3">{{ row.not_recorded }}</td><td class="py-1">{{ _day(row.oldest) }}</td>
+                </tr>
+                {% endif %}
+                </tbody>
+            </table>
+            {% if freshness.no_owner.total %}
+            <p class="text-xs text-muted-foreground mt-1">{{ freshness.no_owner_reason }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endif %}
+    </section>
+
     {% if report_html %}
     <div class="bg-card border border-border rounded-lg p-4">
         <div class="mb-3 text-xs text-muted-foreground">
