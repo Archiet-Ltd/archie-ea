@@ -321,9 +321,9 @@ jobs:
   # state (a module- or class-scoped fixture) is never split across two
   # database sessions; it does not protect against state shared ACROSS files.
   tests-shard:
-    name: Tests (pytest + coverage) — shard ${{ matrix.shard && needs.fast_gate.result != 'failure' }}
+    name: Tests (pytest + coverage) — shard ${{ matrix.shard }}
     needs: [changes, fast_gate]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
     # Same-repository runs (push/dispatch and same-repo PRs) select a runner
     # via repository variables: vars.CI_FAST_RUNNER takes precedence when the
     # PR carries the ci-fast label, vars.CI_SHARD_RUNNER routes to a managed
@@ -713,10 +713,10 @@ jobs:
   # sooner than the old 70-minute serial job.
 
   smoke-main:
-    name: Browser journeys — main shard ${{ matrix.shard && needs.fast_gate.result != 'failure' }}
-    needs: changes
-    runs-on: ubuntu-lates, fast_gate]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
+    name: Browser journeys — main shard ${{ matrix.shard }}
+    needs: [changes, fast_gate]
+    runs-on: ubuntu-latest
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
     strategy:
       fail-fast: false
       matrix:
@@ -792,8 +792,8 @@ jobs:
 
   smoke-adversarial:
     name: Browser journeys — adversarial
-    needs: changes
-    runs-on: ubuntu-lates, fast_gate]
+    needs: [changes, fast_gate]
+    runs-on: ubuntu-latest
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
     services:
       postgres:
@@ -864,8 +864,8 @@ jobs:
 
   smoke-other:
     name: Browser journeys — other
-    needs: changes
-    runs-on: ubuntu-lates, fast_gate]
+    needs: [changes, fast_gate]
+    runs-on: ubuntu-latest
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
     services:
       postgres:
