@@ -278,6 +278,13 @@ def _resolve_application_owners_batch(
     Uses the canonical ``ApplicationOwner`` batch reader methods so the
     single-row readers and this batch path share one implementation.
 
+    User-name resolution is done ONCE for every owner row on the page, in a
+    single batched ``User`` read; the per-element display conversion reuses
+    that map.  Resolving names per element would make the owner fetch issue
+    one extra read per row, so the delta between with_owner=True and
+    with_owner=False would grow with the page size instead of staying
+    constant.
+
     Returns ``{element_id: [{"name": str, "role": str}, ...]}``, with an
     empty list for elements that have no ApplicationOwner record or whose
     type has no owner store.
@@ -299,6 +306,11 @@ def _resolve_application_owners_batch(
         elif el_type and el_type.lower() in ApplicationOwner.ELEMENT_TYPES:
             element_type_ids.setdefault(el_type.lower(), []).append(eid)
         # Other types: no owner store, leave as empty list in results.
+
+    # Collect every owner row across both owner stores first, then resolve
+    # the user names in ONE batched query for all of them.
+    pending: Dict[int, List[Any]] = {}
+    all_owner_rows: List[Any] = []
 
     # Resolve ApplicationComponent elements via application_id.
     if app_component_ids:
@@ -324,26 +336,39 @@ def _resolve_application_owners_batch(
             for eid, comp in comp_by_element.items():
                 owners = owners_by_app.get(comp.id, [])
                 if owners:
-                    results[eid] = _application_owners_to_display(owners, org_id)
+                    pending[eid] = owners
+                    all_owner_rows.extend(owners)
 
     # Resolve element-type owners (capability, data_entity) via element_type + element_id.
     for el_type, type_ids in element_type_ids.items():
         owners_by_eid = ApplicationOwner.get_owners_for_elements_batch(el_type, type_ids, org_id)
         for eid, owners in owners_by_eid.items():
             if owners:
-                results[eid] = _application_owners_to_display(owners, org_id)
+                pending[eid] = owners
+                all_owner_rows.extend(owners)
+
+    # One batched user-name read for every owner row on the page (empty when
+    # nothing was collected — no query is issued for an empty id list).
+    users = ApplicationOwner._resolve_user_names(all_owner_rows, org_id)
+    for eid, owners in pending.items():
+        results[eid] = _application_owners_to_display(owners, org_id, users)
 
     return results
 
 
 def _application_owners_to_display(
-    owner_rows: list, org_id: int
+    owner_rows: list, org_id: int, users=None
 ) -> List[Dict[str, str]]:
     """Convert ApplicationOwner rows to display dicts ``{"name", "role"}``,
-    resolving user names in one batched query."""
+    resolving user names in one batched query.
+
+    ``users`` is the ``{user_id: User}`` map the batch caller resolved for
+    MANY rows in one query; when omitted, the user names are resolved here
+    for exactly these rows (the stand-alone path)."""
     from app.models.application_owner import ApplicationOwner
 
-    users = ApplicationOwner._resolve_user_names(owner_rows, org_id)
+    if users is None:
+        users = ApplicationOwner._resolve_user_names(owner_rows, org_id)
     result = []
     for row in owner_rows:
         user = users.get(row.user_id)
