@@ -156,7 +156,7 @@ def test_fast_gate_lints_every_workflow_with_a_pinned_checksummed_actionlint():
     assert "sha256sum --check" in run and "ACTIONLINT_SHA256" in run
     assert "set -euo pipefail" in run
     assert ".github/workflows/*.yml" in run
-    assert not re.search(r"\|\s*(ba)?sh", run), "never pipe a download into a shell"
+    assert not re.search(r"\|\s*(ba)?sh\b", run), "never pipe a download into a shell"
     assert "continue-on-error" not in step
     # the checksum check must come before the archive is unpacked or run
     assert run.index("sha256sum") < run.index("tar -x") < run.index("/actionlint\" -color")
