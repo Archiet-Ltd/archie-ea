@@ -1096,13 +1096,16 @@ def critical_path_for_plateau(
     return result
 
 
-def critical_paths_for_roadmap(organization_id: int) -> List[Dict[str, Any]]:
+def critical_paths_for_roadmap(organization_id: Optional[int]) -> List[Dict[str, Any]]:
     """One critical path entry per plateau of this organisation, ordered by
     sequence then name -- what the plateau roadmap screen's critical path
     panel renders. Another organisation's plateaus never appear. A plateau
-    with no scheduled work package reports an empty path."""
+    with no scheduled work package reports an empty path. An unknown
+    organisation shows nothing and issues no query."""
     from app.models.implementation_migration import Plateau
 
+    if organization_id is None:
+        return []
     plateaus = (
         Plateau.query.filter_by(organization_id=organization_id)
         .order_by(

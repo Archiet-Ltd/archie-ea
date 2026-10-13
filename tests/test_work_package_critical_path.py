@@ -148,12 +148,57 @@ def test_dependency_cycle_is_reported_and_never_followed(two_orgs, db_session):
     cp = svc.critical_path_for_plateau(plateau.id, a.id)
 
     # the call returned: a cycle never hangs the computation
-    assert cp["cycles"] != []
+    assert len(cp["cycles"]) == 1
     assert set(cp["cycles"][0]) == {w1.id, w2.id}
     assert cp["has_critical_path"] is True
     # the cycle is not followed: no node appears twice on the path
     names = [n["name"] for n in cp["path"]]
     assert len(names) == len(set(names))
+
+
+def test_three_node_cycle_is_reported_exactly_once(two_orgs, db_session):
+    from app.services import work_package_service as svc
+
+    a = two_orgs["a"]
+    plateau = _plateau(db_session, a, "Triangle")
+    w1 = _wp(db_session, a, "Tri one", plateau)
+    w2 = _wp(db_session, a, "Tri two", plateau)
+    w3 = _wp(db_session, a, "Tri three", plateau)
+    w1.work_dependencies = [w2.id]
+    w2.work_dependencies = [w3.id]
+    w3.work_dependencies = [w1.id]
+    db_session.flush()
+
+    cp = svc.critical_path_for_plateau(plateau.id, a.id)
+
+    # each of the three packages is a root, so the loop is met from three
+    # starting points: still one entry, not rotated copies
+    assert len(cp["cycles"]) == 1
+    assert sorted(cp["cycles"][0]) == sorted([w1.id, w2.id, w3.id])
+    assert len(cp["cycles"][0]) == 3
+
+
+def test_self_loop_and_two_node_cycle_in_one_plateau_are_both_reported(
+    two_orgs, db_session
+):
+    from app.services import work_package_service as svc
+
+    a = two_orgs["a"]
+    plateau = _plateau(db_session, a, "Mixed loops")
+    w1 = _wp(db_session, a, "Loop alone", plateau)
+    w2 = _wp(db_session, a, "Pair one", plateau)
+    w3 = _wp(db_session, a, "Pair two", plateau)
+    w1.work_dependencies = [w1.id]
+    w2.work_dependencies = [w3.id]
+    w3.work_dependencies = [w2.id]
+    db_session.flush()
+
+    cp = svc.critical_path_for_plateau(plateau.id, a.id)
+
+    assert len(cp["cycles"]) == 2
+    assert sorted(sorted(c) for c in cp["cycles"]) == sorted(
+        [[w1.id], sorted([w2.id, w3.id])]
+    )
 
 
 def test_self_loop_dependency_is_reported_as_a_cycle(two_orgs, db_session):
@@ -203,12 +248,41 @@ def test_retired_roadmap_row_delegates_to_own_organisation_only(two_orgs, db_ses
     assert result["path"] == []
     assert result["blocking"] is None
 
-    # Under org B's context, the delegation works normally.
-    result_b = retired.get_critical_path_impact(organization_id=b.id)
-    # wp_b has no plateau link, so the path is also empty, but the
-    # organisation fence is the gate we are testing: the call does not
-    # raise and returns the empty path from the unified row's own logic.
-    assert result_b["has_critical_path"] is False
+    # Unknown organisation: nothing is shown, the copy is not consulted.
+    assert retired.get_critical_path_impact()["has_critical_path"] is False
+    assert retired.get_critical_path_impact(organization_id=None)["path"] == []
+
+
+def test_retired_roadmap_row_in_same_organisation_returns_the_computed_path(
+    two_orgs, db_session
+):
+    from app.models.roadmap_models import RoadmapWorkPackage
+
+    a, b = two_orgs["a"], two_orgs["b"]
+    plateau = _plateau(db_session, a, "Delegated plateau")
+    first = _wp(db_session, a, "Delegated first", plateau,
+                start=datetime(2026, 6, 1), end=datetime(2026, 6, 3))
+    last = _wp(db_session, a, "Delegated last", plateau,
+               start=datetime(2026, 6, 4), end=datetime(2026, 6, 8))
+    last.work_dependencies = [first.id]
+    db_session.flush()
+    retired = RoadmapWorkPackage(
+        name="Retired row same org", business_capability="Cap",
+        created_by=two_orgs["user_a"].id, retired_into_id=last.id,
+    )
+    db_session.add(retired)
+    db_session.flush()
+
+    result = retired.get_critical_path_impact(organization_id=a.id)
+
+    assert result["has_critical_path"] is True
+    assert [n["name"] for n in result["path"]] == ["Delegated first", "Delegated last"]
+    assert result["blocking"]["id"] == last.id
+    # an unknown organisation shows nothing even though the path exists
+    assert retired.get_critical_path_impact()["has_critical_path"] is False
+    assert retired.get_critical_path_impact(organization_id=None)["path"] == []
+    # the same row seen from the other organisation shows nothing
+    assert retired.get_critical_path_impact(organization_id=b.id)["path"] == []
 
 
 def test_dependency_on_another_organisations_work_package_is_ignored_and_reported(
@@ -252,6 +326,27 @@ def test_critical_paths_for_roadmap_are_organisation_fenced(two_orgs, db_session
     dumped = json.dumps(paths)
     assert "B work" not in dumped
     assert "B next" not in dumped
+
+
+def test_critical_paths_for_roadmap_with_unknown_organisation_shows_nothing(
+    two_orgs, db_session, monkeypatch
+):
+    from app.models.implementation_migration import Plateau
+    from app.services import work_package_service as svc
+
+    a = two_orgs["a"]
+    plateau = _plateau(db_session, a, "Exists for A")
+    _wp(db_session, a, "A real work", plateau, start=datetime(2026, 3, 1),
+        end=datetime(2026, 3, 5))
+    assert svc.critical_paths_for_roadmap(a.id) != []  # the row exists
+
+    class _NoQuery:
+        def __getattr__(self, name):
+            raise AssertionError("unknown organisation must not query plateaus")
+
+    monkeypatch.setattr(Plateau, "query", _NoQuery())
+
+    assert svc.critical_paths_for_roadmap(None) == []
 
 
 # -- the plateau roadmap screen ---------------------------------------------
