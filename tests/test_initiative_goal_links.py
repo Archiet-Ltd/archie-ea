@@ -344,3 +344,50 @@ def test_isolation_holds_for_a_non_platform_role(app, db_session, make_org, role
     assert initiative.name not in page
     _clear_login_cache()
     assert client_b.get("/portfolio/%d" % initiative.id).status_code in (403, 404)
+
+
+def test_switched_organisation_member_sees_that_organisations_goals(app, db_session, make_org):
+    """Home org A, an OrgRole in org B, session switched to B: B's goal is offered."""
+    from app.middleware.tenant_context import ACTIVE_ORG_SESSION_KEY
+    from app.models.org_role import OrgRole
+
+    org_a, org_b = make_org("goals-home"), make_org("goals-switched")
+    client, user = _client_for(app, db_session, org_a, role="portfolio_manager")
+    OrgRole.set_role(org_b.id, user.id, "architect")
+    goal_b = _goal(db_session, org_b, name="Switched org goal")
+    goal_a = _goal(db_session, org_a, name="Home org goal")
+    initiative_b = _initiative(db_session, org_b)
+    with client.session_transaction() as sess:
+        sess[ACTIVE_ORG_SESSION_KEY] = org_b.id
+    _clear_login_cache()
+    resp = client.get("/portfolio/%d" % initiative_b.id)
+    assert resp.status_code == 200
+    page = resp.get_data(as_text=True)
+    assert goal_b.name in page
+    assert "No goals exist yet" not in page
+    assert goal_a.name not in page
+
+
+def test_via_programme_exists_ignores_a_goal_from_another_organisation(world, db_session):
+    org_a, org_b = world["a"][0], world["b"][0]
+    initiative = _initiative(db_session, org_a)
+    foreign_goal = _goal(db_session, org_b)
+    from app.models.strategic import StrategicInitiative, strategic_initiative_goals
+
+    programme = StrategicInitiative(name="Prog %s" % uuid.uuid4().hex[:6],
+                                    organization_id=org_a.id,
+                                    record_kind="transformation_programme")
+    db_session.add(programme)
+    db_session.flush()
+    db_session.execute(strategic_initiative_goals.insert().values(
+        strategic_initiative_id=programme.id, goal_id=foreign_goal.id))
+    initiative.linked_strategic_initiative_id = programme.id
+    db_session.flush()
+    from app.modules.portfolio.services.initiative_goal_links import (
+        initiatives_serving_no_objective,
+        list_programme_goals,
+    )
+
+    _as_org(org_a)
+    assert list_programme_goals(initiative.id) == []
+    assert initiative.id in [i.id for i in initiatives_serving_no_objective()]

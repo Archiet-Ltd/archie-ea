@@ -142,16 +142,24 @@ def initiatives_serving_no_objective() -> List[EnterpriseInitiative]:
         return []
     direct = (
         db.select(db.literal(1))
-        .select_from(initiative_goals)
-        .where(initiative_goals.c.initiative_id == EnterpriseInitiative.id)
+        .select_from(initiative_goals.join(Goal, Goal.id == initiative_goals.c.goal_id))
+        .where(
+            initiative_goals.c.initiative_id == EnterpriseInitiative.id,
+            Goal.organization_id == EnterpriseInitiative.organization_id,
+        )
         .exists()
     )
     via_programme = (
         db.select(db.literal(1))
-        .select_from(strategic_initiative_goals)
+        .select_from(
+            strategic_initiative_goals.join(
+                Goal, Goal.id == strategic_initiative_goals.c.goal_id
+            )
+        )
         .where(
             strategic_initiative_goals.c.strategic_initiative_id
-            == EnterpriseInitiative.linked_strategic_initiative_id
+            == EnterpriseInitiative.linked_strategic_initiative_id,
+            Goal.organization_id == EnterpriseInitiative.organization_id,
         )
         .exists()
     )

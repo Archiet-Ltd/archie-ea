@@ -11,7 +11,7 @@ all carry TenantMixin, so do_orm_execute injects the organisation predicate.
 import logging
 
 from flask import Blueprint, abort, render_template, request
-from flask_login import current_user, login_required
+from flask_login import login_required
 
 from app import db
 from app.middleware.tenant_context import current_org_id
@@ -52,15 +52,16 @@ def index():
         initiatives_serving_no_objective,
     )
 
-    unlinked = initiatives_serving_no_objective()
+    org_id = current_org_id()
+    unlinked = initiatives_serving_no_objective() if org_id is not None else []
     unlinked_ids = {i.id for i in unlinked}
     only_unlinked = request.args.get("filter") == "no-objective"
-    if only_unlinked:
+    if only_unlinked or org_id is None:
         initiatives = unlinked
     else:
         initiatives = (
             db.session.query(EnterpriseInitiative)
-            .filter(EnterpriseInitiative.organization_id == current_org_id())
+            .filter(EnterpriseInitiative.organization_id == org_id)
             .order_by(EnterpriseInitiative.name)
             .all()
         )
@@ -122,10 +123,13 @@ def detail(initiative_id):
     from app.models.strategic import StrategicInitiative
     from app.models.vendor.vendor_organization import EnterpriseInitiative
 
+    org_id = current_org_id()
+    if org_id is None:
+        abort(404)
     initiative = db.session.execute(
         db.select(EnterpriseInitiative).where(
             EnterpriseInitiative.id == initiative_id,
-            EnterpriseInitiative.organization_id == current_org_id(),
+            EnterpriseInitiative.organization_id == org_id,
         )
     ).scalar_one_or_none()
     if initiative is None:
@@ -139,18 +143,22 @@ def detail(initiative_id):
     from app.models.motivation import Goal
     from app.modules.portfolio.services.initiative_goal_links import (
         CONTRIBUTION_LEVELS,
+        InitiativeGoalLinkError,
         list_links,
         list_programme_goals,
     )
 
-    goal_links = list_links(initiative.id)
-    programme_goals = list_programme_goals(initiative.id)
+    try:
+        goal_links = list_links(initiative.id)
+        programme_goals = list_programme_goals(initiative.id)
+    except InitiativeGoalLinkError:
+        abort(404)
     linked_goal_ids = {g["goal_id"] for g in goal_links}
     available_goals = [
         g
         for g in db.session.execute(
             db.select(Goal)
-            .where(Goal.organization_id == current_user.organization_id)
+            .where(Goal.organization_id == initiative.organization_id)
             .order_by(Goal.name)
             .limit(500)
         ).scalars()
@@ -159,7 +167,7 @@ def detail(initiative_id):
     transformation_programmes = (
         db.session.query(StrategicInitiative)
         .filter(
-            StrategicInitiative.organization_id == current_user.organization_id,
+            StrategicInitiative.organization_id == initiative.organization_id,
             StrategicInitiative.record_kind == "transformation_programme",
         )
         .order_by(StrategicInitiative.name)
