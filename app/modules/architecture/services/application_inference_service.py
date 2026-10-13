@@ -671,22 +671,11 @@ class ApplicationInferenceService:
             if existing:
                 return existing
 
-        # Create new element
-        element = ArchiMateElement(
-            name=application.name,
-            type="ApplicationComponent",
-            layer="application",
-            description=application.description or f"Application: {application.name}",
-            scope="application",
-        )
-        db.session.add(element)
-        db.session.flush()
-
-        # Link to application
-        application.archimate_element_id = element.id
-
-        logger.debug(f"Created ApplicationComponent element for {application.name}")
-        return element
+        # Use the shared writer -- the same helper the flush listener and the
+        # backfill command use -- so an element reached through this path carries
+        # the same type, layer, description and provenance as any other.
+        from app.services.archimate_backbone import sync_archimate_element
+        return sync_archimate_element(application)
 
     def _create_application_function_element(
         self, application: ApplicationComponent, func_data: dict
