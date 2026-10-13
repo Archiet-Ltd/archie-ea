@@ -9,6 +9,7 @@ Provides full CRUD operations with RBAC enforcement and audit logging.
 """
 
 import logging
+from sqlalchemy.exc import IntegrityError
 from flask import Blueprint, abort, jsonify, render_template, request
 from flask_login import current_user, login_required
 
@@ -558,6 +559,14 @@ def create_compliance_policy():
 
         logger.info(f"Compliance policy created: {policy.name} (ID: {policy.id})")
         return jsonify({"success": True, "data": policy.to_dict()}), 201
+    except IntegrityError:
+        # Two same-organisation requests raced past the duplicate check above and
+        # the per-organisation unique constraint refused the second one.
+        db.session.rollback()
+        return (
+            jsonify({"success": False, "error": "Policy with this name already exists"}),
+            409,
+        )
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error creating compliance policy: {e}")

@@ -177,10 +177,14 @@ def test_compliance_matrix_uses_real_linkage(db_session, tenant_ctx, make_org):
         # is invisible to the tenant-filtered query under test.
         organization_id=org.id,
     )
+    # CompliancePolicy/ComplianceViolation are TenantMixin as of the compliance
+    # tenancy fix; outside a request context the org is not auto-assigned, same
+    # as ARBReviewItem above.
     policy = CompliancePolicy(
         name=f"Matrix Policy {suffix}",
         policy_type="security",
         description="test policy",
+        organization_id=org.id,
     )
     db_session.add_all([review, policy])
     db_session.flush()
@@ -188,6 +192,7 @@ def test_compliance_matrix_uses_real_linkage(db_session, tenant_ctx, make_org):
         policy_id=policy.id,
         description="test violation",
         affected_system=application.name,
+        organization_id=org.id,
     )
     db_session.add(violation)
     db_session.flush()

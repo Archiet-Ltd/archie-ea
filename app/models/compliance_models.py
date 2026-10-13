@@ -15,6 +15,7 @@ Supports:
 from datetime import datetime
 
 from app import db
+from app.models.mixins.core import TenantMixin
 
 from .relationship_tables import capability_compliance_requirements
 
@@ -531,12 +532,17 @@ class ComplianceGap(db.Model):
 # ============================================================================
 
 
-class CompliancePolicy(db.Model):
+class CompliancePolicy(TenantMixin, db.Model):
     """
     Compliance policy definition for organizational compliance tracking.
 
     Policies define compliance requirements and frameworks that the
     organization must adhere to (NIST, CIS, ISO, SOX, HIPAA, etc.).
+
+    Pre-TenantMixin, this had no tenant scoping at all: `enterprise_crud_routes.py`
+    queried/counted/created policies with no org filter, and `name` carried a
+    GLOBAL `unique=True` — two organizations could not both have a "NIST" policy,
+    the same cross-tenant collision shape closed for SSOGroupRoleMapping (PR#102).
     """
 
     __tablename__ = "compliance_policies"
@@ -544,7 +550,7 @@ class CompliancePolicy(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     # Policy identification
-    name = db.Column(db.String(200), nullable=False, unique=True)
+    name = db.Column(db.String(200), nullable=False)
     policy_type = db.Column(
         db.String(50), nullable=False, default="NIST"
     )  # NIST, CIS, ISO, SOX, HIPAA, GDPR, PCI-DSS, COBIT
@@ -564,6 +570,10 @@ class CompliancePolicy(db.Model):
 
     # Relationships
     violations = db.relationship("ComplianceViolation", backref="policy", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        db.UniqueConstraint("organization_id", "name", name="uq_compliance_policies_org_name"),
+    )
 
     def __repr__(self):
         return f"<CompliancePolicy {self.name} ({self.policy_type})>"
@@ -585,12 +595,16 @@ class CompliancePolicy(db.Model):
         }
 
 
-class ComplianceViolation(db.Model):
+class ComplianceViolation(TenantMixin, db.Model):
     """
     Compliance violation tracking and remediation management.
 
     Records specific violations of compliance policies and tracks
     remediation efforts and status.
+
+    Pre-TenantMixin, `enterprise_crud_routes.py` counted/listed/created violations
+    with no org filter of their own -- real per-org data (affected_system, assigned
+    owner, evidence links) with zero tenant scoping.
     """
 
     __tablename__ = "compliance_violations"
