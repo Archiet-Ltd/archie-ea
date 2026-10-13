@@ -1144,11 +1144,13 @@ def seeded_ai_system_element(seeded):
         return el.id
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def seeded_grounding_approval(seeded, seeded_ai_system_element):
     """A pending grounding-source approval in the seeded org, so the
     grounding-source accept and refuse POST routes have a real approval id in
-    the URL."""
+    the URL. Function-scoped: every probe gets its own pending approval, so a
+    permitted archetype's accept never leaves a decided approval for the next
+    probe to hit."""
     from app import create_app, db
     from app.models.models import ArchiMateElement
     from app.modules.enterprise_genome.services.ai_system_grounding import (
@@ -1159,9 +1161,18 @@ def seeded_grounding_approval(seeded, seeded_ai_system_element):
     with app.app_context():
         org_id = seeded["ids"]["org"]
         element = db.session.get(ArchiMateElement, seeded_ai_system_element)
+        data_entity = ArchiMateElement(
+            name="Auth-matrix probe data entity",
+            type="DataObject",
+            layer="application",
+            organization_id=org_id,
+            custom_properties={},
+        )
+        db.session.add(data_entity)
+        db.session.flush()
         approval = propose_grounding_source(
             element=element,
-            data_entity_id=element.id,  # a real element of this org
+            data_entity_id=data_entity.id,  # a real data entity of this org
             organization_id=org_id,
             proposed_by_user_id=None,
         )

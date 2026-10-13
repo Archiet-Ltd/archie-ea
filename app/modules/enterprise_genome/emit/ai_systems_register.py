@@ -220,6 +220,16 @@ def _lineage_panel(system: dict) -> str:
     if providers:
         prov_items = "".join(
             '<span class="font-medium">' + str(escape(p.get("name", "not recorded"))) + "</span>"
+            + (
+                ""
+                if p.get("registered", True)
+                else ' <span class="text-muted-foreground">(not in the provider register)</span>'
+            )
+            + (
+                ' <span class="text-destructive">(blocked by the provider register)</span>'
+                if p.get("allowed") is False
+                else ""
+            )
             for p in providers
         )
         parts.append(
@@ -230,7 +240,7 @@ def _lineage_panel(system: dict) -> str:
     else:
         parts.append(
             '<div><span class="font-semibold">Providers:</span> '
-            '<span class="text-muted-foreground">not recorded — no provider elements linked</span></div>'
+            '<span class="text-muted-foreground">not recorded — no provider recorded on the system profile</span></div>'
         )
 
     # Data entities
@@ -247,22 +257,26 @@ def _lineage_panel(system: dict) -> str:
     else:
         parts.append(
             '<div><span class="font-semibold">Data entities:</span> '
-            '<span class="text-muted-foreground">not recorded — no data entity elements linked</span></div>'
+            '<span class="text-muted-foreground">not recorded — no data entities linked</span></div>'
         )
 
     # Systems using the same provider
     if provider_systems:
-        for pid, systems_list in provider_systems.items():
+        for systems_list in provider_systems.values():
             if not systems_list:
                 continue
             sys_items = []
             for sys_entry in systems_list:
                 owner = sys_entry.get("owner")
-                owner_name = "not recorded"
+                owner_name = "not recorded — no owner assigned"
                 if owner and owner.get("user_name"):
                     owner_name = owner["user_name"]
                 data_names = [d.get("name", "not recorded") for d in sys_entry.get("data_entities", [])]
-                data_str = ", ".join(data_names) if data_names else "none"
+                data_str = (
+                    ", ".join(data_names)
+                    if data_names
+                    else "not recorded — no data entities linked"
+                )
                 sys_items.append(
                     str(escape(sys_entry.get("name", "not recorded")))
                     + " (owner: " + str(escape(owner_name))
@@ -294,12 +308,18 @@ def _obligations_panel(system: dict) -> str:
         for ob in obligations:
             title = ob.get("title", "not recorded")
             evidence_status = ob.get("evidence_status", "not recorded")
+            reason = ob.get("evidence_status_reason")
+            badge_text = evidence_status + (f" — {reason}" if reason else "")
+            location = ob.get("evidence_location") or "not recorded — no evidence location"
+            verified = ob.get("last_verified_at") or "not recorded — never verified"
             parts.append(
                 '<div class="flex items-center gap-2">'
                 '<span class="font-medium">' + str(escape(title)) + "</span>"
                 '<span class="text-xs px-2 py-0.5 rounded '
                 + _status_badge_class(evidence_status)
-                + '">' + str(escape(evidence_status)) + "</span>"
+                + '">' + str(escape(badge_text)) + "</span>"
+                '<span>Evidence: ' + str(escape(location)) + "</span>"
+                '<span>Last verified: ' + str(escape(verified)) + "</span>"
                 "</div>"
             )
     else:

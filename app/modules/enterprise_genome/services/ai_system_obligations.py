@@ -28,6 +28,8 @@ from app import db
 
 logger = logging.getLogger(__name__)
 
+NOT_RECORDED = "not recorded"
+
 # The four EU AI Act risk classes from classification.py.
 RISK_CLASSES = ("unacceptable", "high", "limited", "minimal")
 
@@ -182,7 +184,8 @@ def get_obligations_for_system(
                 "id": int,
                 "title": str,
                 "description": str,
-                "evidence_status": str,  # not_started | in_progress | completed | verified | not recorded
+                "evidence_status": str,  # the recorded implementation_status, or "not recorded" when unset
+                "evidence_status_reason": str | None,  # why it is "not recorded"
                 "evidence_location": str | None,
                 "last_verified_at": str | None,
             },
@@ -210,21 +213,21 @@ def get_obligations_for_system(
 
     obligations: list[dict] = []
     for row in rows:
-        impl_status = row.implementation_status or "not_started"
-        evidence_status = impl_status
-        if not impl_status or impl_status == "not_started":
-            if row.evidence_location:
-                evidence_status = "in_progress"
-            elif row.last_verified_at:
-                evidence_status = "verified"
-            else:
-                evidence_status = "not recorded"
+        # The evidence status is the recorded implementation status. Only an
+        # unset status falls back to "not recorded"; evidence location and
+        # last-verified date are separate facts, never folded into it.
+        impl_status = (row.implementation_status or "").strip()
+        evidence_status = impl_status or NOT_RECORDED
+        evidence_status_reason = (
+            None if impl_status else "no implementation status recorded"
+        )
 
         obligations.append({
             "id": row.id,
             "title": row.title,
             "description": row.description,
             "evidence_status": evidence_status,
+            "evidence_status_reason": evidence_status_reason,
             "evidence_location": row.evidence_location or None,
             "last_verified_at": (
                 row.last_verified_at.isoformat()

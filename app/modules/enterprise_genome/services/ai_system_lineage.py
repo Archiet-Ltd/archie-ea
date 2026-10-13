@@ -1,79 +1,114 @@
 """Lineage queries for the AI Systems Register.
 
-Reads ArchiMateRelationship rows that link an AI system to its providers and
-data entities. No new table: the relationship store is the single source of
-truth for every element link in the architecture.
+A system's provider is the provider string on its own stored profile, joined
+to the organisation's provider register; its data entities are the DataObject
+elements linked to it through ArchiMateRelationship. No new table.
 
 Reuse
 -----
-* ArchiMateRelationship (``app.models.models``) for all element links.
-* ``ApplicationOwner.get_owners_for_element`` for the owner read.
-* ``profile_from_element`` for projecting elements into a typed dict.
+* ``ai_system_profile.is_ai_system`` / ``_read_owner`` — the AI-system predicate
+  and the one owner read.
+* ``ai_systems_slice._iter_ai_system_elements`` — the organisation-scoped
+  iteration over AI-system elements.
+* ``ModelProvider`` (``app.models.model_provider``) — the one provider register
+  and its ``is_allowed_for_org`` answer.
+* ArchiMateRelationship (``app.models.models``) for data-entity links.
 """
 
 from __future__ import annotations
 
 import logging
 
+from app import db
+from app.modules.enterprise_genome.services.ai_system_profile import (
+    AI_SYSTEM_MARKER,
+    UNKNOWN,
+    _read_owner,
+    is_ai_system,
+)
+from app.modules.enterprise_genome.services.ai_systems_slice import (
+    _iter_ai_system_elements,
+)
+
 logger = logging.getLogger(__name__)
 
+# A data entity is a DataObject element.
+DATA_ENTITY_TYPE = "DataObject"
 
-def get_providers_for_system(element_id: int, organization_id: int) -> list[dict]:
-    """Providers linked to an AI system element via ArchiMateRelationship.
 
-    Returns a list of provider-element dicts (``{id, name, type}``), or an
-    empty list when none are linked. Scoped to *organization_id* so a caller
-    from another org never sees the relationship.
+def _profile_provider(element) -> tuple[str | None, str | None]:
+    """The (provider, model_id) strings recorded in the AI system's stored
+    profile (``custom_properties['ai_system']``), or ``(None, None)``-style
+    blanks when nothing is recorded. Never invents a value."""
+    props = getattr(element, "custom_properties", None) or {}
+    ai = props.get(AI_SYSTEM_MARKER) if isinstance(props, dict) else None
+    if not isinstance(ai, dict):
+        return None, None
+    provider = (ai.get("provider") or "").strip() or None
+    model_id = (ai.get("model_id") or "").strip() or None
+    if provider and provider.lower() == UNKNOWN:
+        provider = None
+    return provider, model_id
 
-    Direction matters: the AI system is the *source* of the Serving or Flow
-    relationship that points at a provider. A consumer application is the
-    source of a relationship that points AT the system, so it can never be
-    read as a provider. A provider is an element registered in the provider
-    register — it carries the ``provider_register`` marker; element type
-    alone never marks a provider.
-    """
-    from app.models.models import ArchiMateElement, ArchiMateRelationship
 
-    # The system is the source of the provider link; consumers point at the
-    # system (they are the source, the system is the target).
-    rels = (
-        ArchiMateRelationship.query.filter(
-            ArchiMateRelationship.source_id == element_id,
-            ArchiMateRelationship.type.in_(("serving", "flow")),
+def _provider_register_rows(provider: str, organization_id: int) -> list:
+    """``ModelProvider`` rows for *provider* visible to *organization_id*: the
+    organisation's own rows plus the platform defaults (organisation NULL).
+    Scoped explicitly; never another organisation's rows."""
+    from sqlalchemy import func, or_
+
+    from app.models.model_provider import ModelProvider
+
+    return (
+        ModelProvider.query.filter(
+            func.lower(func.trim(ModelProvider.provider)) == provider.strip().lower(),
+            or_(
+                ModelProvider.organization_id == organization_id,
+                ModelProvider.organization_id.is_(None),
+            ),
         )
-        .filter(ArchiMateRelationship.organization_id == organization_id)
+        .order_by(ModelProvider.id.asc())
         .all()
     )
 
-    providers: list[dict] = []
-    seen: set[int] = set()
 
-    for rel in rels:
-        peer_id = rel.target_id
-        if peer_id in seen:
-            continue
-        seen.add(peer_id)
+def get_providers_for_system(element_id: int, organization_id: int) -> list[dict]:
+    """The provider an AI system uses, from its stored profile.
 
-        peer = ArchiMateElement.query.filter_by(
-            id=peer_id,
-            organization_id=organization_id,
-        ).first()
-        if peer is None:
-            continue
-        # A provider is an element registered in the provider register: it
-        # carries the provider_register marker. Element type alone (e.g. an
-        # ApplicationComponent) never marks a provider — a consumer application
-        # is an ApplicationComponent too.
-        props = peer.custom_properties or {}
-        is_provider = props.get("provider_register") is True
-        if is_provider:
-            providers.append({
-                "id": peer.id,
-                "name": peer.name or "not recorded",
-                "type": peer.type or "not recorded",
-            })
+    The provider is the string recorded on the system's own profile
+    (``custom_properties['ai_system']['provider']``) — the same fact the
+    register's Provider column shows — joined to the organisation's provider
+    register (``ModelProvider``: the organisation's rows plus the platform
+    defaults). No separate provider element or marker is needed.
 
-    return providers
+    Returns a list of ``{name, model_id, registered, allowed}`` (at most one
+    entry: a profile carries one provider), or ``[]`` when the system is not in
+    *organization_id* or records no provider. ``registered`` is True when the
+    provider register has a row for it; ``allowed`` is the register's own
+    allow/block answer for the provider and model
+    (``ModelProvider.is_allowed_for_org``).
+    """
+    from app.models.model_provider import ModelProvider
+    from app.models.models import ArchiMateElement
+
+    element = ArchiMateElement.query.filter_by(
+        id=element_id, organization_id=organization_id
+    ).first()
+    if element is None or not is_ai_system(element):
+        return []
+
+    provider, model_id = _profile_provider(element)
+    if provider is None:
+        return []
+
+    return [{
+        "name": provider,
+        "model_id": model_id,
+        "registered": bool(_provider_register_rows(provider, organization_id)),
+        "allowed": ModelProvider.is_allowed_for_org(
+            provider, model_id, organization_id
+        ),
+    }]
 
 
 def get_data_entities_for_system(element_id: int, organization_id: int) -> list[dict]:
@@ -115,7 +150,7 @@ def get_data_entities_for_system(element_id: int, organization_id: int) -> list[
         ).first()
         if peer is None:
             continue
-        if peer.type == "DataObject":
+        if peer.type == DATA_ENTITY_TYPE:
             entities.append({
                 "id": peer.id,
                 "name": peer.name or "not recorded",
@@ -126,10 +161,15 @@ def get_data_entities_for_system(element_id: int, organization_id: int) -> list[
 
 
 def get_systems_using_provider(
-    provider_element_id: int,
+    provider: str,
     organization_id: int,
 ) -> list[dict]:
-    """All AI systems using a provider, with owner and data entities sent.
+    """All of an organisation's AI systems whose profile names *provider*, with
+    owner and data entities.
+
+    An organisation-scoped query over the AI-system elements: a system is
+    listed when its stored profile provider equals *provider* (case and
+    surrounding space ignored). Nothing about a link or a marker decides it.
 
     Returns::
         [
@@ -142,81 +182,22 @@ def get_systems_using_provider(
             ...
         ]
 
-    Scoped to *organization_id*.
+    Scoped to *organization_id*; another organisation's systems never appear.
     """
-    from app.models.application_owner import ApplicationOwner
-    from app.models.models import ArchiMateElement, ArchiMateRelationship
+    wanted = (provider or "").strip().lower()
+    if not wanted:
+        return []
 
-    # Direction: an AI system uses a provider when it is the source of a
-    # Serving or Flow relationship pointing AT the provider. Consumers point at
-    # the AI system, never at the provider, so only relationships where the
-    # provider is the target can name a system that uses it.
-    rels = (
-        ArchiMateRelationship.query.filter(
-            ArchiMateRelationship.target_id == provider_element_id,
-            ArchiMateRelationship.type.in_(("serving", "flow")),
-        )
-        .filter(ArchiMateRelationship.organization_id == organization_id)
-        .all()
-    )
-
-    # Collect peer system elements
     systems: list[dict] = []
-    seen: set[int] = set()
-
-    for rel in rels:
-        peer_id = rel.source_id
-        if peer_id in seen:
+    for peer in _iter_ai_system_elements(organization_id, db.session):
+        peer_provider, _ = _profile_provider(peer)
+        if peer_provider is None or peer_provider.lower() != wanted:
             continue
-        seen.add(peer_id)
-
-        # Must be an AI-system element
-        peer = ArchiMateElement.query.filter_by(
-            id=peer_id,
-            organization_id=organization_id,
-        ).first()
-        if peer is None:
-            continue
-
-        is_ai = (
-            getattr(peer, "type", None) == "ApplicationComponent"
-            and isinstance(getattr(peer, "custom_properties", None) or {}, dict)
-            and "ai_system" in (peer.custom_properties or {})
-        )
-        if not is_ai:
-            continue
-
-        # Read owner
-        owners = ApplicationOwner.get_owners_for_element(
-            element_type="ai_system",
-            element_id=peer.id,
-            organization_id=organization_id,
-        )
-        owner = None
-        if owners:
-            primary = None
-            for o in owners:
-                if o.ownership_type == "primary":
-                    primary = o
-                    break
-            if primary is None:
-                primary = owners[0]
-            owner = {
-                "user_id": primary.user_id,
-                "ownership_type": primary.ownership_type,
-                "user_name": getattr(primary.user, "display_name", None)
-                or f"{getattr(primary.user, 'first_name', '') or ''} {getattr(primary.user, 'last_name', '') or ''}".strip()
-                or None,
-            }
-
-        # Read data entities linked to this system
-        data_entities = get_data_entities_for_system(peer.id, organization_id)
-
         systems.append({
             "id": peer.id,
             "name": peer.name or "not recorded",
-            "owner": owner,
-            "data_entities": data_entities,
+            "owner": _read_owner(peer),
+            "data_entities": get_data_entities_for_system(peer.id, organization_id),
         })
 
     return systems

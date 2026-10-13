@@ -46,10 +46,11 @@ from app.decorators import admin_required
 from app._decorators_base import permission_required
 from app.models import Permission
 from app.modules.enterprise_genome.emit.ai_systems_register import emit_ai_systems_register
+from app.modules.ai_chat.services.ai_chat_approval_service import (
+    AIChatApprovalService,
+)
 from app.modules.enterprise_genome.services.ai_system_grounding import (
-    accept_grounding_source,
     propose_grounding_source,
-    reject_grounding_source,
 )
 from app.modules.enterprise_genome.services.ai_system_lineage import (
     get_data_entities_for_system,
@@ -157,18 +158,24 @@ def ai_systems():
     if org_id is not None:
         slice_data = build_ai_systems_slice(org_id, db.session)
         # Enrich each system with lineage and obligations data
+        users_by_provider: dict = {}
         for s in slice_data.get("systems", []):
             el_id = s.get("archimate_element_id")
             if el_id:
                 s["providers"] = get_providers_for_system(el_id, org_id)
                 s["data_entities"] = get_data_entities_for_system(el_id, org_id)
                 s["obligations"] = get_obligations_for_system(el_id, org_id)
-                # For each provider, find systems using it
+                # For each provider, the organisation's systems that use it
+                # (one query per distinct provider on the page).
                 provider_systems = {}
                 for p in s.get("providers", []):
-                    pid = p.get("id")
-                    if pid:
-                        provider_systems[pid] = get_systems_using_provider(pid, org_id)
+                    name = p.get("name")
+                    if name:
+                        if name not in users_by_provider:
+                            users_by_provider[name] = get_systems_using_provider(
+                                name, org_id
+                            )
+                        provider_systems[name] = users_by_provider[name]
                 s["provider_systems"] = provider_systems
         register_html = emit_ai_systems_register(
             slice_data,
@@ -523,14 +530,20 @@ def ai_system_accept_grounding_source(element_id, approval_id):
     if _approval_payload_element(approval_id, org_id) != element_id:
         abort(404)
 
+    # Decide through the one approval service, as the approval queue does: it
+    # records the approver, claims the approval once and writes the approval
+    # audit trail before dispatching to accept_grounding_source.
     try:
-        result = accept_grounding_source(approval_id, org_id)
-        if result:
-            db.session.commit()
+        result = AIChatApprovalService(user_id=current_user.id).approve_and_execute(
+            approval_id, current_user.id
+        )
+        if result.get("success"):
             flash("Grounding source approved.", "success")
         else:
-            db.session.rollback()
-            flash("Could not approve grounding source.", "error")
+            flash(
+                result.get("error") or "Could not approve grounding source.",
+                "error",
+            )
     except Exception:  # noqa: BLE001
         db.session.rollback()
         logger.exception(
@@ -569,13 +582,16 @@ def ai_system_refuse_grounding_source(element_id, approval_id):
         abort(404)
 
     try:
-        result = reject_grounding_source(approval_id, org_id)
-        if result:
-            db.session.commit()
+        result = AIChatApprovalService(user_id=current_user.id).reject_approval(
+            approval_id, reason="Refused by reviewer"
+        )
+        if result.get("success"):
             flash("Grounding source refused.", "success")
         else:
-            db.session.rollback()
-            flash("Could not refuse grounding source.", "error")
+            flash(
+                result.get("error") or "Could not refuse grounding source.",
+                "error",
+            )
     except Exception:  # noqa: BLE001
         db.session.rollback()
         logger.exception(

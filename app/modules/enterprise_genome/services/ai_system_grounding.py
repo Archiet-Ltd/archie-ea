@@ -9,17 +9,25 @@ Reuse
 * ``create_approval_record`` (``ai_chat_approval_service``) — the one approval
   queue writer, no second queue.
 * ``PropertyService.set_element_property`` — the one typed-property writer.
-* ``AIChatCRUDApproval`` — the one approval store.
+* ``AIChatCRUDApproval`` — the one approval store; its ``approve`` / ``reject``
+  methods record the decision.
+* ``AIChatApprovalService`` — the routes decide a proposal through it, so the
+  approver and the approval audit trail are recorded exactly as for the queue.
+* ``ai_system_profile.is_ai_system`` and ``ai_system_lineage.DATA_ENTITY_TYPE``
+  — the AI-system and data-entity predicates.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
 from typing import Optional
 
 from app import db
+from app.modules.enterprise_genome.services.ai_system_lineage import (
+    DATA_ENTITY_TYPE,
+)
+from app.modules.enterprise_genome.services.ai_system_profile import is_ai_system
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +52,11 @@ def propose_grounding_source(
     Returns the ``AIChatCRUDApproval`` record.
 
     Refuses (``ValueError``) when the AI system element is not in
-    *organization_id*, and when *data_entity_id* is not an element of that
-    organisation — a grounding source must name a real entity the org owns.
+    *organization_id*, when *data_entity_id* is not an element of that
+    organisation, when that element is not a data entity (a ``DataObject``),
+    and when it is the AI system itself — a grounding source must name a real
+    data entity the org owns, never another kind of element and never the
+    system as its own source.
     """
     from app.modules.ai_chat.services.ai_chat_approval_service import (
         create_approval_record,
@@ -66,6 +77,14 @@ def propose_grounding_source(
             f"Grounding source data entity {data_entity_id} is not in this organisation"
         )
 
+    if data_entity.id == element.id or is_ai_system(data_entity):
+        raise ValueError("An AI system cannot be its own grounding source")
+    if data_entity.type != DATA_ENTITY_TYPE:
+        raise ValueError(
+            f"Grounding source {data_entity_id} is not a data entity "
+            f"(expected a {DATA_ENTITY_TYPE} element)"
+        )
+
     payload = {
         "element_id": element.id,
         "data_entity_id": data_entity_id,
@@ -84,16 +103,22 @@ def propose_grounding_source(
     return approval
 
 
-def accept_grounding_source(approval_id: int, organization_id: int) -> bool:
+def accept_grounding_source(
+    approval_id: int,
+    organization_id: int,
+    approver_id: Optional[int] = None,
+) -> bool:
     """Accept a proposed grounding source.
 
     Reads the proposal payload from the approval record and writes the
     grounding source property onto the element's ``acm_properties`` via the
     typed property writer.
 
-    Works both when called directly (the approval is still pending) and when
-    the approval queue's claim has already marked the row approved before
-    dispatching here. Idempotent.
+    Acts only on an approval that is still open: pending (a direct call, which
+    records *approver_id* as the approver) or already claimed as approved by
+    the approval queue before it dispatches here (idempotent). A refused
+    (rejected) approval, or one already executed, writes nothing and returns
+    ``False``.
     """
     from app.models.ai_chat_crud_approval import (
         AIChatCRUDApproval,
@@ -107,9 +132,15 @@ def accept_grounding_source(approval_id: int, organization_id: int) -> bool:
         id=approval_id,
         organization_id=organization_id,
         entity_type=ENTITY_GROUNDING_SOURCE,
+    ).filter(
+        AIChatCRUDApproval.status.in_(
+            (ApprovalStatus.PENDING, ApprovalStatus.APPROVED)
+        )
     ).first()
-    if approval is None:
-        logger.warning("accept_grounding_source: approval %s not found", approval_id)
+    if approval is None or approval.executed_at is not None:
+        logger.warning(
+            "accept_grounding_source: approval %s not found or not open", approval_id
+        )
         return False
 
     try:
@@ -138,8 +169,7 @@ def accept_grounding_source(approval_id: int, organization_id: int) -> bool:
 
     # Record the accept
     if approval.status == ApprovalStatus.PENDING:
-        approval.status = ApprovalStatus.APPROVED
-        approval.approved_at = datetime.utcnow()
+        approval.approve(approver_id)
         db.session.add(approval)
         db.session.flush()
 
@@ -178,8 +208,7 @@ def reject_grounding_source(approval_id: int, organization_id: int) -> bool:
     if approval is None:
         return False
 
-    approval.status = ApprovalStatus.REJECTED
-    approval.rejected_reason = "Rejected by administrator"
+    approval.reject("Rejected by administrator")
     db.session.add(approval)
     db.session.flush()
     return True
