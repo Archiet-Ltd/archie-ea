@@ -136,8 +136,10 @@
             if (!open && returnFocus) publicMenuBtn.focus();
         };
 
-        publicMenuBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
+        publicMenuBtn.addEventListener('click', () => {
+            // No stopPropagation here: letting the click bubble to the
+            // document-level listener above lets it close the signed-in
+            // user dropdown too, so the two never end up open at once.
             const isOpen = publicMenuBtn.getAttribute('aria-expanded') === 'true';
             setPublicMenuOpen(!isOpen, false);
         });
