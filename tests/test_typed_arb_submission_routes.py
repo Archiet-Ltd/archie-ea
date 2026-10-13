@@ -886,7 +886,6 @@ def test_submission_and_evidence_role_sets_are_distinct_and_pinned():
             "technology_architect",
             "security_architect",
             "architect",
-            "platform_admin",
         }
     )
     assert _EVIDENCE_CAPTURE_ROLES == frozenset(
@@ -901,6 +900,8 @@ def test_submission_and_evidence_role_sets_are_distinct_and_pinned():
     # The differences are the point: neither set may silently absorb the other.
     assert "arb_member" in _EVIDENCE_CAPTURE_ROLES
     assert "arb_member" not in _SUBJECT_SUBMIT_ROLES
-    assert "platform_admin" in _SUBJECT_SUBMIT_ROLES
+    # platform_admin authority is the is_platform_admin predicate, never the
+    # self-assignable role value (tests/test_role_self_assignment.py).
+    assert "platform_admin" not in _SUBJECT_SUBMIT_ROLES
     assert "platform_admin" not in _EVIDENCE_CAPTURE_ROLES
     assert _SUBJECT_SUBMIT_ROLES != _EVIDENCE_CAPTURE_ROLES
