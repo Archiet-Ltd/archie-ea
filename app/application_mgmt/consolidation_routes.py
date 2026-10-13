@@ -827,24 +827,21 @@ def confirm_vendor_matches():
 
                 # Create ArchiMate element if it doesn't exist
                 if not archimate_element:
-                    archimate_element = ArchiMateElement(
-                        name=app.name,
-                        type="ApplicationComponent",
-                        layer="application",
-                        description=app.description or "",
-                        properties=json.dumps(
-                            {
-                                "vendor_matched": True,
-                                "vendor_id": vendor_id,
-                                "vendor_name": vendor_product.vendor_organization.name,
-                                "match_confidence": match.get("confidence", 0),
-                            }
+                    from app.services.archimate_backbone import sync_archimate_element
+                    archimate_element = sync_archimate_element(app)
+                    if archimate_element is not None:
+                        archimate_element.properties = (  # untyped-property-write-ok: vendor matching metadata stored in legacy properties field
+                            json.dumps(
+                                {
+                                    "vendor_matched": True,
+                                    "vendor_id": vendor_id,
+                                    "vendor_name": vendor_product.vendor_organization.name,
+                                    "match_confidence": match.get("confidence", 0),
+                                }
+                            )
+                            if match.get("confidence")
+                            else None
                         )
-                        if match.get("confidence")
-                        else None,
-                    )
-                    db.session.add(archimate_element)
-                    db.session.flush()
 
                 # Link to application
                 app.archimate_element_id = archimate_element.id
