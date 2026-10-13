@@ -15,6 +15,16 @@ from datetime import datetime  # dead-code-ok
 
 from sqlalchemy.orm import relationship, synonym
 
+from app.config.archimate_relationship_matrix import (
+    ALL_ELEMENTS as _MATRIX_ALL_ELEMENTS,
+    LAYER_NAME_TO_KEY as _MATRIX_LAYER_TO_KEY,
+    VALID_RELATIONSHIPS as _MATRIX_VALID_RELATIONSHIPS,
+    get_element_layer as _matrix_get_element_layer,
+    get_valid_relationships as _matrix_get_valid_relationships,
+    is_valid_relationship as _matrix_is_valid_relationship,
+    normalize_element_type as _matrix_normalize_element_type,
+)
+
 from .. import db
 
 _FAST_INIT = os.getenv("APP_FAST_INIT", "0") == "1"
@@ -255,102 +265,73 @@ class RelationshipSuggestion(db.Model):  # migration-exempt — uses db.create_a
 # Key: (relationship_type, source_layer, target_layer) → bool
 # Layers: business, application, technology, motivation, strategy, implementation, physical
 #
-# This layer-triple matrix is coarser than the element-type-keyed one in
-# app/config/archimate_relationship_matrix.py (via RelationshipValidator),
-# which is authoritative and which the OEF importer
-# (app/services/archimate_import_service.py) now calls exclusively. This
-# table is NOT retired — it is still read by
-# solution_ai_orchestrator.py, solutions_strategic/v2/routes/
-# solution_archimate_routes.py and modules/genome/patch/coherence.py — so do
-# not delete it. Just don't add a new caller: the importer and any new
-# relationship-validity check belong on RelationshipValidator, not here.
-VALID_RELATIONSHIPS = {
-    # Composition — within same layer only
-    ("composition", "business", "business"): True,
-    ("composition", "application", "application"): True,
-    ("composition", "technology", "technology"): True,
-    ("composition", "motivation", "motivation"): True,
-    ("composition", "strategy", "strategy"): True,
-    ("composition", "physical", "physical"): True,
-    ("composition", "implementation", "implementation"): True,  # Deliverable → WorkPackage
-    # Aggregation — within same layer only
-    ("aggregation", "business", "business"): True,
-    ("aggregation", "application", "application"): True,
-    ("aggregation", "technology", "technology"): True,
-    ("aggregation", "motivation", "motivation"): True,
-    ("aggregation", "strategy", "strategy"): True,  # ArchiMate 3.2 §5.1.2: Capability/Resource hierarchies (same type)
-    # Assignment — within same layer and specific cross-layer
-    ("assignment", "business", "business"): True,
-    ("assignment", "application", "application"): True,
-    ("assignment", "technology", "technology"): True,
-    ("assignment", "technology", "application"): True,
-    ("assignment", "strategy", "strategy"): True,  # ArchiMate 3.2 §7.4: Resource assigned to Capability
-    # Realization — typically lower layer realizes upper layer
-    ("realization", "business", "business"): True,
-    ("realization", "application", "business"): True,
-    ("realization", "technology", "application"): True,
-    ("realization", "technology", "technology"): True,
-    ("realization", "application", "application"): True,
-    ("realization", "implementation", "motivation"): True,
-    ("realization", "motivation", "motivation"): True,  # Goal → Outcome
-    ("realization", "motivation", "strategy"): True,   # Goal → Capability
-    ("realization", "strategy", "motivation"): True,   # CourseOfAction → Goal
-    ("realization", "strategy", "business"): True,     # Capability → BusinessProcess/Service
-    ("realization", "implementation", "implementation"): True,  # WorkPackage → Gap
-    # Serving — cross-layer allowed
-    ("serving", "application", "business"): True,
-    ("serving", "application", "application"): True,
-    ("serving", "technology", "application"): True,
-    ("serving", "technology", "technology"): True,
-    ("serving", "business", "business"): True,
-    ("serving", "strategy", "strategy"): True,          # Capability serves ValueStream
-    ("serving", "strategy", "motivation"): True,         # Capability serves Goal/Outcome
-    # Access — within same layer and cross-layer (application accesses business objects)
-    ("access", "business", "business"): True,
-    ("access", "application", "application"): True,
-    ("access", "application", "business"): True,
-    ("access", "technology", "technology"): True,
-    # Influence — motivation layer
-    ("influence", "motivation", "motivation"): True,
-    # Triggering — within same layer
-    ("triggering", "business", "business"): True,
-    ("triggering", "application", "application"): True,
-    ("triggering", "technology", "technology"): True,
-    ("triggering", "strategy", "strategy"): True,       # ValueStream stage → next stage (ordered)
-    # Flow — within same layer
-    ("flow", "business", "business"): True,
-    ("flow", "application", "application"): True,
-    ("flow", "technology", "technology"): True,
-    # Association — any combination (most permissive)
-    ("association", "business", "business"): True,
-    ("association", "application", "application"): True,
-    ("association", "technology", "technology"): True,
-    ("association", "motivation", "motivation"): True,
-    ("association", "motivation", "strategy"): True,   # Requirement → Capability
-    ("association", "strategy", "strategy"): True,      # ValueStream ↔ Capability (uses), stage adjacency
-    ("association", "strategy", "motivation"): True,    # Capability ↔ Goal/Outcome
-    ("association", "implementation", "implementation"): True,  # WorkPackage → Plateau
-    ("association", "business", "application"): True,
-    ("association", "application", "business"): True,
-    ("association", "application", "technology"): True,
-    ("association", "technology", "application"): True,
-    ("association", "business", "motivation"): True,
-    ("association", "motivation", "business"): True,
-    ("association", "strategy", "implementation"): True,  # ArchiMate 3.2 §5.2.4: option ↔ plan item
-    ("association", "implementation", "strategy"): True,  # ArchiMate 3.2 §5.2.4: plan item ↔ option
-    ("association", "motivation", "implementation"): True,  # ArchiMate 3.2 §5.2.4: outcome ↔ work package
-    ("association", "implementation", "motivation"): True,  # ArchiMate 3.2 §5.2.4: work package ↔ outcome
-    ("association", "business", "strategy"): True,  # ArchiMate 3.2 §5.2.4: key partner ↔ resource/capability
-    ("association", "strategy", "business"): True,  # ArchiMate 3.2 §5.2.4: resource/capability ↔ key partner
-    # Specialization — within same layer
-    ("specialization", "business", "business"): True,
-    ("specialization", "application", "application"): True,
-    ("specialization", "technology", "technology"): True,
-    ("specialization", "motivation", "motivation"): True,
-    ("specialization", "strategy", "strategy"): True,
-}
+# Derived at import time from the element-type-keyed matrix in
+# app/config/archimate_relationship_matrix.py -- the one relationship
+# validity authority -- rather than hand-authored: for every
+# (source type, target type) → [relationship types] row there, one
+# (relationship type, source layer, target layer) key is added per
+# relationship type, using the matrix's own layer classification. Grouping,
+# Location and Junction belong to no layer in that classification, so pairs
+# involving them contribute nothing here, same as before this was derived.
+# The result is a superset of the hand-authored table it replaces: every key
+# that table had, the matrix's own rows still produce, plus what this task
+# adds.
+#
+# This coarser table is NOT retired — it is still read by
+# solutions_strategic/v2/routes/solution_archimate_routes.py's quality-score
+# endpoint, the one caller with no other authority to call directly. Every
+# other caller (the create route, the picker, the AI tools, the OEF
+# importer, the conformance check) reads the matrix itself, through
+# ArchimateValidityService or the matrix's own functions — do not add a new
+# caller here: any new relationship-validity check belongs on
+# RelationshipValidator, not on this projection. ``_MATRIX_LAYER_TO_KEY`` is
+# imported above from the matrix module -- the one definition, also used by
+# app.services.archimate_validity_service.
 
-# Layer classification for element types
+# Three keys of the pre-existing hand-authored table used to be kept by hand
+# here (`_LEGACY_LAYER_ONLY_KEYS`) because no single (source type, target
+# type) pair in the matrix reproduced them. Settled on the standard instead
+# of carrying it forward:
+#   - ("realization", "motivation", "strategy") -- the old table's
+#     Goal -> Capability. §7.5 runs realization from strategy to motivation,
+#     not the reverse; the matrix now carries Capability -> Goal.
+#   - ("serving", "strategy", "motivation") -- the old table's
+#     Capability serves Goal/Outcome. Motivation elements are realized, not
+#     served; Capability -> Goal and -> Outcome realization are landed above.
+#   - ("access", "application", "business") -- an application behaviour
+#     reaches a business object through the data object that realizes it
+#     (§12.1), not directly.
+# A model holding a relationship of one of these three shapes now scores it
+# invalid on the quality-score endpoint, the one caller that reads this
+# projection directly, exactly as the create route already refuses it.
+
+
+def _build_layer_projection():
+    """(relationship type, source layer, target layer) -> True."""
+    projection = {}
+    for (source_type, target_type), rel_types in _MATRIX_VALID_RELATIONSHIPS.items():
+        source_layer = _MATRIX_LAYER_TO_KEY.get(_matrix_get_element_layer(source_type))
+        target_layer = _MATRIX_LAYER_TO_KEY.get(_matrix_get_element_layer(target_type))
+        if source_layer is None or target_layer is None:
+            continue
+        for rel_type in rel_types:
+            projection[(rel_type, source_layer, target_layer)] = True
+    return projection
+
+
+VALID_RELATIONSHIPS = _build_layer_projection()
+
+# Layer classification for element types. Not derived from the matrix like
+# VALID_RELATIONSHIPS above: scripts/check_ai_layer_coverage.py (the AI
+# layer-coverage ratchet) reads this dict as literal source text -- it
+# parses app/models/archimate_core.py without importing it, specifically so
+# the gate can run with no database and no app context -- and a generated
+# assignment leaves nothing for that regex to find, silently reporting zero
+# element types instead of the 58 there really are. Read directly (not
+# through validate_relationship) by solution_archimate_routes.py's
+# quality-score endpoint. Equal, key for key and value for value, to what
+# app/config/archimate_relationship_matrix.py's LAYERED_ELEMENTS classifies
+# each type as (checked in tests/test_relationship_validity_authority.py).
 _ELEMENT_TYPE_LAYER = {
     "business_actor": "business", "business_role": "business",
     "business_collaboration": "business", "business_interface": "business",
@@ -383,7 +364,20 @@ _ELEMENT_TYPE_LAYER = {
 
 
 def validate_relationship(rel_type, source_type, target_type):
-    """Advisory validation of ArchiMate 3.2 relationship cardinality rules.
+    """Advisory validation of ArchiMate 3.2 relationship rules.
+
+    Adapter over the matrix's ``is_valid_relationship`` — the one
+    relationship validity authority — after normalising ``source_type``/
+    ``target_type`` (stored snake_case, e.g. 'application_component') to
+    the matrix's PascalCase keys. An element type the matrix does not
+    recognise at all is not itself evidence of an invalid relationship, so
+    validation is skipped (not refused) for it. Grouping, Location and
+    Junction belong to no layer but are recognised element types (in
+    ``ALL_ELEMENTS``), so they get the matrix's real verdict here rather
+    than the skip -- before this, ``get_element_layer`` returning ``None``
+    for the three of them (they are in no layer) fell into the same skip
+    path as a genuinely unrecognised type, so every relationship touching
+    one of them validated True regardless of what the matrix actually says.
 
     Args:
         rel_type: Relationship type (e.g., 'composition', 'serving')
@@ -393,21 +387,21 @@ def validate_relationship(rel_type, source_type, target_type):
     Returns:
         Tuple of (is_valid: bool, message: str)
     """
-    source_layer = _ELEMENT_TYPE_LAYER.get((source_type or "").lower(), "unknown")
-    target_layer = _ELEMENT_TYPE_LAYER.get((target_type or "").lower(), "unknown")
     rel = (rel_type or "").lower()
+    source_pascal = _matrix_normalize_element_type(source_type)
+    target_pascal = _matrix_normalize_element_type(target_type)
 
-    if source_layer == "unknown" or target_layer == "unknown":
+    if source_pascal not in _MATRIX_ALL_ELEMENTS or target_pascal not in _MATRIX_ALL_ELEMENTS:
         return True, "Element type not in registry; validation skipped"
 
-    key = (rel, source_layer, target_layer)
-    if key in VALID_RELATIONSHIPS:
-        return True, f"Valid: {rel} from {source_layer} to {target_layer}"
+    if _matrix_is_valid_relationship(source_pascal, target_pascal, rel):
+        return True, f"Valid: {rel} from {source_type} to {target_type}"
 
+    valid_rels = _matrix_get_valid_relationships(source_pascal, target_pascal)
+    suffix = f". Valid relationships are: {', '.join(valid_rels)}" if valid_rels else ""
     return False, (
         f"Invalid per ArchiMate 3.2: '{rel}' relationship from "
-        f"{source_layer} layer ({source_type}) to {target_layer} layer ({target_type}) "
-        f"is not in the validity matrix"
+        f"{source_type} to {target_type} is not in the validity matrix{suffix}"
     )
 
 

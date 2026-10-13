@@ -1079,7 +1079,7 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ("Goal", "Resource"): ["influence", "association"],
     # Outcome relationships
     ("Outcome", "Stakeholder"): ["association"],
-    ("Outcome", "Goal"): ["association"],
+    ("Outcome", "Goal"): ["realization", "association"],  # ArchiMate 3.2 §6.3: an outcome realizes a goal
     ("Outcome", "Outcome"): [
         "composition",
         "aggregation",
@@ -1185,6 +1185,10 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ("WorkPackage", "TechnologyService"): ["realization", "association"],
     ("WorkPackage", "Capability"): ["realization", "association"],
     ("WorkPackage", "CourseOfAction"): ["realization", "association"],
+    # ArchiMate 3.2 §12.4 with Appendix B: a work package realizes a
+    # deliverable, a deliverable realizes an outcome, and the §5.7
+    # derivation of a realization chain is realization.
+    ("WorkPackage", "Outcome"): ["realization", "association"],
     # ImplementationEvent relationships
     ("ImplementationEvent", "WorkPackage"): ["triggering", "association"],
     ("ImplementationEvent", "ImplementationEvent"): [
@@ -1366,6 +1370,22 @@ for _element in LAYERED_ELEMENTS + OTHER_ELEMENTS + CONNECTOR_ELEMENTS:
     _add_rule("Junction", _element, list(_JUNCTION_RELATIONSHIPS))
     _add_rule(_element, "Junction", list(_JUNCTION_RELATIONSHIPS))
 
+# Association between any two concepts (ArchiMate 3.2 §5.2.4: "an association
+# relationship... may be used whenever no other relationship in the
+# specification applies" between any two elements). Encoded as one derived
+# pass over every ordered pair of ALL_ELEMENTS, appending "association" where
+# a row lacks it (and creating the row where it is missing entirely), for the
+# same reason the Grouping/Location/Junction passes above are generated
+# rather than hand-authored: an element added to ALL_ELEMENTS gets its
+# association rows automatically, with nothing to fall out of sync.
+for _assoc_source in ALL_ELEMENTS:
+    for _assoc_target in ALL_ELEMENTS:
+        _assoc_entry = VALID_RELATIONSHIPS.setdefault((_assoc_source, _assoc_target), [])
+        if "association" not in _assoc_entry:
+            _assoc_entry.append("association")
+
+del _assoc_source, _assoc_target, _assoc_entry
+
 # Dynamic relationships between ACTIVE STRUCTURE elements.
 #
 # The matrix allowed triggering and flow between behaviour elements
@@ -1422,6 +1442,273 @@ for _pair, _types in VALID_RELATIONSHIPS.items():
 del _pair, _types, _tgt
 
 
+# =============================================================================
+# The rule-based service this matrix replaced used to grant several of the
+# rows below through its own per-layer rank rules; the matrix regressed them
+# when it became the one relationship-validity authority. Landed here on
+# their own ArchiMate 3.2 citations instead of carried over from the old
+# rules. Each pass follows the style above: setdefault the row, then append
+# the type only if the row lacks it, so nothing already present is touched.
+# =============================================================================
+
+# -- Influence ----------------------------------------------------------------
+# ArchiMate 3.2 §5.2.3: influence represents that an element affects the
+# achievement of a motivation element; §5.7.2: an influence on a requirement
+# realized by a core element is an influence on that element -- the rule the
+# matrix's existing Goal->BusinessProcess, Driver->Capability and
+# Assessment->Capability rows already rely on; Appendix B.3 motivation
+# tables. Any ordered pair with at least one motivation-layer endpoint gains
+# influence. A strategy element with no motivation endpoint of its own (a
+# course of action shaping a capability) is realization (§7.3), not
+# influence, and this pass does not touch a strategy-only pair.
+for _source in LAYERED_ELEMENTS:
+    for _target in LAYERED_ELEMENTS:
+        if _source in MOTIVATION_ELEMENTS or _target in MOTIVATION_ELEMENTS:
+            _allowed = VALID_RELATIONSHIPS.setdefault((_source, _target), [])
+            if "influence" not in _allowed:
+                _allowed.append("influence")
+
+del _source, _target, _allowed
+
+# -- Serving --------------------------------------------------------------
+# §5.7.1: a process realizes a service that serves a process, so the derived
+# relationship within one core layer is serving; Appendix B.2 core tables
+# carry serving between processes, functions, interactions and services.
+_NON_EVENT_BUSINESS_BEHAVIOUR = [e for e in BUSINESS_BEHAVIOR_ELEMENTS if e != "BusinessEvent"]
+_NON_EVENT_APPLICATION_BEHAVIOUR = [
+    e for e in APPLICATION_BEHAVIOR_ELEMENTS if e != "ApplicationEvent"
+]
+_NON_EVENT_TECHNOLOGY_BEHAVIOUR = [
+    e for e in TECHNOLOGY_BEHAVIOR_ELEMENTS if e != "TechnologyEvent"
+]
+
+for _layer_non_event_behaviour in (
+    _NON_EVENT_BUSINESS_BEHAVIOUR,
+    _NON_EVENT_APPLICATION_BEHAVIOUR,
+    _NON_EVENT_TECHNOLOGY_BEHAVIOUR,
+):
+    for _source in _layer_non_event_behaviour:
+        for _target in _layer_non_event_behaviour:
+            _allowed = VALID_RELATIONSHIPS.setdefault((_source, _target), [])
+            if "serving" not in _allowed:
+                _allowed.append("serving")
+
+del _layer_non_event_behaviour, _source, _target, _allowed
+
+# §12.1 and §12.2: serving crosses layers in both directions; §11: physical
+# active structure participates on the same basis as technology-layer active
+# structure. Core elements of active-structure or behaviour aspect,
+# excluding events and passive structure, gain serving across a different
+# core layer (business, application, technology, physical are each their
+# own group for this pass).
+_SERVING_CORE_ELEMENTS = (
+    BUSINESS_ACTIVE_ELEMENTS
+    + _NON_EVENT_BUSINESS_BEHAVIOUR
+    + APPLICATION_ACTIVE_ELEMENTS
+    + _NON_EVENT_APPLICATION_BEHAVIOUR
+    + TECHNOLOGY_ACTIVE_ELEMENTS
+    + _NON_EVENT_TECHNOLOGY_BEHAVIOUR
+    + PHYSICAL_ACTIVE_ELEMENTS
+)
+
+
+def _serving_core_group(element_type: str) -> Optional[str]:
+    if element_type in BUSINESS_ACTIVE_ELEMENTS or element_type in _NON_EVENT_BUSINESS_BEHAVIOUR:
+        return "Business"
+    if (
+        element_type in APPLICATION_ACTIVE_ELEMENTS
+        or element_type in _NON_EVENT_APPLICATION_BEHAVIOUR
+    ):
+        return "Application"
+    if (
+        element_type in TECHNOLOGY_ACTIVE_ELEMENTS
+        or element_type in _NON_EVENT_TECHNOLOGY_BEHAVIOUR
+    ):
+        return "Technology"
+    if element_type in PHYSICAL_ACTIVE_ELEMENTS:
+        return "Physical"
+    return None
+
+
+for _source in _SERVING_CORE_ELEMENTS:
+    for _target in _SERVING_CORE_ELEMENTS:
+        if _serving_core_group(_source) == _serving_core_group(_target):
+            continue
+        _allowed = VALID_RELATIONSHIPS.setdefault((_source, _target), [])
+        if "serving" not in _allowed:
+            _allowed.append("serving")
+
+del _source, _target, _allowed
+
+# -- Realization ------------------------------------------------------------
+_MOTIVATION_REALIZATION_TARGETS = ["Goal", "Outcome", "Principle", "Requirement", "Constraint"]
+_CORE_LAYER_ELEMENTS = (
+    BUSINESS_ELEMENTS + APPLICATION_ELEMENTS + TECHNOLOGY_ELEMENTS + PHYSICAL_ELEMENTS
+)
+_CORE_STRUCTURE_ELEMENTS = (
+    BUSINESS_ACTIVE_ELEMENTS + BUSINESS_PASSIVE_ELEMENTS
+    + APPLICATION_ACTIVE_ELEMENTS + APPLICATION_PASSIVE_ELEMENTS
+    + TECHNOLOGY_ACTIVE_ELEMENTS + TECHNOLOGY_PASSIVE_ELEMENTS
+    + PHYSICAL_ACTIVE_ELEMENTS + PHYSICAL_PASSIVE_ELEMENTS
+)
+_CORE_BEHAVIOUR_NON_EVENT = (
+    _NON_EVENT_BUSINESS_BEHAVIOUR + _NON_EVENT_APPLICATION_BEHAVIOUR + _NON_EVENT_TECHNOLOGY_BEHAVIOUR
+)
+_NON_ACTIVE_CORE_ELEMENTS = [e for e in _CORE_LAYER_ELEMENTS if e not in _CORE_ACTIVE_ELEMENTS]
+
+
+def _add_realization(source: str, target: str) -> None:
+    _allowed = VALID_RELATIONSHIPS.setdefault((source, target), [])
+    if "realization" not in _allowed:
+        _allowed.append("realization")
+
+
+# §5.7.1: assignment to a process that realizes the service derives
+# realization; the matrix already has ApplicationComponent -> ApplicationService
+# on the same basis.
+for _source in ("BusinessActor", "BusinessRole", "BusinessCollaboration"):
+    _add_realization(_source, "BusinessService")
+del _source
+
+# §12.1: application behaviour realizes business behaviour, a data object
+# realizes a business object and Contract is a specialization of BusinessObject
+# (§8.4.2).
+for _source in _NON_EVENT_APPLICATION_BEHAVIOUR:
+    for _target in _NON_EVENT_BUSINESS_BEHAVIOUR:
+        _add_realization(_source, _target)
+del _source, _target
+_add_realization("DataObject", "Contract")
+
+# §6.3.4 and §6.3.6: a requirement or constraint is realized by any core
+# element; §5.7.1 chains that through Requirement -> Outcome -> Goal and
+# Requirement -> Principle.
+for _source in _CORE_LAYER_ELEMENTS:
+    for _target in _MOTIVATION_REALIZATION_TARGETS:
+        _add_realization(_source, _target)
+del _source, _target
+
+# §7.6: capabilities are realized by structure and behaviour elements,
+# resources by structure elements, value streams by behaviour.
+for _source in _CORE_LAYER_ELEMENTS:
+    _add_realization(_source, "Capability")
+for _source in _CORE_STRUCTURE_ELEMENTS:
+    _add_realization(_source, "Resource")
+for _source in _CORE_BEHAVIOUR_NON_EVENT:
+    _add_realization(_source, "ValueStream")
+del _source
+
+# §7.5: strategy elements realize motivation elements; Appendix B.3. Lands
+# Capability -> Requirement and CourseOfAction -> Outcome, beside the
+# CourseOfAction -> Goal and -> Requirement rows already pinned, so the
+# CourseOfAction inconsistency (Goal and Requirement present, Outcome
+# absent) is closed.
+for _source in STRATEGY_ELEMENTS:
+    for _target in _MOTIVATION_REALIZATION_TARGETS:
+        _add_realization(_source, _target)
+del _source, _target
+
+# §13.2.2: a deliverable realizes core elements; §5.7.1: a work package
+# realizes a deliverable that realizes them, so a work package realizes them
+# too. Neither realizes an active-structure element (§5.1.3, enforced by the
+# realization-target sweep above, which this pass runs after).
+for _target in _NON_ACTIVE_CORE_ELEMENTS:
+    _add_realization("WorkPackage", _target)
+    _add_realization("Deliverable", _target)
+del _target
+
+# §6.3.3 and §6.3.5.
+_add_realization("Requirement", "Goal")
+_add_realization("Requirement", "Outcome")
+_add_realization("Constraint", "Principle")
+
+# -- Triggering and flow ------------------------------------------------------
+# §5.4.1: triggering joins behaviour elements and events; §5.7.2: dynamic
+# relationships derive through the realization landed above; Appendix B.2.
+# §5.4.2 for flow. Business<->technology stays refused: no realization joins
+# those layers directly, so nothing derives it.
+for _layer_behaviour in (
+    BUSINESS_BEHAVIOR_ELEMENTS, APPLICATION_BEHAVIOR_ELEMENTS, TECHNOLOGY_BEHAVIOR_ELEMENTS,
+):
+    for _source in _layer_behaviour:
+        for _target in _layer_behaviour:
+            _allowed = VALID_RELATIONSHIPS.setdefault((_source, _target), [])
+            for _dynamic in ("triggering", "flow"):
+                if _dynamic not in _allowed:
+                    _allowed.append(_dynamic)
+
+_ADJACENT_BEHAVIOUR_LAYERS = [
+    (BUSINESS_BEHAVIOR_ELEMENTS, APPLICATION_BEHAVIOR_ELEMENTS),
+    (APPLICATION_BEHAVIOR_ELEMENTS, TECHNOLOGY_BEHAVIOR_ELEMENTS),
+]
+for _layer_a, _layer_b in _ADJACENT_BEHAVIOUR_LAYERS:
+    for _source in _layer_a:
+        for _target in _layer_b:
+            _allowed = VALID_RELATIONSHIPS.setdefault((_source, _target), [])
+            for _dynamic in ("triggering", "flow"):
+                if _dynamic not in _allowed:
+                    _allowed.append(_dynamic)
+    for _source in _layer_b:
+        for _target in _layer_a:
+            _allowed = VALID_RELATIONSHIPS.setdefault((_source, _target), [])
+            for _dynamic in ("triggering", "flow"):
+                if _dynamic not in _allowed:
+                    _allowed.append(_dynamic)
+
+del _layer_behaviour, _layer_a, _layer_b, _source, _target, _allowed, _dynamic
+
+# -- Composition and aggregation ----------------------------------------------
+# §8.3, §9.3, §10.3: an interaction of one layer composes and aggregates the
+# process and function of the same layer; the matrix already has the other
+# four directions per layer. §5.1.1 and §5.1.2 define composition and
+# aggregation per element type in each layer metamodel, not per aspect, so
+# this pass is these six explicit pairs, not a generated sweep.
+_INTERACTION_STRUCTURE_PAIRS = [
+    ("BusinessInteraction", "BusinessProcess"), ("BusinessInteraction", "BusinessFunction"),
+    ("ApplicationInteraction", "ApplicationFunction"), ("ApplicationInteraction", "ApplicationProcess"),
+    ("TechnologyInteraction", "TechnologyFunction"), ("TechnologyInteraction", "TechnologyProcess"),
+]
+for _source, _target in _INTERACTION_STRUCTURE_PAIRS:
+    _allowed = VALID_RELATIONSHIPS.setdefault((_source, _target), [])
+    for _structural in ("composition", "aggregation"):
+        if _structural not in _allowed:
+            _allowed.append(_structural)
+
+del _source, _target, _allowed, _structural
+
+# -- Assignment ---------------------------------------------------------------
+# §10.2: node, device and system software are assigned to technology
+# behaviour; the matrix has them for function and process already.
+for _source in ("Device", "SystemSoftware"):
+    _allowed = VALID_RELATIONSHIPS.setdefault((_source, "TechnologyInteraction"), [])
+    if "assignment" not in _allowed:
+        _allowed.append("assignment")
+
+del _source, _allowed
+
+# -- Access ---------------------------------------------------------------
+# §5.7.1: assignment followed by access derives access; the matrix already
+# holds BusinessActor -> BusinessObject and ApplicationComponent -> DataObject
+# on that basis. §8.4 for the business passive-structure targets.
+for _source in BUSINESS_BEHAVIOR_ELEMENTS:
+    for _target in ("Contract", "Representation"):
+        _allowed = VALID_RELATIONSHIPS.setdefault((_source, _target), [])
+        if "access" not in _allowed:
+            _allowed.append("access")
+
+for _source in ("BusinessActor", "BusinessRole", "BusinessCollaboration", "BusinessInterface"):
+    for _target in ("BusinessObject", "Contract", "Representation"):
+        _allowed = VALID_RELATIONSHIPS.setdefault((_source, _target), [])
+        if "access" not in _allowed:
+            _allowed.append("access")
+
+for _source in ("Node", "Device", "SystemSoftware", "TechnologyCollaboration"):
+    _allowed = VALID_RELATIONSHIPS.setdefault((_source, "Artifact"), [])
+    if "access" not in _allowed:
+        _allowed.append("access")
+
+del _source, _target, _allowed
+
+
 # Relationships that can participate in derivation chains
 DERIVABLE_RELATIONSHIPS = {
     "composition",
@@ -1443,6 +1730,28 @@ DERIVABLE_RELATIONSHIPS = {
 # =============================================================================
 # Utility Functions
 # =============================================================================
+
+
+def normalize_element_type(value: str) -> str:
+    """Convert a stored element type to the PascalCase keys this matrix uses.
+
+    Handles snake_case ("application_component") and kebab-case
+    ("application-component") from the database, and leaves an already
+    PascalCase value ("ApplicationComponent") alone.
+
+    ``str.capitalize()`` lowercases the remainder of the string, so a value
+    already stored as "ApplicationComponent" became "Applicationcomponent"
+    and matched nothing in this matrix. That refused a legal relationship
+    between two elements whose types were already PascalCase -- a validator
+    that blocks correct modelling is worse than no validator. The same fix
+    existed twice under different names (one call site's ``_pascal``,
+    another's ``_normalize_type``); it lives here once now, and both call
+    sites use this.
+    """
+    text = str(value or "").replace("-", "_")
+    if "_" not in text and text[:1].isupper():
+        return text  # already PascalCase
+    return "".join(part[:1].upper() + part[1:] for part in text.split("_") if part)
 
 
 def get_valid_relationships(source_type: str, target_type: str) -> List[str]:
@@ -1590,6 +1899,22 @@ def can_derive_relationship(relationship_type: str) -> bool:
     """
     definition = RELATIONSHIP_TYPE_DEFINITIONS.get(relationship_type.lower())
     return definition.can_be_derived if definition else False
+
+
+# The one definition of "Title Case layer name" -> "lowercase single-word
+# key". app.models.archimate_core's coarse layer-triple projection and
+# app.services.archimate_validity_service's practitioner-warning helpers each
+# used to carry their own copy of this same seven-entry map; both now import
+# it from here.
+LAYER_NAME_TO_KEY: Dict[str, str] = {
+    "Strategy": "strategy",
+    "Business": "business",
+    "Application": "application",
+    "Technology": "technology",
+    "Physical": "physical",
+    "Motivation": "motivation",
+    "Implementation & Migration": "implementation",
+}
 
 
 def get_element_layer(element_type: str) -> Optional[str]:
@@ -1877,6 +2202,7 @@ __all__ = [
     "CONNECTOR_ELEMENTS",
     "LAYERED_ELEMENTS",
     "ALL_ELEMENTS",
+    "LAYER_NAME_TO_KEY",
     "ALL_ACTIVE_ELEMENTS",
     "ALL_BEHAVIOR_ELEMENTS",
     "ALL_PASSIVE_ELEMENTS",
@@ -1886,6 +2212,7 @@ __all__ = [
     "RelationshipCategory",
     "AccessMode",
     # Functions
+    "normalize_element_type",
     "get_valid_relationships",
     "is_valid_relationship",
     "get_cardinality",

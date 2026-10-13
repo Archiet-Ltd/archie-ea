@@ -1,12 +1,13 @@
-"""Relationship keys a business case's options, outcomes and plan items need,
-pinned in both validity authorities.
+"""Relationship keys a business case's options, outcomes and plan items need
+to link, pinned against the one relationship validity authority.
 
-``app/models/archimate_core.py`` ``VALID_RELATIONSHIPS`` is the coarse
-``(relationship, source_layer, target_layer)`` authority. ``ArchimateValidityService``
-is the fine-grained, element-type authority the picker route
-(``GET /archimate/api/valid-relationship-types``) actually calls. Eight keys
-were missing from the coarse authority for the pairs a business case's
-options, outcomes and plan items need to link:
+``app/config/archimate_relationship_matrix.py`` is that authority.
+``app/models/archimate_core.py`` ``VALID_RELATIONSHIPS`` (the coarse
+``(relationship, source_layer, target_layer)`` table) and
+``ArchimateValidityService`` (the fine-grained, element-type service the
+picker route calls) are both adapters over it now, so a key present in one
+is present in the other by construction — the drift test below guards that
+construction, not two independently-authored tables:
 
   option <-> plan item                 (association, strategy <-> implementation)
   capability / resource hierarchies    (aggregation, strategy, strategy)
@@ -14,18 +15,10 @@ options, outcomes and plan items need to link:
   resource assigned to capability      (assignment, strategy, strategy)
   key partner <-> resource/capability  (association, business <-> strategy)
 
-Six of these eight (source_type, target_type, relationship) combinations
-already validated at the fine-grained level before this change — association
-is unconditionally valid (ArchiMate 3.2 §5.2.4: "association may connect any
-two concepts"), and the same-type aggregation and the Resource -> Capability
-assignment rules already existed. The fix is the coarse table catching up
-with the fine one, not new relationship logic — see the comment on
-``ArchimateValidityService._strategy_rules``.
-
-This module pins: the eight keys in both authorities; a representative set
-of the canvas zones' other relationships, so this change is proven not to
-have moved them; that the two authorities cannot silently drift back apart;
-and one refused combination per relationship type this change touches.
+This module pins: those keys in both adapters; a representative set of the
+canvas zones' other relationships, so this change is proven not to have
+moved them; that the two adapters cannot silently drift apart; and one
+refused combination per relationship type this change touches.
 """
 from __future__ import annotations
 
@@ -72,34 +65,38 @@ def test_new_key_is_in_both_authorities(svc, label, rel, source, target, src_lay
 
 
 # -- A representative set of the canvas zones' other relationships, proven ---
-# -- unaffected by the eight new keys ----------------------------------------
+# -- unaffected by the keys above --------------------------------------------
+#
+# Three rows this table used to carry are not here: "unfair advantage
+# assigned to key activity", "key resource assigned to key activity" and
+# "key partnership -> resource it supplies" were the same (source type,
+# target type, relationship) combinations already covered by NEW_KEYS above,
+# mislabelled here as pre-existing.
+#
+# "Capability realises solution requirement" and "option realises
+# benefit/disbenefit" (CourseOfAction realises Outcome) are back: this
+# change lands Capability -> Requirement and CourseOfAction -> Outcome
+# realization on their own ArchiMate 3.2 §7.5 citation (strategy elements
+# realize motivation elements), beside the CourseOfAction -> Goal row below,
+# closing the inconsistency where CourseOfAction realised Goal and
+# Requirement but not Outcome.
 EXISTING_ROWS = [
     ("problem -> customer segment", "association", "Driver", "Stakeholder", "motivation", "motivation"),
     ("value proposition -> customer segment", "association", "Value", "Stakeholder", "motivation", "motivation"),
-    ("capability realises solution requirement", "realization", "Capability", "Requirement", "strategy", "motivation"),
     ("key metric -> value proposition", "association", "Outcome", "Value", "motivation", "motivation"),
     ("channel -> customer segment", "association", "BusinessInterface", "Stakeholder", "business", "motivation"),
-    ("unfair advantage assigned to key activity", "assignment", "Resource", "Capability", "strategy", "strategy"),
     ("customer relationship -> customer segment", "association", "BusinessService", "Stakeholder", "business", "motivation"),
     ("key activity serves value stream", "serving", "Capability", "ValueStream", "strategy", "strategy"),
-    ("key resource assigned to key activity", "assignment", "Resource", "Capability", "strategy", "strategy"),
-    ("key partnership -> resource it supplies", "association", "BusinessActor", "Resource", "business", "strategy"),
     ("assessment -> driver", "association", "Assessment", "Driver", "motivation", "motivation"),
     ("option realises goal", "realization", "CourseOfAction", "Goal", "strategy", "motivation"),
+    ("option realises benefit/disbenefit", "realization", "CourseOfAction", "Outcome", "strategy", "motivation"),
+    ("capability realises solution requirement", "realization", "Capability", "Requirement", "strategy", "motivation"),
     ("option -> capability it configures", "association", "CourseOfAction", "Capability", "strategy", "strategy"),
     ("option -> resource it configures", "association", "CourseOfAction", "Resource", "strategy", "strategy"),
-    ("option realises benefit", "realization", "CourseOfAction", "Outcome", "strategy", "motivation"),
-    ("option realises disbenefit", "realization", "CourseOfAction", "Outcome", "strategy", "motivation"),
     ("plan item -> target plateau", "association", "WorkPackage", "Plateau", "implementation", "implementation"),
     ("risk -> option", "association", "Assessment", "CourseOfAction", "motivation", "strategy"),
     ("risk -> outcome", "association", "Assessment", "Outcome", "motivation", "motivation"),
 ]
-# Two rows the mapping's prose also names are deliberately left out of this
-# table rather than pinned as passing: an outcome realising its goal, and a
-# plan item realising the outcome it delivers, neither validate today
-# (motivation-internal and implementation -> motivation realization are not
-# offered by ArchimateValidityService for these types) and fixing that is a
-# different, wider change than the eight keys above.
 
 
 @pytest.mark.parametrize(
@@ -157,15 +154,13 @@ def test_realization_still_refuses_an_active_structure_target(svc):
     assert not svc.is_valid("CourseOfAction", "BusinessActor", "realization")
 
 
-def test_association_key_absence_from_the_coarse_table_does_not_mean_invalid(svc):
+def test_association_is_valid_across_a_layer_pair_the_coarse_table_never_enumerated(svc):
     """Association is unconditionally valid in the fine authority (§5.2.4:
-    "association may connect any two concepts"), so the coarse table is
-    deliberately narrower for it — a layer pair the coarse table has never
-    enumerated can still validate at the fine-grained level. Association is
-    the one relationship type for which "not in VALID_RELATIONSHIPS" is not
-    itself a negative signal, and this test names that explicitly rather
-    than leaving it to be rediscovered as a false regression later."""
-    assert ("association", "physical", "strategy") not in VALID_RELATIONSHIPS
+    "association may connect any two concepts"). The coarse table is now
+    derived from the same matrix, so a layer pair it never had a
+    hand-authored row for — Physical to Strategy — validates True at both
+    levels, not just the fine one."""
+    assert ("association", "physical", "strategy") in VALID_RELATIONSHIPS
     assert svc.is_valid("Equipment", "Capability", "association")
 
 
@@ -195,8 +190,8 @@ class TestPickerContract:
     ):
         from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
-        org_a = make_org("cv0-picker-a")
-        org_b = make_org("cv0-picker-b")
+        org_a = make_org("picker-a")
+        org_b = make_org("picker-b")
         user_a = _make_user(db_session, org_a.id, "PickerOwnerA")
         user_b = _make_user(db_session, org_b.id, "PickerAttackerB")
 
@@ -300,7 +295,7 @@ class TestCreateRelationshipHardening:
     ):
         from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
-        org = make_org("cv0-hardening")
+        org = make_org("hardening")
         user = _make_user(db_session, org.id, "HardeningOwner")
 
         business_el = ArchiMateElement(
@@ -338,7 +333,7 @@ class TestCreateRelationshipHardening:
         pass silently."""
         from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
-        org = make_org("cv0-hardening-control")
+        org = make_org("hardening-control")
         user = _make_user(db_session, org.id, "HardeningControlOwner")
 
         option = ArchiMateElement(

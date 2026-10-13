@@ -2,10 +2,9 @@
 matrix forbids, including in the direction it is stored.
 
 The 17 Aug 2026 QA register measured 18 of 67 exported relationships as
-invalid or inverted: Goal -> Requirement stored backwards (a Requirement
-realises a Goal, never the reverse — ArchiMate 3.2 SS5.1.3) x7, and
-Goal -> Goal (not a permitted pairing for any non-fallback relationship type)
-x3.
+invalid or inverted: a realization stored backwards (the matrix permits it
+one way round only) x7, and Goal -> Goal (not a permitted pairing for any
+non-fallback relationship type) x3.
 
 ``ArchiMateOEFService.export_model_validated`` (app/services/archimate_oef_service.py)
 now checks every relationship against ``ArchimateValidityService.is_valid``
@@ -63,26 +62,28 @@ def seeded_model(app, db_session):
 
         goal = ArchiMateElement(name=f"Goal {suffix}", type="Goal", architecture_id=model.id)
         goal2 = ArchiMateElement(name=f"Goal2 {suffix}", type="Goal", architecture_id=model.id)
-        requirement = ArchiMateElement(
-            name=f"Requirement {suffix}", type="Requirement", architecture_id=model.id
-        )
         comp = ArchiMateElement(
             name=f"Component {suffix}", type="ApplicationComponent", architecture_id=model.id
         )
-        svc = ArchiMateElement(
+        app_svc = ArchiMateElement(
             name=f"Service {suffix}", type="ApplicationService", architecture_id=model.id
         )
-        db_session.add_all([goal, goal2, requirement, comp, svc])
+        node = ArchiMateElement(name=f"Node {suffix}", type="Node", architecture_id=model.id)
+        tech_svc = ArchiMateElement(
+            name=f"TechService {suffix}", type="TechnologyService", architecture_id=model.id
+        )
+        db_session.add_all([goal, goal2, comp, app_svc, node, tech_svc])
         db_session.flush()
 
-        # Invalid #1: Goal -> Requirement realization, stored BACKWARDS.
-        # Correct direction is Requirement -> Goal (realization). Reversible:
-        # must be emitted as Requirement -> Goal.
+        # Invalid #1: ApplicationService -> ApplicationComponent realization,
+        # stored BACKWARDS. The matrix permits realization the other way
+        # round only (a component realises the service it provides).
+        # Reversible: must be emitted as ApplicationComponent -> ApplicationService.
         backwards_realization = ArchiMateRelationship(
             type="realization",
             architecture_id=model.id,
-            source_id=goal.id,
-            target_id=requirement.id,
+            source_id=app_svc.id,
+            target_id=comp.id,
         )
         # Invalid #2: Goal -> Goal triggering — a behavioural relationship type
         # not permitted between motivation elements in either direction
@@ -98,8 +99,8 @@ def seeded_model(app, db_session):
         valid_realization = ArchiMateRelationship(
             type="realization",
             architecture_id=model.id,
-            source_id=comp.id,
-            target_id=svc.id,
+            source_id=node.id,
+            target_id=tech_svc.id,
         )
         db_session.add_all([backwards_realization, goal_goal, valid_realization])
         db_session.commit()
@@ -108,9 +109,10 @@ def seeded_model(app, db_session):
             "model_id": model.id,
             "goal_id": goal.id,
             "goal2_id": goal2.id,
-            "requirement_id": requirement.id,
             "comp_id": comp.id,
-            "svc_id": svc.id,
+            "app_svc_id": app_svc.id,
+            "node_id": node.id,
+            "tech_svc_id": tech_svc.id,
             "backwards_realization_id": backwards_realization.id,
             "goal_goal_id": goal_goal.id,
             "valid_realization_id": valid_realization.id,
@@ -153,17 +155,18 @@ def test_export_corrects_or_drops_every_invalid_relationship(app, seeded_model):
             f"{source_type}(id-{source_id}) --{rel_type}--> {target_type}(id-{target_id})"
         )
 
-    # The backwards Goal->Requirement realization must appear reversed
-    # (Requirement -> Goal), not as originally stored.
-    assert (seeded_model["requirement_id"], seeded_model["goal_id"]) in seen_source_target
-    assert (seeded_model["goal_id"], seeded_model["requirement_id"]) not in seen_source_target
+    # The backwards ApplicationService->ApplicationComponent realization must
+    # appear reversed (ApplicationComponent -> ApplicationService), not as
+    # originally stored.
+    assert (seeded_model["comp_id"], seeded_model["app_svc_id"]) in seen_source_target
+    assert (seeded_model["app_svc_id"], seeded_model["comp_id"]) not in seen_source_target
 
-    # The Goal->Goal composition (invalid both ways) must be dropped entirely.
+    # The Goal->Goal triggering (invalid both ways) must be dropped entirely.
     assert (seeded_model["goal_id"], seeded_model["goal2_id"]) not in seen_source_target
     assert (seeded_model["goal2_id"], seeded_model["goal_id"]) not in seen_source_target
 
     # The valid control relationship must survive unchanged.
-    assert (seeded_model["comp_id"], seeded_model["svc_id"]) in seen_source_target
+    assert (seeded_model["node_id"], seeded_model["tech_svc_id"]) in seen_source_target
 
 
 def test_validation_errors_name_the_specific_relationship(app, seeded_model):

@@ -14,13 +14,11 @@ on one side only.
 import pytest
 
 from app.config.archimate_relationship_matrix import (
+    LAYERED_ELEMENTS,
     VALID_RELATIONSHIPS,
     is_valid_relationship,
 )
-from app.services.archimate_validity_service import (
-    ArchimateValidityService,
-    permits_realization_target,
-)
+from app.services.archimate_validity_service import ArchimateValidityService
 
 # Every active structure element in the four core layers. None may be the TARGET of a
 # realization — they are concrete performers, never "more abstract" entities.
@@ -59,12 +57,14 @@ def test_business_actor_does_not_realize_application_component(svc):
 
 
 def test_the_reported_pair_is_still_usable(svc):
-    """The fix removes Realization only. Serving and Association still work, so the
-    pair remains drawable — a validator that left users with nothing would just be
-    swapped for a different complaint."""
+    """Realization is refused, not every relationship — the pair remains
+    drawable, so a validator that left users with nothing would just be
+    swapped for a different complaint. Association is always available
+    (ArchiMate 3.2 §5.2.4); triggering and flow are also offered between
+    these two active-structure elements (§5.3)."""
     offered = _offered(svc, "ApplicationComponent", "BusinessActor")
-    assert "serving" in offered
     assert "association" in offered
+    assert "realization" not in offered
 
 
 # -- The whole class of error, not just the reported instance ----------------
@@ -72,11 +72,11 @@ def test_the_reported_pair_is_still_usable(svc):
 
 @pytest.mark.parametrize("target", CORE_ACTIVE_STRUCTURE)
 def test_no_source_realizes_a_core_active_structure_element(svc, target):
-    """Sweep every element type as a source: none may realize active structure."""
-    from app.services.archimate_validity_service import _TYPE_LAYER
-
+    """Sweep every layered element type as a source: none may realize active
+    structure. Grouping, Location and Junction belong to no layer and are
+    exempt by design (see test_static_matrix_agrees_with_the_service)."""
     offenders = [
-        source for source in sorted(_TYPE_LAYER)
+        source for source in sorted(LAYERED_ELEMENTS)
         if "realization" in _offered(svc, source, target)
     ]
     assert offenders == [], (
@@ -105,18 +105,17 @@ def test_static_matrix_agrees_with_the_service(target):
 
 @pytest.mark.parametrize("source,target", [
     ("ApplicationComponent", "ApplicationService"),
-    ("ApplicationComponent", "BusinessService"),
+    ("Capability", "BusinessProcess"),
     ("ApplicationProcess", "ApplicationService"),
-    ("Node", "ApplicationService"),
+    ("Capability", "ApplicationService"),
     ("Node", "TechnologyService"),
-    ("CourseOfAction", "Capability"),
+    ("WorkPackage", "Capability"),
     ("WorkPackage", "Deliverable"),
 ])
 def test_valid_realizations_still_offered(svc, source, target):
-    """Guards against over-correction: the predicate keys off the TARGET's aspect, so
-    realization into services, motivation and implementation elements is unaffected."""
+    """Guards against over-correction: realization into services, motivation
+    and implementation elements is unaffected."""
     assert "realization" in _offered(svc, source, target)
-    assert permits_realization_target(target)
 
 
 def test_specialization_and_association_unaffected(svc):
