@@ -213,6 +213,44 @@ def derived_fact_aggregates(organization_id: int) -> Dict[str, Any]:
     }
 
 
+def stale_derived_fact_ids(organization_id: int, limit: Optional[int] = None) -> List[int]:
+    """This tenant's stale ``DerivedRelationship`` ids, explicitly scoped.
+
+    ``derived_fact_aggregates(organization_id)`` returns ``stale_count`` (a
+    number) but not which rows; a caller that needs to tell "the same facts
+    are stale" from "a different fact went stale" (not only that the count
+    held steady) needs the id set itself. The staleness filter is applied
+    here, in this module, rather than re-implemented at the call site --
+    this module's own docstring is the one place that filter belongs. Must
+    be called inside ``app.app_context()``; the explicit ``organization_id
+    ==`` predicate is defence-in-depth on top of the tenant-isolation
+    listener, matching this module's pattern.
+
+    ``limit``, when given, bounds the query itself (``ORDER BY id LIMIT``),
+    not a slice taken after fetching every row: a caller that persists the
+    result (a baseline snapshot, not a live UI list) can ask for a bounded
+    id set without paying to materialise an unbounded one first. Whether the
+    true stale set is bigger than what came back is already answered by
+    ``derived_fact_aggregates``'s own ``stale_count`` -- comparing it against
+    ``len(result)`` tells a capped caller whether it was truncated, without
+    this function needing to say so itself.
+    """
+    from app.modules.intelligence.models.derived_relationship import DerivedRelationship
+
+    stmt = (
+        db.select(DerivedRelationship.id)
+        .where(
+            DerivedRelationship.organization_id == organization_id,
+            DerivedRelationship.stale.is_(True),
+        )
+        .order_by(DerivedRelationship.id)
+    )
+    if limit is not None:
+        stmt = stmt.limit(limit)
+    rows = db.session.execute(stmt).scalars().all()
+    return list(rows)
+
+
 def latest_derivation_run(organization_id: int):
     """T-005 (D5/D6/D7): the most recent completed ``DerivationRun`` for a
     tenant, or ``None`` when derivation has never completed for it.
@@ -303,4 +341,5 @@ __all__ = [
     "get_derived_fact",
     "latest_derivation_run",
     "list_derived_facts",
+    "stale_derived_fact_ids",
 ]

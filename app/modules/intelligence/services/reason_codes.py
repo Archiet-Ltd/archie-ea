@@ -74,6 +74,12 @@ REASON_CODES = frozenset(
         # itself is not reused here so each code stays tied to one field
         # pair's own absence condition.
         "no_budget_recorded",
+# The baseline-drift engine's model dimension (the element/
+        # relationship ids and derived-fact aggregates captured alongside
+        # the other five snapshots) has nothing to compare against on a
+        # baseline captured before that dimension existed -- an honest
+        # absence, not a fabricated zero-drift result.
+        "baseline_lacks_model_snapshot",
         # L4 brief (2026-09-22) additions: Ask's Accountability lens resolves
         # an element to its ApplicationComponent (reusing L3's own
         # resolution) then lists ApplicationOwnership rows for it.
