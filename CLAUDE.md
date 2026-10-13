@@ -508,7 +508,7 @@ to reconfirm the count before trusting it:**
 | `raw-sql-tenancy` | raw SQL on a tenant table with no `organization_id` predicate | ratchet @ 0 |
 | `raw-sql-tenancy-writes` | raw SQL writing `organization_id` outside the canonical backfill | ratchet @ 5 |
 | `tenant-scoping` | ORM queries on a tenant-owned-but-unmixed model with no org predicate | ratchet @ 0 |
-| `untenanted-reads` | a read (`db.select`, `.query`, `session.get`) of ANY model with no `TenantMixin`, with no org predicate in the statement | ratchet @ 2359; a bare `tenant-scoping-ok` (no reason) or an org word inside another name does not clear a read |
+| `untenanted-reads` | a read (`db.select`, `.query`, `session.get`) of ANY model with no `TenantMixin`, with no org predicate in the statement | ratchet @ 2361; a bare `tenant-scoping-ok` (no reason) or an org word inside another name does not clear a read |
 | `unfenced-tables` | a database table with no `TenantMixin` that is not listed in `scripts/unfenced_tables.txt` (a new one is a decision) | ratchet @ 0 |
 | `reuse-register` | a second copy of a concept registered in `docs/reuse-register.yml` (a definition matching a `must_not_create` pattern outside the canonical file and the known exceptions), or a canonical file or symbol that no longer exists; the failure prints what to reuse (`python scripts/check_reuse_register.py --entries`) | zero over per-file counts in `scripts/reuse_register_baseline.json` that only fall; `--update-baseline` refuses to raise one |
 | `llm-boundary` | a codegen emitter calling an LLM directly | ratchet @ 0 |

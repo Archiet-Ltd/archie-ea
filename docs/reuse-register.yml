@@ -139,8 +139,7 @@ entries:
     status: active
     canonical:
       path: app/services/archimate_backbone.py
-      symbols: [create_backbone_element, sync_archimate_element]
-    pending_symbols: [ensure_archimate_element]
+      symbols: [create_backbone_element, sync_archimate_element, ensure_archimate_element]
     reuse: >
       Create or find an element through archimate_backbone (create_backbone_element, sync_archimate_element) so
       the organisation, layer and provenance are set in one place. Do not construct ArchiMateElement(...) in a
@@ -265,8 +264,7 @@ entries:
 
   - id: outbox-test-cleanup
     concept: Purging outbox events between tests
-    status: pending
-    pending_branch: tests/_outbox_cleanup.py (test-isolation fix, under review)
+    status: active
     canonical:
       path: tests/_outbox_cleanup.py
       symbols: [purge_outbox_events]
