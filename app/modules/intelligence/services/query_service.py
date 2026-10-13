@@ -44,6 +44,10 @@ NO_TENANT_CONTEXT_REASON = validate_reason_code("no_tenant_context")
 ELEMENT_NOT_FOUND_REASON = validate_reason_code("element_not_found")
 DERIVATION_NOT_COMPUTED_REASON = validate_reason_code("derivation_not_computed")
 NO_RISK_RECORDED_REASON = validate_reason_code("no_risk_recorded")
+RISK_LINK_UNRESOLVABLE_REASON = validate_reason_code("risk_link_unresolvable")
+NO_CAPABILITY_IN_CHAIN_REASON = validate_reason_code("no_capability_in_chain")
+NO_VENDOR_MAPPING_RECORDED_REASON = validate_reason_code("no_vendor_mapping_recorded")
+REVIEW_ITEM_NOT_VISIBLE_REASON = validate_reason_code("review_item_not_visible")
 NO_APPLICATION_COMPONENT_REASON = validate_reason_code("no_application_component")
 NO_WORK_PACKAGE_RECORDED_REASON = validate_reason_code("no_work_package_recorded")
 NOT_COSTED_REASON = validate_reason_code("not_costed")
@@ -439,6 +443,149 @@ def _resolve_elements_batch(element_ids: Iterable[int], org_id: Optional[int]) -
             "layer": str(layer) if layer is not None else None,
         }
     return elements
+
+
+def _vendor_capability_predicate(model, organization_id: int):
+    """The strict predicate on ``UnifiedCapability``: only this organisation's
+    own capability rows. A shared reference-catalogue row (``organization_id IS
+    NULL``) is not this organisation's capability and never supplies vendor
+    mappings. Its own seam so the cross-tenant mutation proof can replace
+    exactly this function with the permissive predicate."""
+    return model.organization_id == organization_id
+
+
+def _review_tenant_predicate(model, organization_id: int):
+    """The explicit ``organization_id ==`` predicate on both review-board
+    selects (sessions and items), on top of the ORM tenant filter. Its own
+    seam so the cross-tenant mutation proof can replace exactly this function
+    with a no-op."""
+    return model.organization_id == organization_id
+
+
+_VENDOR_BLOCK_SOURCE = "unified_capability_vendor_organization_mappings"
+
+
+def _vendor_block_absent(reason: str) -> Dict[str, Any]:
+    return {
+        "mappings": None,
+        "mapping_count": None,
+        "single_vendor": None,
+        "reason": reason,
+        "source": _VENDOR_BLOCK_SOURCE,
+    }
+
+
+def _vendor_mappings_for_capability_elements(
+    element_ids: List[int], org_id: int
+) -> Dict[int, Dict[str, Any]]:
+    """For each Capability element, the organisation's vendor mappings for the
+    capability that mirrors it, as recorded, and whether it is a single-vendor
+    dependency (the count of mapping rows equals one).
+
+    Three selects regardless of how many ids are asked for, none for an empty
+    input: the organisation's capability rows for the elements (strict tenant
+    predicate, ``order_by(id)`` with the first row winning when two rows point
+    at one element), the mapping rows for those capabilities (the mapping table
+    has no tenant column of its own, so it is reached only through capability
+    ids already resolved for this organisation), and the vendor names.
+    Concentration is a count of rows, never a score: no spend is summed, no
+    contract end is picked, no risk word is ranked.
+    """
+    from app.models.capability_to_vendor_mapping import (
+        UnifiedCapabilityVendorOrganizationMapping as Mapping,
+    )
+    from app.models.unified_capability import UnifiedCapability
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    distinct_ids = sorted(set(element_ids))
+    if not distinct_ids:
+        return {}
+
+    capability_rows = db.session.execute(
+        db.select(UnifiedCapability.id, UnifiedCapability.archimate_element_id)
+        .where(
+            UnifiedCapability.archimate_element_id.in_(distinct_ids),
+            _vendor_capability_predicate(UnifiedCapability, org_id),
+        )
+        .order_by(UnifiedCapability.id)
+    ).all()
+    capability_by_element: Dict[int, int] = {}
+    for capability_id, archimate_element_id in capability_rows:
+        capability_by_element.setdefault(archimate_element_id, capability_id)
+
+    mappings_by_capability: Dict[int, List[Any]] = {}
+    vendor_names: Dict[int, Optional[str]] = {}
+    if capability_by_element:
+        mapping_rows = db.session.execute(
+            db.select(
+                Mapping.id,
+                Mapping.unified_capability_id,
+                Mapping.vendor_organization_id,
+                Mapping.relationship_type,
+                Mapping.vendor_risk_level,
+                Mapping.concentration_risk,
+                Mapping.lock_in_risk,
+                Mapping.dependency_level,
+                Mapping.alternative_vendor_available,
+                Mapping.annual_spend,
+                Mapping.contract_end_date,
+            )
+            .where(Mapping.unified_capability_id.in_(sorted(set(capability_by_element.values()))))
+            .order_by(Mapping.id)
+        ).all()
+        for row in mapping_rows:
+            mappings_by_capability.setdefault(row.unified_capability_id, []).append(row)
+        vendor_ids = sorted({r.vendor_organization_id for r in mapping_rows if r.vendor_organization_id})
+        if vendor_ids:
+            vendor_names = {
+                vendor_id: name
+                for vendor_id, name in db.session.execute(
+                    db.select(VendorOrganization.id, VendorOrganization.name).where(
+                        VendorOrganization.id.in_(vendor_ids)
+                    )
+                ).all()
+            }
+
+    def _iso(value):
+        if value is None:
+            return None
+        return value.date().isoformat() if hasattr(value, "date") else value.isoformat()
+
+    blocks: Dict[int, Dict[str, Any]] = {}
+    for element_id in distinct_ids:
+        capability_id = capability_by_element.get(element_id)
+        if capability_id is None:
+            blocks[element_id] = _vendor_block_absent(NO_CAPABILITY_IN_CHAIN_REASON)
+            continue
+        rows = mappings_by_capability.get(capability_id)
+        if not rows:
+            blocks[element_id] = _vendor_block_absent(NO_VENDOR_MAPPING_RECORDED_REASON)
+            continue
+        entries = [
+            {
+                "mapping_id": row.id,
+                "vendor_organization_id": row.vendor_organization_id,
+                "vendor_name": vendor_names.get(row.vendor_organization_id),
+                "relationship_type": row.relationship_type,
+                "vendor_risk_level": row.vendor_risk_level,
+                "concentration_risk": row.concentration_risk,
+                "lock_in_risk": row.lock_in_risk,
+                "dependency_level": row.dependency_level,
+                "alternative_vendor_available": row.alternative_vendor_available,
+                "annual_spend": float(row.annual_spend) if row.annual_spend is not None else None,
+                "contract_end_date": _iso(row.contract_end_date),
+                "access_reason": None,
+            }
+            for row in rows
+        ]
+        blocks[element_id] = {
+            "mappings": entries,
+            "mapping_count": len(entries),
+            "single_vendor": len(entries) == 1,
+            "reason": None,
+            "source": _VENDOR_BLOCK_SOURCE,
+        }
+    return blocks
 
 
 def _element_ids_in_rows(rows: List[Dict[str, Any]]) -> List[int]:
@@ -1039,6 +1186,158 @@ class IntelligenceQueryService:
         }
 
     @staticmethod
+    def _recorded_risk_blocks(
+        element_id: int, component_id: Optional[int], org_id: int
+    ) -> Dict[str, Any]:
+        """The three blocks ``risk_for_element`` carries beside its risks,
+        each as recorded and none of them scored, aggregated or defaulted."""
+        from app.models.architecture_review_board import (
+            ARB_OPEN_STATUSES,
+            ARBReviewItem,
+            ArchitectureReviewBoard,
+        )
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.unified_work_package import UnifiedWorkPackage
+
+        ratings_scale = "low-medium-high-critical"
+        if component_id is None:
+            recorded_ratings = {
+                "technical_risk": None,
+                "business_risk": None,
+                "vendor_risk": None,
+                "obsolescence_risk": None,
+                "scale": ratings_scale,
+                "reason": NO_APPLICATION_COMPONENT_REASON,
+                "truth_class": "authoritative_fact",
+            }
+        else:
+            row = db.session.execute(
+                db.select(
+                    ApplicationComponent.technical_risk,
+                    ApplicationComponent.business_risk,
+                    ApplicationComponent.vendor_risk,
+                    ApplicationComponent.obsolescence_risk,
+                ).where(
+                    ApplicationComponent.id == component_id,
+                    ApplicationComponent.organization_id == org_id,
+                )
+            ).first()
+            values = tuple(row) if row is not None else (None, None, None, None)
+            recorded_ratings = {
+                "technical_risk": values[0],
+                "business_risk": values[1],
+                "vendor_risk": values[2],
+                "obsolescence_risk": values[3],
+                "scale": ratings_scale,
+                "reason": NO_RISK_RECORDED_REASON if all(v is None for v in values) else None,
+                "truth_class": "authoritative_fact",
+            }
+
+        packages = db.session.execute(
+            db.select(
+                UnifiedWorkPackage.id,
+                UnifiedWorkPackage.name,
+                UnifiedWorkPackage.risk_level,
+                UnifiedWorkPackage.priority,
+                UnifiedWorkPackage.risk_mitigation,
+            )
+            .where(UnifiedWorkPackage.archimate_element_id == element_id)
+            .order_by(UnifiedWorkPackage.id)
+        ).all()
+        if packages:
+            work_package_risk = [
+                {
+                    "work_package_id": p.id,
+                    "name": p.name,
+                    "risk_level": p.risk_level,
+                    "priority": p.priority,
+                    "risk_mitigation": p.risk_mitigation,
+                    "risk_level_default_possible": True,
+                    "priority_default_possible": True,
+                }
+                for p in packages
+            ]
+            work_package_risk_reason = None
+        else:
+            work_package_risk = None
+            work_package_risk_reason = NO_WORK_PACKAGE_RECORDED_REASON
+
+        session_rows = db.session.execute(
+            db.select(
+                ArchitectureReviewBoard.id,
+                ArchitectureReviewBoard.name,
+                ArchitectureReviewBoard.impacted_element_ids,
+            )
+            .where(
+                _review_tenant_predicate(ArchitectureReviewBoard, org_id),
+                ArchitectureReviewBoard.impacted_element_ids.isnot(None),
+            )
+            .order_by(ArchitectureReviewBoard.id)
+        ).all()
+        wanted = {element_id, str(element_id)}
+        sessions = {
+            s.id: s.name
+            for s in session_rows
+            if isinstance(s.impacted_element_ids, list)
+            and any(candidate in wanted for candidate in s.impacted_element_ids)
+        }
+        if not sessions:
+            review_items = None
+            review_items_reason = REVIEW_ITEM_NOT_VISIBLE_REASON
+        else:
+            item_rows = db.session.execute(
+                db.select(
+                    ARBReviewItem.id,
+                    ARBReviewItem.review_number,
+                    ARBReviewItem.title,
+                    ARBReviewItem.review_type,
+                    ARBReviewItem.status,
+                    ARBReviewItem.arb_session_id,
+                    ARBReviewItem.compliance_score,
+                    ARBReviewItem.risk_score,
+                    ARBReviewItem.quality_score,
+                    ARBReviewItem.overall_score,
+                )
+                .where(
+                    ARBReviewItem.arb_session_id.in_(sorted(sessions)),
+                    _review_tenant_predicate(ARBReviewItem, org_id),
+                )
+                .order_by(ARBReviewItem.arb_session_id, ARBReviewItem.id)
+            ).all()
+
+            def _score(value):
+                return float(value) if value is not None else None
+
+            review_items = [
+                {
+                    "review_item_id": i.id,
+                    "review_number": i.review_number,
+                    "title": i.title,
+                    "review_type": i.review_type,
+                    "status": i.status,
+                    "is_open": (i.status in ARB_OPEN_STATUSES) if i.status is not None else None,
+                    "session_id": i.arb_session_id,
+                    "session_name": sessions.get(i.arb_session_id),
+                    "compliance_score": _score(i.compliance_score),
+                    "risk_score": _score(i.risk_score),
+                    "quality_score": _score(i.quality_score),
+                    "overall_score": _score(i.overall_score),
+                    "scale": "0-100",
+                    "basis": "recorded_by_review_board",
+                }
+                for i in item_rows
+            ]
+            review_items_reason = None
+
+        return {
+            "recorded_ratings": recorded_ratings,
+            "work_package_risk": work_package_risk,
+            "work_package_risk_reason": work_package_risk_reason,
+            "review_items": review_items,
+            "review_items_reason": review_items_reason,
+        }
+
+    @staticmethod
     def risk_for_element(
         element_id: int,
         *,
@@ -1052,14 +1351,34 @@ class IntelligenceQueryService:
         algorithm, per the platform convention against parallel scoring
         logic.
 
-        Scope note, not silently dropped: ``RiskEntityLink`` (a risk
-        threatening an Application/Solution/Programme with no direct
-        ``archimate_element_id`` of its own on this element) is not resolved
-        here -- none of those three models carry an ArchiMate mirror id
-        today, so there is no element to seed a traversal from. Only
-        directly-mirrored risks are answered; an indirect risk is invisible
-        to this query, not wrongly reported as "none". Tracked as a
-        follow-up, not implemented speculatively.
+        Risks are also reached through a ``RiskEntityLink`` of type
+        ``application`` whose ``entity_id`` is the ``ApplicationComponent``
+        this element resolves to (the element-to-component resolution
+        ``portfolio_component_for_element`` already makes, called here, not
+        copied). Each risk carries ``seeded_via`` (``element`` or
+        ``application_link``); a risk that is both mirrored on the element
+        and linked to its component is listed once, as ``element``. A linked
+        risk seeds the same traversal from the same element.
+
+        Beside the risks, and entering no score, the answer carries three
+        blocks that describe the picked element whether or not a ``Risk`` row
+        exists: ``recorded_ratings`` (the four risk words recorded on the
+        application component the element resolves to), ``work_package_risk``
+        (the recorded ``risk_level``, ``priority`` and mitigation of every work
+        package seeded on the element; both words carry column defaults
+        (``medium``) on the model, flagged on each entry, passed through as
+        recorded), and ``review_items`` (every review item of every
+        architecture review session whose impacted-element list names the
+        element, with its four recorded 0-100 scores and its status; whether
+        an item is still open is recorded, filtering is the reader's choice).
+        Nothing is aggregated, ranked or defaulted. Reading the four words
+        costs one extra select when a component exists.
+
+        Solution and programme links carry no ArchiMate mirror id, so they
+        cannot be followed to an element. They are not dropped: the answer's
+        ``link_resolution`` block counts them by type across the tenant, with
+        the reason ``risk_link_unresolvable``. That block says what this
+        answer cannot see, not that this element has none.
 
         Score is a **display** label, not a stored fact (per
         ``intelligence-lenses-v1.md`` L6): each risk's own
@@ -1080,9 +1399,24 @@ class IntelligenceQueryService:
                     "risks": [],
                     "reasons": [NO_TENANT_CONTEXT_REASON],
                     "elements": {},
+                    "link_resolution": {
+                        "application_links_resolved": None,
+                        "unresolvable_entity_types": None,
+                        "reason": NO_TENANT_CONTEXT_REASON,
+                    },
+                    "vendor_concentration": {
+                        "by_element": None,
+                        "reason": NO_TENANT_CONTEXT_REASON,
+                    },
+                    "recorded_ratings": None,
+                    "work_package_risk": None,
+                    "work_package_risk_reason": NO_TENANT_CONTEXT_REASON,
+                    "review_items": None,
+                    "review_items_reason": NO_TENANT_CONTEXT_REASON,
                 }
 
             from app.models import ArchiMateElement
+            from app.models.risk_entity_link import RiskEntityLink
 
             element = db.session.execute(
                 db.select(ArchiMateElement).where(ArchiMateElement.id == element_id)
@@ -1092,26 +1426,110 @@ class IntelligenceQueryService:
                     "risks": [],
                     "reasons": [ELEMENT_NOT_FOUND_REASON],
                     "elements": {},
+                    "link_resolution": {
+                        "application_links_resolved": None,
+                        "unresolvable_entity_types": None,
+                        "reason": ELEMENT_NOT_FOUND_REASON,
+                    },
+                    "vendor_concentration": {
+                        "by_element": None,
+                        "reason": ELEMENT_NOT_FOUND_REASON,
+                    },
+                    "recorded_ratings": None,
+                    "work_package_risk": None,
+                    "work_package_risk_reason": ELEMENT_NOT_FOUND_REASON,
+                    "review_items": None,
+                    "review_items_reason": ELEMENT_NOT_FOUND_REASON,
                 }
 
-            seed_risks = (
+            direct_risks = (
                 db.session.execute(
-                    db.select(Risk).where(Risk.archimate_element_id == element_id)
+                    db.select(Risk)
+                    .where(Risk.archimate_element_id == element_id)
+                    .order_by(Risk.id)
                 )
                 .scalars()
                 .all()
             )
+
+            # The one element-to-component resolution on the lens path.
+            component_id = IntelligenceQueryService.portfolio_component_for_element(
+                element_id, include_vendor_concentration=False
+            )["application_component_id"]
+
+            link_id_by_risk: Dict[int, int] = {}
+            linked_risks: List[Any] = []
+            if component_id is not None:
+                direct_ids = {risk.id for risk in direct_risks}
+                link_rows = db.session.execute(
+                    db.select(RiskEntityLink.id, RiskEntityLink.risk_id)
+                    .where(
+                        RiskEntityLink.entity_type == "application",
+                        RiskEntityLink.entity_id == component_id,
+                        RiskEntityLink.organization_id == org_id,
+                    )
+                    .order_by(RiskEntityLink.id)
+                ).all()
+                for link_id, linked_risk_id in link_rows:
+                    if linked_risk_id not in direct_ids:
+                        link_id_by_risk.setdefault(linked_risk_id, link_id)
+                if link_id_by_risk:
+                    linked_risks = (
+                        db.session.execute(
+                            db.select(Risk)
+                            .where(
+                                Risk.id.in_(list(link_id_by_risk)),
+                                Risk.organization_id == org_id,
+                            )
+                            .order_by(Risk.id)
+                        )
+                        .scalars()
+                        .all()
+                    )
+
+            type_rows = db.session.execute(
+                db.select(RiskEntityLink.entity_type, db.func.count(RiskEntityLink.id))
+                .where(
+                    RiskEntityLink.organization_id == org_id,
+                    RiskEntityLink.entity_type != "application",
+                )
+                .group_by(RiskEntityLink.entity_type)
+                .order_by(RiskEntityLink.entity_type)
+            ).all()
+            unresolvable_types = [
+                {"entity_type": entity_type, "count": int(count)}
+                for entity_type, count in type_rows
+            ]
+            link_resolution = {
+                "application_links_resolved": len(linked_risks),
+                "unresolvable_entity_types": unresolvable_types,
+                "reason": RISK_LINK_UNRESOLVABLE_REASON if unresolvable_types else None,
+            }
+
+            element_blocks = IntelligenceQueryService._recorded_risk_blocks(
+                element_id, component_id, org_id
+            )
+
+            seed_risks = [(risk, "element", None) for risk in direct_risks] + [
+                (risk, "application_link", link_id_by_risk[risk.id]) for risk in linked_risks
+            ]
 
             if not seed_risks:
                 return {
                     "risks": [],
                     "reasons": [NO_RISK_RECORDED_REASON],
                     "elements": {},
+                    "link_resolution": link_resolution,
+                    "vendor_concentration": {
+                        "by_element": None,
+                        "reason": NO_RISK_RECORDED_REASON,
+                    },
+                    **element_blocks,
                 }
 
             all_elements: Dict[str, Dict[str, Any]] = {}
             risk_payloads: List[Dict[str, Any]] = []
-            for risk in seed_risks:
+            for risk, seeded_via, link_id in seed_risks:
                 blast = IntelligenceQueryService.cross_layer_impact(
                     element_id,
                     include_derived=include_derived,
@@ -1119,26 +1537,63 @@ class IntelligenceQueryService:
                     with_owner=True,
                 )
                 all_elements.update(blast.get("elements") or {})
-                risk_payloads.append(
-                    {
-                        "risk_id": risk.id,
-                        "title": risk.title,
-                        "status": risk.status.value if risk.status else None,
-                        "likelihood": risk.likelihood,
-                        "impact": risk.impact,
-                        "risk_score": risk.risk_score,
-                        "risk_level": risk.risk_level,
-                        "owner": risk.owner,
-                        "mitigation_plan": risk.mitigation_plan,
-                        "affected_rows": blast.get("rows", []),
-                        "affected_summary": blast.get("summary", {}),
-                    }
-                )
+                payload = {
+                    "risk_id": risk.id,
+                    "title": risk.title,
+                    "status": risk.status.value if risk.status else None,
+                    "likelihood": risk.likelihood,
+                    "impact": risk.impact,
+                    "risk_score": risk.risk_score,
+                    "risk_level": risk.risk_level,
+                    "owner": risk.owner,
+                    "mitigation_plan": risk.mitigation_plan,
+                    "affected_rows": blast.get("rows", []),
+                    "affected_summary": blast.get("summary", {}),
+                    "seeded_via": seeded_via,
+                }
+                if link_id is not None:
+                    payload["link_id"] = link_id
+                risk_payloads.append(payload)
 
-        return {"risks": risk_payloads, "reasons": [], "elements": all_elements}
+            # Vendor concentration for the Capability elements this answer
+            # touches: the picked element and every element in the blast
+            # radii, from the identity maps already resolved. One helper call.
+            capability_element_ids = {
+                eid
+                for payload in risk_payloads
+                for row in payload["affected_rows"]
+                for eid in [row["element_id"]] + (row["relation"].get("chain_elements") or [])
+                if all_elements.get(str(eid), {}).get("type") == "Capability"
+            }
+            if element.type == "Capability":
+                capability_element_ids.add(element_id)
+            if capability_element_ids:
+                vendor_blocks = _vendor_mappings_for_capability_elements(
+                    sorted(capability_element_ids), org_id
+                )
+                vendor_concentration = {
+                    "by_element": {str(eid): block for eid, block in vendor_blocks.items()},
+                    "reason": None,
+                }
+            else:
+                vendor_concentration = {
+                    "by_element": None,
+                    "reason": NO_CAPABILITY_IN_CHAIN_REASON,
+                }
+
+        return {
+            "risks": risk_payloads,
+            "reasons": [],
+            "elements": all_elements,
+            "link_resolution": link_resolution,
+            "vendor_concentration": vendor_concentration,
+            **element_blocks,
+        }
 
     @staticmethod
-    def portfolio_component_for_element(element_id: int) -> Dict[str, Any]:
+    def portfolio_component_for_element(
+        element_id: int, *, include_vendor_concentration: bool = True
+    ) -> Dict[str, Any]:
         """L3, "what do we run, what does it cost, who owns it, what's
         duplicated?": resolves an element to the ``ApplicationComponent``
         row the rationalization/duplicate/TCO pages are keyed on, so the
@@ -1160,6 +1615,14 @@ class IntelligenceQueryService:
         element/app id) -- so this method, deliberately, resolves only what
         the one real page needs. Linking to a JSON response would not be a
         deep link a person can read; not built.
+
+        A picked ``Capability`` element also gets ``vendor_concentration``:
+        the organisation's vendor mappings for the capability that mirrors
+        it, as recorded, with single-vendor stated as the count of rows (see
+        ``_vendor_mappings_for_capability_elements``). Any other element type
+        gets the ``no_capability_in_chain`` block, and the early branches get
+        none. Callers that only need the component id pass
+        ``include_vendor_concentration=False``.
 
         Beside ``application_component_id``, the answer carries a
         ``component`` block: the resolved component's name, its
@@ -1359,27 +1822,35 @@ class IntelligenceQueryService:
             component = ApplicationComponent.query.filter_by(archimate_element_id=element.id).first()
 
         if component is None:
-            return {
+            answer: Dict[str, Any] = {
                 "application_component_id": None,
                 "reasons": [NO_APPLICATION_COMPONENT_REASON],
                 "component": None,
             }
+        else:
+            licence_entries = _licence_entries(component, org_id)
+            component_block = {
+                "name": component.name,
+                "health": _health_block(component),
+                "cost": _cost_block(component),
+                "cost_by_period": _cost_by_period_block(component, org_id),
+                "licences": licence_entries if licence_entries else None,
+                "licences_reason": None if licence_entries else NO_LICENCE_RECORDED_REASON,
+            }
+            answer = {
+                "application_component_id": component.id,
+                "reasons": [],
+                "component": component_block,
+            }
 
-        licence_entries = _licence_entries(component, org_id)
-        component_block = {
-            "name": component.name,
-            "health": _health_block(component),
-            "cost": _cost_block(component),
-            "cost_by_period": _cost_by_period_block(component, org_id),
-            "licences": licence_entries if licence_entries else None,
-            "licences_reason": None if licence_entries else NO_LICENCE_RECORDED_REASON,
-        }
-
-        return {
-            "application_component_id": component.id,
-            "reasons": [],
-            "component": component_block,
-        }
+        if include_vendor_concentration:
+            if (element.type or "") == "Capability":
+                answer["vendor_concentration"] = _vendor_mappings_for_capability_elements(
+                    [element_id], org_id
+                )[element_id]
+            else:
+                answer["vendor_concentration"] = _vendor_block_absent(NO_CAPABILITY_IN_CHAIN_REASON)
+        return answer
 
     @staticmethod
     def _owner_user_tenant_predicate(org_id):

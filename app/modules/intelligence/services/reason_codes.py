@@ -17,8 +17,10 @@ from __future__ import annotations
 # role-gating's addition, the four T-S1 additions, the programme lens's own
 # plateau/gap pair, the two maturity-read-helper additions, the
 # Portfolio-block's three additions, the licence-sync addition and the four
-# connection-explanation additions below (forty-three total), exactly,
-# nothing invented.
+# connection-explanation additions, the risk answer's addition and the
+# vendor-concentration addition below (fifty-one total, re-derived rather
+# than trusted from any one side's own stale count), exactly, nothing
+# invented.
 REASON_CODES = frozenset(
     {
         "no_ownership_recorded",
@@ -115,6 +117,15 @@ REASON_CODES = frozenset(
         "no_capability_linked",
         "value_stream_not_linked_to_model",
         "dependency_direction_unknown",
+        # Risk answer: a risk can be linked to an application, a solution or
+        # a programme. Only the application half can be followed to an
+        # element, so the link types the answer cannot resolve are named
+        # with this reason instead of being dropped.
+        "risk_link_unresolvable",
+        # Vendor concentration for a capability: a capability with no vendor
+        # mapping recorded against it (the no-Capability-in-chain case reuses
+        # the existing no_capability_in_chain member below).
+        "no_vendor_mapping_recorded",
         # L7 (Data lens) additions: Ask's Data lens lists the DataObject rows
         # linked to the picked element. Most elements have none, an honest
         # absence; an object with neither a steward nor an owner recorded is a
