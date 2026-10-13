@@ -150,6 +150,32 @@ def test_application_code_matches_across_interior_whitespace(two_orgs):
         assert [(m["id"], m["match"]) for m in matches] == [(app_id, "same_code")]
 
 
+def test_preview_and_create_agree_on_interior_whitespace_in_a_name(two_orgs, db_session):
+    from app.models.application_portfolio import ApplicationComponent
+
+    _, client, user = two_orgs["a"]
+    app_id = _create(client, user, name="Orbit  Billing")
+    row = db_session.get(ApplicationComponent, app_id)
+    row.name = "Orbit  Billing"  # stored with two spaces
+    db_session.flush()
+    matches = _check(client, name="Orbit Billing").get_json()["matches"]
+    assert [(m["id"], m["match"]) for m in matches] == [(app_id, "same_name")]
+    _clear_login_cache()
+    resp = client.post("/applications/create", json={"name": "Orbit Billing"})
+    assert resp.status_code == 409, resp.get_data(as_text=True)
+
+
+def test_code_with_leading_tab_matches(two_orgs, db_session):
+    from app.models.application_portfolio import ApplicationComponent
+
+    _, client, user = two_orgs["a"]
+    app_id = _create(client, user, name="Tabbed", application_code="TAB-1")
+    db_session.get(ApplicationComponent, app_id).application_code = "	TAB-1"
+    db_session.flush()
+    matches = _check(client, name="Zephyr Gateway", application_code="tab-1").get_json()["matches"]
+    assert [(m["id"], m["match"]) for m in matches] == [(app_id, "same_code")]
+
+
 def test_no_organisation_context_returns_nothing_not_everything(app, db_session, monkeypatch):
     from app.modules.applications.services import registration_check_service as svc
 

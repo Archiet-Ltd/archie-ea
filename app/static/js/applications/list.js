@@ -601,6 +601,8 @@ function applicationCreateForm() {
     _checkArgs: null,
 
     scheduleCheck() {
+      // Any answer still in flight belongs to older text: never paint it.
+      this._checkSeq++;
       clearTimeout(this._checkTimer);
       this._checkTimer = null;
       this.confirmedDistinct = false;
@@ -611,7 +613,6 @@ function applicationCreateForm() {
       const name = this.form.name.trim();
       const code = this.form.application_code.trim();
       if (!name && !code) {
-        this._checkSeq++;
         this.checking = false;
         this._checkArgs = null;
         this.checkError = '';
@@ -720,19 +721,27 @@ function applicationCreateForm() {
         this.$nextTick(() => document.getElementById('ca-name')?.focus());
         return;
       }
-      // A lookup still waiting or in flight must answer before the form is judged.
-      await this.settleCheck();
+      // Claim the form before waiting, so a second press sends nothing while
+      // the lookup settles; every early return below hands it back.
+      this.submitting = true;
+      try {
+        // A lookup still waiting or in flight must answer before the form is judged.
+        await this.settleCheck();
+      } catch (err) {
+        // runCheck reports its own failure through checkError.
+      }
       if (this.checkError && !this.checkFailureAcknowledged) {
         // The lookup failed: say so and let the next press save without it.
         this.checkFailureAcknowledged = true;
         this.errorMsg = this.checkError + ' Press Add Application again to save without it.';
+        this.submitting = false;
         return;
       }
       if (this.needsConfirmation && !this.confirmedDistinct) {
         this.errorMsg = 'Confirm that none of the similar applications is the same one.';
+        this.submitting = false;
         return;
       }
-      this.submitting = true;
       this.errorMsg   = '';
 
       const url = window.__APP_CONFIG__?.createApplicationUrl || '/applications/create';

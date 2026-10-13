@@ -15,15 +15,14 @@ from app import db
 from app.middleware.tenant_context import current_org_id
 from app.models.application_portfolio import ApplicationComponent
 from app.modules.intelligence.services.matcher_service import MatcherService
-from app.utils.duplicate_guard import normalize_name
+from app.utils.duplicate_guard import (
+    find_duplicate_by_name,
+    folded_column,
+    normalize_name,
+)
 
 APPLICATION_ELEMENT_TYPE = "ApplicationComponent"
 MAX_MATCHES = 8
-
-
-def _normalize_code(value: str) -> str:
-    """Trim, collapse interior whitespace and lowercase (mirrors the SQL side)."""
-    return " ".join(str(value).split()).lower()
 
 
 def _entry(app: ApplicationComponent, match: str, reason: str) -> Dict[str, Any]:
@@ -60,15 +59,7 @@ def find_registration_matches(
             .filter(
                 ApplicationComponent.organization_id == org_id,
                 ApplicationComponent.deleted_at.is_(None),
-                db.func.lower(
-                    db.func.regexp_replace(
-                        db.func.btrim(ApplicationComponent.application_code),
-                        r"\s+",
-                        " ",
-                        "g",
-                    )
-                )
-                == _normalize_code(code),
+                folded_column(ApplicationComponent.application_code) == normalize_name(code),
             )
             .limit(MAX_MATCHES)
             .all()
@@ -77,6 +68,16 @@ def find_registration_matches(
             found[app.id] = _entry(app, "same_code", "Same application code")
 
     if name and name.strip():
+        # "Same name" is decided by the one rule the create route enforces with
+        # its 409, so the preview and the server cannot disagree.
+        same = find_duplicate_by_name(
+            ApplicationComponent,
+            name,
+            organization_id=org_id,
+            extra_filters=[ApplicationComponent.deleted_at.is_(None)],
+        )
+        if same is not None and same.id not in found:
+            found[same.id] = _entry(same, "same_name", "Same name")
         result = MatcherService.match_by_name(name, APPLICATION_ELEMENT_TYPE, org_id=org_id)
         element_ids: List[int] = []
         if result.evidence and result.evidence.get("candidate_ids"):
@@ -95,14 +96,10 @@ def find_registration_matches(
             )
             order = {eid: i for i, eid in enumerate(element_ids)}
             apps.sort(key=lambda a: order.get(a.archimate_element_id, 0))
-            exact = normalize_name(name)
             for app in apps:
                 if app.id in found:
                     continue
-                if normalize_name(app.name) == exact:
-                    found[app.id] = _entry(app, "same_name", "Same name")
-                else:
-                    found[app.id] = _entry(app, "similar_name", "Similar name")
+                found[app.id] = _entry(app, "similar_name", "Similar name")
 
     rank = {"same_code": 0, "same_name": 1, "similar_name": 2}
     return sorted(found.values(), key=lambda e: rank[e["match"]])[:MAX_MATCHES]
