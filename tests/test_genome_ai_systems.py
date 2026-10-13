@@ -1585,7 +1585,7 @@ def test_register_page_shows_not_recorded_for_empty_lineage(
     in the lineage panel. Fails on main (no panel)."""
     org = make_org("empty-lineage")
     arch = _make_admin_user(db_session, org, "EmptyLineage")
-    el = register_ai_system(db_session, org.id, name="Empty Lineage System",
+    register_ai_system(db_session, org.id, name="Empty Lineage System",
                              provider="openai", model_id="gpt-4o")
     db_session.flush()
 
@@ -1605,7 +1605,7 @@ def test_register_page_shows_not_recorded_for_empty_obligations(
     panel. Fails on main (no panel)."""
     org = make_org("empty-obl")
     arch = _make_admin_user(db_session, org, "EmptyObl")
-    el = register_ai_system(db_session, org.id, name="Empty Obl System",
+    register_ai_system(db_session, org.id, name="Empty Obl System",
                              provider="openai", model_id="gpt-4o")
     db_session.flush()
 
@@ -1872,7 +1872,6 @@ def test_grounding_source_routes_are_org_scoped(
     """Grounding source routes refuse cross-org access with 404."""
     org_a = make_org("gs-org-a")
     org_b = make_org("gs-org-b")
-    arch_a = _make_admin_user(db_session, org_a, "GSAOrgA")
     arch_b = _make_admin_user(db_session, org_b, "GSAOrgB")
 
     el_a = register_ai_system(db_session, org_a.id, name="GS Org A System",

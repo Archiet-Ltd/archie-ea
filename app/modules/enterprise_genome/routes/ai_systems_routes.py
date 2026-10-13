@@ -47,7 +47,6 @@ from app._decorators_base import permission_required
 from app.models import Permission
 from app.modules.enterprise_genome.emit.ai_systems_register import emit_ai_systems_register
 from app.modules.enterprise_genome.services.ai_system_grounding import (
-    ENTITY_GROUNDING_SOURCE,
     accept_grounding_source,
     propose_grounding_source,
     reject_grounding_source,
