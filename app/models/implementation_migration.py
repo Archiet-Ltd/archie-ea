@@ -939,7 +939,7 @@ def check_gap_resolution_on_work_package_update(mapper, connection, target):
 
         # Get all gaps linked to this work package
         gap_ids = connection.execute(
-            select([gap_work_packages.c.gap_id]).where(
+            select(gap_work_packages.c.gap_id).where(
                 gap_work_packages.c.work_package_id == target.id
             )
         ).fetchall()
@@ -948,7 +948,7 @@ def check_gap_resolution_on_work_package_update(mapper, connection, target):
         for (gap_id,) in gap_ids:
             # Get all work package IDs for this gap
             wp_ids = connection.execute(
-                select([gap_work_packages.c.work_package_id]).where(
+                select(gap_work_packages.c.work_package_id).where(
                     gap_work_packages.c.gap_id == gap_id
                 )
             ).fetchall()
@@ -957,7 +957,7 @@ def check_gap_resolution_on_work_package_update(mapper, connection, target):
             all_completed = True
             for (wp_id,) in wp_ids:
                 wp_status = connection.execute(
-                    select([WorkPackage.__table__.c.status]).where(
+                    select(WorkPackage.__table__.c.status).where(
                         WorkPackage.__table__.c.id == wp_id
                     )
                 ).scalar()

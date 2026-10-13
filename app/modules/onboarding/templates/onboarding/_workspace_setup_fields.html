@@ -1,0 +1,67 @@
+{# Everything the retired first-login modal (layouts/admin_base.html) did,
+   as one reusable block: role choice, "Key features for you" for that role,
+   and -- for admins -- AI provider setup and inviting teammates. Included
+   by both the five-screen flow's own "Set up your workspace" step
+   (onboarding/screen2_company.html) and the standalone page reachable
+   afterwards (onboarding/workspace_setup.html), so there is one markup, not
+   two. The including page must define an Alpine scope with selectedRole,
+   roleCards and roleLabels (partials/_role_personalization_js.html covers
+   the data; each page wires its own submit behaviour around it). #}
+<div class="space-y-3">
+    <label class="text-sm font-medium text-foreground block" id="workspace-role-label">What's your role?</label>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-labelledby="workspace-role-label">
+        <template x-for="(label, key) in roleLabels" :key="key">
+            <label class="flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors"
+                   :class="selectedRole === key ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'">
+                <input type="radio" name="workspace_role" :value="key" x-model="selectedRole" class="accent-primary">
+                <span class="text-sm font-medium text-foreground" x-text="label"></span>
+            </label>
+        </template>
+    </div>
+</div>
+
+<div class="space-y-3">
+    <p class="text-sm font-medium text-foreground">
+        Key features for you
+        <span class="font-normal text-muted-foreground">as <span x-text="roleLabels[selectedRole]"></span></span>
+    </p>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <template x-for="card in (roleCards[selectedRole] || [])" :key="card.title">
+            <a :href="card.href" tabindex="-1" class="flex items-start gap-3 rounded-xl border border-border bg-background p-3 hover:border-primary/30 transition-colors block">
+                <div class="shrink-0 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <i :data-lucide="card.icon" class="h-4 w-4 text-primary" aria-hidden="true"></i>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-sm font-medium text-foreground" x-text="card.title"></p>
+                    <p class="text-xs text-muted-foreground mt-0.5" x-text="card.desc"></p>
+                </div>
+            </a>
+        </template>
+    </div>
+</div>
+
+{% if current_user.is_org_admin or current_user.is_platform_admin %}
+<div class="space-y-3 rounded-lg border border-border p-4">
+    <p class="text-sm font-medium text-foreground">Admin setup</p>
+    <a href="{{ url_for('admin.api_settings') }}" target="_blank" rel="noopener"
+       class="flex items-center gap-3 rounded-lg border border-border bg-background p-3 hover:border-primary/30 transition-colors">
+        <div class="shrink-0 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <i data-lucide="key" class="h-4 w-4 text-primary" aria-hidden="true"></i>
+        </div>
+        <div class="min-w-0">
+            <p class="text-sm font-medium text-foreground">Set up your AI provider</p>
+            <p class="text-xs text-muted-foreground mt-0.5">Configure the LLM and integration keys {{ config.APP_NAME }} uses. Opens in a new tab.</p>
+        </div>
+    </a>
+    <a href="{{ url_for('admin.invite_user') }}" target="_blank" rel="noopener"
+       class="flex items-center gap-3 rounded-lg border border-border bg-background p-3 hover:border-primary/30 transition-colors">
+        <div class="shrink-0 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <i data-lucide="user-plus" class="h-4 w-4 text-primary" aria-hidden="true"></i>
+        </div>
+        <div class="min-w-0">
+            <p class="text-sm font-medium text-foreground">Invite your teammates</p>
+            <p class="text-xs text-muted-foreground mt-0.5">Bring in the colleagues who'll use {{ config.APP_NAME }} with you. Opens in a new tab.</p>
+        </div>
+    </a>
+</div>
+{% endif %}

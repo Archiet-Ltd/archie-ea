@@ -1,0 +1,132 @@
+{% extends 'onboarding/_wizard_shell.html' %}
+{% set step_title = 'Goals and changes' %}
+{% set step_number = 4 %}
+
+{% block wizard_content %}
+<div x-data="{
+        goals: {{ state.goals | tojson | forceescape }},
+        changes: {{ state.changes | tojson | forceescape }},
+        submitting: false,
+        errorMessage: '',
+        init() {
+            if (!this.goals.length) { this.addGoal(); }
+        },
+        addGoal() { this.goals.push({id: null, name: '', by_when: '', measure: ''}); },
+        addChange() { this.changes.push({id: null, name: '', status: 'planned', by_when: '', goal: ''}); },
+        removeGoal(i) { if (!this.goals[i].id) { this.goals.splice(i, 1); } },
+        removeChange(i) { if (!this.changes[i].id) { this.changes.splice(i, 1); } },
+        goalNames() { return this.goals.map(g => g.name.trim()).filter(n => n); },
+        save() {
+            this.submitting = true;
+            this.errorMessage = '';
+            window.Platform.fetch('{{ url_for('onboarding.goals') }}', {
+                method: 'POST',
+                body: {
+                    goals: this.goals.filter(g => g.name.trim()),
+                    changes: this.changes.filter(c => c.name.trim()),
+                },
+                silent: true,
+            }).then(data => {
+                this.submitting = false;
+                if (data && data.success && data.data && data.data.next) {
+                    window.location.href = data.data.next;
+                } else {
+                    this.errorMessage = 'Something went wrong — try again.';
+                }
+            }).catch(() => {
+                this.submitting = false;
+                this.errorMessage = 'Something went wrong — try again.';
+            });
+        }
+    }"
+    class="p-8 space-y-8">
+    <div class="space-y-1">
+        <h1 class="text-lg font-bold text-foreground">Where are you heading?</h1>
+        <p class="text-sm text-muted-foreground">
+            Say what you want to achieve, and what you are doing about it. Both are optional, and only what
+            you fill in is saved.
+        </p>
+    </div>
+
+    <section class="space-y-3" aria-labelledby="goals-heading">
+        <h2 id="goals-heading" class="text-sm font-semibold text-foreground">What do you want to achieve?</h2>
+        <template x-for="(g, i) in goals" :key="i">
+            <div class="rounded-lg border border-border p-3 grid grid-cols-1 sm:grid-cols-6 gap-3 items-end">
+                <div class="sm:col-span-3">
+                    <label class="text-xs text-muted-foreground block mb-1" :for="'goal_' + i">Goal</label>
+                    <input type="text" :id="'goal_' + i" maxlength="100" x-model="g.name"
+                           placeholder="e.g. Win our first ten paying customers"
+                           class="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm">
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="text-xs text-muted-foreground block mb-1" :for="'measure_' + i">How you will know (optional)</label>
+                    <input type="text" :id="'measure_' + i" maxlength="200" x-model="g.measure" placeholder="e.g. 10 signed contracts"
+                           class="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm">
+                </div>
+                <div>
+                    <label class="text-xs text-muted-foreground block mb-1" :for="'when_' + i">By when (optional)</label>
+                    <input type="date" :id="'when_' + i" x-model="g.by_when"
+                           class="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm">
+                </div>
+                <button type="button" x-show="!g.id" @click="removeGoal(i)"
+                        class="rounded-md border border-input text-xs font-medium h-8 px-3 hover:bg-accent sm:col-span-1">Remove</button>
+            </div>
+        </template>
+        <button type="button" @click="addGoal()"
+                class="rounded-md border border-input text-sm font-medium h-9 px-4 hover:bg-accent">Add another goal</button>
+    </section>
+
+    <section class="space-y-3" aria-labelledby="changes-heading">
+        <h2 id="changes-heading" class="text-sm font-semibold text-foreground">What are you changing or building to get there?</h2>
+        <template x-for="(c, i) in changes" :key="i">
+            <div class="rounded-lg border border-border p-3 grid grid-cols-1 sm:grid-cols-6 gap-3 items-end">
+                <div class="sm:col-span-3">
+                    <label class="text-xs text-muted-foreground block mb-1" :for="'change_' + i">Change</label>
+                    <input type="text" :id="'change_' + i" maxlength="255" x-model="c.name"
+                           placeholder="e.g. Launch the self-service sign-up"
+                           class="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm">
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="text-xs text-muted-foreground block mb-1" :for="'status_' + i">Where is it</label>
+                    <select :id="'status_' + i" x-model="c.status"
+                            class="flex h-8 w-full rounded-md border border-input bg-background px-2 text-sm">
+                        {% for s in state.statuses %}<option value="{{ s.key }}">{{ s.label }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-muted-foreground block mb-1" :for="'cwhen_' + i">By when (optional)</label>
+                    <input type="date" :id="'cwhen_' + i" x-model="c.by_when"
+                           class="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm">
+                </div>
+                <div class="sm:col-span-5">
+                    <label class="text-xs text-muted-foreground block mb-1" :for="'serves_' + i">Which goal does it serve? (optional)</label>
+                    <select :id="'serves_' + i" x-model="c.goal"
+                            class="flex h-8 w-full rounded-md border border-input bg-background px-2 text-sm">
+                        <option value="">Not linked to a goal</option>
+                        <template x-for="n in goalNames()" :key="n"><option :value="n" :selected="c.goal === n" x-text="n"></option></template>
+                    </select>
+                </div>
+                <button type="button" x-show="!c.id" @click="removeChange(i)"
+                        class="rounded-md border border-input text-xs font-medium h-8 px-3 hover:bg-accent sm:col-span-1">Remove</button>
+            </div>
+        </template>
+        <button type="button" @click="addChange()"
+                class="rounded-md border border-input text-sm font-medium h-9 px-4 hover:bg-accent">Add a change</button>
+    </section>
+
+    <p x-show="errorMessage" x-cloak x-text="errorMessage" class="text-sm text-destructive" role="alert"></p>
+
+    <div class="flex items-center justify-between gap-3">
+        <a href="{{ url_for('onboarding.tools_step') }}" class="rounded-md border border-input text-sm font-medium h-9 px-4 inline-flex items-center">Back</a>
+        <div class="flex gap-2">
+            <a href="{{ url_for('onboarding.gaps') }}" class="rounded-md text-sm font-medium h-9 px-4 inline-flex items-center hover:bg-accent">Skip this step</a>
+            <button type="button" @click="save()" :disabled="submitting"
+                    class="inline-flex items-center justify-center rounded-md text-sm font-medium
+                           bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2
+                           disabled:opacity-50 disabled:pointer-events-none">
+                <span x-text="submitting ? 'Saving…' : 'Save and continue'"></span>
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}

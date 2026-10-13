@@ -1,0 +1,411 @@
+{
+  "frameworks": [
+    {
+      "id": "cobit2019",
+      "name": "COBIT 2019",
+      "shortName": "COBIT",
+      "description": "Comprehensive IT governance and management framework",
+      "fullDescription": "COBIT (Control Objectives for Information and Related Technologies) is a framework for developing, implementing, monitoring and improving IT governance and management practices.",
+      "category": "IT_GOVERNANCE",
+      "subcategory": "Enterprise Governance",
+      "strategic_domain": "Technology Governance",
+      "maturityLevel": "intermediate",
+      "industryFocus": ["all"],
+      "companySizeFit": ["medium", "large", "enterprise"],
+      "prerequisites": [],
+      "complementaryFrameworks": ["itil-v4", "togaf-enterprise-architecture"],
+      "businessValue": [
+        "Align IT with business strategy",
+        "Optimize IT resource utilization",
+        "Manage IT-related risks effectively",
+        "Ensure compliance with regulations"
+      ],
+      "keyCapabilities": [
+        "IT governance framework",
+        "Risk management integration",
+        "Performance measurement",
+        "Stakeholder value optimization",
+        "Resource optimization"
+      ],
+      "implementationComplexity": "high",
+      "estimatedTimeframe": "6-12 months",
+      "requiredRoles": [
+        "IT Governance Lead",
+        "Risk Manager",
+        "Compliance Officer"
+      ],
+      "certifications": ["COBIT 5 Foundation", "COBIT 2019 Foundation"],
+      "popularity": 85
+    },
+    {
+      "id": "itil-v4",
+      "name": "ITIL v4",
+      "shortName": "ITIL",
+      "description": "IT service management best practice framework",
+      "fullDescription": "ITIL (Information Technology Infrastructure Library) provides a practical framework for identifying, planning, delivering and supporting IT services to businesses.",
+      "category": "IT_SERVICE_MANAGEMENT",
+      "subcategory": "Service Operations",
+      "strategic_domain": "Service Delivery",
+      "maturityLevel": "intermediate",
+      "industryFocus": ["all"],
+      "companySizeFit": ["small", "medium", "large", "enterprise"],
+      "prerequisites": [],
+      "complementaryFrameworks": ["cobit2019", "devops-practices"],
+      "businessValue": [
+        "Improve service quality and reliability",
+        "Reduce service delivery costs",
+        "Enhance customer satisfaction",
+        "Streamline IT operations"
+      ],
+      "keyCapabilities": [
+        "Incident and problem management",
+        "Change and release management",
+        "Service level management",
+        "Configuration management",
+        "Continual service improvement"
+      ],
+      "implementationComplexity": "medium",
+      "estimatedTimeframe": "4-8 months",
+      "requiredRoles": [
+        "Service Manager",
+        "Incident Manager",
+        "Change Manager"
+      ],
+      "certifications": ["ITIL 4 Foundation", "ITIL 4 Managing Professional"],
+      "popularity": 90
+    },
+    {
+      "id": "iso27001",
+      "name": "ISO 27001",
+      "shortName": "ISO 27001",
+      "description": "Information security management system standard",
+      "fullDescription": "ISO/IEC 27001 is an international standard for managing information security through a systematic approach to managing sensitive company information.",
+      "category": "CYBERSECURITY",
+      "subcategory": "Information Security",
+      "strategic_domain": "Security",
+      "maturityLevel": "intermediate",
+      "industryFocus": ["all"],
+      "companySizeFit": ["medium", "large", "enterprise"],
+      "prerequisites": [],
+      "complementaryFrameworks": ["nist-csf", "iso27002"],
+      "businessValue": [
+        "Protect sensitive information assets",
+        "Meet regulatory compliance requirements",
+        "Build customer trust",
+        "Reduce security incident risk"
+      ],
+      "keyCapabilities": [
+        "Information security policy",
+        "Risk assessment and treatment",
+        "Asset management",
+        "Access control",
+        "Incident management",
+        "Business continuity"
+      ],
+      "implementationComplexity": "high",
+      "estimatedTimeframe": "6-12 months",
+      "requiredRoles": ["CISO", "Security Manager", "Compliance Officer"],
+      "certifications": [
+        "ISO 27001 Lead Auditor",
+        "ISO 27001 Lead Implementer"
+      ],
+      "popularity": 88
+    },
+    {
+      "id": "nist-csf",
+      "name": "NIST Cybersecurity Framework",
+      "shortName": "NIST CSF",
+      "description": "Risk-based approach to managing cybersecurity",
+      "fullDescription": "The NIST Cybersecurity Framework provides guidance for organizations to better understand, manage, and reduce their cybersecurity risk.",
+      "category": "CYBERSECURITY",
+      "subcategory": "Cybersecurity",
+      "strategic_domain": "Security",
+      "maturityLevel": "beginner",
+      "industryFocus": ["all"],
+      "companySizeFit": ["startup", "small", "medium", "large", "enterprise"],
+      "prerequisites": [],
+      "complementaryFrameworks": ["iso27001", "cis-controls"],
+      "businessValue": [
+        "Establish baseline cybersecurity posture",
+        "Identify and prioritize security gaps",
+        "Communicate security requirements",
+        "Manage third-party risk"
+      ],
+      "keyCapabilities": [
+        "Identify assets and risks",
+        "Protect critical infrastructure",
+        "Detect security events",
+        "Respond to incidents",
+        "Recover from attacks"
+      ],
+      "implementationComplexity": "medium",
+      "estimatedTimeframe": "3-6 months",
+      "requiredRoles": ["Security Architect", "Risk Manager"],
+      "certifications": ["NIST CSF Practitioner"],
+      "popularity": 82
+    },
+    {
+      "id": "togaf-enterprise-architecture",
+      "name": "TOGAF Enterprise Architecture",
+      "shortName": "TOGAF",
+      "description": "Enterprise architecture methodology and framework",
+      "fullDescription": "TOGAF (The Open Group Architecture Framework) provides an approach for designing, planning, implementing, and governing enterprise information architecture.",
+      "category": "ENTERPRISE_ARCHITECTURE",
+      "subcategory": "Architecture Framework",
+      "strategic_domain": "Architecture",
+      "maturityLevel": "advanced",
+      "industryFocus": ["all"],
+      "companySizeFit": ["large", "enterprise"],
+      "prerequisites": [],
+      "complementaryFrameworks": ["cobit2019", "zachman-framework"],
+      "businessValue": [
+        "Align business and IT strategy",
+        "Reduce complexity and costs",
+        "Improve business agility",
+        "Support digital transformation"
+      ],
+      "keyCapabilities": [
+        "Architecture Development Method (ADM)",
+        "Architecture Content Framework",
+        "Enterprise Continuum",
+        "Architecture Repository",
+        "Governance framework"
+      ],
+      "implementationComplexity": "high",
+      "estimatedTimeframe": "8-18 months",
+      "requiredRoles": [
+        "Enterprise Architect",
+        "Solution Architect",
+        "Business Architect"
+      ],
+      "certifications": ["TOGAF 9 Certified", "TOGAF EA Practitioner"],
+      "popularity": 75
+    },
+    {
+      "id": "safe-scaled-agile",
+      "name": "SAFe (Scaled Agile Framework)",
+      "shortName": "SAFe",
+      "description": "Scaled agile framework for enterprises",
+      "fullDescription": "SAFe provides a knowledge base of proven, integrated principles, practices, and competencies for Lean, Agile, and DevOps.",
+      "category": "AGILE",
+      "subcategory": "Scaled Agile",
+      "strategic_domain": "Delivery",
+      "maturityLevel": "intermediate",
+      "industryFocus": ["software-development", "fintech", "saas-platforms"],
+      "companySizeFit": ["medium", "large", "enterprise"],
+      "prerequisites": ["agile-methodology"],
+      "complementaryFrameworks": [
+        "devops-practices",
+        "lean-portfolio-management"
+      ],
+      "businessValue": [
+        "Scale agile across the enterprise",
+        "Accelerate time to market",
+        "Improve product quality",
+        "Increase employee engagement"
+      ],
+      "keyCapabilities": [
+        "Agile Release Trains (ARTs)",
+        "Program Increment (PI) planning",
+        "Lean portfolio management",
+        "DevOps integration",
+        "Continuous delivery pipeline"
+      ],
+      "implementationComplexity": "high",
+      "estimatedTimeframe": "6-12 months",
+      "requiredRoles": [
+        "Release Train Engineer",
+        "Product Manager",
+        "Scrum Master"
+      ],
+      "certifications": ["SAFe Agilist", "SAFe Program Consultant"],
+      "popularity": 78
+    },
+    {
+      "id": "agile-methodology",
+      "name": "Agile Methodology",
+      "shortName": "Agile",
+      "description": "Iterative software development approach",
+      "fullDescription": "Agile is an iterative approach to project management and software development that helps teams deliver value faster with fewer headaches.",
+      "category": "AGILE",
+      "subcategory": "Project Management",
+      "strategic_domain": "Delivery",
+      "maturityLevel": "beginner",
+      "industryFocus": ["software-development", "saas-platforms", "fintech"],
+      "companySizeFit": ["startup", "small", "medium", "large"],
+      "prerequisites": [],
+      "complementaryFrameworks": ["scrum", "kanban-system"],
+      "businessValue": [
+        "Faster delivery of value",
+        "Improved stakeholder engagement",
+        "Better quality through continuous feedback",
+        "Enhanced team collaboration"
+      ],
+      "keyCapabilities": [
+        "Iterative development cycles",
+        "Daily standups",
+        "Sprint planning and retrospectives",
+        "User story mapping",
+        "Continuous improvement"
+      ],
+      "implementationComplexity": "low",
+      "estimatedTimeframe": "1-3 months",
+      "requiredRoles": ["Scrum Master", "Product Owner", "Development Team"],
+      "certifications": ["Certified Scrum Master", "PMI-ACP"],
+      "popularity": 95
+    },
+    {
+      "id": "devops-practices",
+      "name": "DevOps Practices",
+      "shortName": "DevOps",
+      "description": "Development and operations collaboration framework",
+      "fullDescription": "DevOps combines software development and IT operations to shorten the systems development life cycle and provide continuous delivery.",
+      "category": "DEVOPS",
+      "subcategory": "CI/CD",
+      "strategic_domain": "Delivery",
+      "maturityLevel": "intermediate",
+      "industryFocus": ["software-development", "saas-platforms", "fintech"],
+      "companySizeFit": ["startup", "small", "medium", "large", "enterprise"],
+      "prerequisites": ["agile-methodology"],
+      "complementaryFrameworks": ["itil-v4", "sre-practices"],
+      "businessValue": [
+        "Accelerate software delivery",
+        "Improve deployment frequency",
+        "Reduce change failure rate",
+        "Faster mean time to recovery"
+      ],
+      "keyCapabilities": [
+        "Continuous integration/continuous delivery",
+        "Infrastructure as code",
+        "Automated testing",
+        "Monitoring and logging",
+        "Collaboration culture"
+      ],
+      "implementationComplexity": "medium",
+      "estimatedTimeframe": "4-8 months",
+      "requiredRoles": [
+        "DevOps Engineer",
+        "Site Reliability Engineer",
+        "Platform Engineer"
+      ],
+      "certifications": ["AWS DevOps Engineer", "Azure DevOps Engineer"],
+      "popularity": 92
+    },
+    {
+      "id": "lean-six-sigma",
+      "name": "Lean Six Sigma",
+      "shortName": "Lean Six Sigma",
+      "description": "Process improvement methodology",
+      "fullDescription": "Lean Six Sigma combines lean manufacturing principles and Six Sigma methods to eliminate waste and reduce variation.",
+      "category": "PROCESS_EXCELLENCE",
+      "subcategory": "Quality Management",
+      "strategic_domain": "Process Optimization",
+      "maturityLevel": "intermediate",
+      "industryFocus": ["manufacturing", "healthcare", "financial-services"],
+      "companySizeFit": ["medium", "large", "enterprise"],
+      "prerequisites": [],
+      "complementaryFrameworks": ["kaizen", "theory-of-constraints"],
+      "businessValue": [
+        "Reduce process defects and waste",
+        "Improve operational efficiency",
+        "Lower costs and cycle times",
+        "Enhance customer satisfaction"
+      ],
+      "keyCapabilities": [
+        "DMAIC methodology (Define, Measure, Analyze, Improve, Control)",
+        "Statistical process control",
+        "Value stream mapping",
+        "Root cause analysis",
+        "Continuous improvement culture"
+      ],
+      "implementationComplexity": "high",
+      "estimatedTimeframe": "6-12 months",
+      "requiredRoles": ["Six Sigma Black Belt", "Process Improvement Manager"],
+      "certifications": ["Six Sigma Green Belt", "Six Sigma Black Belt"],
+      "popularity": 70
+    },
+    {
+      "id": "okr-objectives-key-results",
+      "name": "OKR (Objectives and Key Results)",
+      "shortName": "OKR",
+      "description": "Goal-setting framework for organizations",
+      "fullDescription": "OKR is a goal-setting framework used by individuals, teams, and organizations to define measurable goals and track their outcomes.",
+      "category": "STRATEGY_EXECUTION",
+      "subcategory": "Goal Setting",
+      "strategic_domain": "Strategic Planning",
+      "maturityLevel": "beginner",
+      "industryFocus": ["all"],
+      "companySizeFit": ["startup", "small", "medium", "large", "enterprise"],
+      "prerequisites": [],
+      "complementaryFrameworks": ["balanced-scorecard", "hoshin-kanri"],
+      "businessValue": [
+        "Align teams with organizational goals",
+        "Increase focus and accountability",
+        "Drive measurable results",
+        "Foster transparency and engagement"
+      ],
+      "keyCapabilities": [
+        "Quarterly objective setting",
+        "Key result measurement",
+        "Progress tracking",
+        "Cross-functional alignment",
+        "Regular check-ins"
+      ],
+      "implementationComplexity": "low",
+      "estimatedTimeframe": "1-2 months",
+      "requiredRoles": ["Strategy Lead", "Department Heads"],
+      "certifications": [],
+      "popularity": 85
+    }
+  ],
+  "categories": [
+    {
+      "id": "IT_GOVERNANCE",
+      "name": "IT Governance",
+      "description": "Frameworks for managing and governing IT resources and processes",
+      "icon": "shield-check"
+    },
+    {
+      "id": "IT_SERVICE_MANAGEMENT",
+      "name": "IT Service Management",
+      "description": "Best practices for delivering and supporting IT services",
+      "icon": "settings"
+    },
+    {
+      "id": "CYBERSECURITY",
+      "name": "Cybersecurity",
+      "description": "Security frameworks for protecting information and systems",
+      "icon": "lock"
+    },
+    {
+      "id": "ENTERPRISE_ARCHITECTURE",
+      "name": "Enterprise Architecture",
+      "description": "Frameworks for designing and planning enterprise architecture",
+      "icon": "building"
+    },
+    {
+      "id": "AGILE",
+      "name": "Agile & Scrum",
+      "description": "Iterative development and project management methodologies",
+      "icon": "zap"
+    },
+    {
+      "id": "DEVOPS",
+      "name": "DevOps",
+      "description": "Practices for combining development and operations",
+      "icon": "git-branch"
+    },
+    {
+      "id": "PROCESS_EXCELLENCE",
+      "name": "Process Excellence",
+      "description": "Methodologies for improving business processes",
+      "icon": "trending-up"
+    },
+    {
+      "id": "STRATEGY_EXECUTION",
+      "name": "Strategy & Execution",
+      "description": "Frameworks for strategic planning and goal execution",
+      "icon": "target"
+    }
+  ]
+}

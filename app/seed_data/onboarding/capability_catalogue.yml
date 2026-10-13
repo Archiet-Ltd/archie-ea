@@ -1,0 +1,55 @@
+# The business capabilities onboarding offers, by company stage and size.
+#
+# This is template data, editable without a code or schema change. Each entry is
+# only ever *offered*: nothing here becomes a capability in the model until the
+# founder answers about it (an owner, a maturity level, or "we do this").
+#
+# A capability is offered when the company's stage is at or beyond `from_stage`
+# AND its size band is at or beyond `from_size`. So a two-person pre-revenue
+# company sees a handful; a large established one sees the full set.
+#
+# `expected` is the maturity level a company at that stage is usually expected to
+# have reached, on the five-level Capability Maturity Model scale. It is a
+# comparison only. It is never written as the company's own target.
+
+stages: [pre_revenue, early_revenue, growing, established]
+size_bands:
+  - {key: micro, label: "Just us, or up to 10 people"}
+  - {key: small, label: "11 to 50 people"}
+  - {key: mid, label: "51 to 250 people"}
+  - {key: large, label: "More than 250 people"}
+
+default_expected: {pre_revenue: 1, early_revenue: 2, growing: 3, established: 4}
+
+maturity_levels:
+  - {level: 1, name: Initial, meaning: "Ad hoc. It depends on who is free."}
+  - {level: 2, name: Managed, meaning: "Planned and repeatable within a team."}
+  - {level: 3, name: Defined, meaning: "One standard way across the company."}
+  - {level: 4, name: Measured, meaning: "Tracked with numbers."}
+  - {level: 5, name: Optimising, meaning: "Improved continuously from the numbers."}
+
+capabilities:
+  # --- Grow the business
+  - {key: customer_acquisition, label: "Customer acquisition", hint: "Finding and winning customers", group: "Grow the business", from_stage: pre_revenue, from_size: micro}
+  - {key: marketing, label: "Marketing", hint: "Getting known by the right buyers", group: "Grow the business", from_stage: early_revenue, from_size: micro}
+  - {key: pricing_and_proposals, label: "Pricing and proposals", hint: "Working out and sending a price", group: "Grow the business", from_stage: early_revenue, from_size: micro}
+  - {key: customer_support, label: "Customer support", hint: "Answering and fixing", group: "Grow the business", from_stage: early_revenue, from_size: micro}
+
+  # --- Deliver the service
+  - {key: service_delivery, label: "Service delivery", hint: "Delivering what customers buy", group: "Deliver the service", from_stage: early_revenue, from_size: micro}
+  - {key: service_operations, label: "Service operations", hint: "Keeping the service running", group: "Deliver the service", from_stage: early_revenue, from_size: micro}
+  - {key: partner_and_supplier_management, label: "Partner and supplier management", hint: "Choosing and managing the companies you rely on", group: "Deliver the service", from_stage: growing, from_size: micro}
+
+  # --- Build the product
+  - {key: product_development, label: "Product development", hint: "Design, build and release", group: "Build the product", from_stage: pre_revenue, from_size: micro}
+  - {key: data_and_analytics, label: "Data and analytics", hint: "Reports and insight", group: "Build the product", from_stage: growing, from_size: micro}
+
+  # --- Run the company
+  - {key: finance_and_billing, label: "Finance and billing", hint: "Invoicing, cash and the books", group: "Run the company", from_stage: pre_revenue, from_size: micro}
+  - {key: people_and_hiring, label: "People and hiring", hint: "Hiring, contracts, onboarding", group: "Run the company", from_stage: early_revenue, from_size: micro}
+  - {key: compliance_and_security, label: "Compliance and security", hint: "Data protection and customer contracts", group: "Run the company", from_stage: early_revenue, from_size: micro}
+  - {key: risk_and_audit, label: "Risk and audit", hint: "Knowing the risks and checking the controls", group: "Run the company", from_stage: growing, from_size: small}
+  - {key: programme_and_portfolio_management, label: "Programme and portfolio management", hint: "Deciding and tracking what gets funded", group: "Run the company", from_stage: growing, from_size: mid}
+  - {key: procurement, label: "Procurement", hint: "Buying goods and services under a policy", group: "Run the company", from_stage: established, from_size: mid}
+  - {key: data_governance, label: "Data governance", hint: "Who owns and looks after the company's data", group: "Run the company", from_stage: established, from_size: mid}
+  - {key: business_continuity, label: "Business continuity", hint: "Carrying on through a serious disruption", group: "Run the company", from_stage: established, from_size: mid}

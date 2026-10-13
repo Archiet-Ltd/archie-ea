@@ -1,0 +1,124 @@
+{% extends 'onboarding/_wizard_shell.html' %}
+{% set step_title = 'Your tools' %}
+{% set step_number = 4 %}
+
+{% block wizard_content %}
+<div x-data="{
+        capabilities: {{ state.capabilities | tojson | forceescape }},
+        entries: {{ state.tools | tojson | forceescape }},
+        suggestions: {{ state.suggestions | tojson | forceescape }},
+        submitting: false,
+        errorMessage: '',
+        init() {
+            this.entries = this.entries.map(e => this.shape(e));
+            if (!this.entries.length) { this.add(''); }
+        },
+        shape(e) {
+            return {id: e.id || null, name: e.name || '', deployment: e.deployment || '', supports: e.supports || []};
+        },
+        add(name) { this.entries.push(this.shape({name: name})); },
+        addSuggestion(name) {
+            const blank = this.entries.findIndex(e => !e.name.trim());
+            if (blank >= 0) { this.entries[blank].name = name; } else { this.add(name); }
+        },
+        listed(name) { return this.entries.some(e => e.name.trim().toLowerCase() === name.toLowerCase()); },
+        remove(i) { if (!this.entries[i].id) { this.entries.splice(i, 1); } },
+        payload() {
+            return this.entries.filter(e => e.name.trim()).map(e => ({
+                id: e.id, name: e.name.trim(), deployment: e.deployment, supports: e.supports,
+            }));
+        },
+        save() {
+            this.submitting = true;
+            this.errorMessage = '';
+            window.Platform.fetch('{{ url_for('onboarding.tools_step') }}', {
+                method: 'POST',
+                body: {tools: this.payload()},
+                silent: true,
+            }).then(data => {
+                this.submitting = false;
+                if (data && data.success && data.data && data.data.next) {
+                    window.location.href = data.data.next;
+                } else {
+                    this.errorMessage = 'Something went wrong — try again.';
+                }
+            }).catch(() => {
+                this.submitting = false;
+                this.errorMessage = 'Something went wrong — try again.';
+            });
+        }
+    }"
+    class="p-8 space-y-6">
+    <div class="space-y-1">
+        <h1 class="text-lg font-bold text-foreground">What do you run the business on?</h1>
+        <p class="text-sm text-muted-foreground">
+            Name the tools you use, from your code repository to your spreadsheets, and tick which of your
+            capabilities each one supports. Only what you fill in is saved.
+        </p>
+    </div>
+
+    <div x-show="suggestions.length" x-cloak class="space-y-2">
+        <p class="text-xs text-muted-foreground">Companies at your stage usually have these. Add the ones you use:</p>
+        <div class="flex flex-wrap gap-2">
+            <template x-for="s in suggestions" :key="s">
+                <button type="button" @click="addSuggestion(s)" :disabled="listed(s)"
+                        class="rounded-md border border-input text-xs font-medium h-8 px-3 hover:bg-accent disabled:opacity-50"
+                        x-text="listed(s) ? s + ' (added)' : '+ ' + s"></button>
+            </template>
+        </div>
+    </div>
+
+    <div class="space-y-3">
+        <template x-for="(e, i) in entries" :key="i">
+            <div class="rounded-lg border border-border p-3 space-y-3">
+                <div class="flex flex-wrap items-end gap-3">
+                    <div class="grow">
+                        <label class="text-xs text-muted-foreground block mb-1" :for="'tool_' + i">Tool</label>
+                        <input type="text" :id="'tool_' + i" maxlength="256" x-model="e.name" placeholder="e.g. Stripe, Google Sheets, our own app"
+                               class="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm">
+                    </div>
+                    <div>
+                        <label class="text-xs text-muted-foreground block mb-1" :for="'deploy_' + i">How it runs (optional)</label>
+                        <select :id="'deploy_' + i" x-model="e.deployment"
+                                class="flex h-8 rounded-md border border-input bg-background px-2 text-sm">
+                            <option value="">Not sure</option>
+                            {% for d in state.deployments %}<option value="{{ d.key }}">{{ d.label }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <button type="button" x-show="!e.id" @click="remove(i)"
+                            class="rounded-md border border-input text-xs font-medium h-8 px-3 hover:bg-accent">Remove</button>
+                </div>
+                <fieldset x-show="capabilities.length" x-cloak>
+                    <legend class="text-xs text-muted-foreground mb-1">Supports these capabilities</legend>
+                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                        <template x-for="c in capabilities" :key="c.key">
+                            <label class="flex items-center gap-2 text-sm text-foreground">
+                                <input type="checkbox" :value="c.key" x-model="e.supports" class="accent-primary">
+                                <span x-text="c.label"></span>
+                            </label>
+                        </template>
+                    </div>
+                </fieldset>
+            </div>
+        </template>
+    </div>
+
+    <button type="button" @click="add('')"
+            class="rounded-md border border-input text-sm font-medium h-9 px-4 hover:bg-accent">Add another tool</button>
+
+    <p x-show="errorMessage" x-cloak x-text="errorMessage" class="text-sm text-destructive" role="alert"></p>
+
+    <div class="flex items-center justify-between gap-3">
+        <a href="{{ url_for('onboarding.people') }}" class="rounded-md border border-input text-sm font-medium h-9 px-4 inline-flex items-center">Back</a>
+        <div class="flex gap-2">
+            <a href="{{ url_for('onboarding.goals') }}" class="rounded-md text-sm font-medium h-9 px-4 inline-flex items-center hover:bg-accent">Skip this step</a>
+            <button type="button" @click="save()" :disabled="submitting"
+                    class="inline-flex items-center justify-center rounded-md text-sm font-medium
+                           bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2
+                           disabled:opacity-50 disabled:pointer-events-none">
+                <span x-text="submitting ? 'Saving…' : 'Save and continue'"></span>
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}

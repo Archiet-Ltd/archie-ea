@@ -1,0 +1,379 @@
+{
+  "templates": [
+    {
+      "id": "crm",
+      "name": "CRM Implementation",
+      "description": "Customer relationship management system",
+      "fullDescription": "Implement a comprehensive CRM system to unify customer data, automate sales processes, and enhance customer engagement across all touchpoints.",
+      "platform": "Salesforce",
+      "icon": "Users",
+      "category": "Customer Experience",
+      "phases": ["Planning", "Configuration", "Migration", "Launch"],
+      "estimatedDuration": "4-6 months",
+      "complexity": "advanced",
+      "companySizeFit": ["small", "medium", "large", "enterprise"],
+      "industryFocus": ["all"],
+      "strategicBenefits": [
+        "Unified customer view across all touchpoints",
+        "360-degree customer insights and analytics",
+        "Automated sales pipeline management",
+        "Improved customer retention and satisfaction"
+      ],
+      "keyFeatures": [
+        "Contact and account management",
+        "Sales force automation",
+        "Marketing automation integration",
+        "Customer service portal",
+        "Mobile CRM access",
+        "AI-powered insights"
+      ],
+      "prerequisites": [
+        "Customer data mapping and cleanup",
+        "Sales process documentation",
+        "Integration requirements defined",
+        "User roles and permissions planned"
+      ],
+      "integrationPoints": [
+        "Marketing automation platforms",
+        "Email and calendar systems",
+        "ERP and financial systems",
+        "Customer support tools",
+        "Data analytics platforms"
+      ],
+      "successMetrics": [
+        "Sales cycle time reduction",
+        "Customer acquisition cost",
+        "Lead conversion rate",
+        "Customer lifetime value",
+        "User adoption rate"
+      ],
+      "estimatedCost": "$50K - $500K",
+      "vendors": [
+        "Salesforce",
+        "Microsoft Dynamics 365",
+        "HubSpot",
+        "Zoho CRM"
+      ],
+      "recommendedTeamSize": "8-12 people"
+    },
+    {
+      "id": "erp",
+      "name": "ERP System",
+      "description": "Enterprise resource planning implementation",
+      "fullDescription": "Deploy an integrated ERP system to unify business processes, improve operational efficiency, and provide real-time visibility across the organization.",
+      "platform": "SAP",
+      "icon": "Building",
+      "category": "Business Operations",
+      "phases": ["Assessment", "Design", "Implementation", "Rollout"],
+      "estimatedDuration": "8-12 months",
+      "complexity": "enterprise",
+      "companySizeFit": ["medium", "large", "enterprise"],
+      "industryFocus": [
+        "manufacturing",
+        "banking-traditional",
+        "pharmaceutical"
+      ],
+      "strategicBenefits": [
+        "Unified business processes across departments",
+        "Real-time financial visibility and reporting",
+        "Streamlined supply chain management",
+        "Enhanced operational efficiency"
+      ],
+      "keyFeatures": [
+        "Financial management and accounting",
+        "Supply chain and inventory management",
+        "Manufacturing and production planning",
+        "Human capital management",
+        "Business intelligence and analytics",
+        "Procurement and vendor management"
+      ],
+      "prerequisites": [
+        "Business process analysis and reengineering",
+        "Master data management strategy",
+        "Change management plan",
+        "Infrastructure and hosting decisions",
+        "Integration architecture defined"
+      ],
+      "integrationPoints": [
+        "Legacy financial systems",
+        "Manufacturing execution systems",
+        "Customer relationship management",
+        "Business intelligence platforms",
+        "Third-party logistics providers"
+      ],
+      "successMetrics": [
+        "Process automation percentage",
+        "Order-to-cash cycle time",
+        "Inventory turnover ratio",
+        "Financial close time",
+        "System uptime and performance"
+      ],
+      "estimatedCost": "$200K - $5M+",
+      "vendors": [
+        "SAP",
+        "Oracle ERP Cloud",
+        "Microsoft Dynamics 365",
+        "NetSuite"
+      ],
+      "recommendedTeamSize": "15-30 people"
+    },
+    {
+      "id": "data-platform",
+      "name": "Data Platform",
+      "description": "Modern data analytics infrastructure",
+      "fullDescription": "Build a scalable, cloud-native data platform to centralize data, enable advanced analytics, and support AI/ML initiatives across the organization.",
+      "platform": "Snowflake",
+      "icon": "Database",
+      "category": "Data & Analytics",
+      "phases": ["Architecture", "Migration", "Integration", "Optimization"],
+      "estimatedDuration": "3-6 months",
+      "complexity": "advanced",
+      "companySizeFit": ["startup", "small", "medium", "large", "enterprise"],
+      "industryFocus": [
+        "software-development",
+        "fintech",
+        "saas-platforms",
+        "artificial-intelligence"
+      ],
+      "strategicBenefits": [
+        "Centralized data warehouse for all business data",
+        "Scalable analytics and reporting capabilities",
+        "Self-service data access for business users",
+        "Advanced ML and AI model deployment"
+      ],
+      "keyFeatures": [
+        "Cloud-native data warehouse",
+        "Near-infinite scalability",
+        "Multi-cloud support",
+        "Data sharing and collaboration",
+        "Built-in security and governance",
+        "Performance optimization"
+      ],
+      "prerequisites": [
+        "Data source inventory and assessment",
+        "Data governance framework",
+        "Security and compliance requirements",
+        "Analytics use cases defined",
+        "Cloud provider selection"
+      ],
+      "integrationPoints": [
+        "Transactional databases",
+        "Business intelligence tools",
+        "ETL/ELT platforms",
+        "Machine learning platforms",
+        "Data science environments"
+      ],
+      "successMetrics": [
+        "Query performance benchmarks",
+        "Data freshness SLAs",
+        "User adoption metrics",
+        "Cost per query optimization",
+        "Data quality scores"
+      ],
+      "estimatedCost": "$100K - $1M+",
+      "vendors": [
+        "Snowflake",
+        "Databricks",
+        "Google BigQuery",
+        "Amazon Redshift"
+      ],
+      "recommendedTeamSize": "6-10 people"
+    },
+    {
+      "id": "cloud-migration",
+      "name": "Cloud Migration",
+      "description": "Infrastructure modernization and cloud adoption",
+      "fullDescription": "Migrate on-premises infrastructure and applications to the cloud to improve scalability, reduce costs, and accelerate innovation.",
+      "platform": "AWS",
+      "icon": "Cloud",
+      "category": "Infrastructure",
+      "phases": ["Assessment", "Planning", "Migration", "Optimization"],
+      "estimatedDuration": "6-9 months",
+      "complexity": "advanced",
+      "companySizeFit": ["small", "medium", "large", "enterprise"],
+      "industryFocus": ["all"],
+      "strategicBenefits": [
+        "Reduced infrastructure costs and TCO",
+        "Enhanced scalability and flexibility",
+        "Improved disaster recovery capabilities",
+        "Faster time to market for new services"
+      ],
+      "keyFeatures": [
+        "Elastic compute and storage",
+        "Managed database services",
+        "Global content delivery network",
+        "Advanced security and compliance",
+        "DevOps and automation tools",
+        "Serverless computing options"
+      ],
+      "prerequisites": [
+        "Application portfolio assessment",
+        "Cloud readiness evaluation",
+        "Cost-benefit analysis",
+        "Security and compliance review",
+        "Migration strategy selection"
+      ],
+      "integrationPoints": [
+        "On-premises data centers",
+        "Hybrid cloud environments",
+        "SaaS applications",
+        "CI/CD pipelines",
+        "Monitoring and observability tools"
+      ],
+      "successMetrics": [
+        "Infrastructure cost reduction",
+        "Application performance improvement",
+        "System availability and uptime",
+        "Deployment frequency",
+        "Mean time to recovery"
+      ],
+      "estimatedCost": "$150K - $2M+",
+      "vendors": [
+        "AWS",
+        "Microsoft Azure",
+        "Google Cloud Platform",
+        "IBM Cloud"
+      ],
+      "recommendedTeamSize": "10-20 people"
+    },
+    {
+      "id": "digital-workplace",
+      "name": "Digital Workplace",
+      "description": "Modern collaboration and productivity platform",
+      "fullDescription": "Transform employee experience with integrated collaboration tools, document management, and productivity applications.",
+      "platform": "Microsoft 365",
+      "icon": "Laptop",
+      "category": "Employee Experience",
+      "phases": ["Assessment", "Deployment", "Adoption", "Optimization"],
+      "estimatedDuration": "3-5 months",
+      "complexity": "intermediate",
+      "companySizeFit": ["small", "medium", "large", "enterprise"],
+      "industryFocus": ["all"],
+      "strategicBenefits": [
+        "Enhanced employee collaboration and productivity",
+        "Secure access to tools from anywhere",
+        "Reduced IT infrastructure costs",
+        "Improved communication and knowledge sharing"
+      ],
+      "keyFeatures": [
+        "Email and calendar",
+        "Team collaboration workspaces",
+        "Document management and co-authoring",
+        "Video conferencing",
+        "Intranet and communication sites",
+        "Business process automation"
+      ],
+      "prerequisites": [
+        "Current tool inventory and usage analysis",
+        "Security and compliance requirements",
+        "User training plan",
+        "Migration strategy for existing content"
+      ],
+      "integrationPoints": [
+        "Identity management systems",
+        "Line-of-business applications",
+        "Legacy email systems",
+        "File servers and storage",
+        "Third-party collaboration tools"
+      ],
+      "successMetrics": [
+        "User adoption and engagement",
+        "Productivity improvements",
+        "Collaboration tool usage",
+        "IT support ticket reduction",
+        "Employee satisfaction scores"
+      ],
+      "estimatedCost": "$30K - $300K",
+      "vendors": [
+        "Microsoft 365",
+        "Google Workspace",
+        "Slack Enterprise",
+        "Zoom"
+      ],
+      "recommendedTeamSize": "5-8 people"
+    },
+    {
+      "id": "e-commerce",
+      "name": "E-Commerce Platform",
+      "description": "Digital commerce and online sales channel",
+      "fullDescription": "Launch or modernize your e-commerce platform to expand digital sales channels and enhance customer shopping experience.",
+      "platform": "Shopify Plus",
+      "icon": "ShoppingCart",
+      "category": "Customer Experience",
+      "phases": ["Strategy", "Design", "Development", "Launch"],
+      "estimatedDuration": "4-7 months",
+      "complexity": "intermediate",
+      "companySizeFit": ["startup", "small", "medium", "large"],
+      "industryFocus": ["retail", "manufacturing", "consumer-goods"],
+      "strategicBenefits": [
+        "New revenue channel and market expansion",
+        "Enhanced customer shopping experience",
+        "Reduced operational costs",
+        "Real-time inventory and order management"
+      ],
+      "keyFeatures": [
+        "Product catalog management",
+        "Shopping cart and checkout",
+        "Payment gateway integration",
+        "Order management system",
+        "Customer account management",
+        "Marketing and SEO tools"
+      ],
+      "prerequisites": [
+        "Product catalog and pricing strategy",
+        "Payment processing requirements",
+        "Shipping and fulfillment strategy",
+        "Customer service approach",
+        "Marketing and promotion plan"
+      ],
+      "integrationPoints": [
+        "ERP and inventory systems",
+        "Payment processors",
+        "Shipping carriers",
+        "CRM systems",
+        "Marketing automation tools"
+      ],
+      "successMetrics": [
+        "Conversion rate",
+        "Average order value",
+        "Cart abandonment rate",
+        "Customer acquisition cost",
+        "Revenue per visitor"
+      ],
+      "estimatedCost": "$50K - $500K",
+      "vendors": [
+        "Shopify Plus",
+        "Magento",
+        "BigCommerce",
+        "Salesforce Commerce Cloud"
+      ],
+      "recommendedTeamSize": "6-12 people"
+    }
+  ],
+  "complexityLevels": {
+    "beginner": {
+      "label": "Beginner",
+      "description": "Suitable for organizations new to digital transformation",
+      "typicalDuration": "1-3 months",
+      "teamSizeRange": "3-5 people"
+    },
+    "intermediate": {
+      "label": "Intermediate",
+      "description": "Requires some technical expertise and change management",
+      "typicalDuration": "3-6 months",
+      "teamSizeRange": "5-10 people"
+    },
+    "advanced": {
+      "label": "Advanced",
+      "description": "Complex implementation requiring specialized skills",
+      "typicalDuration": "6-12 months",
+      "teamSizeRange": "10-20 people"
+    },
+    "enterprise": {
+      "label": "Enterprise",
+      "description": "Large-scale transformation with significant organizational impact",
+      "typicalDuration": "12+ months",
+      "teamSizeRange": "20+ people"
+    }
+  }
+}

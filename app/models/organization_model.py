@@ -86,3 +86,35 @@ class EnterpriseRaciAssignment(TenantMixin, db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+# How well a person (or team) can do a capability. One optional rating per RACI
+# cell, so who-does-what stays in enterprise_raci_assignments and this table only
+# adds the one thing that table cannot say.
+PROFICIENCY_LEVELS = (1, 2, 3, 4)  # Learning, Working, Proficient, Leads
+
+
+class CapabilityProficiency(TenantMixin, db.Model):
+    """Proficiency of one RACI cell's stakeholder in that capability.
+
+    Personal data about a named individual: read it only where the person's
+    own manager or an administrator would be allowed to. NULL ``level`` means
+    "not assessed" and is never displayed as zero."""
+
+    __tablename__ = "capability_proficiencies"
+
+    id = db.Column(db.Integer, primary_key=True)
+    raci_assignment_id = db.Column(
+        db.Integer,
+        db.ForeignKey("enterprise_raci_assignments.id", ondelete="CASCADE"),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
+    level = db.Column(db.Integer, nullable=True)
+    assessed_at = db.Column(db.DateTime, nullable=True)
+    source = db.Column(db.String(50), nullable=True)  # e.g. "onboarding"
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=True)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=True)
+
+    assignment = db.relationship("EnterpriseRaciAssignment", foreign_keys=[raci_assignment_id])

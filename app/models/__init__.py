@@ -457,7 +457,7 @@ else:
     from .business_model import BusinessModelCanvas  # noqa: F401
 
     # ORG-001: enterprise RACI assignments (Business-Architect org modeling)
-    from .organization_model import EnterpriseRaciAssignment  # noqa: F401
+    from .organization_model import CapabilityProficiency, EnterpriseRaciAssignment  # noqa: F401
 
     # BC-001: consolidated Business Case artifact (Business-Architect)
     from .business_case import BusinessCase  # noqa: F401

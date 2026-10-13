@@ -20,6 +20,7 @@ test_non_solution_architect_reaches_interface_register_from_own_sidebar``.
 """
 
 from __future__ import annotations
+import datetime
 
 import uuid
 
@@ -40,7 +41,7 @@ def _make_user(db_session, make_org, *, enterprise_role: str):
         first_name="Test",
         last_name=enterprise_role,
         organization_id=org.id,
-        confirmed=True,
+        confirmed=True, onboarding_completed_at=datetime.datetime.utcnow(),
         enterprise_role=enterprise_role,
     )
     user.password = "Sup3rSecret!23"

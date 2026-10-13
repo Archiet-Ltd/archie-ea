@@ -1,0 +1,133 @@
+{% extends 'onboarding/_wizard_shell.html' %}
+{% set step_title = 'What you can do' %}
+{% set step_number = 3 %}
+
+{% block wizard_content %}
+<div x-data="{
+        rows: {{ rows | tojson | forceescape }},
+        levels: {{ levels | tojson | forceescape }},
+        touched: {},
+        submitting: false,
+        errorMessage: '',
+        answered() {
+            return this.rows.filter(r => r.present || r.owner || r.maturity).length;
+        },
+        touch(i) {
+            this.touched[this.rows[i].key] = true;
+            this.rows[i].present = true;
+        },
+        setOwner(i, value) {
+            this.rows[i].owner = value;
+            this.touch(i);
+        },
+        setLevel(i, level) {
+            this.rows[i].maturity = (this.rows[i].maturity === level) ? null : level;
+            this.touch(i);
+        },
+        toggle(i) {
+            this.rows[i].present = !this.rows[i].present;
+            this.touched[this.rows[i].key] = true;
+        },
+        save() {
+            this.submitting = true;
+            this.errorMessage = '';
+            const items = this.rows
+                .filter(r => this.touched[r.key] && r.present)
+                .map(r => ({key: r.key, owner: r.owner || '', maturity: r.maturity}));
+            window.Platform.fetch('{{ url_for('onboarding.capabilities') }}', {
+                method: 'POST',
+                body: {items: items},
+                silent: true,
+            }).then(data => {
+                this.submitting = false;
+                if (data && data.success && data.data && data.data.next) {
+                    window.location.href = data.data.next;
+                } else {
+                    this.errorMessage = 'Something went wrong — try again.';
+                }
+            }).catch(() => {
+                this.submitting = false;
+                this.errorMessage = 'Something went wrong — try again.';
+            });
+        }
+    }"
+    class="p-8 space-y-6">
+    <div class="space-y-1">
+        <h1 class="text-lg font-bold text-foreground">What can your company do, and how well?</h1>
+        <p class="text-sm text-muted-foreground">
+            These are the business capabilities usually found in a company at the {{ stage_label | lower }} stage
+            ({{ band_label | lower }}). For each one you do, say who is responsible and how mature it is.
+            Only what you answer is saved. Everything else stays "expected at your stage".
+        </p>
+    </div>
+
+    <div class="space-y-2">
+        <template x-for="(row, i) in rows" :key="row.key">
+            <div>
+                <h2 x-show="i === 0 || rows[i - 1].group !== row.group" x-text="row.group"
+                    class="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-3 pb-1"></h2>
+                <div class="rounded-lg border border-border p-3 space-y-2">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-medium text-foreground" x-text="row.label"></p>
+                            <p class="text-xs text-muted-foreground" x-text="row.hint"></p>
+                        </div>
+                        <button type="button" @click="toggle(i)" :aria-pressed="row.present"
+                                class="shrink-0 rounded-md border border-input text-xs font-medium h-8 px-3"
+                                :class="row.present ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-accent'">
+                            <span x-text="row.present ? 'We do this' : 'We do this?'"></span>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-xs text-muted-foreground block mb-1" :for="'owner_' + row.key">Who is responsible</label>
+                            <input type="text" :id="'owner_' + row.key" maxlength="100" placeholder="A name, or leave blank"
+                                   :value="row.owner" @change="setOwner(i, $event.target.value)"
+                                   class="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm">
+                        </div>
+                        <div>
+                            <p class="text-xs text-muted-foreground mb-1"
+                               x-text="'How mature is it today? Expected at your stage: level ' + row.expected"></p>
+                            <div class="flex gap-1" role="group" :aria-label="'Maturity of ' + row.label">
+                                <template x-for="lv in levels" :key="lv.level">
+                                    <button type="button" @click="setLevel(i, lv.level)"
+                                            :title="lv.name + ': ' + lv.meaning"
+                                            :aria-label="'Level ' + lv.level + ', ' + lv.name"
+                                            :aria-pressed="row.maturity === lv.level"
+                                            class="h-8 w-8 rounded-md border text-sm font-medium"
+                                            :class="row.maturity === lv.level ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-input hover:bg-accent'"
+                                            x-text="lv.level"></button>
+                                </template>
+                            </div>
+                            <p class="text-xs text-muted-foreground mt-1"
+                               x-text="row.maturity ? (levels[row.maturity - 1].name + '. ' + levels[row.maturity - 1].meaning) : 'Not assessed'"></p>
+                            <p x-show="row.maturity && row.maturity < row.expected" x-cloak
+                               class="text-xs text-warning mt-1"
+                               x-text="'Below the level expected at your stage (' + row.expected + ')'"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <p class="text-xs text-muted-foreground">
+        Levels follow the Capability Maturity Model: 1 Initial, 2 Managed, 3 Defined, 4 Measured, 5 Optimising.
+        Hover a number for what it means. Anything you leave unrated shows a dash, never a zero.
+    </p>
+    <p x-show="errorMessage" x-cloak x-text="errorMessage" class="text-sm text-destructive" role="alert"></p>
+
+    <div class="flex items-center justify-between gap-3">
+        <a href="{{ url_for('onboarding.company') }}" class="rounded-md border border-input text-sm font-medium h-9 px-4 inline-flex items-center">Back</a>
+        <div class="flex gap-2">
+            <a href="{{ url_for('onboarding.people') }}" class="rounded-md text-sm font-medium h-9 px-4 inline-flex items-center hover:bg-accent">Skip this step</a>
+            <button type="button" @click="save()" :disabled="submitting"
+                    class="inline-flex items-center justify-center rounded-md text-sm font-medium
+                           bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2
+                           disabled:opacity-50 disabled:pointer-events-none">
+                <span x-text="submitting ? 'Saving…' : 'Save and continue'"></span>
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
