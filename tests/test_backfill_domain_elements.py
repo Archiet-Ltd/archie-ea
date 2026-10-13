@@ -77,6 +77,97 @@ def _seed_contract(app, org_id, contract_name, description=None):
         return row_id
 
 
+def _seed_interface(app, org_id, name, interface_type, description=None):
+    """Insert an ApplicationInterface with plain SQL (no element, needs backfill)."""
+    from app import db
+    from sqlalchemy import text
+
+    with app.app_context():
+        row_id = db.session.execute(
+            text(
+                """
+                INSERT INTO application_interfaces
+                    (name, interface_type, description, organization_id)
+                VALUES
+                    (:name, :interface_type, :description, :org_id)
+                RETURNING id
+                """
+            ),
+            {
+                "name": name,
+                "interface_type": interface_type,
+                "description": description,
+                "org_id": org_id,
+            },
+        ).scalar()
+        db.session.commit()
+        return row_id
+
+
+def _seed_capability(app, org_id, name, description=None):
+    """Insert a BusinessCapability with plain SQL (no element, needs backfill)."""
+    from app import db
+    from sqlalchemy import text
+
+    with app.app_context():
+        row_id = db.session.execute(
+            text(
+                """
+                INSERT INTO business_capability
+                    (name, level, description, organization_id)
+                VALUES
+                    (:name, 1, :description, :org_id)
+                RETURNING id
+                """
+            ),
+            {"name": name, "description": description, "org_id": org_id},
+        ).scalar()
+        db.session.commit()
+        return row_id
+
+
+def _seed_data_domain_and_maybe_entity(app, org_id, domain_name, entity_name=None, entity_description=None):
+    """Insert a DataDomain (and optionally a DataEntity) with plain SQL.
+
+    Returns ``(domain_id, entity_id_or_None)``. Rows written this way bypass
+    the flush listener, so a returned entity has no element and needs the
+    backfill.
+    """
+    from app import db
+    from sqlalchemy import text
+
+    with app.app_context():
+        domain_id = db.session.execute(
+            text(
+                """
+                INSERT INTO data_domains (name, organization_id)
+                VALUES (:name, :org_id)
+                RETURNING id
+                """
+            ),
+            {"name": domain_name, "org_id": org_id},
+        ).scalar()
+        entity_id = None
+        if entity_name is not None:
+            entity_id = db.session.execute(
+                text(
+                    """
+                    INSERT INTO data_entities (name, domain_id, description, organization_id)
+                    VALUES (:name, :domain_id, :description, :org_id)
+                    RETURNING id
+                    """
+                ),
+                {
+                    "name": entity_name,
+                    "domain_id": domain_id,
+                    "description": entity_description,
+                    "org_id": org_id,
+                },
+            ).scalar()
+        db.session.commit()
+        return domain_id, entity_id
+
+
 def _cleanup(app, org_ids):
     """Delete everything the app-context tests created.
 
@@ -96,9 +187,14 @@ def _cleanup(app, org_ids):
             {"ids": list(org_ids)},
         )
         for table, column in (
+            ("unified_capabilities", "organization_id"),
             ("work_packages", "organization_id"),
-            ("application_components", "organization_id"),
             ("vendor_contracts", "organization_id"),
+            ("application_components", "organization_id"),
+            ("application_interfaces", "organization_id"),
+            ("data_entities", "organization_id"),
+            ("data_domains", "organization_id"),
+            ("business_capability", "organization_id"),
             ("archimate_elements", "organization_id"),
         ):
             db.session.execute(
@@ -595,6 +691,188 @@ def test_backfill_vendor_contract_parity(app):
                 # Same provenance property.
                 assert orm_el.custom_properties == {"source_model": "VendorContract"}
                 assert sql_el.custom_properties == {"source_model": "VendorContract"}
+            finally:
+                fresh.close()
+    finally:
+        _cleanup(app, [org_id])
+
+
+def test_backfill_application_interface_parity(app):
+    """An ApplicationInterface created through the ORM and one seeded with
+    plain SQL produce elements with equal description and equal provenance
+    properties after backfill (fails when the shared writer is not the one
+    used for one of the two creation paths)."""
+    from app import db
+    from app.commands.backfill_domain_elements import backfill_domain_elements
+    from app.models.application_layer import ApplicationInterface
+
+    orgs = _seed_orgs(app, ["bf-ai-parity"])
+    org_id = orgs["bf-ai-parity"]
+    try:
+        with app.app_context():
+            # ORM-created interface: goes through the flush listener.
+            orm_interface = ApplicationInterface(
+                name="ORM Interface",
+                interface_type="REST",
+                description="Shared interface description",
+                organization_id=org_id,
+            )
+            db.session.add(orm_interface)
+            db.session.flush()
+            orm_element_id = orm_interface.archimate_element_id
+            assert orm_element_id is not None
+
+            # SQL-seeded interface: no element, needs backfill.
+            _seed_interface(
+                app, org_id, "SQL Interface", "REST", "Shared interface description"
+            )
+
+            stats = backfill_domain_elements(org_id)
+            assert stats["ApplicationInterface"]["created"] == 1
+
+            fresh = db.session.session_factory()
+            try:
+                orm_row = fresh.query(ApplicationInterface).filter_by(
+                    name="ORM Interface",
+                ).one()
+                sql_row = fresh.query(ApplicationInterface).filter_by(
+                    name="SQL Interface",
+                ).one()
+
+                orm_el = fresh.get(ArchiMateElement, orm_row.archimate_element_id)
+                sql_el = fresh.get(ArchiMateElement, sql_row.archimate_element_id)
+
+                assert orm_el is not None
+                assert sql_el is not None
+
+                # Equal description and provenance: both paths use the shared
+                # writer, so the two elements carry identical metadata.
+                assert orm_el.description == sql_el.description == "Shared interface description"
+                assert orm_el.custom_properties == {"source_model": "ApplicationInterface"}
+                assert sql_el.custom_properties == {"source_model": "ApplicationInterface"}
+                assert orm_el.type == sql_el.type == "ApplicationInterface"
+                assert orm_el.layer == sql_el.layer == "Application"
+            finally:
+                fresh.close()
+    finally:
+        _cleanup(app, [org_id])
+
+
+def test_backfill_business_capability_parity(app):
+    """A BusinessCapability created through the ORM and one seeded with plain
+    SQL produce elements with equal description and equal provenance properties
+    after backfill (fails when the shared writer is not the one used for one
+    of the two creation paths)."""
+    from app import db
+    from app.commands.backfill_domain_elements import backfill_domain_elements
+    from app.models.business_capabilities import BusinessCapability
+
+    orgs = _seed_orgs(app, ["bf-bc-parity"])
+    org_id = orgs["bf-bc-parity"]
+    try:
+        with app.app_context():
+            # ORM-created capability: goes through the flush listener.
+            orm_capability = BusinessCapability(
+                name="ORM Capability",
+                description="Shared capability description",
+                organization_id=org_id,
+            )
+            db.session.add(orm_capability)
+            db.session.flush()
+            orm_element_id = orm_capability.archimate_element_id
+            assert orm_element_id is not None
+
+            # SQL-seeded capability: no element, needs backfill.
+            _seed_capability(app, org_id, "SQL Capability", "Shared capability description")
+
+            stats = backfill_domain_elements(org_id)
+            assert stats["BusinessCapability"]["created"] == 1
+
+            fresh = db.session.session_factory()
+            try:
+                orm_row = fresh.query(BusinessCapability).filter_by(
+                    name="ORM Capability",
+                ).one()
+                sql_row = fresh.query(BusinessCapability).filter_by(
+                    name="SQL Capability",
+                ).one()
+
+                orm_el = fresh.get(ArchiMateElement, orm_row.archimate_element_id)
+                sql_el = fresh.get(ArchiMateElement, sql_row.archimate_element_id)
+
+                assert orm_el is not None
+                assert sql_el is not None
+
+                # Equal description and provenance: both paths use the shared
+                # writer, so the two elements carry identical metadata.
+                assert orm_el.description == sql_el.description == "Shared capability description"
+                assert orm_el.custom_properties == {"source_model": "BusinessCapability"}
+                assert sql_el.custom_properties == {"source_model": "BusinessCapability"}
+                assert orm_el.type == sql_el.type == "Capability"
+                assert orm_el.layer == sql_el.layer == "Strategy"
+            finally:
+                fresh.close()
+    finally:
+        _cleanup(app, [org_id])
+
+
+def test_backfill_data_entity_parity(app):
+    """A DataEntity created through the ORM and one seeded with plain SQL
+    produce elements with equal description and equal provenance properties
+    after backfill (fails when the shared writer is not the one used for one
+    of the two creation paths)."""
+    from app import db
+    from app.commands.backfill_domain_elements import backfill_domain_elements
+    from app.models.process_data import DataDomain, DataEntity
+
+    orgs = _seed_orgs(app, ["bf-de-parity"])
+    org_id = orgs["bf-de-parity"]
+    try:
+        with app.app_context():
+            # ORM-created entity (and its domain): the entity goes through the
+            # flush listener; a DataDomain is not one of the element types.
+            orm_domain = DataDomain(
+                name="ORM Domain", organization_id=org_id,
+            )
+            db.session.add(orm_domain)
+            db.session.flush()
+            orm_entity = DataEntity(
+                name="ORM Entity",
+                domain_id=orm_domain.id,
+                description="Shared entity description",
+                organization_id=org_id,
+            )
+            db.session.add(orm_entity)
+            db.session.flush()
+            orm_element_id = orm_entity.archimate_element_id
+            assert orm_element_id is not None
+
+            # SQL-seeded domain + entity: no element, needs backfill.
+            _seed_data_domain_and_maybe_entity(
+                app, org_id, "SQL Domain", "SQL Entity", "Shared entity description"
+            )
+
+            stats = backfill_domain_elements(org_id)
+            assert stats["DataEntity"]["created"] == 1
+
+            fresh = db.session.session_factory()
+            try:
+                orm_row = fresh.query(DataEntity).filter_by(name="ORM Entity").one()
+                sql_row = fresh.query(DataEntity).filter_by(name="SQL Entity").one()
+
+                orm_el = fresh.get(ArchiMateElement, orm_row.archimate_element_id)
+                sql_el = fresh.get(ArchiMateElement, sql_row.archimate_element_id)
+
+                assert orm_el is not None
+                assert sql_el is not None
+
+                # Equal description and provenance: both paths use the shared
+                # writer, so the two elements carry identical metadata.
+                assert orm_el.description == sql_el.description == "Shared entity description"
+                assert orm_el.custom_properties == {"source_model": "DataEntity"}
+                assert sql_el.custom_properties == {"source_model": "DataEntity"}
+                assert orm_el.type == sql_el.type == "DataObject"
+                assert orm_el.layer == sql_el.layer == "application"
             finally:
                 fresh.close()
     finally:
