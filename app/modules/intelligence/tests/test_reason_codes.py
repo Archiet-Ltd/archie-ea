@@ -1,7 +1,7 @@
 """T-001 acceptance criterion 13: the DE-14 reason-code vocabulary is closed.
 
 Mapping:
-    13 -> test_reason_codes_has_exactly_forty_three_members,
+    13 -> test_reason_codes_has_exactly_forty_four_members,
           test_unknown_reason_code_is_rejected_not_passed_through
 
 T-004 (US-1) added two members -- ``no_tenant_context`` and
@@ -44,9 +44,15 @@ reality more than once already (found and corrected multiple times,
 independently, by different lenses' briefs each adding a member without
 re-deriving the true count); merging branches that each added members
 independently (L2/L4/role-gating, T-S1, the maturity read helper, the
-programme lens's own plateau/gap pair, and the Portfolio-block additions) is
-the same class of drift, resolved here by re-deriving the real count (39)
-rather than trusting any one side's own stale number.
+programme lens's own plateau/gap pair, the Portfolio-block additions, and
+the canvas projection's five) is the same class of drift, resolved here by
+re-deriving the real count rather than trusting any one side's own stale
+number.
+
+The canvas projection added five: an empty box, a box composed from
+other sections with nothing to derive yet, an attribute total that cannot
+be shown honestly for revenue or for cost, and an element carrying no
+`profile` value are each a distinct, real absence on that read path.
 """
 
 from __future__ import annotations
@@ -91,6 +97,11 @@ _EXPECTED = {
     "no_work_package_recorded",
     "not_costed",
     "no_budget_recorded",
+    "canvas_box_empty",
+    "canvas_box_not_derived",
+    "revenue_incomplete",
+    "cost_incomplete",
+    "profile_not_set",
     "no_ownership_records",
     "capacity_not_available",
     "financial_data_restricted",
@@ -120,8 +131,8 @@ _EXPECTED = {
 }
 
 
-def test_reason_codes_has_exactly_forty_nine_members():
-    assert len(REASON_CODES) == 49
+def test_reason_codes_has_exactly_forty_four_members():
+    assert len(REASON_CODES) == 44
     assert REASON_CODES == frozenset(_EXPECTED)
 
 

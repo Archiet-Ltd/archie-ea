@@ -71,6 +71,15 @@ class BusinessCase(TenantMixin, db.Model):
         db.Integer, db.ForeignKey("solutions.id"), nullable=True, index=True
     )
 
+    # ADR-CV-1: the saved diagram this business case projects onto, once one
+    # has been chosen (export and share both resolve through this before
+    # falling back to the tenant's most recent saved diagram of this
+    # template kind — see resolve_canvas_saved_diagram_id). Nullable: most
+    # business cases have no saved diagram yet.
+    saved_diagram_id = db.Column(
+        db.Integer, db.ForeignKey("saved_diagrams.id"), nullable=True, index=True
+    )
+
     # ── The business-case document sections ─────────────────────────
     problem_statement = db.Column(db.Text, nullable=True)
     options_considered = db.Column(db.Text, nullable=True)
@@ -137,6 +146,7 @@ class BusinessCase(TenantMixin, db.Model):
             ),
             "solution_id": self.solution_id,
             "solution_name": self.solution.name if self.solution else None,
+            "saved_diagram_id": self.saved_diagram_id,
             "problem_statement": self.problem_statement,
             "options_considered": self.options_considered,
             "recommended_option": self.recommended_option,

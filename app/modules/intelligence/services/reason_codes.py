@@ -74,6 +74,17 @@ REASON_CODES = frozenset(
         # itself is not reused here so each code stays tied to one field
         # pair's own absence condition.
         "no_budget_recorded",
+        # The canvas projection's own absence conditions. An empty canvas
+        # box, a composed box with nothing to derive, an
+        # attribute total that cannot be shown honestly, and an element
+        # carrying no `profile` value are each a distinct, real absence --
+        # not a variant of an existing member -- so each gets its own code
+        # rather than reusing one that means something else.
+        "canvas_box_empty",
+        "canvas_box_not_derived",
+        "revenue_incomplete",
+        "cost_incomplete",
+        "profile_not_set",
         # L4 brief (2026-09-22) additions: Ask's Accountability lens resolves
         # an element to its ApplicationComponent (reusing L3's own
         # resolution) then lists ApplicationOwnership rows for it.

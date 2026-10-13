@@ -12,13 +12,40 @@
     area — no large repeated icon. #}
 
 {% macro canvas_box_entries(zone) %}
-{# The entries list itself: present, empty. A later change is the only
-    thing that ever puts a row in it. #}
+{# zone.entries / zone.attribute_items come from the projection read —
+   a static-template caller (no tenant context) carries neither key, and
+   Jinja reads a missing dict key as Undefined, i.e. falsy below, so this
+   macro still renders the pre-projection empty state unchanged for that
+   caller. #}
+{% set entries = zone.entries or [] %}
+{% set items = zone.attribute_items or [] %}
+{% if entries or items %}
+<ul data-testid="canvas-entries-{{ zone.box_key }}" class="space-y-1">
+  {% for entry in entries %}
+  <li data-testid="canvas-entry-{{ zone.box_key }}-{{ entry.element_id }}" class="text-xs flex flex-wrap items-center gap-1.5">
+    <span>{{ entry.name }}</span>
+    {% if entry.flags.high_risk %}<span class="text-destructive-emphasis" data-testid="canvas-flag-high-risk-{{ entry.element_id }}">High risk</span>{% endif %}
+    {% if entry.flags.nothing_realises %}<span class="text-warning-emphasis" data-testid="canvas-flag-nothing-realises-{{ entry.element_id }}">Nothing realises this yet</span>{% endif %}
+    {% if entry.flags.stale %}<span class="text-muted-foreground" data-testid="canvas-flag-stale-{{ entry.element_id }}">Stale</span>{% endif %}
+  </li>
+  {% endfor %}
+  {% for item in items %}
+  <li data-testid="canvas-attribute-{{ zone.box_key }}-{{ item.element_id }}" class="text-xs">{{ item.name }}</li>
+  {% endfor %}
+</ul>
+{% if zone.total %}
+<p class="text-xs font-medium" data-testid="canvas-total-{{ zone.box_key }}">{{ zone.total.label }}: {{ zone.total.value }} {{ zone.total.currency }}</p>
+{% elif zone.reasons and zone.reasons[0] in ('revenue_incomplete', 'cost_incomplete') %}
+<p class="text-xs text-muted-foreground" data-testid="canvas-box-reason-{{ zone.box_key }}" data-reason="{{ zone.reasons[0] }}">Amounts shown as entered; no total because one item has no amount or currencies differ</p>
+{% endif %}
+{% else %}
+{# The entries list itself: present, empty. #}
 <ul data-testid="canvas-entries-{{ zone.box_key }}" class="sr-only" aria-hidden="true"></ul>
 {% if zone.empty_reason == 'canvas_box_not_derived' %}
 <p data-testid="canvas-box-reason-{{ zone.box_key }}" data-reason="canvas_box_not_derived" role="status" class="text-xs text-muted-foreground mb-2">Composed from the other sections — nothing to show yet</p>
 {% else %}
 <p data-testid="canvas-box-reason-{{ zone.box_key }}" data-reason="canvas_box_empty" role="status" class="text-xs text-muted-foreground mb-2">Nothing here yet</p>
+{% endif %}
 {% endif %}
 {% endmacro %}
 

@@ -72,9 +72,21 @@ def detail(canvas_id):
 
     # The Lean order applies once a saved diagram's viewpoint_type is
     # "lean_canvas" (a later change). No such column exists yet, so every
-    # canvas renders in Business Model Canvas order and zone data comes from
-    # that template's zones, keyed by box_key.
-    canvas_zones = {z["box_key"]: z for z in CANVAS_TEMPLATES["business_model_canvas"]["zones"]}
+    # canvas renders in Business Model Canvas order.
+    org_id = service._current_organization_id()
+    if org_id is None:
+        canvas_zones = {z["box_key"]: z for z in CANVAS_TEMPLATES["business_model_canvas"]["zones"]}
+        unclassified_count = 0
+    else:
+        projection = service.project_canvas(
+            "business_model_canvas", canvas, organization_id=org_id
+        )
+        canvas_zones = {}
+        for z in projection["zones"]:
+            zc = dict(z)
+            zc["empty_reason"] = z["reasons"][0] if z["reasons"] else "canvas_box_empty"
+            canvas_zones[z["box_key"]] = zc
+        unclassified_count = len(projection["unclassified"])
 
     from app.services.composer_export_formats import resolve_canvas_saved_diagram_id
 
@@ -86,7 +98,7 @@ def detail(canvas_id):
         canvas_blocks=CANVAS_BLOCKS,
         operating_model_types=OPERATING_MODEL_TYPES,
         canvas_zones=canvas_zones,
-        canvas_unclassified_count=0,
+        canvas_unclassified_count=unclassified_count,
         canvas_saved_diagram_id=saved_diagram_id,
     )
 
@@ -196,6 +208,24 @@ def save_block(canvas_id):
         return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
 
     return success_response(canvas.to_dict())
+
+
+@business_model_bp.route("/<int:canvas_id>/api/projection", methods=["GET"])
+@login_required
+def api_projection(canvas_id):
+    """The one projection read for this canvas."""
+    org_id = service._current_organization_id()
+    if org_id is None:
+        return error_response(
+            "no tenant context for this request", code="NO_TENANT_CONTEXT", status_code=400
+        )
+
+    canvas = service.get_canvas_or_none(canvas_id)
+    if canvas is None:
+        return not_found_response("Business Model Canvas")
+
+    payload = service.project_canvas("business_model_canvas", canvas, organization_id=org_id)
+    return success_response(payload)
 
 
 @business_model_bp.route("/api/list")

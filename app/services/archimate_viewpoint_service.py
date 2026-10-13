@@ -370,7 +370,9 @@ def _types_for_layer(layer: str) -> list:
     return sorted(LAYER_TYPES.get(layer, set()))
 
 
-def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = None) -> dict:
+def get_viewpoint_data(
+    viewpoint_id: str, solution_id: int = None, layer: str = None, canvas_id: int = None
+) -> dict:
     """Return elements filtered for this viewpoint, grouped for layout.
 
     Enforces 4 invariants:
@@ -385,15 +387,49 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
     4. Relationships with hidden endpoints are hidden (no dangling arrows)
 
     A canvas key (CANVAS_TEMPLATES) short-circuits before any of the above —
-    canvases are never scope_required — and returns the standard shape with
-    `zones` and `entries` present and empty. A later change fills them via
-    a projection; until then the key is present so the Composer's payload
-    shape never changes underneath it.
+    canvases are never scope_required. Without *canvas_id* this returns the
+    standard shape with `zones`/`entries` present and empty (unchanged from
+    before this projection existed — a caller that only wants the catalogue
+    entry, e.g. the dropdown, never pays for a projection read). With
+    *canvas_id*, the id is resolved to its own tenant-scoped record
+    (`BusinessModelCanvas` or `BusinessCase`, per the template's `record`
+    field — a foreign or absent id is honestly empty, never another
+    tenant's) and `project_canvas` fills `zones`/`entries` from it;
+    `entries` is every zone's entries flattened, in `box_key` order.
     """
     from app.config.archimate_viewpoints import CANVAS_TEMPLATES
 
     if viewpoint_id in CANVAS_TEMPLATES:
         tpl = CANVAS_TEMPLATES[viewpoint_id]
+        zones: list = []
+        entries: list = []
+        if canvas_id is not None:
+            from app.middleware.tenant_context import current_org_id as _current_org_id
+            from app.modules.business_case.service import get_business_case_or_none
+            from app.modules.business_model_canvas.service import (
+                get_canvas_or_none,
+                project_canvas,
+            )
+
+            org_id = _current_org_id()
+            record = (
+                get_business_case_or_none(canvas_id)
+                if tpl["record"] == "business_case"
+                else get_canvas_or_none(canvas_id)
+            )
+            # A foreign or absent id: get_*_or_none is already tenant-fenced
+            # (TenantMixin), so a wrong-tenant id resolves to None here just
+            # like a missing one -- the same honest emptiness, never another
+            # tenant's zones.
+            if record is not None and org_id is not None:
+                projection = project_canvas(viewpoint_id, record, organization_id=org_id)
+                zones = projection["zones"]
+                # Flattened, in zone (boxKey) order: every zone's entries are
+                # consecutive, each tagged with its own box_key so a
+                # flattened consumer (the Composer) can still group them.
+                for zone in zones:
+                    for entry in zone["entries"]:
+                        entries.append({"box_key": zone["box_key"], **entry})
         return {
             'viewpoint_id': viewpoint_id,
             'viewpoint_name': tpl['name'],
@@ -403,8 +439,8 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
             'total': 0,
             'layer_order': [],
             'groups': {},
-            'zones': [],
-            'entries': [],
+            'zones': zones,
+            'entries': entries,
         }
 
     vp = STANDARD_VIEWPOINTS.get(viewpoint_id, STANDARD_VIEWPOINTS['basic'])

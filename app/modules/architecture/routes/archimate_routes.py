@@ -253,15 +253,50 @@ def traceability_chain():
 @archimate_bp.route("/api/elements/<int:element_id>", methods=["PATCH"])
 @login_required
 def patch_element(element_id):
-    """Update name/description of an ArchiMate element with audit trail."""
+    """Update name/description/acm_properties of an ArchiMate element with audit trail."""
+    from app.models.acm_property_template import AcmPropertyTemplate
     from app.models.archimate_core import ArchiMateElement as AE
     from app.models.architecture_review_board import ARBAuditLog
+    from app.modules.architecture_assistant.property_service import PropertyService
 
     element = db.session.get(AE, element_id)
     if not element:
         return jsonify({"error": "Element not found"}), 404
 
     data = request.get_json(silent=True) or {}
+
+    # acm_properties merge — same {value, source} shape PropertyService and
+    # JourneyOrchestrator.update_element already use, so a value saved from
+    # either path reads back the same way from the other. Any key with a
+    # closed enum_options vocabulary on this element's type is validated
+    # first, before any field on the element is touched, so a rejected patch
+    # never leaves a partial write (name/description/custom_properties
+    # updated but acm_properties silently dropped, or vice versa).
+    incoming_acm = data.get("acm_properties")
+    if incoming_acm and isinstance(incoming_acm, dict):
+        templates = AcmPropertyTemplate.query.filter_by(
+            archimate_type=element.type
+        ).filter(
+            AcmPropertyTemplate.property_key.in_(list(incoming_acm.keys()))
+        ).all()
+        enum_by_key = {
+            t.property_key: t.enum_options
+            for t in templates
+            if t.enum_options
+        }
+        for key, value in incoming_acm.items():
+            options = enum_by_key.get(key)
+            if not options:
+                continue
+            if value is None or value == "":
+                continue
+            if value not in options:
+                return jsonify({
+                    "error": (
+                        f"Invalid value for {key}: {value!r} is not one of "
+                        f"the allowed options {options}"
+                    )
+                }), 400
 
     # GAP-CMP-009: Handle custom_properties merge (data classification, PII)
     # GAP-CMP-004: Handle lifecycle_history append
@@ -302,6 +337,10 @@ def patch_element(element_id):
     element.name = name
     element.description = (description or "").strip() if description is not None else element.description
 
+    if incoming_acm and isinstance(incoming_acm, dict):
+        existing_acm = dict(element.acm_properties or {})
+        element.acm_properties = PropertyService().merge_properties(existing_acm, incoming_acm)
+
     try:
         audit = ARBAuditLog(
             action="element_updated",
@@ -320,6 +359,7 @@ def patch_element(element_id):
     return jsonify({
         "id": element.id, "name": element.name,
         "description": element.description, "type": element.type, "layer": element.layer,
+        "acm_properties": element.acm_properties,
     })
 
 
@@ -1318,16 +1358,23 @@ def api_viewpoint_data(viewpoint_id: str):
             shared LAYER_TYPES map -- see archimate_viewpoint_service.
             Untrusted input: allowlisted below, 400 on anything else. Never
             silently falls back to "no filter" on a bad value.
+        canvas_id (int): Optional. For a canvas key (CANVAS_TEMPLATES),
+            the BusinessModelCanvas/BusinessCase id to project -- see
+            get_viewpoint_data's own docstring. Ignored for a standard
+            viewpoint key.
     """
     from app.services.archimate_viewpoint_service import VALID_LAYER_KEYS, get_viewpoint_data
     solution_id = request.args.get("solution_id", type=int)
+    canvas_id = request.args.get("canvas_id", type=int)
     layer = request.args.get("layer", "").strip().lower() or None
     if layer is not None and layer not in VALID_LAYER_KEYS:
         return api_error(
             "Invalid layer. Must be one of: " + ", ".join(sorted(VALID_LAYER_KEYS)),
             400,
         )
-    data = get_viewpoint_data(viewpoint_id=viewpoint_id, solution_id=solution_id, layer=layer)
+    data = get_viewpoint_data(
+        viewpoint_id=viewpoint_id, solution_id=solution_id, layer=layer, canvas_id=canvas_id
+    )
     return jsonify(data)
 
 

@@ -594,6 +594,80 @@ def _ensure_connector_config_organization_fk_and_index(
                 failed.append(f"{label}: {str(exc)[:120]}")
 
 
+def _ensure_canvas_saved_diagram_fks(
+    *, dry_run, existing_tables, added, failed
+):
+    """Install the FK and index on business_model_canvases.saved_diagram_id
+    and business_cases.saved_diagram_id (ADR-CV-1).
+
+    ADD COLUMN IF NOT EXISTS carries the column but not its constraint or
+    index on a long-lived schema, the same gap
+    _ensure_connector_config_organization_fk_and_index exists to close for
+    connector_configs.organization_id.
+    """
+    from sqlalchemy import inspect, text
+
+    for table, constraint_name, index_name in (
+        (
+            "business_model_canvases",
+            "fk_business_model_canvases_saved_diagram_id",
+            "ix_business_model_canvases_saved_diagram_id",
+        ),
+        (
+            "business_cases",
+            "fk_business_cases_saved_diagram_id",
+            "ix_business_cases_saved_diagram_id",
+        ),
+    ):
+        if table not in existing_tables or "saved_diagrams" not in existing_tables:
+            continue
+        inspector = inspect(db.engine)
+        live_columns = {item["name"] for item in inspector.get_columns(table)}
+        if "saved_diagram_id" not in live_columns:
+            continue
+
+        existing_fks = inspector.get_foreign_keys(table)
+        has_fk = any(
+            fk.get("constrained_columns") == ["saved_diagram_id"]
+            and fk.get("referred_table") == "saved_diagrams"
+            for fk in existing_fks
+        )
+        if not has_fk:
+            label = f"constraint.{constraint_name}"
+            if dry_run:
+                added.append(f"{label} :: FOREIGN KEY")
+            else:
+                try:
+                    db.session.execute(text(
+                        f'ALTER TABLE "{table}" '
+                        f'ADD CONSTRAINT "{constraint_name}" '
+                        'FOREIGN KEY ("saved_diagram_id") REFERENCES "saved_diagrams" ("id") '
+                        "ON DELETE SET NULL"
+                    ))
+                    db.session.commit()
+                    added.append(f"{label} :: FOREIGN KEY")
+                except Exception as exc:  # noqa: BLE001
+                    db.session.rollback()
+                    failed.append(f"{label}: {str(exc)[:120]}")
+
+        existing_indexes = {idx["name"] for idx in inspector.get_indexes(table)}
+        if index_name not in existing_indexes:
+            label = f"index.{index_name}"
+            if dry_run:
+                added.append(f"{label} :: CREATE INDEX")
+            else:
+                try:
+                    db.session.execute(text(
+                        f'CREATE INDEX IF NOT EXISTS "{index_name}" '
+                        f'ON "{table}" ("saved_diagram_id")'
+                    ))
+                    db.session.commit()
+                    added.append(f"{label} :: CREATE INDEX")
+                except Exception as exc:  # noqa: BLE001
+                    db.session.rollback()
+                    failed.append(f"{label}: {str(exc)[:120]}")
+
+
 def _ensure_evidence_waiver_constraint(
     *, dry_run, existing_tables, added, failed
 ):
@@ -1722,6 +1796,12 @@ def _reconcile(dry_run=False):
         failed=failed,
     )
     _ensure_connector_config_organization_fk_and_index(
+        dry_run=dry_run,
+        existing_tables=existing_tables,
+        added=added,
+        failed=failed,
+    )
+    _ensure_canvas_saved_diagram_fks(
         dry_run=dry_run,
         existing_tables=existing_tables,
         added=added,

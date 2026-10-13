@@ -16,14 +16,20 @@ is always the source of truth, financial aggregation is best-effort.
 import logging
 from decimal import Decimal, InvalidOperation
 
-from flask_login import current_user
-
 from app import db
 from app.models.business_case import BUSINESS_CASE_STATUSES, BusinessCase
 from app.models.cost_intelligence import CapabilityCostAllocation
 from app.models.solution_models import Solution
 from app.models.strategic import StrategicInitiative
 from app.models.unified_capability import UnifiedCapability
+
+# The one projection function and the one org-resolution helper both live in
+# the canvas module; this module imports them rather than growing a second
+# copy of either.
+from app.modules.business_model_canvas.service import (  # noqa: F401
+    _current_organization_id,
+    project_canvas,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +89,18 @@ def get_business_case_or_none(business_case_id):
     # listener's WHERE clause the way a filtered query does, so a guessed id
     # belonging to another organisation would still be found. Filter
     # explicitly, the same two-layer rule applied elsewhere in this codebase.
+    #
+    # current_user.organization_id was read directly here, which crashes
+    # with AttributeError on AnonymousUser (no such attribute) -- reachable
+    # from get_viewpoint_data's canvas_id lookup on an unauthenticated
+    # request. _current_organization_id() returns None instead, and with no
+    # organisation there is no tenant to filter on, so this returns None:
+    # never another tenant's business case, never a crash.
+    org_id = _current_organization_id()
+    if org_id is None:
+        return None
     return BusinessCase.query.filter_by(
-        id=business_case_id, organization_id=current_user.organization_id
+        id=business_case_id, organization_id=org_id
     ).first()
 
 

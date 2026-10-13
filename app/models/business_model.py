@@ -68,6 +68,15 @@ class BusinessModelCanvas(TenantMixin, db.Model):
     cost_structure = db.Column(db.Text, nullable=True)
     revenue_streams = db.Column(db.Text, nullable=True)
 
+    # ADR-CV-1: the saved diagram this canvas projects onto, once one has
+    # been chosen (export and share both resolve through this before falling
+    # back to the tenant's most recent saved diagram of this template kind —
+    # see resolve_canvas_saved_diagram_id). Nullable: most canvases have no
+    # saved diagram yet.
+    saved_diagram_id = db.Column(
+        db.Integer, db.ForeignKey("saved_diagrams.id"), nullable=True, index=True
+    )
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=utcnow, nullable=True)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=True)
@@ -94,6 +103,7 @@ class BusinessModelCanvas(TenantMixin, db.Model):
             "name": self.name,
             "description": self.description,
             "operating_model_type": self.operating_model_type,
+            "saved_diagram_id": self.saved_diagram_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
