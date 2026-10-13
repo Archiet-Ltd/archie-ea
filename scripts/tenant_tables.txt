@@ -1,10 +1,7 @@
 account_tokens
 adm_phase_approvals
 adm_transition_history
-agent_charters
 agent_oversight_state
-agent_registrations
-agent_run_records
 ai_chat_crud_approvals
 ai_chat_document_uploads
 ai_chat_feedback
@@ -28,7 +25,6 @@ arb_audit_logs
 arb_board_members
 arb_canonical_conditions
 arb_capability_impacts
-arb_change_requests
 arb_condition_events
 arb_condition_evidence_records
 arb_decision_events
@@ -92,14 +88,12 @@ command_materialisations
 compliance_status
 conceptual_data_models
 connector_configs
-cost_facts
 courses_of_action
 data_access_controls
 data_catalogs
 data_domains
 data_entities
 data_governance_workflows
-data_issues
 data_lineage
 data_object_storage
 data_quality_metrics
@@ -131,7 +125,6 @@ evidence_head_events
 evidence_records
 evidence_requests
 external_identity_crosswalk
-formula_registers
 framework_instances
 gaps
 gdpr_requests
@@ -155,8 +148,6 @@ monitoring_baselines
 motivation_bridge_links
 operation_results
 options_analysis
-org_connector_credentials
-organization_encryption_keys
 organization_units
 outcome_measurements
 outcomes
