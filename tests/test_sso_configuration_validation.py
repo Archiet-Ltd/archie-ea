@@ -36,8 +36,13 @@ def _configuration_app(monkeypatch, *, existing=True, csrf=False):
         def first(self):
             return state.config
 
+        def filter(self, *criteria):
+            # Domain-claim check: no other organisation holds a domain here.
+            return SimpleNamespace(all=lambda: [])
+
     class Config(SimpleNamespace):
         query = Query()
+        organization_id = 7
 
         def __init__(self, **values):
             super().__init__(**{**initial, **values})

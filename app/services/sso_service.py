@@ -54,6 +54,48 @@ class SSOService:
     # Email-domain lookup
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _organization_id_for_email(email: str):
+        """Organisation id of the existing user with *email*, else None."""
+        from sqlalchemy import func
+
+        from app.models.user import User
+
+        # tenant-scoping-ok: pre-authentication lookup of the user's own org.
+        user = User.query.filter(
+            func.lower(User.email) == (email or "").strip().lower()
+        ).first()
+        return getattr(user, "organization_id", None) if user else None
+
+    @staticmethod
+    def normalise_email_domains(raw: str) -> list:
+        """Lower-cased, de-duplicated domains from a comma-separated string."""
+        seen = []
+        for part in (raw or "").split(","):
+            domain = part.strip().lower().lstrip("@")
+            if domain and domain not in seen:
+                seen.append(domain)
+        return seen
+
+    def find_domain_conflicts(self, raw_domains: str, organization_id) -> list:
+        """Domains in *raw_domains* already claimed by another organisation.
+
+        Returns the conflicting domains only; never the claiming organisation.
+        """
+        wanted = set(self.normalise_email_domains(raw_domains))
+        if not wanted:
+            return []
+        from app.models.sso_config import SSOConfig
+
+        # tenant-scoping-ok: uniqueness of a claim is a cross-organisation check.
+        others = SSOConfig.query.filter(
+            SSOConfig.organization_id != organization_id
+        ).all()
+        claimed = set()
+        for other in others:
+            claimed.update(other.email_domains)
+        return sorted(wanted & claimed)
+
     def get_config_for_email(self, email: str):
         """Return the enabled SSOConfig whose domain matches *email*, or None.
 
@@ -65,15 +107,21 @@ class SSOService:
         """
         if not email or "@" not in email:
             return None
-        domain = email.split("@", 1)[1].lower()
+        domain = email.split("@", 1)[1].strip().lower()
         try:
             from app.models.sso_config import SSOConfig
 
             # tenant-scoping-ok: resolving SSO config by email domain happens
             # pre-authentication (no org context yet) -- the domain match
-            # itself is the scoping mechanism.
-            configs = SSOConfig.query.filter_by(enabled=True).all()
-            for config in configs:
+            # itself is the scoping mechanism, narrowed below to the
+            # organisation of the user when that user already exists.
+            query = SSOConfig.query.filter_by(enabled=True)
+            user_org_id = self._organization_id_for_email(email)
+            if user_org_id is not None:
+                # A known user is only ever sent to their own organisation's
+                # identity provider, whatever domain another org has claimed.
+                query = query.filter(SSOConfig.organization_id == user_org_id)
+            for config in query.order_by(SSOConfig.id).all():
                 if domain in config.email_domains:
                     return config
         except Exception as exc:

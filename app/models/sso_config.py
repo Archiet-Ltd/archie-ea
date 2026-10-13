@@ -68,6 +68,17 @@ class SSOConfig(db.Model):  # migration-exempt
         "Organization", backref=db.backref("sso_config", uselist=False)
     )
 
+    __table_args__ = (
+        # Two enabled configs may not hold the same domain string. Overlap
+        # between differently-written lists is refused by the save route.
+        db.Index(
+            "uq_sso_configs_enabled_email_domain",
+            db.text("lower(btrim(email_domain))"),
+            unique=True,
+            postgresql_where=db.text("enabled AND email_domain IS NOT NULL AND btrim(email_domain) <> ''"),
+        ),
+    )
+
     # ------------------------------------------------------------------
     # Fernet-encrypted client_secret property
     # ------------------------------------------------------------------
