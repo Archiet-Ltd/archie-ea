@@ -193,19 +193,10 @@ class VendorOnboardingService:
         if existing:
             raise ValueError(f"Application '{application_name}' already exists")
 
-        # 1. Create ArchiMateElement (for architecture views)
-        archimate_element = ArchiMateElement(
-            name=application_name,
-            type="ApplicationComponent",
-            layer="application",
-            description=description or f"Deployed instance of {product.name} from {vendor.name}",
-            documentation=f"Vendor: {vendor.name}\nProduct: {product.name}\nOwner: {business_owner or 'TBD'}",
-            status="active",
-        )
-        db.session.add(archimate_element)
-        db.session.flush()
-
-        # 2. Create ApplicationComponent with archimate link
+        # 1. Create the ApplicationComponent; the shared flush listener (the
+        # one element writer) creates its ArchiMate element through
+        # sync_archimate_element, so a vendor-deployed application carries the
+        # same name, description and provenance as a backfilled one.
         deployment_status = "production" if deployment_type == "primary_system" else "development"
         app_component = ApplicationComponent(
             name=application_name,
@@ -215,10 +206,27 @@ class VendorOnboardingService:
             deployment_model=hosting_model,
             business_owner=business_owner,
             deployment_status=deployment_status,
-            archimate_element_id=archimate_element.id,
         )
         db.session.add(app_component)
         db.session.flush()
+
+        archimate_element = db.session.get(
+            ArchiMateElement, app_component.archimate_element_id
+        )
+        if archimate_element is None:
+            raise RuntimeError(
+                f"The shared flush listener did not create an ArchiMate element "
+                f"for deployed application '{application_name}'. The one-writer "
+                "doctrine has no fallback here; the deployment is refused rather "
+                "than silently writing an unmirrored row."
+            )
+
+        # 2. Keep the vendor/product context on the element the shared writer
+        #    produced (display metadata, not the node identity).
+        archimate_element.documentation = (
+            f"Vendor: {vendor.name}\nProduct: {product.name}\nOwner: {business_owner or 'TBD'}"
+        )
+        archimate_element.status = "active"
 
         # 3. Link to vendor product via application_vendor_products
         db.session.execute(  # tenant-filtered: scoped via parent FK
