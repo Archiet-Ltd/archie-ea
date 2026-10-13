@@ -825,26 +825,32 @@ def confirm_vendor_matches():
                 if app.archimate_element_id:
                     archimate_element = archimate_by_id.get(app.archimate_element_id)
 
-                # Create ArchiMate element if it doesn't exist
+                # Create ArchiMate element if it doesn't exist. The prefetch above is
+                # capped, so a miss does not mean the row has no element: the shared
+                # helper falls back to the row's own pointer.
                 if not archimate_element:
-                    archimate_element = ArchiMateElement(
-                        name=app.name,
-                        type="ApplicationComponent",
-                        layer="application",
-                        description=app.description or "",
-                        properties=json.dumps(
-                            {
-                                "vendor_matched": True,
-                                "vendor_id": vendor_id,
-                                "vendor_name": vendor_product.vendor_organization.name,
-                                "match_confidence": match.get("confidence", 0),
-                            }
+                    from app.services.archimate_backbone import ensure_archimate_element
+                    pointer_before = app.archimate_element_id
+                    archimate_element = ensure_archimate_element(app)
+                    if archimate_element is None:
+                        current_app.logger.warning(
+                            "Vendor match for application %s skipped: no ArchiMate element could be resolved",
+                            application_id,
                         )
-                        if match.get("confidence")
-                        else None,
-                    )
-                    db.session.add(archimate_element)
-                    db.session.flush()
+                        continue
+                    if archimate_element.id != pointer_before:
+                        archimate_element.properties = (  # untyped-property-write-ok: vendor matching metadata stored in legacy properties field
+                            json.dumps(
+                                {
+                                    "vendor_matched": True,
+                                    "vendor_id": vendor_id,
+                                    "vendor_name": vendor_product.vendor_organization.name,
+                                    "match_confidence": match.get("confidence", 0),
+                                }
+                            )
+                            if match.get("confidence")
+                            else None
+                        )
 
                 # Link to application
                 app.archimate_element_id = archimate_element.id

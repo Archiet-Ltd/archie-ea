@@ -436,21 +436,11 @@ def generate_application_archimate(id):
             db.session.add(arch_model)
             db.session.flush()
 
-        if app_arch_element is None:
-            app_arch_element = ArchiMateElement(
-                name=app_obj.name,
-                type="ApplicationComponent",
-                layer="application",
-                description=app_obj.description or "",
-                architecture_id=arch_model.id,
-            )
+        from app.services.archimate_backbone import ensure_archimate_element
+        app_arch_element = app_arch_element or ensure_archimate_element(app_obj)
+        if app_arch_element is not None and not app_arch_element.architecture_id:
+            app_arch_element.architecture_id = arch_model.id
             db.session.add(app_arch_element)
-            db.session.flush()
-            app_obj.archimate_element_id = app_arch_element.id
-        else:
-            if not app_arch_element.architecture_id:
-                app_arch_element.architecture_id = arch_model.id
-                db.session.add(app_arch_element)
 
         requirement_lines = [
             f"Application: {app_obj.name}",
