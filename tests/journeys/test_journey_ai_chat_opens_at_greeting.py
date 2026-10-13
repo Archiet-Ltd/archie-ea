@@ -101,36 +101,76 @@ def test_on_load_the_pane_is_at_the_top_with_the_greeting_and_no_persona_notice(
         pg.close()
 
 
-def test_a_deep_link_context_notice_does_not_scroll_the_pane_past_the_greeting(app, browser, client):
-    """A sibling of the bug this file's other test fixes: on a deep link, the same "pane opens
-    scrolled past the greeting" symptom occurred, plus a second one only a deep link exposes.
+def _deep_link_notice_state(pg, text_pattern):
+    """Where the deep-link context notice actually landed, and how far past the pane's
+    bottom edge it ends (positive == clipped)."""
+    return pg.evaluate("""(pattern) => {
+        const pane = document.querySelector('%s'); const box = pane.getBoundingClientRect();
+        const re = new RegExp(pattern);
+        const n = [...pane.querySelectorAll('div')].find(d => re.test(d.textContent) && d.children.length <= 1);
+        if (!n) return null; const r = n.getBoundingClientRect(); return {bottom: r.bottom, paneBottom: box.bottom};
+    }""" % PANE, text_pattern)
 
-    Root cause (two parts, both fixed in app.js/render.js/index.html):
+
+@pytest.mark.parametrize("width,height", VIEWPORTS)
+def test_a_deep_link_context_notice_does_not_scroll_the_pane_past_the_greeting(app, browser, client, width, height):
+    """A sibling of the bug the persona-notice test above fixes: on a deep link, the same
+    "pane opens scrolled past the greeting" symptom occurred, plus a second one only a deep
+    link exposes.
+
+    Both are fixed in app.js/render.js/index.html:
       1. Same as the persona-notice bug: appendSystemMessage() scrolled the pane to the bottom
-         before the welcome content above it had finished growing. Fixed the same way -- an
-         opts.noScroll flag on appendSystemMessage(), passed by both deep-link branches.
+         before the welcome content above it had finished growing. appendSystemMessage() now
+         takes an opts.placement === 'top' that inserts the notice above the greeting instead
+         of scrolling to it; both deep-link call sites pass it.
       2. Deep-link-only: even at scrollTop 0, the ~1000px-tall #domain-welcome-grid (5 persona
-         cards + portfolio briefing + 3+3 domain cards) sat above the notice, pushing it hundreds
-         of px below the pane's visible area regardless of scroll position. A deep link already
-         knows where it's going -- it doesn't need the browse-and-pick suggestion cards -- so
-         index.html now wraps them (but not the heading) in #domain-welcome-suggestions, and the
-         deep-link handler calls the new _hideWelcomeSuggestions() to collapse just that wrapper,
-         leaving the "How can I help you today?" heading visible and the pane under ~220px tall
-         before the notice."""
-    pg = _open(browser, client, _document(app, client, "solution_architect"),
+         cards + portfolio briefing + 3+3 domain cards) sat above the notice, which would push
+         it hundreds of px below the pane's visible area regardless of scroll position --
+         opts.placement === 'top' already avoids this on its own (the notice becomes the pane's
+         first child, above the grid, not merely unscrolled-to), but the deep-link handler also
+         calls _hideWelcomeSuggestions() as belt-and-braces, collapsing the same
+         browse-and-pick cards (index.html's #domain-welcome-suggestions wrapper) that a deep
+         link -- already headed somewhere specific -- does not need shown at all."""
+    pg = _open(browser, client, _document(app, client, "solution_architect"), width, height,
                query="?element_id=7&context_type=vendor&domain=vendor_intelligence")
     try:
         state = _pane_state(pg)
-        assert state["scrollTop"] == 0, "the pane opened scrolled %spx past the greeting with a deep link" % state["scrollTop"]
-        assert state["headingVisible"], "the heading 'How can I help you today?' is not visible with a deep link"
-        notice = pg.evaluate("""() => {
-            const pane = document.querySelector('%s'); const box = pane.getBoundingClientRect();
-            const n = [...pane.querySelectorAll('div')].find(d => /Vendor context loaded/.test(d.textContent) && d.children.length <= 1);
-            if (!n) return null; const r = n.getBoundingClientRect(); return {bottom: r.bottom, paneBottom: box.bottom};
-        }""" % PANE)
+        assert state["scrollTop"] == 0, (
+            "the pane opened scrolled %spx past the greeting with a deep link at %dx%d" % (state["scrollTop"], width, height)
+        )
+        assert state["headingVisible"], (
+            "the heading 'How can I help you today?' is not visible with a deep link at %dx%d" % (width, height)
+        )
+        notice = _deep_link_notice_state(pg, "Vendor context loaded")
         assert notice, "the deep-link context notice was not written at all"
         assert notice["bottom"] <= notice["paneBottom"] + 1, (
-            "the deep-link notice ends %.0fpx below the pane's bottom edge" % (notice["bottom"] - notice["paneBottom"])
+            "the deep-link notice ends %.0fpx below the pane's bottom edge at %dx%d" % (notice["bottom"] - notice["paneBottom"], width, height)
+        )
+    finally:
+        pg.close()
+
+
+@pytest.mark.parametrize("width,height", VIEWPORTS)
+def test_an_application_deep_link_context_notice_does_not_scroll_the_pane_past_the_greeting(
+    app, browser, client, width, height
+):
+    """The other deep-link shape (?context=application&id=), same fix: app.js's
+    ?context=application&id= branch also calls appendSystemMessage() during the load pass
+    and now passes { placement: 'top' } too."""
+    pg = _open(browser, client, _document(app, client, "solution_architect"), width, height,
+               query="?context=application&id=42")
+    try:
+        state = _pane_state(pg)
+        assert state["scrollTop"] == 0, (
+            "the pane opened scrolled %spx past the greeting with an application deep link at %dx%d" % (state["scrollTop"], width, height)
+        )
+        assert state["headingVisible"], (
+            "the heading 'How can I help you today?' is not visible with an application deep link at %dx%d" % (width, height)
+        )
+        notice = _deep_link_notice_state(pg, "Application context loaded")
+        assert notice, "the application deep-link context notice was not written at all"
+        assert notice["bottom"] <= notice["paneBottom"] + 1, (
+            "the application deep-link notice ends %.0fpx below the pane's bottom edge at %dx%d" % (notice["bottom"] - notice["paneBottom"], width, height)
         )
     finally:
         pg.close()
