@@ -40,13 +40,15 @@ on:
 # a new commit lands on it -- nothing still reads its result. Without this,
 # three pushes to one PR in quick succession run three full, uncancelled CI
 # suites at once, each competing with the others for the same shared runner
-# capacity and queuing every job behind itself. Scoped to pull_request only:
-# a push to main/master never cancels another push's run, so every commit
-# that lands there still gets its own complete CI (and release-image build)
-# rather than losing to whichever push landed after it.
+# capacity and queuing every job behind itself. The same applies to pushes to
+# main: every merge starts a full run and nothing cancelled the older ones, so
+# runs queued for hours behind tips that were already superseded. A newer main
+# tip contains every older one, so older main runs are cancelled too. Other
+# branches and workflow_dispatch runs are never cancelled; the deploy workflow
+# has its own group with cancel-in-progress false.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action != 'labeled' }}
+  cancel-in-progress: ${{ (github.event_name == 'pull_request' && github.event.action != 'labeled') || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
 
 permissions:
   contents: read
@@ -203,6 +205,28 @@ jobs:
         # themselves out of the build log.
 
 
+  # Cheap first gate: compile + the fast lint ratchets (verify.py --tag fast).
+  # Needs only ruff, not the application requirements, so it finishes in a couple
+  # of minutes; the heavy jobs (pytest shards, browser journeys, walkthrough)
+  # list it in `needs:` and skip when it fails, instead of spending tens of
+  # minutes of runner time on a change that does not even compile. It is NOT a
+  # required check: the full `Static gates` job below still runs in parallel and
+  # stays the required one. The heavy jobs gate on `result != 'failure'`, never
+  # on success(), so an unknown/skipped state still runs the tests.
+  fast_gate:
+    name: Fast static checks (compile + lint)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install ruff only
+        run: python -m pip install "ruff==${RUFF_VERSION}"
+      - name: Compile + fast ratchets
+        run: python scripts/verify.py --tag fast
+
   static-gates:
     name: Static gates (compile + ratchets)
     runs-on: ubuntu-latest
@@ -297,8 +321,8 @@ jobs:
   # state (a module- or class-scoped fixture) is never split across two
   # database sessions; it does not protect against state shared ACROSS files.
   tests-shard:
-    name: Tests (pytest + coverage) — shard ${{ matrix.shard }}
-    needs: changes
+    name: Tests (pytest + coverage) — shard ${{ matrix.shard && needs.fast_gate.result != 'failure' }}
+    needs: [changes, fast_gate]
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     # Same-repository runs (push/dispatch and same-repo PRs) select a runner
     # via repository variables: vars.CI_FAST_RUNNER takes precedence when the
@@ -462,8 +486,8 @@ jobs:
 
   tests:
     name: Tests (pytest + coverage)
-    needs: [tests-shard, changes]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
+    needs: [tests-shard, changes, fast_gate]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
     # Same runner selection as tests-shard above: vars.CI_FAST_RUNNER takes
     # precedence when the PR carries the ci-fast label, vars.CI_SHARD_RUNNER
     # routes to a managed pool when set, otherwise the job falls back to the
@@ -689,9 +713,9 @@ jobs:
   # sooner than the old 70-minute serial job.
 
   smoke-main:
-    name: Browser journeys — main shard ${{ matrix.shard }}
+    name: Browser journeys — main shard ${{ matrix.shard && needs.fast_gate.result != 'failure' }}
     needs: changes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-lates, fast_gate]
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
     strategy:
       fail-fast: false
@@ -769,8 +793,8 @@ jobs:
   smoke-adversarial:
     name: Browser journeys — adversarial
     needs: changes
-    runs-on: ubuntu-latest
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
+    runs-on: ubuntu-lates, fast_gate]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
     services:
       postgres:
         image: public.ecr.aws/docker/library/postgres:16
@@ -841,8 +865,8 @@ jobs:
   smoke-other:
     name: Browser journeys — other
     needs: changes
-    runs-on: ubuntu-latest
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
+    runs-on: ubuntu-lates, fast_gate]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
     services:
       postgres:
         image: public.ecr.aws/docker/library/postgres:16
@@ -931,8 +955,8 @@ jobs:
 
   smoke:
     name: Browser journeys (one per archetype)
-    needs: [smoke-main, smoke-adversarial, smoke-other, changes]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
+    needs: [smoke-main, smoke-adversarial, smoke-other, changes, fast_gate]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -980,8 +1004,8 @@ jobs:
 
   browser-compatibility:
     name: Browser compatibility (${{ matrix.browser }})
-    needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
+    needs: [changes, fast_gate]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -1076,8 +1100,8 @@ jobs:
 
   walkthrough:
     name: Level 10 archetype walkthrough
-    needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') }}
+    needs: [changes, fast_gate]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
     runs-on: ubuntu-latest
     # docs/TESTING_STANDARD.md level 10: not "does it break?" but "can this
     # archetype do their job, and could they have FOUND the page?". It runs as a
