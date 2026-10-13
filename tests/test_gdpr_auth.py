@@ -110,6 +110,16 @@ def _login(client, user_id):
 
 @pytest.fixture
 def two_users(app):
+    """Real, fully committed rows rather than db_session/make_org: this
+    file's own app fixture registers gdpr_bp only on itself, deliberately
+    never on the real app (see module docstring) — a session-scoped
+    db_session cannot depend on that module-scoped app (pytest raises
+    ScopeMismatch), so db_session/make_org are not usable here, and there is
+    no canonical make_user anywhere in scope either (tests/conftest.py and
+    tests/_session_test_helpers.py create no User). Deletes exactly what it
+    created, by id, instead — including the soc2_audit_log and gdpr_requests
+    rows these tests' own authenticated actions write along the way.
+    """
     from app import db
 
     with app.app_context():
@@ -117,7 +127,37 @@ def two_users(app):
         subject_id = _make_user_id(db, org_id, "Subject")
         other_id = _make_user_id(db, org_id, "Other")
         admin_id = _make_user_id(db, org_id, "Admin", is_platform_admin=True)
-    return {"subject": subject_id, "other": other_id, "admin": admin_id}
+
+    yield {"subject": subject_id, "other": other_id, "admin": admin_id}
+
+    with app.app_context():
+        from app.models.audit_log import AuditLog
+        from app.models.gdpr_request import GDPRRequest
+        from app.models.organization import Organization
+        from app.models.user import User
+
+        user_ids = (subject_id, other_id, admin_id)
+        # User is an audited ("controlled") model, so creating each of the
+        # three above already wrote a soc2_audit_log row keyed by record_id
+        # (user_id there is the acting user, None outside a request — this
+        # catches those too, not just the insert rows). An admin action above
+        # (e.g. the delete-user-data anonymisation) can ALSO write a row whose
+        # user_id is the acting admin, not the subject — either way, and
+        # unlike user_sessions, that FK is not ondelete=CASCADE, so both must
+        # be cleared before the users they reference or the delete below
+        # raises a ForeignKeyViolation. gdpr_requests has no FK at all but
+        # still needs deleting; user_sessions cascades with the user.
+        db.session.query(AuditLog).filter(
+            db.or_(
+                AuditLog.user_id.in_(user_ids),
+                db.and_(AuditLog.table_name == "user", AuditLog.record_id.in_(user_ids)),
+            )
+        ).delete(synchronize_session=False)
+        db.session.query(GDPRRequest).filter(GDPRRequest.user_id.in_(user_ids)).delete(synchronize_session=False)
+        for uid in user_ids:
+            db.session.query(User).filter_by(id=uid).delete()
+        db.session.query(Organization).filter_by(id=org_id).delete()
+        db.session.commit()
 
 
 class TestAnonymousBlocked:
