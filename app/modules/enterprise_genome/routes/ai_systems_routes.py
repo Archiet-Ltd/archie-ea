@@ -116,6 +116,37 @@ def _may_write(user) -> bool:
     return getattr(user, "is_authenticated", False) and user.can(Permission.GENERAL)
 
 
+def _approval_payload_element(approval_id: int, org_id: int):
+    """The element id a grounding-source approval's payload names, or ``None``
+    when no such approval exists in this organisation or its payload is not
+    readable JSON.
+
+    Read-only. The accept and refuse routes use it to answer 404 before any
+    state is touched when the URL element and the approval's own element
+    disagree, so an approval can only ever be decided through the element it
+    was proposed for.
+    """
+    import json
+
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+    from app.modules.enterprise_genome.services.ai_system_grounding import (
+        ENTITY_GROUNDING_SOURCE,
+    )
+
+    approval = AIChatCRUDApproval.query.filter_by(
+        id=approval_id,
+        organization_id=org_id,
+        entity_type=ENTITY_GROUNDING_SOURCE,
+    ).first()
+    if approval is None:
+        return None
+    try:
+        payload = json.loads(approval.operation_payload)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return payload.get("element_id")
+
+
 @ai_systems_genome_bp.route("/ai-systems")
 @login_required
 def ai_systems():
@@ -476,6 +507,8 @@ def ai_system_accept_grounding_source(element_id, approval_id):
 
     Reads the proposal payload from the approval record and writes the
     grounding source property onto the element's acm_properties. Org-scoped.
+    Answers 404 when the approval's payload names a different element than the
+    URL — an approval is decided only through its own element.
     """
     org_id = _current_org_id()
     if org_id is None:
@@ -483,6 +516,11 @@ def ai_system_accept_grounding_source(element_id, approval_id):
 
     element = _org_scoped_element(element_id, org_id)
     if element is None:
+        abort(404)
+
+    # An approval is decided through the element it was proposed for: refuse
+    # with 404 when the URL element and the approval's payload element differ.
+    if _approval_payload_element(approval_id, org_id) != element_id:
         abort(404)
 
     try:
@@ -514,6 +552,8 @@ def ai_system_refuse_grounding_source(element_id, approval_id):
     """Refuse a proposed grounding source.
 
     The system stays unchanged; no property is written. Org-scoped.
+    Answers 404 when the approval's payload names a different element than the
+    URL — an approval is decided only through its own element.
     """
     org_id = _current_org_id()
     if org_id is None:
@@ -521,6 +561,11 @@ def ai_system_refuse_grounding_source(element_id, approval_id):
 
     element = _org_scoped_element(element_id, org_id)
     if element is None:
+        abort(404)
+
+    # An approval is decided through the element it was proposed for: refuse
+    # with 404 when the URL element and the approval's payload element differ.
+    if _approval_payload_element(approval_id, org_id) != element_id:
         abort(404)
 
     try:

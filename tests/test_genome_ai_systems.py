@@ -2079,3 +2079,78 @@ def test_grounding_source_routes_are_org_scoped(
     assert r.status_code == 404, (
         "Cross-org grounding source refuse should get 404"
     )
+
+
+def test_grounding_source_routes_refuse_element_mismatch(
+    app, db_session, make_org, client, login_as
+):
+    """The accept and refuse routes answer 404 when the approval's payload
+    names a different element than the URL. Fails when the routes act on the
+    approval regardless of the URL element."""
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+    from app.models.user import Role, User
+
+    org = make_org("gs-mismatch")
+    arch_role = Role.query.filter_by(name="Architect").first()
+    if arch_role is None:
+        pytest.skip("no Architect role seeded")
+    arch = User(
+        email=f"arch-gs-mismatch-{uuid.uuid4().hex[:8]}@example.test",
+        first_name="GSMismatch",
+        organization_id=org.id,
+        confirmed=True,
+        role=arch_role,
+    )
+    arch.password = uuid.uuid4().hex
+    db_session.add(arch)
+    el = register_ai_system(db_session, org.id, name="Mismatch System",
+                             provider="openai", model_id="gpt-4o")
+    other = register_ai_system(db_session, org.id, name="Other System",
+                                provider="anthropic", model_id="claude-opus-5")
+    de = _create_data_entity(db_session, org.id, "Mismatch Data")
+    db_session.flush()
+
+    approval = propose_grounding_source(
+        element=el, data_entity_id=de.id,
+        organization_id=org.id, proposed_by_user_id=None,
+    )
+    db_session.flush()
+
+    login_as(client, arch)
+
+    # Accept with the wrong element in the URL: the approval stays pending and
+    # no property is written, answered 404.
+    r = client.post(
+        f"/genome/ai-systems/{other.id}/grounding-source/{approval.id}/accept",
+    )
+    assert r.status_code == 404, (
+        "accept with a mismatched URL element should get 404, got %s" % r.status_code
+    )
+    db_session.expire_all()
+    still = db_session.get(AIChatCRUDApproval, approval.id)
+    assert still.status == ApprovalStatus.PENDING, (
+        "the approval must stay pending after a mismatched accept"
+    )
+
+    # Refuse with the wrong element in the URL: the approval stays pending.
+    r = client.post(
+        f"/genome/ai-systems/{other.id}/grounding-source/{approval.id}/refuse",
+    )
+    assert r.status_code == 404, (
+        "refuse with a mismatched URL element should get 404, got %s" % r.status_code
+    )
+    db_session.expire_all()
+    still = db_session.get(AIChatCRUDApproval, approval.id)
+    assert still.status == ApprovalStatus.PENDING, (
+        "the approval must stay pending after a mismatched refuse"
+    )
+
+    # No property was written on either system.
+    db_session.expire_all()
+    from app.models.models import ArchiMateElement
+
+    el_reloaded = db_session.get(ArchiMateElement, el.id)
+    props = getattr(el_reloaded, "acm_properties", None) or {}
+    assert "ai_system_grounding_source" not in props, (
+        "no grounding property may be written by a mismatched accept"
+    )
