@@ -126,6 +126,28 @@ def _seed_capability(app, org_id, name, description=None):
         return row_id
 
 
+def _seed_application(app, org_id, name, description=None):
+    """Insert an ApplicationComponent with plain SQL (no element, needs backfill)."""
+    from app import db
+    from sqlalchemy import text
+
+    with app.app_context():
+        row_id = db.session.execute(
+            text(
+                """
+                INSERT INTO application_components
+                    (name, description, organization_id)
+                VALUES
+                    (:name, :description, :org_id)
+                RETURNING id
+                """
+            ),
+            {"name": name, "description": description, "org_id": org_id},
+        ).scalar()
+        db.session.commit()
+        return row_id
+
+
 def _seed_data_domain_and_maybe_entity(app, org_id, domain_name, entity_name=None, entity_description=None):
     """Insert a DataDomain (and optionally a DataEntity) with plain SQL.
 
@@ -873,6 +895,64 @@ def test_backfill_data_entity_parity(app):
                 assert sql_el.custom_properties == {"source_model": "DataEntity"}
                 assert orm_el.type == sql_el.type == "DataObject"
                 assert orm_el.layer == sql_el.layer == "application"
+            finally:
+                fresh.close()
+    finally:
+        _cleanup(app, [org_id])
+
+
+def test_backfill_application_component_parity(app):
+    """An ApplicationComponent created through the ORM and one seeded with
+    plain SQL produce elements with equal description and equal provenance
+    properties after backfill (fails when the shared writer is not the one
+    used for one of the two creation paths)."""
+    from app import db
+    from app.commands.backfill_domain_elements import backfill_domain_elements
+    from app.models.application_portfolio import ApplicationComponent
+
+    orgs = _seed_orgs(app, ["bf-ac-parity"])
+    org_id = orgs["bf-ac-parity"]
+    try:
+        with app.app_context():
+            # ORM-created application: goes through the flush listener.
+            orm_app = ApplicationComponent(
+                name="ORM Application",
+                description="Shared application description",
+                organization_id=org_id,
+            )
+            db.session.add(orm_app)
+            db.session.flush()
+            orm_element_id = orm_app.archimate_element_id
+            assert orm_element_id is not None
+
+            # SQL-seeded application: no element, needs backfill.
+            _seed_application(app, org_id, "SQL Application", "Shared application description")
+
+            stats = backfill_domain_elements(org_id)
+            assert stats["ApplicationComponent"]["created"] == 1
+
+            fresh = db.session.session_factory()
+            try:
+                orm_row = fresh.query(ApplicationComponent).filter_by(
+                    name="ORM Application",
+                ).one()
+                sql_row = fresh.query(ApplicationComponent).filter_by(
+                    name="SQL Application",
+                ).one()
+
+                orm_el = fresh.get(ArchiMateElement, orm_row.archimate_element_id)
+                sql_el = fresh.get(ArchiMateElement, sql_row.archimate_element_id)
+
+                assert orm_el is not None
+                assert sql_el is not None
+
+                # Equal description and provenance: both paths use the shared
+                # writer, so the two elements carry identical metadata.
+                assert orm_el.description == sql_el.description == "Shared application description"
+                assert orm_el.custom_properties == {"source_model": "ApplicationComponent"}
+                assert sql_el.custom_properties == {"source_model": "ApplicationComponent"}
+                assert orm_el.type == sql_el.type == "ApplicationComponent"
+                assert orm_el.layer == sql_el.layer == "Application"
             finally:
                 fresh.close()
     finally:
