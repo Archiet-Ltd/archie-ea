@@ -527,7 +527,7 @@ def test_runner_choice_and_parallelism_contract():
                 "_labels": [],
             },
             ["self-hosted", "ibm-vsi"],
-            "4",
+            4,
         ),
     ]
 
@@ -541,6 +541,57 @@ def test_runner_choice_and_parallelism_contract():
         assert actual_parallel == expected_parallel, (
             f"{name}: expected max-parallel {expected_parallel!r}, "
             f"got {actual_parallel!r}"
+        )
+        assert isinstance(actual_parallel, int) and not isinstance(
+            actual_parallel, bool
+        ), f"{name}: max-parallel must evaluate to a number, got {actual_parallel!r}"
+
+
+def test_max_parallel_is_a_number_for_every_variable_state():
+    """The Actions schema types strategy.max-parallel as a number and does not
+    coerce strings: a raw repository variable yields zero shard jobs."""
+    max_parallel = _strip_expr(_ci_jobs()["tests-shard"]["strategy"]["max-parallel"])
+    repo = "anioko/archie-ea"
+
+    def ctx(value, labels=()):
+        return {
+            "github": {
+                "event_name": "pull_request",
+                "event": {
+                    "pull_request": {"head": {"repo": {"full_name": repo}}}
+                },
+                "repository": repo,
+            },
+            "vars": {
+                "CI_FAST_RUNNER": "runner" if labels else "",
+                "CI_SHARD_RUNNER": "",
+                "CI_SHARD_MAX_PARALLEL": value,
+            },
+            "_labels": list(labels),
+        }
+
+    for name, context, expected in (
+        ("variable unset", ctx(""), 6),
+        ("variable 4", ctx("4"), 4),
+        ("variable 8", ctx("8"), 8),
+        ("ci-fast label wins over the variable", ctx("4", ["ci-fast"]), 8),
+    ):
+        actual = _eval_github_expr(max_parallel, context)
+        assert actual == expected and isinstance(actual, int), (
+            f"{name}: expected number {expected!r}, got {actual!r}"
+        )
+
+
+def test_max_parallel_variable_is_wrapped_in_fromjson():
+    """Using the variable without fromJSON hands the schema a string."""
+    import re
+
+    raw = _ci_jobs()["tests-shard"]["strategy"]["max-parallel"]
+    assert "vars.CI_SHARD_MAX_PARALLEL" in raw
+    for match in re.finditer(r"vars\.CI_SHARD_MAX_PARALLEL", raw):
+        before = raw[: match.start()].rstrip()
+        assert before.endswith("fromJSON("), (
+            "vars.CI_SHARD_MAX_PARALLEL must be wrapped in fromJSON(...)"
         )
 
 
