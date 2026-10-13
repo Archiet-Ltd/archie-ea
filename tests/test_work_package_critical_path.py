@@ -185,7 +185,6 @@ def test_retired_roadmap_row_delegates_to_own_organisation_only(two_orgs, db_ses
 
     a, b = two_orgs["a"], two_orgs["b"]
     user_a = two_orgs["user_a"]
-    plateau_a = _plateau(db_session, a, "A plateau")
     # A unified work package in org B
     wp_b = _wp(db_session, b, "B wp", plateau=None,
                start=datetime(2026, 5, 1), end=datetime(2026, 5, 5))
