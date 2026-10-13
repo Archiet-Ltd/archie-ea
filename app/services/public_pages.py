@@ -49,6 +49,7 @@ MERGED_PAGES: dict[str, str] = {
     "/modules/batch-import": "/modules/architecture-model",
     "/modules/duplicate-detection": "/modules/rationalization",
     "/modules/gap-analysis": "/modules/roadmaps",
+    "/modules/integrations": "/connectors",
     "/modules/investment-analysis": "/modules/business-case",
     "/modules/my-applications": "/use-cases/what-i-own",
     "/modules/projects": "/use-cases/programme-tracking",
@@ -60,31 +61,9 @@ MERGED_PAGES: dict[str, str] = {
 }
 
 HELD_PAGE_URLS: frozenset[str] = frozenset({
-    "/modules/capability-maturity",
-    "/use-cases/capability-maturity-heatmap",
-    "/modules/industry-apqc",
-    "/modules/integrations",
-    "/use-cases/canvas-dependencies",
-    "/use-cases/lean-canvas",
-    "/use-cases/reference-packs",
-    "/use-cases/website-first-look",
-    "/use-cases/website-full-profile",
-    "/use-cases/systems-with-no-owner",
-    "/use-cases/import-from-jira-and-github",
-    "/use-cases/match-systems-across-jira-and-servicenow",
-    "/use-cases/architecture-change-tracking",
-    "/use-cases/pagerduty-and-datadog-incidents",
-    "/use-cases/connector-candidates",
-    "/use-cases/leanix-ardoq-import",
-    "/use-cases/servicenow-cmdb-mapping",
-    "/use-cases/ai-assistant-for-your-architecture",
-    "/use-cases/derivation-yield",
-    "/use-cases/workforce-planning",
-    "/use-cases/adopt-reference-pack",
-    "/use-cases/see-your-own-twin",
-    "/use-cases/set-up-in-an-afternoon",
-    "/use-cases/demo-on-a-company-like-mine",
-    "/use-cases/what-we-can-and-cannot-tell",
+    # /docs has no front-matter state field of its own (it is a plain site
+    # page, not a module/use-case), so is_held's state-based half cannot see
+    # it -- this is its only hold mechanism.
     "/docs",
 })
 
@@ -221,6 +200,12 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
     ),
     "roadmaps": "0 gaps detected; plateaus with no description and 0 gaps",
     "value-streams": "0 stages and 0 capabilities on every value stream",
+    "digital-twin": (
+        "no seeded demonstration organisation or browser available when the "
+        "page was written to capture Ask with an impact answer and the "
+        "provenance drawer open, the twin map, or model history with a "
+        "seeded change -- needs a real capture run, not a placeholder"
+    ),
 }
 
 # The one live use-case page: same screen as the capability-maturity module
@@ -271,6 +256,8 @@ FAMILY_DIR_MAP = {
     "dogfood": "dogfood",
     "site": "site",
     "legal": "legal",
+    "role": "roles",
+    "connector": "connectors",
 }
 
 FAMILY_URL_PREFIX = {
@@ -284,6 +271,8 @@ FAMILY_URL_PREFIX = {
     "site": "",
     # Same shape as "site", but only published while LEGAL_PAGES_ENABLED is on.
     "legal": "",
+    "role": "/roles",
+    "connector": "/connectors",
 }
 
 _md = markdown.Markdown(extensions=["extra"])
@@ -361,22 +350,33 @@ class PublicPage:
         """Out of the sitemap, llms.txt/llms-full.txt and every nav/index
         listing, but still reachable at its own URL with a noindex tag.
 
-        True for a HOLD-verdict page (``HELD_PAGE_URLS`` -- not built yet)
-        and for a page withdrawn from discovery via front matter
-        ``state: not_planned`` (a feature that shipped as a page, then had
-        its release item pulled, with nothing left to build towards) --
-        both are the same "still reachable, just not advertised" case to
-        every caller, so one property covers both reasons.
+        True for a HOLD-verdict page (``HELD_PAGE_URLS`` -- a hold with no
+        front-matter mechanism of its own, e.g. a site page like /docs) and
+        for any page whose own front matter sets an explicit ``state`` other
+        than ``"on_main"`` -- ``missing``, ``briefed``, ``in_review``,
+        ``held`` and ``not_planned`` are all the same "not ready to
+        advertise" case from this property's point of view, so a page is
+        trusted to say so of itself rather than needing a second,
+        hand-maintained list entry kept in sync by hand. A page with no
+        ``state`` field at all (most site/vs/legal pages) is not held by
+        this half of the check -- only ``HELD_PAGE_URLS`` can hold those.
+
+        This was two checks before (``HELD_PAGE_URLS`` plus a literal
+        ``state == "not_planned"`` match): a page whose state had moved on
+        to ``on_main`` could still sit in ``HELD_PAGE_URLS`` from before it
+        was finished, with nothing forcing the two back into agreement
+        (found live: /use-cases/import-from-jira-and-github and
+        /modules/industry-apqc, both on_main, both still noindexed). One
+        check, with the page's own state as the only thing that can say
+        "ready", removes that drift instead of auditing it by hand again.
 
         A MERGE-verdict page (``MERGED_PAGES``) is a different case --
         its own URL 301s to a parent instead of rendering at all -- so it
         is not folded into this property; see load_feed_pages(), which
         checks both ``is_held`` and ``MERGED_PAGES`` separately.
         """
-        return (
-            self.url in HELD_PAGE_URLS
-            or self.front_matter.get("state") == "not_planned"
-        )
+        state = self.front_matter.get("state")
+        return self.url in HELD_PAGE_URLS or (state is not None and state != "on_main")
 
     @property
     def description(self) -> str | None:
@@ -823,6 +823,8 @@ _BREADCRUMB_PARENTS: dict[str, tuple[str, str]] = {
     "module": ("Features", "/features"),
     "function-per-segment": ("Use cases", "/use-cases"),
     "comparison": ("Compare", "/vs"),
+    "role": ("Roles", "/roles"),
+    "connector": ("Connectors", "/connectors"),
 }
 
 
@@ -844,6 +846,184 @@ def _breadcrumb_list_items(page: PublicPage, site_url: str) -> list[dict[str, An
         }
         for position, (name, path) in enumerate(trail, start=1)
     ]
+
+
+# ── Hubs: /roles, /connectors, /features (feed-built lists) ─────────────────
+# One ordered label table per family (front-matter key -> heading), and one
+# grouping function every hub shares. A page with a missing or unknown key
+# lands in a final "More" group.
+
+ROLE_GROUPS: tuple[tuple[str, str], ...] = (
+    ("architecture", "Architecture"),
+    ("technology-leadership", "Technology leadership"),
+    ("portfolio-procurement-finance", "Portfolio, procurement and finance"),
+    ("security-risk-compliance", "Security, risk and compliance"),
+    ("owners", "Owners"),
+)
+
+CONNECTOR_GROUPS: tuple[tuple[str, str], ...] = (
+    ("ai-assistants", "AI assistants"),
+    ("sign-in", "Sign-in"),
+    ("service-management-and-delivery", "Service management and delivery"),
+    ("collaboration", "Collaboration"),
+)
+
+# family -> (front-matter key, ordered label table)
+_HUB_GROUP_TABLES: dict[str, tuple[str, tuple[tuple[str, str], ...]]] = {
+    "role": ("role_group", ROLE_GROUPS),
+    "connector": ("connector_group", CONNECTOR_GROUPS),
+}
+
+# Non-page entries: (heading, target URLs). Link text is each target page's
+# own title from load_feed_pages(); a target not in the feed is dropped.
+ROLE_HUB_EXTRA_ENTRIES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Architecture review board members", (
+        "/modules/arb",
+        "/use-cases/architecture-review-board",
+    )),
+    ("IT operations", (
+        "/use-cases/what-breaks-and-who-gets-called",
+        "/use-cases/what-happens-if-a-supplier-fails",
+        "/use-cases/contract-renewals",
+    )),
+)
+
+CONNECTOR_HUB_EXTRA_ENTRIES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("File imports", (
+        "/use-cases/import-archimate-model",
+        "/modules/architecture-model",
+    )),
+)
+
+
+def _title_key(page: PublicPage) -> str:
+    return page.title.lower()
+
+
+def family_hub_groups(
+    family: str,
+    *,
+    group_key: str | None = None,
+    labels: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    """The one grouping function behind every hub: the feed pages of *family*
+    grouped by a front-matter key, pages sorted by title (case-insensitive),
+    empty groups omitted.
+
+    Roles and connectors use their own ordered tables, with anything whose
+    key is missing or unknown in a final "More" group. /use-cases passes
+    ``group_key="segment_id"`` and its segment labels (a mapping): groups in
+    sorted key order, an unknown key labelled by itself ("More" when empty).
+    """
+    pages = [p for p in load_feed_pages() if p.family == family]
+    by_key: dict[str, list[PublicPage]] = {}
+
+    if group_key is not None:
+        for page in pages:
+            by_key.setdefault(str(page.front_matter.get(group_key) or ""), []).append(page)
+        mapping = labels or {}
+        return [
+            {"label": mapping.get(key, key or "More"), "pages": sorted(by_key[key], key=_title_key)}
+            for key in sorted(by_key)
+        ]
+
+    group_key, table = _HUB_GROUP_TABLES[family]
+    known = {key for key, _ in table}
+    extra: list[PublicPage] = []
+    for page in pages:
+        key = str(page.front_matter.get(group_key) or "")
+        if key in known:
+            by_key.setdefault(key, []).append(page)
+        else:
+            extra.append(page)
+    groups = [
+        {"label": label, "pages": sorted(by_key[key], key=_title_key)}
+        for key, label in table
+        if by_key.get(key)
+    ]
+    if extra:
+        groups.append({"label": "More", "pages": sorted(extra, key=_title_key)})
+    return groups
+
+
+def hub_extra_entries(
+    entries: tuple[tuple[str, tuple[str, ...]], ...],
+) -> list[dict[str, Any]]:
+    """Resolve non-page entries against the feed: only targets that are live
+    feed pages are linked, titled with their own page title."""
+    by_url = {p.url: p for p in load_feed_pages()}
+    resolved = []
+    for label, urls in entries:
+        pages = [by_url[u] for u in urls if u in by_url]
+        if pages:
+            resolved.append({"label": label, "pages": pages})
+    return resolved
+
+
+def role_siblings(page: PublicPage) -> list[dict[str, Any]]:
+    """The "Other roles" strip for a role page: every other role-family feed
+    page (sorted by title) as one group, then the non-page role entries as
+    further groups. Never the page itself."""
+    others = sorted(
+        (p for p in load_feed_pages() if p.family == "role" and p.url != page.url),
+        key=_title_key,
+    )
+    groups = hub_extra_entries(ROLE_HUB_EXTRA_ENTRIES)
+    if others:
+        groups.insert(0, {"label": "", "pages": others})
+    return groups
+
+
+def build_hub_jsonld(
+    name: str,
+    path: str,
+    description: str | None,
+    pages: list[PublicPage],
+    body_html: str | None = None,
+) -> str:
+    """Structured data for a hub: CollectionPage with an ItemList of every
+    linked page, a BreadcrumbList (Home > hub) and an FAQPage only when the
+    hub's own intro has a real FAQ section. One @graph, one script block."""
+    site_url = SITE_URL
+    collection: dict[str, Any] = {
+        "@type": "CollectionPage",
+        "url": f"{site_url}{path}",
+        "name": name,
+    }
+    if description:
+        collection["description"] = description
+    collection["mainEntity"] = {
+        "@type": "ItemList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": position,
+                "url": f"{site_url}{page.url}",
+                "name": page.title,
+            }
+            for position, page in enumerate(pages, start=1)
+        ],
+    }
+    nodes: list[dict[str, Any]] = [
+        collection,
+        {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Home", "item": f"{site_url}/"},
+                {"@type": "ListItem", "position": 2, "name": name, "item": f"{site_url}{path}"},
+            ],
+        },
+    ]
+    if body_html:
+        faq_questions = _extract_faq_questions(body_html)
+        if faq_questions:
+            nodes.append({
+                "@type": "FAQPage",
+                "url": f"{site_url}{path}",
+                "mainEntity": faq_questions,
+            })
+    ld = {"@context": "https://schema.org", "@graph": nodes}
+    return Markup(_escape_for_script_block(json.dumps(ld, indent=2, ensure_ascii=False)))
 
 
 def _escape_for_script_block(serialised: str) -> str:

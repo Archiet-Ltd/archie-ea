@@ -11,7 +11,6 @@ from app.decorators import audit_log, role_required
 from app.models.application_owner import ApplicationOwner
 from app.models.user import ROLE_CTO, ROLE_PORTFOLIO_MANAGER
 from app.services.capability_ownership_service import (
-    CrossOrganisationCapabilityOwner,
     get_tenant_capability,
     list_capabilities_with_no_owner,
     remove_capability_owner,
@@ -65,7 +64,7 @@ def api_set_capability_owner(capability_id):
             ownership_type=ownership_type,
             assigned_by=getattr(g, "current_user_id", None),
         )
-    except CrossOrganisationCapabilityOwner as exc:
+    except ValueError as exc:  # includes CrossOrganisationCapabilityOwner
         return jsonify({"message": str(exc)}), 400
     return jsonify({"owner": record.to_dict()}), 201
 
