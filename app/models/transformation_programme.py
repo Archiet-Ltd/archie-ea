@@ -83,6 +83,16 @@ class ProgrammeWorkstream(TenantMixin, OptimisticLockMixin, db.Model):
     target_date_unavailable_reason = db.Column(db.Text)
     archived_at = db.Column(db.DateTime)
     revision = db.Column(db.Integer, nullable=False, default=1, server_default="1")
+    # R1-05 (US-11). A short display name, distinct from `objective` (free
+    # text); nullable so old rows are tolerated. `template_key` names the
+    # sdd.md 4.2 workstream key this row was instantiated from, or NULL for
+    # a manually created workstream. `archimate_element_id` is set only by
+    # the ArchiMate backbone sync, never from request input.
+    name = db.Column(db.String(255), nullable=True)
+    template_key = db.Column(db.String(80), nullable=True)
+    archimate_element_id = db.Column(
+        db.Integer, db.ForeignKey("archimate_elements.id", ondelete="SET NULL"), nullable=True
+    )
 
     programme = db.relationship(
         "StrategicInitiative",

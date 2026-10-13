@@ -48,6 +48,7 @@ import importlib.metadata
 import json
 import os
 import re
+import uuid
 
 import pytest
 
@@ -1066,3 +1067,76 @@ def test_write_baseline_when_asked(audited, audited_canvas_pages):
     if unexplained:
         print("a11y baseline entries still needing a dated one-line reason in "
               "accepted_notes:\n  " + "\n  ".join(unexplained))
+
+
+# --------------------------------------------------------------------- #
+# R1-08: the programme-structure and workstream-objective screens        #
+# (US-16.4). New screens; audited at zero accepted violations, the same #
+# rule Ask and Twin map joined the list under -- a violation here is    #
+# fixed, not baselined. Each needs a typed journey/workstream a plain   #
+# page load cannot reach, so it gets its own fixture rather than a      #
+# static AUDIT entry.                                                   #
+# --------------------------------------------------------------------- #
+
+
+@pytest.fixture(scope="module")
+def r1_08_pages(seeded):
+    from app import create_app, db
+    from app.models.architecture_journey import ArchitectureJourney
+    from app.models.strategic import StrategicInitiative
+    from app.models.transformation_programme import ProgrammeWorkstream
+    from app.models.user import User
+
+    app = create_app("testing")
+    suffix = uuid.uuid4().hex[:8]
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        owner = User.query.filter_by(email=seeded["emails"]["enterprise_architect"]).one()
+        journey = ArchitectureJourney(
+            owner_id=owner.id, organization_id=org_id, title="A11y switch %s" % suffix,
+            intent="portfolio_change", selected_layers=["motivation"], programme_type="s4hana",
+            journey_state={},
+        )
+        db.session.add(journey)
+        programme = StrategicInitiative(
+            organization_id=org_id, name="A11y programme %s" % suffix, description="A11y fixture.",
+            record_kind="transformation_programme", status="draft", owner_id=owner.id, revision=1,
+        )
+        db.session.add(programme)
+        db.session.flush()
+        workstream = ProgrammeWorkstream(
+            organization_id=org_id, programme_id=programme.id, workstream_type="process",
+            objective="A11y fixture workstream.", scope_expression={}, lifecycle_stage="objective",
+            lead_id=owner.id, revision=1,
+        )
+        db.session.add(workstream)
+        db.session.commit()
+        paths = {
+            "programme_structure": "/architecture-journey/work/%s/programme-structure" % journey.id,
+            "workstream_objective": "/solutions/programmes/%s/workstreams/%s/objective" % (
+                programme.id, workstream.id),
+        }
+    return paths
+
+
+def test_r1_08_screens_carry_no_accepted_violations(axe_module, axe_engine, browser, live_server, seeded, r1_08_pages):
+    _require_rule_set(axe_engine)
+    axe = axe_module.Axe()
+    offenders = {}
+    for label, path in r1_08_pages.items():
+        ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+        ctx.set_default_timeout(PAGE_TIMEOUT)
+        ctx.set_default_navigation_timeout(PAGE_TIMEOUT)
+        page = ctx.new_page()
+        try:
+            _login(page, live_server, seeded["emails"]["enterprise_architect"])
+            page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            page.wait_for_timeout(1000)
+            report = axe.run(page, options={"runOnly": {"type": "tag", "values": TAGS}})
+            data = report.response if hasattr(report, "response") else report
+            blocking = [v for v in data.get("violations", []) if v.get("impact") in BLOCKING]
+            if blocking:
+                offenders[label] = [_violation_evidence(v) for v in blocking]
+        finally:
+            ctx.close()
+    assert offenders == {}, offenders

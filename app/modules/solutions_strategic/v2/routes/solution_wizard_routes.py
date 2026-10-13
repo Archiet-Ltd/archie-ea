@@ -209,9 +209,14 @@ def programme_ai_prefill():
 
     try:
         fields = ProgrammeSetupService().ai_prefill_programme(description)
-    except Exception as exc:
+    except Exception:
+        # Never echo exception text to the caller (R1-09): a JSON or model
+        # failure gets a fixed, plain-language message; the real exception is
+        # logged server-side only.
         logger.exception("AI programme prefill failed")
-        return jsonify({"error": f"Programme prefill failed: {exc}"}), 502
+        return jsonify({
+            "error": "The assistant could not read this description. Fill the form by hand."
+        }), 502
 
     return jsonify({"fields": fields})
 

@@ -38,33 +38,15 @@ class ProgrammeSetupService:
 
         from app.services.llm_service import LLMService
         from app.models.transformation_programme import WORKSTREAM_TYPES, IMPROVEMENT_DIRECTIONS
+        from app.modules.ai_chat.services.programme_prefill_prompt import build_prefill_prompt
 
-        prompt = f"""You are helping populate a transformation-programme intake form from a
-free-text description written by an enterprise architect.
-
-Description:
-\"\"\"{description}\"\"\"
-
-Extract ONLY what this description actually supports. If something is not
-stated or cannot be confidently inferred, respond with null for that field —
-never guess or invent a plausible-sounding value.
-
-Return ONLY a JSON object with exactly these keys:
-{{
-  "name": string or null (a short programme name, not the whole description),
-  "objective": string or null (one or two sentences on the business objective),
-  "workstream_type": one of {list(WORKSTREAM_TYPES)} or null,
-  "business_units": array of strings or null (business units in scope),
-  "outcome_statement": string or null (the outcome the programme commits to),
-  "direction": one of {list(IMPROVEMENT_DIRECTIONS)} or null (does the metric increase/decrease/stay the same),
-  "metric_name": string or null (the metric that proves the outcome),
-  "unit": string or null (unit the metric is measured in),
-  "baseline_value": number or null (only if a current/starting value is explicitly stated),
-  "target_value": number or null (only if a target value is explicitly stated),
-  "target_date": string or null (YYYY-MM-DD, only if a date is explicitly stated or unambiguously computable)
-}}"""
+        prompt = build_prefill_prompt(
+            description, workstream_types=WORKSTREAM_TYPES, directions=IMPROVEMENT_DIRECTIONS
+        )
         response = LLMService().generate_from_prompt(prompt)
         raw = json.loads(response)
+        if not isinstance(raw, dict):
+            raise ValueError("AI prefill response was not a JSON object")
 
         def _clean_str(value):
             if isinstance(value, str) and value.strip():

@@ -1,0 +1,161 @@
+schema_version: 1
+key: s4hana
+name: SAP S/4HANA transformation
+summary: Move core finance and operations onto SAP S/4HANA, with the data, integration and controls work
+  that goes with it.
+vendor_specific: true
+arb_required_at_decide: false
+workstreams:
+- key: finance_and_controlling
+  name: Finance and controlling
+  workstream_type: process
+  objective: Own the finance and controlling work this programme depends on.
+- key: supply_chain
+  name: Supply chain
+  workstream_type: process
+  objective: Own the supply chain work this programme depends on.
+- key: data_migration
+  name: Data migration
+  workstream_type: data
+  objective: Own the data migration work this programme depends on.
+- key: integration
+  name: Integration
+  workstream_type: technology
+  objective: Own the integration work this programme depends on.
+- key: security_and_controls
+  name: Security and controls
+  workstream_type: policy_control
+  objective: Own the security and controls work this programme depends on.
+- key: testing_and_cutover
+  name: Testing and cutover
+  workstream_type: technology
+  objective: Own the testing and cutover work this programme depends on.
+- key: change_and_training
+  name: Change and training
+  workstream_type: organisation_skills
+  objective: Own the change and training work this programme depends on.
+- key: programme_office
+  name: Programme office
+  workstream_type: other
+  objective: 'Run the programme: business case, governance and the deliverables no single workstream owns.'
+stages:
+  frame:
+    gate: Business case approved
+    deliverables:
+    - code: s4hana.frame.business_case_and_value_drivers
+      name: Business case and value drivers
+      adm_phase: A
+      workstream: programme_office
+      element_types:
+      - Driver
+      - Goal
+      - Assessment
+      purpose: State why this programme is needed and how success will be judged.
+    - code: s4hana.frame.programme_charter_and_sponsorship
+      name: Programme charter and sponsorship
+      adm_phase: A
+      workstream: programme_office
+      element_types:
+      - Driver
+      - Stakeholder
+      purpose: Name the sponsor and the outcome the programme is accountable for.
+  discover:
+    gate: Current state understood
+    deliverables:
+    - code: s4hana.discover.current_state_and_requirements
+      name: Current state and requirements
+      adm_phase: B
+      workstream: finance_and_controlling
+      element_types:
+      - Requirement
+      - Capability
+      purpose: Capture what exists today and what the programme must satisfy.
+    - code: s4hana.discover.process_and_data_assessment
+      name: Process and data assessment
+      adm_phase: B
+      workstream: finance_and_controlling
+      element_types:
+      - Requirement
+      - Capability
+      purpose: Assess current finance and supply-chain process against the target platform.
+    - code: s4hana.discover.integration_landscape_review
+      name: Integration landscape review
+      adm_phase: B
+      workstream: integration
+      element_types:
+      - ApplicationInterface
+      - Requirement
+      purpose: Catalogue the interfaces the new platform must replace or keep.
+  shape:
+    gate: Target design agreed
+    deliverables:
+    - code: s4hana.shape.target_design_and_delivery_plan
+      name: Target design and delivery plan
+      adm_phase: D
+      workstream: finance_and_controlling
+      element_types:
+      - WorkPackage
+      - Plateau
+      purpose: Describe the target state and the work packages that will reach it.
+    - code: s4hana.shape.target_process_design
+      name: Target process design
+      adm_phase: D
+      workstream: finance_and_controlling
+      element_types:
+      - WorkPackage
+      - Plateau
+      purpose: Design the target finance and supply-chain processes on the new platform.
+    - code: s4hana.shape.cutover_approach
+      name: Cutover approach
+      adm_phase: D
+      workstream: testing_and_cutover
+      element_types:
+      - WorkPackage
+      - Gap
+      purpose: Set out how the organisation moves from the current to the target state.
+  decide:
+    gate: Governance sign-off
+    deliverables:
+    - code: s4hana.decide.decision_readiness
+      name: Decision readiness
+      adm_phase: E
+      workstream: programme_office
+      element_types:
+      - Requirement
+      - Assessment
+      purpose: Confirm the chosen option is ready for governance sign-off.
+    - code: s4hana.decide.controls_and_segregation_of_duties_sign_off
+      name: Controls and segregation-of-duties sign-off
+      adm_phase: E
+      workstream: security_and_controls
+      element_types:
+      - Requirement
+      - Assessment
+      purpose: Confirm the security and controls design is ready for governance sign-off.
+  deliver:
+    gate: Change landed
+    deliverables:
+    - code: s4hana.deliver.delivery_and_cutover
+      name: Delivery and cutover
+      adm_phase: F
+      workstream: finance_and_controlling
+      element_types:
+      - WorkPackage
+      - ImplementationEvent
+      purpose: Deliver the change and confirm it has landed.
+    - code: s4hana.deliver.data_migration_execution
+      name: Data migration execution
+      adm_phase: F
+      workstream: data_migration
+      element_types:
+      - WorkPackage
+      - ImplementationEvent
+      purpose: Migrate data onto the new platform and confirm it landed correctly.
+    - code: s4hana.deliver.change_and_training_rollout
+      name: Change and training rollout
+      adm_phase: F
+      workstream: change_and_training
+      element_types:
+      - WorkPackage
+      - ImplementationEvent
+      purpose: Prepare and support the people affected by the new platform.

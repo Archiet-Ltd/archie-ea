@@ -259,6 +259,45 @@ def register_transformation_room_routes(blueprint) -> None:
                 ), error.http_status
             return _render_error(error)
 
+    @blueprint.route(
+        "/programmes/<int:programme_id>/workstreams/<int:workstream_id>/archimate-element",
+        methods=["POST"],
+    )
+    @login_required
+    def transformation_workstream_add_to_model(programme_id, workstream_id):
+        """R1-05 (US-11): give an existing workstream its ArchiMate WorkPackage
+        element. CSRF-covered form post; idempotent."""
+        try:
+            actor = actor_from_request()
+            TransformationProgrammeService.add_workstream_to_model(
+                actor=actor,
+                programme_id=programme_id,
+                workstream_id=workstream_id,
+                command_key=request.form.get("command_key", "").strip() or str(uuid.uuid4()),
+            )
+            return redirect(
+                f"/solutions/programmes/{programme_id}/workstreams/{workstream_id}/objective",
+                code=303,
+            )
+        except (TypeError, ValueError) as error:
+            try:
+                room = _room(programme_id, workstream_id, "objective")
+            except TransformationError as room_error:
+                return _render_error(room_error)
+            room["form_error"] = str(error)
+            return render_template("solutions/transformation_room/objective.html", room=room), 400
+        except TransformationError as error:
+            if error.http_status not in {403, 404}:
+                try:
+                    room = _room(programme_id, workstream_id, "objective")
+                except TransformationError as room_error:
+                    return _render_error(room_error)
+                room["form_error"] = error.reason
+                return render_template(
+                    "solutions/transformation_room/objective.html", room=room
+                ), error.http_status
+            return _render_error(error)
+
     @blueprint.route("/programmes/<int:programme_id>/governance", methods=["GET"])
     @login_required
     def transformation_programme_governance(programme_id):

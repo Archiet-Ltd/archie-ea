@@ -81,6 +81,16 @@ class ArchitectureJourney(TenantMixin, OptimisticLockMixin, db.Model):
         nullable=True,
         index=True,
     )
+    # R1-04/ADR 0012 decision 6: the type is stored once, on the journey, not
+    # copied onto the programme. No DB CHECK -- the offered-types set changes
+    # as templates are reviewed, and reconcile-schema cannot widen a CHECK.
+    # Written once at start; never repointed to a different type afterwards.
+    programme_type = db.Column(db.String(40), nullable=True)
+    # The next two are written by R1-06 at confirm time (a snapshot of the
+    # template used to instantiate, ADR 0012 decision 4); declared here so one
+    # reconcile-schema pass covers all three new columns.
+    programme_template_version = db.Column(db.String(64), nullable=True)
+    arb_required_at_decide = db.Column(db.Boolean, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(
         db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow

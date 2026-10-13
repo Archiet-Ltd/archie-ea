@@ -10,6 +10,8 @@ function architectureJourneyHub() {
     layers: [],
     deliverables: [],
     outcomeType: 'undecided',
+    programmeType: '',
+    programmeTypeOptions: [],
     starting: false,
     startingSolution: false,
     error: '',
@@ -23,6 +25,21 @@ function architectureJourneyHub() {
         this.deliverables = ['capability_map', 'value_stream', 'operating_model', 'roadmap'];
         this.outcomeType = 'undecided';
       }
+      // R1-04: counts shown on selection come from the loaded template via
+      // this server-rendered data attribute, never a literal in the markup.
+      const el = this.$root || document.querySelector('[data-programme-type-options]');
+      if (el && el.dataset.programmeTypeOptions) {
+        try {
+          this.programmeTypeOptions = JSON.parse(el.dataset.programmeTypeOptions) || [];
+        } catch (e) {
+          this.programmeTypeOptions = [];
+        }
+      }
+    },
+
+    get selectedProgrammeType() {
+      if (!this.programmeType) return null;
+      return this.programmeTypeOptions.find((option) => option.key === this.programmeType) || null;
     },
 
     get canStart() {
@@ -42,6 +59,7 @@ function architectureJourneyHub() {
           selected_layers: this.layers,
           selected_deliverables: this.deliverables,
           outcome_type: this.outcomeType,
+          programme_type: this.programmeType || null,
         }, { silent: true }); // silent: true because we paint our own inline error state
         // Platform.fetch returns the parsed response body directly (already JSON).
         // The server returns a { data: { redirect: ... } } structure on success.

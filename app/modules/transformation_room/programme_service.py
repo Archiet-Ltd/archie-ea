@@ -13,6 +13,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app import db
+from app.models.relationship_tables import work_package_events as work_package_events_table
 from app.models.strategic import StrategicInitiative
 from app.models.transformation_programme import (
     IMPROVEMENT_DIRECTIONS,
@@ -25,7 +26,7 @@ from app.models.transformation_programme import (
     ProgrammeRoleAssignment,
     ProgrammeWorkstream,
 )
-from app.models.user import User
+from app.models.user import Permission, User
 from app.modules.transformation_room.command_service import CommandService, OperationAuthorizer
 from app.modules.transformation_room.domain import (
     ActorContext,
@@ -39,27 +40,22 @@ from app.modules.transformation_room.domain import (
 )
 
 
-CREATE_ROLES = frozenset(
-    {"enterprise_architect", "chief_architect", "cto", "platform_admin", "organization_admin", "administrator"}
-)
+# Programme WRITE authority is persona- or assignment-based only. Admin flags,
+# the legacy Role name and the enterprise_role column default ("platform_admin")
+# grant no programme write (SRS section 6; security.md S1).
+CREATE_ROLES = frozenset({"enterprise_architect", "chief_architect", "cto"})
 OBJECTIVE_ROLES = CREATE_ROLES | frozenset({"programme_owner", "workstream_lead"})
 ROLE_ASSIGNMENT_ROLES = CREATE_ROLES | frozenset({"programme_owner"})
-ARCHIVE_ROLES = frozenset({"programme_owner", "platform_admin", "organization_admin", "administrator"})
-READ_ROLES = CREATE_ROLES | frozenset(
-    {
-        "portfolio_manager",
-        "business_architect",
-        "application_architect",
-        "arb_member",
-        "programme_owner",
-        "workstream_lead",
-        "evidence_owner",
-        "decision_authority",
-        "delivery_lead",
-        "outcome_owner",
-        "contributor",
-    }
-)
+LINK_ROLES = CREATE_ROLES | frozenset({"programme_owner", "workstream_lead", "contributor"})
+# Org governance escape hatch: an org admin may retire a programme whose owner
+# has left. This is the only admin-derived write, and it is non-destructive.
+ARCHIVE_ROLES = frozenset({"programme_owner", "organization_admin"})
+# Admins keep READ within their own organisation (support, governance).
+READ_ROLES = CREATE_ROLES | frozenset({"organization_admin"}) | frozenset({
+    "portfolio_manager", "business_architect", "application_architect", "arb_member",
+    "programme_owner", "workstream_lead", "evidence_owner", "decision_authority",
+    "delivery_lead", "outcome_owner", "contributor",
+})
 
 
 def _required_text(value: Any, field: str) -> str:
@@ -110,6 +106,14 @@ def canonical_role_assignment_key(payload: Mapping[str, Any]) -> str:
     }
     canonical = json.dumps(identity, sort_keys=True, separators=(",", ":"))
     return f"role-assignment:{hashlib.sha256(canonical.encode('utf-8')).hexdigest()}"
+
+
+def _require_write_permission(user) -> None:
+    """Programme writes require Permission.GENERAL; a read-only Viewer persona
+    must not write programme content even if their enterprise_role string
+    matches a write role (security.md S2)."""
+    if not user.can(Permission.GENERAL):
+        raise NotAuthorised("write_permission_required")
 
 
 class TransformationProgrammeService:
@@ -184,12 +188,16 @@ class TransformationProgrammeService:
         )
 
     @classmethod
-    def validate_intake(cls, *, actor: ActorContext, request: ProgrammeIntake) -> ProgrammeIntake:
+    def validate_intake(
+        cls, *, actor: ActorContext, request: ProgrammeIntake, require_workstream_type: bool = True
+    ) -> ProgrammeIntake:
+        """*require_workstream_type* is False for the templated path, where
+        each template workstream carries its own type (R1-06)."""
         if not isinstance(request, ProgrammeIntake):
             raise TypeError("request must be ProgrammeIntake")
         name = _required_text(request.name, "name")
         objective = _required_text(request.objective, "objective")
-        if request.workstream_type not in WORKSTREAM_TYPES:
+        if require_workstream_type and request.workstream_type not in WORKSTREAM_TYPES:
             raise ValueError("workstream_type is not supported")
         if not isinstance(request.scope_expression, Mapping):
             raise ValueError("scope_expression must be an object")
@@ -263,6 +271,7 @@ class TransformationProgrammeService:
             if operation != "programme.create" or supplied_key != natural_key:
                 raise NotAuthorised("programme_create_command_mismatch")
             user = cls._load_runtime_user(session, actor)
+            _require_write_permission(user)
             if not cls._server_roles(user).intersection(CREATE_ROLES):
                 raise NotAuthorised("programme_create_not_authorised")
             owner = session.scalar(
@@ -276,18 +285,10 @@ class TransformationProgrammeService:
 
         return authorize
 
-    @classmethod
-    def _insert_intake_graph(cls, *, session, actor, request, claim) -> DomainMutationResult:
-        # Receipt-time authorization is intentionally repeated on the persisted
-        # actor row inside the mutation transaction. Holding this row lock until
-        # commit serializes account-role revocation with the first programme
-        # persistence. User has no separate active/disabled account predicate.
-        runtime_user = cls._load_runtime_user(session, actor, lock=True)
-        if not cls._server_roles(runtime_user).intersection(CREATE_ROLES):
-            raise NotAuthorised("programme_create_not_authorised")
-        outcome_data = request.outcome
-        measure_data = outcome_data["measure"]
-        programme = StrategicInitiative(
+    @staticmethod
+    def _build_programme(actor, request):
+        """Shared by the intake path and the templated path (R1-06)."""
+        return StrategicInitiative(
             organization_id=actor.organization_id,
             name=request.name,
             description=request.objective,
@@ -297,18 +298,41 @@ class TransformationProgrammeService:
             target_completion_date=request.target_date,
             revision=1,
         )
-        workstream = ProgrammeWorkstream(
+
+    @staticmethod
+    def _build_workstream(
+        actor,
+        programme,
+        *,
+        workstream_type,
+        objective,
+        scope_expression,
+        lead_id,
+        target_date,
+        target_date_unavailable_reason,
+        name=None,
+        template_key=None,
+    ):
+        return ProgrammeWorkstream(
             organization_id=actor.organization_id,
             programme=programme,
-            workstream_type=request.workstream_type,
-            objective=request.objective,
-            scope_expression=dict(request.scope_expression),
+            workstream_type=workstream_type,
+            objective=objective,
+            scope_expression=dict(scope_expression),
             lifecycle_stage="objective",
-            lead_id=request.owner_id,
-            target_date=request.target_date,
-            target_date_unavailable_reason=request.target_date_unavailable_reason,
+            lead_id=lead_id,
+            target_date=target_date,
+            target_date_unavailable_reason=target_date_unavailable_reason,
+            name=name,
+            template_key=template_key,
             revision=1,
         )
+
+    @staticmethod
+    def _build_owner_and_outcome(actor, programme, request, *, outcome_workstream):
+        """The programme_owner assignment, outcome commitment and measure."""
+        outcome_data = request.outcome
+        measure_data = outcome_data["measure"]
         assignment = ProgrammeRoleAssignment(
             organization_id=actor.organization_id,
             programme=programme,
@@ -321,7 +345,7 @@ class TransformationProgrammeService:
         outcome = ProgrammeOutcomeCommitment(
             organization_id=actor.organization_id,
             programme=programme,
-            workstream=workstream,
+            workstream=outcome_workstream,
             statement=outcome_data["statement"],
             owner_id=outcome_data["owner_id"],
             improvement_direction=outcome_data["direction"],
@@ -343,8 +367,39 @@ class TransformationProgrammeService:
             target_date=request.target_date,
             **measure_values,
         )
+        return assignment, outcome, measure
+
+    @classmethod
+    def _insert_intake_graph(cls, *, session, actor, request, claim) -> DomainMutationResult:
+        # Receipt-time authorization is intentionally repeated on the persisted
+        # actor row inside the mutation transaction. Holding this row lock until
+        # commit serializes account-role revocation with the first programme
+        # persistence. User has no separate active/disabled account predicate.
+        runtime_user = cls._load_runtime_user(session, actor, lock=True)
+        _require_write_permission(runtime_user)
+        if not cls._server_roles(runtime_user).intersection(CREATE_ROLES):
+            raise NotAuthorised("programme_create_not_authorised")
+        programme = cls._build_programme(actor, request)
+        workstream = cls._build_workstream(
+            actor,
+            programme,
+            workstream_type=request.workstream_type,
+            objective=request.objective,
+            scope_expression=request.scope_expression,
+            lead_id=request.owner_id,
+            target_date=request.target_date,
+            target_date_unavailable_reason=request.target_date_unavailable_reason,
+        )
+        assignment, outcome, measure = cls._build_owner_and_outcome(
+            actor, programme, request, outcome_workstream=workstream
+        )
         session.add_all([programme, assignment, workstream, outcome, measure])
         session.flush()
+
+        from app.services.archimate_backbone import sync_archimate_element
+
+        sync_archimate_element(workstream, session=session, organization_id=actor.organization_id)
+
         object_ids = {
             "programme_id": programme.id,
             "role_assignment_id": assignment.id,
@@ -754,20 +809,23 @@ class TransformationProgrammeService:
         )
         if lead is None:
             raise NotFound("lead_not_found")
-        workstream = ProgrammeWorkstream(
-            organization_id=actor.organization_id,
-            programme_id=programme.id,
+        workstream = cls._build_workstream(
+            actor,
+            programme,
             workstream_type=payload["workstream_type"],
             objective=payload["objective"],
-            scope_expression=dict(payload["scope_expression"]),
-            lifecycle_stage="objective",
+            scope_expression=payload["scope_expression"],
             lead_id=payload["lead_id"],
             target_date=payload["target_date"],
             target_date_unavailable_reason=payload["target_date_unavailable_reason"],
-            revision=1,
         )
         session.add(workstream)
         session.flush()
+
+        from app.services.archimate_backbone import sync_archimate_element
+
+        sync_archimate_element(workstream, session=session, organization_id=actor.organization_id)
+
         response = {
             "programme_id": programme.id,
             "workstream_id": workstream.id,
@@ -778,6 +836,351 @@ class TransformationProgrammeService:
             response,
             response,
             ({"event_type": "workstream.created", "payload": {**response, "actor_id": actor.user_id}},),
+        )
+
+    # ------------------------------------------------------------------ #
+    # R1-06: instantiate a programme type template into programme records #
+    # ------------------------------------------------------------------ #
+
+    @classmethod
+    def instantiate_template(
+        cls, *, actor: ActorContext, journey_id: int, command_key: str, request: Mapping[str, Any]
+    ) -> CommandResult:
+        """Turn a typed journey into a real programme (ADR 0012 decision 3).
+
+        *request* keys: name, objective, owner_id, target_date,
+        target_date_unavailable_reason, outcome, leads ({template workstream
+        key: user id}). One transaction through CommandService, keyed per
+        journey; a missing lead is a ValueError naming the workstream --
+        never defaulted to the actor.
+        """
+        from app.modules.transformation_room.programme_types.loader import ProgrammeTypeCatalogue
+
+        with Session(db.engine) as session:
+            journey = session.execute(
+                db.text(
+                    "SELECT programme_type, programme_id FROM architecture_journeys "
+                    "WHERE id = :j AND organization_id = :org"
+                ),
+                {"j": journey_id, "org": actor.organization_id},
+            ).first()
+        if journey is None:
+            raise NotFound("journey_not_found")
+        template_key = journey.programme_type
+        if not template_key:
+            raise ValueError("This journey has no programme type")
+        catalogue = ProgrammeTypeCatalogue()
+        template = catalogue.get(template_key)
+        if template is None:
+            raise ValueError("That programme type is not available")
+        offered = {offered_type.key for offered_type in catalogue.offered_types()}
+        if template_key not in offered:
+            raise ValueError("That programme type is not available")
+
+        intake = ProgrammeIntake(
+            name=request.get("name"),
+            objective=request.get("objective"),
+            owner_id=request.get("owner_id"),
+            target_date=request.get("target_date"),
+            target_date_unavailable_reason=request.get("target_date_unavailable_reason"),
+            workstream_type="other",
+            scope_expression={},
+            outcome=request.get("outcome") or {},
+        )
+        validated = cls.validate_intake(actor=actor, request=intake, require_workstream_type=False)
+
+        leads = {}
+        raw_leads = request.get("leads") or {}
+        with Session(db.engine) as session:
+            for workstream in template.workstreams:
+                key = workstream["key"]
+                lead_id = raw_leads.get(key)
+                if not isinstance(lead_id, int) or lead_id <= 0:
+                    raise ValueError(f"Choose a lead for the workstream: {workstream.get('name', key)}")
+                found = session.scalar(
+                    select(User.id).where(User.id == lead_id, User.organization_id == actor.organization_id)
+                )
+                if found is None:
+                    raise ValueError(f"The lead chosen for {workstream.get('name', key)} was not found")
+                leads[key] = lead_id
+
+        natural_key = f"journey-programme-structure:{journey_id}"
+        payload = {
+            **asdict(validated),
+            "journey_id": journey_id,
+            "template_key": template_key,
+            "content_sha256": template.content_sha256,
+            "leads": leads,
+        }
+        return CommandService.execute(
+            actor=actor,
+            operation="programme.instantiate_template",
+            idempotency_key=command_key,
+            payload=payload,
+            natural_key=natural_key,
+            authorizer=cls.authorise_instantiate_template(journey_id, natural_key),
+            natural_key_resolver=CommandService.fail_closed_pre_envelope_recovery,
+            handler=lambda session, claim: cls._instantiate_template_locked(
+                session, actor, validated, template, leads, journey_id, claim
+            ),
+        )
+
+    @classmethod
+    def authorise_instantiate_template(cls, journey_id: int, natural_key: str) -> OperationAuthorizer:
+        def authorize(session: Session, actor: ActorContext, operation: str, supplied_key: str) -> None:
+            if operation != "programme.instantiate_template" or supplied_key != natural_key:
+                raise NotAuthorised("instantiate_template_command_mismatch")
+            user = cls._load_runtime_user(session, actor)
+            _require_write_permission(user)
+            if not cls._server_roles(user).intersection(CREATE_ROLES):
+                raise NotAuthorised("programme_create_not_authorised")
+            row = session.execute(
+                db.text(
+                    "SELECT owner_id FROM architecture_journeys WHERE id = :j AND organization_id = :org"
+                ),
+                {"j": journey_id, "org": actor.organization_id},
+            ).first()
+            if row is None:
+                raise NotFound("journey_not_found")
+            if row.owner_id != actor.user_id:
+                member = session.execute(
+                    db.text(
+                        "SELECT 1 FROM architecture_journey_members WHERE journey_id = :j "
+                        "AND user_id = :u AND organization_id = :org"
+                    ),
+                    {"j": journey_id, "u": actor.user_id, "org": actor.organization_id},
+                ).first()
+                if member is None:
+                    raise NotAuthorised("journey_edit_not_authorised")
+
+        return authorize
+
+    @classmethod
+    def _instantiate_template_locked(cls, session, actor, validated, template, leads, journey_id, claim):
+        from app.models.architecture_journey import ArchitectureJourney
+        from app.models.implementation_migration import Deliverable, ImplementationEvent, WorkPackage
+        from app.services.archimate_backbone import sync_archimate_element
+
+        journey = session.scalar(
+            select(ArchitectureJourney)
+            .where(
+                ArchitectureJourney.id == journey_id,
+                ArchitectureJourney.organization_id == actor.organization_id,
+            )
+            .with_for_update()
+        )
+        if journey is None:
+            raise NotFound("journey_not_found")
+        if journey.programme_id is not None:
+            existing = {"programme_id": journey.programme_id, "journey_id": journey.id}
+            return DomainMutationResult(existing, existing, ())
+
+        runtime_user = cls._load_runtime_user(session, actor, lock=True)
+        _require_write_permission(runtime_user)
+        if not cls._server_roles(runtime_user).intersection(CREATE_ROLES):
+            raise NotAuthorised("programme_create_not_authorised")
+
+        org = actor.organization_id
+        programme = cls._build_programme(actor, validated)
+        assignment, outcome, measure = cls._build_owner_and_outcome(
+            actor, programme, validated, outcome_workstream=None
+        )
+        session.add_all([programme, assignment, outcome, measure])
+        session.flush()
+
+        workstream_rows = {}
+        for spec in template.workstreams:
+            ws = cls._build_workstream(
+                actor,
+                programme,
+                workstream_type=spec["workstream_type"],
+                objective=spec.get("objective") or spec["name"],
+                scope_expression={},
+                lead_id=leads[spec["key"]],
+                target_date=validated.target_date,
+                target_date_unavailable_reason=validated.target_date_unavailable_reason,
+                name=spec["name"],
+                template_key=f"{template.key}.{spec['key']}",
+            )
+            session.add(ws)
+            session.flush()
+            sync_archimate_element(ws, session=session, organization_id=org)
+            session.add(
+                ProgrammeRoleAssignment(
+                    organization_id=org,
+                    programme=programme,
+                    workstream=ws,
+                    user_id=leads[spec["key"]],
+                    role="workstream_lead",
+                    effective_from=date.today(),
+                    assigned_by_id=actor.user_id,
+                )
+            )
+            workstream_rows[spec["key"]] = ws
+        session.flush()
+
+        work_package_ids, deliverable_ids, event_ids = [], [], []
+        for stage_key, stage in template.stages.items():
+            stage_packages = []
+            for spec in stage.get("deliverables") or ():
+                ws = workstream_rows[spec["workstream"]]
+                digest = hashlib.sha256(f"journey:{journey.id}:{spec['code']}".encode("utf-8")).hexdigest()
+                package = WorkPackage(
+                    organization_id=org,
+                    name=spec["name"],
+                    strategic_initiative_id=programme.id,
+                    programme_workstream_id=ws.id,
+                    togaf_phase=spec.get("adm_phase"),
+                    status="planned",
+                    materialisation_key=digest,
+                )
+                session.add(package)
+                session.flush()
+                sync_archimate_element(package, session=session, organization_id=org)
+                deliverable = Deliverable(
+                    name=spec["name"],
+                    work_package_id=package.id,
+                    delivery_status="planned",
+                    template_code=spec["code"],
+                    journey_stage=stage_key,
+                    declared_element_types=list(spec.get("element_types") or ()),
+                )
+                session.add(deliverable)
+                session.flush()
+                sync_archimate_element(deliverable, session=session, organization_id=org)
+                work_package_ids.append(package.id)
+                deliverable_ids.append(deliverable.id)
+                stage_packages.append(package)
+            gate_text = stage.get("gate")
+            if gate_text:
+                event = ImplementationEvent(
+                    organization_id=org,
+                    name=gate_text,
+                    event_type="journey_stage_gate",
+                    status="planned",
+                )
+                session.add(event)
+                session.flush()
+                sync_archimate_element(event, session=session, organization_id=org)
+                for package in stage_packages:
+                    session.execute(
+                        work_package_events_table.insert().values(
+                            work_package_id=package.id,
+                            implementation_event_id=event.id,
+                            relationship_type="gate",
+                            is_blocking=False,
+                        )
+                    )
+                event_ids.append(event.id)
+
+        journey.programme_id = programme.id
+        journey.programme_template_version = template.content_sha256
+        journey.arb_required_at_decide = template.arb_required_at_decide
+        journey.outcome_type = "programme"
+        session.flush()
+
+        object_ids = {
+            "journey_id": journey.id,
+            "programme_id": programme.id,
+            "workstream_ids": [w.id for w in workstream_rows.values()],
+            "work_package_ids": work_package_ids,
+            "deliverable_ids": deliverable_ids,
+            "event_ids": event_ids,
+        }
+        response = dict(object_ids)
+        return DomainMutationResult(
+            object_ids,
+            response,
+            (
+                {
+                    "event_type": "programme.template_instantiated",
+                    "payload": {
+                        **object_ids,
+                        "template_key": template.key,
+                        "content_sha256": template.content_sha256,
+                        "organization_id": org,
+                        "actor_id": actor.user_id,
+                        "command_receipt_id": claim.receipt_id,
+                    },
+                },
+            ),
+        )
+
+    @classmethod
+    def add_workstream_to_model(
+        cls, *, actor: ActorContext, programme_id: int, workstream_id: int, command_key: str
+    ) -> CommandResult:
+        """R1-05 (US-11): give an existing workstream its ArchiMate WorkPackage
+        element. Idempotent -- sync_archimate_element leaves an already-synced
+        row alone, so a replay or a second click creates nothing further."""
+        natural_key = f"workstream-add-to-model:{command_key}"
+        return CommandService.execute(
+            actor=actor,
+            operation="workstream.add_to_model",
+            idempotency_key=command_key,
+            payload={"programme_id": programme_id, "workstream_id": workstream_id},
+            natural_key=natural_key,
+            authorizer=cls.authorise_add_to_model(programme_id, workstream_id, natural_key),
+            natural_key_resolver=CommandService.fail_closed_pre_envelope_recovery,
+            handler=lambda session, claim: cls._add_workstream_to_model_locked(
+                session, actor, programme_id, workstream_id, claim
+            ),
+        )
+
+    @classmethod
+    def authorise_add_to_model(cls, programme_id: int, workstream_id: int, natural_key: str) -> OperationAuthorizer:
+        def authorize(session: Session, actor: ActorContext, operation: str, supplied_key: str) -> None:
+            if operation != "workstream.add_to_model" or supplied_key != natural_key:
+                raise NotAuthorised("workstream_add_to_model_command_mismatch")
+            programme = cls._programme_query(session, actor, programme_id).scalar_one_or_none()
+            if programme is None:
+                raise NotFound("programme_not_found")
+            workstream = session.scalar(
+                select(ProgrammeWorkstream.id).where(
+                    ProgrammeWorkstream.id == workstream_id,
+                    ProgrammeWorkstream.programme_id == programme_id,
+                    ProgrammeWorkstream.organization_id == actor.organization_id,
+                )
+            )
+            if workstream is None:
+                raise NotFound("workstream_not_found")
+            cls._require_programme_authority(
+                session, actor, programme_id, workstream_id, LINK_ROLES,
+                "workstream_add_to_model_not_authorised",
+            )
+
+        return authorize
+
+    @classmethod
+    def _add_workstream_to_model_locked(cls, session, actor, programme_id, workstream_id, claim):
+        workstream = session.scalar(
+            select(ProgrammeWorkstream).where(
+                ProgrammeWorkstream.id == workstream_id,
+                ProgrammeWorkstream.programme_id == programme_id,
+                ProgrammeWorkstream.organization_id == actor.organization_id,
+            )
+            .with_for_update()
+        )
+        if workstream is None:
+            raise NotFound("workstream_not_found")
+        cls._require_programme_authority(
+            session, actor, programme_id, workstream_id, LINK_ROLES,
+            "workstream_add_to_model_not_authorised",
+            lock=True,
+        )
+
+        from app.services.archimate_backbone import sync_archimate_element
+
+        sync_archimate_element(workstream, session=session, organization_id=actor.organization_id)
+        response = {
+            "programme_id": programme_id,
+            "workstream_id": workstream.id,
+            "archimate_element_id": workstream.archimate_element_id,
+        }
+        return DomainMutationResult(
+            response,
+            response,
+            ({"event_type": "workstream.added_to_model", "payload": {**response, "actor_id": actor.user_id}},),
         )
 
     @classmethod
@@ -992,11 +1395,6 @@ class TransformationProgrammeService:
             roles.add("organization_admin")
         if user.is_platform_admin:
             roles.add("platform_admin")
-        try:
-            if user.role and user.role.name:
-                roles.add(user.role.name.strip().lower())
-        except Exception:
-            pass
         return roles
 
     @classmethod
@@ -1008,7 +1406,7 @@ class TransformationProgrammeService:
         at the final submit with a raw 'programme_create_not_authorised'. Authorising
         once at the door and once at the command keeps both honest."""
         try:
-            return bool(cls._server_roles(user) & CREATE_ROLES)
+            return bool(cls._server_roles(user) & CREATE_ROLES) and user.can(Permission.GENERAL)
         except Exception:
             return False
 
@@ -1030,6 +1428,8 @@ class TransformationProgrammeService:
         # check and the governed mutation.
         user = cls._load_runtime_user(session, actor, lock=lock)
         roles = cls._server_roles(user)
+        if allowed_roles is not READ_ROLES:
+            _require_write_permission(user)
         today = date.today()
         assignment_statement = (
             select(ProgrammeRoleAssignment)

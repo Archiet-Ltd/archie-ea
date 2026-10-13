@@ -1,0 +1,9 @@
+{# R1-08: the one ArchiMate-detail switch used by every screen in the programme
+   journey. `detail` lives in the enclosing archimateSwitch() x-data scope. #}
+{% macro archimate_switch() %}
+<button type="button" @click="toggle" :aria-pressed="detail.toString()" data-testid="archimate-switch"
+  class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+  <span>Show ArchiMate detail</span>
+  <span class="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground" x-text="detail ? 'On' : 'Off'" aria-hidden="true"></span>
+</button>
+{% endmacro %}

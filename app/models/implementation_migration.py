@@ -423,6 +423,15 @@ class Deliverable(db.Model):
 
     artifact_references = db.Column(db.JSON)
 
+    # R1-06 (programme-journey-templates): a snapshot of what the template
+    # declared, so later template edits never alter an instantiated programme
+    # (ADR 0012 decision 4). All nullable; tolerated when NULL.
+    template_code = db.Column(db.String(80), nullable=True)
+    journey_stage = db.Column(db.String(20), nullable=True)
+    declared_element_types = db.Column(db.JSON, nullable=True)
+    # R1-07: why a deliverable was completed with no model content.
+    completion_reason = db.Column(db.Text, nullable=True)
+
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
@@ -465,6 +474,40 @@ WorkPackage.deliverables = db.relationship(
     cascade="all, delete-orphan",
     lazy="dynamic",
 )
+
+
+CREDIT_KINDS = ("created", "existing")
+
+
+class DeliverableArchimateElement(TenantMixin, db.Model):
+    """The one store for "this element is credited to this deliverable" (ADR
+    0013's 2026-09-25 amendment, tech-lead ruling C5). Deliverable itself is
+    untenanted, so this edge carries its own organization_id in the unique key
+    -- which also keeps it visible to the tenant-scoping gate. Counting reads
+    this table only; element provenance is written but never counted.
+    credit_kind is validated in code (CREDIT_KINDS), with no DB CHECK, so
+    reconcile-schema never needs to widen a constraint."""
+
+    __tablename__ = "deliverable_archimate_elements"
+
+    id = db.Column(db.Integer, primary_key=True)
+    deliverable_id = db.Column(
+        db.Integer, db.ForeignKey("deliverables.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    archimate_element_id = db.Column(
+        db.Integer, db.ForeignKey("archimate_elements.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    credit_kind = db.Column(db.String(20), nullable=False)
+    approval_id = db.Column(db.Integer, nullable=True)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "organization_id", "deliverable_id", "archimate_element_id",
+            name="uq_deliverable_element_credit",
+        ),
+    )
 
 
 class ImplementationEvent(TenantMixin, db.Model):

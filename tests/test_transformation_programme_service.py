@@ -1031,3 +1031,113 @@ def test_subordinate_failure_rolls_back_entire_programme_graph(programme_fixture
     assert rows["workstreams"] == rows["roles"] == rows["outcomes"] == rows["measures"] == []
     assert rows["solutions"] == 0
     assert rows["events"] == []
+
+
+# --------------------------------------------------------------------- #
+# R1-01: programme write authority is persona- or assignment-based only #
+# (security.md 3.2, findings S1 and S2)                                 #
+# --------------------------------------------------------------------- #
+
+
+def test_programme_write_roles_exclude_admin_derived():
+    """T-A1 (S1): no write role set admits an admin-derived or legacy-Role
+    string; ARCHIVE_ROLES keeps only the owner and the org-governance
+    escape hatch."""
+    from app.modules.transformation_room.programme_service import (
+        ARCHIVE_ROLES,
+        CREATE_ROLES,
+        OBJECTIVE_ROLES,
+        ROLE_ASSIGNMENT_ROLES,
+    )
+
+    admin_derived = {"platform_admin", "organization_admin", "administrator"}
+    assert not (CREATE_ROLES & admin_derived)
+    assert not (OBJECTIVE_ROLES & admin_derived)
+    assert not (ROLE_ASSIGNMENT_ROLES & admin_derived)
+    assert ARCHIVE_ROLES == {"programme_owner", "organization_admin"}
+
+
+def test_admin_flags_alone_do_not_authorise_write_but_do_authorise_read(programme_fixture):
+    """T-A2 (S1): a user left on the enterprise_role column default, with Role
+    Administrator, is_org_admin and is_platform_admin all set, cannot create a
+    programme -- but organization_admin (from is_org_admin) still reaches
+    READ_ROLES, so list_programmes succeeds."""
+    from app.models.user import Permission, Role
+
+    with Session(db.engine) as session, session.begin():
+        admin_role = session.scalar(select(Role).where(Role.name == "Administrator"))
+        if admin_role is None:
+            admin_role = Role(name="Administrator", permissions=Permission.ADMINISTER, index="admin", default=False)
+            session.add(admin_role)
+            session.flush()
+        user = User(
+            email=f"admin-default-{uuid.uuid4().hex[:10]}@example.test",
+            organization_id=programme_fixture.organization_id,
+            confirmed=True,
+            is_org_admin=True,
+            is_platform_admin=True,
+            role=admin_role,
+        )
+        # enterprise_role left at the column server_default ("platform_admin").
+        session.add(user)
+        session.flush()
+        user_id = user.id
+
+    try:
+        actor = ActorContext(
+            user_id, programme_fixture.organization_id, frozenset({"platform_admin"}), "t-a2"
+        )
+        with pytest.raises(NotAuthorised, match="programme_create_not_authorised"):
+            TransformationProgrammeService.create_programme(
+                actor=actor,
+                command_key=f"t-a2-{uuid.uuid4().hex[:8]}",
+                request=_intake(user_id),
+            )
+        # Read succeeds: organization_admin (from is_org_admin) is in READ_ROLES.
+        TransformationProgrammeService.list_programmes(actor=actor)
+    finally:
+        with db.engine.begin() as connection:
+            connection.execute(text('DELETE FROM "users" WHERE id = :id'), {"id": user_id})
+
+
+def test_viewer_permission_blocks_write_but_not_read(programme_fixture):
+    """T-A3 (S2): a Viewer-permissioned user (Role.permissions == 0) whose
+    enterprise_role string is a write role is still refused every write --
+    Permission.GENERAL, not the role string, gates programme writes. Read
+    stays allowed because authorise_read / list_programmes do not call
+    _require_write_permission."""
+    from app.models.user import Role
+
+    with Session(db.engine) as session, session.begin():
+        viewer_role = session.scalar(select(Role).where(Role.name == "Viewer"))
+        if viewer_role is None:
+            viewer_role = Role(name="Viewer", permissions=0, index="main", default=False)
+            session.add(viewer_role)
+            session.flush()
+        user = User(
+            email=f"viewer-ea-{uuid.uuid4().hex[:10]}@example.test",
+            organization_id=programme_fixture.organization_id,
+            confirmed=True,
+            enterprise_role="enterprise_architect",
+            role=viewer_role,
+        )
+        session.add(user)
+        session.flush()
+        user_id = user.id
+
+    try:
+        actor = ActorContext(
+            user_id, programme_fixture.organization_id, frozenset({"enterprise_architect"}), "t-a3"
+        )
+        with pytest.raises(NotAuthorised, match="write_permission_required"):
+            TransformationProgrammeService.create_programme(
+                actor=actor,
+                command_key=f"t-a3-{uuid.uuid4().hex[:8]}",
+                request=_intake(user_id),
+            )
+        # Read is unaffected by Permission.GENERAL: enterprise_architect is in
+        # READ_ROLES regardless of the user's Role bitfield.
+        TransformationProgrammeService.list_programmes(actor=actor)
+    finally:
+        with db.engine.begin() as connection:
+            connection.execute(text('DELETE FROM "users" WHERE id = :id'), {"id": user_id})

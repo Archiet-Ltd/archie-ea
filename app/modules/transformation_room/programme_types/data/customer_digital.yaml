@@ -1,0 +1,93 @@
+schema_version: 1
+key: customer_digital
+name: Customer and digital experience
+summary: Build a self-service digital channel for customers, connected to the systems and data that support
+  it.
+vendor_specific: false
+arb_required_at_decide: false
+workstreams:
+- key: journeys_and_design
+  name: Journeys and design
+  workstream_type: process
+  objective: Own the journeys and design work this programme depends on.
+- key: channels_and_front_end
+  name: Channels and front end
+  workstream_type: technology
+  objective: Own the channels and front end work this programme depends on.
+- key: crm_and_customer_data
+  name: CRM and customer data
+  workstream_type: data
+  objective: Own the crm and customer data work this programme depends on.
+- key: integration
+  name: Integration
+  workstream_type: technology
+  objective: Own the integration work this programme depends on.
+- key: analytics_and_consent
+  name: Analytics and consent
+  workstream_type: data
+  objective: Own the analytics and consent work this programme depends on.
+- key: adoption_and_support
+  name: Adoption and support
+  workstream_type: organisation_skills
+  objective: Own the adoption and support work this programme depends on.
+- key: programme_office
+  name: Programme office
+  workstream_type: other
+  objective: 'Run the programme: business case, governance and the deliverables no single workstream owns.'
+stages:
+  frame:
+    gate: Business case approved
+    deliverables:
+    - code: customer_digital.frame.business_case_and_value_drivers
+      name: Business case and value drivers
+      adm_phase: A
+      workstream: programme_office
+      element_types:
+      - Driver
+      - Goal
+      - Assessment
+      purpose: State why this programme is needed and how success will be judged.
+  discover:
+    gate: Current state understood
+    deliverables:
+    - code: customer_digital.discover.current_state_and_requirements
+      name: Current state and requirements
+      adm_phase: B
+      workstream: journeys_and_design
+      element_types:
+      - Requirement
+      - Capability
+      purpose: Capture what exists today and what the programme must satisfy.
+  shape:
+    gate: Target design agreed
+    deliverables:
+    - code: customer_digital.shape.target_design_and_delivery_plan
+      name: Target design and delivery plan
+      adm_phase: D
+      workstream: journeys_and_design
+      element_types:
+      - WorkPackage
+      - Plateau
+      purpose: Describe the target state and the work packages that will reach it.
+  decide:
+    gate: Governance sign-off
+    deliverables:
+    - code: customer_digital.decide.decision_readiness
+      name: Decision readiness
+      adm_phase: E
+      workstream: programme_office
+      element_types:
+      - Requirement
+      - Assessment
+      purpose: Confirm the chosen option is ready for governance sign-off.
+  deliver:
+    gate: Change landed
+    deliverables:
+    - code: customer_digital.deliver.delivery_and_cutover
+      name: Delivery and cutover
+      adm_phase: F
+      workstream: journeys_and_design
+      element_types:
+      - WorkPackage
+      - ImplementationEvent
+      purpose: Deliver the change and confirm it has landed.
