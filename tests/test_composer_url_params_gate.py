@@ -34,9 +34,20 @@ def tmp_html():
 
 def test_flags_unknown_param_name(tmp_html):
     with open(tmp_html, "w", encoding="utf-8") as fh:
-        fh.write('<a href="/archimate/composer?element=42">Open</a>\n')
+        fh.write('<a href="/archimate/composer?element_id=42">Open</a>\n')
     result = _run(tmp_html)
     assert result.stdout.strip().splitlines()[-1] == "1"
+
+
+def test_element_is_now_a_known_good_param(tmp_html):
+    """`element` moved from the bad list to the known-good list on 2026-09-21,
+    when the composer gained the ability to read it. This is the inverse of
+    test_flags_unknown_param_name above, which now uses `element_id` (still
+    unread) as its bad-param example."""
+    with open(tmp_html, "w", encoding="utf-8") as fh:
+        fh.write('<a href="/archimate/composer?element=42">Open</a>\n')
+    result = _run(tmp_html)
+    assert result.stdout.strip().splitlines()[-1] == "0"
 
 
 def test_flags_elements_param(tmp_html):
@@ -57,7 +68,7 @@ def test_passes_known_good_params(tmp_html):
 
 def test_honours_escape_hatch(tmp_html):
     with open(tmp_html, "w", encoding="utf-8") as fh:
-        fh.write('<a href="/archimate/composer?element=42">Open</a>  {# composer-url-ok: legacy, tracked #}\n')
+        fh.write('<a href="/archimate/composer?element_id=42">Open</a>  {# composer-url-ok: legacy, tracked #}\n')
     result = _run(tmp_html)
     assert result.stdout.strip().splitlines()[-1] == "0"
 
@@ -80,7 +91,7 @@ def test_flags_interpolated_viewpoint_value(tmp_html):
 def test_flags_url_for_composer_pattern(tmp_html):
     with open(tmp_html, "w", encoding="utf-8") as fh:
         fh.write(
-            "<a href=\"{{ url_for('archimate.composer_page') }}?element=1\">Open</a>\n"
+            "<a href=\"{{ url_for('archimate.composer_page') }}?element_id=1\">Open</a>\n"
         )
     result = _run(tmp_html)
     assert result.stdout.strip().splitlines()[-1] == "1"
@@ -89,7 +100,7 @@ def test_flags_url_for_composer_pattern(tmp_html):
 def test_flags_bad_param_after_double_escaped_ampersand(tmp_html):
     with open(tmp_html, "w", encoding="utf-8") as fh:
         fh.write(
-            '<a href="/archimate/composer?viewpoint=layered&amp;amp;element=1">Open</a>\n'
+            '<a href="/archimate/composer?viewpoint=layered&amp;amp;element_id=1">Open</a>\n'
         )
     result = _run(tmp_html)
     assert result.stdout.strip().splitlines()[-1] == "1"

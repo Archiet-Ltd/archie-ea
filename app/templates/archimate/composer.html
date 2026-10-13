@@ -2318,6 +2318,7 @@ window.__COMPOSER_CONFIG__ = {
     startBlank: {{ ('true' if request.args.get('blank') else 'false') }},
     initialViewpoint: {{ initial_viewpoint|tojson }},
     initialLayer: {{ initial_layer|tojson }},
+    initialElement: {{ initial_element|tojson }},
 };
 document.addEventListener('DOMContentLoaded', function() {
     if (window.lucide) lucide.createIcons();

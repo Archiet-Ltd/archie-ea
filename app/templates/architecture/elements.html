@@ -447,12 +447,10 @@
                    whenever the drawer had no selection (browser-audit
                    "dead-link"). #}
                 <template x-if="selectedElement?.id">
-                    {# `element` is not a parameter the composer reads — opening a
-                       real scoped diagram would require creating a SavedDiagram
-                       server-side first, which this client-only drawer doesn't do.
-                       Link honestly to the generic composer instead of a URL that
-                       looks scoped but silently isn't. #}
-                    <a href="/archimate/composer"
+                    {# The composer now reads `element` (selects and centres it once
+                       the enterprise-wide 'layered' viewpoint has loaded) -- see
+                       composer_page()'s docstring. No SavedDiagram needed. #}
+                    <a :href="'/archimate/composer?element=' + selectedElement.id"
                        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3">
                         Open in Composer
                     </a>
