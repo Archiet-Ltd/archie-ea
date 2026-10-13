@@ -341,6 +341,11 @@ def test_judge_fails_on_a_missing_report(tmp_path):
         ("app/static/app.js", True),
         ("app/modules/x/tests/test_routes.py", False),
         ("app/modules/x/tests/helpers.py", False),
+        ("app/services/test_alert_service.py", True),
+        ("app/services/test_health_service.py", True),
+        ("app/modules/codegen/routes/test_exec_routes.py", True),
+        ("app/modules/codegen/services/test_scheduler.py", True),
+        ("app/modules/solutions_product/services/test_generator.py", True),
         ("app/templates/public/pricing.html", False),
         ("app/modules/x/README.md", False),
         ("tests/test_x.py", False),
@@ -409,3 +414,60 @@ def test_the_job_runs_the_script_in_order_with_the_labels_from_the_event():
     order = [runs.index(f"check_failing_first.py {c}") for c in ("plan", "prepare", "run", "judge")]
     assert order == sorted(order)
     assert "failing-first-exempt" in job["if"] or "PR_LABELS" in json.dumps(job)
+
+
+def test_job_level_keys_use_no_context_that_is_unavailable_there():
+    """GitHub rejects the whole workflow file for this (runner.* in job-level env did, on PR 577)."""
+    job = dict(_job())
+    job.pop("steps")
+    assert "runner." not in json.dumps(job)
+    assert "steps." not in json.dumps(job)
+    assert "env.BASE_CHECKOUT" not in json.dumps(job)
+
+
+def test_the_base_checkout_location_is_set_in_a_step():
+    runs = "\n".join(s.get("run", "") for s in _job()["steps"])
+    assert 'BASE_CHECKOUT=$RUNNER_TEMP/failing-first-base" >> "$GITHUB_ENV"' in runs
+
+
+def test_all_skipped_on_base_is_reported_as_skipped(tmp_path):
+    plan = tmp_path / "plan.json"
+    plan.write_text(json.dumps({"added_files": [], "test_files": ["tests/test_a.py"], "capped": 0}))
+    junit = tmp_path / "r.xml"
+    junit.write_text(
+        '<testsuites><testsuite><testcase classname="tests.test_a" name="test_x"><skipped/></testcase>'
+        "</testsuite></testsuites>"
+    )
+    summary = tmp_path / "s.md"
+    code = ff.main(["judge", "--plan", str(plan), "--junit", str(junit), "--summary", str(summary)])
+    assert code == 1
+    assert "was skipped on the base" in summary.read_text(encoding="utf-8")
+
+
+def test_plan_writes_mode_once(repo, tmp_path, monkeypatch):
+    out = tmp_path / "gh_output"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(out))
+    _app_change(repo)
+    _write(
+        repo,
+        "tests/test_m.py",
+        "from app.feature import surcharge\n\ndef test_m():\n    assert surcharge()\n",
+    )
+    _commit(repo)
+    ff.main(
+        [
+            "plan",
+            "--repo",
+            str(repo),
+            "--base-ref",
+            "main",
+            "--labels",
+            "[]",
+            "--plan",
+            str(tmp_path / "p.json"),
+            "--summary",
+            str(tmp_path / "s.md"),
+        ]
+    )
+    lines = [ln for ln in out.read_text().splitlines() if ln.startswith("mode=")]
+    assert lines == ["mode=run"]

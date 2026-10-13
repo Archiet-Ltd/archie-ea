@@ -1303,7 +1303,7 @@ jobs:
     name: Failing-first proof
     if: ${{ github.event_name == 'pull_request' && (github.event.action != 'labeled' || github.event.label.name == 'failing-first-exempt') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     services:
       postgres:
         image: public.ecr.aws/docker/library/postgres:16
@@ -1320,11 +1320,13 @@ jobs:
       SECRET_KEY: ci-only-not-secret
       # Passed through the environment, never interpolated into a script.
       PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
-      BASE_CHECKOUT: ${{ runner.temp }}/failing-first-base
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+      - name: Name the base checkout location
+        # The runner context is not available in job-level env, so it is set here.
+        run: echo "BASE_CHECKOUT=$RUNNER_TEMP/failing-first-base" >> "$GITHUB_ENV"
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}

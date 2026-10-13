@@ -35,9 +35,9 @@ import xml.etree.ElementTree as ET  # noqa: S405 - our own pytest output, not un
 from pathlib import Path
 
 try:  # imported as scripts.ci.check_failing_first
-    from scripts.ci.detect_content_only import is_content_path
+    from scripts.ci.detect_content_only import _diff_entries, is_content_path
 except ImportError:  # run as a script: scripts/ci is sys.path[0]
-    from detect_content_only import is_content_path  # type: ignore[no-redef]
+    from detect_content_only import _diff_entries, is_content_path  # type: ignore[no-redef]
 
 EXEMPT_LABEL = "failing-first-exempt"
 MAX_TEST_FILES = 40
@@ -54,7 +54,9 @@ def is_test_path(path: str) -> bool:
         return True
     if parts[0] == "app" and "tests" in parts[1:-1]:
         return True
-    return name.startswith("test_") or name == "conftest.py"
+    # An app module that merely starts with test_ (app/services/test_alert_service.py) is
+    # application code, not test support.
+    return name == "conftest.py"
 
 
 def is_test_file(path: str) -> bool:
@@ -93,12 +95,8 @@ def git(repo: Path, *args: str, check: bool = True) -> str:
 
 def changed_files(repo: Path, base: str, head: str) -> list[tuple[str, str]]:
     """(status, path) pairs between the merge base and head; renames reported as delete + add."""
-    out = git(repo, "diff", "--name-status", "-z", "--no-renames", base, head)
-    fields = out.split("\0")
-    pairs = []
-    for i in range(0, len(fields) - 1, 2):
-        pairs.append((fields[i][:1], fields[i + 1]))
-    return pairs
+    entries = _diff_entries(base, head, str(repo))
+    return [(status, path) for _, _, path, status in entries if path]
 
 
 # ---------------------------------------------------------------------------
@@ -135,8 +133,8 @@ def cmd_plan(args: argparse.Namespace) -> int:
     labels = parse_labels(
         args.labels if args.labels is not None else os.environ.get("PR_LABELS", "")
     )
-    set_output("mode", "done")
     if EXEMPT_LABEL in labels:
+        set_output("mode", "done")
         emit_summary(
             f"## Failing-first proof\n\nExempted by the `{EXEMPT_LABEL}` label "
             "(for pure refactors and documentation). Nothing was run.",
@@ -148,6 +146,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     changes = changed_files(repo, merge_base, args.head)
     app_changed = sorted(p for _, p in changes if is_app_code(p))
     if not app_changed:
+        set_output("mode", "done")
         tests_changed = sorted(p for s, p in changes if s != "D" and is_test_file(p))
         note = (
             f" ({len(tests_changed)} changed test file(s) were not run.)" if tests_changed else ""
@@ -163,6 +162,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     added = {p for s, p in changes if s in "AT"}
     all_tests = sorted((p for p in live if is_test_file(p)), key=lambda p: (p not in added, p))
     if not all_tests:
+        set_output("mode", "done")
         emit_summary(
             "## Failing-first proof: FAILED\n\n"
             f"Application code changed ({len(app_changed)} file(s), e.g. `{app_changed[0]}`) but no "
@@ -315,8 +315,10 @@ def cmd_judge(args: argparse.Namespace) -> int:
             f"PASSED: {len(failed)} test(s) fail or error on the base code, so the change is observable by the tests."
         )
     else:
+        passed_all = bool(passed_new or passed_old)
+        what = "passes" if passed_all else "was skipped"
         lines.append(
-            "FAILED: every changed test passes on the base code, so none of them proves the change. "
+            f"FAILED: every changed test {what} on the base code, so none of them proves the change. "
             "Make a test assert the new behaviour, or, for a pure refactor or documentation change, "
             f"add the `{EXEMPT_LABEL}` label."
         )

@@ -67,20 +67,25 @@ def is_content_path(path: str) -> bool:
 NON_REGULAR_MODES: frozenset[str] = frozenset({"120000", "160000"})
 
 
-def _diff_entries(base_ref: str) -> list[tuple[str, str, str]]:
-    """Return (old_mode, new_mode, path) for each file changed since *base_ref*."""
+def _diff_entries(
+    base_ref: str, head: str = "HEAD", repo: str | None = None
+) -> list[tuple[str, str, str, str]]:
+    """Return (old_mode, new_mode, path, status) for each file changed from *base_ref* to *head*.
+
+    status is git's single status letter (A, M, D, T). Also used by check_failing_first.py.
+    """
     result = subprocess.run(
-        ["git", "diff", "--raw", "--no-renames", "-z", base_ref, "HEAD"],
-        capture_output=True, text=True, check=True,
+        ["git", "diff", "--raw", "--no-renames", "-z", base_ref, head],
+        capture_output=True, text=True, check=True, cwd=repo,
     )
     fields = result.stdout.split("\0")
-    entries: list[tuple[str, str, str]] = []
+    entries: list[tuple[str, str, str, str]] = []
     i = 0
     while i + 1 < len(fields):
         meta = fields[i]
         if meta.startswith(":"):
             parts = meta[1:].split()
-            entries.append((parts[0], parts[1], fields[i + 1]))
+            entries.append((parts[0], parts[1], fields[i + 1], parts[4][:1]))
             i += 2
         else:
             i += 1
@@ -89,13 +94,13 @@ def _diff_entries(base_ref: str) -> list[tuple[str, str, str]]:
 
 def get_changed_files(base_ref: str = "origin/main") -> list[str]:
     """Return the list of files changed between *base_ref* and HEAD."""
-    return [path for _, _, path in _diff_entries(base_ref) if path]
+    return [path for _, _, path, _ in _diff_entries(base_ref) if path]
 
 
 def get_non_regular_files(base_ref: str = "origin/main") -> frozenset[str]:
     """Changed paths that are, or were, a symlink or a submodule."""
     return frozenset(
-        path for old, new, path in _diff_entries(base_ref)
+        path for old, new, path, _ in _diff_entries(base_ref)
         if old in NON_REGULAR_MODES or new in NON_REGULAR_MODES
     )
 
