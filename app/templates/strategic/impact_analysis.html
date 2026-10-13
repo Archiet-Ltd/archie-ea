@@ -226,7 +226,7 @@
                                             <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium border bg-muted/50 text-foreground border-border capitalize" x-text="(impact.type || '').replace(/_/g, ' ')"></span>
                                         </td>
                                         <td class="px-3 py-2 align-middle text-muted-foreground" x-text="impact.app_name || '—'"></td>
-                                        <td class="px-3 py-2 align-middle text-muted-foreground" x-text="impact.owner || '—'"></td>
+                                        <td class="px-3 py-2 align-middle text-muted-foreground" x-text="impact.owners && impact.owners.length ? impact.owners.map(o => o.name).join(', ') : '—'"></td>
                                         <td class="px-3 py-2 align-middle">
                                             <template x-if="impact.health !== null && impact.health !== undefined">
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
@@ -672,6 +672,7 @@
                                 criticality: d.criticality, 
                                 app_name: d.app_name,
                                 owner: d.owner,
+                                owners: d.owners || [],
                                 health: d.health
                             };
                         }),
@@ -684,6 +685,7 @@
                                 criticality: d.criticality, 
                                 app_name: d.app_name,
                                 owner: d.owner,
+                                owners: d.owners || [],
                                 health: d.health
                             };
                         }),
