@@ -156,6 +156,28 @@ def test_dependency_cycle_is_reported_and_never_followed(two_orgs, db_session):
     assert len(names) == len(set(names))
 
 
+def test_self_loop_dependency_is_reported_as_a_cycle(two_orgs, db_session):
+    from app.services import work_package_service as svc
+
+    a = two_orgs["a"]
+    plateau = _plateau(db_session, a, "Self-loop")
+    w1 = _wp(db_session, a, "Self-loop wp", plateau,
+             start=datetime(2026, 4, 1), end=datetime(2026, 4, 5))
+    # planted raw: the column is JSON read directly (merge, bridge, seed paths)
+    w1.work_dependencies = [w1.id]
+    db_session.flush()
+
+    cp = svc.critical_path_for_plateau(plateau.id, a.id)
+
+    # the self-loop is reported as a cycle naming the package itself
+    assert cp["cycles"] != []
+    assert cp["cycles"][0] == [w1.id]
+    assert cp["has_critical_path"] is True
+    # the cycle is not followed: the path has no duplicate
+    names = [n["name"] for n in cp["path"]]
+    assert len(names) == len(set(names))
+
+
 def test_dependency_on_another_organisations_work_package_is_ignored_and_reported(
     two_orgs, db_session
 ):

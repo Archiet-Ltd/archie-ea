@@ -953,7 +953,9 @@ def _path_node(wp: UnifiedWorkPackage, organization_id: int) -> Dict[str, Any]:
 
 def _canonicalise_cycles(raw_cycles: List[List[int]]) -> List[List[int]]:
     """Deduplicate reported cycles: the same loop read in any rotation or
-    direction is one cycle, reported once in the order it was first seen."""
+    direction is one cycle, reported once in the order it was first seen.
+    A self-loop (a work package that depends on itself) is reported as a
+    single-element cycle."""
     def rotated(seq: List[int], offset: int) -> List[int]:
         return seq[offset:] + seq[:offset]
 
@@ -963,13 +965,17 @@ def _canonicalise_cycles(raw_cycles: List[List[int]]) -> List[List[int]]:
         if not cycle:
             continue
         nodes = cycle[:-1]  # the closing node repeats the first
-        if len(nodes) < 2:
+        if not nodes:
             continue
-        forwards = min(tuple(rotated(nodes, i)) for i in range(len(nodes)))
-        backwards = min(
-            tuple(rotated(list(reversed(nodes)), i)) for i in range(len(nodes))
-        )
-        canonical = min(forwards, backwards)
+        if len(nodes) == 1:
+            # self-loop: the canonical form is the single node id
+            canonical = tuple(nodes)
+        else:
+            forwards = min(tuple(rotated(nodes, i)) for i in range(len(nodes)))
+            backwards = min(
+                tuple(rotated(list(reversed(nodes)), i)) for i in range(len(nodes))
+            )
+            canonical = min(forwards, backwards)
         if canonical not in seen:
             seen.add(canonical)
             out.append(nodes)
