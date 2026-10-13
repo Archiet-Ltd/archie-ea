@@ -55,7 +55,7 @@ def _configure_sso(db_session, org, email_domain, *, enabled=True, protocol="oid
 
 
 def _make_user(db_session, org, email, *, password=None, external_id=None,
-               sso_provider=None, is_platform_admin=False, role=None):
+               sso_provider=None, is_platform_admin=False, role=None, confirmed=True):
     from app.models.user import User
 
     kwargs = dict(
@@ -63,7 +63,7 @@ def _make_user(db_session, org, email, *, password=None, external_id=None,
         first_name="Existing",
         last_name="Member",
         organization_id=org.id,
-        confirmed=True,
+        confirmed=confirmed,
         external_id=external_id,
         sso_provider=sso_provider,
         is_platform_admin=is_platform_admin,
@@ -76,6 +76,18 @@ def _make_user(db_session, org, email, *, password=None, external_id=None,
     db_session.add(user)
     db_session.flush()
     return user
+
+
+def _issue_reset_token(db_session, user):
+    """Issue a password-reset token for ``user`` outside a request, the way
+    TS-36 and TS-41 both need one in hand. Shared rather than duplicated."""
+    from app.jobs.tenant_safe_job import platform_scope
+    from app.models.account_token import PURPOSE_PASSWORD_RESET, AccountToken
+
+    with platform_scope("test: issue a reset token"):
+        _row, raw = AccountToken.issue(user, PURPOSE_PASSWORD_RESET)
+        db_session.commit()
+    return raw
 
 
 def _snapshot(user):
@@ -941,3 +953,411 @@ def test_config_for_login_runs_exactly_one_hash_check_per_claimed_address(db_ses
     before = len(calls)
     assert SSOService().config_for_login(f"someone@{_domain('unclaimed')}", _PASSWORD) is None
     assert len(calls) == before
+
+
+# --------------------------------------------------------------------------- #
+# TS-35, TS-36, TS-37  D-3 hash-format uniformity                             #
+# --------------------------------------------------------------------------- #
+
+_LEGACY_260K = "pbkdf2:sha256:260000"
+_LEGACY_600K = "pbkdf2:sha256:600000"
+_FOREIGN_HASH = "$2b$12$" + "a" * 53
+
+
+def test_claimed_domain_check_costs_the_same_for_every_stored_hash_format(app, db_session, make_org,
+                                                                           monkeypatch):
+    import app.services.sso_service as sso_service
+    from app.services.sso_service import SSOService
+    from werkzeug.security import generate_password_hash
+
+    org = make_org("scope-hash-uniform")
+    claimed = _domain("hashformat")
+    _configure_sso(db_session, org, claimed)
+
+    current_admin = _make_user(db_session, org, f"current@{claimed}", password=_PASSWORD,
+                               is_platform_admin=True)
+    legacy_260_admin = _make_user(db_session, org, f"legacy260@{claimed}", is_platform_admin=True)
+    legacy_260_admin.password_hash = generate_password_hash(_PASSWORD, method=_LEGACY_260K)
+    legacy_600_admin = _make_user(db_session, org, f"legacy600@{claimed}", is_platform_admin=True)
+    legacy_600_admin.password_hash = generate_password_hash(_PASSWORD, method=_LEGACY_600K)
+    foreign_admin = _make_user(db_session, org, f"foreign@{claimed}", is_platform_admin=True)
+    foreign_admin.password_hash = _FOREIGN_HASH
+    nopass_admin = _make_user(db_session, org, f"nopass@{claimed}", is_platform_admin=True)
+    legacy_member = _make_user(db_session, org, f"member@{claimed}")
+    legacy_member.password_hash = generate_password_hash(_PASSWORD, method=_LEGACY_260K)
+    db_session.commit()
+
+    addresses = [
+        current_admin.email, legacy_260_admin.email, legacy_600_admin.email,
+        foreign_admin.email, nopass_admin.email, legacy_member.email,
+        f"newcomer@{claimed}",
+    ]
+
+    real = sso_service.check_password_hash
+    calls = []
+
+    def counting(stored, password):
+        calls.append(stored)
+        return real(stored, password)
+
+    monkeypatch.setattr(sso_service, "check_password_hash", counting)
+
+    for email in addresses:
+        before = len(calls)
+        SSOService().config_for_login(email, "wrong-password")
+        assert len(calls) == before + 1, email
+        hash_argument = calls[-1]
+        assert hash_argument.startswith(sso_service.PASSWORD_HASH_METHOD), (email, hash_argument)
+        if email == current_admin.email:
+            assert hash_argument != sso_service._DUMMY_PASSWORD_HASH, email
+        else:
+            assert hash_argument == sso_service._DUMMY_PASSWORD_HASH, email
+
+    # Every one of these addresses, right down to the foreign-format account,
+    # is sent to the identity provider the same way for a wrong password.
+    locations = []
+    for email in addresses:
+        client = _anonymous_client(app)
+        resp = _post_login(client, email, password="wrong-password")
+        assert resp.status_code in (302, 303), email
+        location = resp.headers.get("Location", "")
+        assert "/auth/sso/initiate" in location, (email, location)
+        assert _session_user_id(client) is None, email
+        locations.append(_without_email_param(location))
+    assert len(set(locations)) == 1, locations
+
+
+def test_legacy_hash_platform_admin_recovers_by_password_reset(app, db_session, make_org):
+    from werkzeug.security import generate_password_hash
+
+    from app.models.user import PASSWORD_HASH_METHOD
+    from app.modules.account.services.account_service import AccountService
+
+    org = make_org("scope-legacy-recovery")
+    claimed = _domain("legacyrecovery")
+    _configure_sso(db_session, org, claimed)
+    admin = _make_user(db_session, org, f"admin@{claimed}", is_platform_admin=True)
+    admin.password_hash = generate_password_hash(_PASSWORD, method=_LEGACY_600K)
+    db_session.commit()
+
+    client = _anonymous_client(app)
+    resp = _post_login(client, admin.email, _PASSWORD)
+    assert resp.status_code in (302, 303)
+    assert "/auth/sso/initiate" in resp.headers.get("Location", "")
+    assert _session_user_id(client) is None
+
+    raw = _issue_reset_token(db_session, admin)
+    success, message = AccountService.reset_password(raw, _PASSWORD)
+    assert success, message
+    reloaded = _reload(db_session, admin.id)
+    assert reloaded.password_hash.startswith(PASSWORD_HASH_METHOD)
+
+    after_client = _anonymous_client(app)
+    after_resp = _post_login(after_client, admin.email, _PASSWORD)
+    assert after_resp.status_code in (302, 303)
+    # A platform administrator still completes multi-factor before a session
+    # is minted (mfa_service.required_for), so the proof here is the same one
+    # the sign-in-form-disclosure tests use: the password path was taken, not
+    # the identity provider.
+    assert "/auth/sso/initiate" not in after_resp.headers.get("Location", "")
+
+
+def test_password_sign_in_upgrades_legacy_hash(app, db_session, make_org):
+    from werkzeug.security import check_password_hash, generate_password_hash
+
+    from app.models.user import PASSWORD_HASH_METHOD
+
+    org = make_org("scope-upgrade")
+    unclaimed = f"person-{uuid.uuid4().hex[:8]}@unclaimed.example"
+    member = _make_user(db_session, org, unclaimed)
+    member.password_hash = generate_password_hash(_PASSWORD, method=_LEGACY_260K)
+    db_session.commit()
+
+    wrong_client = _anonymous_client(app)
+    _post_login(wrong_client, unclaimed, "wrong-password")
+    assert _session_user_id(wrong_client) is None
+    unchanged = _reload(db_session, member.id)
+    assert unchanged.password_hash.startswith(_LEGACY_260K)
+
+    right_client = _anonymous_client(app)
+    right_resp = _post_login(right_client, unclaimed, _PASSWORD)
+    assert right_resp.status_code in (302, 303)
+    assert _session_user_id(right_client) == str(member.id)
+    upgraded = _reload(db_session, member.id)
+    assert upgraded.password_hash.startswith(PASSWORD_HASH_METHOD)
+    assert check_password_hash(upgraded.password_hash, _PASSWORD)
+
+    foreign = _make_user(db_session, org, f"foreign-{uuid.uuid4().hex[:8]}@unclaimed.example")
+    foreign.password_hash = _FOREIGN_HASH
+    db_session.commit()
+    foreign_client = _anonymous_client(app)
+    foreign_resp = _post_login(foreign_client, foreign.email, "anything")
+    assert foreign_resp.status_code == 200
+    assert "Invalid email or password." in foreign_resp.get_data(as_text=True)
+    assert _session_user_id(foreign_client) is None
+
+
+# --------------------------------------------------------------------------- #
+# TS-38  D-1, end to end through the real routes                              #
+# --------------------------------------------------------------------------- #
+
+
+def test_invited_member_linked_by_sso_stays_activated_after_a_reset(app, db_session, make_org, mail_on,
+                                                                     login_as):
+    from flask import template_rendered
+
+    from app.models.organization import Organization
+    from app.models.subscription import Subscription, SubscriptionPlan, SubscriptionStatus
+    from app.modules.account.services import invitation_service
+    from app.services.sso_service import SSOService
+
+    org_a = make_org("scope-ts38")
+    # An unlimited plan keeps the seat check out of a test that is not about
+    # it, as TS-32 also needs for its four-person organisation.
+    db_session.add(Subscription(
+        organization_id=org_a.id, plan=SubscriptionPlan.enterprise,
+        status=SubscriptionStatus.active, seats_purchased=0,
+    ))
+    db_session.flush()
+    domain = _domain("ts38")
+    _configure_sso(db_session, org_a, domain)
+    admin = _org_admin(db_session, org_a)
+    db_session.commit()
+
+    organization_count_before = Organization.query.count()
+    bob_email = f"bob@{domain}"
+
+    client = app.test_client()
+    login_as(client, admin)
+    invite_resp = client.post("/admin/team/invite", data={"email": bob_email, "role": "viewer"})
+    assert invite_resp.status_code in (302, 303)
+
+    found = _users_with_email(db_session, bob_email)
+    assert len(found) == 1
+    bob_id = found[0].id
+    assert found[0].password_hash is None
+    assert found[0].confirmed is False
+    assert invitation_service.is_unactivated(found[0])
+
+    linked = SSOService().provision_user(org_a, {"email": bob_email, "sub": "bob-subject"})
+    assert linked.id == bob_id
+    assert linked.confirmed is True
+    assert linked.external_id == "bob-subject"
+
+    login_as(client, admin)
+    reset_resp = client.post(f"/admin/team/member/{bob_id}/reset-sign-in")
+    assert reset_resp.status_code in (302, 303)
+    reset_bob = _reload(db_session, bob_id)
+    assert reset_bob.external_id is None
+    assert reset_bob.sso_provider is None
+    assert reset_bob.confirmed is True
+    assert not invitation_service.is_unactivated(reset_bob)
+
+    seen = []
+
+    def capture(sender, template, context, **extra):
+        seen.append(context)
+
+    template_rendered.connect(capture, app)
+    try:
+        login_as(client, admin)
+        team_resp = client.get("/admin/team")
+        assert team_resp.status_code == 200
+    finally:
+        template_rendered.disconnect(capture, app)
+    member_ids = [m.id for ctx in seen for m in ctx.get("members", [])]
+    assert bob_id in member_ids
+
+    register_client = _anonymous_client(app)
+    register_resp = register_client.post("/account/register", data={
+        "first_name": "Someone", "last_name": "Else", "email": bob_email,
+        "password": _PASSWORD, "password2": _PASSWORD,
+    })
+    assert register_resp.status_code == 200
+    assert "Email already registered" in register_resp.get_data(as_text=True)
+    assert _session_user_id(register_client) is None
+    still_there = _reload(db_session, bob_id)
+    assert still_there is not None
+    assert still_there.organization_id == org_a.id
+    assert len(_users_with_email(db_session, bob_email)) == 1
+    assert Organization.query.count() == organization_count_before
+
+    relinked = SSOService().provision_user(org_a, {"email": bob_email, "sub": "bob-new-subject"})
+    assert relinked.id == bob_id
+    assert relinked.external_id == "bob-new-subject"
+
+
+# --------------------------------------------------------------------------- #
+# TS-39  D-1, another organisation's invitation after a reset                 #
+# --------------------------------------------------------------------------- #
+
+
+def test_reset_member_keeps_their_address_against_another_organisations_invitation(
+    app, db_session, make_org, mail_on, login_as,
+):
+    from datetime import datetime, timedelta, timezone
+
+    from app.models.pending_invitation import PendingInvitation
+    from app.models.subscription import Subscription, SubscriptionPlan, SubscriptionStatus
+    from app.modules.account.services import invitation_service
+    from app.services.sso_service import SSOService
+
+    org_a = make_org("scope-ts39-a")
+    db_session.add(Subscription(
+        organization_id=org_a.id, plan=SubscriptionPlan.enterprise,
+        status=SubscriptionStatus.active, seats_purchased=0,
+    ))
+    db_session.flush()
+    domain = _domain("ts39")
+    _configure_sso(db_session, org_a, domain)
+    admin_a = _org_admin(db_session, org_a)
+    db_session.commit()
+
+    bob_email = f"bob@{domain}"
+    client = app.test_client()
+    login_as(client, admin_a)
+    invite_resp = client.post("/admin/team/invite", data={"email": bob_email, "role": "viewer"})
+    assert invite_resp.status_code in (302, 303)
+    bob_id = _users_with_email(db_session, bob_email)[0].id
+
+    linked = SSOService().provision_user(org_a, {"email": bob_email, "sub": "bob-subject"})
+    assert linked.confirmed is True
+
+    login_as(client, admin_a)
+    reset_resp = client.post(f"/admin/team/member/{bob_id}/reset-sign-in")
+    assert reset_resp.status_code in (302, 303)
+    reset_bob = _reload(db_session, bob_id)
+    assert reset_bob.confirmed is True
+    assert not invitation_service.is_unactivated(reset_bob)
+
+    past = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1)
+    for row in PendingInvitation.query.filter_by(user_id=bob_id).all():
+        row.expires_at = past
+    db_session.commit()
+
+    org_b = make_org("scope-ts39-b")
+    db_session.add(Subscription(
+        organization_id=org_b.id, plan=SubscriptionPlan.enterprise,
+        status=SubscriptionStatus.active, seats_purchased=0,
+    ))
+    db_session.flush()
+    admin_b = _org_admin(db_session, org_b)
+    db_session.commit()
+
+    with pytest.raises(invitation_service.InvitationError) as refused:
+        invitation_service.invite_new_person(org_b.id, admin_b, bob_email)
+    assert refused.value.status == 409
+    db_session.rollback()
+
+    login_as(client, admin_b)
+    client.post("/admin/team/invite", data={"email": bob_email, "role": "viewer"})
+
+    survivor = _reload(db_session, bob_id)
+    assert survivor is not None
+    assert survivor.organization_id == org_a.id
+    assert len(_users_with_email(db_session, bob_email)) == 1
+
+
+# --------------------------------------------------------------------------- #
+# TS-40  D-1, rows linked before this change                                  #
+# --------------------------------------------------------------------------- #
+
+
+def test_reset_keeps_accounts_linked_before_this_change_activated(db_session, make_org):
+    from app.modules.account.services import invitation_service
+    from app.services.sso_service import SSOService
+
+    # (a) a platform-provider link, made before this change, confirmed=False.
+    org_a = make_org("scope-ts40-a")
+    member = _make_user(db_session, org_a, f"legacy-{uuid.uuid4().hex[:8]}@example.com",
+                        external_id="legacy-subject", sso_provider="google", confirmed=False)
+    db_session.commit()
+
+    reset = SSOService().reset_member_sign_in_link(org_a.id, member.id, actor_id=None, reason="test")
+    assert reset.confirmed is True
+    assert not invitation_service.is_unactivated(reset)
+    assert invitation_service.release_for_registration(member.email) is False
+    assert _reload(db_session, member.id) is not None
+
+    # (b) a pre-existing organisation-SSO link, healed at its next sign-in.
+    org_b = make_org("scope-ts40-b")
+    domain = _domain("ts40")
+    _configure_sso(db_session, org_b, domain)
+    kept = _make_user(db_session, org_b, f"kept@{domain}",
+                      external_id="kept-subject", sso_provider="oidc", confirmed=False)
+    db_session.commit()
+
+    healed = SSOService().provision_user(org_b, {"email": kept.email, "sub": "kept-subject"})
+    assert healed.id == kept.id
+    assert healed.confirmed is True
+
+
+# --------------------------------------------------------------------------- #
+# TS-41  D-2, runbook Case 2b proved end to end                               #
+# --------------------------------------------------------------------------- #
+
+
+def test_password_less_admin_recovers_through_their_own_mailbox_before_sso_is_disabled(
+    app, db_session, make_org, mail_on, login_as,
+):
+    import secrets
+
+    from app.jobs.tenant_safe_job import platform_scope
+    from app.models.account_token import PURPOSE_PASSWORD_RESET, AccountToken
+    from app.models.org_role import OrgRole
+    from app.models.user import Role
+    from app.modules.account.services.account_service import AccountService
+    from app.modules.admin.services.admin_user_service import AdminUserService
+    from app.services.sso_service import SSOService
+
+    org = make_org("scope-ts41")
+    domain = _domain("ts41")
+    config = _configure_sso(db_session, org, domain)
+    admin_role = Role.query.filter_by(name="Administrator").first()
+    if admin_role is None:
+        Role.insert_roles()
+        admin_role = Role.query.filter_by(name="Administrator").first()
+    admin = _make_user(db_session, org, f"admin@{domain}",
+                       external_id="admin-subject", sso_provider="oidc", role=admin_role)
+    admin.is_org_admin = True
+    OrgRole.set_role(org.id, admin.id, "org_admin", granted_by_id=admin.id)
+    db_session.commit()
+
+    assert SSOService().config_for_login(admin.email, "anything") is not None
+
+    AdminUserService.set_user_password(admin, secrets.token_urlsafe(32))
+
+    def _reset_token_count():
+        with platform_scope("test: count password reset tokens"):
+            return AccountToken.query.filter_by(
+                user_id=admin.id, purpose=PURPOSE_PASSWORD_RESET,
+            ).count()
+
+    before = _reset_token_count()
+    anon = _anonymous_client(app)
+    reset_resp = anon.post("/account/reset-password", data={"email": admin.email})
+    assert reset_resp.status_code == 200
+    assert _reset_token_count() == before + 1
+
+    new_password = "N3w!Str0ngPassw0rd"
+    raw = _issue_reset_token(db_session, admin)
+    success, message = AccountService.reset_password(raw, new_password)
+    assert success, message
+
+    sso_client = _anonymous_client(app)
+    sso_resp = _post_login(sso_client, admin.email, new_password)
+    assert sso_resp.status_code in (302, 303)
+    assert "/auth/sso/initiate" in sso_resp.headers.get("Location", "")
+
+    config.enabled = False
+    db_session.commit()
+
+    password_client = _anonymous_client(app)
+    password_resp = _post_login(password_client, admin.email, new_password)
+    assert password_resp.status_code in (302, 303)
+    assert "/auth/sso/initiate" not in password_resp.headers.get("Location", "")
+    assert "Invalid email or password." not in password_resp.get_data(as_text=True)
+
+    admin_client = app.test_client()
+    login_as(admin_client, admin)
+    assert admin_client.get("/admin/sso").status_code == 200
