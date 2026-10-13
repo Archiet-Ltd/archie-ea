@@ -438,12 +438,71 @@ def _model_walk_table_sets():
     return tenant, hybrid
 
 
+def _walk_models_without_touching_this_process():
+    """Call ``_model_walk_table_sets()`` and prove the walk left this process alone.
+
+    Snapshots the mapped class names, ``db.metadata.tables`` and the ``app.models``
+    entries in ``sys.modules`` immediately before calling ``_model_walk_table_sets()``,
+    then checks straight after that none of the three gained anything. Both
+    ``test_every_tenant_and_hybrid_model_is_listed_or_excluded`` and
+    ``test_model_walk_leaves_the_orm_unchanged`` get their table sets only through
+    this helper, so whichever of the two makes the first call in a given process is
+    the one whose snapshot measures the walk: if the walk is ever put back in-process,
+    the pollution happens inside that first call's own before/after window and that
+    call fails, whichever of the two tests it belongs to, run alone or together, in
+    either order.
+
+    Each check compares "gained nothing" rather than "unchanged", so something an
+    unrelated test removes earlier in the process cannot trip this.
+
+    On top of those three relative checks, this also asserts in absolute terms that
+    ``app.models.adm_kanban_junctions`` was never imported into this process. That
+    holds even if the process was already polluted before this helper's first
+    snapshot, because it does not depend on the before/after comparison at all.
+    """
+    from app import db
+
+    mapper_names_before = {m.class_.__name__ for m in db.Model.registry.mappers}
+    table_names_before = set(db.metadata.tables)
+    model_modules_before = {
+        name for name in sys.modules if name == "app.models" or name.startswith("app.models.")
+    }
+
+    tenant, hybrid = _model_walk_table_sets()
+
+    new_mappers = sorted(
+        {m.class_.__name__ for m in db.Model.registry.mappers} - mapper_names_before
+    )
+    new_tables = sorted(set(db.metadata.tables) - table_names_before)
+    new_modules = sorted(
+        {
+            name
+            for name in sys.modules
+            if name == "app.models" or name.startswith("app.models.")
+        }
+        - model_modules_before
+    )
+    assert not new_mappers, f"model walk left new classes mapped: {new_mappers}"
+    assert not new_tables, f"model walk added tables to db.metadata: {new_tables}"
+    assert not new_modules, (
+        f"model walk imported app.models submodules into this process: {new_modules}"
+    )
+
+    assert "app.models.adm_kanban_junctions" not in sys.modules, (
+        "the model walk must run in a child process, never import "
+        "app.models.adm_kanban_junctions into this one; if normal application boot "
+        "ever starts importing that module, this is the line to remove."
+    )
+
+    return tenant, hybrid
+
+
 def test_every_tenant_and_hybrid_model_is_listed_or_excluded():
     """The literal table lists cannot drift from the models unnoticed: the union of every
     fencing revision must cover every ``TenantMixin`` / ``HybridTenantMixin`` table."""
     from app import db
 
-    tenant_tables, hybrid_tables = _model_walk_table_sets()
+    tenant_tables, hybrid_tables = _walk_models_without_touching_this_process()
     revisions = _fencing_revisions()
     assert "20261008_row_level_security.py" in revisions
     _assert_every_model_is_fenced(tenant_tables, hybrid_tables, revisions)
@@ -454,32 +513,20 @@ def test_every_tenant_and_hybrid_model_is_listed_or_excluded():
 
 
 def test_model_walk_leaves_the_orm_unchanged():
-    """The subprocess isolation actually works: running the walk never adds the
-    ``adm_kanban_junctions`` models (or any other mapped class or table) to this
-    pytest process's SQLAlchemy mapper registry or ``db.metadata``, and never imports
-    that module into ``sys.modules`` here. Put the walk back in-process (call
-    ``_load_all_model_modules()`` directly in this test, before calling
-    ``_model_walk_table_sets()``) and this fails, naming the tables it adds."""
-    from app import db
-
-    mappers_before = sorted(m.class_.__name__ for m in db.Model.registry.mappers)
-    tables_before = sorted(db.metadata.tables)
-    imported_before = "app.models.adm_kanban_junctions" in sys.modules
-
-    tenant_tables, hybrid_tables = _model_walk_table_sets()
+    """The subprocess isolation actually works. This test and
+    ``test_every_tenant_and_hybrid_model_is_listed_or_excluded`` both get their table
+    sets through ``_walk_models_without_touching_this_process()``, which snapshots the
+    mapper registry, ``db.metadata`` and the imported ``app.models`` submodules right
+    before and right after the walk, and fails, naming what was added, if any of the
+    three gained anything -- plus an absolute check that ``app.models.adm_kanban_junctions``
+    was never imported here. Whichever of the two tests calls the helper first in a
+    given process is the one that measures the walk, so putting the walk back
+    in-process fails here regardless of which order the two tests run in, or whether
+    only one of them runs at all."""
+    tenant_tables, hybrid_tables = _walk_models_without_touching_this_process()
 
     assert tenant_tables
     assert hybrid_tables
-
-    new_mappers = sorted(
-        set(m.class_.__name__ for m in db.Model.registry.mappers) - set(mappers_before)
-    )
-    new_tables = sorted(set(db.metadata.tables) - set(tables_before))
-    assert not new_mappers, f"model walk left new classes mapped: {new_mappers}"
-    assert not new_tables, f"model walk added tables to db.metadata: {new_tables}"
-    assert ("app.models.adm_kanban_junctions" in sys.modules) == imported_before, (
-        "model walk imported app.models.adm_kanban_junctions into this process"
-    )
 
 
 def test_a_mixin_table_missing_from_every_fencing_revision_fails_the_guard():
