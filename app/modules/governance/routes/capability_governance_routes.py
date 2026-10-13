@@ -11,7 +11,7 @@ Routes for capability governance and business process management.
 import logging
 
 from flask import Blueprint, jsonify, render_template, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app import db
 from app.decorators import audit_log, require_roles
@@ -171,6 +171,54 @@ def api_update_governance(capability_id):
             "description", "current_maturity_level", "target_maturity_level",
             "maturity_assessment_notes",
         ]
+
+        # Route maturity changes through the single write path so they leave
+        # a history row.  For a row sourced from business_capability the write
+        # must land on the source row (via the service), not the derived copy,
+        # which the next projection run would overwrite.
+        maturity_fields = {
+            "current_maturity_level", "target_maturity_level", "maturity_assessment_notes",
+        }
+        maturity_data = {k: data[k] for k in maturity_fields if k in data}
+        if maturity_data and cap.source_table == "business_capability":
+            from flask import g
+
+            from app.modules.capabilities.services.capability_maturity_service import (
+                MaturityValidationError,
+                record_capability_maturity,
+            )
+            try:
+                source_id = int(cap.source_id)
+            except (ValueError, TypeError):
+                return jsonify({"success": False, "error": "Capability not found"}), 404
+            org_id = getattr(g, "current_org_id", None)
+            if org_id is None:
+                return jsonify({"success": False, "error": "Capability not found"}), 404
+            try:
+                record_capability_maturity(
+                    capability_id=source_id,
+                    organization_id=org_id,
+                    current=int(maturity_data["current_maturity_level"])
+                    if maturity_data.get("current_maturity_level") not in (None, "")
+                    else None,
+                    target=int(maturity_data["target_maturity_level"])
+                    if maturity_data.get("target_maturity_level") not in (None, "")
+                    else None,
+                    notes=maturity_data.get("maturity_assessment_notes"),
+                    assessor_user_id=current_user.id,
+                    assessor_name=current_user.full_name(),
+                    assessor_role=current_user.role_name,
+                    commit=False,
+                )
+            except MaturityValidationError as e:
+                db.session.rollback()
+                return jsonify({"success": False, "error": str(e)}), 400
+            except LookupError:
+                db.session.rollback()
+                return jsonify({"success": False, "error": "Capability not found"}), 404
+            db.session.commit()
+            return jsonify({"success": True})
+
         for field in ALLOWED_FIELDS:
             if field in data:
                 setattr(cap, field, data[field])

@@ -161,7 +161,8 @@
                         <select id="current_maturity_level" 
                                 name="current_maturity_level" 
                                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            <option value="">Not Set</option>
+                            <option value="">Leave unchanged</option>
+                            <option value="clear">Clear level (not assessed)</option>
                             {% for level in range(1, 6) %}
                             <option value="{{ level }}" 
                                     {% if capability.current_maturity_level == level %}selected{% endif %}>
@@ -179,7 +180,8 @@
                         <select id="target_maturity_level" 
                                 name="target_maturity_level" 
                                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            <option value="">Not Set</option>
+                            <option value="">Leave unchanged</option>
+                            <option value="clear">Clear level (not assessed)</option>
                             {% for level in range(1, 6) %}
                             <option value="{{ level }}" 
                                     {% if capability.target_maturity_level == level %}selected{% endif %}>

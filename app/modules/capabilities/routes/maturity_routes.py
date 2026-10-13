@@ -9,8 +9,6 @@ Provides user-friendly routes for managing business capability maturity levels
 without requiring admin privileges.
 """
 
-from datetime import datetime
-
 from flask import Blueprint, current_app, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
@@ -18,6 +16,10 @@ from app.decorators import audit_log
 from sqlalchemy import text
 
 from app import db
+from app.modules.capabilities.services.capability_maturity_service import (
+    CapabilityNotFoundError,
+    record_capability_maturity,
+)
 from app.utils.framework_classifier import FrameworkClassifier
 from app.utils.pagination import safe_int_arg
 from app.utils.tenant_sql import current_org_id
@@ -127,6 +129,15 @@ def edit_capability_maturity(capability_id):
             target_level = request.form.get("target_maturity_level")
             notes = request.form.get("assessment_notes", "")
 
+            # "clear" is the explicit way to un-assess a level; a blank value
+            # leaves the stored level unchanged.
+            clear_current = current_level == "clear"
+            clear_target = target_level == "clear"
+            if clear_current:
+                current_level = None
+            if clear_target:
+                target_level = None
+
             # Validate input
             if current_level:
                 try:
@@ -168,37 +179,39 @@ def edit_capability_maturity(capability_id):
                         )
                     )
 
-            # Calculate gap
-            gap = 0
-            if current_level is not None and target_level is not None:
-                gap = target_level - current_level
+            # Record through the single write path: it updates the source row
+            # and appends exactly one history row in the same transaction.
+            # The org is passed explicitly so the write can never cross
+            # organisations; a capability that does not belong to the caller
+            # (or does not exist) reads back as not found, as the GET branch
+            # already did.
+            from flask_login import current_user
 
-            # Update the capability
-            update_query = """
-                UPDATE business_capability
-                SET current_maturity_level = :current_level,
-                    target_maturity_level = :target_level,
-                    maturity_gap = :gap,
-                    maturity_assessment_date = :assessment_date,
-                    maturity_assessment_notes = :notes,
-                    updated_at = :updated_at
-                WHERE id = :capability_id AND organization_id = :org_id
-            """
-
-            params = {
-                "current_level": current_level,
-                "target_level": target_level,
-                "gap": gap,
-                "assessment_date": datetime.utcnow(),
-                "notes": notes,
-                "updated_at": datetime.utcnow(),
-                "capability_id": capability_id,
-                "org_id": getattr(g, "current_org_id", None),
-            }
-
-
-            db.session.execute(text(update_query), params)  # tenant-filtered
-            db.session.commit()
+            assessor_name = (
+                current_user.full_name() if current_user.is_authenticated else None
+            )
+            assessor_role = (
+                current_user.role_name if current_user.is_authenticated else None
+            )
+            try:
+                record_capability_maturity(
+                    capability_id=capability_id,
+                    organization_id=getattr(g, "current_org_id", None),
+                    current=current_level if current_level else None,
+                    target=target_level if target_level else None,
+                    notes=notes,
+                    assessor_user_id=(
+                        current_user.id if current_user.is_authenticated else None
+                    ),
+                    assessor_name=assessor_name,
+                    assessor_role=assessor_role,
+                    clear_current=clear_current,
+                    clear_target=clear_target,
+                    commit=True,
+                )
+            except CapabilityNotFoundError:
+                flash("Capability not found", "error")
+                return redirect(url_for("maturity_management.search_capabilities"))
 
             flash("Capability maturity levels updated successfully!", "success")
             return redirect(url_for("maturity_management.search_capabilities"))
@@ -264,61 +277,65 @@ def batch_update_maturity():
                     flash("Invalid target maturity level", "error")
                     return redirect(url_for("maturity_management.batch_update_maturity"))
 
-            # Build update query
-            update_query = """
-                UPDATE business_capability
-                SET current_maturity_level = :current_level,
-                    target_maturity_level = :target_level,
-                    maturity_assessment_date = :assessment_date,
-                    maturity_assessment_notes = :notes,
-                    updated_at = :updated_at
-            """
+            # Reject an entirely blank submission — no level and no notes
+            # would still touch every row's updated_at and flash a success
+            # message without recording anything.
+            if not current_level and not target_level and not notes:
+                flash("Provide at least one field to update (current level, target level or notes).", "error")
+                return redirect(url_for("maturity_management.batch_update_maturity"))
 
-            params = {
-                "current_level": current_level,
-                "target_level": target_level,
-                "assessment_date": datetime.utcnow(),
-                "notes": notes,
-                "updated_at": datetime.utcnow(),
-            }
+            # Scope to the caller's org (and any domain / importance
+            # filters the form selected), then record through the
+            # single write path once per capability in the set.
+            from flask_login import current_user
 
-            # Add WHERE conditions. CRITICAL: always scope to the caller's org
-            # so a blank filter can never mass-update every tenant's capabilities.
-            # Refuse the write outright if there is no tenant context (should not
-            # happen on a @login_required route — but never run an unscoped UPDATE).
             _org = getattr(g, "current_org_id", None)
             if _org is None:
                 flash("Your session has expired — please sign in again.", "error")
                 return redirect(url_for("maturity_management.batch_update_maturity"))
-            where_conditions = ["organization_id = :org_id"]
-            params["org_id"] = _org
 
-            # The form's domain selector says "Only update capabilities in this
-            # domain". It was read from the form and then never used in the WHERE,
-            # so a domain-scoped batch update silently rewrote every capability in
-            # the organisation. The predicate is the contract the label states.
+            from app.models.business_capabilities import BusinessCapability
+
+            scope = BusinessCapability.query.filter(
+                BusinessCapability.organization_id == _org
+            )
             if domain:
-                where_conditions.append("business_domain = :domain")
-                params["domain"] = domain
-
+                scope = scope.filter(BusinessCapability.business_domain == domain)
             if strategic_importance:
-                where_conditions.append("strategic_importance = :strategic_importance")
-                params["strategic_importance"] = strategic_importance
-
-            update_query += " WHERE " + " AND ".join(where_conditions)
-
-            # Calculate and update gaps
-            if current_level is not None and target_level is not None:
-                update_query = update_query.replace(
-                    "SET current_maturity_level = :current_level,",
-                    "SET current_maturity_level = :current_level, maturity_gap = (:target_level - :current_level),",
+                scope = scope.filter(
+                    BusinessCapability.strategic_importance == strategic_importance
                 )
+            target_capabilities = scope.all()
 
-            # Execute update
-            result = db.session.execute(text(update_query), params)  # tenant-filtered
+            assessor_name = (
+                current_user.full_name() if current_user.is_authenticated else None
+            )
+            assessor_role = (
+                current_user.role_name if current_user.is_authenticated else None
+            )
+            assessor_user_id = (
+                current_user.id if current_user.is_authenticated else None
+            )
+            current_level_value = current_level if current_level else None
+            target_level_value = target_level if target_level else None
+            for cap in target_capabilities:
+                record_capability_maturity(
+                    capability_id=cap.id,
+                    organization_id=_org,
+                    current=current_level_value,
+                    target=target_level_value,
+                    notes=notes,
+                    assessor_user_id=assessor_user_id,
+                    assessor_name=assessor_name,
+                    assessor_role=assessor_role,
+                    commit=False,
+                )
             db.session.commit()
 
-            flash(f"Successfully updated {result.rowcount} capabilities!", "success")
+            flash(
+                f"Successfully updated {len(target_capabilities)} capabilities!",
+                "success",
+            )
             return redirect(url_for("maturity_management.frameworks_overview"))
 
         # GET request - show batch update form
@@ -1102,73 +1119,84 @@ def import_maturity_csv():
     caps = BusinessCapability.query.all()
     cap_map = {c.name.strip().lower(): c for c in caps if c.name}
 
+    from flask_login import current_user
+
+    csv_user_id = current_user.id if current_user.is_authenticated else None
+    csv_user_name = current_user.full_name() if current_user.is_authenticated else None
+    csv_user_role = current_user.role_name if current_user.is_authenticated else None
+
     updated = 0
     skipped = 0
     errors = []
 
-    for row_num, row in enumerate(reader, start=2):
-        row_norm = {k.strip().lower(): (v or "").strip() for k, v in row.items() if k}
-        name_key = row_norm.get("capability_name", "").lower()
-
-        if not name_key:
-            skipped += 1
-            continue
-
-        cap = cap_map.get(name_key)
-        if not cap:
-            errors.append({"row": row_num, "reason": f"Capability not found: {row_norm.get('capability_name', '')}"})
-            skipped += 1
-            continue
-
-        current_raw = row_norm.get("current_maturity", "") or row_norm.get("current_level", "")
-        target_raw = row_norm.get("target_maturity", "") or row_norm.get("target_level", "")
-        notes = row_norm.get("notes", "") or row_norm.get("assessment_notes", "")
-
-        changed = False
-
-        if current_raw:
-            try:
-                lvl = int(current_raw)
-                if not (1 <= lvl <= 5):
-                    raise ValueError()
-                cap.current_maturity_level = lvl
-                changed = True
-            except ValueError:
-                errors.append({"row": row_num, "reason": f"Invalid current_maturity '{current_raw}' — must be 1-5"})
-                skipped += 1
-                continue
-
-        if target_raw:
-            try:
-                lvl = int(target_raw)
-                if not (1 <= lvl <= 5):
-                    raise ValueError()
-                cap.target_maturity_level = lvl
-                changed = True
-            except ValueError:
-                errors.append({"row": row_num, "reason": f"Invalid target_maturity '{target_raw}' — must be 1-5"})
-                skipped += 1
-                continue
-
-        if notes and hasattr(cap, "maturity_assessment_notes"):
-            cap.maturity_assessment_notes = notes
-            changed = True
-
-        # Recalculate gap
-        if cap.current_maturity_level and cap.target_maturity_level:
-            cap.maturity_gap = cap.target_maturity_level - cap.current_maturity_level
-
-        if changed:
-            cap.updated_at = datetime.utcnow()
-            updated += 1
-        else:
-            skipped += 1
-
-        if row_num > 501:
-            errors.append({"row": row_num, "reason": "Row limit (500) reached — remaining rows skipped"})
-            break
-
     try:
+        for row_num, row in enumerate(reader, start=2):
+            row_norm = {k.strip().lower(): (v or "").strip() for k, v in row.items() if k}
+            name_key = row_norm.get("capability_name", "").lower()
+
+            if not name_key:
+                skipped += 1
+                continue
+
+            cap = cap_map.get(name_key)
+            if not cap:
+                errors.append({"row": row_num, "reason": f"Capability not found: {row_norm.get('capability_name', '')}"})
+                skipped += 1
+                continue
+
+            current_raw = row_norm.get("current_maturity", "") or row_norm.get("current_level", "")
+            target_raw = row_norm.get("target_maturity", "") or row_norm.get("target_level", "")
+            notes = row_norm.get("notes", "") or row_norm.get("assessment_notes", "")
+
+            changed = False
+
+            current_lvl = None
+            target_lvl = None
+            if current_raw:
+                try:
+                    current_lvl = int(current_raw)
+                    if not (1 <= current_lvl <= 5):
+                        raise ValueError()
+                    changed = True
+                except ValueError:
+                    errors.append({"row": row_num, "reason": f"Invalid current_maturity '{current_raw}' — must be 1-5"})
+                    skipped += 1
+                    continue
+
+            if target_raw:
+                try:
+                    target_lvl = int(target_raw)
+                    if not (1 <= target_lvl <= 5):
+                        raise ValueError()
+                    changed = True
+                except ValueError:
+                    errors.append({"row": row_num, "reason": f"Invalid target_maturity '{target_raw}' — must be 1-5"})
+                    skipped += 1
+                    continue
+
+            if notes and hasattr(cap, "maturity_assessment_notes"):
+                changed = True
+
+            if changed:
+                record_capability_maturity(
+                    capability_id=cap.id,
+                    organization_id=cap.organization_id,
+                    current=current_lvl,
+                    target=target_lvl,
+                    notes=notes if notes else None,
+                    assessor_user_id=csv_user_id,
+                    assessor_name=csv_user_name,
+                    assessor_role=csv_user_role,
+                    commit=False,
+                )
+                updated += 1
+            else:
+                skipped += 1
+
+            if row_num > 501:
+                errors.append({"row": row_num, "reason": "Row limit (500) reached — remaining rows skipped"})
+                break
+
         db.session.commit()
     except Exception as e:
         db.session.rollback()

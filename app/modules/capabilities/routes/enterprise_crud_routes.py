@@ -9,7 +9,7 @@ Provides full CRUD operations with RBAC enforcement and audit logging.
 """
 
 import logging
-from flask import Blueprint, abort, jsonify, render_template, request
+from flask import Blueprint, abort, g, jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from app import db
@@ -399,6 +399,13 @@ def update_capability(capability_id):
             }
             capability.level = data["level"]
 
+        # Route maturity changes through the single write path so they leave
+        # a history row.  Pop the two maturity keys before
+        # _apply_optional_capability_fields so it does not overwrite them.
+        maturity_current = data.pop("current_maturity_level", None)
+        maturity_target = data.pop("target_maturity_level", None)
+        maturity_notes = data.pop("maturity_assessment_notes", None)
+
         extra_errors = _apply_optional_capability_fields(capability, data)
         if extra_errors:
             db.session.rollback()
@@ -407,6 +414,39 @@ def update_capability(capability_id):
                          "errors": {"capability": extra_errors}}),
                 400,
             )
+
+        # Record maturity through the service when either level differs from
+        # the stored value or notes are provided.
+        if (
+            maturity_current is not None
+            or maturity_target is not None
+            or maturity_notes is not None
+        ):
+            from app.modules.capabilities.services.capability_maturity_service import (
+                MaturityValidationError,
+                record_capability_maturity,
+            )
+            try:
+                record_capability_maturity(
+                    capability_id=capability.id,
+                    organization_id=g.current_org_id,
+                    current=int(maturity_current) if maturity_current not in (None, "", "0") else None,
+                    target=int(maturity_target) if maturity_target not in (None, "", "0") else None,
+                    notes=maturity_notes,
+                    clear_current=maturity_current in ("", "0") and capability.current_maturity_level is not None,
+                    clear_target=maturity_target in ("", "0") and capability.target_maturity_level is not None,
+                    assessor_user_id=current_user.id,
+                    assessor_name=current_user.full_name(),
+                    assessor_role=current_user.role_name,
+                    commit=False,
+                )
+            except MaturityValidationError as e:
+                db.session.rollback()
+                return (
+                    jsonify({"success": False, "error": "Validation failed",
+                             "errors": {"capability": [str(e)]}}),
+                    400,
+                )
 
         db.session.commit()
 

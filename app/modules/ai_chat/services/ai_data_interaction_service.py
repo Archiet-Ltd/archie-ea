@@ -145,10 +145,48 @@ class AIDataInteractionService:
                 if hasattr(capability, field):
                     before_state[field] = getattr(capability, field)
 
-            # Update fields
+            # Route maturity changes through the single write path so they
+            # leave a history row.  Pop the maturity keys before the generic
+            # setattr loop so it does not overwrite them.
+            maturity_current = update_data.pop("current_maturity_level", None)
+            maturity_target = update_data.pop("target_maturity_level", None)
+            maturity_notes = update_data.pop("maturity_assessment_notes", None)
+
+            # Update fields (non-maturity)
             for field, value in update_data.items():
                 if hasattr(capability, field):
                     setattr(capability, field, value)
+
+            # Record maturity through the service when any maturity field was
+            # provided.
+            if maturity_current is not None or maturity_target is not None or maturity_notes is not None:
+                from app.modules.capabilities.services.capability_maturity_service import (
+                    MaturityValidationError,
+                    record_capability_maturity,
+                )
+                from flask import g
+                org_id = getattr(g, "current_org_id", None)
+                if org_id is None and self.user_id:
+                    from app.models.user import User
+                    user = db.session.get(User, self.user_id)
+                    org_id = user.organization_id if user else None
+                try:
+                    record_capability_maturity(
+                        capability_id=capability.id,
+                        organization_id=org_id,
+                        current=int(maturity_current) if maturity_current is not None else None,
+                        target=int(maturity_target) if maturity_target is not None else None,
+                        notes=maturity_notes,
+                        assessor_user_id=self.user_id,
+                        commit=False,
+                    )
+                except (MaturityValidationError, LookupError) as e:
+                    db.session.rollback()
+                    return {
+                        "success": False,
+                        "error": str(e),
+                        "operation": "update_capability",
+                    }
 
             capability.updated_at = datetime.utcnow()
             db.session.commit()
