@@ -441,3 +441,46 @@ def test_request_with_no_resolved_organisation_is_refused(world, db_session, mon
     assert resp.status_code == 403
     db_session.refresh(demand)
     assert demand.status == "submitted"
+
+
+def test_absent_route_field_leaves_the_recorded_route(world, db_session):
+    org, client = world["a"]
+    _tenant(org.id)
+    cap = _capability(db_session, org, "Keep")
+    _map(db_session, cap, _application(db_session, org, "Keep App"))
+    demand = _demand(org, "Defer then approve", cap.id)
+    db_session.add(demand)
+    db_session.flush()
+    _clear_login_cache()
+    client.post("/portfolio/demands/%d/decide" % demand.id, data={"status": "deferred", "route": "reuse"})
+    db_session.refresh(demand)
+    reasons = demand.triage_route_reasons
+    assert demand.triage_route == "reuse" and "Keep App" in reasons
+    _clear_login_cache()
+    client.post("/portfolio/demands/%d/decide" % demand.id, data={"status": "approved"})
+    db_session.refresh(demand)
+    assert demand.status == "approved"
+    assert demand.triage_route == "reuse"
+    assert demand.triage_route_reasons == reasons
+
+
+def test_non_numeric_capability_id_is_refused(world, db_session):
+    org, client = world["a"]
+    _tenant(org.id)
+    _clear_login_cache()
+    resp = client.post("/portfolio/demands/new", data={"title": "Junk id", "capability_id": "abc"})
+    assert resp.status_code == 400
+    from app.models.demand import Demand
+
+    assert db_session.query(Demand).filter_by(title="Junk id").count() == 0
+
+
+def test_queue_shows_capability_name_from_the_recommendation(world, db_session):
+    org, client = world["a"]
+    _tenant(org.id)
+    cap = _capability(db_session, org, "Named Capability")
+    db_session.add(_demand(org, "Needs a name", cap.id))
+    db_session.flush()
+    _clear_login_cache()
+    page = client.get("/portfolio/demands").get_data(as_text=True)
+    assert "Named Capability" in page

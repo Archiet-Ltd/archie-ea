@@ -101,8 +101,9 @@ def demand_new():
 
     if request.method == "POST":
         title = (request.form.get("title") or "").strip()
-        capability_id = _int_or_none(request.form.get("capability_id"))
-        if capability_id is not None and visible_capability(capability_id) is None:
+        raw_capability = (request.form.get("capability_id") or "").strip()
+        capability_id = _int_or_none(raw_capability)
+        if raw_capability and (capability_id is None or visible_capability(capability_id) is None):
             flash("That capability could not be found.", "error")
             return render_template(
                 "portfolio/demand_form.html", sources=DEMAND_SOURCES, form=request.form,
@@ -173,7 +174,10 @@ def demand_decide(demand_id):
     from app.models.demand import DEMAND_ROUTES
     from app.modules.portfolio.services.demand_triage import recommend
 
-    route = (request.form.get("route") or "").strip() or None
+    # Absent field = leave the recorded route alone (approving a deferred row
+    # posts none); an explicit blank clears it.
+    route_field = request.form.get("route")
+    route = (route_field or "").strip() or None
     if route is not None and route not in DEMAND_ROUTES:
         flash("Unrecognised route.", "error")
         return redirect(url_for("portfolio.demands"))
@@ -181,8 +185,8 @@ def demand_decide(demand_id):
         # Keep the coverage the person was looking at with the route they chose.
         demand.triage_route = route
         demand.triage_route_reasons = recommend(demand.capability_id)["reason"]
-    else:
-        # A blank route clears an earlier one, with the reasons recorded for it.
+    elif route_field is not None:
+        # An explicit blank route clears an earlier one, with its reasons.
         demand.triage_route = None
         demand.triage_route_reasons = None
 

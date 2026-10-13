@@ -56,12 +56,7 @@ def visible_capability(capability_id: int) -> Optional[UnifiedCapability]:
     org_id = _org_id()
     if org_id is None:
         return None
-    return db.session.execute(
-        db.select(UnifiedCapability).where(
-            UnifiedCapability.id == capability_id,
-            UnifiedCapability.visibility_predicate(org_id),
-        )
-    ).scalar_one_or_none()
+    return UnifiedCapability.visible_to_organization(capability_id, org_id)
 
 
 def coverage_by_capability(capability_ids) -> Dict[int, List[Dict[str, Any]]]:
@@ -143,6 +138,12 @@ def recommend_many(capability_ids) -> Dict[Optional[int], Dict[str, Any]]:
 
 
 def _recommendation(capability_id, capability, apps) -> Dict[str, Any]:
+    rec = _recommendation_body(capability_id, capability, apps)
+    rec["capability_name"] = capability.name if capability is not None else None
+    return rec
+
+
+def _recommendation_body(capability_id, capability, apps) -> Dict[str, Any]:
     if capability_id is None:
         return {
             "route": None,

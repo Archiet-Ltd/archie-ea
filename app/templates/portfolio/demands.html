@@ -68,7 +68,7 @@
         {% set rec = recommendations.get(d.id) %}
         <div class="mt-3 rounded-md border bg-muted p-3 text-sm" data-testid="demand-recommendation-{{ d.id }}">
           <p class="font-medium">
-            {% if d.capability %}{{ d.capability.name }}{% else %}No capability recorded{% endif %}
+            {% if rec.capability_name %}{{ rec.capability_name }}{% else %}No capability recorded{% endif %}
             {% if rec.route %}&middot; Recommended: {{ rec.route|replace('_',' ') }}{% endif %}
           </p>
           <p class="text-muted-foreground mt-1">{{ rec.reason }}</p>
