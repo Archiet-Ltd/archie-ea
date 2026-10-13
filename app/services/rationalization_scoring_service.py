@@ -10,6 +10,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
+from flask import g, has_request_context
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
@@ -37,6 +38,9 @@ from app.services.decorators import transactional
 
 logger = logging.getLogger(__name__)
 
+# Answer given when no governed scoring configuration resolves for an organisation.
+NO_FORMULA_MESSAGE = "No scoring formula is registered for this organisation"
+
 
 class RationalizationScoringService:
     """
@@ -48,11 +52,12 @@ class RationalizationScoringService:
     - MIGRATE: Move to better platform (technical debt, obsolete)
     - ELIMINATE: Retire/consolidate (redundant, high cost, low value)
 
-    Scoring Dimensions:
-    - Technical Health (30%): Architecture, tech stack, technical debt
-    - Business Value (35%): Strategic alignment, user satisfaction, process criticality
-    - Cost Efficiency (25%): TCO, license optimization, maintenance burden
-    - Vendor Risk (10%): Vendor health, contract status, concentration risk
+    Scoring Dimensions (weights come from the resolved ScoringConfiguration,
+    the formula register; no weights are held in code):
+    - Technical Health: Architecture, tech stack, technical debt
+    - Business Value: Strategic alignment, user satisfaction, process criticality
+    - Cost Efficiency: TCO, license optimization, maintenance burden
+    - Vendor Risk: Vendor health, contract status, concentration risk
     - Capability Coverage (adjustment): Apps supporting critical L1-L2 capabilities
       receive a score adjustment (+/-10 pts max).  Single-point-of-failure for
       L1-L2 capabilities blocks ELIMINATE recommendations.
@@ -70,16 +75,34 @@ class RationalizationScoringService:
     MODEL_CALIBRATION_HISTORY = []  # Populated by calibration runs
 
     @classmethod
-    def get_model_metadata(cls):
-        """Return current scoring model metadata."""
+    def get_model_metadata(cls, scoring_config: Optional[ScoringConfiguration] = None):
+        """Return current scoring model metadata.
+
+        Weights and the formula identity come from the scoring configuration
+        the service resolves; with none resolvable both are ``None``.
+        """
+        config = scoring_config
+        if config is None:
+            config = cls.get_scoring_configuration()
         return {
             "version": cls.MODEL_VERSION,
-            "weights": {
-                "technical_health": 0.30,
-                "business_value": 0.35,
-                "cost_efficiency": 0.25,
-                "vendor_risk": 0.10,
-            },
+            "weights": config.get_weights_dict() if config is not None else None,
+            "formula": (
+                {
+                    "scoring_configuration_id": config.id,
+                    "name": config.name,
+                    "formula_version": config.formula_version or 1,
+                    "organization_id": config.organization_id,
+                    "is_shared": config.organization_id is None,
+                    "owner_user_id": config.owner_user_id,
+                    "reviewer_user_id": config.reviewer_user_id,
+                    "effective_from": (
+                        config.effective_from.isoformat() if config.effective_from else None
+                    ),
+                }
+                if config is not None
+                else None
+            ),
             "capability_coverage": {
                 "type": "adjustment",
                 "max_adjustment": 10.0,
@@ -200,28 +223,37 @@ class RationalizationScoringService:
         scope_type: str = "global",
         scope_entity_id: Optional[int] = None,
         scope_entity_type: Optional[str] = None,
-    ) -> ScoringConfiguration:
+        organization_id: Optional[int] = None,
+    ) -> Optional[ScoringConfiguration]:
         """
-        Get the appropriate scoring configuration for the given scope.
+        Resolve the governed scoring configuration (formula) for a scope.
 
-        Falls back to default federal CIO weights (30/35/25/10) if no
-        custom configuration exists for the specified scope.
+        Candidates are the caller's organisation's own configurations and the
+        shared ones (``organization_id IS NULL``); an organisation's own row
+        wins over a shared row at the same step. Resolution order: the
+        specific scope, then the default, then any global configuration.
+
+        Returns ``None`` when nothing resolves. No default weighting is
+        invented: a score without a governed formula has no overall value.
 
         Args:
             scope_type: Configuration scope (global, division, department, business_unit)
             scope_entity_id: ID of the scoped entity
             scope_entity_type: Type of entity (BusinessUnit, Department, etc.)
-
-        Returns:
-            ScoringConfiguration object
+            organization_id: Organisation to resolve for; defaults to the
+                request's current organisation.
         """
+        if organization_id is None and has_request_context():
+            organization_id = getattr(g, "current_org_id", None)
         try:
-            # Try to find specific configuration
-            query = ScoringConfiguration.query.filter_by(
-                is_active=True
+            query = ScoringConfiguration.query.filter(
+                ScoringConfiguration.is_active.is_(True),
+                ScoringConfiguration.visibility_predicate(organization_id),
+            ).order_by(
+                ScoringConfiguration.organization_id.is_(None).asc(),
+                ScoringConfiguration.id.asc(),
             )
 
-            # For non-global scopes, try specific config first
             if scope_type != "global" and scope_entity_id is not None:
                 specific_config = query.filter_by(
                     scope_type=scope_type,
@@ -231,43 +263,24 @@ class RationalizationScoringService:
                 if specific_config:
                     return specific_config
 
-            # Try default configuration
             default_config = query.filter_by(is_default=True).first()
             if default_config:
                 return default_config
 
-            # Return global configuration or create default
             global_config = query.filter_by(scope_type="global").first()
             if global_config:
                 return global_config
 
-            # Create default CIO.gov baseline configuration if none exists
-            logger.warning("No scoring configuration found, creating default CIO.gov baseline")
-            default = ScoringConfiguration(
-                name="CIO.gov Federal Baseline",
-                description="Default weights per CIO.gov Application Rationalization Playbook",
-                scope_type="global",
-                technical_health_weight=30,
-                business_value_weight=35,
-                cost_efficiency_weight=25,
-                vendor_risk_weight=10,
-                is_default=True,
+            logger.warning(
+                "No scoring configuration resolves for organisation %s; "
+                "rationalisation scores have no overall value until one is registered",
+                organization_id,
             )
-            db.session.add(default)
-            db.session.flush()
-            return default
+            return None
 
         except Exception as e:
             logger.error(f"Error getting scoring configuration: {e}", exc_info=True)
-            # Return a transient default configuration (not persisted)
-            return ScoringConfiguration(
-                name="Emergency Default",
-                scope_type="global",
-                technical_health_weight=30,
-                business_value_weight=35,
-                cost_efficiency_weight=25,
-                vendor_risk_weight=10,
-            )
+            return None
 
     @staticmethod
     def resolve_policy(app: "ApplicationComponent") -> Optional["RationalizationPolicy"]:
@@ -506,37 +519,6 @@ class RationalizationScoringService:
         # Both unknown — default to operational with flag
         return {"lifecycle": "operational", "data_quality_flag": True}
 
-    REQUIRED_FORMULA_DIMENSIONS = frozenset(
-        {"technical_health", "business_value", "cost_efficiency", "vendor_risk"}
-    )
-
-    @staticmethod
-    def _resolve_overall_weights(app, scoring_config, active_policy):
-        """The ONE weight-resolution path for the rationalization overall
-        score, shared by calculate_app_score (which writes the score) and
-        get_evidence_trail (which re-derives it for display) -- so both
-        surfaces answer with the same weights (ADR 0008: one answer per
-        question). Returns (weights, active_formula_or_None); the second
-        value is non-None only when a registered FormulaRegister version's
-        weights are the ones actually returned, so callers can record that
-        version only when it is true.
-
-        A registered formula is used only when it names every required
-        dimension; an incomplete one (R1-B34 review finding C) is treated
-        exactly as if nothing were registered, rather than partially
-        overriding ScoringConfiguration with some dimensions missing.
-        """
-        from app.models.formula_register import FormulaRegister
-
-        active_formula = FormulaRegister.active_for(app.organization_id, "rationalization_overall")
-        required = RationalizationScoringService.REQUIRED_FORMULA_DIMENSIONS
-        if active_formula is not None and required.issubset(active_formula.inputs or {}):
-            return active_formula.inputs, active_formula
-
-        if active_policy is not None:
-            return active_policy.get_effective_weights(scoring_config), None
-        return scoring_config.get_weights_dict(), None
-
     @staticmethod
     @transactional
     def calculate_app_score(
@@ -548,7 +530,8 @@ class RationalizationScoringService:
         Calculate comprehensive rationalization score for an application.
 
         Creates or updates ApplicationRationalizationScore record with TIME recommendation.
-        Uses configurable weights if scoring_config provided, otherwise uses default.
+        Uses the governed configuration the service resolves (or scoring_config when
+        given); returns None when no configuration resolves.
 
         Args:
             application_id: Application component ID
@@ -571,8 +554,15 @@ class RationalizationScoringService:
             # Get scoring configuration
             if scoring_config is None:
                 scoring_config = RationalizationScoringService.get_scoring_configuration(
-                    scope_type="global"
+                    scope_type="global",
+                    organization_id=getattr(app, "organization_id", None),  # model-safety-ok
                 )
+            if scoring_config is None:
+                logger.warning(
+                    "Application %s not scored: no scoring configuration resolves",
+                    application_id,
+                )
+                return None
 
             # Resolve the policy overlay for this application.
             # The policy can override dimension weights and TIME thresholds.
@@ -589,12 +579,11 @@ class RationalizationScoringService:
             # Capability coverage dimension (CAP-020: now contributes to overall score)
             capability_result = RationalizationScoringService._compute_capability_score(application_id)
 
-            # R1-B34 (TB-0135): one shared resolver, also used by
-            # get_evidence_trail below, so both surfaces answer with the
-            # same weights. See _resolve_overall_weights's own docstring.
-            weights, active_formula = RationalizationScoringService._resolve_overall_weights(
-                app, scoring_config, active_policy,
-            )
+            # Resolve effective weights — policy overrides base config if present.
+            if active_policy is not None:
+                weights = active_policy.get_effective_weights(scoring_config)
+            else:
+                weights = scoring_config.get_weights_dict()
 
             # Calculate weighted overall score using resolved weights.
             overall_score = (
@@ -814,13 +803,10 @@ class RationalizationScoringService:
             score.action_rationale = justification
             score.assessment_date = datetime.utcnow().date()
             score.scoring_model_version = scoring_config.configuration_version
-
-            # R1-B34 (TB-0135): `active_formula` here is the same object
-            # resolved above when the overall score was computed -- it is
-            # None whenever the FormulaRegister's weights were NOT the ones
-            # actually used (missing or incomplete), so this column never
-            # names a formula that did not produce this number.
-            score.formula_version = active_formula.version if active_formula else None
+            # Formula register: record exactly which governed formula produced this score.
+            score.scoring_configuration_id = scoring_config.id
+            # A row registered before versioning (NULL) is its first version.
+            score.formula_version = scoring_config.formula_version or 1
 
             # Record which policy was applied (nullable — None when no policy exists).
             score.policy_id = active_policy.id if active_policy else None
@@ -953,8 +939,11 @@ class RationalizationScoringService:
 
             if scoring_config is None:
                 scoring_config = RationalizationScoringService.get_scoring_configuration(
-                    scope_type="global"
+                    scope_type="global",
+                    organization_id=getattr(app, "organization_id", None),  # model-safety-ok
                 )
+            if scoring_config is None:
+                return {"error": NO_FORMULA_MESSAGE, "no_formula": True}
 
             # Resolve policy overlay (read-only — no DB flush in this method).
             active_policy = RationalizationScoringService.resolve_policy(app)
@@ -966,12 +955,10 @@ class RationalizationScoringService:
             vendor_score = vendor_result["score"]
             vendor_evidence = vendor_result.get("evidence", [])
 
-            # R1-B34 (TB-0135): the same resolver calculate_app_score uses,
-            # so this re-derived trail never disagrees with the saved score
-            # (review finding A).
-            weights, _active_formula = RationalizationScoringService._resolve_overall_weights(
-                app, scoring_config, active_policy,
-            )
+            if active_policy is not None:
+                weights = active_policy.get_effective_weights(scoring_config)
+            else:
+                weights = scoring_config.get_weights_dict()
 
             overall_score = (
                 technical_score * weights["technical_health"]
@@ -1180,6 +1167,8 @@ class RationalizationScoringService:
                 "app_id": application_id,
                 "app_name": app.name,
                 "scoring_config_name": scoring_config.name,
+                "scoring_configuration_id": scoring_config.id,
+                "formula_version": scoring_config.formula_version or 1,
                 "policy_applied": policy_applied,
                 "scores": {
                     "technical_health": round(technical_score, 2),

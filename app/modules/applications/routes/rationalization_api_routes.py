@@ -1408,6 +1408,8 @@ def rationalization_evidence_trail(app_id):
 
         result = RationalizationScoringService.get_evidence_trail(app_id, app=app_obj)
 
+        if result.get("no_formula"):
+            return jsonify({"success": False, "error": result["error"]}), 409
         if "error" in result:
             return jsonify({"success": False, "error": result["error"]}), 500
 
@@ -3587,6 +3589,7 @@ def rationalization_score_app(app_id):
         RationalizationBenefitsTracker,
     )
     from app.services.rationalization_scoring_service import (
+        NO_FORMULA_MESSAGE,
         RationalizationScoringService,
     )
 
@@ -3595,6 +3598,14 @@ def rationalization_score_app(app_id):
         return jsonify({"success": False, "error": "Application not found"}), 404
 
     try:
+        if (
+            RationalizationScoringService.get_scoring_configuration(
+                organization_id=app_obj.organization_id
+            )
+            is None
+        ):
+            return jsonify({"success": False, "error": NO_FORMULA_MESSAGE}), 409
+
         score = RationalizationScoringService.calculate_app_score(app_id, app=app_obj)
         if not score:
             return jsonify({"success": False, "error": "Scoring failed — check logs"}), 500

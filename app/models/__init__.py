@@ -92,7 +92,6 @@ else:
     from .capability_archimate_mapping import *  # noqa
     from .copilot_insight import *  # noqa
     from .frontend_configuration import *  # noqa
-    from .scoring_config import *  # noqa
     from .usage_event import *  # noqa
     from .simple_duplicate_detection import *  # noqa
     from .optimization import *  # noqa
@@ -107,7 +106,6 @@ else:
     )  # ARB-002, ARB-004
     from .application_portfolio import *  # noqa - ApplicationComponent, ApplicationTechnologyInstance, VendorContract
     from .application_rationalization import *  # noqa - ApplicationReplacement, ApplicationDependency, ApplicationRationalizationScore, VendorConcentrationAnalysis
-    from .formula_register import FormulaRegister  # noqa - R1-B34, versioned composite-score formulas
     from .archimate_motivation import *  # noqa - MotivationStakeholder, MotivationAssessment, MotivationOutcome, MotivationConstraint, MotivationValue, MotivationMeaning (ArchiMate 3.2 Motivation Layer)
     from .business_capabilities import (  # noqa
         ApplicationCapabilityCoverage,
