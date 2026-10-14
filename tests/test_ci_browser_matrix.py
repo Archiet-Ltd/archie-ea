@@ -561,7 +561,7 @@ def test_jobs_skip_on_non_ci_fast_labeled_events():
         "secret-scan", "static-gates", "boot-health", "tests-shard",
         "tests", "db-gates", "security-sast", "smoke",
         "browser-compatibility", "walkthrough", "dependency-audit",
-        "content-page-tests",
+        "content-page-tests", "fast-tests", "quarantine-tests",
     }
     for job_id in gating_jobs:
         job = jobs[job_id]
@@ -746,7 +746,7 @@ def test_detector_gated_jobs_use_cancelled_not_always():
     """A cancelled run must really cancel: no detector-gated job may start its
     condition with always(), which would keep running after a cancellation."""
     gated = _detector_gated_jobs()
-    assert len(gated) == 9
+    assert len(gated) == 11
     for name, job in gated.items():
         expr = _strip_expr(str(job["if"]))
         assert expr.startswith("!cancelled() &&"), name
@@ -765,7 +765,7 @@ def test_heavy_jobs_run_when_the_detector_job_did_not_succeed(changes_result):
     for name, job in gated.items():
         expr = _strip_expr(str(job["if"])).replace("!cancelled()", "1 == 1")
         ran = bool(_eval_github_expr(expr, c))
-        if name == "content-page-tests":
+        if name in ("content-page-tests", "fast-tests"):
             continue
         assert ran, f"{name} must run when the changes job result is {changes_result}"
 
@@ -779,7 +779,7 @@ def test_heavy_jobs_run_when_the_detector_output_is_missing():
         "_labels": [],
     }
     for name, job in gated.items():
-        if name == "content-page-tests":
+        if name in ("content-page-tests", "fast-tests"):
             continue
         expr = _strip_expr(str(job["if"])).replace("!cancelled()", "1 == 1")
         assert bool(_eval_github_expr(expr, c)), f"{name} must run when is_content_only is missing"
