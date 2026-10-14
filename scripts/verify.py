@@ -1281,6 +1281,27 @@ def gate_unfenced_tables() -> Result:
     return Result("unfenced-tables", PASS if count == 0 else FAIL, detail, count, 0)
 
 
+def gate_reuse_register() -> Result:
+    """One canonical implementation per concept (docs/reuse-register.yml). Gated at ZERO.
+
+    Static (no boot, no database). Fails when a register entry's canonical file or
+    symbol no longer exists, and when a definition matching a `must_not_create`
+    pattern appears outside the canonical file and the known exceptions beyond the
+    per-file counts in scripts/reuse_register_baseline.json (which only fall). The
+    failure prints the register entry so a builder knows what to reuse. See
+    scripts/check_reuse_register.py.
+    """
+    proc = _run([sys.executable, "scripts/check_reuse_register.py"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("reuse-register", FAIL,
+                      f"could not parse: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = proc.stdout[-1800:] if count or proc.returncode else ""
+    return Result("reuse-register", PASS if count == 0 and proc.returncode == 0 else FAIL,
+                  detail, count, 0)
+
+
 def gate_sidebar_links(baseline: int) -> Result:
     """Persona sidebar link-count budget (shell-overhaul Wave 1, Task 3).
 
@@ -1795,6 +1816,12 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="give the model TenantMixin, or list the table in "
                          "scripts/unfenced_tables.txt with a reason in review",
              tags=["static", "security"]),
+        Gate("reuse-register", "one canonical implementation per concept; no second copy beside it",
+             "zero", gate_reuse_register,
+             remediation="reuse the implementation named in docs/reuse-register.yml "
+                         "(python scripts/check_reuse_register.py --entries), or add a "
+                         "known_exceptions entry with a reason",
+             tags=["static", "process"]),
         Gate("llm-boundary", "codegen emitters make no direct LLM calls (deterministic boundary)",
              "ratchet", lambda: gate_llm_boundary(baseline.get("llm_boundary", 0)),
              remediation="move the LLM call out of the emitter; the LLM may only propose "

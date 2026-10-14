@@ -10,7 +10,7 @@ saving is the same class of lie as a dashboard that invents a number.
 """
 from datetime import datetime
 
-from flask import abort, flash, redirect, request, url_for
+from flask import abort, flash, g, redirect, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -42,6 +42,18 @@ def _uid():
     return getattr(current_user, "id", None)
 
 
+def _require_org_id():
+    """The signed-in organisation; 403 when it is not resolved.
+
+    The automatic tenant filter does nothing without an organisation, so the
+    demand routes state it explicitly and refuse to run without one.
+    """
+    org_id = getattr(g, "current_org_id", None)
+    if org_id is None:
+        abort(403)
+    return org_id
+
+
 # ── Demand ────────────────────────────────────────────────────────────────
 
 @portfolio_bp.route("/demands")
@@ -52,11 +64,24 @@ def demands():
 
     from app.models.demand import Demand
 
-    rows = db.session.query(Demand).order_by(Demand.id.desc()).all()
+    org_id = _require_org_id()
+    rows = (
+        db.session.query(Demand)
+        .filter(Demand.organization_id == org_id)
+        .order_by(Demand.id.desc())
+        .all()
+    )
     open_demands = [d for d in rows if not d.is_decided]
     open_demands.sort(key=lambda d: (d.days_awaiting_decision or 0), reverse=True)
+    from app.models.demand import DEMAND_ROUTES
+    from app.modules.portfolio.services.demand_triage import recommend_many
+
+    by_capability = recommend_many([d.capability_id for d in open_demands])
+    recommendations = {d.id: by_capability[d.capability_id] for d in open_demands}
     return render_template(
         "portfolio/demands.html",
+        recommendations=recommendations,
+        routes=DEMAND_ROUTES,
         open_demands=open_demands,
         decided=[d for d in rows if d.is_decided],
     )
@@ -69,13 +94,26 @@ def demand_new():
     from flask import render_template
 
     from app.models.demand import DEMAND_SOURCES, Demand
+    from app.modules.portfolio.services.demand_triage import visible_capabilities, visible_capability
+
+    _require_org_id()
+    capabilities = visible_capabilities()
 
     if request.method == "POST":
         title = (request.form.get("title") or "").strip()
+        raw_capability = (request.form.get("capability_id") or "").strip()
+        capability_id = _int_or_none(raw_capability)
+        if raw_capability and (capability_id is None or visible_capability(capability_id) is None):
+            flash("That capability could not be found.", "error")
+            return render_template(
+                "portfolio/demand_form.html", sources=DEMAND_SOURCES, form=request.form,
+                capabilities=capabilities,
+            ), 400
         if not title:
             flash("A title is required.", "error")
             return render_template(
-                "portfolio/demand_form.html", sources=DEMAND_SOURCES, form=request.form
+                "portfolio/demand_form.html", sources=DEMAND_SOURCES, form=request.form,
+                capabilities=capabilities,
             ), 400
 
         demand = Demand(
@@ -90,6 +128,7 @@ def demand_new():
             requested_for_business_unit=(request.form.get("requested_for_business_unit") or "").strip() or None,
             needed_by_date=_date_or_none(request.form.get("needed_by_date")),
             requested_by_id=_uid(),
+            capability_id=capability_id,
             status="submitted",
         )
         db.session.add(demand)
@@ -97,7 +136,9 @@ def demand_new():
         flash("Demand submitted.", "success")
         return redirect(url_for("portfolio.demands"))
 
-    return render_template("portfolio/demand_form.html", sources=DEMAND_SOURCES, form={})
+    return render_template(
+        "portfolio/demand_form.html", sources=DEMAND_SOURCES, form={}, capabilities=capabilities
+    )
 
 
 @portfolio_bp.route("/demands/<int:demand_id>/decide", methods=["POST"])
@@ -111,7 +152,12 @@ def demand_decide(demand_id):
     """
     from app.models.demand import Demand
 
-    demand = db.session.get(Demand, demand_id)
+    org_id = _require_org_id()
+    demand = (
+        db.session.query(Demand)
+        .filter(Demand.id == demand_id, Demand.organization_id == org_id)
+        .one_or_none()
+    )
     if demand is None:
         abort(404)
 
@@ -124,6 +170,25 @@ def demand_decide(demand_id):
     if decision == "declined" and not rationale:
         flash("A declined demand needs a rationale.", "error")
         return redirect(url_for("portfolio.demands"))
+
+    from app.models.demand import DEMAND_ROUTES
+    from app.modules.portfolio.services.demand_triage import recommend
+
+    # Absent field = leave the recorded route alone (approving a deferred row
+    # posts none); an explicit blank clears it.
+    route_field = request.form.get("route")
+    route = (route_field or "").strip() or None
+    if route is not None and route not in DEMAND_ROUTES:
+        flash("Unrecognised route.", "error")
+        return redirect(url_for("portfolio.demands"))
+    if route is not None:
+        # Keep the coverage the person was looking at with the route they chose.
+        demand.triage_route = route
+        demand.triage_route_reasons = recommend(demand.capability_id)["reason"]
+    elif route_field is not None:
+        # An explicit blank route clears an earlier one, with its reasons.
+        demand.triage_route = None
+        demand.triage_route_reasons = None
 
     demand.status = decision
     demand.decision_rationale = rationale or None
@@ -341,4 +406,52 @@ def initiative_link_programme(initiative_id):
     initiative.linked_strategic_initiative_id = programme.id
     db.session.commit()
     flash(f"Linked to {programme.name}.", "success")
+    return redirect(url_for("portfolio.detail", initiative_id=initiative_id))
+
+
+# ── Strategic objectives an initiative serves ─────────────────────────────
+
+@portfolio_bp.route("/initiatives/<int:initiative_id>/goals", methods=["POST"])
+@login_required
+def initiative_goal_add(initiative_id):
+    from app.modules.portfolio.services.initiative_goal_links import (
+        InitiativeGoalLinkError,
+        add_link,
+    )
+
+    goal_id = _int_or_none(request.form.get("goal_id"))
+    if goal_id is None:
+        flash("Choose the goal this initiative serves.", "error")
+        return redirect(url_for("portfolio.detail", initiative_id=initiative_id))
+    try:
+        goal = add_link(initiative_id, goal_id, request.form.get("contribution_level"))
+        db.session.commit()
+    except InitiativeGoalLinkError as exc:
+        db.session.rollback()
+        if exc.status == 404 and exc.message == "Initiative not found.":
+            abort(404)
+        flash(exc.message, "error")
+    else:
+        flash(f"Linked to {goal.name}.", "success")
+    return redirect(url_for("portfolio.detail", initiative_id=initiative_id))
+
+
+@portfolio_bp.route("/initiatives/<int:initiative_id>/goals/<int:goal_id>/remove", methods=["POST"])
+@login_required
+def initiative_goal_remove(initiative_id, goal_id):
+    from app.modules.portfolio.services.initiative_goal_links import (
+        InitiativeGoalLinkError,
+        remove_link,
+    )
+
+    try:
+        remove_link(initiative_id, goal_id)
+        db.session.commit()
+    except InitiativeGoalLinkError as exc:
+        db.session.rollback()
+        if exc.status == 404 and exc.message == "Initiative not found.":
+            abort(404)
+        flash(exc.message, "error")
+    else:
+        flash("Goal link removed.", "success")
     return redirect(url_for("portfolio.detail", initiative_id=initiative_id))

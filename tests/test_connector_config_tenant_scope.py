@@ -301,16 +301,26 @@ class TestConnectorAdminRoutesAreTenantScoped:
 
 
 class TestServiceNowConnectorRouteStoresSecretInVault:
-    """The ServiceNow connector admin route (``/admin/connectors/servicenow``,
-    backed by the retired ``OrgConnectorConfig``) must save the client secret
-    through ``OrgCredentialVault`` instead of the retired setter, and that
-    secret must be encrypted per organisation — never shared or readable
-    across organisations."""
+    """The ServiceNow connector admin route (``/admin/connectors/servicenow``)
+    must save the client secret through ``OrgCredentialVault`` instead of the
+    retired setter — encrypted per organisation, never shared or readable
+    across organisations — and route the configuration change through the
+    organisation's approval queue: the row is written when the proposal is
+    approved, not by the save itself. The retiring ``OrgConnectorConfig``
+    forever store is no longer written."""
 
-    def test_save_succeeds_and_stores_the_secret_encrypted_via_the_vault(
+    def test_save_queues_a_proposal_and_approval_applies_the_config(
         self, db_session, org_a, admin_a, client, login_as
     ):
-        from app.models.connector_config import OrgConnectorConfig, OrgConnectorCredential
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+        from app.models.connector_config import (
+            ConnectorConfig,
+            OrgConnectorConfig,
+            OrgConnectorCredential,
+        )
+        from app.modules.ai_chat.services.ai_chat_approval_service import (
+            AIChatApprovalService,
+        )
         from app.modules.codegen.services.credential_vault import OrgCredentialVault
 
         secret = uuid.uuid4().hex
@@ -327,40 +337,74 @@ class TestServiceNowConnectorRouteStoresSecretInVault:
             },
         )
 
-        # Before this fix, OrgConnectorConfig.client_secret's retired setter
-        # raised RuntimeError here, surfacing as a 500.
+        # Before this change, the setter's RuntimeError surfaced as a 500.
         assert resp.status_code in (200, 302), (
             f"ServiceNow save must not fail now that the setter is retired "
             f"(got {resp.status_code})."
         )
 
-        cfg = OrgConnectorConfig.query.filter_by(
-            organization_id=org_a.id, connector_type="servicenow"
+        # The change is queued, not written: no config row exists yet.
+        queued = AIChatCRUDApproval.query.filter_by(
+            organization_id=org_a.id,
+            entity_type="connectors",
+            status=ApprovalStatus.PENDING,
         ).first()
-        assert cfg is not None
-        # Non-secret settings still live on OrgConnectorConfig, as before.
-        assert cfg.instance_url == "https://org-a.service-now.com"
-        assert cfg.client_id == "org-a-client-id"
-        assert cfg.enabled is True
-        # The retired column must never receive the new secret.
-        assert cfg._client_secret_encrypted is None
+        assert queued is not None, (
+            "The connector change must be queued as an approval proposal in "
+            "the organisation's own queue."
+        )
+        assert ConnectorConfig.query.filter_by(
+            organization_id=org_a.id, connector_type="servicenow"
+        ).first() is None, (
+            "A connector change must not reach the model before its proposal "
+            "is approved."
+        )
+        # The retired forever store is no longer written at all.
+        assert OrgConnectorConfig.query.filter_by(
+            organization_id=org_a.id, connector_type="servicenow"
+        ).first() is None
 
+        # M1 (cloud-review-pr448-961a0c35-v1.md): at proposal time the secret
+        # is staged under this approval, encrypted, not yet the live
+        # credential -- a rejected or still-pending proposal must never make
+        # it reachable.
+        staged_type = f"pending:{queued.id}:client_secret"
         row = OrgConnectorCredential.query.filter_by(
             organization_id=org_a.id,
             connector_type="servicenow",
-            credential_type="client_secret",
+            credential_type=staged_type,
         ).first()
-        assert row is not None, "The secret must be stored via OrgConnectorCredential."
+        assert row is not None, "The secret must be staged via OrgConnectorCredential."
         assert secret.encode() not in row.encrypted_value, (
             "The secret must be stored encrypted, not as plaintext."
         )
+        vault = OrgCredentialVault()
+        assert vault.retrieve(org_a.id, "servicenow", staged_type) == secret
+        assert vault.retrieve(org_a.id, "servicenow", "client_secret") is None, (
+            "an unapproved proposal must not make its secret live"
+        )
 
-        retrieved = OrgCredentialVault().retrieve(org_a.id, "servicenow", "client_secret")
-        assert retrieved == secret
+        # Approving the proposal applies the configuration to the framework row.
+        admin_a2 = _make_admin(db_session, org_a.id, "AdminA2")
+        db_session.commit()
+        result = AIChatApprovalService(user_id=admin_a2.id).approve_and_execute(queued.id)
+        assert result.get("success") is True, result
+
+        cfg = ConnectorConfig.query.filter_by(
+            organization_id=org_a.id, connector_type="servicenow"
+        ).first()
+        assert cfg is not None
+        assert cfg.config.get("instance_url") == "https://org-a.service-now.com"
+        assert cfg.config.get("client_id") == "org-a-client-id"
+        assert cfg.config.get("enabled") is True
+        assert "client_secret" not in cfg.config, (
+            "Credentials never live on the configuration row."
+        )
 
     def test_secret_is_isolated_between_organisations(
         self, db_session, org_a, org_b, admin_a, admin_b, client, login_as, tenant_ctx
     ):
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
         from app.modules.codegen.services.credential_vault import OrgCredentialVault
 
         secret_a = uuid.uuid4().hex
@@ -376,6 +420,9 @@ class TestServiceNowConnectorRouteStoresSecretInVault:
                 "enabled": "on",
             },
         )
+        proposal_a = AIChatCRUDApproval.query.filter_by(
+            organization_id=org_a.id, entity_type="connectors", status=ApprovalStatus.PENDING
+        ).first()
 
         login_as(client, admin_b)
         client.post(
@@ -387,16 +434,26 @@ class TestServiceNowConnectorRouteStoresSecretInVault:
                 "enabled": "on",
             },
         )
+        proposal_b = AIChatCRUDApproval.query.filter_by(
+            organization_id=org_b.id, entity_type="connectors", status=ApprovalStatus.PENDING
+        ).first()
 
+        # M1: each secret is staged under its own approval, not yet live --
+        # check isolation at the staged key, the same place a tenant leak
+        # would show up before either proposal is ever approved.
         # The test client's last request left g.current_org_id set to org B
         # (the app context is held open for the whole test, per login_as's
         # docstring) — read each org's secret back inside its own tenant
         # context, exactly as a real request for that org would.
         vault = OrgCredentialVault()
         with tenant_ctx(org_a.id):
-            assert vault.retrieve(org_a.id, "servicenow", "client_secret") == secret_a
+            assert vault.retrieve(
+                org_a.id, "servicenow", f"pending:{proposal_a.id}:client_secret"
+            ) == secret_a
         with tenant_ctx(org_b.id):
-            assert vault.retrieve(org_b.id, "servicenow", "client_secret") == secret_b, (
+            assert vault.retrieve(
+                org_b.id, "servicenow", f"pending:{proposal_b.id}:client_secret"
+            ) == secret_b, (
                 "TENANT LEAK: org B's saved secret was not the one org B submitted — "
                 "org A's save may have overwritten it."
             )

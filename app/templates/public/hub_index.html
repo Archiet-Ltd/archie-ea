@@ -1,0 +1,61 @@
+{# smoke-coverage-ok: covered by tests/test_public_content_pages.py (hub index lists every live page of its family).
+   Template: public/hub_index.html -- Renders a feed-built hub index: /use-cases,
+   /roles and /connectors. The pages come from load_feed_pages() grouped by
+   family_hub_groups() (app/services/public_pages.py), so a new .md file
+   under the family's content directory appears here with no template
+   edit. Extends layouts/public_base.html, reuses components/public_navbar.html
+   and components/public_footer.html; no second loader or renderer.
+   Receives: title, canonical_url, description, intro_html (Markup, optional),
+   groups, extra_groups (optional non-page entries), show_descriptions,
+   noindex and jsonld.
+#}
+{% extends 'layouts/public_base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block meta_description %}
+{% from 'partials/_seo_meta.html' import seo_meta %}
+{{ seo_meta(canonical_url, description, noindex) }}
+<meta property="og:title" content="{{ title }}">
+<meta name="twitter:title" content="{{ title }}">
+{% endblock %}
+
+{% block header %}
+{% include 'components/public_navbar.html' %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .public-page-content h1 { font-size: 2.25rem; font-weight: 700; margin-bottom: 1rem; line-height: 1.2; }
+  .public-page-content h2 { font-size: 1.5rem; font-weight: 600; margin-top: 2rem; margin-bottom: 0.75rem; }
+  .public-page-content p { margin-bottom: 1rem; line-height: 1.75; }
+  .public-page-content ul { margin-bottom: 1.5rem; padding-left: 1.5rem; }
+  .public-page-content li { margin-bottom: 0.5rem; line-height: 1.75; }
+  .public-page-content a { color: var(--color-primary, #3b82f6); text-decoration: underline; }
+  .public-page-content a:hover { color: var(--color-primary-hover, #2563eb); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-3xl px-4 sm:px-6 py-12 sm:py-16">
+  <article class="public-page-content prose max-w-none">
+    {% if jsonld %}
+    <script type="application/ld+json">{{ jsonld }}</script>
+    {% endif %}
+    {% if intro_html %}
+    {{ intro_html }}
+    {% else %}
+    <h1>{{ title }}</h1>
+    {% if intro_text %}
+    <p>
+      {{ intro_text }}
+    </p>
+    {% endif %}
+    {% endif %}
+
+    {% include 'public/_hub_groups.html' %}
+    {% set groups = extra_groups or [] %}
+    {% set show_descriptions = false %}
+    {% include 'public/_hub_groups.html' %}
+  </article>
+</div>
+{% include 'components/public_footer.html' %}
+{% endblock %}
