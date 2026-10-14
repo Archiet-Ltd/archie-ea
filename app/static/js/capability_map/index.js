@@ -109,6 +109,12 @@
     // fired: the "N selected" counter stayed 0 and Save Mappings had an empty set.
     // Same delegation reason as CM_ACTIONS: the list is re-rendered wholesale.
     const CM_CHANGES = {
+        // Table-row and work-package checkboxes carried inline onchange= handlers,
+        // which the nonce + strict-dynamic CSP refuses to run: every render of a
+        // capability row logged a CSP violation to the console and the checkbox
+        // did nothing.
+        'toggle-row-checkbox': (el) => toggleRowSelection(el.dataset.capId, el.dataset.tab, el.checked),
+        'toggle-wp-child':    (el) => toggleWPChildSelection(parseInt(el.dataset.childId, 10), el.checked),
         'toggle-app':         (el) => toggleApplicationSelection(el.dataset.appId),
         'update-app-mapping': (el) => {
             const raw = el.value;
@@ -715,7 +721,7 @@
                         class="rounded border-input text-primary focus-visible:ring-ring"
                         ${isSelected ? 'checked' : ''}
                         aria-label="Select ${escapeHtml(item.name || item.capability_name || 'capability')}"
-                        onchange="toggleRowSelection('${capabilityId}', '${tabType}', this.checked)">
+                        data-cm-change="toggle-row-checkbox" data-cap-id="${escapeAttr(capabilityId)}" data-tab="${escapeAttr(tabType)}">
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                     <div class="font-medium text-foreground">${escapeHtml(item.name || item.capability_name || 'Unknown')}</div>
@@ -4295,7 +4301,7 @@
                             <input type="checkbox"
                                    class="mt-1 rounded border-input text-primary focus-visible:ring-ring"
                                    aria-label="Select ${escapeHtml(child.name)}"
-                                   onchange="toggleWPChildSelection(${child.id}, this.checked)">
+                                   data-cm-change="toggle-wp-child" data-child-id="${escapeAttr(child.id)}">
                             <div class="flex-1">
                                 <div class="flex items-center space-x-2 mb-1">
                                     <span class="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">L${child.level || 1}</span>

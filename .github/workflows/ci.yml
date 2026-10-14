@@ -1284,3 +1284,113 @@ jobs:
           path: release.json
           if-no-files-found: error
           retention-days: 90
+
+  # ---------------------------------------------------------------------------
+  # Failing-first proof (informational). On a pull request that changes
+  # application code, the tests it adds or changes must be able to fail: they
+  # are run alone against the merge base's application code, with the PR's test
+  # files overlaid, and at least one of them must fail or error there. Tests
+  # that also pass on the old code are listed as candidates for vacuous tests.
+  #
+  # Deliberately NOT a required check and not a deploy prerequisite (see
+  # EXCLUDED_CHECKS in scripts/deploy_workflow.py); nothing `needs` it. It runs
+  # on pull requests only, so it never exists on a push to main. The label
+  # `failing-first-exempt` passes it for pure refactors and documentation.
+  # The name must never start with "Tests (pytest + coverage)": the merge gate
+  # matches the pytest shards by that name.
+  # ---------------------------------------------------------------------------
+  failing-first-proof:
+    name: Failing-first proof
+    if: ${{ github.event_name == 'pull_request' && (github.event.action != 'labeled' || github.event.label.name == 'failing-first-exempt') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: public.ecr.aws/docker/library/postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_test
+        ports: ["5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret
+      # Passed through the environment, never interpolated into a script.
+      PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Name the base checkout location
+        # The runner context is not available in job-level env, so it is set here.
+        run: echo "BASE_CHECKOUT=$RUNNER_TEMP/failing-first-base" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Decide whether there is anything to prove
+        id: plan
+        # Exempt label, no application code changed, or no runnable changed test
+        # are all settled here, before any dependency is installed.
+        run: |
+          python scripts/ci/check_failing_first.py plan \
+            --base-ref "origin/${GITHUB_BASE_REF}" --head HEAD --plan failing-first-plan.json
+      - name: Create an isolated virtual environment for this job's dependencies
+        if: ${{ steps.plan.outputs.mode == 'run' }}
+        run: |
+          python -m venv --clear .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Resolve the postgres service's mapped port
+        if: ${{ steps.plan.outputs.mode == 'run' }}
+        run: |
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+      - name: Install deps
+        # The head's requirements are a superset of the base's, so a PR that adds
+        # a dependency can still be imported by the overlaid tests.
+        if: ${{ steps.plan.outputs.mode == 'run' }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || {
+            echo "::warning::pip install from the cache failed; retrying without it"
+            pip install --no-cache-dir -r requirements.txt
+          }
+          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+      - name: Install Chromium for browser tests in the selection
+        if: ${{ steps.plan.outputs.mode == 'run' && steps.plan.outputs.has_playwright == 'true' }}
+        run: python -m playwright install --with-deps chromium
+      - name: Check out the merge base and overlay the PR's test files
+        # The PR's application files are NOT applied: only test modules and test
+        # support files (conftest, helpers, fixtures) are copied from the head.
+        if: ${{ steps.plan.outputs.mode == 'run' }}
+        run: python scripts/ci/check_failing_first.py prepare --plan failing-first-plan.json --dest "$BASE_CHECKOUT"
+      - name: Create schema (the base's schema, so tables a PR adds are missing)
+        if: ${{ steps.plan.outputs.mode == 'run' }}
+        working-directory: ${{ env.BASE_CHECKOUT }}
+        run: |
+          python -c "import psycopg2" 2>/dev/null || pip install psycopg2-binary
+          flask --app manage init-db
+          flask --app manage schema-upgrade
+          flask --app manage reconcile-schema
+          flask --app manage apply-unified-capability-provenance-migration
+      - name: Run only the changed tests against the base code
+        # Failures here are the point; the judge step decides the outcome.
+        if: ${{ steps.plan.outputs.mode == 'run' }}
+        run: |
+          python scripts/ci/check_failing_first.py run \
+            --plan failing-first-plan.json --dest "$BASE_CHECKOUT" --junit failing-first.xml
+      - name: Judge
+        if: ${{ steps.plan.outputs.mode == 'run' }}
+        run: python scripts/ci/check_failing_first.py judge --plan failing-first-plan.json --junit failing-first.xml
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() && steps.plan.outputs.mode == 'run' }}
+        with:
+          name: failing-first-proof
+          path: |
+            failing-first-plan.json
+            failing-first.xml
+          if-no-files-found: ignore
+          retention-days: 7
