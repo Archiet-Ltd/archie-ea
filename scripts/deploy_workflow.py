@@ -126,6 +126,12 @@ EXCLUDED_CHECKS = {
         "never gate a deploy. The page tests it runs are also covered by the "
         "required pytest shards on every non-content run."
     ),
+    "Failing-first proof": (
+        "informational: runs only on pull requests (never on a push to main) "
+        "and checks that a PR's new tests fail against the base code; it may "
+        "be made a required branch-protection check later, but it can never "
+        "gate a deploy."
+    ),
 }
 CHECK_APP_SLUG = "github-actions"
 MAX_CHECK_PAGES = 10
