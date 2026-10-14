@@ -28,6 +28,9 @@ name: CI
 # group as the run it follows, and a newer pending run replaces an older pending
 # one. If the full run never appears after `full-ci` is added, remove and re-add
 # the label; until a full run exists the merge gate sees 0 of 8 shards.
+# Accepted design limit: a Python file under app/ that no test imports selects no
+# tests in the fast lane. That is why a full run on the final head is mandatory
+# before merge; the fast lane is a quick signal, never merge evidence.
 # The lane is decided once, in the `changes` job; a job that needs the full suite
 # tests for `lane != 'fast'`, so an unanswered question runs everything.
 on:
@@ -732,8 +735,15 @@ jobs:
             echo "No test file is affected by this change."
             exit 0
           fi
-          xargs -r -d '\n' pytest -q --maxfail=20 -o xfail_strict=true \
-            --junitxml=fast-tests.xml -p scripts.ci.quarantine < fast-tests.txt
+          # One pytest run, so one junit file. Exit 5 means everything selected was
+          # quarantined (deselected), which is a pass here.
+          mapfile -t files < fast-tests.txt
+          status=0
+          pytest -q --maxfail=20 -o xfail_strict=true \
+            --junitxml=fast-tests.xml -p scripts.ci.quarantine "${files[@]}" || status=$?
+          if [ "$status" -ne 0 ] && [ "$status" -ne 5 ]; then
+            exit "$status"
+          fi
       - uses: actions/upload-artifact@v6
         if: always()
         with:

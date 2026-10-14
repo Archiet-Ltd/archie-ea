@@ -59,6 +59,15 @@ ESCALATING_FILES = (
     "scripts/route_verification_audit.py",
     "package.json",
     "package-lock.json",
+    "tests/factories.py",
+    ".github/dependabot.yml",
+    "Makefile",
+    "alembic.ini",
+    "gunicorn.conf.py",
+    "wsgi.py",
+    "runtime.txt",
+    "compose.yml",
+    "compose.yaml",
 )
 ESCALATING_PREFIXES = (
     "migrations/",
@@ -68,11 +77,15 @@ ESCALATING_PREFIXES = (
     "scripts/ci/",
     "tests/fixtures/",
     ".github/workflows/",
+    ".github/actions/",
+    "tests/helpers/",
+    "requirements/",
 )
 ESCALATING_PATTERNS = (
     re.compile(r"^requirements[^/]*\.txt$"),
     re.compile(r"^tests/_[^/]*\.py$"),
     re.compile(r"(^|/)Dockerfile[^/]*$"),
+    re.compile(r"(^|/)conftest\.py$"),
     re.compile(r"^docker-compose[^/]*\.ya?ml$"),
 )
 
@@ -231,25 +244,32 @@ def source_files(changed: list[str]) -> list[str]:
     ]
 
 
-def untested_application_files(changed: list[str], selected: list[str]) -> list[str]:
-    """Non-Python files under app/ that no selected test can be tied to.
+def untested_application_files(changed: list[str], root: Path | str = ".") -> list[str]:
+    """Non-Python files under app/ that no test can be tied to, file by file.
 
     A module's non-Python files (templates, static files) select that module's
     tests through the module mapping; anywhere else under app/ there is no
-    mapping, so the change must not pass with nothing selected.
+    mapping. Each file is judged on its own mapping, never against the whole
+    selection, so an unrelated selected test cannot hide a changed template.
     """
-    if selected:
-        return []
     return sorted(
         p for p in changed
         if p.startswith("app/") and not p.endswith(".py") and "/tests/" not in p
+        and not select_tests([p], root)
     )
+
+
+def clean(path: str) -> str:
+    """A file name safe to print: control characters (newlines included) replaced."""
+    return "".join("?" if ord(ch) < 32 or ord(ch) == 127 else ch for ch in path)
 
 
 def escalating(changed: list[str]) -> list[str]:
     """Changed paths that make the fast lane unsafe, sorted."""
     hits = []
     for path in changed:
+        if module_package(path) and path.endswith("/conftest.py") and not path.startswith("app/modules/conftest.py"):
+            continue  # a module's own conftest is covered by the module mapping
         if (
             path in ESCALATING_FILES
             or path.startswith(ESCALATING_PREFIXES)
@@ -263,17 +283,17 @@ def escalation_reason(changed: list[str], selected: list[str], root: Path | str 
     """Why the full suite must run instead of the fast lane, or an empty string."""
     hits = escalating(changed)
     if hits:
-        return "shared wiring changed: " + ", ".join(hits[:5]) + (" ..." if len(hits) > 5 else "")
+        return "shared wiring changed: " + ", ".join(map(clean, hits[:5])) + (" ..." if len(hits) > 5 else "")
     helpers = [
         p for p in changed
         if p.startswith("scripts/") and p.endswith(".py") and module_name(p)
         and tests_importing({module_name(p)}, Path(root))
     ]
     if helpers:
-        return "scripts that tests import changed: " + ", ".join(sorted(helpers)[:5])
-    orphans = untested_application_files(changed, selected)
+        return "scripts that tests import changed: " + ", ".join(map(clean, sorted(helpers)[:5]))
+    orphans = untested_application_files(changed, root)
     if orphans:
-        return "application files changed that no test is tied to: " + ", ".join(orphans[:5])
+        return "application files changed that no test is tied to: " + ", ".join(map(clean, orphans[:5]))
     sources = source_files(changed)
     if len(sources) > WIDE_CHANGE_SOURCE_FILES and len(selected) < WIDE_CHANGE_MIN_TESTS:
         return (

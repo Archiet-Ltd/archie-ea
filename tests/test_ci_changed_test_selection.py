@@ -182,16 +182,21 @@ def test_the_workflow_tests_for_real_content_not_file_size():
     assert "[ ! -s fast-tests.txt ]" not in text
 
 
-def test_non_python_source_files_count_toward_a_wide_change():
-    changed = [f"app/templates/page{i}.html" for i in range(8)] + [f"app/static/a{i}.css" for i in range(8)]
+def test_non_python_source_files_count_toward_a_wide_change(tmp_path):
+    root = _tree(tmp_path, {"app/modules/m/tests/test_m.py": "def test(): pass\n"})
+    changed = [f"app/modules/m/templates/page{i}.html" for i in range(8)] + [
+        f"app/modules/m/static/a{i}.css" for i in range(8)
+    ]
     assert len(sel.source_files(changed)) == 16
-    assert "16 source files" in sel.escalation_reason(changed, ["tests/test_x.py"])
+    selected = sel.select_tests(changed, root)
+    assert "16 source files" in sel.escalation_reason(changed, selected, root)
 
 
 def test_non_python_application_files_never_pass_with_nothing_selected():
     reason = sel.escalation_reason(["app/templates/page.html"], [])
     assert "no test is tied to" in reason
-    assert sel.escalation_reason(["app/templates/page.html"], ["tests/test_page.py"]) == ""
+    # An unrelated selected test must not mask a template no test is tied to.
+    assert "no test is tied to" in sel.escalation_reason(["app/templates/page.html"], ["tests/test_page.py"])
 
 
 def test_a_module_template_selects_the_modules_tests(tmp_path):
@@ -253,3 +258,43 @@ def test_deleted_and_renamed_paths_are_reported(tmp_path):
         assert sorted(sel.changed_files("main")) == ["app/gone.py", "app/new.py", "app/old name.py"]
     finally:
         os.chdir(cwd)
+
+
+@pytest.mark.parametrize("path", [
+    "tests/unit/conftest.py", "tests/smoke/conftest.py", "app/utils/conftest.py", "conftest.py",
+    "tests/factories.py", "tests/helpers/builders.py",
+])
+def test_every_conftest_outside_a_module_and_the_shared_helpers_force_the_full_suite(path):
+    assert sel.escalation_reason([path], ["tests/test_x.py"])
+
+
+def test_a_conftest_inside_a_module_uses_the_module_mapping():
+    assert sel.escalation_reason(["app/modules/billing/conftest.py"], ["tests/test_x.py"]) == ""
+
+
+@pytest.mark.parametrize("path", [
+    ".github/actions/setup/action.yml", ".github/dependabot.yml", "requirements/base.txt",
+    "compose.yml", "compose.yaml", "Makefile", "alembic.ini", "gunicorn.conf.py", "wsgi.py", "runtime.txt",
+])
+def test_build_and_runtime_files_force_the_full_suite(path):
+    assert sel.escalation_reason([path], ["tests/test_x.py"])
+
+
+def test_a_template_is_judged_on_its_own_mapping_not_the_global_selection(tmp_path):
+    root = _tree(tmp_path, {
+        "app/modules/billing/templates/invoice.html": "x\n",
+        "app/modules/billing/tests/test_invoice.py": "def test(): pass\n",
+        "app/templates/base.html": "x\n",
+    })
+    # The module template is tied to its module's tests; the shared template is tied to nothing,
+    # even though another file in the same diff selected a test.
+    changed = ["app/modules/billing/templates/invoice.html", "app/templates/base.html"]
+    selected = sel.select_tests(changed, root)
+    assert selected == ["app/modules/billing/tests/test_invoice.py"]
+    assert sel.untested_application_files(changed, root) == ["app/templates/base.html"]
+    assert "app/templates/base.html" in sel.escalation_reason(changed, selected, root)
+
+
+def test_file_names_are_cleaned_before_they_are_printed():
+    reason = sel.escalation_reason(["tests/conftest.py\n::error::forged", "tests/unit/conftest.py\x1b[31m"], [])
+    assert "\n" not in reason and "\x1b" not in reason

@@ -153,7 +153,7 @@ def test_the_fast_job_script_is_safe_for_shellcheck():
     assert "$(cat fast-tests.txt)" not in runs
     assert "mapfile -t files < fast-tests.txt" in runs
     assert 'read -ra extra <<< "$EXTRA_BROWSERS"' in runs and '"${extra[@]}"' in runs
-    assert "xargs -r -d '\\n' pytest" in runs
+    assert 'xargs' not in runs and '"${files[@]}"' in runs and '-ne 5' in runs
     assert "/tmp/" not in runs.replace("/tmp/archie-ci-browser-install.lock", "")
     assert "python -I" in runs
 
