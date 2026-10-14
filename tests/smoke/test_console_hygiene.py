@@ -79,6 +79,44 @@ def _normalise_console(text):
     return text
 
 
+def _settle_after_login(page):
+    """Let the post-login landing page finish loading before auditing a page.
+
+    _login returns as soon as the URL leaves /account/login, while the landing
+    page is still loading and running scripts. Anything it logged afterwards was
+    recorded against whichever page was audited next.
+    """
+    for state in ("load", "networkidle"):
+        try:
+            page.wait_for_load_state(state, timeout=PAGE_TIMEOUT)
+        except Exception:
+            pass
+
+
+# Reports every CSP violation with its source, on a channel (console.debug) the
+# error fingerprint does not read, so a failure can name the file and line.
+CSP_PROBE = """
+document.addEventListener('securitypolicyviolation', function (e) {
+  console.debug('CSPV ' + JSON.stringify({
+    sourceFile: e.sourceFile, line: e.lineNumber, col: e.columnNumber,
+    directive: e.violatedDirective, blocked: e.blockedURI,
+    sample: (e.sample || '').slice(0, 160)
+  }));
+});
+"""
+
+
+def _console_source(msg):
+    """Full, untruncated text and where the browser says it came from."""
+    loc = msg.location or {}
+    return "%s [at %s:%s:%s]" % (
+        msg.text.split("\n")[0],
+        loc.get("url", "?"),
+        loc.get("lineNumber", "?"),
+        loc.get("columnNumber", "?"),
+    )
+
+
 def _normalise_url(url, base):
     path = url.replace(base, "").split("?")[0]
     return re.sub(r"/\d+", "/N", path)[:160]
@@ -102,14 +140,20 @@ def audited(browser, live_server, seeded):
         ctx = browser.new_context(viewport={"width": 1440, "height": 900})
         page = ctx.new_page()
         console = []
+        sources = {}
+        csp = []
         failed = []
-        page.on(
-            "console",
-            lambda m: console.append(_normalise_console(m.text))
-            if m.type == "error"
-            and not any(s in m.text for s in IGNORE_CONSOLE)
-            else None,
-        )
+        page.add_init_script(CSP_PROBE)
+
+        def _on_console(m):
+            if m.type == "debug" and m.text.startswith("CSPV "):
+                csp.append(m.text[5:])
+            elif m.type == "error" and not any(s in m.text for s in IGNORE_CONSOLE):
+                fingerprint = _normalise_console(m.text)
+                console.append(fingerprint)
+                sources.setdefault(fingerprint, []).append(_console_source(m))
+
+        page.on("console", _on_console)
         page.on(
             "response",
             lambda r: failed.append((r.status, _normalise_url(r.url, live_server)))
@@ -119,7 +163,10 @@ def audited(browser, live_server, seeded):
             else None,
         )
         _login(page, live_server, email)
+        _settle_after_login(page)
         console.clear()
+        sources.clear()
+        csp.clear()
         failed.clear()
         try:
             page.goto(live_server + path, wait_until="load", timeout=PAGE_TIMEOUT)
@@ -131,6 +178,8 @@ def audited(browser, live_server, seeded):
         results[path] = {
             "console_errors": sorted(set(console)),
             "failed_requests": sorted({"%d %s" % (s, u) for s, u in failed}),
+            "console_sources": {k: sorted(set(v)) for k, v in sources.items()},
+            "csp_violations": sorted(set(csp)),
         }
         ctx.close()
 
@@ -144,7 +193,14 @@ def audited(browser, live_server, seeded):
                         "page is healthy. Regenerate with "
                         "SMOKE_HYGIENE_UPDATE_BASELINE=1."
                     ),
-                    "accepted": results,
+                    "accepted": {
+                        path: {
+                            k: v
+                            for k, v in entry.items()
+                            if k in ("console_errors", "failed_requests", "navigation_error")
+                        }
+                        for path, entry in results.items()
+                    },
                 },
                 fh,
                 indent=1,
@@ -167,7 +223,14 @@ def test_page_hygiene_no_worse_than_baseline(audited, archetype, path):
 
     problems = []
     if new_console:
-        problems.append("new console errors:\n  " + "\n  ".join(sorted(new_console)))
+        detail = []
+        for fingerprint in sorted(new_console):
+            detail.append(fingerprint)
+            for src in result.get("console_sources", {}).get(fingerprint, []):
+                detail.append("    source: " + src)
+        for violation in result.get("csp_violations", []):
+            detail.append("    csp violation: " + violation)
+        problems.append("new console errors:\n  " + "\n  ".join(detail))
     if new_failed:
         problems.append("new failed requests:\n  " + "\n  ".join(sorted(new_failed)))
     assert not problems, (
@@ -191,3 +254,37 @@ def test_console_fingerprint_ignores_per_request_nonce():
     assert "nonce-N" in first
     # a genuinely different error must still differ
     assert _normalise_console("TypeError: x is undefined") != first
+
+
+def test_fixture_settles_landing_page_before_clearing_console():
+    """The audit must not inherit the post-login landing page's console output."""
+    import inspect
+
+    source = inspect.getsource(audited.__wrapped__ if hasattr(audited, "__wrapped__") else audited)
+    assert "_settle_after_login(page)" in source
+    assert source.index("_login(page") < source.index("_settle_after_login(page)")
+    assert source.index("_settle_after_login(page)") < source.index("console.clear()")
+
+
+def test_settle_after_login_waits_for_load_then_idle():
+    calls = []
+
+    class Page:
+        def wait_for_load_state(self, state, timeout=None):
+            calls.append(state)
+            if state == "networkidle":
+                raise TimeoutError("never idle")
+
+    _settle_after_login(Page())
+    assert calls == ["load", "networkidle"]
+
+
+def test_console_source_names_file_and_line():
+    class Msg:
+        text = "Executing inline event handler violates ...\nmore"
+        location = {"url": "http://x/static/js/a.js", "lineNumber": 12, "columnNumber": 3}
+
+    assert _console_source(Msg()) == (
+        "Executing inline event handler violates ... [at http://x/static/js/a.js:12:3]"
+    )
+
