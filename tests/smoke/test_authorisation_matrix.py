@@ -59,6 +59,9 @@ POLICY = {
     "/dashboard/compliance":   set(ARCHETYPES),
     # risk.risk_register is @login_required only.
     "/risks/":                 set(ARCHETYPES),
+    # portfolio.conflicts is @login_required only: competing initiatives of
+    # the viewer's own organisation for a quarter.
+    "/portfolio/conflicts":    set(ARCHETYPES),
     "/my-applications/":       {"application_manager"},
     "/my-applications/list":   {"application_manager"},
     "/my-applications/health": {"application_manager"},
