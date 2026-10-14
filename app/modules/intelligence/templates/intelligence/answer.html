@@ -76,8 +76,8 @@
             </div>
             <div>
                 <dt class="text-muted-foreground">Confidence</dt>
-                <dd class="text-foreground" data-confidence>
-                    {% if answer.confidence_basis == 'lowest_derived_row' %}{{ (answer.confidence * 100) | round | int }}% (the lowest of the worked-out connections)
+                <dd class="text-foreground" data-answer-basis>
+                    {% if answer.confidence_basis == 'lowest_derived_row' %}{{ answer.confidence_percent }}% (the lowest of the worked-out connections)
                     {% elif answer.confidence_basis == 'drawn_facts_only' %}Every connection was recorded by a person; none is estimated.
                     {% else %}Not applicable: there are no rows.{% endif %}
                 </dd>

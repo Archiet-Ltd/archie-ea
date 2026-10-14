@@ -426,6 +426,9 @@ def present(record, *, include_rows: bool = True) -> Dict[str, Any]:
         "truth_class": record.truth_class,
         "confidence": record.confidence,
         "confidence_basis": record.confidence_basis,
+        "confidence_percent": (
+            int(round(record.confidence * 100)) if record.confidence is not None else None
+        ),
         "summary": record.summary,
         "reasons": record.reasons,
         "freshness": record.freshness,
