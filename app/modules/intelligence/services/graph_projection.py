@@ -69,6 +69,14 @@ DIRECTIONS = ("downstream", "upstream", "both")
 MAX_HOPS_CAP = 10
 DEFAULT_NODE_BUDGET = 10_000
 MAX_CACHED_ORGANISATIONS = 16
+# Memory bound for the as-of history. Each retained relationship version is a
+# five-field tuple (about 250 bytes with its two datetimes), so this cap holds
+# one projection's history to roughly 60 MB, and with at most
+# MAX_CACHED_ORGANISATIONS cached the process-wide worst case stays near 1 GB.
+# Beyond the cap the OLDEST closed versions are dropped (open versions, which
+# mirror the current edges, are always kept) and as-of answers report
+# ``truncated`` so a caller never mistakes a shortened history for a full one.
+MAX_VERSIONS_PER_PROJECTION = 250_000
 EVENT_BATCH = 1000
 ID_CHUNK = 5000
 
@@ -134,6 +142,8 @@ class GraphProjection:
         self._in: Dict[int, List[int]] = {}
         # relationship id -> [(valid_from, valid_to, source, target, type code)]
         self._versions: Dict[int, List[Tuple[datetime, Optional[datetime], int, int, int]]] = {}
+        self._version_total = 0
+        self.history_truncated = False
         self._versions_out: Dict[int, set] = {}
         self._versions_in: Dict[int, set] = {}
         # Element ids that have history but are no longer elements: an as-of
@@ -168,7 +178,7 @@ class GraphProjection:
 
     @property
     def version_count(self) -> int:
-        return sum(len(v) for v in self._versions.values())
+        return self._version_total
 
     def has_node(self, element_id: int) -> bool:
         return element_id in self._nodes
@@ -220,14 +230,44 @@ class GraphProjection:
         if not stored:
             return
         self._versions[relationship_id] = stored
+        self._version_total += len(stored)
         for _from, _to, source, target, _type in stored:
             self._versions_out.setdefault(source, set()).add(relationship_id)
             self._versions_in.setdefault(target, set()).add(relationship_id)
+
+    def enforce_version_cap(self, cap: Optional[int] = None) -> int:
+        """Drop the oldest closed versions beyond the cap. Returns how many were dropped."""
+        cap = MAX_VERSIONS_PER_PROJECTION if cap is None else int(cap)
+        with self._lock:
+            excess = self._version_total - cap
+            if excess <= 0:
+                return 0
+            closed = sorted(
+                (vt, rid, index)
+                for rid, versions in self._versions.items()
+                for index, (_vf, vt, _s, _t, _ty) in enumerate(versions)
+                if vt is not None
+            )
+            doomed: Dict[int, set] = {}
+            for _vt, rid, index in closed[:excess]:
+                doomed.setdefault(rid, set()).add(index)
+            for rid, indexes in doomed.items():
+                kept = [
+                    (vf, vt, s, t, self._strings[ty])
+                    for index, (vf, vt, s, t, ty) in enumerate(self._versions[rid])
+                    if index not in indexes
+                ]
+                self.set_versions(rid, kept)
+            dropped = sum(len(i) for i in doomed.values())
+            if dropped:
+                self.history_truncated = True
+            return dropped
 
     def clear_versions(self, relationship_id: int) -> None:
         old = self._versions.pop(int(relationship_id), None)
         if not old:
             return
+        self._version_total -= len(old)
         for _from, _to, source, target, _type in old:
             for index, node in ((self._versions_out, source), (self._versions_in, target)):
                 ids = index.get(node)
@@ -323,6 +363,9 @@ class GraphProjection:
                     if result.truncated:
                         break
                 frontier = next_frontier
+            if as_of is not None and self.history_truncated:
+                # The retained history is shorter than the recorded one.
+                result.truncated = True
             for row in result.rows:
                 result.by_layer[row.layer] = result.by_layer.get(row.layer, 0) + 1
                 result.by_type[row.type] = result.by_type.get(row.type, 0) + 1
@@ -397,6 +440,7 @@ class GraphProjection:
                 "edges": body["edges"],
                 "versions": body["versions"],
                 "retired": body["retired"],
+                "history_truncated": self.history_truncated,
             }
         return zlib.compress(json.dumps(document, separators=(",", ":")).encode("utf-8"), 6)
 
@@ -427,6 +471,7 @@ class GraphProjection:
         for rid, versions in grouped.items():
             projection.set_versions(rid, versions)
         projection._retired = {int(x) for x in document.get("retired", ())}
+        projection.history_truncated = bool(document.get("history_truncated", False))
         return projection
 
 
@@ -524,6 +569,7 @@ def build_projection(organization_id: Optional[int]) -> GraphProjection:
         for rel_id, versions in _history_versions(organization_id, None).items():
             projection.set_versions(rel_id, versions)
         projection._retired = _history_element_ids(organization_id, None) - set(projection._nodes)
+        projection.enforce_version_cap()
     return projection
 
 
@@ -590,6 +636,7 @@ def apply_events(projection: GraphProjection, events: Sequence[Dict[str, Any]]) 
                 else:
                     projection.remove_edge(rel_id)
                 projection.set_versions(rel_id, versions.get(rel_id, ()))
+        projection.enforce_version_cap()
         projection.last_ordinal = highest
     return len(element_ids) + len(relationship_ids)
 
@@ -749,6 +796,45 @@ SNAPSHOT_EVERY_EVENTS = 500
 VERIFY_EVERY_HOURS = 24
 
 
+def _unchanged_snapshot_summary(organization_id: int, now: datetime) -> Optional[Dict[str, Any]]:
+    """The refresh result when nothing needs doing, from the snapshot's header columns only.
+
+    Reads only the offset, counts and verification time (never the compressed
+    payload). When the stored offset equals the event log's highest ordinal and
+    the daily verification is not due, the stored snapshot is already current:
+    nothing is decoded, replayed or saved. Anything else returns ``None`` and
+    the caller does the full refresh.
+    """
+    from app.models.graph_projection_snapshot import GraphProjectionSnapshot as Row
+
+    header = db.session.execute(
+        db.select(Row.format_version, Row.last_ordinal, Row.verified_at, Row.node_count, Row.edge_count)
+        .where(Row.organization_id == organization_id)
+    ).first()
+    if header is None or header.format_version != SNAPSHOT_FORMAT or header.verified_at is None:
+        return None
+    verified_at = header.verified_at.replace(tzinfo=timezone.utc)
+    if (now - verified_at).total_seconds() >= VERIFY_EVERY_HOURS * 3600:
+        return None
+    from app.services.event_log_service import max_ordinal
+
+    if int(header.last_ordinal) != int(max_ordinal(organization_id)):
+        return None
+    return {
+        "outcome": "empty" if header.node_count == 0 and header.edge_count == 0 else "ok",
+        "nodes": header.node_count,
+        "edges": header.edge_count,
+        "versions": None,
+        "last_ordinal": int(header.last_ordinal),
+        "from_snapshot": True,
+        "reloaded": 0,
+        "saved": False,
+        "verified": False,
+        "drift": None,
+        "unchanged": True,
+    }
+
+
 def refresh_organisation(organization_id: Optional[int], *, verify: Optional[bool] = None) -> Dict[str, Any]:
     """Bring one organisation's stored snapshot up to date from the log.
 
@@ -763,6 +849,10 @@ def refresh_organisation(organization_id: Optional[int], *, verify: Optional[boo
         return {"skipped": NO_TENANT_CONTEXT_REASON}
     organization_id = int(organization_id)
     now = datetime.now(timezone.utc)
+    if verify is None:
+        unchanged = _unchanged_snapshot_summary(organization_id, now)
+        if unchanged is not None:
+            return unchanged
     snapshot = load_snapshot(organization_id)
     started_from_snapshot = snapshot is not None
     projection = snapshot or build_projection(organization_id)

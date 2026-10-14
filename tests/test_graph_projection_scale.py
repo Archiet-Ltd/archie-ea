@@ -9,6 +9,15 @@ per-call budget (it happens once per process, then from the stored snapshot).
 Rows are inserted with set-based SQL inside the test's rolled-back transaction,
 the way a bulk import writes them, so no event is queued for them; the
 projection is built from the relational store.
+
+The model is seeded ONCE (one fixture use, one test) and with the history
+trigger switched off for the insert only (``session_replication_role =
+replica``, the same device other bulk-seeding tests here use). With the trigger
+on, every one of the 405,000 rows is copied into ``entity_history`` as a JSON
+snapshot, which doubled the disk the CI shard needed and ran it out of space.
+The seed lives and dies inside the test's rolled-back transaction, so nothing
+is left behind. The history table is not needed here: the budget is measured on
+current-state traversal and on the snapshot round trip.
 """
 
 from __future__ import annotations
@@ -29,13 +38,14 @@ BUDGET_P95_SECONDS = 0.5
 ROOTS = 300
 
 
-@pytest.fixture
-def big_model(db_session):
+def _seed_big_model(db_session):
     suffix = uuid.uuid4().hex[:10]
     org = Organization(name=f"Scale {suffix}", slug=f"scale-{suffix}")
     other = Organization(name=f"Scale other {suffix}", slug=f"scale-o-{suffix}")
     db_session.add_all([org, other])
     db_session.flush()
+    # No history rows for the seed (see the module note); restored below.
+    db_session.execute(text("SET LOCAL session_replication_role = replica"))
     db_session.execute(
         text(
             "INSERT INTO archimate_elements (name, type, layer, organization_id) "
@@ -68,6 +78,7 @@ def big_model(db_session):
         ),
         {"o": other.id},
     )
+    db_session.execute(text("SET LOCAL session_replication_role = origin"))
     db_session.commit()
     return {"org": org, "other": other, "ids": ids}
 
@@ -77,7 +88,8 @@ def _p95(samples):
     return ordered[min(len(ordered) - 1, int(round(0.95 * (len(ordered) - 1))))]
 
 
-def test_three_hops_in_a_100k_element_model_answer_under_half_a_second_at_p95(db_session, big_model):
+def test_three_hops_in_a_100k_element_model_answer_under_half_a_second_at_p95(db_session):
+    big_model = _seed_big_model(db_session)
     org, ids = big_model["org"], big_model["ids"]
     gp.clear_cache()
 
@@ -122,9 +134,11 @@ def test_three_hops_in_a_100k_element_model_answer_under_half_a_second_at_p95(db
     assert statistics.median(reached) > 10, "the roots must have something to traverse"
     assert p95 < BUDGET_P95_SECONDS
 
+    # The same seeded model: a snapshot of it restores identically.
+    _check_snapshot_round_trip(db_session, org)
 
-def test_a_snapshot_of_the_large_model_restores_identically(db_session, big_model):
-    org = big_model["org"]
+
+def _check_snapshot_round_trip(db_session, org):
     started = time.perf_counter()
     built = gp.build_projection(org.id)
     rebuild_seconds = time.perf_counter() - started

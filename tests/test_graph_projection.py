@@ -751,3 +751,56 @@ def test_scheduler_skips_the_refresh_on_a_bad_interval_and_keeps_the_others(monk
 
 def test_default_configuration_schedules_the_refresh(app):
     assert int(app.config["GRAPH_PROJECTION_INTERVAL_MINUTES"]) > 0
+
+
+def test_refresh_of_an_unchanged_organisation_does_not_decode_the_snapshot(db_session, monkeypatch):
+    org = _org(db_session, "Unchanged")
+    a, b = _element(db_session, org.id, "a"), _element(db_session, org.id, "b")
+    _rel(db_session, org.id, a.id, b.id)
+    _publish(db_session)
+    gp.refresh_organisation(org.id)
+
+    def _must_not_decode(*args, **kwargs):
+        raise AssertionError("the snapshot payload was decoded although nothing changed")
+
+    monkeypatch.setattr(gp.GraphProjection, "from_payload", classmethod(_must_not_decode))
+    again = gp.refresh_organisation(org.id)
+    assert again["unchanged"] is True and again["saved"] is False and again["reloaded"] == 0
+    assert again["nodes"] == 2 and again["edges"] == 1
+
+
+def test_refresh_does_the_full_work_once_the_log_has_moved(db_session):
+    org = _org(db_session, "Moved")
+    a, b = _element(db_session, org.id, "a"), _element(db_session, org.id, "b")
+    _rel(db_session, org.id, a.id, b.id)
+    _publish(db_session)
+    gp.refresh_organisation(org.id)
+    c = _element(db_session, org.id, "c")
+    _rel(db_session, org.id, b.id, c.id)
+    _publish(db_session)
+    moved = gp.refresh_organisation(org.id)
+    assert "unchanged" not in moved and moved["reloaded"] > 0 and moved["nodes"] == 3
+
+
+def test_history_beyond_the_cap_drops_the_oldest_closed_versions_and_says_so():
+    projection = gp.GraphProjection(1)
+    for node in (1, 2, 3):
+        projection.set_node(node, "Node", "technology")
+    t = datetime(2026, 1, 1)
+    # relationship 10: three closed versions (oldest first) and one open one.
+    projection.set_versions(10, [
+        (t, t + timedelta(days=1), 1, 2, "Serving"),
+        (t + timedelta(days=1), t + timedelta(days=2), 1, 3, "Serving"),
+        (t + timedelta(days=2), t + timedelta(days=3), 1, 2, "Serving"),
+        (t + timedelta(days=3), None, 1, 2, "Serving"),
+    ])
+    assert projection.version_count == 4
+    assert projection.enforce_version_cap(2) == 2
+    assert projection.version_count == 2 and projection.history_truncated is True
+    kept = projection._versions[10]
+    assert kept[-1][1] is None, "the open version is always kept"
+    assert min(v[0] for v in kept) == t + timedelta(days=2), "the oldest closed versions went first"
+    assert projection.traverse(1, 1, "downstream", as_of=t + timedelta(days=10)).truncated is True
+    assert projection.traverse(1, 1, "downstream").truncated is False
+    restored = gp.GraphProjection.from_payload(projection.to_payload(), 1)
+    assert restored.history_truncated is True and restored.version_count == 2

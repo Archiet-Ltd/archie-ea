@@ -7,7 +7,7 @@ disposable cache. The same revision fences the table with the four tenant
 policies the other tenant tables carry (policy text copied from the earlier
 fencing revisions, listing only this table).
 
-Idempotent: the table and its index are created only when absent, and the
+Idempotent: the table is created only when absent, and the
 policies are dropped and recreated, so a second run (or a database where
 ``init-db`` created the table first) converges.
 
@@ -110,8 +110,7 @@ def upgrade():
             sa.Column("updated_at", sa.DateTime()),
             sa.UniqueConstraint("organization_id", name="uq_graph_projection_snapshot_org"),
         )
-    op.execute("CREATE INDEX IF NOT EXISTS ix_graph_projection_snapshots_organization_id "
-               "ON graph_projection_snapshots (organization_id)")
+    # No separate index on organization_id: the unique constraint above already indexes it.
 
     for table in TENANT_TABLES:
         reason = _skip_reason(bind, table)

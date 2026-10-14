@@ -563,10 +563,10 @@ def _revision_graph():
     graph = {}
     for path in versions.glob("*.py"):
         text = path.read_text(encoding="utf-8")
-        rev = re.search(r'^revision\s*=\s*"([^"]+)"', text, re.M)
+        rev = re.search(r"""^revision\s*=\s*["']([^"']+)["']""", text, re.M)
         down = re.search(r'^down_revision\s*=\s*(.+)$', text, re.M)
         if rev:
-            graph[rev.group(1)] = set(re.findall(r'"([^"]+)"', down.group(1))) if down else set()
+            graph[rev.group(1)] = set(re.findall(r"""["']([^"']+)["']""", down.group(1))) if down else set()
     return graph
 
 
