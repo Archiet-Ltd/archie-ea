@@ -33,6 +33,11 @@ on:
   # moment to learn a ratchet has regressed.
   pull_request:
     types: [opened, synchronize, reopened, labeled]
+  # Merge queue: GitHub builds a temporary branch (base + queued PRs) and waits
+  # for the required checks on it. Without this trigger no check ever reports on
+  # that commit and the queue times out. See docs/ci/merge-queue.md.
+  merge_group:
+    types: [checks_requested]
   # Run the full suite against a work-in-progress branch without opening a PR.
   workflow_dispatch:
 
@@ -91,6 +96,13 @@ jobs:
         # the base branch exists but has no detector yet. If the base branch
         # cannot be resolved at all, nothing is trusted and everything runs.
         run: |
+          # A merge-queue run is never treated as content-only: the queue commit
+          # has no pull-request base ref, so the diff cannot be computed the same
+          # way. Run everything.
+          if [ "${GITHUB_EVENT_NAME}" = "merge_group" ]; then
+            echo "is_content_only=false" | tee -a "${GITHUB_OUTPUT:-/dev/null}"
+            exit 0
+          fi
           BASE="${GITHUB_BASE_REF:-main}"
           if git show "origin/${GITHUB_BASE_REF:-main}:scripts/ci/detect_content_only.py" > /tmp/detect_content_only.py 2>/dev/null; then
             python /tmp/detect_content_only.py
@@ -1170,7 +1182,8 @@ jobs:
 
   release-image:
     name: Build immutable release image
-    if: github.event_name != 'pull_request'
+    # Never on merge_group: the queue's temporary branch must not publish an image.
+    if: github.event_name != 'pull_request' && github.event_name != 'merge_group'
     needs:
       - secret-scan
       - static-gates
