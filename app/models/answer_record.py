@@ -33,8 +33,8 @@ class AnswerRecord(TenantMixin, db.Model):
     # The permanent address: unguessable, global-unique. A lookup always also
     # names the caller's organisation, so another organisation's address reads
     # exactly like one that was never issued.
-    address = db.Column(db.String(32), nullable=False)
-    question_kind = db.Column(db.String(32), nullable=False)
+    address = db.Column(db.String(32), nullable=False)  # nullable-ok: new table, created fresh by migration; every insert sets it
+    question_kind = db.Column(db.String(32), nullable=False)  # nullable-ok: new table, created fresh by migration; every insert sets it
     params = db.Column(db.JSON, nullable=False, default=dict)
 
     # Drawn / derived / synchronised (query_catalogue.TRUTH_CLASS_*); None when
@@ -54,8 +54,7 @@ class AnswerRecord(TenantMixin, db.Model):
     # True when the stored rows were cut at the storage ceiling; the summary
     # still carries the true total.
     truncated = db.Column(db.Boolean, nullable=False, default=False)
-
-    computed_at = db.Column(db.DateTime, nullable=False)
+    computed_at = db.Column(db.DateTime, nullable=False)  # nullable-ok: new table, created fresh by migration; every insert sets it
     created_by_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

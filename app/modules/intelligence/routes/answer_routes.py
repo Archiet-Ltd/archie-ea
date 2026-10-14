@@ -11,7 +11,7 @@ either prefix -- ADR 0008 rule 3):
 
 No logic lives here: the question is computed by the query service, wrapped and
 stored by ``answer_envelope``. Every route names the caller's ACTIVE
-organisation and refuses (403) or reads nothing when there is none. An address
+organisation and refuses (400, as /ask does) or reads nothing when there is none. An address
 that belongs to another organisation answers exactly as one never issued (404).
 """
 
@@ -43,7 +43,11 @@ def ask_answer():
             "no tenant context for this request",
             code="NO_TENANT_CONTEXT",
             details={"reason": _NO_TENANT_CONTEXT_REASON},
-            status_code=403,
+            status_code=400,
+        )
+    if (request.content_length or 0) > envelope.MAX_BODY_BYTES:
+        return error_response(
+            "the question is too large", code="INVALID_PARAMETER", status_code=400
         )
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
@@ -72,7 +76,7 @@ def ask_answer():
                 "no tenant context for this request",
                 code="NO_TENANT_CONTEXT",
                 details={"reason": exc.reason},
-                status_code=403,
+                status_code=400,
             )
         return error_response(
             "Element not found",
@@ -92,7 +96,7 @@ def list_answers():
             "no tenant context for this request",
             code="NO_TENANT_CONTEXT",
             details={"reason": _NO_TENANT_CONTEXT_REASON},
-            status_code=403,
+            status_code=400,
         )
     return success_response(
         {"answers": [envelope.present(r, include_rows=False) for r in envelope.recent_answers()]}
@@ -108,7 +112,7 @@ def get_answer(address: str):
             "no tenant context for this request",
             code="NO_TENANT_CONTEXT",
             details={"reason": _NO_TENANT_CONTEXT_REASON},
-            status_code=403,
+            status_code=400,
         )
     record = envelope.open_answer(address)
     if record is None:

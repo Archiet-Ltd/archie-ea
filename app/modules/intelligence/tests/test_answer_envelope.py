@@ -301,9 +301,9 @@ def test_with_no_active_organisation_nothing_is_read_or_written(
     login_as(client, user)
     index = client.get("/intelligence/answers")
 
-    assert asked.status_code == 403
-    assert opened.status_code == 403
-    assert listed.status_code == 403
+    assert asked.status_code == 400
+    assert opened.status_code == 400
+    assert listed.status_code == 400
     assert page.status_code == 404
     assert index.status_code == 200
     assert "data-answers-list" not in index.get_data(as_text=True)
@@ -621,3 +621,105 @@ def test_rows_over_the_ceiling_are_cut_and_the_stored_answer_says_so(
         assert data["truncated"] is True
         assert "rows_truncated" in data["reasons"]
         assert data["summary"]["total"] == 4
+
+
+# --- review round: bounded input, named seeds never dropped, linear cost --------
+
+
+def test_a_huge_element_list_is_refused_quickly_without_being_walked(app, db_session, make_org, client, login_as):
+    import time
+
+    org = make_org("env-huge-list")
+    user = _user(db_session, org.id)
+    db_session.commit()
+    login_as(client, user)
+
+    started = time.monotonic()
+    resp = _ask(client, question="set_impact", element_ids=list(range(1, 40_001)))
+    elapsed = time.monotonic() - started
+
+    assert resp.status_code == 400
+    assert elapsed < 1.0, elapsed
+    assert _count(db_session) == 0
+
+
+def test_a_request_body_over_the_ceiling_is_refused(app, db_session, make_org, client, login_as):
+    org = make_org("env-big-body")
+    user = _user(db_session, org.id)
+    db_session.commit()
+    login_as(client, user)
+    padding = "x" * (2 * 1024 * 1024)
+
+    resp = client.post("/api/v1/intelligence/answers",
+                       json={"question": "set_impact", "element_ids": [1], "note": padding})
+
+    assert resp.status_code == 400
+    assert _count(db_session) == 0
+
+
+def test_a_named_element_is_never_dropped_by_a_filter_that_matches_many(
+    app, db_session, make_org, client, login_as
+):
+    org = make_org("env-named-first")
+    user = _user(db_session, org.id)
+    named = _element(db_session, org.id, "NamedApp", type_="Node", layer="technology")
+    dependant = _element(db_session, org.id, "NamedDependant", type_="Node", layer="technology")
+    _link(db_session, org.id, named, dependant)
+    for i in range(30):
+        _element(db_session, org.id, f"Actor{i}", type_="BusinessActor", layer="business")
+    db_session.commit()
+    login_as(client, user)
+
+    resp = _ask(client, question="set_impact", element_ids=[named.id], filter={"type": "BusinessActor"})
+
+    assert resp.status_code == 201
+    data = resp.get_json()["data"]
+    assert named.id in data["summary"]["seed_element_ids"]
+    assert dependant.id in [r["element_id"] for r in data["rows"]]
+    assert "seed_limit_reached" in data["reasons"]
+    assert len(data["summary"]["seed_element_ids"]) == 25
+
+
+def test_the_statement_count_grows_linearly_with_the_number_of_seeds(app, db_session, make_org):
+    import threading
+
+    from sqlalchemy import event
+
+    from app.extensions import db
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("env-query-count")
+    seeds = []
+    for i in range(25):
+        seed = _element(db_session, org.id, f"Seed{i}")
+        _link(db_session, org.id, seed, _element(db_session, org.id, f"Dep{i}"))
+        seeds.append(seed.id)
+    db_session.commit()
+
+    def count_for(n):
+        counter = {"n": 0}
+        me = threading.get_ident()
+
+        def listener(conn, cursor, statement, params, context, executemany):
+            if threading.get_ident() == me:
+                counter["n"] += 1
+
+        with app.test_request_context("/"):
+            from flask import g
+
+            g.current_org_id = org.id
+            event.listen(db.engine, "before_cursor_execute", listener)
+            try:
+                result = IntelligenceQueryService.set_impact(seeds[:n])
+            finally:
+                event.remove(db.engine, "before_cursor_execute", listener)
+        assert len(result["rows"]) == n
+        return counter["n"]
+
+    counts = {n: count_for(n) for n in (1, 5, 25)}
+    per_seed = 20
+    fixed = 20
+    for n, used in counts.items():
+        assert used <= fixed + per_seed * n, (n, counts)
+    # Linear, not worse: 25 seeds cost no more than five times what 5 seeds cost, plus slack.
+    assert counts[25] <= 5 * counts[5] + fixed, counts

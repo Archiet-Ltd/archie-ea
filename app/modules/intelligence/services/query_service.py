@@ -1166,6 +1166,11 @@ class IntelligenceQueryService:
         ranked blast radius of a set of elements, or of every element matching
         a filter (``{"type": ..., "layer": ...}``).
 
+        Cost: each seed is one ``cross_layer_impact`` walk (about a dozen
+        statements), so the statement count grows linearly with the number of
+        seeds, bounded by ``SET_IMPACT_MAX_SEEDS``; only owner resolution is a
+        constant number of batched reads. The bound is pinned by a test.
+
         Each seed is answered by ``cross_layer_impact`` (so the combined
         answer is, by construction, the union of the single answers); an
         element reached from several seeds is ONE row carrying every seed that
@@ -1205,7 +1210,14 @@ class IntelligenceQueryService:
 
         from app.models import ArchiMateElement
 
+        # Named elements come first and are never dropped: more of them than the
+        # ceiling is refused, and the filter only fills the places left over.
         seeds: List[int] = []
+        for raw in element_ids or []:
+            if raw not in seeds:
+                seeds.append(raw)
+        if len(seeds) > SET_IMPACT_MAX_SEEDS:
+            raise ValueError(f"name at most {SET_IMPACT_MAX_SEEDS} elements in one question")
         if element_filter is not None:
             type_filter = element_filter.get("type")
             layer_filter = element_filter.get("layer")
@@ -1216,18 +1228,25 @@ class IntelligenceQueryService:
                 stmt = stmt.where(ArchiMateElement.type == type_filter)
             if layer_filter:
                 stmt = stmt.where(ArchiMateElement.layer == layer_filter)
-            seeds = list(
+            matched = list(
                 db.session.execute(
-                    stmt.order_by(ArchiMateElement.id).limit(SET_IMPACT_MAX_SEEDS + 1)
+                    stmt.order_by(ArchiMateElement.id).limit(SET_IMPACT_MAX_SEEDS + len(seeds) + 1)
                 ).scalars()
             )
-        for raw in element_ids or []:
-            if raw not in seeds:
-                seeds.append(raw)
+            named = set(seeds)
+            room = SET_IMPACT_MAX_SEEDS - len(seeds)
+            extra = [m for m in matched if m not in named]
+            if len(extra) > room:
+                extra = extra[:room]
+                filter_cut = True
+            else:
+                filter_cut = False
+            seeds.extend(extra)
+        else:
+            filter_cut = False
 
         reasons: List[str] = []
-        if len(seeds) > SET_IMPACT_MAX_SEEDS:
-            seeds = seeds[:SET_IMPACT_MAX_SEEDS]
+        if filter_cut:
             reasons.append(SEED_LIMIT_REACHED_REASON)
         if not seeds:
             base["reasons"] = [NO_SEED_ELEMENTS_REASON]

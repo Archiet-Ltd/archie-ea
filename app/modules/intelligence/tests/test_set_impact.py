@@ -197,17 +197,32 @@ def test_a_filter_with_neither_type_nor_layer_is_refused(app, db_session, make_o
         _as(app, org.id, lambda: IntelligenceQueryService.set_impact(element_filter={"type": ""}))
 
 
-def test_more_seeds_than_the_ceiling_are_cut_and_the_answer_says_so(app, db_session, make_org, monkeypatch):
+def test_more_named_seeds_than_the_ceiling_are_refused_not_silently_cut(app, db_session, make_org, monkeypatch):
+    import pytest
+
     org = make_org("set-seed-cap")
     seeds = [_element(db_session, org.id, f"Seed{i}") for i in range(4)]
     db_session.commit()
     monkeypatch.setattr(query_service, "SET_IMPACT_MAX_SEEDS", 3)
 
-    result = _as(app, org.id, lambda: IntelligenceQueryService.set_impact([s.id for s in seeds]))
+    with pytest.raises(ValueError):
+        _as(app, org.id, lambda: IntelligenceQueryService.set_impact([s.id for s in seeds]))
+
+
+def test_a_filter_fills_only_the_places_the_named_seeds_leave(app, db_session, make_org, monkeypatch):
+    org = make_org("set-filter-cap")
+    named = _element(db_session, org.id, "Named", type_="Node", layer="technology")
+    actors = [_element(db_session, org.id, f"A{i}", type_="BusinessActor", layer="business") for i in range(4)]
+    db_session.commit()
+    monkeypatch.setattr(query_service, "SET_IMPACT_MAX_SEEDS", 3)
+
+    result = _as(
+        app, org.id,
+        lambda: IntelligenceQueryService.set_impact([named.id], element_filter={"type": "BusinessActor"}),
+    )
 
     assert "seed_limit_reached" in result["reasons"]
-    assert result["summary"]["resolved_seed_count"] == 3
-    assert result["seed_element_ids"] == [s.id for s in seeds[:3]]
+    assert result["seed_element_ids"] == [named.id, actors[0].id, actors[1].id]
 
 
 def test_rows_beyond_the_ceiling_are_cut_but_the_total_stays_true(app, db_session, make_org, monkeypatch):

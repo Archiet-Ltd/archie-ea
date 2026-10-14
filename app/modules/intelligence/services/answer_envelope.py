@@ -40,6 +40,7 @@ from app.modules.intelligence.services.query_service import (
     NO_TENANT_CONTEXT_REASON,
     ROWS_TRUNCATED_REASON,
     SET_IMPACT_MAX_ROWS,
+    SET_IMPACT_MAX_SEEDS,
     IntelligenceQueryService,
 )
 
@@ -55,6 +56,10 @@ CONFIDENCE_NO_ROWS = "no_rows"
 # Citations kept per answer; the rows themselves are already held to the query
 # service's row ceiling.
 MAX_CITATIONS = 5000
+
+# The largest request body the ask route reads; far above any legitimate
+# question (25 element ids) and well below the application-wide ceiling.
+MAX_BODY_BYTES = 1024 * 1024
 
 ADDRESS_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 
@@ -128,10 +133,19 @@ def normalise_params(kind: str, raw: Dict[str, Any]) -> Dict[str, Any]:
     if element_ids_raw is not None:
         if not isinstance(element_ids_raw, list):
             raise AnswerParamError("element_ids must be a list of element ids")
+        seen: set = set()
         for item in element_ids_raw:
             value = _as_int(item, "element_ids")
-            if value not in element_ids:
-                element_ids.append(value)
+            if value in seen:
+                continue
+            seen.add(value)
+            element_ids.append(value)
+            if len(element_ids) > SET_IMPACT_MAX_SEEDS:
+                # Stop reading: an answer covers at most this many elements, so
+                # a longer list is refused without being walked to its end.
+                raise AnswerParamError(
+                    f"name at most {SET_IMPACT_MAX_SEEDS} elements in one question"
+                )
     element_filter = raw.get("filter")
     cleaned_filter: Optional[Dict[str, str]] = None
     if element_filter is not None:

@@ -99,9 +99,7 @@
     </section>
 
     {% for reason in answer.reasons %}
-        {% if reason_words.get(reason) %}
-        <p role="status" class="rounded-lg border border-border bg-muted/30 p-4 text-sm text-foreground" data-reason="{{ reason }}">{{ reason_words[reason] }}</p>
-        {% endif %}
+        <p role="status" class="rounded-lg border border-border bg-muted/30 p-4 text-sm text-foreground" data-reason="{{ reason }}">{{ reason_words.get(reason, 'Not stated.') }}</p>
     {% endfor %}
 
     {% if not answer.rows %}
