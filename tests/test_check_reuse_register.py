@@ -229,6 +229,29 @@ def test_a_macro_symbol_in_a_template_is_found(tmp_path):
     assert any("empty_state" in f for f in _run(root)[0])
 
 
+def test_a_css_custom_property_symbol_is_found(tmp_path):
+    register = REGISTER.replace("app/utils/duplicate_guard.py", "app/static/css/tokens.css").replace(
+        "symbols: [normalize_name, Guard.check]", "symbols: [--primary]")
+    root = _tree(tmp_path, register=register)
+    (root / "app" / "utils" / "duplicate_guard.py").unlink()
+    (root / "app" / "static" / "css").mkdir(parents=True)
+    (root / "app" / "static" / "css" / "tokens.css").write_text(
+        ":root {\n  --primary: 0 0% 9%;\n}\n", encoding="utf-8")
+    assert _run(root)[0] == []
+
+
+def test_a_missing_css_custom_property_symbol_fails(tmp_path):
+    register = REGISTER.replace("app/utils/duplicate_guard.py", "app/static/css/tokens.css").replace(
+        "symbols: [normalize_name, Guard.check]", "symbols: [--primary]")
+    root = _tree(tmp_path, register=register)
+    (root / "app" / "utils" / "duplicate_guard.py").unlink()
+    (root / "app" / "static" / "css").mkdir(parents=True)
+    (root / "app" / "static" / "css" / "tokens.css").write_text(
+        ":root {\n  --background: 0 0% 100%;\n}\n", encoding="utf-8")
+    fails, _ = _run(root)
+    assert len(fails) == 1 and "--primary" in fails[0]
+
+
 def test_update_baseline_refuses_to_raise_a_pattern_total(tmp_path):
     baseline = {"name-matching/normaliser": {"app/a.py": 1}}
     root = _tree(tmp_path, extra={"app/a.py": COPY, "app/b.py": COPY}, baseline=baseline)
