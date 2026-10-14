@@ -28,6 +28,10 @@ import uuid
 
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "scripts"))
+
+from capture_screenshots import _dismiss_onboarding  # noqa: E402
+
 PASSWORD = "ScreenshotJourney!2026"
 VIEWPORTS = {"desktop": (1440, 900), "mobile": (390, 844)}
 
@@ -171,31 +175,6 @@ def _login(page, base, email):
             "could not sign in; the page said: "
             + " ".join(page.inner_text("body").split())[:200]
         )
-
-
-def _dismiss_onboarding(page):
-    """Remove the first-run role-picker overlay before photographing anything.
-
-    A brand-new tenant always gets it, and it sits over the middle of the page --
-    on the journey home that is precisely the decisions and risks panels. A
-    screenshot with it in place would document the modal, not the feature, while
-    looking like a full-page capture. The smoke harness removes the same element
-    for the same reason.
-    """
-    page.eval_on_selector_all(
-        "[x-show='showOnboarding']", "els => els.forEach(el => el.remove())"
-    )
-    # Some builds render the overlay as a sibling backdrop; clear anything left
-    # that is fixed, full-screen and above the content.
-    page.evaluate(
-        """() => {
-            document.querySelectorAll('.fixed.inset-0').forEach((el) => {
-                const z = parseInt(window.getComputedStyle(el).zIndex || '0', 10);
-                if (z >= 40) { el.remove(); }
-            });
-        }"""
-    )
-    page.wait_for_timeout(300)
 
 
 def _capture(page, target, width, height):

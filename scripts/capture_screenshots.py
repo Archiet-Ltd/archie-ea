@@ -69,6 +69,16 @@ PAGES = [
 
 VIEWPORT = {"width": 1440, "height": 900}
 
+# The sidebar's own "Build <id>" diagnostic line (admin_sidebar.html) is for
+# whoever is signed in, not for a visitor of a public module/use-case page or
+# the README. Scoped to that one <p>, not the bare `.sidebar-footer-text`
+# class it also carries: that class sits on six other sidebar elements (the
+# avatar initial, the user name/email block, the log-out/log-in link, the
+# "All modules" link label) so the collapsed rail can hide them too, and
+# stripping all of those would break the sidebar every capture is supposed to
+# be showing, not just the build line.
+BUILD_STAMP_SELECTOR = 'p.sidebar-footer-text[title^="Build identifier"]'
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -122,6 +132,7 @@ def main() -> int:
                     failed.append("%s -> HTTP %d" % (path, status))
                     continue
                 page.wait_for_timeout(1200)  # let charts and icons settle
+                _dismiss_onboarding(page)
 
                 # An empty screen is a finding, not a picture. Report it rather
                 # than shipping a shop window full of empty states.
@@ -704,11 +715,16 @@ def _login(page, base: str, email: str, password: str) -> None:
 
 
 def _dismiss_onboarding(page) -> None:
-    """Remove the first-run role-picker overlay before photographing anything.
+    """Strip non-product chrome before photographing anything.
 
-    Same approach as scripts/capture_journey_screenshots.py: a capture of that
-    overlay documents onboarding, not the module, and the brief refuses it the
-    same way it refuses an empty or error screen.
+    Removes the first-run role-picker overlay and the sidebar's own
+    "Build <id>" diagnostic line (BUILD_STAMP_SELECTOR). A capture that still
+    shows the onboarding overlay documents onboarding, not the module; a
+    capture that still shows the build line leaks an internal diagnostic to
+    every visitor of a public module, use-case or README page. Both are
+    refused the same way an empty or error screen already is.
+    scripts/capture_journey_screenshots.py imports this function rather than
+    keeping its own copy, so there is one strip step to widen.
     """
     page.eval_on_selector_all(
         "[x-show='showOnboarding']", "els => els.forEach(el => el.remove())"
@@ -721,17 +737,63 @@ def _dismiss_onboarding(page) -> None:
             });
         }"""
     )
+    page.eval_on_selector_all(
+        BUILD_STAMP_SELECTOR, "els => els.forEach(el => el.remove())"
+    )
     page.wait_for_timeout(300)
 
 
+def _hide_build_stamp_script() -> str:
+    """Script for ``context.add_init_script``: hide the build line before first paint.
+
+    ``_dismiss_onboarding`` runs after ``networkidle`` plus one second, well
+    after a recording's opening frames -- and the poster, taken at 2.0s -- are
+    already in the can. This builds a <style> rule for the same
+    BUILD_STAMP_SELECTOR and injects it as soon as ``document.documentElement``
+    exists, so it is in force before the first paint of every navigation in a
+    context carrying this script. A MutationObserver covers the (normally
+    instantaneous) case where the init script runs before the parser has even
+    created the document element. Wrapped as an IIFE: ``add_init_script``
+    evaluates a bare arrow function expression but never calls it, which is
+    the exact bug scripts/demo/record_demo.py's own ``add_init_script`` call
+    already carries a note about.
+    """
+    return (
+        "(() => {"
+        "  const rule = " + json.dumps(BUILD_STAMP_SELECTOR) + " + ' { display: none !important; }';"
+        "  const inject = () => {"
+        "    if (!document.documentElement) return false;"
+        "    const style = document.createElement('style');"
+        "    style.textContent = rule;"
+        "    document.documentElement.appendChild(style);"
+        "    return true;"
+        "  };"
+        "  if (inject()) return;"
+        "  const observer = new MutationObserver(() => {"
+        "    if (inject()) observer.disconnect();"
+        "  });"
+        "  observer.observe(document, {childList: true, subtree: true});"
+        "})()"
+    )
+
+
 def _visit_and_check(page, base: str, path: str, label: str):
-    """Navigate to path; refuse (raise) an error response or an empty screen."""
+    """Navigate to path; refuse (raise) an error response, an empty screen, or
+    a page that still shows the sidebar build line after _dismiss_onboarding."""
     response = page.goto(base + path, wait_until="networkidle", timeout=60000)
     status = response.status if response else 0
     if status >= 400:
         raise SystemExit(f"{label} ({path}) returned HTTP {status}; refusing to capture it")
     page.wait_for_timeout(1000)
     _dismiss_onboarding(page)
+    remaining = page.locator(BUILD_STAMP_SELECTOR).count()
+    if remaining != 0:
+        raise SystemExit(
+            f"{label} ({path}) still shows the sidebar build line after "
+            f"_dismiss_onboarding ({remaining} element(s) matched "
+            f"{BUILD_STAMP_SELECTOR!r}); refusing to capture it, the same way "
+            f"an empty screen is refused"
+        )
     text = (page.evaluate("() => document.body.innerText") or "").strip()
     if len(text) < 200:
         raise SystemExit(
@@ -908,6 +970,10 @@ def run_public_pages_capture() -> int:
                             record_video_dir=str(video_dir),
                             record_video_size=VIDEO_VIEWPORT,
                         )
+                        # _dismiss_onboarding() runs after the page settles, too late
+                        # for frames a recording has already captured; hide the build
+                        # line from the first paint of every navigation instead.
+                        rec_ctx.add_init_script(_hide_build_stamp_script())
                         page = rec_ctx.new_page()
                         for path, hold_seconds in steps:
                             _visit_and_check(page, base, path, f"{slug} ({path})")
