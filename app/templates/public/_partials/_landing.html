@@ -10,8 +10,10 @@
    left-ruled attention box instead of a plain prose band; one whose heading is "What Entelim
    answers" (`s.variant == 'figure_band'`) renders beside the page's own screenshot/recording when
    one exists (the same figure _page_media.html already renders for module pages, moved into this
-   band instead of the page-top slot for a function-per-segment page specifically) and as a
-   text-only band, unchanged from the default, when neither exists yet -- never an empty frame. -#}
+   band instead of the page-top slot, but only for a function-per-segment page that actually has
+   this section) and as a text-only band, unchanged from the default, when neither exists yet --
+   never an empty frame. A use-case page with no "What Entelim answers" heading has no figure_band
+   section, so it keeps the page-top slot instead -- the figure always renders somewhere. -#}
 {% from 'macros/pricing_cta.html' import plan_buy_section %}
 {% set primary_label, primary_url = landing.primary_action %}
 {% set secondary_label, secondary_url = landing.secondary_action %}
@@ -39,10 +41,15 @@
 </section>
 
 <div class="landing-bands">
-  {# A use-case page's figure (if any) renders inside its "What Entelim answers" band below,
-     not here -- see the section loop's figure_band branch. Every other landing family (module,
-     comparison) keeps this page-top slot exactly as before. #}
-  {% if (screenshot or recording) and page.family != 'function-per-segment' %}
+  {# A use-case page's figure (if any) renders inside its "What Entelim answers" band below
+     instead of here -- see the section loop's figure_band branch -- but only when that band
+     actually exists. A use-case page with no "What Entelim answers" heading (e.g. one whose
+     second heading reads "What Entelim is building" instead) has no figure_band section to
+     show the figure in, so it must keep this page-top slot or the screenshot/recording would
+     be dropped entirely instead of rendered anywhere. Every other landing family (module,
+     comparison) keeps this page-top slot exactly as before regardless. #}
+  {% set has_figure_band = landing.sections | selectattr('variant', 'equalto', 'figure_band') | list %}
+  {% if (screenshot or recording) and not (page.family == 'function-per-segment' and has_figure_band) %}
   <section class="landing-band">
     <div class="public-container">
 {% include 'public/_partials/_page_media.html' %}

@@ -105,7 +105,7 @@ USE_CASE_ICONS = {
     "uc-s3-11-derivation-yield": "percent",
     "uc-s3-12-who-do-we-need": "user-plus",
     "uc-s3-13-target-state-roadmap": "flag",
-    "uc-s3-14-adopt-a-reference-pack": "cloud-download",
+    "uc-s3-14-adopt-a-reference-pack": "download-cloud",
     "uc-s3-15-see-your-own-twin": "scan",
     "uc-s4-01-what-happens-if": "server-off",
     "uc-s4-02-set-up-in-an-afternoon": "clock",
@@ -114,6 +114,42 @@ USE_CASE_ICONS = {
     "uc-s4-05-contract-renewals": "calendar",
     "uc-s4-06-what-we-can-and-cannot-tell": "eye-off",
 }
+
+# The vendored Lucide bundle only ever exports an icon's PascalCase name (e.g.
+# "DownloadCloud"); it never embeds a kebab-case form. createIcons() resolves a
+# data-lucide/icon-front-matter value back to that PascalCase name with its own
+# toPascalCase conversion -- (\w)(\w*)(_|-|\s*), replacing each chunk with its
+# upper-cased head plus lower-cased rest and dropping the separator -- before
+# indexing the icons object. A name that was never valid (e.g. "cloud-download",
+# which Lucide calls "DownloadCloud") renders nothing at runtime, and checking
+# only against USE_CASE_ICONS/MODULE_ICONS can never catch that, because those
+# dicts are exactly where the invalid name was copied from. Mirror the real
+# conversion and check against the bundle's own export map instead.
+_LUCIDE_BUNDLE = CONTENT_ROOT.parent.parent / "app" / "static" / "js" / "vendor" / "lucide.min.js"
+
+
+def _lucide_pascal_names() -> set[str]:
+    source = _LUCIDE_BUNDLE.read_text(encoding="utf-8")
+    start = source.index("{__proto__:null,")
+    end = source.index("});", start)
+    block = source[start : end + 1]
+    names = {
+        match.group(1)
+        for match in re.finditer(r"([A-Za-z][A-Za-z0-9]*):([A-Za-z0-9_$]+)", block)
+        if match.group(1) != "__proto__"
+    }
+    assert len(names) > 1000, "Lucide export map parse looks broken -- too few names found"
+    return names
+
+
+def _lucide_pascal_case(name: str) -> str:
+    """Lucide's own kebab/snake/space -> PascalCase conversion (toPascalCase)."""
+
+    def repl(match: re.Match) -> str:
+        head, rest = match.group(1), match.group(2)
+        return head.upper() + rest.lower()
+
+    return re.sub(r"(\w)(\w*)(?:_|-|\s*)", repl, name)
 
 
 def _page(body: str, family: str = "module", front_matter: dict | None = None) -> PublicPage:
@@ -703,6 +739,40 @@ def test_use_case_answer_band_shows_the_figure_beside_the_text_when_one_exists(a
     assert 'data-testid="page-screenshot"' not in html[:band_start]
 
 
+def test_use_case_answer_figure_still_renders_without_a_figure_band_section(app, monkeypatch):
+    """D-3 regression: a use-case page whose second heading is not "What
+    Entelim answers" (this one reads "What Entelim is building" instead) has
+    no figure_band section to show a screenshot in. The page-top media slot
+    must not be unconditionally suppressed for every function-per-segment
+    page -- only for the ones that actually have a figure_band to show the
+    figure in instead -- or a captured screenshot would render nowhere at
+    all."""
+    from app.services import public_pages
+
+    url = "/use-cases/capability-maturity-heatmap"
+    fake_screenshot = {
+        "url": "/static/img/use-cases/capability-maturity-heatmap.webp",
+        "width": 1200,
+        "height": 800,
+        "mobile": None,
+        "alt": "Synthetic screenshot for this test only.",
+        "caption": "Synthetic caption for this test only.",
+    }
+
+    def _fake_get_page_screenshot(page):
+        return fake_screenshot if page.url == url else None
+
+    monkeypatch.setattr(public_pages, "get_page_screenshot", _fake_get_page_screenshot)
+    with app.test_client() as client:
+        html = client.get(url).data.decode()
+
+    # This page has no "What Entelim answers" heading, so no figure_band section exists.
+    assert 'data-testid="usecase-answer-figure-band"' not in html
+    # The figure must still render -- in the page-top slot, since there is no band for it.
+    assert 'data-testid="page-screenshot"' in html
+    assert "Synthetic caption for this test only." in html
+
+
 def test_every_module_page_declares_a_known_icon():
     module_dir = CONTENT_ROOT / "modules"
     files = sorted(module_dir.glob("*.md"))
@@ -726,12 +796,16 @@ def test_every_use_case_page_declares_a_known_icon():
     assert known.isdisjoint(set(MODULE_ICONS.values())), (
         "a use-case icon repeats a module icon -- a Related grid mixing the two would collide"
     )
+    valid_lucide_names = _lucide_pascal_names()
     for md_file in files:
         front = md_file.read_text(encoding="utf-8").split("---", 2)[1]
         icons = re.findall(r"^icon:\s*(\S+)\s*$", front, re.M)
         assert len(icons) == 1, md_file.name
         assert icons[0] in known, (md_file.name, icons[0])
         assert icons[0] == USE_CASE_ICONS[md_file.stem], md_file.name
+        assert _lucide_pascal_case(icons[0]) in valid_lucide_names, (
+            md_file.name, icons[0], "not a real Lucide 0.344 icon name -- it would render blank"
+        )
         assert page_icon(PublicPage(
             family="function-per-segment", slug=md_file.stem, url="/use-cases/x",
             title="x", body_html=Markup(""), front_matter={"icon": icons[0]},
