@@ -134,7 +134,7 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("compliance-frameworks", "/dashboard/compliance", DEMO_PERSONA,
      "The compliance frameworks dashboard, tracking framework coverage across the estate.",
      "Screenshot of the Compliance Frameworks module's dashboard."),
-    ("diagrams", "/architecture/composer", DEMO_PERSONA,
+    ("diagrams", "/archimate/composer", DEMO_PERSONA,
      "A saved diagram open in the ArchiMate Composer, with its elements laid out on the canvas.",
      "Screenshot of the ArchiMate Composer with a saved diagram's elements open on the canvas."),
     ("duplicate-detection", "/duplicate-detection/simple", DEMO_PERSONA,

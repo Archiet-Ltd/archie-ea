@@ -528,11 +528,18 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             created_by_id=demo_user_id
         ).count()
         if existing_impact_count == 0 and affected_app is not None:
-            for analysis_type, elem_type, severity, caps, apps_count, procs in impact_rows:
+            # Round 2 (MP-B1): this loop's 4th variable was itself named
+            # "caps" (an int count, not the capability dict), silently
+            # shadowing the outer `caps = _resolve_caps(org_id)` dict for
+            # the rest of the function -- every block added below that reads
+            # `caps` (business capabilities, investment analysis, value
+            # streams) crashed with "'int' object has no attribute 'values'"
+            # the moment it ran after this loop. Renamed; behaviour unchanged.
+            for analysis_type, elem_type, severity, affected_caps_count, apps_count, procs in impact_rows:
                 db.session.add(ImpactAnalysisResult(
                     analysis_type=analysis_type, trigger_element_type=elem_type,
                     trigger_element_id=affected_app.id, overall_severity=severity,
-                    affected_capabilities_count=caps, affected_applications_count=apps_count,
+                    affected_capabilities_count=affected_caps_count, affected_applications_count=apps_count,
                     affected_processes_count=procs, created_by_id=demo_user_id,
                 ))
         db.session.flush()
@@ -740,11 +747,24 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
              "with full capability coverage across the estate.", 545),
         ]
         for name, seq, description, days_out in _plateau_rows:
-            if Plateau.query.filter_by(name=name).first():
+            target_date = (today_dt + _dt.timedelta(days=days_out)).date()
+            existing_plateau = Plateau.query.filter_by(name=name).first()
+            if existing_plateau is not None:
+                # A plateau named "Current State"/"Target State" already
+                # existed (a product default created ahead of this script,
+                # not by seed_demo_company() -- its own stats dict reports
+                # plateaus_created: 0 even on a fresh organisation) with no
+                # description or target date. Filling those in on the
+                # existing row is the same "reseed what's needed" fix as
+                # everywhere else in this function, not a second Plateau.
+                if not existing_plateau.description:
+                    existing_plateau.description = description
+                if not existing_plateau.target_date:
+                    existing_plateau.target_date = target_date
                 continue
             db.session.add(Plateau(
                 name=name, description=description, sequence_order=seq,
-                target_date=(today_dt + _dt.timedelta(days=days_out)).date(),
+                target_date=target_date,
             ))
         db.session.flush()
 
@@ -804,19 +824,31 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             vs_row = value_streams_by_code.get(code)
             if vs_row is None:
                 continue
-            existing_stage_names = {
-                s.name for s in ValueStreamStage.query.filter_by(value_stream_id=vs_row.id).all()
+            existing_stages_by_name = {
+                s.name: s for s in ValueStreamStage.query.filter_by(value_stream_id=vs_row.id).all()
             }
             for order, stage_name in enumerate(stage_names, start=1):
-                if stage_name in existing_stage_names:
-                    continue
-                stage = ValueStreamStage(
-                    name=stage_name, value_stream_id=vs_row.id, stage_order=order,
-                    stage_type="operational",
-                )
-                db.session.add(stage)
-                db.session.flush()
-                if cap_list_all:
+                stage = existing_stages_by_name.get(stage_name)
+                if stage is None:
+                    stage = ValueStreamStage(
+                        name=stage_name, value_stream_id=vs_row.id, stage_order=order,
+                        stage_type="operational",
+                    )
+                    db.session.add(stage)
+                    db.session.flush()
+                # Round 2 (MP-B1), second pass: this used to sit inside the
+                # "stage didn't exist yet" branch above, so a database that
+                # already had these stages (e.g. from an earlier capture run,
+                # before UnifiedCapability's write-time projection was caught
+                # up -- see apply-unified-capability-provenance-migration /
+                # project-capabilities above) would skip ever creating the
+                # capability link, leaving every stream's own "N capabilities"
+                # stuck at 0 even once cap_list_all stopped being empty. The
+                # mapping's own existence is checked independently of the
+                # stage's, so a re-run always catches up.
+                if cap_list_all and not CapabilityValueStreamMapping.query.filter_by(
+                    value_stream_stage_id=stage.id
+                ).first():
                     cap_row = cap_list_all[(order + hash(code)) % len(cap_list_all)]
                     db.session.add(CapabilityValueStreamMapping(
                         capability_id=cap_row.id, value_stream_id=vs_row.id,
@@ -895,7 +927,6 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             list(framework.unique_process_areas or [])
             + list(framework.key_differentiators or [])
         ) or _CROSS_INDUSTRY_PROCESSES
-        is_regulated = framework.regulatory_intensity in ("high", "very_high")
         for i, process_name in enumerate(process_names):
             db.session.add(IndustryAPQCProcess(
                 industry_framework_id=framework.id,
@@ -904,17 +935,18 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
                 industry_process_name=process_name,
                 industry_category_1=framework.industry_name,
                 is_industry_unique=process_name in (framework.unique_process_areas or []),
-                # "Regulatory Processes" is a distinct dashboard count, read
-                # from this field (get_regulatory_processes()) -- the first
-                # two named processes of a high/very-high intensity
-                # framework get one real regulatory citation each, so that
-                # count isn't silently 0 alongside the others.
-                regulatory_requirements=(
-                    [{"regulation": "SOX" if framework.industry_code == "BFS" else "GDPR",
-                      "requirement": f"Applies to {process_name.lower()}",
-                      "criticality": "high"}]
-                    if is_regulated and i < 2 else None
-                ),
+                # "Regulatory Processes" (get_regulatory_processes(), read via
+                # IndustryAPQCProcess.regulatory_requirements.isnot(None))
+                # deliberately left unset here: this column's SQLAlchemy type
+                # serialises a Python None as the JSON literal `null`, not a
+                # SQL NULL, so any explicit True/False distinction attempted
+                # here would pass the "is not None" filter regardless and
+                # make every process read as regulatory -- a pre-existing
+                # product-model quirk (JSON column vs. an IS NOT NULL check),
+                # out of scope to fix by reseeding. Total/unique process
+                # counts (the actual "0 processes" defect this round fixes)
+                # are unaffected; regulatory_requirements stays at the
+                # column's own default either way.
             ))
     db.session.commit()
 
@@ -1070,7 +1102,7 @@ def _seed_lantern_quay(demo_password: str) -> dict:
         dynamic_paths = {}
         diagram = SavedDiagram.query.filter_by(name="Calibration estate overview").first()
         if diagram is not None:
-            dynamic_paths["diagrams"] = f"/architecture/composer?viewpoint_id={diagram.id}"
+            dynamic_paths["diagrams"] = f"/archimate/composer?viewpoint_id={diagram.id}"
         return dynamic_paths
 
 
