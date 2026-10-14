@@ -1385,3 +1385,63 @@ def test_ai_system_owner_delete_route_authorisation(
         max_redirects=0,
     )
     _expect_gate(response, archetype, AI_SYSTEMS_OWNER_WRITE_PERMITTED, "owner delete")
+
+
+# Approval inbox routes (the one approval queue). All four are login_required
+# and answer for a reviewer with GENERAL permission, which every archetype
+# holds; a read-only Viewer role is refused (covered against the services in
+# tests/test_approval_impact_preview.py, since no archetype is read-only).
+APPROVAL_INBOX_PERMITTED = set(ARCHETYPES)
+
+
+@pytest.fixture
+def seeded_impact_approval(seeded):
+    """A pending change proposal in the seeded organisation, so the impact route
+    has a real approval id in the URL. Function-scoped."""
+    from app import create_app, db
+    from app.modules.ai_chat.services.ai_chat_approval_service import create_approval_record
+
+    app = create_app("testing")
+    with app.app_context():
+        approval = create_approval_record(
+            organization_id=seeded["ids"]["org"],
+            operation_type="create",
+            entity_type="capability",
+            summary="Auth-matrix probe proposal",
+            operation_payload={"name": "Auth-matrix probe capability"},
+            user_id=None,
+        )
+        db.session.commit()
+        return approval.id
+
+
+@pytest.mark.parametrize("path", [
+    "/ai-chat/approvals/inbox",
+    "/ai-chat/approvals/queue",
+    "/ai-chat/approvals/decided",
+])
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_approval_inbox_reads_authorisation(archetype, path, page, live_server, seeded):
+    """The inbox page and its two JSON reads are reachable by every archetype
+    that holds GENERAL permission (all of them) and by nobody else."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.get(live_server + path, max_redirects=0)
+    if archetype in APPROVAL_INBOX_PERMITTED:
+        assert response.status == 200, "%s was refused %s (%s)" % (archetype, path, response.status)
+    else:
+        assert response.status == 403, "%s reached %s (%s)" % (archetype, path, response.status)
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_approval_impact_route_authorisation(archetype, page, live_server, seeded, seeded_impact_approval):
+    """GET /ai-chat/approvals/<id>/impact answers the same archetypes, with the
+    impact state stated (a new capability is not in the model yet)."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.get(
+        live_server + "/ai-chat/approvals/%d/impact" % seeded_impact_approval, max_redirects=0
+    )
+    if archetype in APPROVAL_INBOX_PERMITTED:
+        assert response.status == 200, "%s was refused the impact route (%s)" % (archetype, response.status)
+        assert response.json()["impact"]["state"] == "not_in_model"
+    else:
+        assert response.status == 403, "%s reached the impact route (%s)" % (archetype, response.status)

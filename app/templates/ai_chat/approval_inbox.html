@@ -15,7 +15,7 @@
     </div>
 
     <!-- Loading state -->
-    <div x-data="approvalInbox()" x-init="fetchApprovals()" x-cloak>
+    <div x-data="approvalInbox()" x-init="fetchApprovals(); fetchDecided()" x-cloak>
         <div x-show="loading && !hasLoaded" x-cloak data-testid="approval-inbox-loading" role="status"
              class="rounded-md border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
             Loading approval inbox…
@@ -41,7 +41,9 @@
 
         <!-- Approval cards -->
         <template x-for="item in approvals" :key="item.id">
-            <div class="rounded-xl border border-border bg-card p-5 space-y-3">
+            <div class="rounded-xl border bg-card p-5 space-y-3"
+                 :id="'approval-' + item.id" :data-testid="'approval-card-' + item.id"
+                 :class="focusId === item.id ? 'border-primary ring-2 ring-primary' : 'border-border'">
                 <!-- Top row: operation badge + entity type + created -->
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
@@ -80,6 +82,50 @@
                     Expires: <span x-text="formatDate(item.expires_at)"></span>
                 </p>
 
+                <!-- What approving this would affect (computed on demand, one proposal at a time) -->
+                <div class="text-sm">
+                    <button type="button" @click="toggleImpact(item.id)"
+                            :aria-expanded="!!impactOpen[item.id]"
+                            :data-testid="'approval-impact-toggle-' + item.id"
+                            class="inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors">
+                        <i data-lucide="network" class="h-3 w-3" aria-hidden="true"></i>
+                        <span x-text="impactOpen[item.id] ? 'Hide what this affects' : 'What does this affect?'"></span>
+                    </button>
+                    <div x-show="impactOpen[item.id]" x-cloak class="mt-2 rounded-md border border-border bg-muted/30 p-3 space-y-2"
+                         :data-testid="'approval-impact-' + item.id">
+                        <p x-show="impacts[item.id] && impacts[item.id].loading" role="status" class="text-xs text-muted-foreground">Working out what this affects…</p>
+                        <div x-show="impacts[item.id] && impacts[item.id].error" role="alert" class="text-xs text-destructive-emphasis flex items-center gap-2">
+                            <span x-text="impacts[item.id] && impacts[item.id].error"></span>
+                            <button type="button" @click="loadImpact(item.id)" class="underline">Retry</button>
+                        </div>
+                        <template x-if="impacts[item.id] && impacts[item.id].data">
+                            <div class="space-y-2" :data-impact-state="impacts[item.id].data.state">
+                                <p class="text-sm text-foreground" x-text="impacts[item.id].data.message"></p>
+                                <template x-if="impacts[item.id].data.subject_owners.length">
+                                    <p class="text-xs text-muted-foreground">
+                                        Owned by:
+                                        <span class="text-foreground" x-text="impacts[item.id].data.subject_owners.map(o => o.name + (o.role ? ' (' + o.role + ')' : '')).join(', ')"></span>
+                                    </p>
+                                </template>
+                                <template x-for="group in impactGroups(impacts[item.id].data)" :key="group.key">
+                                    <div>
+                                        <p class="text-xs font-medium text-foreground" x-text="group.label + ' (' + group.items.length + ')'"></p>
+                                        <ul class="mt-1 space-y-1">
+                                            <template x-for="el in group.items" :key="el.element_id">
+                                                <li class="text-xs text-muted-foreground">
+                                                    <span class="text-foreground" x-text="el.name"></span>
+                                                    <span> — owner: </span>
+                                                    <span x-text="el.owners.length ? el.owners.map(o => o.name).join(', ') : (el.owner_unit || 'no owner recorded')"></span>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
                 <!-- Technical detail disclosure -->
                 <details class="text-xs" x-show="item.arguments !== null">
                     <summary class="cursor-pointer text-muted-foreground hover:text-foreground select-none">
@@ -91,12 +137,12 @@
                 <!-- Reject reason textarea (shown when rejecting this item) -->
                 <template x-if="rejectingId === item.id">
                     <div class="space-y-2 pt-1 border-t border-border">
-                        <label :for="'reject-reason-' + item.id" class="text-xs font-medium text-foreground">Rejection reason (optional)</label>
+                        <label :for="'reject-reason-' + item.id" class="text-xs font-medium text-foreground">Why are you rejecting this? The reason stays with the proposal.</label>
                         <textarea :id="'reject-reason-' + item.id"
                                   x-model="rejectReason"
                                   rows="2"
                                   class="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                  placeholder="Why are you rejecting this operation?" aria-label="Why are you rejecting this operation?"></textarea>
+                                  placeholder="Say in a sentence why this should not go ahead" aria-label="Why are you rejecting this?"></textarea>
                         <div class="flex gap-2">
                             <button type="button" @click="confirmReject(item.id)"
                                     :class="busyIds[item.id] ? 'opacity-50 pointer-events-none' : ''"
@@ -130,11 +176,35 @@
                 </template>
             </div>
         </template>
+
+        <!-- Recently decided: a rejected proposal keeps its reason after a reload -->
+        <section class="mt-10 space-y-3" aria-labelledby="approval-decided-heading" data-testid="approval-decided">
+            <h2 id="approval-decided-heading" class="text-base font-semibold text-foreground">Recently decided</h2>
+            <p x-show="decidedLoaded && !decidedError && decided.length === 0" x-cloak data-testid="approval-decided-empty" class="text-sm text-muted-foreground">
+                Nothing has been decided yet.
+            </p>
+            <p x-show="decidedError" x-cloak role="alert" class="text-sm text-destructive-emphasis" x-text="decidedError"></p>
+            <ul class="space-y-2">
+                <template x-for="d in decided" :key="d.id">
+                    <li class="rounded-lg border border-border bg-card px-4 py-3 text-sm" :data-testid="'approval-decided-' + d.id">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <span class="text-foreground" x-text="d.summary"></span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border"
+                                  :class="d.status === 'rejected' ? 'bg-destructive/10 text-destructive-emphasis border-destructive/30' : 'bg-success/10 text-success-emphasis border-success/30'"
+                                  x-text="d.status === 'rejected' ? 'Rejected' : 'Approved'"></span>
+                        </div>
+                        <p class="mt-1 text-xs text-muted-foreground" x-show="d.status === 'rejected'">
+                            Reason: <span class="text-foreground" x-text="d.rejected_reason || 'No reason was given'"></span>
+                        </p>
+                    </li>
+                </template>
+            </ul>
+        </section>
     </div>
 </div>
 {% endblock %}
 
-{% block extra_scripts %}
+{% block extra_js %}
 <script>
 function approvalInbox() {
     return {
@@ -145,6 +215,61 @@ function approvalInbox() {
         rejectingId: null,
         rejectReason: "",
         busyIds: {},
+        impacts: {},
+        impactOpen: {},
+        focusId: null,
+        decided: [],
+        decidedLoaded: false,
+        decidedError: null,
+
+        async fetchDecided() {
+            try {
+                const data = await Platform.fetch("/ai-chat/approvals/decided", {
+                    credentials: "same-origin",
+                    silent: true,
+                });
+                if (!data.success) throw new Error(data.error || "unavailable");
+                this.decided = data.decisions || [];
+                this.decidedError = null;
+            } catch (err) {
+                this.decidedError = "Unable to load recent decisions.";
+            } finally {
+                this.decidedLoaded = true;
+            }
+        },
+
+        toggleImpact(approvalId) {
+            this.impactOpen[approvalId] = !this.impactOpen[approvalId];
+            if (this.impactOpen[approvalId] && !(this.impacts[approvalId] && this.impacts[approvalId].data)) {
+                this.loadImpact(approvalId);
+            }
+        },
+
+        async loadImpact(approvalId) {
+            this.impacts[approvalId] = { loading: true, error: null, data: null };
+            try {
+                const data = await Platform.fetch("/ai-chat/approvals/" + approvalId + "/impact", {
+                    credentials: "same-origin",
+                    silent: true,
+                });
+                if (!data.success) throw new Error(data.error || "unavailable");
+                this.impacts[approvalId] = { loading: false, error: null, data: data.impact };
+            } catch (err) {
+                this.impacts[approvalId] = { loading: false, error: "Unable to work out what this affects.", data: null };
+            }
+        },
+
+        impactGroups(impact) {
+            const labels = [
+                ["services", "Services"],
+                ["interfaces", "Interfaces"],
+                ["applications", "Applications"],
+                ["other", "Other elements"],
+            ];
+            return labels
+                .map(([key, label]) => ({ key, label, items: impact.affected[key] || [] }))
+                .filter(g => g.items.length > 0);
+        },
 
         async fetchApprovals() {
             this.loading = true;
@@ -159,6 +284,17 @@ function approvalInbox() {
                 this.approvals = data.approvals || [];
                 this.hasLoaded = true;
                 this.error = null;
+                // A notification link opens the inbox at one proposal.
+                const wanted = parseInt(new URLSearchParams(window.location.search).get("approval"), 10);
+                if (wanted && this.approvals.some(a => a.id === wanted)) {
+                    this.focusId = wanted;
+                    this.impactOpen[wanted] = true;
+                    this.loadImpact(wanted);
+                    this.$nextTick(() => {
+                        const el = document.getElementById("approval-" + wanted);
+                        if (el) el.scrollIntoView({ block: "center" });
+                    });
+                }
                 this.$nextTick(() => {
                     if (typeof lucide !== 'undefined') lucide.createIcons();
                 });
@@ -183,6 +319,7 @@ function approvalInbox() {
                 );
                 if (data.success) {
                     this.approvals = this.approvals.filter(a => a.id !== approvalId);
+                    this.fetchDecided();
                 } else {
                     this.error = data.error || "Approval failed";
                 }
@@ -218,6 +355,7 @@ function approvalInbox() {
                     this.approvals = this.approvals.filter(a => a.id !== approvalId);
                     this.rejectingId = null;
                     this.rejectReason = "";
+                    this.fetchDecided();
                 } else {
                     this.error = data.error || "Rejection failed";
                 }
