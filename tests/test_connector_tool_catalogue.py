@@ -60,6 +60,30 @@ def test_no_catalogue_tool_marked_mcp_mutates():
     assert bad == [], f"tools marked for the connector that are not read-only: {bad}"
 
 
+def test_connector_tools_are_not_offered_to_chat():
+    """Their handlers need a request context the chat streaming path lacks."""
+    for name in PUBLISHED_NAMES:
+        assert TOOL_SCHEMA_BY_NAME[name]["surfaces"] == ["mcp"], name
+
+
+def test_route_read_tool_helper_refuses_a_route_that_is_not_get():
+    with pytest.raises(ValueError):
+        registry._route_read_tool("x", "POST /api/v1/things", "d", {"type": "object"})
+    with pytest.raises(ValueError):
+        registry._route_read_tool("x", "GET /a | POST /b", "d", {"type": "object"})
+    ok = registry._route_read_tool("x", "GET /a + GET /b", "d", {"type": "object"})
+    assert ok["mutates"] is False and ok["risk_class"] == "read"
+
+
+def test_a_hand_written_handler_colliding_with_a_connector_name_is_an_error():
+    class Executor:
+        def _tool_ask_impact(self, args):
+            return {}
+
+    with pytest.raises(RuntimeError):
+        route_read_tools.install_route_read_tools(Executor)
+
+
 def test_no_tool_name_appears_twice():
     names = [s["name"] for s in TOOL_SCHEMAS]
     assert len(names) == len(set(names))

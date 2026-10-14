@@ -9,6 +9,8 @@ execution behaviour:
 Tools always accept names (not IDs) — the EntityResolver converts them.
 """
 
+import re
+
 TOOL_SCHEMAS = [
     {
         "name": "create_solution",
@@ -1787,9 +1789,19 @@ TOOL_SCHEMAS = [
 # run the same code. All are read-only; a write tool must never carry "mcp".
 # ---------------------------------------------------------------------------
 def _route_read_tool(name, route, description, parameters):
+    # Published on the connector only. Each handler calls its route in-process
+    # with the caller's session, which needs a request context; the chat UI's
+    # streaming path runs tools on a worker thread with only an app context, so
+    # on "chat" the model would be handed ten failing tools. Serving them in chat
+    # needs a request-free execution path with its own tenancy review.
+    # risk_class and mutates are fixed to read-only because the helper refuses
+    # anything but a GET route: a route that writes needs its own entry.
+    for part in re.split(r" [+|] ", route):
+        if not part.startswith("GET "):
+            raise ValueError(f"{name}: route tools are read-only, got {part!r}")
     return {
         "name": name,
-        "surfaces": ["chat", "mcp"],
+        "surfaces": ["mcp"],
         "route": route,
         "fenced_fields": [],
         "risk_class": "read",

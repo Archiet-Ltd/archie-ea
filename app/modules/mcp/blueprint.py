@@ -47,11 +47,11 @@ from flask_login import current_user
 from app.extensions import csrf
 from app.modules.ai_chat.tools.executor import ToolCall, ToolExecutor
 from app.modules.ai_chat.tools.route_read_tools import (
-    CONNECTOR_READ_SCOPE,
     connector_tools,
     resolve_connector_tool,
     scrub_credentials,
 )
+from app.modules.oauth_provider.scopes import MCP_READ_SCOPE
 
 logger = logging.getLogger(__name__)
 
@@ -243,10 +243,10 @@ def mcp_endpoint():
         if getattr(g, "auth_mode", None) == "bearer":
             bearer_token = getattr(g, "bearer_token", None)
             granted_scopes = set((bearer_token.scope or "").split()) if bearer_token else set()
-            if CONNECTOR_READ_SCOPE not in granted_scopes:
+            if MCP_READ_SCOPE not in granted_scopes:
                 return jsonify(_jsonrpc_error(
                     req_id, JSONRPC_INTERNAL_ERROR,
-                    f"insufficient_scope: this token does not have {CONNECTOR_READ_SCOPE}",
+                    f"insufficient_scope: this token does not have {MCP_READ_SCOPE}",
                 )), 403
 
         # Meter the call

@@ -22,10 +22,6 @@ from app.utils.text_sanitization import neutralize_fence_lookalikes
 
 from .registry import TOOL_SCHEMAS
 
-# Scope a bearer token must carry to call any connector tool. Every connector
-# tool is read-only, so there is one scope; a future tool that needs another
-# would be a deliberate addition to the authorisation server's allow-list.
-CONNECTOR_READ_SCOPE = "mcp:read"
 CONNECTOR_SURFACE = "mcp"
 
 # Old tool name -> catalogue tool name, for a tool the connector used to
@@ -216,13 +212,18 @@ def install_route_read_tools(executor_cls) -> int:
     """Install ``_tool_<name>`` on the executor for each route-backed read tool.
 
     Same mechanism the generated ArchiMate element tools use. A hand-written
-    handler of the same name wins.
+    handler of the same name is an error, not a silent skip.
     """
     installed = 0
     for name, fn in ROUTE_READ_HANDLERS.items():
         attribute = f"_tool_{name}"
         if hasattr(executor_cls, attribute):
-            continue
+            # A hand-written handler of the same name would silently replace or
+            # be replaced by the route-backed one: two tools, one name.
+            raise RuntimeError(
+                f"ToolExecutor already defines {attribute}; a connector tool name "
+                "must have exactly one implementation"
+            )
 
         def _make(handler):
             def _tool(self, args: dict) -> dict:
