@@ -1715,6 +1715,63 @@ def gate_llm_boundary(baseline: int) -> Result:
                   detail, count, baseline)
 
 
+INTERFACE_CONTRACT_SUBSET = REPO_ROOT / "app" / "config" / "api_contract_subset.yaml"
+_INTERFACE_CONTRACT_REPORTS: dict = {}
+
+
+def _interface_contract_report() -> dict:
+    """One application boot answers both interface-contract gates.
+
+    The checker prints {"violations": [...], "unbuilt": N}; each gate judges
+    its own half. Cached per subset path for the life of the process.
+    """
+    key = str(INTERFACE_CONTRACT_SUBSET)
+    if key not in _INTERFACE_CONTRACT_REPORTS:
+        proc = _run([sys.executable, "scripts/check_interface_contract.py",
+                     "--subset", key, "--json"])
+        try:
+            report = json.loads(proc.stdout.strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            report = {"error": f"could not parse checker output: {proc.stdout[-500:]!r} "
+                               f"{proc.stderr[-300:]}"}
+        _INTERFACE_CONTRACT_REPORTS[key] = report
+    return _INTERFACE_CONTRACT_REPORTS[key]
+
+
+def gate_interface_contract_unlisted() -> Result:
+    """Every token-accepting /api/v1 route is in the committed contract subset.
+    Zero tolerance — no ratchet."""
+    if not INTERFACE_CONTRACT_SUBSET.exists():
+        return Result("interface-contract-unlisted", SKIP,
+                      "no committed subset at app/config/api_contract_subset.yaml; "
+                      "run scripts/generate_api_contract_subset.py first")
+    report = _interface_contract_report()
+    if "error" in report:
+        return Result("interface-contract-unlisted", FAIL, report["error"])
+    violations = report["violations"]
+    if not violations:
+        return Result("interface-contract-unlisted", PASS,
+                      "all token-accepting routes are in the contract subset")
+    return Result("interface-contract-unlisted", FAIL,
+                  "\n".join(violations[:20]), measured=len(violations), baseline=0)
+
+
+def gate_interface_contract_unimplemented(baseline: int) -> Result:
+    """Subset operations with no matching token-accepting route — ratchet."""
+    if not INTERFACE_CONTRACT_SUBSET.exists():
+        return Result("interface-contract-unimplemented", SKIP,
+                      "no committed subset at app/config/api_contract_subset.yaml; "
+                      "run scripts/generate_api_contract_subset.py first")
+    report = _interface_contract_report()
+    if "error" in report:
+        return Result("interface-contract-unimplemented", FAIL, report["error"])
+    count = int(report["unbuilt"])
+    detail = "" if count <= baseline else f"{count} unbuilt operation(s) > baseline {baseline}"
+    return Result("interface-contract-unimplemented",
+                  PASS if count <= baseline else FAIL,
+                  detail, count, baseline)
+
+
 def gate_count_checker(name: str, script: str, baseline: int) -> Result:
     """Run a checker whose final stdout line is its finding count."""
     proc = _run([sys.executable, script, "--count"])
@@ -1735,6 +1792,20 @@ def gate_count_checker(name: str, script: str, baseline: int) -> Result:
 
 def build_gates(baseline: dict) -> list[Gate]:
     return [
+        Gate("interface-contract-unlisted",
+             "Every token-accepting /api/v1 route is in the committed contract subset",
+             "zero", gate_interface_contract_unlisted,
+             remediation="run scripts/generate_api_contract_subset.py to regenerate the "
+                         "subset, or add the missing route to the contract",
+             tags=["static"]),
+        Gate("interface-contract-unimplemented",
+             "Subset operations with no matching token-accepting route",
+             "ratchet",
+             lambda: gate_interface_contract_unimplemented(
+                 baseline.get("interface_contract_unimplemented", 0)),
+             remediation="implement the missing route, or remove the operation from the "
+                         "subset's PUBLISHED_GROUPS",
+             tags=["static"]),
         Gate("compile", "Every module bytecode-compiles", "command", gate_compile,
              remediation="fix the reported SyntaxError", tags=["static", "fast"]),
         Gate("undefined-exports", "No __all__ entry names a missing symbol", "zero",
