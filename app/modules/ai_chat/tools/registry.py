@@ -1785,8 +1785,9 @@ TOOL_SCHEMAS = [
 # They live here, in the one catalogue, rather than in a list of the
 # connector's own: the connector derives its tool list from the entries that
 # carry the "mcp" surface (see route_read_tools.connector_tools). Their handlers
-# are installed on ToolExecutor by route_read_tools, so chat and the connector
-# run the same code. All are read-only; a write tool must never carry "mcp".
+# are installed on ToolExecutor by route_read_tools. They are NOT offered to the
+# chat model: AgentRunner._build_tool_schemas keeps only tools whose surfaces
+# include "chat". All are read-only; a write tool must never carry "mcp".
 # ---------------------------------------------------------------------------
 def _route_read_tool(name, route, description, parameters):
     # Published on the connector only. Each handler calls its route in-process
@@ -1796,7 +1797,7 @@ def _route_read_tool(name, route, description, parameters):
     # needs a request-free execution path with its own tenancy review.
     # risk_class and mutates are fixed to read-only because the helper refuses
     # anything but a GET route: a route that writes needs its own entry.
-    for part in re.split(r" [+|] ", route):
+    for part in re.split(r"\s*[+|]\s*", route):
         if not part.startswith("GET "):
             raise ValueError(f"{name}: route tools are read-only, got {part!r}")
     return {

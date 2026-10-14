@@ -60,10 +60,24 @@ def test_no_catalogue_tool_marked_mcp_mutates():
     assert bad == [], f"tools marked for the connector that are not read-only: {bad}"
 
 
-def test_connector_tools_are_not_offered_to_chat():
-    """Their handlers need a request context the chat streaming path lacks."""
-    for name in PUBLISHED_NAMES:
-        assert TOOL_SCHEMA_BY_NAME[name]["surfaces"] == ["mcp"], name
+@pytest.mark.parametrize("provider", ["anthropic", "openai"])
+def test_connector_tools_are_not_offered_to_the_chat_model(provider):
+    """Their handlers need a request context the chat streaming path lacks, so
+    the list the runner hands the model, built by the runner's own function,
+    must not contain them, and must still contain the existing chat tools."""
+    from app.modules.ai_chat.services.agent_runner import AgentRunner
+
+    built = AgentRunner._build_tool_schemas(provider, TOOL_SCHEMAS)
+    names = {t["name"] if provider == "anthropic" else t["function"]["name"] for t in built}
+    assert names.isdisjoint(PUBLISHED_NAMES), sorted(names & PUBLISHED_NAMES)
+    for kept in ("create_solution", "find_applications", "search_archimate_elements",
+                 "get_executive_dashboard", "create_goal"):
+        assert kept in names, kept
+    # An entry with no surfaces key stays a chat tool.
+    legacy = {"name": "legacy", "description": "d", "parameters": {"type": "object"}}
+    only_mcp = {**legacy, "name": "only_mcp", "surfaces": ["mcp"]}
+    again = AgentRunner._build_tool_schemas("anthropic", [legacy, only_mcp])
+    assert [t["name"] for t in again] == ["legacy"]
 
 
 def test_route_read_tool_helper_refuses_a_route_that_is_not_get():
@@ -71,6 +85,8 @@ def test_route_read_tool_helper_refuses_a_route_that_is_not_get():
         registry._route_read_tool("x", "POST /api/v1/things", "d", {"type": "object"})
     with pytest.raises(ValueError):
         registry._route_read_tool("x", "GET /a | POST /b", "d", {"type": "object"})
+    with pytest.raises(ValueError):
+        registry._route_read_tool("x", "GET /a|POST /b", "d", {"type": "object"})
     ok = registry._route_read_tool("x", "GET /a + GET /b", "d", {"type": "object"})
     assert ok["mutates"] is False and ok["risk_class"] == "read"
 
