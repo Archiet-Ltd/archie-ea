@@ -172,7 +172,15 @@ def _estate(db_session, org, *, downstream_apps=1, owner_first="Dana"):
     return {"root": root, "root_el": root_el, "names": names}
 
 
-def _propose(tenant_ctx, org, requester, *, operation_type, entity_type, payload, entity_id=None, summary="A change"):
+def _propose(
+    tenant_ctx, org, requester, *, operation_type, entity_type, payload, entity_id=None, summary="A change",
+    deliver=True,
+):
+    """Create a proposal in a request context. Owner email is sent once the
+    response has been sent, so ``deliver`` plays that moment (as the server does
+    when the response closes); ``deliver=False`` leaves it pending."""
+    from flask import current_app
+
     from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
 
     with tenant_ctx(org.id):
@@ -185,6 +193,8 @@ def _propose(tenant_ctx, org, requester, *, operation_type, entity_type, payload
             entity_id=entity_id,
             chat_session_id="impact-sess",
         )
+        if deliver:
+            current_app.process_response(current_app.response_class()).close()
     assert result["success"] is True, result
     return result["approval_id"]
 
@@ -506,6 +516,26 @@ def test_unset_organisation_reads_nothing_and_refuses(db_session, make_org, app,
     assert unavailable["affected"]["services"] == []
 
 
+def test_impact_answer_is_unavailable_when_the_active_organisation_differs(db_session, make_org, tenant_ctx):
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+    from app.services.architecture_change_impact_service import ArchitectureChangeImpactService
+
+    org_a, org_b = make_org("prev-active-a"), make_org("prev-active-b")
+    requester = _user(db_session, org_a, "requester")
+    _estate(db_session, org_a, downstream_apps=1)
+    approval_id = _propose(
+        tenant_ctx, org_a, requester,
+        operation_type="update", entity_type="application", entity_id=SHARED_ID, payload={"name": "x"},
+    )
+    with tenant_ctx(org_a.id):
+        approval = AIChatCRUDApproval.query.filter_by(id=approval_id, organization_id=org_a.id).one()
+    with tenant_ctx(org_b.id):
+        answer = ArchitectureChangeImpactService().assess_approval_impact(approval, org_a.id)
+
+    assert answer["state"] == "unavailable"
+    assert answer["affected"]["services"] == [] and answer["subjects"] == []
+
+
 def test_routes_enforce_the_reviewer_permission_and_organisation(app, db_session, make_org, tenant_ctx, login_as):
     org_a, org_b = make_org("prev-route-a"), make_org("prev-route-b")
     requester = _user(db_session, org_a, "requester")
@@ -725,6 +755,62 @@ def test_owners_are_told_in_app_and_by_email_and_nobody_else(db_session, make_or
     assert [foreign_owner.email] not in recipients
     html = send.call_args_list[0].args[3]
     assert "&lt;b&gt;" in html and "<b>" not in html  # the summary is escaped
+    # The call to action is an absolute link (a relative one goes nowhere in a mail client).
+    href = html.split('href="', 1)[1].split('"', 1)[0]
+    assert href.startswith("http"), href
+    assert href.endswith(f"/ai-chat/approvals/inbox?approval={approval_id}")
+
+
+def test_owner_email_waits_for_the_response_and_records_delivery(db_session, make_org, tenant_ctx, app):
+    from flask import current_app
+
+    org = make_org("prev-note-defer")
+    requester = _user(db_session, org, "requester")
+    owner = _user(db_session, org, "owner")
+    estate = _estate(db_session, org, downstream_apps=0)
+    _owns_app(db_session, org.id, estate["root"], owner)
+
+    with patch("app._bootstrap._digest_emails._safe_send_email", return_value=True) as send:
+        with tenant_ctx(org.id):
+            from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+            result = AIChatApprovalService(requester.id).create_pending_approval(
+                operation_type="update", entity_type="application", entity_id=SHARED_ID,
+                original_command="t", operation_payload={"name": "x"}, summary="Deferred",
+            )
+            assert result["success"] is True
+            # The proposal and the bell exist; the mail server has not been touched.
+            assert send.call_count == 0
+            assert len(_bell(org, owner)) == 1
+            assert _bell(org, owner)[0].email_sent_at is None
+            current_app.process_response(current_app.response_class()).close()
+        assert send.call_count == 1
+
+    with tenant_ctx(org.id):
+        assert _bell(org, owner)[0].email_sent_at is not None
+
+
+def test_without_a_base_url_or_request_the_email_has_no_relative_link(db_session, make_org, app):
+    """Outside a request with no configured base URL the link is left out, never relative."""
+    from flask import g
+
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval  # noqa: F401
+    from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+    org = make_org("prev-note-nolink")
+    requester = _user(db_session, org, "requester")
+    owner = _user(db_session, org, "owner")
+    estate = _estate(db_session, org, downstream_apps=0)
+    _owns_app(db_session, org.id, estate["root"], owner)
+    app.config["PUBLIC_BASE_URL"] = ""
+    g.current_org_id = org.id  # the test's own application context: no request is active
+    with patch("app._bootstrap._digest_emails._safe_send_email", return_value=True) as send:
+        AIChatApprovalService(requester.id).create_pending_approval(
+            operation_type="update", entity_type="application", entity_id=SHARED_ID,
+            original_command="t", operation_payload={"name": "x"}, summary="No link",
+        )
+    assert send.call_count == 1
+    assert "href" not in send.call_args.args[3]
 
 
 def test_capability_owner_is_found_by_the_unified_id_not_the_source_id(db_session, make_org, tenant_ctx):

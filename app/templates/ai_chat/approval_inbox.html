@@ -43,7 +43,7 @@
         <template x-for="item in approvals" :key="item.id">
             <div class="rounded-xl border bg-card p-5 space-y-3"
                  :id="'approval-' + item.id" :data-testid="'approval-card-' + item.id"
-                 :class="focusId === item.id ? 'border-primary ring-2 ring-ring' : 'border-border'">
+                 :class="focusId === item.id ? 'border-primary ring-2 ring-primary' : 'border-border'">
                 <!-- Top row: operation badge + entity type + created -->
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <div class="flex items-center gap-2">

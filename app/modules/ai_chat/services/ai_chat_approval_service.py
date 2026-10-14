@@ -1069,7 +1069,7 @@ class AIChatApprovalService:
         try:
             from html import escape
 
-            from flask import current_app
+            from flask import after_this_request, current_app, has_request_context, request
 
             from app._bootstrap._digest_emails import _safe_send_email
             from app.services.architecture_change_impact_service import (
@@ -1117,15 +1117,58 @@ class AIChatApprovalService:
             db.session.commit()
 
             subject = "A change to something you own needs review"
+            # The email link must be absolute: a relative href goes nowhere in
+            # a mail client. The public base URL, else this request's host;
+            # with neither, the link is left out rather than sent relative.
+            base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
+            if not base and has_request_context():
+                base = request.host_url.rstrip("/")
+            link = (
+                f'<p><a href="{escape(base + inbox_path)}">Open the approval inbox</a></p>'
+                if base
+                else ""
+            )
             body = (
                 "<p>A proposed change to something you own is waiting for review:</p>"
-                f"<p>{escape(approval.summary or '')}</p>"
-                f'<p><a href="{escape(inbox_path)}">Open the approval inbox</a></p>'
+                f"<p>{escape(approval.summary or '')}</p>" + link
             )
-            for user, notification in notifications:
-                if user.email and _safe_send_email(current_app, subject, [user.email], body):
-                    notification.email_sent_at = datetime.utcnow()
-            db.session.commit()
+            targets = [(user.email, note.id) for user, note in notifications if user.email]
+            app_obj = current_app._get_current_object()
+
+            def send_emails():
+                # Own application context: this runs after the response has
+                # gone, so a slow mail server never holds up the proposal.
+                from flask import g
+
+                from app.models.models import Notification
+
+                with app_obj.app_context():
+                    g.current_org_id = org_id
+                    sent_ids = [
+                        note_id
+                        for email, note_id in targets
+                        if _safe_send_email(app_obj, subject, [email], body)
+                    ]
+                    if sent_ids:
+                        try:
+                            Notification.query.filter(
+                                Notification.id.in_(sent_ids),
+                                Notification.organization_id == org_id,
+                            ).update({Notification.email_sent_at: datetime.utcnow()}, synchronize_session=False)
+                            db.session.commit()
+                        except Exception:
+                            db.session.rollback()
+                            self.logger.warning("Could not record email delivery for approval %s", approval.id)
+
+            if has_request_context():
+
+                @after_this_request
+                def _send_when_closed(response):
+                    response.call_on_close(send_emails)
+                    return response
+
+            else:
+                send_emails()
             return len(notifications)
         except Exception as exc:
             db.session.rollback()

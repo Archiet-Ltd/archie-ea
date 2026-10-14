@@ -192,7 +192,15 @@ class ArchitectureChangeImpactService:
             "shown": 0,
             "truncated": False,
         }
-        if organization_id is None or approval.organization_id != organization_id:
+        from app.middleware.tenant_context import current_org_id
+
+        # The caller's organisation, the approval's and the active one must be
+        # the same; anything else reads nothing.
+        if (
+            organization_id is None
+            or approval.organization_id != organization_id
+            or current_org_id() != organization_id
+        ):
             return base
 
         try:
