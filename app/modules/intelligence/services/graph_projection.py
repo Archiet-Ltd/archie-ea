@@ -39,6 +39,7 @@ writes nothing.
 from __future__ import annotations
 
 import hashlib
+import heapq
 import json
 import logging
 import threading
@@ -69,14 +70,17 @@ DIRECTIONS = ("downstream", "upstream", "both")
 MAX_HOPS_CAP = 10
 DEFAULT_NODE_BUDGET = 10_000
 MAX_CACHED_ORGANISATIONS = 16
-# Memory bound for the as-of history. Each retained relationship version is a
-# five-field tuple (about 250 bytes with its two datetimes), so this cap holds
-# one projection's history to roughly 60 MB, and with at most
-# MAX_CACHED_ORGANISATIONS cached the process-wide worst case stays near 1 GB.
-# Beyond the cap the OLDEST closed versions are dropped (open versions, which
-# mirror the current edges, are always kept) and as-of answers report
-# ``truncated`` so a caller never mistakes a shortened history for a full one.
-MAX_VERSIONS_PER_PROJECTION = 250_000
+# Memory bound for the as-of history. Measured (tracemalloc, 250,000 versions
+# built through ``set_versions``): about 510 bytes per retained version, so
+# about 128 MB for 250,000. The cap is therefore 100,000 versions (about 50 MB)
+# per projection; with MAX_CACHED_ORGANISATIONS projections cached that is a
+# worst case of about 0.8 GB of history in one process. Beyond the cap the
+# OLDEST closed versions are dropped (open versions, which mirror the current
+# edges, are always kept) and an as-of answer for an instant older than what
+# was dropped reports ``history_truncated`` (separate from the node budget's
+# ``truncated``). Enforcement trims to 90% of the cap so it does not run on
+# every batch once the cap is reached.
+MAX_VERSIONS_PER_PROJECTION = 100_000
 EVENT_BATCH = 1000
 ID_CHUNK = 5000
 
@@ -116,7 +120,8 @@ class TraversalResult:
     rows: List[TraversalRow] = field(default_factory=list)
     by_layer: Dict[str, int] = field(default_factory=dict)
     by_type: Dict[str, int] = field(default_factory=dict)
-    truncated: bool = False
+    truncated: bool = False  # the node budget cut the answer
+    history_truncated: bool = False  # as_of is older than the retained history (see MAX_VERSIONS_PER_PROJECTION)
     reason: Optional[str] = None  # closed reason code when there is nothing to show
 
     def depth_by_element(self) -> Dict[int, int]:
@@ -143,7 +148,8 @@ class GraphProjection:
         # relationship id -> [(valid_from, valid_to, source, target, type code)]
         self._versions: Dict[int, List[Tuple[datetime, Optional[datetime], int, int, int]]] = {}
         self._version_total = 0
-        self.history_truncated = False
+        # Latest end of any dropped version: as-of instants before it may be incomplete.
+        self.history_floor: Optional[datetime] = None
         self._versions_out: Dict[int, set] = {}
         self._versions_in: Dict[int, set] = {}
         # Element ids that have history but are no longer elements: an as-of
@@ -179,6 +185,10 @@ class GraphProjection:
     @property
     def version_count(self) -> int:
         return self._version_total
+
+    @property
+    def history_truncated(self) -> bool:
+        return self.history_floor is not None
 
     def has_node(self, element_id: int) -> bool:
         return element_id in self._nodes
@@ -236,21 +246,31 @@ class GraphProjection:
             self._versions_in.setdefault(target, set()).add(relationship_id)
 
     def enforce_version_cap(self, cap: Optional[int] = None) -> int:
-        """Drop the oldest closed versions beyond the cap. Returns how many were dropped."""
+        """Drop the oldest closed versions once over the cap. Returns how many were dropped.
+
+        Does nothing (and touches nothing) at or under the cap. Over it, trims
+        to 90% of the cap with a partial selection (``heapq.nsmallest``), not a
+        full sort, so the next batches do not trigger it again.
+        """
         cap = MAX_VERSIONS_PER_PROJECTION if cap is None else int(cap)
         with self._lock:
-            excess = self._version_total - cap
-            if excess <= 0:
+            if self._version_total <= cap:
                 return 0
-            closed = sorted(
-                (vt, rid, index)
-                for rid, versions in self._versions.items()
-                for index, (_vf, vt, _s, _t, _ty) in enumerate(versions)
-                if vt is not None
+            excess = self._version_total - (cap - cap // 10)
+            closed = heapq.nsmallest(
+                excess,
+                (
+                    (vt, rid, index)
+                    for rid, versions in self._versions.items()
+                    for index, (_vf, vt, _s, _t, _ty) in enumerate(versions)
+                    if vt is not None
+                ),
             )
             doomed: Dict[int, set] = {}
-            for _vt, rid, index in closed[:excess]:
+            for vt, rid, index in closed:
                 doomed.setdefault(rid, set()).add(index)
+                if self.history_floor is None or vt > self.history_floor:
+                    self.history_floor = vt
             for rid, indexes in doomed.items():
                 kept = [
                     (vf, vt, s, t, self._strings[ty])
@@ -258,10 +278,7 @@ class GraphProjection:
                     if index not in indexes
                 ]
                 self.set_versions(rid, kept)
-            dropped = sum(len(i) for i in doomed.values())
-            if dropped:
-                self.history_truncated = True
-            return dropped
+            return sum(len(i) for i in doomed.values())
 
     def clear_versions(self, relationship_id: int) -> None:
         old = self._versions.pop(int(relationship_id), None)
@@ -363,9 +380,9 @@ class GraphProjection:
                     if result.truncated:
                         break
                 frontier = next_frontier
-            if as_of is not None and self.history_truncated:
-                # The retained history is shorter than the recorded one.
-                result.truncated = True
+            if as_of is not None and self.history_floor is not None and as_of < self.history_floor:
+                # Older versions were dropped to stay within the memory cap.
+                result.history_truncated = True
             for row in result.rows:
                 result.by_layer[row.layer] = result.by_layer.get(row.layer, 0) + 1
                 result.by_type[row.type] = result.by_type.get(row.type, 0) + 1
@@ -440,7 +457,7 @@ class GraphProjection:
                 "edges": body["edges"],
                 "versions": body["versions"],
                 "retired": body["retired"],
-                "history_truncated": self.history_truncated,
+                "history_floor": self.history_floor.isoformat() if self.history_floor else None,
             }
         return zlib.compress(json.dumps(document, separators=(",", ":")).encode("utf-8"), 6)
 
@@ -471,7 +488,8 @@ class GraphProjection:
         for rid, versions in grouped.items():
             projection.set_versions(rid, versions)
         projection._retired = {int(x) for x in document.get("retired", ())}
-        projection.history_truncated = bool(document.get("history_truncated", False))
+        floor = document.get("history_floor")
+        projection.history_floor = datetime.fromisoformat(floor) if floor else None
         return projection
 
 
@@ -792,7 +810,10 @@ def query(
 # Refresh (what the scheduled job runs for one organisation)
 # ---------------------------------------------------------------------- #
 
-SNAPSHOT_EVERY_EVENTS = 500
+# Events applied before the snapshot is rewritten. 1 means any change is saved,
+# so the stored offset never lags the log and the next run takes the cheap
+# early path (a lagging snapshot would be decoded in full every run).
+SNAPSHOT_EVERY_EVENTS = 1
 VERIFY_EVERY_HOURS = 24
 
 
@@ -803,7 +824,12 @@ def _unchanged_snapshot_summary(organization_id: int, now: datetime) -> Optional
     payload). When the stored offset equals the event log's highest ordinal and
     the daily verification is not due, the stored snapshot is already current:
     nothing is decoded, replayed or saved. Anything else returns ``None`` and
-    the caller does the full refresh.
+    the caller does the full refresh (which saves, so the offset does not lag).
+
+    Accepted trade-off: on this path a damaged snapshot (checksum mismatch,
+    unreadable payload) is not noticed until the daily verification, because
+    the payload is not read. Queries are unaffected: they load through
+    ``load_snapshot``, which checks the checksum and rebuilds.
     """
     from app.models.graph_projection_snapshot import GraphProjectionSnapshot as Row
 
@@ -881,11 +907,11 @@ def refresh_organisation(organization_id: Optional[int], *, verify: Optional[boo
     outcome = "ok"
     if projection.node_count == 0 and projection.edge_count == 0:
         outcome = "empty"
-    else:
-        events_applied = projection.last_ordinal - starting_ordinal
-        if (not started_from_snapshot) or verify or events_applied >= SNAPSHOT_EVERY_EVENTS:
-            save_snapshot(projection)
-            saved = True
+    events_applied = projection.last_ordinal - starting_ordinal
+    # Empty organisations are saved too, so their next run is the cheap early path.
+    if (not started_from_snapshot) or verify or events_applied >= SNAPSHOT_EVERY_EVENTS:
+        save_snapshot(projection)
+        saved = True
     clear_cache(organization_id)
     return {
         "outcome": outcome,

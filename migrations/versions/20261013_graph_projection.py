@@ -111,6 +111,8 @@ def upgrade():
             sa.UniqueConstraint("organization_id", name="uq_graph_projection_snapshot_org"),
         )
     # No separate index on organization_id: the unique constraint above already indexes it.
+    # (Databases created from the model also get ix_graph_projection_snapshots_organization_id, from
+    # the tenant mixin's index=True; it is redundant with the constraint and harmless.)
 
     for table in TENANT_TABLES:
         reason = _skip_reason(bind, table)

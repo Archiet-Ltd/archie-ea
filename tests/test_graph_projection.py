@@ -172,9 +172,11 @@ def test_an_organisation_with_no_model_gets_an_honest_empty_answer(db_session):
     assert result.reason == "no_data_recorded"
     assert result.by_layer == {} and result.by_type == {}
     assert gp.refresh_organisation(empty.id)["outcome"] == "empty"
+    # An empty organisation is stored too, so its next refresh is the cheap early path.
     assert db_session.scalar(
         select(func.count()).select_from(GraphProjectionSnapshot).where(
-            GraphProjectionSnapshot.organization_id == empty.id)) == 0
+            GraphProjectionSnapshot.organization_id == empty.id)) == 1
+    assert gp.refresh_organisation(empty.id)["unchanged"] is True
 
 
 def test_relationship_and_element_ids_that_collide_do_not_confuse_the_walk(db_session):
@@ -592,8 +594,8 @@ def test_as_of_traversal_equals_the_history_services_relational_answer(db_sessio
     mid = projection.traverse(ids["a"], 3, "downstream", as_of=t2 + timedelta(days=1)).depth_by_element()
     assert mid == {ids["b"]: 1, ids["d"]: 1, ids["c"]: 2, timeline["gone"]: 3}
     late = projection.traverse(ids["a"], 3, "downstream", as_of=t4).depth_by_element()
-    assert late == {ids["b"]: 1, ids["d"]: 1, ids["e"]: 2, ids["c"]: 3, timeline["gone"]: 4} or \
-        late == {ids["b"]: 1, ids["d"]: 1, ids["e"]: 2}
+    # b -> c ended at t3 (replaced by b -> e), so c and the deleted element are not reachable at t4.
+    assert late == {ids["b"]: 1, ids["d"]: 1, ids["e"]: 2}
     before = projection.traverse(ids["a"], 3, "downstream", as_of=t0 - timedelta(days=1))
     assert before.rows == [] and before.reason is None
 
@@ -797,10 +799,45 @@ def test_history_beyond_the_cap_drops_the_oldest_closed_versions_and_says_so():
     assert projection.version_count == 4
     assert projection.enforce_version_cap(2) == 2
     assert projection.version_count == 2 and projection.history_truncated is True
+    assert projection.history_floor == t + timedelta(days=2)
     kept = projection._versions[10]
     assert kept[-1][1] is None, "the open version is always kept"
     assert min(v[0] for v in kept) == t + timedelta(days=2), "the oldest closed versions went first"
-    assert projection.traverse(1, 1, "downstream", as_of=t + timedelta(days=10)).truncated is True
-    assert projection.traverse(1, 1, "downstream").truncated is False
+    # Older than what was dropped: flagged, and never as the node budget's flag.
+    old = projection.traverse(1, 1, "downstream", as_of=t + timedelta(days=1, hours=1))
+    assert old.history_truncated is True and old.truncated is False
+    # Newer than every dropped version, and the current walk: complete.
+    assert projection.traverse(1, 1, "downstream", as_of=t + timedelta(days=10)).history_truncated is False
+    assert projection.traverse(1, 1, "downstream").history_truncated is False
     restored = gp.GraphProjection.from_payload(projection.to_payload(), 1)
     assert restored.history_truncated is True and restored.version_count == 2
+
+
+def test_the_version_cap_does_nothing_at_the_cap_and_trims_below_it_when_over():
+    projection = gp.GraphProjection(1)
+    t = datetime(2026, 1, 1)
+    for node in range(1, 4):
+        projection.set_node(node, "Node", "technology")
+    for rid in range(1, 41):
+        projection.set_versions(rid, [(t, t + timedelta(days=rid), 1, 2, "Serving")])
+    assert projection.enforce_version_cap(40) == 0 and projection.history_floor is None
+    assert projection.enforce_version_cap(50) == 0
+    dropped = projection.enforce_version_cap(30)  # over: trims to 90% of the cap (27)
+    assert dropped == 13 and projection.version_count == 27
+    assert projection.history_floor == t + timedelta(days=13)
+    assert sorted(projection._versions) == list(range(14, 41)), "the oldest closed versions went"
+    assert projection.enforce_version_cap(30) == 0, "no repeat work until over the cap again"
+
+
+def test_a_lagging_snapshot_is_saved_so_the_next_refresh_is_the_early_path(db_session):
+    org = _org(db_session, "Lagging")
+    a, b = _element(db_session, org.id, "a"), _element(db_session, org.id, "b")
+    _rel(db_session, org.id, a.id, b.id)
+    _publish(db_session)
+    gp.refresh_organisation(org.id)
+    _element(db_session, org.id, "c")  # one more change: far fewer than a batch of events
+    _publish(db_session)
+    behind = gp.refresh_organisation(org.id)
+    assert "unchanged" not in behind and behind["reloaded"] > 0 and behind["saved"] is True
+    quiet = gp.refresh_organisation(org.id)
+    assert quiet["unchanged"] is True and quiet["nodes"] == 3
