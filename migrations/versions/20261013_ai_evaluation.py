@@ -7,7 +7,7 @@ nullable ``architecture_decisions.ai_system_id`` / ``ai_design_review`` columns
 need no revision: ``reconcile-schema`` adds them (ADR-0002).
 
 Revision ID: 20261013_ai_evaluation
-Revises: 20261011_notif_rls
+Revises: 20261009_app_comp_elem
 Create Date: 2026-10-13
 """
 import sqlalchemy as sa
@@ -15,7 +15,7 @@ from alembic import op
 from sqlalchemy import inspect
 
 revision = "20261013_ai_evaluation"
-down_revision = "20261011_notif_rls"
+down_revision = "20261009_app_comp_elem"
 branch_labels = None
 depends_on = None
 
