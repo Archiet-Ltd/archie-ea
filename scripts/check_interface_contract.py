@@ -33,6 +33,7 @@ The checks take the application as an argument (``check_unlisted_routes``,
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -88,6 +89,11 @@ def _load_subset(path: Path) -> dict:
         return yaml.safe_load(f)
 
 
+def _under_api_v1(path: str) -> bool:
+    """True for /api/v1 and anything below it, but not /api/v10."""
+    return path == "/api/v1" or path.startswith("/api/v1/")
+
+
 def _get_token_accepting_routes(app) -> list[tuple[str, str, str]]:
     """Return list of (path, method, scope) for every token-accepting route
     under /api/v1.
@@ -100,7 +106,7 @@ def _get_token_accepting_routes(app) -> list[tuple[str, str, str]]:
     routes: list[tuple[str, str, str]] = []
     for info in extract_route_info(app):
         path = info["path"]
-        if not path.startswith("/api/v1"):
+        if not _under_api_v1(path):
             continue
         view_func = info["view_func"]
         scope = getattr(view_func, "_api_token_scope", None)
@@ -119,8 +125,8 @@ def _normalize_path(path: str) -> str:
     /elements/{id} -> /elements/{}
     """
     # Strip /api/v1 prefix if present
-    if path.startswith("/api/v1"):
-        path = path[len("/api/v1"):]
+    if _under_api_v1(path):
+        path = path[len("/api/v1"):] or "/"
     if len(path) > 1:
         path = path.rstrip("/")
     return re.sub(r"\{[^}]+\}", "{}", path)
@@ -220,6 +226,14 @@ def main() -> int:
         "--baseline", type=int, default=None,
         help="Baseline for the unbuilt-operations ratchet",
     )
+    parser.add_argument(
+        "--unlisted-only", action="store_true",
+        help="Run check (i) only; the unbuilt-operations ratchet is not evaluated",
+    )
+    parser.add_argument(
+        "--json", action="store_true",
+        help="Print {violations, unbuilt} as JSON and exit 0; each gate judges its own half",
+    )
     args = parser.parse_args()
 
     subset_path = Path(args.subset)
@@ -234,6 +248,14 @@ def main() -> int:
     from app import create_app
     app = create_app("testing")
 
+    if args.json:
+        _passes, violations = check_unlisted_routes(app, subset)
+        print(json.dumps({
+            "violations": violations,
+            "unbuilt": count_unbuilt_operations(app, subset),
+        }))
+        return 0
+
     if args.count:
         # Print the unbuilt-operations count
         count = count_unbuilt_operations(app, subset)
@@ -247,6 +269,12 @@ def main() -> int:
         for v in violations:
             print(f"  {v}")
         print(f"\n{len(violations)} violation(s) found")
+
+    if args.unlisted_only:
+        if passes:
+            print("PASS: interface-contract-unlisted")
+            return 0
+        return 1
 
     # Check (ii): unbuilt operations
     unbuilt = count_unbuilt_operations(app, subset)

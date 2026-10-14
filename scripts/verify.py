@@ -1694,42 +1694,57 @@ def gate_llm_boundary(baseline: int) -> Result:
                   detail, count, baseline)
 
 
+INTERFACE_CONTRACT_SUBSET = REPO_ROOT / "app" / "config" / "api_contract_subset.yaml"
+_INTERFACE_CONTRACT_REPORTS: dict = {}
+
+
+def _interface_contract_report() -> dict:
+    """One application boot answers both interface-contract gates.
+
+    The checker prints {"violations": [...], "unbuilt": N}; each gate judges
+    its own half. Cached per subset path for the life of the process.
+    """
+    key = str(INTERFACE_CONTRACT_SUBSET)
+    if key not in _INTERFACE_CONTRACT_REPORTS:
+        proc = _run([sys.executable, "scripts/check_interface_contract.py",
+                     "--subset", key, "--json"])
+        try:
+            report = json.loads(proc.stdout.strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            report = {"error": f"could not parse checker output: {proc.stdout[-500:]!r} "
+                               f"{proc.stderr[-300:]}"}
+        _INTERFACE_CONTRACT_REPORTS[key] = report
+    return _INTERFACE_CONTRACT_REPORTS[key]
+
+
 def gate_interface_contract_unlisted() -> Result:
     """Every token-accepting /api/v1 route is in the committed contract subset.
     Zero tolerance — no ratchet."""
-    subset_path = REPO_ROOT / "app" / "config" / "api_contract_subset.yaml"
-    if not subset_path.exists():
+    if not INTERFACE_CONTRACT_SUBSET.exists():
         return Result("interface-contract-unlisted", SKIP,
                       "no committed subset at app/config/api_contract_subset.yaml; "
                       "run scripts/generate_api_contract_subset.py first")
-    proc = _run([sys.executable, "scripts/check_interface_contract.py",
-                 "--subset", str(subset_path)])
-    output = (proc.stdout + proc.stderr).strip()
-    if proc.returncode == 0:
+    report = _interface_contract_report()
+    if "error" in report:
+        return Result("interface-contract-unlisted", FAIL, report["error"])
+    violations = report["violations"]
+    if not violations:
         return Result("interface-contract-unlisted", PASS,
                       "all token-accepting routes are in the contract subset")
-    # Parse violations from output
-    violations = [ln for ln in output.splitlines()
-                  if ln.startswith("  Route ") or ln.startswith("FAIL")]
-    detail = "\n".join(violations[:20]) if violations else output[:2000]
-    return Result("interface-contract-unlisted", FAIL, detail,
-                  measured=len(violations), baseline=0)
+    return Result("interface-contract-unlisted", FAIL,
+                  "\n".join(violations[:20]), measured=len(violations), baseline=0)
 
 
 def gate_interface_contract_unimplemented(baseline: int) -> Result:
     """Subset operations with no matching token-accepting route — ratchet."""
-    subset_path = REPO_ROOT / "app" / "config" / "api_contract_subset.yaml"
-    if not subset_path.exists():
+    if not INTERFACE_CONTRACT_SUBSET.exists():
         return Result("interface-contract-unimplemented", SKIP,
                       "no committed subset at app/config/api_contract_subset.yaml; "
                       "run scripts/generate_api_contract_subset.py first")
-    proc = _run([sys.executable, "scripts/check_interface_contract.py",
-                 "--subset", str(subset_path), "--count"])
-    try:
-        count = int(proc.stdout.strip().splitlines()[-1])
-    except (ValueError, IndexError):
-        return Result("interface-contract-unimplemented", FAIL,
-                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    report = _interface_contract_report()
+    if "error" in report:
+        return Result("interface-contract-unimplemented", FAIL, report["error"])
+    count = int(report["unbuilt"])
     detail = "" if count <= baseline else f"{count} unbuilt operation(s) > baseline {baseline}"
     return Result("interface-contract-unimplemented",
                   PASS if count <= baseline else FAIL,

@@ -725,3 +725,123 @@ class TestVerifyRegistration:
     def test_unimplemented_baseline_is_the_true_count(self):
         baseline = json.loads((REPO_ROOT / "verification_baseline.json").read_text(encoding="utf-8"))
         assert baseline["ratchets"]["interface_contract_unimplemented"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Review round: zero gate independent of the ratchet, /api/v10, body hash
+# ---------------------------------------------------------------------------
+
+EXTRA_OPERATION = {
+    "get": {
+        "operationId": "listExtra",
+        "summary": "List extra things",
+        "tags": ["Model"],
+        "responses": {"200": {"description": "Success"}},
+        "security": [{"entelimOAuth": ["model:read"]}],
+    }
+}
+
+
+def _verify_module():
+    scripts_dir = str(REPO_ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    import verify
+
+    return verify
+
+
+def _gates_for(verify, monkeypatch, subset_path: Path, ratchet: int) -> dict:
+    """Run both interface-contract gates from verify.build_gates against a
+    subset, with the given ratchet baseline."""
+    monkeypatch.chdir(REPO_ROOT)
+    monkeypatch.setattr(verify, "INTERFACE_CONTRACT_SUBSET", subset_path)
+    monkeypatch.setattr(verify, "_INTERFACE_CONTRACT_REPORTS", {})
+    gates = {g.name: g for g in verify.build_gates({"interface_contract_unimplemented": ratchet})}
+    return {
+        name: gates[name].runner()
+        for name in ("interface-contract-unlisted", "interface-contract-unimplemented")
+    }
+
+
+class TestZeroGateIsIndependentOfTheRatchet:
+    def test_unbuilt_operation_within_baseline_passes_both_gates(self, tmp_path, monkeypatch):
+        """One unbuilt operation with the ratchet at 1: the zero gate PASSES
+        (it used to fail with '[1 > 0]') and the ratchet gate passes."""
+        verify = _verify_module()
+        subset = _minimal_contract()
+        subset["paths"]["/extra"] = EXTRA_OPERATION
+        subset_path = tmp_path / "subset.yaml"
+        _write_contract(subset_path, subset)
+
+        results = _gates_for(verify, monkeypatch, subset_path, ratchet=1)
+        assert results["interface-contract-unlisted"].status == verify.PASS
+        assert results["interface-contract-unimplemented"].status == verify.PASS
+        assert results["interface-contract-unimplemented"].measured == 1
+
+    def test_route_outside_the_subset_fails_the_zero_gate_with_exact_count(self, tmp_path, monkeypatch):
+        """A real route missing from the subset fails the zero gate, and the
+        measured count is the number of violations (one), not one more for the
+        header line."""
+        verify = _verify_module()
+        subset = _minimal_contract()
+        del subset["paths"]["/elements/{id}"]
+        subset_path = tmp_path / "subset.yaml"
+        _write_contract(subset_path, subset)
+
+        results = _gates_for(verify, monkeypatch, subset_path, ratchet=0)
+        unlisted = results["interface-contract-unlisted"]
+        assert unlisted.status == verify.FAIL
+        assert unlisted.measured == 1
+        assert "GET /api/v1/elements/{element_id}" in unlisted.detail
+        assert "FAIL:" not in unlisted.detail
+        assert results["interface-contract-unimplemented"].status == verify.PASS
+
+    def test_unlisted_only_flag_skips_the_ratchet(self, tmp_path):
+        subset = _minimal_contract()
+        subset["paths"]["/extra"] = EXTRA_OPERATION
+        subset_path = tmp_path / "subset.yaml"
+        _write_contract(subset_path, subset)
+        result = _run(
+            sys.executable, str(GATE_SCRIPT), "--subset", str(subset_path), "--unlisted-only"
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "PASS: interface-contract-unlisted" in result.stdout
+
+
+def test_api_v10_is_not_under_api_v1():
+    """/api/v10 is another version: a marked route there is not checked
+    against the v1 contract, and the prefix strip does not eat '/api/v1'."""
+    gate = _gate_module()
+    app = _app_with_routes(ELEMENT_ROUTES + [("/api/v10/things", ["GET"], "api:read")])
+    assert gate.check_unlisted_routes(app, _minimal_contract()) == (True, [])
+    assert gate._under_api_v1("/api/v1") and gate._under_api_v1("/api/v1/elements")
+    assert not gate._under_api_v1("/api/v10") and not gate._under_api_v1("/api/v10/things")
+    assert gate._normalize_path("/api/v10/things") == "/api/v10/things"
+
+
+def _body_sha_check(text: str) -> tuple[str, str]:
+    """Return (recorded, recomputed) Body-SHA256 for a subset file's text."""
+    lines = text.replace("\r\n", "\n").split("\n")
+    recorded = next(ln for ln in lines if ln.startswith("# Body-SHA256:")).split(":", 1)[1].strip()
+    body = "\n".join(ln for ln in lines if ln.startswith("#") is False or False)
+    # The body is everything after the leading comment header.
+    index = 0
+    while lines[index].startswith("#"):
+        index += 1
+    body = "\n".join(lines[index:])
+    return recorded, hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+
+class TestCommittedSubsetBodyHash:
+    def test_committed_subset_body_matches_its_recorded_hash(self):
+        """No source file needed: a hand edit of the committed subset body
+        changes its hash and fails here, in CI."""
+        text = (REPO_ROOT / "app" / "config" / "api_contract_subset.yaml").read_text(encoding="utf-8")
+        recorded, recomputed = _body_sha_check(text)
+        assert recorded == recomputed, "the committed subset was edited by hand; regenerate it"
+
+    def test_a_hand_edit_changes_the_hash(self):
+        text = (REPO_ROOT / "app" / "config" / "api_contract_subset.yaml").read_text(encoding="utf-8")
+        recorded, recomputed = _body_sha_check(text.replace("listElements", "listElementz", 1))
+        assert recorded != recomputed

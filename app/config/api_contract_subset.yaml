@@ -1,6 +1,7 @@
 # API Contract Subset — auto-generated
 # Source: api-model-v1.yaml
 # SHA256: f34b68f30dd7d8e52334a523eae0af7f025f379232f3280754811be6a74204fc
+# Body-SHA256: 5cdc00221071f6f0861a8b7e8e375e92110fc2895a527607536e7aaf6c0a5e79
 # Do not edit by hand.
 openapi: 3.1.0
 info:

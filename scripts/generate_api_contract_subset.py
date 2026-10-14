@@ -259,15 +259,18 @@ def main() -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Write with header comment
+    body = _ordered_dump(subset)
+    body_sha = hashlib.sha256(body.encode("utf-8")).hexdigest()
     header = (
         f"# API Contract Subset — auto-generated\n"
         f"# Source: {source_path.name}\n"
         f"# SHA256: {sha}\n"
+        f"# Body-SHA256: {body_sha}\n"
         f"# Do not edit by hand.\n"
     )
 
-    body = _ordered_dump(subset)
-    output_path.write_text(header + body, encoding="utf-8")
+    # Bytes, not write_text: the file is identical on every platform.
+    output_path.write_bytes((header + body).encode("utf-8"))
 
     print(f"Wrote subset to {output_path} ({len(subset.get('paths', {}))} paths)", file=sys.stderr)
 
