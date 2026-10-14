@@ -28,6 +28,14 @@
         Back to Traceability Matrix
     </a>
 
+    {% if goal %}
+    <a href="{{ url_for('architect_ui.goal_trace_page', goal_id=goal.id) }}" data-testid="trace-from-here"
+       class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
+        <i data-lucide="route" class="h-4 w-4"></i>
+        Trace from here
+    </a>
+    {% endif %}
+
     <!-- TRC-013: link traceability detail to impact analysis -->
     {% if impact_summary %}
     <section class="rounded-lg border border-primary/20 bg-card p-4 shadow-sm">

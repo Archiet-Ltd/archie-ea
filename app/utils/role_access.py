@@ -964,6 +964,7 @@ _MY_WORK_LINKS = {
     ],
     ROLE_OPERATIONS: [
         _link("Service Status", "service_status.status_page", "activity"),
+        _link("Value Streams at Risk", "intelligence_ui.value_streams_at_risk", "trending-down"),
         _APPROVAL_INBOX_LINK,
     ],
     ROLE_NON_TECHNICAL_OWNER: [
