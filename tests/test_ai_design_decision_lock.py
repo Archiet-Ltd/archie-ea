@@ -211,3 +211,55 @@ def test_case_counts_are_capped_with_a_message_naming_the_field(db_session, make
                       metrics={"groundedness": 0.9}, cases_run=99999999999999)
     assert ev.record_run(element_id=el.id, organization_id=org.id,
                          metrics={"groundedness": 0.9}, cases_run=ev.MAX_CASES).cases_run == ev.MAX_CASES
+
+
+def _refused_in_a_savepoint(db_session, review_id, mutate):
+    """Apply *mutate* to the stored review and flush inside a savepoint, expecting
+    the guard to refuse; leave the rest of the test's data in place."""
+    savepoint = db_session.begin_nested()
+    try:
+        mutate(db_session.get(ArchitectureDecision, review_id))
+        with pytest.raises(AIDesignDecisionLocked):
+            db_session.flush()
+    finally:
+        savepoint.rollback()
+    db_session.expire_all()
+
+
+def _unlink(review):
+    review.ai_system_id = None
+
+
+def _unlink_and_accept(review):
+    review.ai_system_id = None
+    review.status = "accepted"
+
+
+def _accept(review):
+    review.status = "accepted"
+
+
+def _unlink_and_delete(review):
+    review.ai_system_id = None
+    from app import db
+
+    db.session.delete(review)
+
+
+@pytest.mark.parametrize("mutate", [_unlink, _unlink_and_accept, _unlink_and_delete])
+def test_unlinking_a_review_cannot_make_it_an_ordinary_decision(db_session, make_org, mutate):
+    """The guard judges 'is an AI design review' from the stored link, not the
+    pending one: clearing ai_system_id alone, with a status change, or with a
+    delete is refused, and so is accepting it in the next flush."""
+    org = make_org("lk8")
+    sub = _user(db_session, org, "Architect", "sub")
+    review = _submit(_system(db_session, org), org, sub)
+    review_id, system_id = review.id, review.ai_system_id
+
+    _refused_in_a_savepoint(db_session, review_id, mutate)
+    _refused_in_a_savepoint(db_session, review_id, _accept)  # the "next flush"
+
+    row = db_session.execute(
+        text("SELECT status, ai_system_id FROM architecture_decisions WHERE id = :i"),
+        {"i": review_id}).one()
+    assert tuple(row) == ("under_review", system_id)

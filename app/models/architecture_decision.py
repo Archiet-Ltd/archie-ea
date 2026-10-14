@@ -569,6 +569,15 @@ _AI_DESIGN_LOCKED_FIELDS = (
 )
 
 
+def _was_linked(state, target):
+    """Whether the row is an AI design review as stored, judged from the loaded
+    value and not the pending one: unlinking it in the same flush must not make
+    it look like an ordinary decision."""
+    history = state.attrs["ai_system_id"].history
+    stored = history.deleted[0] if history.deleted else target.ai_system_id
+    return stored is not None
+
+
 @event.listens_for(ArchitectureDecision, "before_update")
 def _ai_design_decision_status_is_the_boards(mapper, connection, target):
     """The board's decision on an AI design (a row with ``ai_system_id``) is made,
@@ -576,11 +585,11 @@ def _ai_design_decision_status_is_the_boards(mapper, connection, target):
     writes with a single guarded UPDATE statement and never reaches this ORM
     event. Any ORM write that changes the status, the decision fields or the
     AI-system link of such a row, from any route now or later, is refused here."""
-    if target.ai_system_id is None:
-        return
     from sqlalchemy import inspect
 
     state = inspect(target)
+    if not _was_linked(state, target):
+        return
     for attribute in _AI_DESIGN_LOCKED_FIELDS:
         if state.attrs[attribute].history.has_changes():
             raise AIDesignDecisionLocked(
@@ -590,5 +599,7 @@ def _ai_design_decision_status_is_the_boards(mapper, connection, target):
 
 @event.listens_for(ArchitectureDecision, "before_delete")
 def _ai_design_decision_is_not_deleted(mapper, connection, target):
-    if target.ai_system_id is not None:
+    from sqlalchemy import inspect
+
+    if _was_linked(inspect(target), target):
         raise AIDesignDecisionLocked("An AI design review is a board record and is not deleted.")
