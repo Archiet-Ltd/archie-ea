@@ -696,13 +696,18 @@ def test_the_statement_count_grows_linearly_with_the_number_of_seeds(app, db_ses
         seeds.append(seed.id)
     db_session.commit()
 
+    shapes = {}
+
     def count_for(n):
         counter = {"n": 0}
+        seen = shapes.setdefault(n, {})
         me = threading.get_ident()
 
         def listener(conn, cursor, statement, params, context, executemany):
             if threading.get_ident() == me:
                 counter["n"] += 1
+                shape = " ".join(statement.split())[:90]
+                seen[shape] = seen.get(shape, 0) + 1
 
         with app.test_request_context("/"):
             from flask import g
@@ -720,6 +725,9 @@ def test_the_statement_count_grows_linearly_with_the_number_of_seeds(app, db_ses
     per_seed = 20
     fixed = 20
     for n, used in counts.items():
-        assert used <= fixed + per_seed * n, (n, counts)
+        # On failure, name the five most repeated statements for the smallest run
+        # so a count that grows is attributed to a statement, not guessed at.
+        top = sorted(shapes[1].items(), key=lambda kv: -kv[1])[:5]
+        assert used <= fixed + per_seed * n, (n, counts, top)
     # Linear, not worse: 25 seeds cost no more than five times what 5 seeds cost, plus slack.
     assert counts[25] <= 5 * counts[5] + fixed, counts
