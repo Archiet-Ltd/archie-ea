@@ -116,6 +116,10 @@ EXCLUDED_CHECKS = {
         "a dedicated job for census, ai-protocol and guide-history journeys; "
         "the aggregate \"Browser journeys (one per archetype)\" is the required check."
     ),
+    "Fast static checks (compile + lint)": (
+        "an early, cheap subset of \"Static gates (compile + ratchets)\" that only "
+        "orders the heavy CI jobs; the full static job is the required check."
+    ),
     "Content page tests": (
         "runs only on pull requests whose changes are all content "
         "(is_content_only=true); it never runs on a push to main, so it can "

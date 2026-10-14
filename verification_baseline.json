@@ -49,6 +49,7 @@
     "background_mechanisms_thread": 21,
     "background_mechanisms_thread_instances": 28,
     "unrendered_model_fields": 342,
-    "tenant_isolation_route_coverage_pct": 44.0
+    "tenant_isolation_route_coverage_pct": 44.0,
+    "interface_contract_unimplemented": 0
   }
 }
