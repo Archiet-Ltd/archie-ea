@@ -19,7 +19,7 @@ from app.modules.mcp.tests.test_tools import _make_element, _make_user
 
 
 def test_scrub_credentials_withholds_secret_keys_at_any_depth():
-    from app.modules.mcp.tools import REDACTED, scrub_credentials
+    from app.modules.ai_chat.tools.route_read_tools import REDACTED, scrub_credentials
 
     out = scrub_credentials({
         "name": "kept",
@@ -34,13 +34,15 @@ def test_scrub_credentials_withholds_secret_keys_at_any_depth():
 def test_tool_result_with_a_credential_field_is_scrubbed(client, db_session, make_org, monkeypatch):
     from flask import current_app
 
-    from app.modules.mcp.tools import TOOL_REGISTRY
+    from app.modules.ai_chat.tools.executor import ToolExecutor
 
     org = make_org("harden")
     user = _make_user(db_session, org, "harden-scrub@example.com")
     token = _mint_token_with_scope(current_app, user, org, "mcp:read")
-    handler = TOOL_REGISTRY["list_canvases"]
-    monkeypatch.setattr(handler, "_execute", lambda a: {"rows": [{"api_key": "sk-live-9", "n": 1}]})
+    monkeypatch.setattr(
+        ToolExecutor, "_tool_list_canvases",
+        lambda self, a: {"rows": [{"api_key": "sk-live-9", "n": 1}]},
+    )
     status, body = _mcp_call(client, token, "list_canvases", {})
     assert status == 200, body
     text = body["result"]["content"][0]["text"]
@@ -51,16 +53,16 @@ def test_tool_result_with_a_credential_field_is_scrubbed(client, db_session, mak
 def test_tool_failure_does_not_leak_the_exception_text(client, db_session, make_org, monkeypatch):
     from flask import current_app
 
-    from app.modules.mcp.tools import TOOL_REGISTRY
+    from app.modules.ai_chat.tools.executor import ToolExecutor
 
     org = make_org("harden")
     user = _make_user(db_session, org, "harden-err@example.com")
     token = _mint_token_with_scope(current_app, user, org, "mcp:read")
 
-    def boom(_a):
+    def boom(_self, _a):
         raise RuntimeError("SELECT secret FROM other_org_table")
 
-    monkeypatch.setattr(TOOL_REGISTRY["list_canvases"], "_execute", boom)
+    monkeypatch.setattr(ToolExecutor, "_tool_list_canvases", boom)
     status, body = _mcp_call(client, token, "list_canvases", {})
     assert status == 500
     assert "SELECT" not in json.dumps(body)
@@ -85,13 +87,13 @@ def test_tool_call_without_matching_organisation_scope_is_refused(client, db_ses
     """If the request's organisation scope is not the caller's own, no tool runs."""
     from flask import current_app
 
-    from app.modules.mcp.tools import TOOL_REGISTRY
+    from app.modules.ai_chat.tools.executor import ToolExecutor
 
     org = make_org("harden")
     user = _make_user(db_session, org, "harden-scope@example.com")
     token = _mint_token_with_scope(current_app, user, org, "mcp:read")
     ran = []
-    monkeypatch.setattr(TOOL_REGISTRY["list_canvases"], "_execute", lambda a: ran.append(1) or {})
+    monkeypatch.setattr(ToolExecutor, "_tool_list_canvases", lambda self, a: ran.append(1) or {})
 
     # The identity loader accepts the token (the user really belongs to the
     # organisation); the request's organisation scope is then lost between the
