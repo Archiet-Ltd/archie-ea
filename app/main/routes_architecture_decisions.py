@@ -4,7 +4,10 @@ from flask import Blueprint, g, jsonify, redirect, render_template, request, url
 from flask_login import current_user, login_required
 
 from app import db
-from app.models.architecture_decision import ArchitectureDecision
+from app.models.architecture_decision import (
+    ArchitectureDecision,
+    decision_in_active_organisation_or_404,
+)
 from app.models.archimate_core import ArchiMateElement
 from app.security.audit import audit_logger, AuditEventType, AuditEventSeverity
 
@@ -158,7 +161,7 @@ def create_decision():
 @arch_decisions_bp.route("/<int:decision_id>")
 @login_required
 def view_decision(decision_id):
-    decision = ArchitectureDecision.query.get_or_404(decision_id)
+    decision = decision_in_active_organisation_or_404(decision_id)
     elements = _own_elements(decision.archimate_element_ids)
     return render_template(
         "architecture_decisions/detail.html", decision=decision, elements=elements
@@ -168,7 +171,10 @@ def view_decision(decision_id):
 @arch_decisions_bp.route("/<int:decision_id>/edit", methods=["GET", "POST"])
 @login_required
 def edit_decision(decision_id):
-    decision = ArchitectureDecision.query.get_or_404(decision_id)
+    decision = decision_in_active_organisation_or_404(decision_id)
+    if decision.ai_system_id is not None:
+        flash("An AI design review is decided on its review page, not edited here.", "error")
+        return redirect(url_for("ai_design_review.detail", review_id=decision.id))
     if request.method == "POST":
         decision.title = request.form.get("title") or decision.title
         decision.status = request.form.get("status", "proposed")
@@ -207,7 +213,10 @@ def delete_decision(decision_id):
     from app.models.adr import ArchitectureDecisionRecord
     from app.models.solution_architect_models import SolutionADRLink
 
-    decision = ArchitectureDecision.query.get_or_404(decision_id)
+    decision = decision_in_active_organisation_or_404(decision_id)
+    if decision.ai_system_id is not None:
+        flash("An AI design review is a board record and is not deleted.", "error")
+        return redirect(url_for("ai_design_review.detail", review_id=decision.id))
     decision_ref = decision.decision_id
     decision_title = decision.title
     # The legacy register stays as read history (lead ruling): a
@@ -297,7 +306,7 @@ def due_for_review():
 @arch_decisions_bp.route("/<int:decision_id>/record-outcome", methods=["GET", "POST"])
 @login_required
 def record_outcome(decision_id):
-    decision = ArchitectureDecision.query.get_or_404(decision_id)
+    decision = decision_in_active_organisation_or_404(decision_id)
     if request.method == "POST":
         outcome = request.form.get("review_outcome", "").strip()
         if not outcome:

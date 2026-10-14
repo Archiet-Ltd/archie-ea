@@ -84,20 +84,12 @@ def _current_org_id():
 
 
 def _org_scoped_element(element_id: int, org_id: int):
-    """Load one AI-system element scoped to *org_id*, or ``None`` if it does
-    not belong to this organisation — never load, name or change another
-    organisation's system."""
-    from app.models.models import ArchiMateElement
+    """One AI-system element scoped to *org_id*, or ``None``: never load, name
+    or change another organisation's system. The one implementation is
+    ``ai_evaluation_service.scoped_ai_system``."""
+    from app.modules.ai_chat.services.ai_evaluation_service import scoped_ai_system
 
-    if org_id is None:
-        return None
-    from app.modules.enterprise_genome.services.ai_system_profile import is_ai_system
-
-    element = ArchiMateElement.query.filter_by(
-        id=element_id,
-        organization_id=org_id,
-    ).first()
-    return element if element is not None and is_ai_system(element) else None
+    return scoped_ai_system(element_id, org_id)
 
 
 def _wants_json() -> bool:

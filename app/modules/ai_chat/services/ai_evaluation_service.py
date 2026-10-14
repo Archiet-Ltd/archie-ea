@@ -47,6 +47,9 @@ METRICS = {
     "cost_per_task": ("max", None, "Cost per task"),
 }
 
+# Upper bound for case counts (the columns are 32-bit integers).
+MAX_CASES = 1_000_000
+
 NO_ORGANISATION = "Release refused: no organisation is set, so no evaluation can be read."
 
 
@@ -179,6 +182,8 @@ def set_plan(
         raise EvaluationError("The test set name is limited to 200 characters.")
     if isinstance(test_set_size, bool) or not isinstance(test_set_size, int) or test_set_size < 1:
         raise EvaluationError("The test set size must be a whole number of at least 1.")
+    if test_set_size > MAX_CASES:
+        raise EvaluationError(f"The test set size is limited to {MAX_CASES:,} cases.")
     cleaned = _clean_metric_map(thresholds, what="Threshold")
     if not cleaned:
         raise EvaluationError("A plan needs at least one threshold.")
@@ -233,6 +238,8 @@ def record_run(
         raise EvaluationError("AI system not found.")
     if isinstance(cases_run, bool) or not isinstance(cases_run, int) or cases_run < 1:
         raise EvaluationError("The number of cases run must be a whole number of at least 1.")
+    if cases_run > MAX_CASES:
+        raise EvaluationError(f"The number of cases run is limited to {MAX_CASES:,}.")
     cleaned = _clean_metric_map(metrics, what="Measured value")
     if not cleaned:
         raise EvaluationError("A run needs at least one measured metric.")
