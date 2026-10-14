@@ -68,7 +68,12 @@ def _login(page, base, email):
 
 def _normalise_console(text):
     """Stable fingerprint: strip URLs' query strings, line/col numbers, ids."""
-    text = text.split("\n")[0][:200]
+    text = text.split("\n")[0]
+    # A CSP violation quotes the policy, and the policy carries a fresh nonce on
+    # every request. Left in, the same error never matched the baseline twice.
+    text = re.sub(r"'nonce-[^']*'", "'nonce-N'", text)
+    text = re.sub(r"'sha(?:256|384|512)-[^']*'", "'sha-N'", text)
+    text = text[:200]
     text = re.sub(r":\d+:\d+", ":L:C", text)
     text = re.sub(r"\b\d{3,}\b", "N", text)
     return text
@@ -170,3 +175,19 @@ def test_page_hygiene_no_worse_than_baseline(audited, archetype, path):
         "If these are pre-existing and being recorded for the first time, "
         "regenerate the baseline and review the diff." % (path, "\n".join(problems))
     )
+
+
+def test_console_fingerprint_ignores_per_request_nonce():
+    """Two violations that differ only by the CSP nonce are the same error."""
+    template = (
+        "Executing inline event handler violates the following Content Security "
+        "Policy directive 'script-src 'self' 'nonce-%s' 'strict-dynamic' "
+        "https://esm.sh'. Either the 'unsafe-inline' keyword, a hash, or a nonce "
+        "is required to enable inline execution."
+    )
+    first = _normalise_console(template % "4dHBsJL9RD1nryci8faIgiHOuxMlSIAxC6PcXRuJS_g")
+    second = _normalise_console(template % "Zq81xkTt0ePmW3aVnb2yHcUoRfDgLs7iJ9KXAEwMNvQ")
+    assert first == second
+    assert "nonce-N" in first
+    # a genuinely different error must still differ
+    assert _normalise_console("TypeError: x is undefined") != first
