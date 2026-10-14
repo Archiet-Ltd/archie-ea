@@ -14,3 +14,4 @@ tests/test_import_history_filters.py::test_apply_sends_filters_and_changes_visib
 tests/test_ai_model_selector_display.py::test_model_count_note[1-firefox]  # firefox timing flake on unrelated changes
 tests/test_ai_model_selector_display.py::test_model_count_note[0-webkit]  # webkit timing flake on unrelated changes
 tests/test_roadmap_modal_visibility.py::test_edit_opens_with_existing_values_and_keyboard_stays_in_dialog[chromium]  # browser timing flake on unrelated changes
+tests/test_throwaway_unlisted_failure.py::test_self_quarantined_failure_must_still_fail_the_run  # throwaway proof, must be ignored
