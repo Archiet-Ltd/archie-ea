@@ -5,7 +5,18 @@ Covers the "Screenshots on the public module pages" brief, widened
 2026-10-06 to include use-case pages and short recordings for four
 multi-step use cases, then revised 2026-10-06 after lead review of PR #402
 rejected 11 of the 26 captured images and all 4 recordings (empty data, the
-wrong screen, or a recording that never performed the use case it claimed):
+wrong screen, or a recording that never performed the use case it claimed),
+then revised again 2026-10-14 (round 2, MP-B1) once 10 of those 11 rejected
+images (every one except the Integrations product-bug exception, which stays
+pending) were reseeded and recaptured properly -- arb's hero also moved from
+the dashboard to the review ledger (/arb/reviews) the same round, because the
+dashboard's own AI-triage panel sat above a 4-item queue and read as a toy.
+None of the assertions below changed shape: every one already reads
+MODULE_CAPTURES / MODULE_CAPTURE_PENDING / USE_CASE_SCREENSHOT_CAPTURES /
+USE_CASE_SCREENSHOT_PENDING directly rather than hardcoding a slug list, so
+moving entries between those registries in app/services/public_pages.py is
+exactly what "the new pending/captured lists" means here -- this file itself
+needed no logic change to reflect round 2, only this docstring:
 
   - Every live module page (content/pages/modules/*.md, capture_status: live)
     either has a captured image file under the 200 KB cap and renders it

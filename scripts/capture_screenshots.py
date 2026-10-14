@@ -235,26 +235,59 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         apps = _resolve_apps(org_id)
         caps = _resolve_caps(org_id)
 
-        # ── ARB review items (arb.dashboard reads ARBReviewItem) ───────────
+        # ── ARB review items (arb.dashboard / arb.reviews read ARBReviewItem) ──
+        # Round 2 (MP-B1): the hero capture moved from arb.dashboard to
+        # arb.reviews (the "Full review ledger") because the dashboard's own
+        # AI queue triage panel sat above the fold and a 4-item queue read as
+        # a toy. The ledger has no AI panel at all, and a few dozen items
+        # across every status/type/priority gives it genuine, paginated
+        # volume (20/page) instead of a single screenful.
         from app.models.architecture_review_board import ARBReviewItem
 
-        arb_rows = [
-            ("REV-2026-001", "Migrate event backbone to a managed message broker",
-             "architecture_change", "submitted", "high"),
-            ("REV-2026-002", "Consolidate supplier onboarding into Supplier Portal",
-             "architecture_change", "under_review", "medium"),
-            ("REV-2026-003", "Adopt predictive maintenance for field service",
-             "architecture_change", "approved", "high"),
-            ("REV-2026-004", "Retire the manual inventory reconciliation spreadsheet",
-             "architecture_change", "rejected", "low"),
+        _arb_titles = [
+            ("Migrate event backbone to a managed message broker", "architecture_change"),
+            ("Consolidate supplier onboarding into Supplier Portal", "architecture_change"),
+            ("Adopt predictive maintenance for field service", "architecture_change"),
+            ("Retire the manual inventory reconciliation spreadsheet", "architecture_change"),
+            ("Standardise calibration rig firmware update process", "standard"),
+            ("Adopt a shared API gateway for field service integrations", "architecture_change"),
+            ("Introduce a canonical customer identifier across billing and CRM", "standard"),
+            ("Replace the legacy EDI gateway with managed file transfer", "architecture_change"),
+            ("Consolidate three ticketing tools into one service desk", "solution"),
+            ("Add a calibration rig telemetry data lake", "architecture_change"),
+            ("Change request: extend warranty tracking to field kits", "change_request"),
+            ("Adopt single sign-on across all customer-facing portals", "standard"),
+            ("Decommission the on-premises fax gateway", "change_request"),
+            ("Introduce event-driven inventory reconciliation", "architecture_change"),
+            ("Adopt a shared vendor risk scoring standard", "standard"),
+            ("Migrate the calibration ledger to the managed database tier", "solution"),
+            ("Change request: add multi-currency support to contracts", "change_request"),
+            ("Retire the spreadsheet-based capacity planning process", "architecture_change"),
+            ("Adopt a common logging and tracing standard for field apps", "standard"),
+            ("Consolidate supplier onboarding forms into one intake flow", "solution"),
+            ("Change request: shorten the calibration certificate renewal window", "change_request"),
+            ("Introduce a real-time parts availability feed", "architecture_change"),
+            ("Adopt a shared incident severity classification standard", "standard"),
+            ("Replace manual contract renewal reminders with automated alerts", "solution"),
+            ("Change request: add offline mode to the field engineer app", "change_request"),
+            ("Consolidate calibration certificate templates into one standard", "standard"),
+            ("Adopt a managed queue for supplier status webhooks", "architecture_change"),
+            ("Retire the duplicate document management instance", "architecture_change"),
         ]
-        for number, title, review_type, status, priority in arb_rows:
+        _arb_cycle = [
+            ("submitted", "high"), ("under_review", "medium"), ("approved", "high"),
+            ("rejected", "low"), ("approved_with_conditions", "medium"), ("deferred", "low"),
+            ("submitted", "critical"), ("under_review", "high"),
+        ]
+        for i, (title, review_type) in enumerate(_arb_titles):
+            number = f"REV-2026-{i + 1:03d}"
             if ARBReviewItem.query.filter_by(review_number=number).first():
                 continue
+            status, priority = _arb_cycle[i % len(_arb_cycle)]
             db.session.add(ARBReviewItem(
                 review_number=number, title=title, review_type=review_type,
                 status=status, priority=priority, submitter_id=demo_user_id,
-                submitted_at=_dt.datetime.utcnow() - _dt.timedelta(days=14),
+                submitted_at=_dt.datetime.utcnow() - _dt.timedelta(days=90 - i * 2),
             ))
         db.session.flush()
 
@@ -297,7 +330,13 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             ))
         db.session.flush()
 
-        # ── Saved ArchiMate diagrams (archimate.diagrams_library) ───────────
+        # ── Saved ArchiMate diagrams (archimate.diagrams_library, and -- round
+        #    2, MP-B1 -- archimate.composer_page with ?viewpoint_id=<id>) ────
+        # Round 1's capture showed the library's list of names, not a
+        # rendered diagram, because every element here sat at the model's
+        # default position (0, 0) -- opening any of these in the Composer
+        # would stack every box on top of the last. Positions below are laid
+        # out on an explicit grid so the Composer has something real to draw.
         from app.models.archimate_core import SavedDiagram, SavedDiagramElement
 
         diagram_names = [
@@ -305,16 +344,37 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             "Event backbone target state",
             "Supplier integration landscape",
         ]
-        element_ids = [el.id for el in list(elements.values())[:6]]
+        element_ids = [el.id for el in list(elements.values())[:9]]
+        _diagrams_hero_name = diagram_names[0]
         for name in diagram_names:
-            if SavedDiagram.query.filter_by(name=name).first():
+            diagram = SavedDiagram.query.filter_by(name=name).first()
+            if diagram is not None:
                 continue
             diagram = SavedDiagram(name=name, created_by_id=demo_user_id)
             db.session.add(diagram)
             db.session.flush()
-            for element_id in element_ids:
-                db.session.add(SavedDiagramElement(diagram_id=diagram.id, element_id=element_id))
+            for i, element_id in enumerate(element_ids):
+                db.session.add(SavedDiagramElement(
+                    diagram_id=diagram.id, element_id=element_id,
+                    position_x=80 + (i % 3) * 260, position_y=80 + (i // 3) * 160,
+                ))
         db.session.flush()
+
+        # Backfill positions for a pre-existing run's rows that predate the
+        # grid layout above (idempotency: a second run of this script against
+        # the same database must not leave the hero diagram stacked at 0,0).
+        _hero_diagram = SavedDiagram.query.filter_by(name=_diagrams_hero_name).first()
+        if _hero_diagram is not None:
+            _hero_positions = list(
+                SavedDiagramElement.query.filter_by(diagram_id=_hero_diagram.id)
+                .order_by(SavedDiagramElement.id)
+                .all()
+            )
+            if _hero_positions and all(p.position_x == 0 and p.position_y == 0 for p in _hero_positions):
+                for i, pos in enumerate(_hero_positions):
+                    pos.position_x = 80 + (i % 3) * 260
+                    pos.position_y = 80 + (i // 3) * 160
+            db.session.flush()
 
         # ── Duplicate detection: one real duplicate, then run it ───────────
         from app.models.application_portfolio import ApplicationComponent
@@ -346,22 +406,14 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             print(f"  duplicate detection run did not complete: {type(exc).__name__}: {exc}")
 
         # ── Investment priorities (application <-> capability mapping) ─────
+        # Round 2 (MP-B1) widens this to full coverage across every
+        # UnifiedCapability row -- see the dedicated block further down,
+        # near the other investment-analysis fixes -- rather than just the
+        # first 8, so this import stays here for the modules that still read
+        # it directly above (duplicate detection's own capability linkage).
         from app.models.unified_application_capability_mapping import (
             UnifiedApplicationCapabilityMapping,
         )
-
-        app_list = list(apps.values())[:8]
-        cap_list = list(caps.values())[:8]
-        for app_row, cap_row in zip(app_list, cap_list):
-            exists = UnifiedApplicationCapabilityMapping.query.filter_by(
-                application_component_id=app_row.id, unified_capability_id=cap_row.id,
-            ).first()
-            if exists:
-                continue
-            db.session.add(UnifiedApplicationCapabilityMapping(
-                application_component_id=app_row.id, unified_capability_id=cap_row.id,
-            ))
-        db.session.flush()
 
         # ── Portfolio (portfolio.index reads EnterpriseInitiative, NOT
         #    PortfolioInitiative -- two separate, pre-existing models) ──────
@@ -529,6 +581,282 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         # -- harmless, and ready for whenever that bug is fixed and this
         # module's capture_status goes back to live.
 
+        # ── Org chart (organization.chart reads BusinessActor + Composition/
+        #    Aggregation ArchiMateRelationship) ─────────────────────────────
+        # Round 2 (MP-B1): round 1's capture showed the module's hub page
+        # (three link cards) because no BusinessActor hierarchy existed to
+        # draw -- build_org_tree() falls back to a flat list with zero
+        # relationships. BusinessActor auto-creates its own linked
+        # ArchiMateElement on insert (see the model's own docstring), so the
+        # composition edges below are added once each actor's element exists.
+        from app.models.business_layer import BusinessActor
+
+        _actor_rows = [
+            # (name, actor_type, parent_name, headcount, location)
+            ("Lantern Quay Systems", "Business Unit", None, 420, "Head Office"),
+            ("Field Operations", "Department", "Lantern Quay Systems", 160, "Bristol Depot"),
+            ("Calibration Services Team", "Team", "Field Operations", 48, "Bristol Depot"),
+            ("Field Engineering Team", "Team", "Field Operations", 62, "Regional Depots"),
+            ("Quality & Compliance", "Department", "Lantern Quay Systems", 38, "Head Office"),
+            ("Quality Assurance Team", "Team", "Quality & Compliance", 22, "Head Office"),
+            ("Technology", "Department", "Lantern Quay Systems", 74, "Head Office"),
+            ("Platform Engineering Team", "Team", "Technology", 34, "Head Office"),
+            ("Data & Architecture Team", "Team", "Technology", 18, "Head Office"),
+            ("Commercial", "Department", "Lantern Quay Systems", 90, "Head Office"),
+            ("Procurement Team", "Team", "Commercial", 16, "Head Office"),
+            ("Customer Success Team", "Team", "Commercial", 28, "Head Office"),
+        ]
+        actors_by_name = {a.name: a for a in BusinessActor.query.all()}
+        for name, actor_type, _parent_name, headcount, location in _actor_rows:
+            if name in actors_by_name:
+                continue
+            actor = BusinessActor(
+                name=name, actor_type=actor_type, headcount=headcount, location=location,
+            )
+            db.session.add(actor)
+            db.session.flush()
+            actors_by_name[name] = actor
+
+        from app.models.archimate_core import ArchiMateRelationship
+
+        existing_actor_rels = {
+            (rel.source_id, rel.target_id, rel.type)
+            for rel in ArchiMateRelationship.query.filter(
+                ArchiMateRelationship.source_id.in_(
+                    [a.archimate_element_id for a in actors_by_name.values()
+                     if a.archimate_element_id is not None]
+                )
+            ).all()
+        }
+        for name, _actor_type, parent_name, _headcount, _location in _actor_rows:
+            if parent_name is None:
+                continue
+            parent = actors_by_name.get(parent_name)
+            child = actors_by_name.get(name)
+            if parent is None or child is None:
+                continue
+            if parent.archimate_element_id is None or child.archimate_element_id is None:
+                continue
+            key = (parent.archimate_element_id, child.archimate_element_id, "composition")
+            if key in existing_actor_rels:
+                continue
+            db.session.add(ArchiMateRelationship(
+                type="composition",
+                source_id=parent.archimate_element_id,
+                target_id=child.archimate_element_id,
+                organization_id=org_id,
+            ))
+            existing_actor_rels.add(key)
+        db.session.flush()
+
+        # ── Business capabilities (capability-maturity.heatmap reads
+        #    BusinessCapability directly; roadmap_routes.py's gap detection
+        #    reads the same table via ApplicationCapabilityCoverage) ───────
+        # Round 2 (MP-B1): round 1 only ever populated UnifiedCapability (a
+        # separate, later capability store -- see that model's own comment on
+        # business_capability being the projection's SOURCE, not a read
+        # target). capability-maturity, gap-analysis and roadmaps all read
+        # BusinessCapability, which stayed empty, so the heatmap showed "No
+        # capabilities yet" and the gap detector had nothing to flag. Rows
+        # below are a real, additional business-capability catalogue -- not a
+        # duplicate of UnifiedCapability, which keeps representing the
+        # portfolio's capability-to-application investment view.
+        from app.models.business_capabilities import ApplicationCapabilityCoverage, BusinessCapability
+
+        apps_list = list(apps.values())
+        _biz_cap_rows = [
+            # (name, domain, strategic_importance, current, target, coverage_apps)
+            # coverage_apps: list of (app_name_or_None, strategic_importance_override,
+            # lifecycle_status_override, technical_risk_override) -- empty list -> coverage gap.
+            ("Calibration Service Delivery", "Operations", "critical", 4, 5,
+             [("Calibration Ledger", "critical", None, None)]),
+            ("Field Service Scheduling", "Operations", "high", 2, 4,
+             [("Field Service Scheduler", "low", None, None)]),
+            ("Supplier Risk Management", "Procurement", "high", None, None, []),
+            ("Regulatory Compliance Tracking", "Compliance", "critical", 3, 5,
+             [("Document Management", "medium", "deprecated", None)]),
+            ("Equipment Asset Management", "Operations", "medium", 2, 4,
+             [("Inventory Manager", "medium", None, "critical")]),
+            ("Customer Contract Administration", "Commercial", "medium", None, None, []),
+            ("Quality Assurance & Certification", "Quality", "critical", 4, 5,
+             [("Calibration Ledger", "high", None, None), ("Document Management", "high", None, None)]),
+            ("Data & Integration Architecture", "Technology", "high", None, None, []),
+            ("Workforce Planning", "People", "medium", 2, 3,
+             [("Event Relay", "low", None, None)]),
+            ("Financial Planning & Reporting", "Finance", "medium", None, None, []),
+            ("Incident & Problem Management", "Operations", "high", 2, 4,
+             [("Event Relay", "medium", None, "high")]),
+            ("Vendor Performance Management", "Procurement", "medium", 3, 4,
+             [("Document Management", "critical", None, None)]),
+        ]
+        biz_caps_by_name = {c.name: c for c in BusinessCapability.query.all()}
+        today_dt = _dt.datetime.utcnow()
+        for i, (name, domain, importance, current, target, coverage) in enumerate(_biz_cap_rows):
+            cap = biz_caps_by_name.get(name)
+            if cap is None:
+                cap = BusinessCapability(
+                    name=name, code=f"CAP-LQ-{i + 1:03d}", category=domain,
+                    business_domain=domain, strategic_importance=importance,
+                    current_maturity_level=current, target_maturity_level=target,
+                    maturity_assessment_date=(today_dt - _dt.timedelta(days=30)) if current else None,
+                    business_owner="Lantern Quay capability owner",
+                )
+                db.session.add(cap)
+                db.session.flush()
+                biz_caps_by_name[name] = cap
+            if ApplicationCapabilityCoverage.query.filter_by(capability_id=cap.id).first():
+                continue
+            for app_name, importance_override, lifecycle_override, risk_override in coverage:
+                app_row = apps.get(app_name)
+                if app_row is None:
+                    continue
+                if importance_override is not None:
+                    app_row.strategic_importance = importance_override
+                if lifecycle_override is not None:
+                    app_row.lifecycle_status = lifecycle_override
+                if risk_override is not None:
+                    app_row.technical_risk = risk_override
+                db.session.add(ApplicationCapabilityCoverage(
+                    application_component_id=app_row.id, capability_id=cap.id,
+                    support_level="full", coverage_percentage=80.0,
+                ))
+        db.session.flush()
+
+        # ── Roadmap plateaus (capability-roadmap reads Plateau) ─────────────
+        # Round 2 (MP-B1): the plateau timeline existed with no description
+        # and no linked gaps -- adding real ones here, in sequence order.
+        from app.models.implementation_migration import Plateau
+
+        _plateau_rows = [
+            ("Current State", 1,
+             "The estate as it runs today: the calibration ledger, field "
+             "scheduling and supplier systems in their current, largely "
+             "manual form.", 0),
+            ("Transition State", 2,
+             "Event backbone and supplier integration land; calibration and "
+             "field service begin moving onto the managed platform.", 270),
+            ("Target State", 3,
+             "Every governed gap closed: modernised, consolidated systems "
+             "with full capability coverage across the estate.", 545),
+        ]
+        for name, seq, description, days_out in _plateau_rows:
+            if Plateau.query.filter_by(name=name).first():
+                continue
+            db.session.add(Plateau(
+                name=name, description=description, sequence_order=seq,
+                target_date=(today_dt + _dt.timedelta(days=days_out)).date(),
+            ))
+        db.session.flush()
+
+        # ── Investment analysis (strategic.investment_matrix reads
+        #    UnifiedCapability.industry_domain and UnifiedApplicationCapabilityMapping) ──
+        # Round 2 (MP-B1): round 1 mapped only the first 8 of 24
+        # UnifiedCapability rows to an application, and never set
+        # industry_domain on any of them -- so investment_prioritization_service's
+        # capability_domain fell through to "Unknown" and coverage_count read 0
+        # on every OTHER row (and on these 8 too, once the matrix is read
+        # fresh, since getattr(capability, 'business_domain', ...) is not a
+        # real column on this model). Every capability gets a domain and at
+        # least one mapped application below; a few are deliberately left
+        # under-covered (1 app, or a lower-strategic one) so the matrix still
+        # shows a believable spread of priorities rather than "fully solved".
+        _domain_cycle = [
+            "Operations", "Quality", "Technology", "Commercial", "Procurement",
+            "Finance", "People", "Compliance",
+        ]
+        cap_list_all = list(caps.values())
+        for i, cap_row in enumerate(cap_list_all):
+            if not cap_row.industry_domain:
+                cap_row.industry_domain = _domain_cycle[i % len(_domain_cycle)]
+        db.session.flush()
+
+        if apps_list:
+            for i, cap_row in enumerate(cap_list_all):
+                wanted_apps = [apps_list[i % len(apps_list)]]
+                if i % 3 != 2:  # leave roughly a third single-covered
+                    wanted_apps.append(apps_list[(i + 5) % len(apps_list)])
+                for app_row in wanted_apps:
+                    exists = UnifiedApplicationCapabilityMapping.query.filter_by(
+                        application_component_id=app_row.id, unified_capability_id=cap_row.id,
+                    ).first()
+                    if exists:
+                        continue
+                    db.session.add(UnifiedApplicationCapabilityMapping(
+                        application_component_id=app_row.id, unified_capability_id=cap_row.id,
+                    ))
+        db.session.flush()
+
+        # ── Value streams (value_stream.detail reads ValueStreamStage +
+        #    CapabilityValueStreamMapping -- the BIZBOK stage/capability grid) ──
+        # Round 2 (MP-B1): the 4 ValueStream rows from round 1 had no stages
+        # and no capability mappings, so every stream's own detail page (the
+        # screen the content page actually points at) showed 0 of both.
+        from app.models.unified_capability import ValueStream, ValueStreamStage, CapabilityValueStreamMapping
+
+        _vs_stage_rows = {
+            "OTC": ["Order Received", "Order Scheduled", "Calibration Performed", "Invoice Issued"],
+            "C2C": ["Sample Received", "Calibration Executed", "Certificate Issued"],
+            "P2P": ["Requisition Raised", "Supplier Selected", "Goods Received", "Invoice Paid"],
+            "I2R": ["Incident Logged", "Triaged", "Resolved"],
+        }
+        value_streams_by_code = {v.code: v for v in ValueStream.query.all()}
+        for code, stage_names in _vs_stage_rows.items():
+            vs_row = value_streams_by_code.get(code)
+            if vs_row is None:
+                continue
+            existing_stage_names = {
+                s.name for s in ValueStreamStage.query.filter_by(value_stream_id=vs_row.id).all()
+            }
+            for order, stage_name in enumerate(stage_names, start=1):
+                if stage_name in existing_stage_names:
+                    continue
+                stage = ValueStreamStage(
+                    name=stage_name, value_stream_id=vs_row.id, stage_order=order,
+                    stage_type="operational",
+                )
+                db.session.add(stage)
+                db.session.flush()
+                if cap_list_all:
+                    cap_row = cap_list_all[(order + hash(code)) % len(cap_list_all)]
+                    db.session.add(CapabilityValueStreamMapping(
+                        capability_id=cap_row.id, value_stream_id=vs_row.id,
+                        value_stream_stage_id=stage.id, support_type="primary",
+                    ))
+        db.session.flush()
+
+        # ── Application rationalization scores (unified_applications.
+        #    rationalization_workbench reads ApplicationRationalizationScore) ──
+        # Round 2 (MP-B1): round 1 ran duplicate detection (the Rationalization
+        # dashboard's own stepper) but never scored any application, so the
+        # Decision Workbench -- the screen the content page's capture
+        # actually needs -- stayed on its "No scored applications found, run
+        # detection from the Dashboard" onboarding panel regardless.
+        from app.models.application_rationalization import ApplicationRationalizationScore
+
+        _time_actions = ["TOLERATE", "INVEST", "MIGRATE", "ELIMINATE"]
+        _priorities = ["critical", "high", "medium", "low"]
+        for i, app_row in enumerate(apps_list[:12]):
+            if ApplicationRationalizationScore.query.filter_by(
+                application_component_id=app_row.id
+            ).first():
+                continue
+            action = _time_actions[i % len(_time_actions)]
+            db.session.add(ApplicationRationalizationScore(
+                application_component_id=app_row.id,
+                technical_health_score=40 + (i * 7) % 55,
+                business_value_score=35 + (i * 11) % 60,
+                cost_efficiency_score=30 + (i * 13) % 65,
+                vendor_risk_score=45 + (i * 5) % 50,
+                overall_health_score=38 + (i * 9) % 58,
+                rationalization_action=action,
+                priority=_priorities[i % len(_priorities)],
+                priority_score=90 - i * 6,
+                action_rationale=f"{action.title()}: scored from technical health, business "
+                                 f"value, cost efficiency and vendor risk signals.",
+                review_status="reviewed" if i % 2 == 0 else "draft",
+            ))
+        db.session.flush()
+
         db.session.commit()
 
     # ── Globally-scoped data: no tenant_scope, not a seeded script concern ──
@@ -539,6 +867,56 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
     from app.services.industry_apqc_service import IndustryAPQCService
 
     IndustryAPQCService().seed_default_frameworks()
+
+    # Round 2 (MP-B1): seed_default_frameworks() above only creates the
+    # framework rows themselves -- industry_apqc_dashboard's own per-framework
+    # stats (get_industry_statistics) count IndustryAPQCProcess rows, which
+    # stayed at zero, so every framework showed "0 processes". Each framework
+    # already carries its own real unique_process_areas/key_differentiators
+    # (APQC's own published category names, not invented here); this reuses
+    # that existing text as the process catalogue rather than writing a
+    # second list of names.
+    from app.models.industry_apqc import IndustryAPQCFramework, IndustryAPQCProcess
+
+    _CROSS_INDUSTRY_PROCESSES = [
+        "Develop vision and strategy",
+        "Develop and manage products and services",
+        "Market and sell products and services",
+        "Deliver products and services",
+        "Manage customer service",
+        "Develop and manage human capital",
+        "Manage information technology",
+        "Manage financial resources",
+    ]
+    for framework in IndustryAPQCFramework.query.all():
+        if IndustryAPQCProcess.query.filter_by(industry_framework_id=framework.id).first():
+            continue
+        process_names = (
+            list(framework.unique_process_areas or [])
+            + list(framework.key_differentiators or [])
+        ) or _CROSS_INDUSTRY_PROCESSES
+        is_regulated = framework.regulatory_intensity in ("high", "very_high")
+        for i, process_name in enumerate(process_names):
+            db.session.add(IndustryAPQCProcess(
+                industry_framework_id=framework.id,
+                base_process_id=None,
+                industry_process_code=f"{framework.industry_code}-{i + 1:02d}",
+                industry_process_name=process_name,
+                industry_category_1=framework.industry_name,
+                is_industry_unique=process_name in (framework.unique_process_areas or []),
+                # "Regulatory Processes" is a distinct dashboard count, read
+                # from this field (get_regulatory_processes()) -- the first
+                # two named processes of a high/very-high intensity
+                # framework get one real regulatory citation each, so that
+                # count isn't silently 0 alongside the others.
+                regulatory_requirements=(
+                    [{"regulation": "SOX" if framework.industry_code == "BFS" else "GDPR",
+                      "requirement": f"Applies to {process_name.lower()}",
+                      "criticality": "high"}]
+                    if is_regulated and i < 2 else None
+                ),
+            ))
+    db.session.commit()
 
     # Regulatory compliance frameworks (dashboard/compliance): standard,
     # real framework/control names (GDPR, ISO 27001 -- not fictional data,
@@ -580,23 +958,63 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
 
     # Batch import jobs (batch-import.dashboard): scoped by user_id only, no
     # organization_id column on this model at all.
-    from app.models.batch_import import BatchImportJob
+    #
+    # Round 2 (MP-B1): round 1's rows left total_batches/batches_completed at
+    # their 0 defaults, so BatchImportJob.progress_percentage (batches_completed
+    # / total_batches) read 0/0 -> 0% on every job, and no BatchImportBatch rows
+    # existed at all, so list_jobs()'s elementsGenerated (SUM of
+    # BatchImportBatch.total_elements_generated) read 0 too -- both genuinely
+    # empty fields, not a product bug. Batches are added below, keyed by each
+    # job's own filename so a re-run stays idempotent.
+    from app.models.batch_import import BatchImportBatch, BatchImportJob, BatchStatus
 
     job_rows = [
-        ("lantern-quay-applications.xlsx", 20, "completed"),
-        ("lantern-quay-capabilities.csv", 24, "completed"),
-        ("lantern-quay-risk-register.csv", 10, "processing"),
+        ("lantern-quay-applications.xlsx", 20, "completed", 4, 4,
+         [("completed", 5, 12), ("completed", 5, 15), ("completed", 5, 10), ("completed", 5, 14)]),
+        ("lantern-quay-capabilities.csv", 24, "completed", 5, 5,
+         [("completed", 5, 8), ("completed", 5, 9), ("completed", 5, 7),
+          ("completed", 5, 11), ("completed", 4, 6)]),
+        ("lantern-quay-risk-register.csv", 10, "processing", 3, 1,
+         [("completed", 4, 9), ("processing", 3, 0), ("queued", 3, 0)]),
+        ("lantern-quay-vendor-contracts.csv", 15, "completed", 3, 3,
+         [("completed", 5, 13), ("completed", 5, 11), ("completed", 5, 9)]),
+        ("lantern-quay-work-packages.xlsx", 12, "completed", 3, 3,
+         [("completed", 4, 10), ("completed", 4, 8), ("completed", 4, 12)]),
+        ("lantern-quay-solutions.csv", 8, "failed", 2, 1,
+         [("completed", 4, 6), ("failed", 4, 0)]),
     ]
-    for filename, total, status in job_rows:
-        if BatchImportJob.query.filter_by(filename=filename, user_id=demo_user_id).first():
-            continue
-        db.session.add(BatchImportJob(
-            user_id=demo_user_id, filename=filename, total_applications=total, status=status,
-        ))
+    _batch_status = {
+        "completed": BatchStatus.COMMITTED,
+        "processing": BatchStatus.PROCESSING,
+        "queued": BatchStatus.QUEUED,
+        "failed": BatchStatus.FAILED,
+    }
+    for filename, total_apps, status, total_batches, batches_completed, batch_rows in job_rows:
+        job = BatchImportJob.query.filter_by(filename=filename, user_id=demo_user_id).first()
+        if job is None:
+            job = BatchImportJob(
+                user_id=demo_user_id, filename=filename, total_applications=total_apps,
+                status=status, total_batches=total_batches, batches_completed=batches_completed,
+                batches_committed=batches_completed if status == "completed" else 0,
+            )
+            db.session.add(job)
+            db.session.flush()
+        if len(job.batches) == 0:
+            for batch_number, (batch_status, apps_in_batch, elements_generated) in enumerate(
+                batch_rows, start=1
+            ):
+                db.session.add(BatchImportBatch(
+                    job_id=job.id, batch_number=batch_number,
+                    status=_batch_status[batch_status],
+                    total_applications=apps_in_batch,
+                    processed_applications=apps_in_batch if batch_status != "queued" else 0,
+                    successful_applications=apps_in_batch if batch_status == "completed" else 0,
+                    total_elements_generated=elements_generated,
+                ))
     db.session.commit()
 
 
-def _seed_lantern_quay(demo_password: str) -> None:
+def _seed_lantern_quay(demo_password: str) -> dict:
     """Seed Lantern Quay Systems and grant three capture-only persona roles.
 
     Calls the existing seed_demo_company() unchanged (app/commands/seed_demo_company.py
@@ -605,6 +1023,12 @@ def _seed_lantern_quay(demo_password: str) -> None:
     (platform admin), My Applications (application_manager), Procurement
     (procurement). No new fictional person is invented: all three are already
     part of the seeded cast.
+
+    Returns a dict of slug -> path for the one module capture whose real
+    URL carries a database-generated id (a saved diagram, opened in the
+    Composer via ?viewpoint_id=<id>) that cannot be a fixed string in
+    MODULE_CAPTURES -- run_public_pages_capture() applies this to
+    MODULE_CAPTURES before building its capture job list.
     """
     os.environ.setdefault("DEMO_USER_PASSWORD", demo_password)
     from app import create_app, db
@@ -640,6 +1064,14 @@ def _seed_lantern_quay(demo_password: str) -> None:
         org = Organization.query.filter_by(slug="lantern-quay").first()
         demo_user = User.query.filter_by(email=DEMO_EMAIL).first()
         _seed_module_screen_data(org.id, demo_user.id)
+
+        from app.models.archimate_core import SavedDiagram
+
+        dynamic_paths = {}
+        diagram = SavedDiagram.query.filter_by(name="Calibration estate overview").first()
+        if diagram is not None:
+            dynamic_paths["diagrams"] = f"/architecture/composer?viewpoint_id={diagram.id}"
+        return dynamic_paths
 
 
 def _boot(port: int, log_path: pathlib.Path):
@@ -850,7 +1282,16 @@ def run_public_pages_capture() -> int:
     demo_password = os.environ.get("DEMO_USER_PASSWORD") or secrets.token_urlsafe(18)
 
     print("seeding Lantern Quay Systems ...")
-    _seed_lantern_quay(demo_password)
+    dynamic_paths = _seed_lantern_quay(demo_password)
+
+    # A saved diagram's real URL carries a database id that cannot be a
+    # fixed string in MODULE_CAPTURES (see _seed_lantern_quay's own
+    # docstring) -- patch that entry's path in place, in memory only, right
+    # before building the capture job list below.
+    for i, entry in enumerate(MODULES):
+        slug = entry[0]
+        if slug in dynamic_paths:
+            MODULES[i] = (slug, dynamic_paths[slug], entry[2], entry[3], entry[4])
 
     port = _free_port()
     scratch = pathlib.Path(os.environ.get("CAPTURE_SCRATCH_DIR",

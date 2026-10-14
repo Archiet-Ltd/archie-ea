@@ -106,27 +106,55 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("applications", "/applications/", DEMO_PERSONA,
      "The application portfolio: lifecycle tiles, owner and vendor coverage, and each application's type, lifecycle stage and the capability it supports.",
      "Screenshot of the Applications module showing Lantern Quay Systems' portfolio tiles, data-quality coverage and application list with type, lifecycle stage and mapped capability."),
-    ("arb", "/arb/", DEMO_PERSONA,
-     "The Architecture Review Board hub: review volume, pending decisions, approval rate and cycle time.",
-     "Screenshot of the Architecture Review Board hub showing total and pending reviews, approval rate, cycle time and the review status chart."),
+    # Round 2 (MP-B1): repointed from the dashboard (/arb/) to the review
+    # ledger (/arb/reviews) -- the dashboard's own "AI queue triage" panel
+    # sat above the fold with only 4 seeded reviews behind it, which read as
+    # a toy demo rather than a governed queue. The ledger has no AI panel,
+    # and two dozen-plus real review items across every status/type/priority
+    # (paginated) is the same screen at the volume the module actually
+    # carries in use.
+    ("arb", "/arb/reviews", DEMO_PERSONA,
+     "The Architecture Review Board's review ledger: every submission with its status, type, priority and submission date, filterable across the full governance queue.",
+     "Screenshot of the Architecture Review Board's review ledger listing submitted review items with their status, type, priority and submission date."),
     ("architecture-model", "/architecture/", DEMO_PERSONA,
      "The ArchiMate element browser, spanning the business, application, technology and motivation layers.",
      "Screenshot of the Architecture Model module's ArchiMate element browser."),
+    ("batch-import", "/batch-import/", DEMO_PERSONA,
+     "The batch import dashboard: job status, elements generated and per-job progress across every import run.",
+     "Screenshot of the Batch Import dashboard showing job status, elements generated and progress for each import job."),
     ("business-case", "/business-case/", DEMO_PERSONA,
      "Business cases with their status, three-year TCO and return on investment.",
      "Screenshot of the Business Case module's list of business cases."),
     ("business-model-canvas", "/business-model/", DEMO_PERSONA,
      "The business model canvas library, with each canvas's operating-model archetype.",
      "Screenshot of the Business Model Canvas module's canvas library."),
+    ("capability-maturity", "/capability-maturity/heatmap", DEMO_PERSONA,
+     "The capability maturity heatmap: current vs target maturity for every assessed capability, grouped by domain.",
+     "Screenshot of the Capability Maturity heatmap showing current and target maturity levels grouped by domain."),
     ("compliance-frameworks", "/dashboard/compliance", DEMO_PERSONA,
      "The compliance frameworks dashboard, tracking framework coverage across the estate.",
      "Screenshot of the Compliance Frameworks module's dashboard."),
+    ("diagrams", "/architecture/composer", DEMO_PERSONA,
+     "A saved diagram open in the ArchiMate Composer, with its elements laid out on the canvas.",
+     "Screenshot of the ArchiMate Composer with a saved diagram's elements open on the canvas."),
     ("duplicate-detection", "/duplicate-detection/simple", DEMO_PERSONA,
      "The duplicate detection dashboard, flagging applications that may overlap in function.",
      "Screenshot of the Duplicate Detection module's dashboard."),
+    ("gap-analysis", "/capability-roadmap", DEMO_PERSONA,
+     "The capability roadmap's gap detector, flagging coverage, quality, retirement and modernisation gaps across the estate.",
+     "Screenshot of the capability roadmap showing detected capability gaps by type and priority."),
+    ("industry-apqc", "/industry-apqc/", DEMO_PERSONA,
+     "The Industry APQC dashboard, showing each industry framework's process catalogue and benchmarks.",
+     "Screenshot of the Industry APQC dashboard listing industry frameworks with their process counts and benchmarks."),
+    ("investment-analysis", "/architecture/investment-priorities", DEMO_PERSONA,
+     "The investment prioritisation matrix, scoring every capability on strategic importance, coverage, maturity and risk.",
+     "Screenshot of the investment prioritisation matrix showing capabilities scored and ranked by investment priority."),
     ("my-applications", "/my-applications/", APP_MANAGER_PERSONA,
      "An application owner's personal dashboard of the applications they're responsible for.",
      "Screenshot of the My Applications module's owner dashboard."),
+    ("org-chart", "/organization/chart", DEMO_PERSONA,
+     "The enterprise org chart, built from the organisation's own departments and teams.",
+     "Screenshot of the Org Chart module showing the organisation's department and team hierarchy."),
     ("portfolio", "/portfolio/", DEMO_PERSONA,
      "The portfolio dashboard, summarising active initiatives and programmes.",
      "Screenshot of the Portfolio module's dashboard."),
@@ -136,12 +164,21 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("projects", "/enterprise/implementation/work-packages", DEMO_PERSONA,
      "The work packages list, tracking delivery programmes in progress.",
      "Screenshot of the Projects module's work packages list."),
+    ("rationalization", "/applications/rationalization", DEMO_PERSONA,
+     "The rationalization dashboard, past onboarding, with real detection groups, scored applications and a savings estimate.",
+     "Screenshot of the Rationalization dashboard showing detection groups, scored applications and estimated savings."),
     ("risk-register", "/risks/", DEMO_PERSONA,
      "The risk register, with likelihood, impact and a mitigation plan recorded for each risk.",
      "Screenshot of the Risk Register module."),
+    ("roadmaps", "/capability-roadmap", DEMO_PERSONA,
+     "The capability roadmap, with plateaus from current to target state and the gaps assigned to each.",
+     "Screenshot of the capability roadmap showing plateaus from current to target state with assigned gaps."),
     ("solutions", "/solutions/", DEMO_PERSONA,
      "The solutions list, tracking each solution's design progress and next action.",
      "Screenshot of the Solutions module's solution list."),
+    ("value-streams", "/value-streams/", DEMO_PERSONA,
+     "The value stream library, with each stream's stage count and mapped-capability coverage across the estate.",
+     "Screenshot of the Value Streams module listing each value stream with its stage count and mapped capabilities."),
     ("vendors", "/applications/vendors", DEMO_PERSONA,
      "The vendor catalogue, with each vendor's type, products and contract status.",
      "Screenshot of the Vendors module's vendor catalogue."),
@@ -172,34 +209,6 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
         "app/models/connector_config.py declares all three as plain strings -- "
         "pre-existing bug, unrelated file, out of scope to fix here"
     ),
-    "capability-maturity": (
-        "heat map showed \"No capabilities yet\" for an organisation that has 24 "
-        "capabilities elsewhere (investment-analysis) -- this screen reads a "
-        "different capability store than the one seeded; a reuse-register-shaped "
-        "bug, separate brief owed"
-    ),
-    "batch-import": (
-        "completed jobs rendered at 0% progress and 0 elements generated -- "
-        "reads broken, not done; needs a real completed run with actual elements"
-    ),
-    "org-chart": (
-        "captured screen was the module's hub page (three link cards), not the "
-        "organisation chart itself -- needs actors/hierarchy seeded and the "
-        "/organization/chart route captured instead"
-    ),
-    "diagrams": (
-        "captured screen was a list of diagram names, not a rendered diagram -- "
-        "needs a diagram actually open in the Composer"
-    ),
-    "industry-apqc": "0 processes shown on every seeded framework",
-    "investment-analysis": "domain Unknown and 0 apps coverage on every capability row",
-    "gap-analysis": "type None on every row",
-    "rationalization": (
-        "captured screen was the \"Get started\" onboarding panel, not the "
-        "rationalization view itself -- needs scores past onboarding"
-    ),
-    "roadmaps": "0 gaps detected; plateaus with no description and 0 gaps",
-    "value-streams": "0 stages and 0 capabilities on every value stream",
     "digital-twin": (
         "no seeded demonstration organisation or browser available when the "
         "page was written to capture Ask with an impact answer and the "
@@ -209,17 +218,18 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
 }
 
 # The one live use-case page: same screen as the capability-maturity module
-# (its own url_slug front-matter field points at the identical route). Empty
-# for the same reason as capability-maturity above -- see
-# USE_CASE_SCREENSHOT_PENDING.
-USE_CASE_SCREENSHOT_CAPTURES: list[tuple[str, str, str, str, str]] = []
+# (its own url_slug front-matter field points at the identical route).
+# Round 2 (MP-B1): captured once capability-maturity's own BusinessCapability
+# rows existed -- the module and this use-case page share the identical
+# /capability-maturity/heatmap route, so the fix that unblocked one unblocked
+# both.
+USE_CASE_SCREENSHOT_CAPTURES: list[tuple[str, str, str, str, str]] = [
+    ("capability-maturity-heatmap", "/capability-maturity/heatmap", DEMO_PERSONA,
+     "The capability maturity heatmap, read as a value-stream risk answer: current vs target maturity for every assessed capability.",
+     "Screenshot of the capability maturity heatmap showing current and target maturity levels for every assessed capability."),
+]
 
-USE_CASE_SCREENSHOT_PENDING: dict[str, str] = {
-    "capability-maturity-heatmap": (
-        "same capability-maturity heat map issue as the module above -- "
-        "\"No capabilities yet\""
-    ),
-}
+USE_CASE_SCREENSHOT_PENDING: dict[str, str] = {}
 
 # Four multi-step use cases keyed by the readable /use-cases/<slug> form --
 # the pending URL rewrite from /use-cases/uc-* to this readable form has
@@ -509,7 +519,13 @@ def use_case_redirect_target(old_filename_slug: str) -> str | None:
 # Module images captured at 2x device pixel ratio by scripts/capture_proof_assets.py: their file
 # pixels are twice their CSS size, so the <img> width/height attributes halve them and the
 # image displays 1:1. Every other module image is a 1x capture and keeps its file size.
-TWO_X_MODULE_IMAGES = frozenset({"applications", "arb"})
+#
+# "arb" moved out of this set in round 2 (MP-B1): its hero now comes from
+# scripts/capture_screenshots.py --modules (the review ledger at /arb/reviews,
+# a 1x capture like every other ordinary module), not from the 2x
+# capture_proof_assets.py crop of the dashboard -- see the MODULE_CAPTURES
+# entry below for why.
+TWO_X_MODULE_IMAGES = frozenset({"applications"})
 
 
 def _screenshot_density(slug: str, page_family: str) -> int:
