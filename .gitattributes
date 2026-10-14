@@ -17,3 +17,4 @@
 *.min.js   -text
 *.min.css  -text
 app/static/vendor/** -text
+app/config/api_contract_subset.yaml -text
