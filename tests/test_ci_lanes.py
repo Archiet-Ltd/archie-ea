@@ -163,3 +163,17 @@ def test_the_lane_can_be_raised_to_full_by_the_selector():
     assert changes["outputs"]["lane"] == "${{ steps.final.outputs.lane }}"
     step = next(s for s in changes["steps"] if s.get("id") == "final")
     assert "--escalate" in step["run"] and "lane=full" in step["run"]
+
+
+def test_an_empty_selection_skips_every_expensive_fast_lane_step():
+    steps = _jobs()["fast-tests"]["steps"]
+    names = [s.get("name") or s.get("uses") for s in steps]
+    select = next(i for i, s in enumerate(steps) if s.get("id") == "select")
+    # Nothing heavy runs before the selection is known.
+    for step in steps[:select]:
+        assert "pip install" not in step.get("run", "")
+    for step in steps[select + 1:]:
+        if str(step.get("uses", "")).startswith("actions/upload-artifact"):
+            continue
+        assert step.get("if") == "${{ steps.select.outputs.any == 'true' }}", names
+    assert 'echo "any=false"' in steps[select]["run"]

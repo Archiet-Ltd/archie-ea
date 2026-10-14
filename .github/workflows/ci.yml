@@ -624,28 +624,6 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-      - name: Create an isolated virtual environment for this job's dependencies
-        # Same reason as tests-shard: a self-hosted runner's leftover ~/.local
-        # site-packages must not shadow this job's dependencies.
-        run: |
-          python -m venv --clear .venv
-          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
-      - name: Resolve the postgres service's mapped port
-        run: |
-          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
-          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
-      - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt || {
-            echo "::warning::pip install from the cache failed; retrying without it"
-            pip install --no-cache-dir -r requirements.txt
-          }
-          pip install pytest-cov
-          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
       - name: Select the tests this pull request touches
         id: select
         env:
@@ -662,13 +640,46 @@ jobs:
           python -I "$SELECTOR" --base "$BASE" > fast-tests.txt
           grep -c . fast-tests.txt || true
           cat fast-tests.txt
+          if grep -q . fast-tests.txt; then
+            echo "any=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "any=false" >> "$GITHUB_OUTPUT"
+            echo "No test file is affected by this change; nothing to install or run."
+          fi
           mapfile -t files < fast-tests.txt
           echo "browsers=$(python -I "$SELECTOR" --browsers "${files[@]}")" >> "$GITHUB_OUTPUT"
           {
             echo "### Fast lane"
             echo "$(grep -c . fast-tests.txt || true) test files selected. The full suite runs when the pull request carries the full-ci label."
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Create an isolated virtual environment for this job's dependencies
+        if: ${{ steps.select.outputs.any == 'true' }}
+        # Same reason as tests-shard: a self-hosted runner's leftover ~/.local
+        # site-packages must not shadow this job's dependencies.
+        run: |
+          python -m venv --clear .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Resolve the postgres service's mapped port
+        if: ${{ steps.select.outputs.any == 'true' }}
+        run: |
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+      - name: Install deps
+        if: ${{ steps.select.outputs.any == 'true' }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || {
+            echo "::warning::pip install from the cache failed; retrying without it"
+            pip install --no-cache-dir -r requirements.txt
+          }
+          pip install pytest-cov
+          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+      - uses: actions/setup-node@v4
+        if: ${{ steps.select.outputs.any == 'true' }}
+        with:
+          node-version: "22"
       - name: Install the browsers the selected tests name
+        if: ${{ steps.select.outputs.any == 'true' }}
         # Chromium always; Firefox and WebKit only when a selected file names
         # them. The same host-wide lock as the shards, for the same reason.
         env:
@@ -685,14 +696,17 @@ jobs:
           done
           exit 1
       - name: Create schema
+        if: ${{ steps.select.outputs.any == 'true' }}
         run: |
           python -c "import psycopg2" 2>/dev/null || pip install psycopg2-binary
           flask --app manage init-db
           flask --app manage schema-upgrade
           flask --app manage reconcile-schema
       - name: Apply the capability provenance migration
+        if: ${{ steps.select.outputs.any == 'true' }}
         run: flask --app manage apply-unified-capability-provenance-migration
       - name: Accept the quarantine list from the base branch
+        if: ${{ steps.select.outputs.any == 'true' }}
         # A pull request cannot quarantine its own failing test: the list that
         # counts is the base branch's, and this pull request's copy may only
         # remove lines. Additions are ignored and reported. Pushes to protected
@@ -712,6 +726,7 @@ jobs:
             echo "CI_QUARANTINE_FILE=${RUNNER_TEMP}/quarantine.txt" >> "$GITHUB_ENV"
           fi
       - name: Run the selected tests
+        if: ${{ steps.select.outputs.any == 'true' }}
         run: |
           if ! grep -q . fast-tests.txt; then
             echo "No test file is affected by this change."
