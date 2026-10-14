@@ -1,0 +1,182 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, section_card %}
+{% from 'components/empty_state.html' import empty_state %}
+
+{% block title %}Answer{% endblock %}
+
+{# One stored answer, rendered on the server from the snapshot that was saved
+   at its address. Opening it again shows the same rows and the same computed
+   time: nothing here is recomputed. Element names come from the snapshot's own
+   identity map, never from an ambient lookup. #}
+
+{% macro name_of(answer, element_id) -%}
+{%- set known = answer.elements.get(element_id | string) -%}
+{{ known.name if known else '—' }}
+{%- endmacro %}
+
+{% macro basis_badge(truth_class) -%}
+{%- if truth_class == 'derived' -%}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/40" data-truth-class="derived">Worked out from recorded links</span>
+{%- else -%}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30" data-truth-class="drawn">Recorded by people</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro owner_text(row) -%}
+{%- if row.owners -%}{{ row.owners | map(attribute='name') | select | join(', ') or 'No owner recorded' }}
+{%- elif row.owner and row.owner.name -%}{{ row.owner.name }}
+{%- else -%}No owner recorded{%- endif -%}
+{%- endmacro %}
+
+{% block content %}
+{% set home_url = url_for('dashboard.overview') if 'dashboard.overview' in flask.current_app.view_functions else none %}
+{% set kind = answer.question_kind %}
+{% set reason_words = {
+    'no_risk_recorded': 'No open risk is recorded on this or on anything it depends on.',
+    'no_data_recorded': 'Nothing is recorded as depending on these yet.',
+    'rows_truncated': 'The list was cut at the most the product keeps for one answer; the total above is the full count.',
+    'seed_limit_reached': 'More elements matched than one answer covers, so only the first were used.',
+    'element_not_found': 'Some of the elements you named could not be found in your organisation.',
+    'no_ownership_recorded': 'Some rows have no owner recorded.',
+    'no_seed_elements': 'No element was named.',
+} %}
+{% set state_words = {
+    'current': 'The worked-out connections under this answer are up to date.',
+    'stale': 'Some worked-out connections under this answer have gone out of date.',
+    'not_computed': 'Indirect connections have not been worked out yet, so only recorded links are shown.',
+    'partial': 'Indirect connections are up to date for some of these elements and not for others.',
+    'not_used': 'Only recorded links were followed.',
+} %}
+{% if kind == 'risk_propagation' %}
+    {% set heading = 'Risks that reach ' ~ name_of(answer, answer.params.element_id) %}
+{% elif kind == 'set_impact' %}
+    {% set ns = namespace(names=[]) %}
+    {% for seed_id in answer.summary.seed_element_ids %}{% set ns.names = ns.names + [name_of(answer, seed_id)] %}{% endfor %}
+    {% set heading = 'What breaks if ' ~ (ns.names | join(', ') if ns.names else 'these') ~ ' fail together' %}
+{% else %}
+    {% set heading = 'What breaks if ' ~ name_of(answer, answer.params.element_id) ~ ' fails' %}
+{% endif %}
+<div class="p-6 space-y-6" data-answer-address="{{ answer.address }}" data-answer-kind="{{ kind }}">
+    {{ page_shell(
+        title=heading,
+        subtitle='A saved answer. Opening it again shows the same rows and the time it was worked out.',
+        breadcrumb=[('Home', home_url), ('Answers', url_for('intelligence_ui.answers_page')), ('Answer', none)]
+    ) }}
+
+    <section class="rounded-xl border border-border bg-card p-6 space-y-3" aria-labelledby="answer-facts-heading">
+        <h2 id="answer-facts-heading" class="text-lg font-semibold text-foreground">About this answer</h2>
+        <dl class="grid gap-3 text-sm sm:grid-cols-2">
+            <div>
+                <dt class="text-muted-foreground">Worked out</dt>
+                <dd class="font-medium text-foreground"><time datetime="{{ answer.computed_at }}" data-computed-at>{{ answer.computed_at }}</time></dd>
+            </div>
+            <div>
+                <dt class="text-muted-foreground">Basis</dt>
+                <dd>{% if answer.truth_class %}{{ basis_badge(answer.truth_class) }}{% else %}<span class="text-foreground">Nothing to rest on: no rows</span>{% endif %}</dd>
+            </div>
+            <div>
+                <dt class="text-muted-foreground">Confidence</dt>
+                <dd class="text-foreground" data-confidence>
+                    {% if answer.confidence_basis == 'lowest_derived_row' %}{{ (answer.confidence * 100) | round | int }}% (the lowest of the worked-out connections)
+                    {% elif answer.confidence_basis == 'drawn_facts_only' %}Every connection was recorded by a person; none is estimated.
+                    {% else %}Not applicable: there are no rows.{% endif %}
+                </dd>
+            </div>
+            <div>
+                <dt class="text-muted-foreground">Freshness</dt>
+                <dd class="text-foreground">{{ state_words.get(answer.freshness.derivation_state, 'Not stated.') }}</dd>
+            </div>
+            <div>
+                <dt class="text-muted-foreground">Rows</dt>
+                <dd class="text-foreground" data-row-total>{{ answer.summary.total }}{% if answer.truncated %} (the first {{ answer.rows | length }} are shown){% endif %}</dd>
+            </div>
+            <div>
+                <dt class="text-muted-foreground">Recorded links this rests on</dt>
+                <dd class="text-foreground" data-citation-count>{{ answer.citations | length }}</dd>
+            </div>
+        </dl>
+        <p class="text-sm text-muted-foreground">Permanent address: <a class="underline" href="{{ answer.page_url }}" data-answer-link>{{ answer.page_url }}</a></p>
+    </section>
+
+    {% for reason in answer.reasons %}
+        {% if reason_words.get(reason) %}
+        <p role="status" class="rounded-lg border border-border bg-muted/30 p-4 text-sm text-foreground" data-reason="{{ reason }}">{{ reason_words[reason] }}</p>
+        {% endif %}
+    {% endfor %}
+
+    {% if not answer.rows %}
+        {% if kind == 'risk_propagation' %}
+            {{ empty_state(icon='shield-check', title='No open risk reaches this', description='Nothing in the risk register is recorded on this or on anything it depends on. That is what is recorded today, not a guarantee.') }}
+        {% else %}
+            {{ empty_state(icon='search', title='Nothing is recorded as depending on this yet', description='No connections lead from here. Nothing is missing: there is simply nothing recorded.') }}
+        {% endif %}
+    {% elif kind == 'risk_propagation' %}
+    {% call section_card(title='Risks') %}
+        <ul class="space-y-4" data-answer-rows>
+            {% for row in answer.rows %}
+            <li class="rounded-lg border border-border p-4 space-y-2" data-risk-id="{{ row.risk_id }}" data-indirect="{{ 'true' if row.indirect else 'false' }}">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <h3 class="min-w-0 break-words text-base font-semibold text-foreground">{{ row.title }}</h3>
+                    <span class="text-sm text-foreground">{{ row.risk_level | capitalize }} · score {{ row.risk_score }}</span>
+                </div>
+                <p class="text-sm text-foreground">
+                    {% if row.indirect %}Starts at <span class="font-medium">{{ name_of(answer, row.seeded_on_element_id) }}</span> and reaches this through:
+                    {% else %}Recorded directly on this.{% endif %}
+                </p>
+                {% if row.indirect %}
+                <p class="text-sm text-foreground" data-path>
+                    {% for element_id in row.path_elements | reverse %}{% if not loop.first %} <span class="text-muted-foreground" aria-hidden="true">→</span> {% endif %}<span class="font-medium">{{ name_of(answer, element_id) }}</span>{% endfor %}
+                </p>
+                {% endif %}
+                <p class="text-sm text-muted-foreground">{{ basis_badge(row.truth_class) }} · Owner: {{ row.owner or 'No owner recorded' }}</p>
+                <div class="text-sm" data-controls>
+                    {% if row.controls %}
+                    <p class="font-medium text-foreground">Controls on this path</p>
+                    <ul class="mt-1 space-y-1">
+                        {% for control in row.controls %}
+                        <li class="text-foreground" data-control-id="{{ control.control_id }}">{{ control.code or '—' }} {{ control.name or '' }}: {{ control.implementation_status | replace('_', ' ') }}{% if control.evidence_url_recorded or control.verified %}, evidence recorded{% else %}, no evidence recorded{% endif %}</li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted-foreground">No controls are recorded on this path.</p>
+                    {% endif %}
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    {% endcall %}
+    {% else %}
+    {% call section_card(title='Affected') %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm" data-answer-rows>
+                <caption class="sr-only">Everything affected, ranked by how many of the failing elements reach it</caption>
+                <thead>
+                    <tr class="text-left text-muted-foreground">
+                        <th scope="col" class="py-2 pr-4 font-medium">Element</th>
+                        {% if kind == 'set_impact' %}<th scope="col" class="py-2 pr-4 font-medium">Reached from</th>{% endif %}
+                        <th scope="col" class="py-2 pr-4 font-medium">Steps away</th>
+                        <th scope="col" class="py-2 pr-4 font-medium">Owner</th>
+                        <th scope="col" class="py-2 font-medium">Basis</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in answer.rows %}
+                    <tr class="border-t border-border" data-element-id="{{ row.element_id }}">
+                        <th scope="row" class="py-2 pr-4 text-left font-medium text-foreground">{{ name_of(answer, row.element_id) }}</th>
+                        {% if kind == 'set_impact' %}
+                        <td class="py-2 pr-4 text-foreground" data-seeds="{{ row.seed_ids | join(',') }}">
+                            {% for seed_id in row.seed_ids %}{{ name_of(answer, seed_id) }}{% if not loop.last %}, {% endif %}{% endfor %}
+                        </td>
+                        {% endif %}
+                        <td class="py-2 pr-4 text-foreground">{% if kind == 'set_impact' %}{{ row.depth }}{% else %}{{ row.relation.depth }}{% endif %}</td>
+                        <td class="py-2 pr-4 text-foreground">{{ owner_text(row) }}</td>
+                        <td class="py-2">{{ basis_badge(row.truth_class) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endcall %}
+    {% endif %}
+</div>
+{% endblock %}

@@ -87,6 +87,14 @@ NO_LICENCE_RECORDED_REASON = validate_reason_code("no_licence_recorded")
 # a measurement, so under_used is withheld with this reason instead.
 LICENCE_USAGE_NOT_SYNCED_REASON = validate_reason_code("licence_usage_not_synced")
 
+# R1-B30: set / filter blast radius and risk propagation reasons, and the
+# ceilings the combined answers are held to (seeds asked, rows kept).
+NO_SEED_ELEMENTS_REASON = validate_reason_code("no_seed_elements")
+SEED_LIMIT_REACHED_REASON = validate_reason_code("seed_limit_reached")
+ROWS_TRUNCATED_REASON = validate_reason_code("rows_truncated")
+SET_IMPACT_MAX_SEEDS = 25
+SET_IMPACT_MAX_ROWS = 1000
+
 # T-005 (D1): the NFR-5 measurement point is this exact, PINNED series --
 # never widened, never aggregated across label values.
 NFR5_QUERY = "cross_layer_impact"
@@ -1136,6 +1144,505 @@ class IntelligenceQueryService:
                 )
 
         return {"risks": risk_payloads, "reasons": [], "elements": all_elements}
+
+    # ------------------------------------------------------------------ #
+    # R1-B30: set / filter blast radius (TB-0037) and risk propagation
+    # (TB-0038). Both are built ON ``cross_layer_impact`` above -- the one
+    # canonical walk -- and never walk the graph themselves.
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def set_impact(
+        element_ids: Optional[Iterable[int]] = None,
+        *,
+        element_filter: Optional[Dict[str, Any]] = None,
+        include_derived: bool = True,
+        include_stale: bool = False,
+        max_depth: int = 3,
+        direction: str = "downstream",
+        with_owner: bool = True,
+    ) -> Dict[str, Any]:
+        """"What breaks if these fail together?": the combined, de-duplicated,
+        ranked blast radius of a set of elements, or of every element matching
+        a filter (``{"type": ..., "layer": ...}``).
+
+        Each seed is answered by ``cross_layer_impact`` (so the combined
+        answer is, by construction, the union of the single answers); an
+        element reached from several seeds is ONE row carrying every seed that
+        reaches it and every relation it was reached by. Rows are ranked by how
+        many of the failing seeds reach them (most first), then by distance,
+        then by name. A seed that does not resolve in the caller's organisation
+        is reported as unresolved exactly like one that never existed.
+        """
+        if direction not in VALID_DIRECTIONS:
+            raise ValueError(f"direction must be one of {sorted(VALID_DIRECTIONS)}")
+        if not (1 <= max_depth <= 10):
+            raise ValueError("max_depth must be between 1 and 10")
+
+        org_id = current_org_id()
+        base: Dict[str, Any] = {
+            "seed_element_ids": [],
+            "unresolved_seed_ids": [],
+            "rows": [],
+            "total": 0,
+            "truncated": False,
+            "summary": {
+                "seed_count": 0,
+                "resolved_seed_count": 0,
+                "row_count": 0,
+                "shared_row_count": 0,
+                "explicit_count": 0,
+                "derived_count": 0,
+                "stale_count": 0,
+                "derivation_state": "not_computed",
+            },
+            "reasons": [],
+            "elements": {},
+        }
+        if org_id is None:
+            base["reasons"] = [NO_TENANT_CONTEXT_REASON]
+            return base
+
+        from app.models import ArchiMateElement
+
+        seeds: List[int] = []
+        if element_filter is not None:
+            type_filter = element_filter.get("type")
+            layer_filter = element_filter.get("layer")
+            if not type_filter and not layer_filter:
+                raise ValueError("a filter needs an element type or a layer")
+            stmt = db.select(ArchiMateElement.id).where(ArchiMateElement.organization_id == org_id)
+            if type_filter:
+                stmt = stmt.where(ArchiMateElement.type == type_filter)
+            if layer_filter:
+                stmt = stmt.where(ArchiMateElement.layer == layer_filter)
+            seeds = list(
+                db.session.execute(
+                    stmt.order_by(ArchiMateElement.id).limit(SET_IMPACT_MAX_SEEDS + 1)
+                ).scalars()
+            )
+        for raw in element_ids or []:
+            if raw not in seeds:
+                seeds.append(raw)
+
+        reasons: List[str] = []
+        if len(seeds) > SET_IMPACT_MAX_SEEDS:
+            seeds = seeds[:SET_IMPACT_MAX_SEEDS]
+            reasons.append(SEED_LIMIT_REACHED_REASON)
+        if not seeds:
+            base["reasons"] = [NO_SEED_ELEMENTS_REASON]
+            return base
+
+        combined: Dict[int, Dict[str, Any]] = {}
+        resolved_seeds: List[int] = []
+        unresolved: List[int] = []
+        derivation_states: set = set()
+        elements: Dict[str, Dict[str, Any]] = {}
+
+        for seed in seeds:
+            single = IntelligenceQueryService.cross_layer_impact(
+                seed,
+                include_derived=include_derived,
+                include_stale=include_stale,
+                max_depth=max_depth,
+                direction=direction,
+                with_owner=False,
+            )
+            if ELEMENT_NOT_FOUND_REASON in (single.get("reasons") or []):
+                unresolved.append(seed)
+                continue
+            resolved_seeds.append(seed)
+            derivation_states.add(single["summary"]["derivation_state"])
+            elements.update(single.get("elements") or {})
+            for row in single["rows"]:
+                eid = row["element_id"]
+                entry = combined.get(eid)
+                if entry is None:
+                    entry = combined[eid] = {
+                        "element_id": eid,
+                        "is_seed": False,
+                        "seed_ids": [],
+                        "relations": [],
+                        "maturity": None,
+                        "health": None,
+                        "reason": None,
+                    }
+                if seed not in entry["seed_ids"]:
+                    entry["seed_ids"].append(seed)
+                relation = dict(row["relation"])
+                relation["from_seed"] = seed
+                entry["relations"].append(relation)
+                if entry["maturity"] is None and row.get("maturity") is not None:
+                    entry["maturity"] = row["maturity"]
+                if entry["health"] is None and row.get("health") is not None:
+                    entry["health"] = row["health"]
+                if entry["reason"] is None and row.get("reason"):
+                    entry["reason"] = row["reason"]
+
+        seed_set = set(resolved_seeds)
+        for entry in combined.values():
+            entry["is_seed"] = entry["element_id"] in seed_set
+            entry["seed_ids"].sort()
+            entry["seed_count"] = len(entry["seed_ids"])
+            entry["depth"] = min(rel["depth"] for rel in entry["relations"])
+
+        # Seed names are needed for the ranking and the page even when no row
+        # names them: one tenant-fenced batched select, never one per seed.
+        elements.update(_resolve_elements_batch(resolved_seeds, org_id))
+
+        def _name_key(entry: Dict[str, Any]) -> str:
+            return (_name_in(elements, entry["element_id"]) or "").lower()
+
+        ranked = sorted(
+            combined.values(),
+            key=lambda e: (-e["seed_count"], e["depth"], _name_key(e), e["element_id"]),
+        )
+        total = len(ranked)
+        truncated = total > SET_IMPACT_MAX_ROWS
+        if truncated:
+            ranked = ranked[:SET_IMPACT_MAX_ROWS]
+            reasons.append(ROWS_TRUNCATED_REASON)
+        for position, entry in enumerate(ranked, start=1):
+            entry["rank"] = position
+
+        # Owners for the kept rows only, in the same constant number of
+        # batched reads the single answer uses.
+        if with_owner and ranked:
+            ids = [e["element_id"] for e in ranked]
+            owners_by_element = _resolve_owners_batch(ids, org_id)
+            application_owners = _resolve_application_owners_batch(ids, org_id, elements)
+            for entry in ranked:
+                owner, _legacy = owners_by_element.get(entry["element_id"], (None, NO_OWNERSHIP_REASON))
+                owners = application_owners.get(entry["element_id"], [])
+                entry["owner"] = owner
+                entry["owners"] = owners
+                if not entry["reason"] and not (owners or owner):
+                    entry["reason"] = NO_OWNERSHIP_REASON
+        else:
+            for entry in ranked:
+                entry["owner"] = None
+                entry["owners"] = []
+
+        if not resolved_seeds:
+            reasons.append(ELEMENT_NOT_FOUND_REASON)
+        elif not combined:
+            reasons.append(NO_DATA_RECORDED_REASON)
+
+        if not derivation_states:
+            state = "not_computed"
+        elif derivation_states == {"current"}:
+            state = "current"
+        elif derivation_states == {"not_computed"}:
+            state = "not_computed"
+        elif "stale" in derivation_states:
+            state = "stale"
+        else:
+            state = "partial"
+
+        relation_kinds = [rel for e in combined.values() for rel in e["relations"]]
+        summary = {
+            "seed_count": len(seeds),
+            "resolved_seed_count": len(resolved_seeds),
+            "row_count": total,
+            "shared_row_count": sum(1 for e in combined.values() if e["seed_count"] > 1),
+            "explicit_count": sum(1 for rel in relation_kinds if rel["kind"] == "explicit"),
+            "derived_count": sum(1 for rel in relation_kinds if rel["kind"] == "derived"),
+            "stale_count": sum(1 for rel in relation_kinds if rel.get("stale")),
+            "derivation_state": state,
+        }
+        return {
+            "seed_element_ids": resolved_seeds,
+            "unresolved_seed_ids": unresolved,
+            "rows": ranked,
+            "total": total,
+            "truncated": truncated,
+            "summary": summary,
+            "reasons": reasons,
+            "elements": elements,
+        }
+
+    @staticmethod
+    def risk_propagation(
+        element_id: int,
+        *,
+        max_depth: int = 3,
+        include_derived: bool = False,
+    ) -> Dict[str, Any]:
+        """"Which risks reach <element> through what it depends on, along which
+        path, and which controls sit on that path?"
+
+        Direction: a risk recorded on something the element depends on (the
+        element's upstream in the one canonical walk) reaches the element, so
+        an indirect risk on a supplier shows on the business service that the
+        supplier serves. Risks come from the one risk register, read-only: a
+        risk seeded on an element (``Risk.archimate_element_id``) or linked to
+        an application (``RiskEntityLink`` with ``entity_type`` application,
+        whose ``entity_id`` is an ``ApplicationComponent`` id, resolved to its
+        element through ``ApplicationComponent.archimate_element_id``). Closed
+        risks do not propagate. Controls are the ``ApplicationComplianceControl``
+        mappings of the applications on the path, with their implementation
+        status and whether evidence is recorded -- a control is reported, not
+        assumed to mitigate.
+
+        Paths run over drawn relationships only unless ``include_derived`` is
+        set; a derived path says so on the row.
+        """
+        from app.models import ArchiMateElement
+        from app.models.application_compliance import ApplicationComplianceControl
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.compliance_models import ComplianceControl
+        from app.models.risk import Risk, RiskStatus
+        from app.models.risk_entity_link import RiskEntityLink
+
+        if not (1 <= max_depth <= 10):
+            raise ValueError("max_depth must be between 1 and 10")
+
+        org_id = current_org_id()
+        empty: Dict[str, Any] = {
+            "root_element_id": element_id,
+            "rows": [],
+            "total": 0,
+            "truncated": False,
+            "summary": {
+                "risk_count": 0,
+                "indirect_count": 0,
+                "direct_count": 0,
+                "highest_risk_level": None,
+                "derivation_state": "not_computed",
+            },
+            "reasons": [],
+            "elements": {},
+        }
+        if org_id is None:
+            return {**empty, "reasons": [NO_TENANT_CONTEXT_REASON]}
+
+        element = db.session.execute(
+            db.select(ArchiMateElement.id).where(
+                ArchiMateElement.id == element_id, ArchiMateElement.organization_id == org_id
+            )
+        ).scalar_one_or_none()
+        if element is None:
+            return {**empty, "reasons": [ELEMENT_NOT_FOUND_REASON]}
+
+        walk = IntelligenceQueryService.cross_layer_impact(
+            element_id,
+            include_derived=include_derived,
+            max_depth=max_depth,
+            direction="upstream",
+            with_owner=False,
+        )
+
+        def _preference(path: Dict[str, Any]) -> Tuple[int, int]:
+            # Shallowest first, a drawn path before a derived one.
+            return (path["depth"], 1 if path["kind"] == "derived" else 0)
+
+        # The best way each upstream element is reached from the root; the
+        # root itself is depth 0.
+        reach: Dict[int, Dict[str, Any]] = {
+            element_id: {
+                "depth": 0,
+                "chain_elements": [element_id],
+                "chain": [],
+                "kind": "direct",
+                "confidence": None,
+                "derived_id": None,
+            }
+        }
+        for row in walk["rows"]:
+            relation = row["relation"]
+            candidate = {
+                "depth": relation["depth"],
+                "chain_elements": list(relation.get("chain_elements") or [row["element_id"]]),
+                "chain": list(relation.get("chain") or []),
+                "kind": relation["kind"],
+                "confidence": relation.get("confidence"),
+                "derived_id": relation.get("derived_id"),
+            }
+            current = reach.get(row["element_id"])
+            if current is None or _preference(candidate) < _preference(current):
+                reach[row["element_id"]] = candidate
+
+        reached_ids = sorted(reach)
+
+        # Which risks reach the reached elements: seeded on the element itself,
+        # or linked to an application whose element is reached. The two id
+        # spaces (element id, application component id) are kept apart.
+        components = db.session.execute(
+            db.select(ApplicationComponent.id, ApplicationComponent.archimate_element_id).where(
+                ApplicationComponent.organization_id == org_id,
+                ApplicationComponent.archimate_element_id.in_(reached_ids),
+            )
+        ).all()
+        element_by_component: Dict[int, int] = {}
+        for component_id, mirrored_element_id in sorted(components):
+            element_by_component[component_id] = mirrored_element_id
+
+        links = []
+        if element_by_component:
+            links = db.session.execute(
+                db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_id).where(
+                    RiskEntityLink.organization_id == org_id,
+                    RiskEntityLink.entity_type == "application",
+                    RiskEntityLink.entity_id.in_(list(element_by_component)),
+                )
+            ).all()
+        linked_elements_by_risk: Dict[int, List[int]] = {}
+        for risk_id, component_id in links:
+            linked_elements_by_risk.setdefault(risk_id, []).append(element_by_component[component_id])
+
+        risks = (
+            db.session.execute(
+                db.select(Risk)
+                .where(
+                    Risk.organization_id == org_id,
+                    Risk.status != RiskStatus.CLOSED,
+                    db.or_(
+                        Risk.archimate_element_id.in_(reached_ids),
+                        Risk.id.in_(list(linked_elements_by_risk) or [-1]),
+                    ),
+                )
+                .order_by(Risk.id)
+            )
+            .scalars()
+            .all()
+        )
+
+        path_element_ids: set = set()
+        entries_by_risk: Dict[int, List[Dict[str, Any]]] = {}
+        for risk in risks:
+            entry_points: Dict[int, str] = {}
+            if risk.archimate_element_id in reach:
+                entry_points[risk.archimate_element_id] = "element"
+            for linked_element in linked_elements_by_risk.get(risk.id, []):
+                entry_points.setdefault(linked_element, "application_link")
+            entries = []
+            for entry_element, seeded_on in entry_points.items():
+                path = reach[entry_element]
+                entries.append(
+                    {
+                        "element_id": entry_element,
+                        "seeded_on": seeded_on,
+                        "depth": path["depth"],
+                        "path_elements": path["chain_elements"],
+                        "path_relationships": path["chain"],
+                        "path_kind": path["kind"],
+                        "path_confidence": path["confidence"],
+                        "path_derived_id": path["derived_id"],
+                    }
+                )
+            entries.sort(key=lambda e: (e["depth"], e["path_kind"] == "derived", e["element_id"]))
+            entries_by_risk[risk.id] = entries
+            if entries:
+                path_element_ids.update(entries[0]["path_elements"])
+
+        # Controls for every application on any entry path, in one read.
+        controls_by_element: Dict[int, List[Dict[str, Any]]] = {}
+        if path_element_ids:
+            path_components = db.session.execute(
+                db.select(ApplicationComponent.id, ApplicationComponent.archimate_element_id).where(
+                    ApplicationComponent.organization_id == org_id,
+                    ApplicationComponent.archimate_element_id.in_(sorted(path_element_ids)),
+                )
+            ).all()
+            element_of_component: Dict[int, int] = {}
+            for component_id, mirrored_element_id in sorted(path_components):
+                element_of_component[component_id] = mirrored_element_id
+            if element_of_component:
+                control_rows = db.session.execute(
+                    db.select(ApplicationComplianceControl, ComplianceControl)
+                    .outerjoin(
+                        ComplianceControl,
+                        ComplianceControl.id == ApplicationComplianceControl.control_id,
+                    )
+                    .where(
+                        ApplicationComplianceControl.organization_id == org_id,
+                        ApplicationComplianceControl.application_id.in_(list(element_of_component)),
+                    )
+                    .order_by(ApplicationComplianceControl.id)
+                    .limit(IntelligenceQueryService._COMPLIANCE_LIMIT)
+                ).all()
+                for mapping, control in control_rows:
+                    status = mapping.implementation_status
+                    applies_to = element_of_component[mapping.application_id]
+                    controls_by_element.setdefault(applies_to, []).append(
+                        {
+                            "control_id": mapping.control_id,
+                            "code": control.control_code if control else None,
+                            "name": control.title if control else None,
+                            "applies_to_element_id": applies_to,
+                            "implementation_status": status,
+                            "implemented": status in ("implemented", "verified"),
+                            "evidence_url_recorded": bool((mapping.evidence_url or "").strip()),
+                            "verified": mapping.verified_date is not None,
+                        }
+                    )
+
+        rows: List[Dict[str, Any]] = []
+        for risk in risks:
+            entries = entries_by_risk[risk.id]
+            if not entries:
+                continue
+            best = entries[0]
+            controls: List[Dict[str, Any]] = []
+            for path_element in best["path_elements"]:
+                controls.extend(controls_by_element.get(path_element, []))
+            rows.append(
+                {
+                    "risk_id": risk.id,
+                    "title": risk.title,
+                    "status": risk.status.value if risk.status else None,
+                    "likelihood": risk.likelihood,
+                    "impact": risk.impact,
+                    "risk_score": risk.risk_score,
+                    "risk_level": risk.risk_level,
+                    "owner": risk.owner,
+                    "mitigation_plan": risk.mitigation_plan,
+                    "indirect": best["depth"] > 0,
+                    "seeded_on_element_id": best["element_id"],
+                    "seeded_on": best["seeded_on"],
+                    "depth": best["depth"],
+                    "path_elements": best["path_elements"],
+                    "path_relationships": best["path_relationships"],
+                    "path_kind": best["path_kind"],
+                    "path_confidence": best["path_confidence"],
+                    "path_derived_id": best["path_derived_id"],
+                    "other_entry_points": len(entries) - 1,
+                    "controls": controls,
+                    "implemented_control_count": sum(1 for c in controls if c["implemented"]),
+                }
+            )
+
+        rows.sort(key=lambda r: (-r["risk_score"], r["depth"], r["risk_id"]))
+        total = len(rows)
+        truncated = total > SET_IMPACT_MAX_ROWS
+        reasons: List[str] = []
+        if truncated:
+            rows = rows[:SET_IMPACT_MAX_ROWS]
+            reasons.append(ROWS_TRUNCATED_REASON)
+        if not rows:
+            reasons.append(NO_RISK_RECORDED_REASON)
+
+        elements = _resolve_elements_batch(
+            {eid for r in rows for eid in r["path_elements"]} | {element_id}, org_id
+        )
+        level_order = ["low", "medium", "high", "critical"]
+        levels = [r["risk_level"] for r in rows]
+        summary = {
+            "risk_count": total,
+            "indirect_count": sum(1 for r in rows if r["indirect"]),
+            "direct_count": sum(1 for r in rows if not r["indirect"]),
+            "highest_risk_level": max(levels, key=level_order.index) if levels else None,
+            "derivation_state": walk["summary"]["derivation_state"] if include_derived else "not_used",
+        }
+        return {
+            "root_element_id": element_id,
+            "rows": rows,
+            "total": total,
+            "truncated": truncated,
+            "summary": summary,
+            "reasons": reasons,
+            "elements": elements,
+        }
 
     @staticmethod
     def portfolio_component_for_element(element_id: int) -> Dict[str, Any]:
