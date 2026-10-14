@@ -51,14 +51,33 @@ ESCALATING_FILES = (
     "app/config.py",
     "app/__init__.py",
     "manage.py",
-    ".github/workflows/ci.yml",
+    "tests/schema_baseline.json",
+    "tests/shard_durations.json",
+    ".coveragerc",
+    "ruff.toml",
+    "scripts/deploy_workflow.py",
+    "scripts/route_verification_audit.py",
+    "package.json",
+    "package-lock.json",
 )
 ESCALATING_PREFIXES = (
     "migrations/",
     "app/_bootstrap/",
+    "app/config/",
+    "app/extensions/",
     "scripts/ci/",
+    "tests/fixtures/",
+    ".github/workflows/",
 )
-ESCALATING_PATTERNS = (re.compile(r"^requirements[^/]*\.txt$"),)
+ESCALATING_PATTERNS = (
+    re.compile(r"^requirements[^/]*\.txt$"),
+    re.compile(r"^tests/_[^/]*\.py$"),
+    re.compile(r"(^|/)Dockerfile[^/]*$"),
+    re.compile(r"^docker-compose[^/]*\.ya?ml$"),
+)
+
+# Changes under these roots count as source changes whatever their file type.
+SOURCE_ROOTS = ("app/", "migrations/", "scripts/")
 
 # More source files than this changed and fewer test files than the minimum were
 # selected: the import map is too thin to trust, so run the full suite.
@@ -155,6 +174,19 @@ def _imports_into(names: set[str], packages: set[str]) -> bool:
     return any(n == p or n.startswith(p + ".") for n in names for p in packages)
 
 
+def tests_importing(modules: set[str], base: Path) -> list[str]:
+    """Test files that import any of the dotted module names."""
+    found = []
+    for rel in list_test_files(base):
+        try:
+            source = (base / rel).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if imported_names(source, module_name(rel) or rel) & modules:
+            found.append(rel)
+    return found
+
+
 def select_tests(changed: list[str], root: Path | str = ".") -> list[str]:
     """Test files affected by the changed paths (posix, relative to root)."""
     base = Path(root)
@@ -190,12 +222,28 @@ def select_tests(changed: list[str], root: Path | str = ".") -> list[str]:
 
 
 def source_files(changed: list[str]) -> list[str]:
-    """Changed python files that are not tests."""
+    """Changed non-test files under the application, migration and script roots,
+    of any type: templates, static files, SQL and YAML count as well as Python."""
     return [
         p for p in changed
-        if p.endswith(".py") and not p.startswith("tests/") and "/tests/" not in p
+        if p.startswith(SOURCE_ROOTS) and "/tests/" not in p
         and not p.rsplit("/", 1)[-1].startswith("test_")
     ]
+
+
+def untested_application_files(changed: list[str], selected: list[str]) -> list[str]:
+    """Non-Python files under app/ that no selected test can be tied to.
+
+    A module's non-Python files (templates, static files) select that module's
+    tests through the module mapping; anywhere else under app/ there is no
+    mapping, so the change must not pass with nothing selected.
+    """
+    if selected:
+        return []
+    return sorted(
+        p for p in changed
+        if p.startswith("app/") and not p.endswith(".py") and "/tests/" not in p
+    )
 
 
 def escalating(changed: list[str]) -> list[str]:
@@ -205,17 +253,27 @@ def escalating(changed: list[str]) -> list[str]:
         if (
             path in ESCALATING_FILES
             or path.startswith(ESCALATING_PREFIXES)
-            or any(pattern.match(path) for pattern in ESCALATING_PATTERNS)
+            or any(pattern.search(path) for pattern in ESCALATING_PATTERNS)
         ):
             hits.append(path)
     return sorted(hits)
 
 
-def escalation_reason(changed: list[str], selected: list[str]) -> str:
+def escalation_reason(changed: list[str], selected: list[str], root: Path | str = ".") -> str:
     """Why the full suite must run instead of the fast lane, or an empty string."""
     hits = escalating(changed)
     if hits:
         return "shared wiring changed: " + ", ".join(hits[:5]) + (" ..." if len(hits) > 5 else "")
+    helpers = [
+        p for p in changed
+        if p.startswith("scripts/") and p.endswith(".py") and module_name(p)
+        and tests_importing({module_name(p)}, Path(root))
+    ]
+    if helpers:
+        return "scripts that tests import changed: " + ", ".join(sorted(helpers)[:5])
+    orphans = untested_application_files(changed, selected)
+    if orphans:
+        return "application files changed that no test is tied to: " + ", ".join(orphans[:5])
     sources = source_files(changed)
     if len(sources) > WIDE_CHANGE_SOURCE_FILES and len(selected) < WIDE_CHANGE_MIN_TESTS:
         return (
@@ -239,12 +297,13 @@ def browsers_needed(files: list[str], root: Path | str = ".") -> list[str]:
 
 
 def changed_files(base_ref: str, head: str = "HEAD") -> list[str]:
-    """Files the pull request adds, copies, modifies or renames against the merge base."""
+    """Every path the pull request touches against the merge base, deleted files
+    and both sides of a rename included (renames are reported as a delete plus an add)."""
     result = subprocess.run(
-        ["git", "diff", "--name-only", "--diff-filter=ACMR", f"{base_ref}...{head}"],
+        ["git", "diff", "-z", "--name-only", "--no-renames", f"{base_ref}...{head}"],
         capture_output=True, text=True, check=True,
     )
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    return [path for path in result.stdout.split("\0") if path]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -270,7 +329,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.escalate:
         print(escalation_reason(changed, selected))
         return 0
-    print("\n".join(selected))
+    if selected:
+        print("\n".join(selected))
     return 0
 
 

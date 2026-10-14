@@ -175,3 +175,18 @@ def test_the_shards_deselect_and_the_quarantine_job_selects():
         needs = job.get("needs", [])
         needs = [needs] if isinstance(needs, str) else needs
         assert "quarantine-tests" not in needs, job_id
+
+
+def test_a_non_empty_accepted_list_deselects_through_the_whole_pipeline(monkeypatch, tmp_path):
+    # The path a real pull-request run takes: base list, the PR's copy, resolve, then the plugin.
+    monkeypatch.setattr(q, "_git_show", lambda ref, path: "tests/test_a.py::test_flaky  # timing flake\n")
+    mine = tmp_path / "mine.txt"
+    mine.write_text("tests/test_a.py::test_flaky  # timing flake\n", encoding="utf-8")
+    accepted = tmp_path / "accepted.txt"
+    assert q.resolve("origin/main", accepted, mine) == []
+    monkeypatch.setenv("CI_QUARANTINE_FILE", str(accepted))
+    for mode, expected in (("exclude", ["tests/test_a.py::test_solid"]), ("only", ["tests/test_a.py::test_flaky"])):
+        monkeypatch.setenv("CI_QUARANTINE_MODE", mode)
+        items = [_Item("tests/test_a.py::test_flaky"), _Item("tests/test_a.py::test_solid")]
+        q.pytest_collection_modifyitems(_Config(), items)
+        assert [i.nodeid for i in items] == expected

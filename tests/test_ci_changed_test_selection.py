@@ -167,3 +167,89 @@ def test_the_command_prints_one_path_per_line(tmp_path, capsys, monkeypatch):
     monkeypatch.chdir(root)
     assert sel.main(["--files", "app/x.py"]) == 0
     assert capsys.readouterr().out.split() == ["tests/test_x.py"]
+
+
+def test_an_empty_selection_prints_nothing_at_all(tmp_path, capsys, monkeypatch):
+    # A single newline would leave a one-byte file that looks non-empty to the workflow.
+    monkeypatch.chdir(_tree(tmp_path, {"docs/note.md": "x\n"}))
+    assert sel.main(["--files", "docs/note.md"]) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_the_workflow_tests_for_real_content_not_file_size():
+    text = (Path(__file__).resolve().parent.parent / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "if ! grep -q . fast-tests.txt" in text
+    assert "[ ! -s fast-tests.txt ]" not in text
+
+
+def test_non_python_source_files_count_toward_a_wide_change():
+    changed = [f"app/templates/page{i}.html" for i in range(8)] + [f"app/static/a{i}.css" for i in range(8)]
+    assert len(sel.source_files(changed)) == 16
+    assert "16 source files" in sel.escalation_reason(changed, ["tests/test_x.py"])
+
+
+def test_non_python_application_files_never_pass_with_nothing_selected():
+    reason = sel.escalation_reason(["app/templates/page.html"], [])
+    assert "no test is tied to" in reason
+    assert sel.escalation_reason(["app/templates/page.html"], ["tests/test_page.py"]) == ""
+
+
+def test_a_module_template_selects_the_modules_tests(tmp_path):
+    root = _tree(tmp_path, {
+        "app/modules/billing/templates/invoice.html": "<p></p>\n",
+        "app/modules/billing/tests/test_invoice.py": "def test(): pass\n",
+    })
+    assert sel.select_tests(["app/modules/billing/templates/invoice.html"], root) == [
+        "app/modules/billing/tests/test_invoice.py"
+    ]
+
+
+def test_documentation_changes_need_no_tests():
+    assert sel.escalation_reason(["docs/guide.md", "README.md"], []) == ""
+
+
+@pytest.mark.parametrize("path", [
+    "app/config/base.py", "app/extensions/db.py", "tests/_helpers.py", "tests/fixtures/org.json",
+    "tests/schema_baseline.json", "tests/shard_durations.json", ".coveragerc", "ruff.toml",
+    ".github/workflows/deploy.yml", "scripts/deploy_workflow.py", "scripts/route_verification_audit.py",
+    "package.json", "Dockerfile", "docker/Dockerfile.worker",
+])
+def test_more_shared_wiring_forces_the_full_suite(path):
+    assert sel.escalation_reason([path], ["tests/test_x.py"])
+
+
+def test_a_script_that_tests_import_forces_the_full_suite(tmp_path):
+    root = _tree(tmp_path, {
+        "scripts/helper.py": "",
+        "scripts/lonely.py": "",
+        "tests/test_uses_helper.py": "from scripts import helper\n",
+    })
+    assert "scripts that tests import" in sel.escalation_reason(["scripts/helper.py"], [], root)
+    assert sel.escalation_reason(["scripts/lonely.py"], [], root) == ""
+
+
+def test_deleted_and_renamed_paths_are_reported(tmp_path):
+    import subprocess
+
+    def git(*args):
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=tmp_path, check=True,
+                       capture_output=True)
+
+    git("init", "-q", "-b", "main")
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "old name.py").write_text("x = 1\n" * 20, encoding="utf-8")
+    (tmp_path / "app" / "gone.py").write_text("y = 1\n" * 20, encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "base")
+    git("checkout", "-q", "-b", "topic")
+    git("mv", "app/old name.py", "app/new.py")
+    git("rm", "-q", "app/gone.py")
+    git("commit", "-q", "-am", "change")
+    cwd = Path.cwd()
+    import os
+
+    os.chdir(tmp_path)
+    try:
+        assert sorted(sel.changed_files("main")) == ["app/gone.py", "app/new.py", "app/old name.py"]
+    finally:
+        os.chdir(cwd)

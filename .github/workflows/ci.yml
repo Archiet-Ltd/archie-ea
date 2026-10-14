@@ -24,6 +24,10 @@ name: CI
 # on workflow_dispatch, and on a pull request that carries the `full-ci` label
 # (adding the label triggers it; every later push to that pull request runs it
 # again). A pull request is merged only after the full run on its final head.
+# Known quirk: a run started by the `labeled` event waits in the same concurrency
+# group as the run it follows, and a newer pending run replaces an older pending
+# one. If the full run never appears after `full-ci` is added, remove and re-add
+# the label; until a full run exists the merge gate sees 0 of 8 shards.
 # The lane is decided once, in the `changes` job; a job that needs the full suite
 # tests for `lane != 'fast'`, so an unanswered question runs everything.
 on:
@@ -599,7 +603,7 @@ jobs:
     timeout-minutes: 40
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:16
+        image: mirror.gcr.io/library/postgres:16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: archie_test
@@ -656,13 +660,13 @@ jobs:
             SELECTOR=scripts/ci/changed_test_selection.py
           fi
           python -I "$SELECTOR" --base "$BASE" > fast-tests.txt
-          wc -l fast-tests.txt
+          grep -c . fast-tests.txt || true
           cat fast-tests.txt
           mapfile -t files < fast-tests.txt
           echo "browsers=$(python -I "$SELECTOR" --browsers "${files[@]}")" >> "$GITHUB_OUTPUT"
           {
             echo "### Fast lane"
-            echo "$(wc -l < fast-tests.txt) test files selected. The full suite runs when the pull request carries the full-ci label."
+            echo "$(grep -c . fast-tests.txt || true) test files selected. The full suite runs when the pull request carries the full-ci label."
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Install the browsers the selected tests name
         # Chromium always; Firefox and WebKit only when a selected file names
@@ -709,7 +713,7 @@ jobs:
           fi
       - name: Run the selected tests
         run: |
-          if [ ! -s fast-tests.txt ]; then
+          if ! grep -q . fast-tests.txt; then
             echo "No test file is affected by this change."
             exit 0
           fi
@@ -733,7 +737,7 @@ jobs:
     runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:16
+        image: mirror.gcr.io/library/postgres:16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: archie_test
