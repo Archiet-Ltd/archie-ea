@@ -420,7 +420,7 @@ jobs:
       # same-repository runs (default 6 when the variable is unset).
       # GitHub-hosted runners (forked PRs) have no such limit, so all eight
       # shards start together there.
-      max-parallel: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && 8 || vars.CI_SHARD_MAX_PARALLEL || 6) || 8 }}
+      max-parallel: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && 8 || fromJSON(vars.CI_SHARD_MAX_PARALLEL || '6')) || 8 }}
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     services:
