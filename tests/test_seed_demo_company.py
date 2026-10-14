@@ -98,7 +98,7 @@ def test_seed_creates_organisation_and_exits_zero(app, db_session, make_org):
     assert stats["risks_created"] == 10
     assert stats["programmes_created"] == 5
     assert stats["work_packages_created"] == 12
-    assert stats["plateaus_created"] == 5
+    assert stats["plateaus_created"] == 3
     assert stats["gaps_created"] == 10
     assert stats["demo_user_created"] == 1
 
@@ -139,7 +139,7 @@ def test_seed_creates_organisation_and_exits_zero(app, db_session, make_org):
     assert len(wp_orgs) == 1 and wp_orgs[0][0] == org_id, (
         f"all seeded work packages must carry org_id={org_id}, got {wp_orgs}"
     )
-    assert counts["plateaus"] == 5
+    assert counts["plateaus"] == 3
     assert counts["gaps"] == 10
     assert counts["users"] >= 17  # demo user + 16 owner users
 

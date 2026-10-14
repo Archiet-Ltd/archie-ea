@@ -222,6 +222,7 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         _resolve_apps,
         _resolve_caps,
         _resolve_elements,
+        _resolve_users,
     )
     from app.jobs.tenant_safe_job import tenant_scope
 
@@ -234,6 +235,7 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         elements = _resolve_elements(org_id)
         apps = _resolve_apps(org_id)
         caps = _resolve_caps(org_id)
+        users = _resolve_users(org_id)
 
         # ── ARB review items (arb.dashboard / arb.reviews read ARBReviewItem) ──
         # Round 2 (MP-B1): the hero capture moved from arb.dashboard to
@@ -244,49 +246,144 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         # volume (20/page) instead of a single screenful.
         from app.models.architecture_review_board import ARBReviewItem
 
+        # Each item now carries a one- or two-sentence description
+        # specific to its own title (the queue already had a real depth,
+        # but every item still read "No description"), and submitter_id
+        # rotates across ten existing cast members by subject -- infrastructure to
+        # Sage ITOps, supplier items to Taylor Procurement, calibration
+        # standards to Blake Quality, and others from the cast at
+        # app/commands/seed_demo_company.py's own _OWNER_USERS -- instead of
+        # every item reading "Demo User".
         _arb_titles = [
-            ("Migrate event backbone to a managed message broker", "architecture_change"),
-            ("Consolidate supplier onboarding into Supplier Portal", "architecture_change"),
-            ("Adopt predictive maintenance for field service", "architecture_change"),
-            ("Retire the manual inventory reconciliation spreadsheet", "architecture_change"),
-            ("Standardise calibration rig firmware update process", "standard"),
-            ("Adopt a shared API gateway for field service integrations", "architecture_change"),
-            ("Introduce a canonical customer identifier across billing and CRM", "standard"),
-            ("Replace the legacy EDI gateway with managed file transfer", "architecture_change"),
-            ("Consolidate three ticketing tools into one service desk", "solution"),
-            ("Add a calibration rig telemetry data lake", "architecture_change"),
-            ("Change request: extend warranty tracking to field kits", "change_request"),
-            ("Adopt single sign-on across all customer-facing portals", "standard"),
-            ("Decommission the on-premises fax gateway", "change_request"),
-            ("Introduce event-driven inventory reconciliation", "architecture_change"),
-            ("Adopt a shared vendor risk scoring standard", "standard"),
-            ("Migrate the calibration ledger to the managed database tier", "solution"),
-            ("Change request: add multi-currency support to contracts", "change_request"),
-            ("Retire the spreadsheet-based capacity planning process", "architecture_change"),
-            ("Adopt a common logging and tracing standard for field apps", "standard"),
-            ("Consolidate supplier onboarding forms into one intake flow", "solution"),
-            ("Change request: shorten the calibration certificate renewal window", "change_request"),
-            ("Introduce a real-time parts availability feed", "architecture_change"),
-            ("Adopt a shared incident severity classification standard", "standard"),
-            ("Replace manual contract renewal reminders with automated alerts", "solution"),
-            ("Change request: add offline mode to the field engineer app", "change_request"),
-            ("Consolidate calibration certificate templates into one standard", "standard"),
-            ("Adopt a managed queue for supplier status webhooks", "architecture_change"),
-            ("Retire the duplicate document management instance", "architecture_change"),
+            ("Migrate event backbone to a managed message broker", "architecture_change",
+             "Moves event traffic between calibration rigs and the ledger off the "
+             "self-hosted broker onto a managed service, so a broker outage no "
+             "longer needs an on-call page.", "sage.itops@lantern-quay.example.com"),
+            ("Consolidate supplier onboarding into Supplier Portal", "architecture_change",
+             "Brings the three separate supplier intake spreadsheets into the "
+             "Supplier Portal, so every new vendor goes through the same checks "
+             "before their first purchase order.", "taylor.procurement@lantern-quay.example.com"),
+            ("Adopt predictive maintenance for field service", "architecture_change",
+             "Uses sensor telemetry from deployed field testers to schedule "
+             "maintenance before a unit fails, rather than on a fixed calendar.",
+             "ivo.reed@lantern-quay.example.com"),
+            ("Retire the manual inventory reconciliation spreadsheet", "architecture_change",
+             "Replaces the monthly manual stock count spreadsheet with the "
+             "inventory reconciliation tool now live in the warehouse.",
+             "casey.inventory@lantern-quay.example.com"),
+            ("Standardise calibration rig firmware update process", "standard",
+             "Gives every calibration rig the same firmware update procedure, "
+             "closing the gap where two depots were running different rig "
+             "firmware versions.", "blake.quality@lantern-quay.example.com"),
+            ("Adopt a shared API gateway for field service integrations", "architecture_change",
+             "Puts every field service integration behind one gateway, instead "
+             "of the handful of direct point-to-point connections added over "
+             "the last two years.", "sage.itops@lantern-quay.example.com"),
+            ("Introduce a canonical customer identifier across billing and CRM", "standard",
+             "Gives each customer one identifier shared by billing and the CRM, "
+             "closing the mismatch that currently needs a manual reconciliation "
+             "each month.", "drew.dataanalyst@lantern-quay.example.com"),
+            ("Replace the legacy EDI gateway with managed file transfer", "architecture_change",
+             "Moves supplier EDI exchanges off the gateway that only one "
+             "engineer still knows how to operate, onto a managed file "
+             "transfer service.", "sage.itops@lantern-quay.example.com"),
+            ("Consolidate three ticketing tools into one service desk", "solution",
+             "Merges the separate IT, facilities and field service ticketing "
+             "tools into a single service desk, so a request no longer gets "
+             "lost between systems.", "finley.support@lantern-quay.example.com"),
+            ("Add a calibration rig telemetry data lake", "architecture_change",
+             "Collects calibration rig telemetry in one data lake, so "
+             "engineering can run trend analysis that today needs exporting "
+             "each rig's logs by hand.", "blake.quality@lantern-quay.example.com"),
+            ("Change request: extend warranty tracking to field kits", "change_request",
+             "Extends the existing warranty tracker, currently scoped to fixed "
+             "equipment, to cover the handheld field test kits now in "
+             "circulation.", "jordan.fieldeng@lantern-quay.example.com"),
+            ("Adopt single sign-on across all customer-facing portals", "standard",
+             "Brings every customer-facing portal under one sign-on, removing "
+             "the separate password resets each portal currently manages on "
+             "its own.", "sage.itops@lantern-quay.example.com"),
+            ("Decommission the on-premises fax gateway", "change_request",
+             "Retires the on-premises fax gateway that now carries fewer than "
+             "ten transmissions a month, once the two remaining suppliers that "
+             "use it confirm email receipt instead.", "sage.itops@lantern-quay.example.com"),
+            ("Introduce event-driven inventory reconciliation", "architecture_change",
+             "Replaces the nightly batch stock reconciliation with an "
+             "event-driven update each time a part moves, closing the same-day "
+             "visibility gap.", "casey.inventory@lantern-quay.example.com"),
+            ("Adopt a shared vendor risk scoring standard", "standard",
+             "Applies one risk scoring method to every supplier at onboarding "
+             "and renewal, instead of each procurement category scoring risk "
+             "its own way.", "taylor.procurement@lantern-quay.example.com"),
+            ("Migrate the calibration ledger to the managed database tier", "solution",
+             "Moves the calibration ledger database onto the managed tier the "
+             "rest of the estate already runs on, ending its separate backup "
+             "and patching schedule.", "blake.quality@lantern-quay.example.com"),
+            ("Change request: add multi-currency support to contracts", "change_request",
+             "Adds multi-currency fields to the contract record, needed now "
+             "that two of the newer suppliers invoice in euros rather than "
+             "sterling.", "taylor.procurement@lantern-quay.example.com"),
+            ("Retire the spreadsheet-based capacity planning process", "architecture_change",
+             "Replaces the shared capacity planning spreadsheet, which three "
+             "teams currently edit by hand each week, with the programme's own "
+             "planning view.", "ivo.reed@lantern-quay.example.com"),
+            ("Adopt a common logging and tracing standard for field apps", "standard",
+             "Gives every field application the same logging and tracing "
+             "format, so a field incident can be traced across apps instead of "
+             "app by app.", "sage.itops@lantern-quay.example.com"),
+            ("Consolidate supplier onboarding forms into one intake flow", "solution",
+             "Merges the separate finance, legal and procurement intake forms "
+             "a new supplier currently fills in three times into one flow.",
+             "taylor.procurement@lantern-quay.example.com"),
+            ("Change request: shorten the calibration certificate renewal window", "change_request",
+             "Shortens the calibration certificate renewal window from 90 to "
+             "60 days, matching what two major customers now require in "
+             "contract.", "blake.quality@lantern-quay.example.com"),
+            ("Introduce a real-time parts availability feed", "architecture_change",
+             "Gives field engineers a real-time feed of parts availability at "
+             "each depot, replacing the end-of-day stock report they currently "
+             "work from.", "casey.inventory@lantern-quay.example.com"),
+            ("Adopt a shared incident severity classification standard", "standard",
+             "Applies one severity classification to every incident, closing "
+             "the gap where field service and IT currently label the same "
+             "kind of outage differently.", "finley.support@lantern-quay.example.com"),
+            ("Replace manual contract renewal reminders with automated alerts", "solution",
+             "Replaces the manually maintained renewal reminder spreadsheet "
+             "with automated alerts sent ahead of each contract's expiry.",
+             "taylor.procurement@lantern-quay.example.com"),
+            ("Change request: add offline mode to the field engineer app", "change_request",
+             "Adds an offline mode to the field engineer app, needed for the "
+             "depots where mobile coverage regularly drops during a "
+             "calibration visit.", "jordan.fieldeng@lantern-quay.example.com"),
+            ("Consolidate calibration certificate templates into one standard", "standard",
+             "Reduces the five calibration certificate templates in use today "
+             "to one standard template, aligned to the latest accreditation "
+             "requirements.", "blake.quality@lantern-quay.example.com"),
+            ("Adopt a managed queue for supplier status webhooks", "architecture_change",
+             "Moves supplier status webhook delivery onto a managed queue, so "
+             "a slow supplier endpoint no longer blocks the next webhook in "
+             "line.", "sage.itops@lantern-quay.example.com"),
+            ("Retire the duplicate document management instance", "architecture_change",
+             "Retires the second Document Management instance stood up during "
+             "the acquisition, once its records are confirmed migrated to the "
+             "primary system.", "avery.compliance@lantern-quay.example.com"),
         ]
         _arb_cycle = [
             ("submitted", "high"), ("under_review", "medium"), ("approved", "high"),
             ("rejected", "low"), ("approved_with_conditions", "medium"), ("deferred", "low"),
             ("submitted", "critical"), ("under_review", "high"),
         ]
-        for i, (title, review_type) in enumerate(_arb_titles):
+        for i, (title, review_type, description, submitter_email) in enumerate(_arb_titles):
             number = f"REV-2026-{i + 1:03d}"
             if ARBReviewItem.query.filter_by(review_number=number).first():
                 continue
             status, priority = _arb_cycle[i % len(_arb_cycle)]
+            submitter = users.get(submitter_email)
             db.session.add(ARBReviewItem(
                 review_number=number, title=title, review_type=review_type,
-                status=status, priority=priority, submitter_id=demo_user_id,
+                description=description,
+                status=status, priority=priority,
+                submitter_id=submitter.id if submitter else demo_user_id,
                 submitted_at=_dt.datetime.utcnow() - _dt.timedelta(days=90 - i * 2),
             ))
         db.session.flush()
@@ -330,22 +427,60 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             ))
         db.session.flush()
 
-        # ── Saved ArchiMate diagrams (archimate.diagrams_library, and -- round
-        #    2, MP-B1 -- archimate.composer_page with ?viewpoint_id=<id>) ────
-        # Round 1's capture showed the library's list of names, not a
-        # rendered diagram, because every element here sat at the model's
-        # default position (0, 0) -- opening any of these in the Composer
-        # would stack every box on top of the last. Positions below are laid
-        # out on an explicit grid so the Composer has something real to draw.
-        from app.models.archimate_core import SavedDiagram, SavedDiagramElement
+        # ── Saved ArchiMate diagrams (archimate.diagrams_library, and
+        #    archimate.composer_page with ?viewpoint_id=<id>) ────────────────
+        # Elements are laid out on an explicit grid, not left at the model's
+        # default (0, 0), so the Composer has something real to draw. The
+        # hero diagram's own elements are chosen by name -- a real, connected
+        # cluster spanning the business, application and technology layers
+        # around the calibration ledger -- laid out in layer rows, and every
+        # ArchiMateRelationship joining two of them gets a
+        # SavedDiagramRelationship so the composer actually draws the
+        # connecting lines. The other two saved diagrams keep a generic
+        # "first 9 elements" grid.
+        from app.models import ArchiMateRelationship
+        from app.models.archimate_core import (
+            SavedDiagram,
+            SavedDiagramElement,
+            SavedDiagramRelationship,
+        )
 
         diagram_names = [
             "Calibration estate overview",
             "Event backbone target state",
             "Supplier integration landscape",
         ]
-        element_ids = [el.id for el in list(elements.values())[:9]]
         _diagrams_hero_name = diagram_names[0]
+
+        # Layer rows, top to bottom: business, application, technology.
+        # Width 220 (>= the brief's 200 floor) and 300px horizontal spacing
+        # (>= the 280 floor) so a two-line name never overprints the type
+        # label the way it did at the old 180px/260px grid.
+        _hero_layers = [
+            ("Evaluate calibration", "Validate measurement accuracy",
+             "Compute drift trend", "Generate calibration certificate"),
+            ("Calibration Ledger", "Calibration Lookup", "Calibration result"),
+            ("Relational Database", "Quay Compute Pool", "Database Engine"),
+        ]
+        _hero_element_names = [name for row in _hero_layers for name in row]
+        # (source name, target name, relationship type) -- every one of
+        # these is a real row _RELATIONSHIPS already seeds; none invented
+        # here. 11 pairs, comfortably over the brief's floor of 8.
+        _hero_relationship_pairs = [
+            ("Calibration Ledger", "Evaluate calibration", "Assignment"),
+            ("Calibration Ledger", "Evaluate calibration", "Serving"),
+            ("Evaluate calibration", "Calibration result", "Access"),
+            ("Calibration Ledger", "Calibration Lookup", "Realization"),
+            ("Calibration Ledger", "Validate measurement accuracy", "Serving"),
+            ("Calibration Ledger", "Compute drift trend", "Serving"),
+            ("Calibration Ledger", "Generate calibration certificate", "Serving"),
+            ("Relational Database", "Calibration Ledger", "Serving"),
+            ("Quay Compute Pool", "Relational Database", "Realization"),
+            ("Database Engine", "Relational Database", "Assignment"),
+            ("Validate measurement accuracy", "Calibration result", "Access"),
+        ]
+        _other_element_ids = [el.id for el in list(elements.values())[:9]]
+
         for name in diagram_names:
             diagram = SavedDiagram.query.filter_by(name=name).first()
             if diagram is not None:
@@ -353,27 +488,96 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             diagram = SavedDiagram(name=name, created_by_id=demo_user_id)
             db.session.add(diagram)
             db.session.flush()
-            for i, element_id in enumerate(element_ids):
-                db.session.add(SavedDiagramElement(
-                    diagram_id=diagram.id, element_id=element_id,
-                    position_x=80 + (i % 3) * 260, position_y=80 + (i // 3) * 160,
-                ))
+            if name == _diagrams_hero_name:
+                for row_index, row_names in enumerate(_hero_layers):
+                    for col_index, el_name in enumerate(row_names):
+                        el = elements.get(el_name)
+                        if el is None:
+                            continue
+                        db.session.add(SavedDiagramElement(
+                            diagram_id=diagram.id, element_id=el.id,
+                            position_x=80 + col_index * 300,
+                            position_y=80 + row_index * 220,
+                            width=220, height=80,
+                        ))
+            else:
+                for i, element_id in enumerate(_other_element_ids):
+                    db.session.add(SavedDiagramElement(
+                        diagram_id=diagram.id, element_id=element_id,
+                        position_x=80 + (i % 3) * 260, position_y=80 + (i // 3) * 160,
+                    ))
         db.session.flush()
 
-        # Backfill positions for a pre-existing run's rows that predate the
-        # grid layout above (idempotency: a second run of this script against
-        # the same database must not leave the hero diagram stacked at 0,0).
+        # Idempotency: a re-run against a database that already has the
+        # hero diagram -- whichever elements or positions it currently
+        # holds -- ends up with exactly the named cluster at the
+        # layer-row positions above, every time.
         _hero_diagram = SavedDiagram.query.filter_by(name=_diagrams_hero_name).first()
         if _hero_diagram is not None:
-            _hero_positions = list(
-                SavedDiagramElement.query.filter_by(diagram_id=_hero_diagram.id)
-                .order_by(SavedDiagramElement.id)
-                .all()
-            )
-            if _hero_positions and all(p.position_x == 0 and p.position_y == 0 for p in _hero_positions):
-                for i, pos in enumerate(_hero_positions):
-                    pos.position_x = 80 + (i % 3) * 260
-                    pos.position_y = 80 + (i // 3) * 160
+            _hero_elements_by_element_id = {
+                e.element_id: e
+                for e in SavedDiagramElement.query.filter_by(diagram_id=_hero_diagram.id).all()
+            }
+            _wanted_ids = {
+                elements[n].id for n in _hero_element_names if n in elements
+            }
+            if set(_hero_elements_by_element_id) != _wanted_ids:
+                for el in list(_hero_elements_by_element_id.values()):
+                    db.session.delete(el)
+                db.session.flush()
+                for row_index, row_names in enumerate(_hero_layers):
+                    for col_index, el_name in enumerate(row_names):
+                        el = elements.get(el_name)
+                        if el is None:
+                            continue
+                        db.session.add(SavedDiagramElement(
+                            diagram_id=_hero_diagram.id, element_id=el.id,
+                            position_x=80 + col_index * 300,
+                            position_y=80 + row_index * 220,
+                            width=220, height=80,
+                        ))
+                db.session.flush()
+                _hero_elements_by_element_id = {
+                    e.element_id: e
+                    for e in SavedDiagramElement.query.filter_by(diagram_id=_hero_diagram.id).all()
+                }
+            else:
+                for row_index, row_names in enumerate(_hero_layers):
+                    for col_index, el_name in enumerate(row_names):
+                        el = elements.get(el_name)
+                        pos = _hero_elements_by_element_id.get(el.id) if el else None
+                        if pos is None:
+                            continue
+                        pos.position_x = 80 + col_index * 300
+                        pos.position_y = 80 + row_index * 220
+                        pos.width = 220
+                        pos.height = 80
+                db.session.flush()
+
+            # SavedDiagramRelationship: one row per ArchiMateRelationship
+            # that joins two elements in the hero cluster.
+            _hero_ids_by_name = {
+                n: elements[n].id for n in _hero_element_names if n in elements
+            }
+            _existing_diagram_rel_ids = {
+                r.relationship_id
+                for r in SavedDiagramRelationship.query.filter_by(diagram_id=_hero_diagram.id).all()
+            }
+            for source_name, target_name, rel_type in _hero_relationship_pairs:
+                source_id = _hero_ids_by_name.get(source_name)
+                target_id = _hero_ids_by_name.get(target_name)
+                if source_id is None or target_id is None:
+                    continue
+                rel = ArchiMateRelationship.query.filter_by(
+                    source_id=source_id, target_id=target_id, type=rel_type,
+                    organization_id=org_id,
+                ).first()
+                if rel is None or rel.id in _existing_diagram_rel_ids:
+                    continue
+                db.session.add(SavedDiagramRelationship(
+                    diagram_id=_hero_diagram.id, relationship_id=rel.id,
+                ))
+                _existing_diagram_rel_ids.add(rel.id)
             db.session.flush()
 
         # ── Duplicate detection: one real duplicate, then run it ───────────
@@ -679,18 +883,23 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
              [("Calibration Ledger", "critical", None, None)]),
             ("Field Service Scheduling", "Operations", "high", 2, 4,
              [("Field Service Scheduler", "low", None, None)]),
-            ("Supplier Risk Management", "Procurement", "high", None, None, []),
+            # These four used to carry no assessed maturity at all,
+            # which rendered as an all-dash row rather than a coverage gap --
+            # the gap these capabilities are meant to show is the empty
+            # coverage_apps list below, not a missing assessment. Each now
+            # gets a real current/target pair like every other row.
+            ("Supplier Risk Management", "Procurement", "high", 1, 4, []),
             ("Regulatory Compliance Tracking", "Compliance", "critical", 3, 5,
              [("Document Management", "medium", "deprecated", None)]),
             ("Equipment Asset Management", "Operations", "medium", 2, 4,
              [("Inventory Manager", "medium", None, "critical")]),
-            ("Customer Contract Administration", "Commercial", "medium", None, None, []),
+            ("Customer Contract Administration", "Commercial", "medium", 2, 4, []),
             ("Quality Assurance & Certification", "Quality", "critical", 4, 5,
              [("Calibration Ledger", "high", None, None), ("Document Management", "high", None, None)]),
-            ("Data & Integration Architecture", "Technology", "high", None, None, []),
+            ("Data & Integration Architecture", "Technology", "high", 1, 4, []),
             ("Workforce Planning", "People", "medium", 2, 3,
              [("Event Relay", "low", None, None)]),
-            ("Financial Planning & Reporting", "Finance", "medium", None, None, []),
+            ("Financial Planning & Reporting", "Finance", "medium", 2, 3, []),
             ("Incident & Problem Management", "Operations", "high", 2, 4,
              [("Event Relay", "medium", None, "high")]),
             ("Vendor Performance Management", "Procurement", "medium", 3, 4,
@@ -729,43 +938,54 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
                 ))
         db.session.flush()
 
-        # ── Roadmap plateaus (capability-roadmap reads Plateau) ─────────────
-        # Round 2 (MP-B1): the plateau timeline existed with no description
-        # and no linked gaps -- adding real ones here, in sequence order.
-        from app.models.implementation_migration import Plateau
+        # ── Roadmap: link seeded work packages to plateaus and gaps ─────────
+        # The plateau narrative (name, description, target date) has
+        # one source now -- app/commands/seed_demo_company.py's own
+        # _PLATEAUS -- so this block only wires existing work packages to
+        # the three plateaus and to a stored gap each, through the one
+        # work-package writer (work_package_service.update_work_package).
+        # Nothing here writes unified_work_packages.plateau_id/gap_id or any
+        # association table directly.
+        from app.models.implementation_migration import Gap, Plateau
+        from app.services import work_package_service
 
-        _plateau_rows = [
-            ("Current State", 1,
-             "The estate as it runs today: the calibration ledger, field "
-             "scheduling and supplier systems in their current, largely "
-             "manual form.", 0),
-            ("Transition State", 2,
-             "Event backbone and supplier integration land; calibration and "
-             "field service begin moving onto the managed platform.", 270),
-            ("Target State", 3,
-             "Every governed gap closed: modernised, consolidated systems "
-             "with full capability coverage across the estate.", 545),
+        plateaus_by_name = {
+            p.name: p for p in Plateau.query.filter_by(organization_id=org_id).all()
+        }
+        gaps_by_name = {
+            g.name: g for g in Gap.query.filter_by(organization_id=org_id).all()
+        }
+        wps_by_name = {wp.name: wp for wp in work_package_service.query_for(org_id).all()}
+
+        # (work package name, plateau name, gap name) -- each work package
+        # addresses exactly one gap, and the per-plateau counts (2, 4, 3) are
+        # deliberately uneven so the roadmap's "gap(s) assigned" figures are
+        # not a row of identical numbers.
+        _ROADMAP_WORK_LINKS = [
+            ("Procure handheld field testers", "Baseline Architecture", "Field service coverage gap"),
+            ("Deploy mobile field app", "Baseline Architecture", "Monitoring coverage gap"),
+            ("Integrate calibration ledger with rigs", "Transition State 1", "Calibration throughput gap"),
+            ("Migrate event backbone to cloud", "Transition State 1", "Event backbone resilience gap"),
+            ("Consolidate supplier base", "Transition State 1", "Supplier performance gap"),
+            ("Deploy inventory reconciliation tool", "Transition State 1", "Inventory visibility gap"),
+            ("Build digital twin of calibration lab", "Target Architecture", "Data quality gap"),
+            ("Upgrade compliance reporting module", "Target Architecture", "Documentation currency gap"),
+            ("Build predictive maintenance model", "Target Architecture", "Integration coverage gap"),
         ]
-        for name, seq, description, days_out in _plateau_rows:
-            target_date = (today_dt + _dt.timedelta(days=days_out)).date()
-            existing_plateau = Plateau.query.filter_by(name=name).first()
-            if existing_plateau is not None:
-                # A plateau named "Current State"/"Target State" already
-                # existed (a product default created ahead of this script,
-                # not by seed_demo_company() -- its own stats dict reports
-                # plateaus_created: 0 even on a fresh organisation) with no
-                # description or target date. Filling those in on the
-                # existing row is the same "reseed what's needed" fix as
-                # everywhere else in this function, not a second Plateau.
-                if not existing_plateau.description:
-                    existing_plateau.description = description
-                if not existing_plateau.target_date:
-                    existing_plateau.target_date = target_date
+        _existing_plateau_links = work_package_service.plateau_work_package_ids(
+            [p.id for p in plateaus_by_name.values()], org_id
+        )
+        for wp_name, plateau_name, gap_name in _ROADMAP_WORK_LINKS:
+            wp = wps_by_name.get(wp_name)
+            plateau = plateaus_by_name.get(plateau_name)
+            gap = gaps_by_name.get(gap_name)
+            if wp is None or plateau is None or gap is None:
                 continue
-            db.session.add(Plateau(
-                name=name, description=description, sequence_order=seq,
-                target_date=target_date,
-            ))
+            if wp.id in _existing_plateau_links.get(plateau.id, set()):
+                continue
+            work_package_service.update_work_package(
+                wp.id, organization_id=org_id, plateau_id=plateau.id, gap_id=gap.id,
+            )
         db.session.flush()
 
         # ── Investment analysis (strategic.investment_matrix reads
@@ -820,7 +1040,16 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             "I2R": ["Incident Logged", "Triaged", "Resolved"],
         }
         value_streams_by_code = {v.code: v for v in ValueStream.query.all()}
+        # The old offset used Python's own string hash of the
+        # stream code, which is randomised per process, so which capability
+        # mapped to which stage was different on every recapture. Sorted by
+        # (code, id) is the same order on every run; the stream's own
+        # position in _vs_stage_rows is the offset, so the four streams
+        # don't all start from the same capability either.
+        cap_list_sorted = sorted(cap_list_all, key=lambda c: (c.code, c.id))
+        _vs_codes_ordered = list(_vs_stage_rows.keys())
         for code, stage_names in _vs_stage_rows.items():
+            stream_offset = _vs_codes_ordered.index(code)
             vs_row = value_streams_by_code.get(code)
             if vs_row is None:
                 continue
@@ -846,10 +1075,10 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
                 # stuck at 0 even once cap_list_all stopped being empty. The
                 # mapping's own existence is checked independently of the
                 # stage's, so a re-run always catches up.
-                if cap_list_all and not CapabilityValueStreamMapping.query.filter_by(
+                if cap_list_sorted and not CapabilityValueStreamMapping.query.filter_by(
                     value_stream_stage_id=stage.id
                 ).first():
-                    cap_row = cap_list_all[(order + hash(code)) % len(cap_list_all)]
+                    cap_row = cap_list_sorted[(order + stream_offset) % len(cap_list_sorted)]
                     db.session.add(CapabilityValueStreamMapping(
                         capability_id=cap_row.id, value_stream_id=vs_row.id,
                         value_stream_stage_id=stage.id, support_type="primary",
@@ -865,7 +1094,32 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         # detection from the Dashboard" onboarding panel regardless.
         from app.models.application_rationalization import ApplicationRationalizationScore
 
+        # The Disposition Breakdown panel and the "Decision Ready" /
+        # "Insufficient Evidence" tiles read disposition_action and
+        # is_decision_ready (rationalization_api_routes.py ~228, ~1459), not
+        # rationalization_action -- these hand-written rows previously set
+        # neither, so the panel rendered empty regardless of the TIME
+        # action already shown elsewhere on the page.
+        #
+        # The product's own scoring path, RationalizationScoringService
+        # (the same one POST /applications/rationalization/api/bulk-score
+        # calls), derives is_decision_ready from evaluate_readiness(), which
+        # requires three high-severity fields on the application itself:
+        # application_owner, a recognised lifecycle_status, and
+        # technical_risk or business_risk. seed_demo_company() never sets
+        # application_owner (ownership here lives in the separate
+        # ApplicationOwner table, not that column), so every application
+        # would fail that one dimension and the service would return
+        # is_decision_ready=False across the board -- a worse, less
+        # truthful "Insufficient Evidence" wall than a real mix. Keeping the
+        # hand-written rows and setting disposition_action/is_decision_ready
+        # directly (the brief's offered fallback) gives the panel the real
+        # three-or-more non-zero dispositions the acceptance bar asks for.
         _time_actions = ["TOLERATE", "INVEST", "MIGRATE", "ELIMINATE"]
+        _time_to_disposition = {
+            "TOLERATE": "retain", "INVEST": "refactor",
+            "MIGRATE": "replace", "ELIMINATE": "retire",
+        }
         _priorities = ["critical", "high", "medium", "low"]
         for i, app_row in enumerate(apps_list[:12]):
             if ApplicationRationalizationScore.query.filter_by(
@@ -881,6 +1135,8 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
                 vendor_risk_score=45 + (i * 5) % 50,
                 overall_health_score=38 + (i * 9) % 58,
                 rationalization_action=action,
+                disposition_action=_time_to_disposition[action],
+                is_decision_ready=True,
                 priority=_priorities[i % len(_priorities)],
                 priority_score=90 - i * 6,
                 action_rationale=f"{action.title()}: scored from technical health, business "
@@ -920,6 +1176,24 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         "Manage information technology",
         "Manage financial resources",
     ]
+    # "Regulatory Processes" (get_regulatory_processes(), read via
+    # IndustryAPQCProcess.regulatory_requirements.isnot(None)) needs a real
+    # SQL NULL on the non-regulatory rows, not a Python None and not an
+    # omitted value -- omitting the keyword argument stores the column's own
+    # default (an empty list, from `default=list`), and passing Python None
+    # into a JSON column serialises it as the JSON literal `null`, and both
+    # of those still satisfy `isnot(None)`, which is why every row read as
+    # regulatory before. `sqlalchemy.null()` is the one way to write an
+    # actual SQL NULL into a JSON column, so it is the one way the
+    # IS NOT NULL filter can tell the two kinds of row apart. Which rows are
+    # regulatory is decided by a fixed keyword rule on the process name,
+    # applied the same way to every framework.
+    from sqlalchemy import null as sa_null
+
+    _REGULATORY_KEYWORDS = (
+        "compliance", "regulat", "safety", "quality", "audit",
+        "certif", "licens", "environment",
+    )
     for framework in IndustryAPQCFramework.query.all():
         if IndustryAPQCProcess.query.filter_by(industry_framework_id=framework.id).first():
             continue
@@ -928,6 +1202,9 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             + list(framework.key_differentiators or [])
         ) or _CROSS_INDUSTRY_PROCESSES
         for i, process_name in enumerate(process_names):
+            is_regulatory = any(
+                kw in process_name.lower() for kw in _REGULATORY_KEYWORDS
+            )
             db.session.add(IndustryAPQCProcess(
                 industry_framework_id=framework.id,
                 base_process_id=None,
@@ -935,19 +1212,35 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
                 industry_process_name=process_name,
                 industry_category_1=framework.industry_name,
                 is_industry_unique=process_name in (framework.unique_process_areas or []),
-                # "Regulatory Processes" (get_regulatory_processes(), read via
-                # IndustryAPQCProcess.regulatory_requirements.isnot(None))
-                # deliberately left unset here: this column's SQLAlchemy type
-                # serialises a Python None as the JSON literal `null`, not a
-                # SQL NULL, so any explicit True/False distinction attempted
-                # here would pass the "is not None" filter regardless and
-                # make every process read as regulatory -- a pre-existing
-                # product-model quirk (JSON column vs. an IS NOT NULL check),
-                # out of scope to fix by reseeding. Total/unique process
-                # counts (the actual "0 processes" defect this round fixes)
-                # are unaffected; regulatory_requirements stays at the
-                # column's own default either way.
+                regulatory_requirements=(
+                    [f"{framework.industry_name} regulatory requirement: {process_name}"]
+                    if is_regulatory else sa_null()
+                ),
             ))
+    db.session.commit()
+
+    # Every capability gets an assessed current and target maturity
+    # pair (see _biz_cap_rows above) -- BusinessDomain rows from the one
+    # canonical domain list (UNIFIED_CAPABILITY_DOMAINS) feed the roadmap's
+    # own "Domains" tile the same way. Insert-if-missing on code, the same
+    # fields app/commands/seed_capabilities.py's seed_unified_caps() writes
+    # at its own domain-creation step -- that function is not called here,
+    # since it also retires and creates capabilities, which is out of scope.
+    from app.commands.seed_capabilities import UNIFIED_CAPABILITY_DOMAINS
+    from app.models.unified_capability import BusinessDomain
+
+    existing_domain_codes = {d.code for d in BusinessDomain.query.all()}
+    for dom_data in UNIFIED_CAPABILITY_DOMAINS:
+        if dom_data["code"] in existing_domain_codes:
+            continue
+        db.session.add(BusinessDomain(
+            code=dom_data["code"],
+            name=dom_data["name"],
+            description=dom_data.get("description", ""),
+            domain_type=dom_data.get("domain_type", "primary"),
+            strategic_focus=dom_data.get("strategic_focus", ""),
+            domain_owner=dom_data.get("domain_owner", ""),
+        ))
     db.session.commit()
 
     # Regulatory compliance frameworks (dashboard/compliance): standard,
@@ -1046,6 +1339,89 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
     db.session.commit()
 
 
+def _check_seed_health(org_id: int) -> None:
+    """Stop the run, loudly, before any image is written, if
+    the data every captured screen depends on did not actually get seeded.
+
+    A brand-new database's UnifiedCapability table stays silently empty
+    unless the write-time projection's provenance index is created first --
+    nothing in the capture pipeline's own bootstrap used to do that, so a
+    recapture from a fresh database could ship an empty or wrong screen
+    with no warning before the screenshots were written and committed.
+    Every count below is something a committed image actually needs to be
+    honest; a zero here means a later screenshot would be empty or wrong.
+    """
+    from app.models.application_rationalization import ApplicationRationalizationScore
+    from app.models.architecture_review_board import ARBReviewItem
+    from app.models.archimate_core import SavedDiagram, SavedDiagramRelationship
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.implementation_migration import Plateau
+    from app.models.industry_apqc import IndustryAPQCProcess
+    from app.models.unified_capability import BusinessDomain, UnifiedCapability
+    from app.services import work_package_service
+
+    failures = []
+
+    def _check(label, count):
+        if not count:
+            failures.append(label)
+
+    _check(
+        "UnifiedCapability",
+        UnifiedCapability.query.filter_by(organization_id=org_id).count(),
+    )
+    _check(
+        "BusinessCapability",
+        BusinessCapability.query.filter_by(organization_id=org_id).count(),
+    )
+    _check("BusinessDomain", BusinessDomain.query.count())
+    plateaus = Plateau.query.filter_by(organization_id=org_id).all()
+    _check(
+        "Plateau with a description",
+        sum(1 for p in plateaus if p.description and p.description.strip()),
+    )
+    linked_wp_ids = work_package_service.plateau_work_package_ids(
+        [p.id for p in plateaus], org_id
+    )
+    _check(
+        "unified work packages linked to a plateau",
+        sum(len(ids) for ids in linked_wp_ids.values()),
+    )
+    _check(
+        "ARBReviewItem",
+        ARBReviewItem.query.filter_by(organization_id=org_id).count(),
+    )
+    _check(
+        "ApplicationRationalizationScore with disposition_action set",
+        ApplicationRationalizationScore.query.filter(
+            ApplicationRationalizationScore.organization_id == org_id,
+            ApplicationRationalizationScore.disposition_action.isnot(None),
+        ).count(),
+    )
+    _check(
+        "IndustryAPQCProcess with non-null regulatory_requirements",
+        IndustryAPQCProcess.query.filter(
+            IndustryAPQCProcess.regulatory_requirements.isnot(None)
+        ).count(),
+    )
+    hero_diagram = SavedDiagram.query.filter_by(name="Calibration estate overview").first()
+    _check(
+        "SavedDiagramRelationship on the hero diagram",
+        SavedDiagramRelationship.query.filter_by(
+            diagram_id=hero_diagram.id if hero_diagram else -1
+        ).count(),
+    )
+
+    if failures:
+        raise SystemExit(
+            "capture_screenshots.py --modules: refusing to capture -- the "
+            "seed is missing data every committed screenshot depends on: "
+            + "; ".join(failures)
+            + ". Run the bootstrap (apply-unified-capability-provenance-migration, "
+            "then project-capabilities --apply) and reseed before recapturing."
+        )
+
+
 def _seed_lantern_quay(demo_password: str) -> dict:
     """Seed Lantern Quay Systems and grant three capture-only persona roles.
 
@@ -1071,6 +1447,21 @@ def _seed_lantern_quay(demo_password: str) -> dict:
     with app.app_context():
         db.create_all()
         Role.insert_roles()
+
+        # The schema migration that creates the unique index
+        # project-capabilities needs (so UnifiedCapability has somewhere to
+        # record provenance) has to run before anything is seeded. Through
+        # the Flask CLI runner -- never a copy of its SQL.
+        runner = app.test_cli_runner()
+        migration_result = runner.invoke(
+            args=["apply-unified-capability-provenance-migration"]
+        )
+        if migration_result.exit_code != 0:
+            raise SystemExit(
+                "apply-unified-capability-provenance-migration failed:\n"
+                + str(migration_result.output)
+            )
+
         stats = seed_demo_company()
         print("seeded Lantern Quay Systems:", stats)
 
@@ -1095,7 +1486,25 @@ def _seed_lantern_quay(demo_password: str) -> dict:
 
         org = Organization.query.filter_by(slug="lantern-quay").first()
         demo_user = User.query.filter_by(email=DEMO_EMAIL).first()
-        _seed_module_screen_data(org.id, demo_user.id)
+        # Captured as plain ints before the call: _seed_module_screen_data()
+        # enters tenant_scope(), which resets the session (see that
+        # function's own docstring) and leaves org/demo_user detached, so
+        # anything read after the call must not touch their attributes.
+        org_id = org.id
+        _seed_module_screen_data(org_id, demo_user.id)
+
+        # Catch up the UnifiedCapability projection for every
+        # BusinessCapability row created above -- seed_demo_company()'s 24
+        # plus _seed_module_screen_data()'s own 12 -- through the Flask CLI
+        # runner, after all seeding, so capability_count/domain_count on the
+        # roadmap page and the gap-detection route below read real numbers.
+        project_result = runner.invoke(args=["project-capabilities", "--apply"])
+        if project_result.exit_code != 0:
+            raise SystemExit(
+                "project-capabilities --apply failed:\n" + str(project_result.output)
+            )
+
+        _check_seed_health(org_id)
 
         from app.models.archimate_core import SavedDiagram
 
@@ -1342,6 +1751,33 @@ def run_public_pages_capture() -> int:
         with sync_playwright() as pw:
             browser = pw.chromium.launch()
             try:
+                # ── roadmap gap detection, before any image is captured ─────
+                # The "AI Generated" tile and the auto_generated
+                # gaps roadmaps.webp needs come from stored Gap rows the
+                # product's own detector creates -- POST through the signed-in
+                # browser to the real route (gap_archimate_service), rather
+                # than reimplementing detection here.
+                detect_ctx = browser.new_context(viewport=IMAGE_CAPTURE_VIEWPORT)
+                detect_page = detect_ctx.new_page()
+                _login(detect_page, base, DEMO_EMAIL, demo_password)
+                detect_page.goto(
+                    base + "/capability-roadmap", wait_until="networkidle", timeout=60000
+                )
+                csrf_token = detect_page.eval_on_selector(
+                    'meta[name="csrf-token"]', "el => el.getAttribute('content')"
+                )
+                detect_response = detect_page.request.post(
+                    base + "/capability-map/api/roadmap/gaps/detect",
+                    headers={"X-CSRFToken": csrf_token or ""},
+                )
+                if detect_response.status >= 400:
+                    raise SystemExit(
+                        f"gap detection ({detect_response.status}) failed: "
+                        f"{detect_response.text()}"
+                    )
+                print(f"  gap detection: HTTP {detect_response.status}")
+                detect_ctx.close()
+
                 # ── module + use-case screenshots ──────────────────────────
                 image_jobs = [(slug, path, email, IMG_MODULES_DIR) for slug, path, email, _, _ in MODULES]
                 image_jobs += [(slug, path, email, IMG_USE_CASES_DIR)
@@ -1352,6 +1788,18 @@ def run_public_pages_capture() -> int:
                         page = context.new_page()
                         _login(page, base, email, demo_password)
                         _visit_and_check(page, base, path, slug)
+                        if slug == "diagrams":
+                            # Use the composer's own existing
+                            # fit-to-content control (Constraint 4) rather
+                            # than invent a second way to frame a diagram --
+                            # the default zoom clipped the badge/toolbar at
+                            # the right edge once the hero had a real layout.
+                            fit_button = page.locator(
+                                'button[title="Fit to content (Ctrl+0)"]'
+                            )
+                            if fit_button.count():
+                                fit_button.first.click()
+                                page.wait_for_timeout(500)
                         png_bytes = page.screenshot(full_page=False)
                         dest = out_dir / f"{slug}.webp"
                         width, height = compress_to_webp(png_bytes, dest, IMAGE_TARGET_WIDTH)

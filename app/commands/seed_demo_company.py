@@ -269,6 +269,10 @@ _ELEMENTS = [
     ("Baseline Architecture", "Plateau", "implementation"),
     ("Transition State 1", "Plateau", "implementation"),
     ("Target Architecture", "Plateau", "implementation"),
+    # The second, overlapping "Current State"/"Future State" pair that
+    # used to sit here was removed -- the plateau timeline is one
+    # three-stage chain (Baseline Architecture, Transition State 1,
+    # Target Architecture), not two competing ones.
     ("Calibration throughput gap", "Gap", "implementation"),
     ("Field service coverage gap", "Gap", "implementation"),
     ("Inventory visibility gap", "Gap", "implementation"),
@@ -390,8 +394,6 @@ _ELEMENTS = [
     ("Real-time Dashboard", "Deliverable", "implementation"),
     ("Automated Test Suite", "Deliverable", "implementation"),
     ("Disaster Recovery Runbook", "Deliverable", "implementation"),
-    ("Current State", "Plateau", "implementation"),
-    ("Future State", "Plateau", "implementation"),
     ("Data quality gap", "Gap", "implementation"),
     ("Integration coverage gap", "Gap", "implementation"),
     ("Skills shortage gap", "Gap", "implementation"),
@@ -549,7 +551,6 @@ _RELATIONSHIPS = [
     # Plateau transitions
     ("Baseline Architecture", "Transition State 1", "Triggering"),
     ("Transition State 1", "Target Architecture", "Triggering"),
-    ("Current State", "Future State", "Triggering"),
     # Gap associations
     ("Calibration throughput gap", "Calibration Automation Phase 1", "Association"),
     ("Field service coverage gap", "Field Tester Rollout", "Association"),
@@ -1046,12 +1047,22 @@ _WORK_PACKAGES = [
 # ── plateaus ───────────────────────────────────────────────────────────────
 
 _PLATEAUS = [
-    # (name, sequence_order, archimate_element_name)
-    ("Baseline Architecture", 1, "Baseline Architecture"),
-    ("Transition State 1", 2, "Transition State 1"),
-    ("Target Architecture", 3, "Target Architecture"),
-    ("Current State", 1, "Current State"),
-    ("Future State", 2, "Future State"),
+    # (name, sequence_order, archimate_element_name, description, target_date_days_from_today)
+    ("Baseline Architecture", 1, "Baseline Architecture",
+     "The estate as Lantern Quay runs it today: calibration rigs, field "
+     "scheduling and the supplier panel operating largely as separate, "
+     "manually reconciled systems.",
+     0),
+    ("Transition State 1", 2, "Transition State 1",
+     "The calibration ledger integrates directly with the automated rigs, "
+     "the event backbone moves onto the managed platform, and the supplier "
+     "base consolidates onto one panel.",
+     270),
+    ("Target Architecture", 3, "Target Architecture",
+     "Every governed gap closed: a digital twin of the calibration lab, "
+     "predictive maintenance running on integrated sensor data, and current "
+     "compliance reporting across a fully consolidated estate.",
+     545),
 ]
 
 # ── gaps ───────────────────────────────────────────────────────────────────
@@ -1577,13 +1588,16 @@ def seed_demo_company() -> dict:
             .all()
         }
         plateaus_created = 0
-        for name, seq, el_name in _PLATEAUS:
+        _plateau_today = _dt.date.today()
+        for name, seq, el_name, description, days_out in _PLATEAUS:
             if name in existing_plateaus:
                 continue
             el = elements.get(el_name)
             plateau = Plateau(
                 name=name,
+                description=description,
                 sequence_order=seq,
+                target_date=_plateau_today + _dt.timedelta(days=days_out),
                 organization_id=org_id,
                 archimate_element_id=el.id if el else None,
             )

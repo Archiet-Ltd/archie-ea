@@ -119,9 +119,6 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("architecture-model", "/architecture/", DEMO_PERSONA,
      "The ArchiMate element browser, spanning the business, application, technology and motivation layers.",
      "Screenshot of the Architecture Model module's ArchiMate element browser."),
-    ("batch-import", "/batch-import/", DEMO_PERSONA,
-     "The batch import dashboard: job status, elements generated and per-job progress across every import run.",
-     "Screenshot of the Batch Import dashboard showing job status, elements generated and progress for each import job."),
     ("business-case", "/business-case/", DEMO_PERSONA,
      "Business cases with their status, three-year TCO and return on investment.",
      "Screenshot of the Business Case module's list of business cases."),
@@ -140,21 +137,12 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("duplicate-detection", "/duplicate-detection/simple", DEMO_PERSONA,
      "The duplicate detection dashboard, flagging applications that may overlap in function.",
      "Screenshot of the Duplicate Detection module's dashboard."),
-    ("gap-analysis", "/capability-roadmap", DEMO_PERSONA,
-     "The capability roadmap's gap detector, flagging coverage, quality, retirement and modernisation gaps across the estate.",
-     "Screenshot of the capability roadmap showing detected capability gaps by type and priority."),
     ("industry-apqc", "/industry-apqc/", DEMO_PERSONA,
      "The Industry APQC dashboard, showing each industry framework's process catalogue and benchmarks.",
      "Screenshot of the Industry APQC dashboard listing industry frameworks with their process counts and benchmarks."),
-    ("investment-analysis", "/architecture/investment-priorities", DEMO_PERSONA,
-     "The investment prioritisation matrix, scoring every capability on strategic importance, coverage, maturity and risk.",
-     "Screenshot of the investment prioritisation matrix showing capabilities scored and ranked by investment priority."),
     ("my-applications", "/my-applications/", APP_MANAGER_PERSONA,
      "An application owner's personal dashboard of the applications they're responsible for.",
      "Screenshot of the My Applications module's owner dashboard."),
-    ("org-chart", "/organization/chart", DEMO_PERSONA,
-     "The enterprise org chart, built from the organisation's own departments and teams.",
-     "Screenshot of the Org Chart module showing the organisation's department and team hierarchy."),
     ("portfolio", "/portfolio/", DEMO_PERSONA,
      "The portfolio dashboard, summarising active initiatives and programmes.",
      "Screenshot of the Portfolio module's dashboard."),
@@ -170,15 +158,9 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("risk-register", "/risks/", DEMO_PERSONA,
      "The risk register, with likelihood, impact and a mitigation plan recorded for each risk.",
      "Screenshot of the Risk Register module."),
-    ("roadmaps", "/capability-roadmap", DEMO_PERSONA,
-     "The capability roadmap, with plateaus from current to target state and the gaps assigned to each.",
-     "Screenshot of the capability roadmap showing plateaus from current to target state with assigned gaps."),
     ("solutions", "/solutions/", DEMO_PERSONA,
      "The solutions list, tracking each solution's design progress and next action.",
      "Screenshot of the Solutions module's solution list."),
-    ("value-streams", "/value-streams/", DEMO_PERSONA,
-     "The value stream library, with each stream's stage count and mapped-capability coverage across the estate.",
-     "Screenshot of the Value Streams module listing each value stream with its stage count and mapped capabilities."),
     ("vendors", "/applications/vendors", DEMO_PERSONA,
      "The vendor catalogue, with each vendor's type, products and contract status.",
      "Screenshot of the Vendors module's vendor catalogue."),
@@ -214,6 +196,57 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
         "page was written to capture Ask with an impact answer and the "
         "provenance drawer open, the twin map, or model history with a "
         "seeded change -- needs a real capture run, not a placeholder"
+    ),
+    # The org chart's own layout cannot honestly be captured at this
+    # organisation's real size (see org_chart.js) -- recapture after the
+    # layout fix lands, not by shrinking the seeded headcount to hide it.
+    "org-chart": (
+        "org chart layout overprints sibling team nodes and clips the "
+        "right-hand branch once a level has more than about six teams "
+        "(org_chart.js spaces leaves by SVG width, not node width); "
+        "recapture after the layout fix"
+    ),
+    # These four pages redirect before they ever render (see this file's
+    # own MERGED_PAGES above), so a visitor never sees their image --
+    # captured or not. Named here rather than fixed, since fixing a screen
+    # nobody reaches is the wrong priority, with what a reversal would
+    # need first.
+    "batch-import": (
+        "redirects to /modules/architecture-model before it renders "
+        "(MERGED_PAGES); a reversal would need a real cost tile and real "
+        "Type/Started columns first, both dash-only today"
+    ),
+    "gap-analysis": (
+        "redirects to /modules/roadmaps before it renders (MERGED_PAGES); "
+        "its own caption promises gaps by type and priority, which the "
+        "shared roadmap frame does not show, so a reversal needs its own "
+        "screen built first"
+    ),
+    "investment-analysis": (
+        "redirects to /modules/business-case before it renders "
+        "(MERGED_PAGES); a reversal would need the AI-suggestion panel "
+        "above the fold reworked, a non-zero critical-priorities tile and "
+        "matching domain labels first"
+    ),
+    "value-streams": (
+        "redirects to /use-cases/value-streams-at-risk before it renders "
+        "(MERGED_PAGES); a reversal would need a non-zero critical-streams "
+        "tile first"
+    ),
+    # The plateau and work-package data behind this frame is genuinely
+    # fixed (three described plateaus, each with a non-zero, uneven
+    # "gap(s) assigned" count); what still fails the bar is the "AI
+    # Generated" metric tile, which reads 0 after running the product's
+    # own gap-detection route. That route (gap_archimate_service.py)
+    # creates its detected gaps without ever setting Gap.auto_generated,
+    # the flag this tile counts -- a service bug, not a seed gap, and
+    # outside what a module/seed-data change can fix.
+    "roadmaps": (
+        "the 'AI Generated' metric tile reads 0 even after running the "
+        "product's own gap-detection route: that route never sets "
+        "Gap.auto_generated on the gaps it creates, so the tile it feeds "
+        "cannot read non-zero from any amount of seed data; recapture "
+        "once the detection service sets that flag"
     ),
 }
 
