@@ -310,6 +310,9 @@ else:
     from .technology_layer import *  # noqa - Node, Device, SystemSoftware, TechnologyInterface, Path, CommunicationNetwork, TechnologyService
     from .truly_missing_models import *  # noqa - Solution, SolutionPattern, SolutionContract
     from .adm_kanban import ADMPhase, KanbanBoard, KanbanCard, KanbanCardComment, KanbanCardAttachment, ADMPhaseStep  # noqa: F401
+    # Registered with the kanban models so db.create_all() builds the card_* junction tables;
+    # imported only lazily elsewhere, they were missing from any schema created before that import.
+    from .adm_kanban_junctions import CardApplication, CardArchiMateElement, CardCapability, CardDependency, CardInitiative, CardSystem  # noqa: F401
     from .solution_architect_models import *  # noqa - SolutionAnalysisSession, SolutionProblemDefinition, etc.
     from app.models.solution_architect_models import RequirementChangeLog  # noqa: F401
     from .solution_lifecycle_models import *  # noqa - SolutionRisk, SolutionTCOItem, SolutionMetric, SolutionPlateau
