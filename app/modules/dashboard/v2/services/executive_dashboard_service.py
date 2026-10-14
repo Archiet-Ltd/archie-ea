@@ -189,37 +189,48 @@ class ExecutiveDashboardService:
             return {"total": None, "covered": None, "percentage": None}
 
     def _get_portfolio_stats(self):
-        """Counts for solutions, applications, vendors, ArchiMate elements."""
-        stats = {"solutions": 0, "applications": 0, "vendors": 0, "archimate_elements": 0}
-        try:
+        """Counts for solutions, applications, vendors, ArchiMate elements.
+
+        A count whose query failed is ``None`` (shown as a dash), not 0: a zero
+        the reader cannot tell from a measured zero is a number the system
+        invented.
+        """
+
+        def count(label, model_name):
+            try:
+                model = model_name()
+                return db.session.query(db.func.count(model.id)).scalar() or 0
+            except Exception as exc:
+                logger.warning("Executive dashboard: %s count unavailable: %s", label, exc)
+                db.session.rollback()
+                return None
+
+        def solution():
             from app.models.solution_models import Solution
 
-            stats["solutions"] = db.session.query(db.func.count(Solution.id)).scalar() or 0
-        except Exception as exc:
-            logger.warning("Executive dashboard: solution count unavailable: %s", exc)
+            return Solution
 
-        try:
+        def application():
             from app.models.application_portfolio import ApplicationComponent
 
-            stats["applications"] = db.session.query(db.func.count(ApplicationComponent.id)).scalar() or 0
-        except Exception as exc:
-            logger.warning("Executive dashboard: application count unavailable: %s", exc)
+            return ApplicationComponent
 
-        try:
+        def vendor():
             from app.models.vendor.vendor_organization import VendorOrganization
 
-            stats["vendors"] = db.session.query(db.func.count(VendorOrganization.id)).scalar() or 0
-        except Exception as exc:
-            logger.warning("Executive dashboard: vendor count unavailable: %s", exc)
+            return VendorOrganization
 
-        try:
+        def element():
             from app.models.archimate_core import ArchiMateElement
 
-            stats["archimate_elements"] = db.session.query(db.func.count(ArchiMateElement.id)).scalar() or 0
-        except Exception as exc:
-            logger.warning("Executive dashboard: ArchiMate count unavailable: %s", exc)
+            return ArchiMateElement
 
-        return stats
+        return {
+            "solutions": count("solution", solution),
+            "applications": count("application", application),
+            "vendors": count("vendor", vendor),
+            "archimate_elements": count("ArchiMate", element),
+        }
 
     def _get_health_score(self):
         """Compute a composite architecture health score (0-100).

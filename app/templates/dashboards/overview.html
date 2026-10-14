@@ -262,8 +262,8 @@
                     <div>
                         <h2 class="text-sm font-semibold text-foreground">Architecture Overview — Layered Viewpoint</h2>
                         <p class="text-xs text-muted-foreground mt-1">
-                            {{ '{:,}'.format(nav_stats.elements) if nav_stats and nav_stats.elements else '0' }} elements ·
-                            {{ '{:,}'.format(nav_stats.relationships) if nav_stats and nav_stats.relationships else '0' }} relationships across all ArchiMate layers
+                            {{ '{:,}'.format(nav_stats.elements) if nav_stats and nav_stats.elements is not none else '—' }} elements ·
+                            {{ '{:,}'.format(nav_stats.relationships) if nav_stats and nav_stats.relationships is not none else '—' }} relationships across all ArchiMate layers
                         </p>
                     </div>
                     <a href="/archimate/composer?viewpoint=layered"
@@ -277,28 +277,28 @@
             <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {{ metrics_card(
                     title='Applications',
-                    value=(metrics.applications or 0)|string,
+                    value=(metrics.applications|string if metrics.applications is not none else '—'),
                     icon='package',
                     description='Active applications in portfolio',
                     href='/applications/'
                 ) }}
                 {{ metrics_card(
                     title='Vendors',
-                    value=(metrics.vendors or 0)|string,
+                    value=(metrics.vendors|string if metrics.vendors is not none else '—'),
                     icon='building',
                     description='Registered vendor organizations',
                     href='/applications/vendors'
                 ) }}
                 {{ metrics_card(
                     title='Solutions',
-                    value=(nav_stats.solutions or 0)|string,
+                    value=(nav_stats.solutions|string if nav_stats.solutions is not none else '—'),
                     icon='puzzle',
                     description='Solution designs in portfolio',
                     href='/solutions/'
                 ) }}
                 {{ metrics_card(
                     title='ArchiMate Elements',
-                    value=(nav_stats.elements or 0)|string,
+                    value=(nav_stats.elements|string if nav_stats.elements is not none else '—'),
                     icon='boxes',
                     description='Architecture elements catalogued',
                     href='/architecture/dashboard'
@@ -505,10 +505,10 @@
             </div>
 
 <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {{ metrics_card(title='Applications', value=(metrics.applications or 0)|string, icon='package', description='In portfolio', href='/applications/') }}
+                {{ metrics_card(title='Applications', value=(metrics.applications|string if metrics.applications is not none else '—'), icon='package', description='In portfolio', href='/applications/') }}
                 {{ metrics_card(title='Health Score', value=health_score_text|default('—'), value_testid='cto-health-score-value', icon='heart-pulse', description='Architecture health', href='/dashboard/health') }}
-                {{ metrics_card(title='Solutions', value=(nav_stats.solutions or 0)|string, icon='puzzle', description='Active designs', href='/solutions/') }}
-                {{ metrics_card(title='ArchiMate', value=(nav_stats.elements or 0)|string, icon='boxes', description='Elements catalogued', href='/architecture/dashboard') }}
+                {{ metrics_card(title='Solutions', value=(nav_stats.solutions|string if nav_stats.solutions is not none else '—'), icon='puzzle', description='Active designs', href='/solutions/') }}
+                {{ metrics_card(title='ArchiMate', value=(nav_stats.elements|string if nav_stats.elements is not none else '—'), icon='boxes', description='Elements catalogued', href='/architecture/dashboard') }}
             </div>
             {% call card.card() %}
                 {% call card.card_header(class='pb-3') %}
@@ -555,10 +555,10 @@
     <div x-show="activeRole === 'cfo'" x-cloak>
         <div class="space-y-6">
             <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {{ metrics_card(title='Applications', value=(metrics.applications or 0)|string, icon='package', description='In portfolio', href='/applications/') }}
-                {{ metrics_card(title='Vendors', value=(metrics.vendors or 0)|string, icon='building', description='Vendor organizations', href='/applications/vendors') }}
+                {{ metrics_card(title='Applications', value=(metrics.applications|string if metrics.applications is not none else '—'), icon='package', description='In portfolio', href='/applications/') }}
+                {{ metrics_card(title='Vendors', value=(metrics.vendors|string if metrics.vendors is not none else '—'), icon='building', description='Vendor organizations', href='/applications/vendors') }}
                 {{ metrics_card(title='Health Score', value=health_score_text|default('—'), value_testid='cfo-health-score-value', icon='heart-pulse', description='Architecture health', href='/dashboard/health') }}
-                {{ metrics_card(title='Solutions', value=(nav_stats.solutions or 0)|string, icon='puzzle', description='Active designs', href='/solutions/') }}
+                {{ metrics_card(title='Solutions', value=(nav_stats.solutions|string if nav_stats.solutions is not none else '—'), icon='puzzle', description='Active designs', href='/solutions/') }}
             </div>
             {% call card.card() %}
                 {% call card.card_header(class='pb-3') %}
