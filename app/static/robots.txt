@@ -4,6 +4,10 @@ Allow: /vision
 Allow: /modules/
 Allow: /use-cases$
 Allow: /use-cases/
+Allow: /roles$
+Allow: /roles/
+Allow: /connectors$
+Allow: /connectors/
 Allow: /vs$
 Allow: /vs/
 Allow: /how-archiet-runs-on-entelim

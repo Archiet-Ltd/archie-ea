@@ -53,17 +53,50 @@ class JiraConnectorService:
         return config.config or {}
 
     def _get_headers(self, config: ConnectorConfig) -> Dict[str, str]:
-        """Return Jira Basic Auth headers (email:api_token, base64-encoded)."""
+        """Return Jira Basic Auth headers (email:api_token, base64-encoded).
+
+        N1 (cloud-review-pr448-505c3c2e-v1.md): connector_routes.py's save
+        path stores the token only in the per-organisation vault (never on
+        this row), so reading the row left every new setup with an empty
+        token and every rotation still sending the old one. Read the vault
+        first; fall back to the row only for a legacy value that predates
+        the vault-only save path.
+        """
         cfg = self._cfg_data(config)
         email = cfg.get("email", "")
-        api_token = cfg.get("api_token_encrypted") or cfg.get("api_token", "")
 
-        if isinstance(api_token, (bytes, bytearray)):
-            try:
-                from app.modules.codegen.services.credential_encryption import decrypt_credential
-                api_token = decrypt_credential(api_token) or ""
-            except Exception:
-                logger.warning("jira_connector: could not decrypt api_token")
+        api_token = None
+        if config.organization_id:
+            from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+            vault = OrgCredentialVault()
+            api_token = vault.retrieve(config.organization_id, "jira", "api_token")
+            if not api_token:
+                # N6: a connector added through the generic /admin/connectors
+                # page stores its secret under the "credentials" blob, not
+                # this connector type's named key.
+                generic = vault.retrieve_credentials(config.organization_id, "jira") or {}
+                api_token = generic.get("credential") or None
+
+        if not api_token:
+            # The vault has nothing (legacy row that predates the
+            # vault-only save path) -- this value is still encrypted and
+            # needs decrypting, unlike the vault's own plaintext return.
+            row_value = cfg.get("api_token_encrypted") or cfg.get("api_token", "")
+            if row_value:
+                # F1 (cloud-review-pr448-a85f082b-v1.md): main's own save
+                # path stored the encrypted token as a decoded str (Fernet
+                # ciphertext is ASCII-safe), not bytes -- the old
+                # "only decrypt if bytes" check left every legacy row's
+                # header carrying raw ciphertext instead of the real token.
+                raw = row_value.encode("utf-8") if isinstance(row_value, str) else row_value
+                try:
+                    from app.modules.codegen.services.credential_encryption import decrypt_credential
+                    api_token = decrypt_credential(raw) or ""
+                except Exception:
+                    logger.warning("jira_connector: could not decrypt api_token")
+                    api_token = ""
+            else:
                 api_token = ""
 
         credentials = f"{email}:{api_token}"

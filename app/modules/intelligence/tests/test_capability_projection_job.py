@@ -94,6 +94,9 @@ def cleanup(db):
         ).delete(synchronize_session=False)
     db.session.commit()
     if created["organizations"]:
+        from tests._outbox_cleanup import purge_outbox_events
+
+        purge_outbox_events(db.session, created["organizations"])
         Organization.query.filter(Organization.id.in_(created["organizations"])).delete(
             synchronize_session=False
         )

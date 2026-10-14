@@ -311,14 +311,26 @@ class TestAskQuestions:
         pool_id = _element_id(org_id, "Quay Compute Pool")
 
         result = self._call(app, org_id, "accountability_for_element", pool_id)
-        assert "ownership_reader_not_built" in result.get("reasons", [])
+        # The accountability answer is the real walk answer now: the quota
+        # pool's ApplicationOwner record is present, the withdrawn empty
+        # answer is gone.
+        assert result["owners"], "accountability on Quay Compute Pool returned no owners"
+        assert "ownership_reader_not_built" not in result.get("reasons", [])
+        assert all(owner.get("name") for owner in result["owners"])
 
     def test_accountability_on_event_relay(self, app, db_session, make_org):
         org_id = _seed_and_get_org_id()
         relay_id = _element_id(org_id, "Event Relay")
 
         result = self._call(app, org_id, "accountability_for_element", relay_id)
-        assert "ownership_reader_not_built" in result.get("reasons", [])
+        # The seed records two owners against Event Relay itself (a primary
+        # and a technical owner). The answer names the element's own owners
+        # first, so both appear and no absence reason is given.
+        assert [(o["name"], o["role"]) for o in result["owners"][:2]] == [
+            ("Ivo Reed", "Primary"),
+            ("Cameron SysAdmin", "Technical"),
+        ]
+        assert "no_ownership_records" not in result.get("reasons", [])
 
     def test_programme_on_quay_compute_pool(self, app, db_session, make_org):
         org_id = _seed_and_get_org_id()

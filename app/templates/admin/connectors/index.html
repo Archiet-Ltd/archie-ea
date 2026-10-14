@@ -1,0 +1,208 @@
+{% extends 'layouts/admin_base.html' %}
+{% block title %}Connectors{% endblock %}
+{% from 'components/page_header.html' import page_header %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    {{ page_header(
+        title='Connectors',
+        description='Every connector of your organisation: health, last synchronisation, and the change queue each edit goes through.',
+        breadcrumbs=[
+            {'label': 'Admin', 'href': url_for('admin.index')},
+            {'label': 'Connectors'}
+        ]
+    ) }}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-6 space-y-2">
+                {% for category, message in messages %}
+                    <div class="rounded-md border p-4
+                        {% if category == 'success' %}bg-primary/10 border-primary/20 text-foreground
+                        {% elif category == 'error' %}bg-destructive/10 border-destructive/20 text-destructive-emphasis
+                        {% else %}bg-accent border-border text-foreground{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    {% if pending_count %}
+        <div class="mb-6 rounded-md border border-accent bg-accent/40 p-4">
+            <p class="text-sm text-foreground">
+                <strong>{{ pending_count }}</strong> connector change{{ 's' if pending_count != 1 }}
+                pending approval in this organisation's queue.
+                <a href="{{ inbox_url }}" class="underline text-primary">Review them in the approval inbox</a>.
+            </p>
+        </div>
+    {% endif %}
+
+    <div class="grid gap-6 lg:grid-cols-3">
+        <!-- Add / edit form -->
+        <div data-slot="card" class="rounded-xl border-2 border-input bg-card h-fit lg:col-span-1">
+            <div class="p-4 sm:p-6 border-b">
+                <h3 class="text-lg font-semibold">Add connector</h3>
+                <p class="text-sm text-muted-foreground mt-1">
+                    Every change is queued for approval in this organisation unless
+                    the action type is delegated. Credentials are stored encrypted,
+                    per organisation, and shown masked.
+                </p>
+            </div>
+            <form method="POST" action="{{ url_for('m365_connector.connectors_save') }}" class="p-4 sm:p-6 space-y-4" data-connector-form>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div>
+                    <label for="connector_type" class="block text-sm font-medium mb-1">Connector type</label>
+                    <select id="connector_type" name="connector_type" required
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                        <option value="">Select a type…</option>
+                        {% for type_key, type_label in connector_type_labels.items() %}
+                            <option value="{{ type_key }}">{{ type_label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="name" class="block text-sm font-medium mb-1">Display name</label>
+                    <input type="text" id="name" name="name"
+                        placeholder="Production ServiceNow"
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                </div>
+
+                <div>
+                    <label for="config_json" class="block text-sm font-medium mb-1">
+                        Configuration (JSON, non-secret)
+                    </label>
+                    <textarea id="config_json" name="config_json" rows="5"
+                        placeholder='{"instance_url": "https://your-instance.service-now.com"}'
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"></textarea>
+                    <p class="mt-1 text-xs text-muted-foreground">
+                        Settings only. Secrets go in the credential field and are stored
+                        separately, encrypted.
+                    </p>
+                </div>
+
+                <div>
+                    <label for="credential" class="block text-sm font-medium mb-1">Credential</label>
+                    <input type="password" id="credential" name="credential"
+                        autocomplete="new-password"
+                        placeholder="API token or client secret"
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <input type="checkbox" id="enabled" name="enabled" value="1" checked
+                        class="h-4 w-4 rounded border-input text-primary focus:ring-ring">
+                    <label for="enabled" class="text-sm font-medium">Enable connector</label>
+                </div>
+
+                <button type="submit"
+                    class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+                    Save connector
+                </button>
+            </form>
+        </div>
+
+        <!-- Connector list -->
+        <div class="lg:col-span-2">
+            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-border">
+                        <thead>
+                            <tr class="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                                <th class="px-4 py-3">Connector</th>
+                                <th class="px-4 py-3">Health</th>
+                                <th class="px-4 py-3">Credential</th>
+                                <th class="px-4 py-3">Last synchronisation</th>
+                                <th class="px-4 py-3">Schedule</th>
+                                <th class="px-4 py-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border">
+                            {% for connector in connectors %}
+                                <tr>
+                                    <td class="px-4 py-3">
+                                        <div class="text-sm font-medium text-foreground">
+                                            {{ connector.name }}
+                                            {% if connector.is_proposal %}
+                                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent text-muted-foreground">queued</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="text-xs text-muted-foreground">{{ connector.connector_type_label }}</div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                            {% if connector.health == 'active' %}bg-success/10 text-success-emphasis
+                                            {% elif connector.health == 'error' %}bg-destructive/10 text-destructive-emphasis
+                                            {% elif connector.health == 'pending_review' %}bg-warning/10 text-warning-emphasis
+                                            {% else %}bg-muted text-muted-foreground{% endif %}">
+                                            {{ connector.health }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        {% if connector.credential_masked %}
+                                            <span class="text-sm font-mono text-muted-foreground">{{ connector.credential_masked }}</span>
+                                        {% else %}
+                                            <span class="text-xs text-muted-foreground">None</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-foreground">
+                                        {% if connector.is_proposal %}
+                                            <span class="text-xs text-muted-foreground">Awaiting approval</span>
+                                        {% elif connector.last_sync %}
+                                            {{ connector.last_sync.strftime('%Y-%m-%d %H:%M') }} UTC
+                                            {% if connector.last_sync_status %}
+                                                <span class="text-xs text-muted-foreground">({{ connector.last_sync_status }})</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-xs text-muted-foreground">Never</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-foreground">
+                                        {{ connector.sync_schedule or 'Not scheduled' }}
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        {% if connector.is_proposal %}
+                                            <a href="{{ inbox_url }}" class="inline-flex items-center rounded-md border border-input bg-background px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-accent transition-colors">
+                                                In approval queue
+                                            </a>
+                                        {% else %}
+                                        <div class="flex gap-2">
+                                            <form method="POST" action="{{ url_for('m365_connector.connectors_sync', connector_id=connector.id) }}">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit"
+                                                    class="inline-flex items-center rounded-md border border-input bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-accent transition-colors">
+                                                    Sync
+                                                </button>
+                                            </form>
+                                            <form method="POST" action="{{ url_for('m365_connector.connectors_delete', connector_id=connector.id) }}"
+                                                data-confirm="Remove this connector? Its stored credentials are deleted with it.">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit"
+                                                    class="inline-flex items-center rounded-md border border-destructive/30 bg-background px-2.5 py-1.5 text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 transition-colors">
+                                                    Delete
+                                                </button>
+                                            </form>
+                                        </div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="px-4 py-10 text-center">
+                                        <p class="text-sm text-muted-foreground">No connectors configured for this organisation yet.</p>
+                                        <p class="text-xs text-muted-foreground mt-1">
+                                            Add one with the form, then approve it in the approval inbox.
+                                        </p>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

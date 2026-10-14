@@ -234,3 +234,19 @@ def test_no_page_links_to_the_private_repository(app):
             assert "github.com" not in other, (
                 f"{path} links to a github.com repository other than the public archie-ea one"
             )
+
+
+def test_navbar_has_roles_and_footer_has_roles_and_connectors(app):
+    import re
+
+    with app.test_client() as client:
+        html = client.get("/").data.decode()
+    nav = re.search(r'<nav aria-label="Primary".*?</nav>', html, re.DOTALL).group(0)
+    hrefs = re.findall(r'<a href="([^"]+)"', nav)
+    assert len(hrefs) == 7
+    assert hrefs[hrefs.index("/use-cases") + 1] == "/roles"
+    assert "/connectors" not in hrefs
+    footer = re.search(r"<footer\b.*?</footer>", html, re.DOTALL).group(0)
+    footer_hrefs = re.findall(r'href="([^"]+)"', footer)
+    at = footer_hrefs.index("/use-cases")
+    assert footer_hrefs[at + 1:at + 3] == ["/roles", "/connectors"]

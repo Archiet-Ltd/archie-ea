@@ -203,6 +203,147 @@ def _classify_cell(system: dict, can_write: bool = False) -> str:
     return "".join(parts)
 
 
+def _lineage_panel(system: dict) -> str:
+    """Render a lineage panel for one system: providers, data entities, and
+    systems using the same provider with owner and data.
+
+    Unrecorded facts render as 'not recorded' with the reason the service
+    gives. CSP-safe: all text escaped.
+    """
+    providers = system.get("providers") or []
+    data_entities = system.get("data_entities") or []
+    provider_systems = system.get("provider_systems") or {}
+
+    parts = ['<div class="text-xs text-muted-foreground space-y-1" data-testid="lineage-panel">']
+
+    # Providers
+    if providers:
+        prov_items = "".join(
+            '<span class="font-medium">' + str(escape(p.get("name", "not recorded"))) + "</span>"
+            + (
+                ""
+                if p.get("registered", True)
+                else ' <span class="text-muted-foreground">(not in the provider register)</span>'
+            )
+            + (
+                ' <span class="text-destructive">(blocked by the provider register)</span>'
+                if p.get("allowed") is False
+                else ""
+            )
+            for p in providers
+        )
+        parts.append(
+            '<div><span class="font-semibold">Providers:</span> '
+            + prov_items
+            + "</div>"
+        )
+    else:
+        parts.append(
+            '<div><span class="font-semibold">Providers:</span> '
+            '<span class="text-muted-foreground">not recorded — no provider recorded on the system profile</span></div>'
+        )
+
+    # Data entities
+    if data_entities:
+        de_items = "".join(
+            '<span class="font-medium">' + str(escape(d.get("name", "not recorded"))) + "</span>"
+            for d in data_entities
+        )
+        parts.append(
+            '<div><span class="font-semibold">Data entities:</span> '
+            + de_items
+            + "</div>"
+        )
+    else:
+        parts.append(
+            '<div><span class="font-semibold">Data entities:</span> '
+            '<span class="text-muted-foreground">not recorded — no data entities linked</span></div>'
+        )
+
+    # Systems using the same provider
+    if provider_systems:
+        for systems_list in provider_systems.values():
+            if not systems_list:
+                continue
+            sys_items = []
+            for sys_entry in systems_list:
+                owner = sys_entry.get("owner")
+                owner_name = "not recorded — no owner assigned"
+                if owner and owner.get("user_name"):
+                    owner_name = owner["user_name"]
+                data_names = [d.get("name", "not recorded") for d in sys_entry.get("data_entities", [])]
+                data_str = (
+                    ", ".join(data_names)
+                    if data_names
+                    else "not recorded — no data entities linked"
+                )
+                sys_items.append(
+                    str(escape(sys_entry.get("name", "not recorded")))
+                    + " (owner: " + str(escape(owner_name))
+                    + ", data: " + str(escape(data_str)) + ")"
+                )
+            if sys_items:
+                parts.append(
+                    '<div><span class="font-semibold">Systems using provider:</span> '
+                    + "; ".join(sys_items)
+                    + "</div>"
+                )
+
+    parts.append("</div>")
+    return "".join(parts)
+
+
+def _obligations_panel(system: dict) -> str:
+    """Render an obligations panel for one system: title and evidence status.
+
+    Unrecorded facts render as 'not recorded' with the reason the service
+    gives. CSP-safe: all text escaped.
+    """
+    obligations = system.get("obligations") or []
+
+    parts = ['<div class="text-xs text-muted-foreground space-y-1" data-testid="obligations-panel">']
+
+    if obligations:
+        parts.append('<div class="font-semibold">Obligations:</div>')
+        for ob in obligations:
+            title = ob.get("title", "not recorded")
+            evidence_status = ob.get("evidence_status", "not recorded")
+            reason = ob.get("evidence_status_reason")
+            badge_text = evidence_status + (f" — {reason}" if reason else "")
+            location = ob.get("evidence_location") or "not recorded — no evidence location"
+            verified = ob.get("last_verified_at") or "not recorded — never verified"
+            parts.append(
+                '<div class="flex items-center gap-2">'
+                '<span class="font-medium">' + str(escape(title)) + "</span>"
+                '<span class="text-xs px-2 py-0.5 rounded '
+                + _status_badge_class(evidence_status)
+                + '">' + str(escape(badge_text)) + "</span>"
+                '<span>Evidence: ' + str(escape(location)) + "</span>"
+                '<span>Last verified: ' + str(escape(verified)) + "</span>"
+                "</div>"
+            )
+    else:
+        parts.append(
+            '<div><span class="font-semibold">Obligations:</span> '
+            '<span class="text-muted-foreground">not recorded — no compliance requirements attached</span></div>'
+        )
+
+    parts.append("</div>")
+    return "".join(parts)
+
+
+def _status_badge_class(status: str) -> str:
+    """CSS class for an evidence-status badge."""
+    mapping = {
+        "not_started": "bg-yellow-100 text-yellow-800",
+        "in_progress": "bg-blue-100 text-blue-800",
+        "completed": "bg-green-100 text-green-800",
+        "verified": "bg-green-200 text-green-900",
+        "not recorded": "bg-gray-100 text-gray-500",
+    }
+    return mapping.get(status, "bg-gray-100 text-gray-500")
+
+
 def emit_ai_systems_register(
     slice_data: dict,
     *,
@@ -247,6 +388,8 @@ def emit_ai_systems_register(
             f'<td class="px-3 py-2 text-sm">{_release_cell(s, can_release=can_release, can_write=can_write)}</td>'  # raw-html-ok: _release_cell() (defined above) escapes internally
             f'<td class="px-3 py-2 text-sm">{_owner_cell(s.get("owner"), s.get("archimate_element_id"), can_write=can_write)}</td>'  # raw-html-ok: _owner_cell() (defined above) escapes internally
             f'<td class="px-3 py-2 text-sm text-destructive">{_flags_cell(flags)}</td>'  # raw-html-ok: _flags_cell() (defined above) escapes internally
+            f'<td class="px-3 py-2 text-sm">{_lineage_panel(s)}</td>'  # raw-html-ok: _lineage_panel() (defined above) escapes internally
+            f'<td class="px-3 py-2 text-sm">{_obligations_panel(s)}</td>'  # raw-html-ok: _obligations_panel() (defined above) escapes internally
             "</tr>"
         )
 
@@ -254,7 +397,7 @@ def emit_ai_systems_register(
         body = "".join(rows)
     else:
         body = (
-            '<tr><td colspan="12" class="px-3 py-6 text-sm text-muted-foreground text-center">'
+            '<tr><td colspan="14" class="px-3 py-6 text-sm text-muted-foreground text-center">'
             "No AI systems modelled yet.</td></tr>"
         )
 
@@ -271,6 +414,8 @@ def emit_ai_systems_register(
         "Release state",
         "Owner",
         "Risk flags",
+        "Lineage",
+        "Obligations",
     ]
     head = "".join(
         f'<th class="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{escape(h)}</th>'

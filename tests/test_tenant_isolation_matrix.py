@@ -300,6 +300,9 @@ def test_bulk_delete_is_tenant_filtered(app):
         ApplicationComponent.query.filter(
             ApplicationComponent.name == "bulk-target %s" % marker
         ).delete(synchronize_session=False)
+        from tests._outbox_cleanup import purge_outbox_events
+
+        purge_outbox_events(db.session, [a_id, b_id])
         Organization.query.filter(Organization.id.in_([a_id, b_id])).delete(
             synchronize_session=False)
         db.session.commit()
