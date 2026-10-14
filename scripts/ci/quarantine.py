@@ -17,15 +17,26 @@ A quarantined test is never dropped from CI. The mode decides where it runs:
 Load it with ``-p scripts.ci.quarantine``. It runs before the shard splitter so
 every shard sees the same remaining tests and agrees on the partition.
 
-The list may only shrink without review; adding a line needs a reason, and the
-rest of the failures on main are not this file's business.
+The list may only shrink without review. A pull request cannot quarantine its
+own failing test: in a pull-request run the list that counts is the base
+branch's copy, and the pull request's copy may only REMOVE lines from it
+(`resolve` below; additions are ignored and reported). A line added on main is
+reviewed like any other change before it merges.
+
+    python -I quarantine.py resolve --base origin/main --out accepted.txt
 """
 from __future__ import annotations
 
+import argparse
 import os
+import subprocess
+import sys
 from pathlib import Path
 
-import pytest
+try:  # the resolve command runs without pytest being importable from -I
+    import pytest
+except ImportError:  # pragma: no cover
+    pytest = None
 
 DEFAULT_LIST = Path(__file__).resolve().parent / "quarantine.txt"
 REASON_SEPARATOR = " # "
@@ -91,7 +102,11 @@ def unmatched_entries(items, entries) -> list[str]:
     )
 
 
-@pytest.hookimpl(tryfirst=True)
+def _tryfirst(func):
+    return pytest.hookimpl(tryfirst=True)(func) if pytest else func
+
+
+@_tryfirst
 def pytest_collection_modifyitems(config, items):
     mode = os.environ.get("CI_QUARANTINE_MODE", "")
     if mode not in ("exclude", "only"):
@@ -117,3 +132,57 @@ def pytest_terminal_summary(terminalreporter):
         terminalreporter.write_sep("-", "quarantine entries matching no collected test")
         for entry in _unmatched:
             terminalreporter.write_line(f"stale: {entry}")
+
+
+def effective_text(base_text: str, pr_text: str) -> tuple[str, list[str]]:
+    """(accepted list text, node ids the pull request added and so were ignored).
+
+    Only lines the base branch already has count, and only while the pull
+    request's copy still has them: the pull request may remove, never add.
+    """
+    base = parse_entries(base_text)
+    mine = parse_entries(pr_text)
+    kept = [f"{node}{REASON_SEPARATOR}{reason}" for node, reason in base.items() if node in mine]
+    ignored = sorted(node for node in mine if node not in base)
+    return "\n".join(kept) + ("\n" if kept else ""), ignored
+
+
+def _git_show(ref: str, path: str) -> str:
+    result = subprocess.run(["git", "show", f"{ref}:{path}"], capture_output=True, text=True)
+    return result.stdout if result.returncode == 0 else ""
+
+
+def resolve(base_ref: str, out: Path, listing: Path = DEFAULT_LIST) -> list[str]:
+    base_text = _git_show(base_ref, "scripts/ci/quarantine.txt")
+    try:
+        pr_text = listing.read_text(encoding="utf-8")
+    except OSError:
+        pr_text = ""
+    text, ignored = effective_text(base_text, pr_text)
+    out.write_text(text, encoding="utf-8")
+    return ignored
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="command", required=True)
+    one = sub.add_parser("resolve")
+    one.add_argument("--base", required=True)
+    one.add_argument("--out", required=True)
+    one.add_argument("--list", default=str(DEFAULT_LIST))
+    args = parser.parse_args(argv)
+    ignored = resolve(args.base, Path(args.out), Path(args.list))
+    count = len(parse_entries(Path(args.out).read_text(encoding="utf-8")))
+    line = f"Quarantine: {count} accepted entries from the base branch, {len(ignored)} additions ignored"
+    print(line)
+    for node in ignored:
+        print(f"::warning::quarantine addition ignored (add it on the base branch first): {node}")
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with open(summary, "a", encoding="utf-8") as handle:
+            handle.write(f"### {line}\n")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

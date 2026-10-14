@@ -146,3 +146,20 @@ def test_the_lane_choice(tmp_path, event, has_label, lane):
 def test_the_fast_lane_selection_runs_from_the_base_branch_copy():
     step = next(s for s in _jobs()["fast-tests"]["steps"] if s.get("id") == "select")
     assert "git show" in step["run"] and "changed_test_selection.py" in step["run"]
+
+
+def test_the_fast_job_script_is_safe_for_shellcheck():
+    runs = "\n".join(s.get("run", "") for s in _jobs()["fast-tests"]["steps"])
+    assert "$(cat fast-tests.txt)" not in runs
+    assert "mapfile -t files < fast-tests.txt" in runs
+    assert 'read -ra extra <<< "$EXTRA_BROWSERS"' in runs and '"${extra[@]}"' in runs
+    assert "xargs -r -d '\\n' pytest" in runs
+    assert "/tmp/" not in runs.replace("/tmp/archie-ci-browser-install.lock", "")
+    assert "python -I" in runs
+
+
+def test_the_lane_can_be_raised_to_full_by_the_selector():
+    changes = _jobs()["changes"]
+    assert changes["outputs"]["lane"] == "${{ steps.final.outputs.lane }}"
+    step = next(s for s in changes["steps"] if s.get("id") == "final")
+    assert "--escalate" in step["run"] and "lane=full" in step["run"]

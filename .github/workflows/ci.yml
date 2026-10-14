@@ -89,7 +89,7 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     outputs:
       is_content_only: ${{ steps.detect.outputs.is_content_only }}
-      lane: ${{ steps.lane.outputs.lane }}
+      lane: ${{ steps.final.outputs.lane }}
     steps:
       - name: Choose the lane
         # An ordinary pull-request push runs the fast lane (the cheap gates plus
@@ -115,6 +115,35 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      - name: Escalate when the fast lane cannot cover the change
+        # A change to shared test or application wiring, or a wide change that
+        # matched few tests, runs the full suite even without the label. The
+        # selector runs from the base branch's copy (the checked-out copy only
+        # for the first introduction); any failure here means the full suite.
+        id: final
+        env:
+          LANE: ${{ steps.lane.outputs.lane }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          lane="$LANE"
+          if [ "$lane" = "fast" ]; then
+            base="origin/${BASE_REF:-main}"
+            selector="${RUNNER_TEMP}/changed_test_selection.py"
+            if ! git show "${base}:scripts/ci/changed_test_selection.py" > "$selector" 2>/dev/null; then
+              selector=scripts/ci/changed_test_selection.py
+            fi
+            if reason=$(python -I "$selector" --base "$base" --escalate); then
+              if [ -n "$reason" ]; then
+                lane=full
+                echo "Full suite required: $reason"
+                echo "### Full suite runs without the label: $reason" >> "$GITHUB_STEP_SUMMARY"
+              fi
+            else
+              lane=full
+              echo "The selector failed; running the full suite."
+            fi
+          fi
+          echo "lane=$lane" | tee -a "$GITHUB_OUTPUT"
       - name: Detect content-only changes
         id: detect
         # Run the detector as it exists on the base branch, so a pull request
@@ -496,6 +525,25 @@ jobs:
       # that projection would fail or skip here on a schema production never has.
       - name: Apply the capability provenance migration
         run: flask --app manage apply-unified-capability-provenance-migration
+      - name: Accept the quarantine list from the base branch
+        # A pull request cannot quarantine its own failing test: the list that
+        # counts is the base branch's, and this pull request's copy may only
+        # remove lines. Additions are ignored and reported. Pushes to protected
+        # branches use the checked-out list, which has already been reviewed.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch --quiet --depth=1 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+            tool="${RUNNER_TEMP}/quarantine_base.py"
+            if ! git show "origin/${BASE_REF}:scripts/ci/quarantine.py" > "$tool" 2>/dev/null; then
+              tool=scripts/ci/quarantine.py
+            fi
+            python -I "$tool" resolve --base "origin/${BASE_REF}" \
+              --out "${RUNNER_TEMP}/quarantine.txt" --list scripts/ci/quarantine.txt
+            echo "CI_QUARANTINE_FILE=${RUNNER_TEMP}/quarantine.txt" >> "$GITHUB_ENV"
+          fi
       - name: Run this shard's tests with coverage and route verification
         # route_verification.json is ignored execution evidence, scoped to
         # this shard's slice of the suite; the tests job below unions every
@@ -603,15 +651,15 @@ jobs:
         # checked-out copy is the fallback for the first introduction only.
         run: |
           BASE="origin/${BASE_REF:-main}"
-          if git show "$BASE:scripts/ci/changed_test_selection.py" > /tmp/changed_test_selection.py 2>/dev/null; then
-            SELECTOR=/tmp/changed_test_selection.py
-          else
+          SELECTOR="${RUNNER_TEMP}/changed_test_selection.py"
+          if ! git show "$BASE:scripts/ci/changed_test_selection.py" > "$SELECTOR" 2>/dev/null; then
             SELECTOR=scripts/ci/changed_test_selection.py
           fi
-          python "$SELECTOR" --base "$BASE" > fast-tests.txt
+          python -I "$SELECTOR" --base "$BASE" > fast-tests.txt
           wc -l fast-tests.txt
           cat fast-tests.txt
-          echo "browsers=$(python "$SELECTOR" --browsers $(cat fast-tests.txt))" >> "$GITHUB_OUTPUT"
+          mapfile -t files < fast-tests.txt
+          echo "browsers=$(python -I "$SELECTOR" --browsers "${files[@]}")" >> "$GITHUB_OUTPUT"
           {
             echo "### Fast lane"
             echo "$(wc -l < fast-tests.txt) test files selected. The full suite runs when the pull request carries the full-ci label."
@@ -622,9 +670,10 @@ jobs:
         env:
           EXTRA_BROWSERS: ${{ steps.select.outputs.browsers }}
         run: |
+          read -ra extra <<< "$EXTRA_BROWSERS"
           for attempt in $(seq 1 10); do
             if flock /tmp/archie-ci-browser-install.lock \
-                python -m playwright install --with-deps chromium $EXTRA_BROWSERS; then
+                python -m playwright install --with-deps chromium "${extra[@]}"; then
               exit 0
             fi
             echo "Browser install attempt $attempt failed; retrying in 60 seconds."
@@ -639,13 +688,32 @@ jobs:
           flask --app manage reconcile-schema
       - name: Apply the capability provenance migration
         run: flask --app manage apply-unified-capability-provenance-migration
+      - name: Accept the quarantine list from the base branch
+        # A pull request cannot quarantine its own failing test: the list that
+        # counts is the base branch's, and this pull request's copy may only
+        # remove lines. Additions are ignored and reported. Pushes to protected
+        # branches use the checked-out list, which has already been reviewed.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch --quiet --depth=1 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+            tool="${RUNNER_TEMP}/quarantine_base.py"
+            if ! git show "origin/${BASE_REF}:scripts/ci/quarantine.py" > "$tool" 2>/dev/null; then
+              tool=scripts/ci/quarantine.py
+            fi
+            python -I "$tool" resolve --base "origin/${BASE_REF}" \
+              --out "${RUNNER_TEMP}/quarantine.txt" --list scripts/ci/quarantine.txt
+            echo "CI_QUARANTINE_FILE=${RUNNER_TEMP}/quarantine.txt" >> "$GITHUB_ENV"
+          fi
       - name: Run the selected tests
         run: |
           if [ ! -s fast-tests.txt ]; then
             echo "No test file is affected by this change."
             exit 0
           fi
-          xargs -r pytest -q --maxfail=20 -o xfail_strict=true \
+          xargs -r -d '\n' pytest -q --maxfail=20 -o xfail_strict=true \
             --junitxml=fast-tests.xml -p scripts.ci.quarantine < fast-tests.txt
       - uses: actions/upload-artifact@v6
         if: always()
@@ -727,6 +795,25 @@ jobs:
           flask --app manage reconcile-schema
       - name: Apply the capability provenance migration
         run: flask --app manage apply-unified-capability-provenance-migration
+      - name: Accept the quarantine list from the base branch
+        # A pull request cannot quarantine its own failing test: the list that
+        # counts is the base branch's, and this pull request's copy may only
+        # remove lines. Additions are ignored and reported. Pushes to protected
+        # branches use the checked-out list, which has already been reviewed.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch --quiet --depth=1 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+            tool="${RUNNER_TEMP}/quarantine_base.py"
+            if ! git show "origin/${BASE_REF}:scripts/ci/quarantine.py" > "$tool" 2>/dev/null; then
+              tool=scripts/ci/quarantine.py
+            fi
+            python -I "$tool" resolve --base "origin/${BASE_REF}" \
+              --out "${RUNNER_TEMP}/quarantine.txt" --list scripts/ci/quarantine.txt
+            echo "CI_QUARANTINE_FILE=${RUNNER_TEMP}/quarantine.txt" >> "$GITHUB_ENV"
+          fi
       - name: Run the quarantined tests
         # Exit code 5 is "nothing collected" (every entry removed or renamed).
         run: |
@@ -736,6 +823,7 @@ jobs:
         if: always()
         run: |
           python - <<'PY'
+          import json
           import os
           import xml.etree.ElementTree as ET
 
@@ -749,10 +837,14 @@ jobs:
               total += 1
               if case.find("failure") is not None or case.find("error") is not None:
                   failed.append(f"{case.get('classname', '')}::{case.get('name', '')}")
-          lines = [f"### Quarantined tests: {total} run, {len(failed)} failed (not blocking)"]
+          summary_line = f"Quarantined tests: {total} run, {len(failed)} failed (not blocking)"
+          lines = [f"### {summary_line}"]
           lines += [f"- {name}" for name in failed]
           for name in failed:
               print(f"::warning::quarantined test failed: {name}")
+          print(f"::notice title=Quarantined tests::{summary_line}")
+          with open("quarantine-report.json", "w", encoding="utf-8") as handle:
+              json.dump({"run": total, "failed": failed}, handle, indent=2)
           print("\n".join(lines))
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
               handle.write("\n".join(lines) + "\n")
@@ -761,7 +853,9 @@ jobs:
         if: always()
         with:
           name: quarantine-tests-junit
-          path: quarantine-tests.xml
+          path: |
+            quarantine-tests.xml
+            quarantine-report.json
           if-no-files-found: ignore
 
   tests:

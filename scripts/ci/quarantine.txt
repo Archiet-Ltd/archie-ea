@@ -14,6 +14,3 @@ tests/test_import_history_filters.py::test_apply_sends_filters_and_changes_visib
 tests/test_ai_model_selector_display.py::test_model_count_note[1-firefox]  # firefox timing flake on unrelated changes
 tests/test_ai_model_selector_display.py::test_model_count_note[0-webkit]  # webkit timing flake on unrelated changes
 tests/test_roadmap_modal_visibility.py::test_edit_opens_with_existing_values_and_keyboard_stays_in_dialog[chromium]  # browser timing flake on unrelated changes
-tests/test_model_viewer_back_navigation.py::test_model_viewer_navigation_and_card_contract[empty_back-firefox]  # firefox timing flake on unrelated changes
-tests/test_smoke_console_diagnostics.py::test_timer_callback_errors_are_serialized_before_being_rethrown  # timer-based browser test, recurring timing flake
-tests/test_smoke_console_diagnostics.py::test_non_transition_plain_object_rejection_remains_diagnostic  # browser timing flake on unrelated changes

@@ -3,6 +3,8 @@ a module it changes, and nothing from the browser journeys."""
 
 from pathlib import Path
 
+import pytest
+
 from scripts.ci import changed_test_selection as sel
 
 
@@ -94,11 +96,59 @@ def test_an_unparseable_test_file_does_not_stop_selection(tmp_path):
     assert sel.select_tests(["app/x.py"], root) == ["tests/test_ok.py"]
 
 
-def test_a_change_to_shared_test_configuration_is_flagged():
-    assert sel.global_impact(["tests/conftest.py", "app/x.py", "requirements.txt"]) == [
-        "requirements.txt",
-        "tests/conftest.py",
+@pytest.mark.parametrize("path", [
+    "tests/conftest.py", "pytest.ini", "requirements.txt", "requirements-test.txt",
+    "migrations/versions/abc_add_table.py", "app/__init__.py", "app/_bootstrap/context_processors.py",
+    "config.py", ".github/workflows/ci.yml", "scripts/ci/test_sharding.py",
+])
+def test_shared_wiring_forces_the_full_suite(path):
+    assert sel.escalation_reason([path, "app/x.py"], ["tests/test_x.py"])
+
+
+def test_an_ordinary_change_stays_in_the_fast_lane():
+    assert sel.escalation_reason(["app/services/pricing.py", "tests/test_pricing.py"], ["tests/test_pricing.py"]) == ""
+
+
+def test_a_wide_change_that_matched_few_tests_forces_the_full_suite():
+    changed = [f"app/area/mod{i}.py" for i in range(40)]
+    assert "40 source files" in sel.escalation_reason(changed, ["tests/test_a.py", "tests/test_b.py", "tests/test_c.py"])
+
+
+def test_a_wide_change_that_matched_many_tests_may_stay_fast():
+    changed = [f"app/area/mod{i}.py" for i in range(40)]
+    selected = [f"tests/test_{i}.py" for i in range(sel.WIDE_CHANGE_MIN_TESTS)]
+    assert sel.escalation_reason(changed, selected) == ""
+
+
+def test_a_model_class_import_reaches_the_lower_case_model_file(tmp_path):
+    root = _tree(tmp_path, {
+        "app/models/work_package.py": "class WorkPackage: pass\n",
+        "app/models/foo.py": "class Foo: pass\n",
+        "tests/test_wp.py": "from app.models import WorkPackage\n",
+        "tests/test_foo.py": "from app.models import Foo\n",
+        "tests/test_other.py": "from app.models import Bar\n",
+    })
+    assert sel.select_tests(["app/models/foo.py"], root) == ["tests/test_foo.py"]
+    assert sel.select_tests(["app/models/work_package.py"], root) == ["tests/test_wp.py"]
+
+
+def test_a_change_inside_a_module_selects_its_tests_and_anything_importing_it(tmp_path):
+    root = _tree(tmp_path, {
+        "app/modules/billing/service.py": "",
+        "app/modules/billing/tests/test_local.py": "def test(): pass\n",
+        "app/modules/other/tests/test_other.py": "def test(): pass\n",
+        "tests/test_uses_billing.py": "from app.modules.billing.views import x\n",
+        "tests/test_unrelated.py": "import app.modules.other\n",
+    })
+    assert sel.select_tests(["app/modules/billing/service.py"], root) == [
+        "app/modules/billing/tests/test_local.py",
+        "tests/test_uses_billing.py",
     ]
+
+
+def test_the_command_can_report_an_escalation(capsys):
+    assert sel.main(["--files", "tests/conftest.py", "--escalate"]) == 0
+    assert "shared wiring changed" in capsys.readouterr().out
 
 
 def test_extra_browsers_are_installed_only_when_a_selected_file_names_them(tmp_path):

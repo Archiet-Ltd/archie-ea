@@ -107,12 +107,54 @@ def test_stale_entries_are_reported():
 
 def test_the_checked_in_list_is_well_formed_and_every_entry_names_a_test_file():
     entries = q.load_entries(REPO / "scripts" / "ci" / "quarantine.txt")
-    assert entries, "the seeded list should not be empty"
     assert len(entries) <= 20, "the quarantine list is meant to stay small"
     for node_id, reason in entries.items():
         path = node_id.split("::", 1)[0]
         assert (REPO / path).is_file(), f"{node_id} names a file that does not exist"
         assert reason
+
+
+def test_a_pull_request_may_remove_lines_but_never_add_them():
+    base = "tests/a.py::t1  # r1\ntests/a.py::t2  # r2\n"
+    mine = "tests/a.py::t2  # r2\ntests/a.py::sneaky  # my own failing test\n"
+    text, ignored = q.effective_text(base, mine)
+    assert q.parse_entries(text) == {"tests/a.py::t2": "r2"}
+    assert ignored == ["tests/a.py::sneaky"]
+
+
+def test_a_pull_request_cannot_reason_its_way_onto_the_list_when_the_base_has_none():
+    text, ignored = q.effective_text("", "tests/a.py::t1  # reason\n")
+    assert text == "" and ignored == ["tests/a.py::t1"]
+
+
+def test_resolve_reads_the_base_branch_copy(tmp_path, monkeypatch):
+    monkeypatch.setattr(q, "_git_show", lambda ref, path: "tests/a.py::t1  # r\n" if ref == "origin/main" else "")
+    mine = tmp_path / "mine.txt"
+    mine.write_text("tests/a.py::t1  # r\ntests/a.py::new  # r\n", encoding="utf-8")
+    out = tmp_path / "accepted.txt"
+    assert q.resolve("origin/main", out, mine) == ["tests/a.py::new"]
+    assert q.parse_entries(out.read_text(encoding="utf-8")) == {"tests/a.py::t1": "r"}
+
+
+def test_an_empty_list_quarantines_nothing(monkeypatch, tmp_path):
+    listing = tmp_path / "empty.txt"
+    listing.write_text("# nothing quarantined\n", encoding="utf-8")
+    monkeypatch.setenv("CI_QUARANTINE_FILE", str(listing))
+    monkeypatch.setenv("CI_QUARANTINE_MODE", "exclude")
+    items = [_Item("tests/test_a.py::test_x")]
+    q.pytest_collection_modifyitems(_Config(), items)
+    assert [i.nodeid for i in items] == ["tests/test_a.py::test_x"]
+
+
+def test_every_job_that_uses_the_list_takes_it_from_the_base_branch():
+    import yaml
+
+    jobs = yaml.safe_load((REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))["jobs"]
+    for job_id in ("tests-shard", "fast-tests", "quarantine-tests"):
+        step = next(s for s in jobs[job_id]["steps"] if s.get("name", "").startswith("Accept the quarantine list"))
+        assert "resolve --base" in step["run"] and "CI_QUARANTINE_FILE" in step["run"], job_id
+        order = [s.get("name", "") for s in jobs[job_id]["steps"]]
+        assert order.index(step["name"]) < max(i for i, n in enumerate(order) if n.startswith("Run "))
 
 
 def test_the_shards_deselect_and_the_quarantine_job_selects():
