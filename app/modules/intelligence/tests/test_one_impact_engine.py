@@ -768,6 +768,8 @@ def test_owner_fetch_query_count(app, db_session, make_org):
     drown the signal.  The same delta must hold at page sizes 2, 10 and 50:
     if user-name resolution ran once per row, the delta would grow with the
     page and this test would fail."""
+    import threading
+
     import sqlalchemy as sa
 
     org = make_org("owner-query-count")
@@ -794,8 +796,14 @@ def test_owner_fetch_query_count(app, db_session, make_org):
             g.current_org_id = org_id
 
             queries = []
+            # Count only statements run on THIS thread: a background thread in
+            # the same process (scheduler, outbox relay) also issues statements
+            # through the global engine and would add noise to the delta.
+            my_ident = threading.get_ident()
 
             def _listener(conn, cur, stmt, params, context, executemany):
+                if threading.get_ident() != my_ident:
+                    return
                 if not str(stmt).startswith("SELECT set_config"):
                     queries.append(stmt)
 
