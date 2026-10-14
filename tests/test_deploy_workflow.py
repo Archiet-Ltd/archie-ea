@@ -223,7 +223,7 @@ def test_every_ci_job_is_required_or_deliberately_excluded():
 
 
 def test_the_only_exclusion_is_the_image_build_and_it_says_why():
-    assert len(dw.EXCLUDED_CHECKS) == 8
+    assert len(dw.EXCLUDED_CHECKS) == 9
     assert "Build immutable release image" in dw.EXCLUDED_CHECKS
     reason = dw.EXCLUDED_CHECKS["Build immutable release image"]
     assert "GHCR" in reason and "bind-mounted" in reason
@@ -241,6 +241,8 @@ def test_the_only_exclusion_is_the_image_build_and_it_says_why():
     # The detector job routes PR jobs only; on a push every job runs regardless of its result.
     assert "Detect changed paths" in dw.EXCLUDED_CHECKS
     assert "Detect changed paths" not in dw.REQUIRED_CHECKS
+    # The failing-first proof is informational: pull requests only, never a deploy prerequisite.
+    assert "Failing-first proof" in dw.EXCLUDED_CHECKS
     # Everything else the CI runs is required, including the jobs that are red today.
     for name in ("Tests (pytest + coverage)", "SAST (bandit)", "Browser journeys (one per archetype)",
                  "Browser compatibility (webkit)", "Browser compatibility (firefox)"):
