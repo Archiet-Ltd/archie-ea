@@ -32,6 +32,7 @@ from app.modules.enterprise_genome.services.ai_system_profile import (
     profile_from_element,
     risk_flags,
 )
+from tests._ai_eval_helpers import passing_evaluation
 from app.modules.enterprise_genome.services.ai_systems_seed import (
     ARCHIE_COPILOT_NAME,
     register_ai_system,
@@ -319,6 +320,7 @@ def test_high_risk_with_assessment_can_be_released(db_session, org):
     el = register_ai_system(db_session, org.id, name="Test System",
                             provider="anthropic", model_id="claude-opus-5")
     db_session.flush()
+    passing_evaluation(el, org.id)
     approval = propose_classification(
         element=el,
         proposed_risk_class="high",
@@ -351,6 +353,7 @@ def test_low_risk_system_can_be_released_without_assessment(db_session, org):
     el = register_ai_system(db_session, org.id, name="Test System",
                             provider="anthropic", model_id="claude-opus-5")
     db_session.flush()
+    passing_evaluation(el, org.id)
     approval = propose_classification(
         element=el,
         proposed_risk_class="minimal",
@@ -546,6 +549,7 @@ def test_can_mark_released_true_for_unclassified_system(db_session, org):
     el = register_ai_system(db_session, org.id, name="Test System",
                             provider="anthropic", model_id="claude-opus-5")
     db_session.flush()
+    passing_evaluation(el, org.id)
     # An unclassified system is not high-risk, so it can be released
     assert can_mark_released(el, org.id) is True
 
@@ -555,6 +559,7 @@ def test_can_mark_released_true_for_high_risk_with_assessment(db_session, org):
     el = register_ai_system(db_session, org.id, name="Test System",
                             provider="anthropic", model_id="claude-opus-5")
     db_session.flush()
+    passing_evaluation(el, org.id)
     approval = propose_classification(
         element=el,
         proposed_risk_class="high",
@@ -609,6 +614,7 @@ def test_release_route_refuses_without_assessment_then_releases_with_it(
     el = register_ai_system(db_session, org.id, name="Route System",
                             provider="anthropic", model_id="claude-opus-5")
     db_session.flush()
+    passing_evaluation(el, org.id)
     approval = propose_classification(
         element=el,
         proposed_risk_class="high",
@@ -693,6 +699,7 @@ def test_release_gate_and_assessment_are_org_scoped(
     el_b = register_ai_system(db_session, org_b.id, name="System B",
                               provider="anthropic", model_id="claude-opus-5")
     db_session.flush()
+    passing_evaluation(el_b, org_b.id)
 
     # A: high-risk classification accepted, no assessment (blocked).
     approval_a = propose_classification(
@@ -767,6 +774,7 @@ def test_release_before_classification_resets_release_state(db_session, org):
     el = register_ai_system(db_session, org.id, name="Released-then-classified System",
                             provider="anthropic", model_id="claude-opus-5")
     db_session.flush()
+    passing_evaluation(el, org.id)
 
     # Release while unclassified (gate does not apply).
     result = mark_released(el, org.id)
@@ -799,6 +807,7 @@ def test_stale_assessment_does_not_open_gate(db_session, org):
     el = register_ai_system(db_session, org.id, name="Stale-assessment System",
                             provider="anthropic", model_id="claude-opus-5")
     db_session.flush()
+    passing_evaluation(el, org.id)
 
     # Propose and accept an assessment while the system is unclassified.
     # This should fail because propose_assessment now refuses when there is

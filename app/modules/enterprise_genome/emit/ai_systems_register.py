@@ -144,8 +144,13 @@ def _release_cell(system: dict, can_release: bool = False, can_write: bool = Fal
 
     parts = [_cell(state)]
     if reason:
+        shown = reason
+        if state == "released" and reason.startswith("Release refused: "):
+            # A released system whose evaluation has lapsed is not being
+            # refused a release; say what the register now needs.
+            shown = "Re-evaluation needed: " + reason[len("Release refused: "):]
         parts.append(
-            f'<p class="text-xs text-destructive mt-1">{_cell(reason)}</p>'  # raw-html-ok: _cell() escapes internally
+            f'<p class="text-xs text-destructive mt-1">{_cell(shown)}</p>'  # raw-html-ok: _cell() escapes internally
         )
         if element_id is not None and reason == REFUSAL_MISSING_ASSESSMENT:
             attach = _action_form(
@@ -165,6 +170,18 @@ def _release_cell(system: dict, can_release: bool = False, can_write: bool = Fal
         )
         if release:
             parts.append(f'<div class="mt-1">{release}</div>')  # raw-html-ok: _action_form() escapes its action URL, csrf token and label
+
+    if element_id is not None:
+        from flask import has_request_context, url_for
+
+        if has_request_context():
+            href = url_for("ai_systems_genome.ai_system_evaluation", element_id=element_id)
+            # raw-html-ok: the href is escaped; the link text is a fixed literal
+            parts.append(
+                '<div class="mt-1"><a href="' + str(escape(href)) + '" '
+                'class="text-xs font-medium text-primary hover:underline" '
+                'data-testid="evaluation-link">Evaluation</a></div>'
+            )
 
     return "".join(parts)
 

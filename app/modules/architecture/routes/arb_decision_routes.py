@@ -13,8 +13,9 @@ from app.utils.pagination import safe_int_arg
 @login_required
 def link_decision_capability(decision_id):
     """ARB-002: Link a capability to an architecture decision."""
-    from app.models.architecture_decision import ArchitectureDecision, DecisionCapabilityLink
-    ArchitectureDecision.query.get_or_404(decision_id)
+    from app.models.architecture_decision import DecisionCapabilityLink
+    from app.models.architecture_decision import decision_in_active_organisation_or_404
+    decision_in_active_organisation_or_404(decision_id)
     data = request.get_json() or {}
     capability_id = data.get('capability_id')
     if not capability_id:
@@ -258,8 +259,10 @@ def create_decision():
 @login_required
 def update_decision(decision_id):
     """ARB-005: Update an architecture decision."""
-    from app.models.architecture_decision import ArchitectureDecision
-    decision = ArchitectureDecision.query.get_or_404(decision_id)
+    from app.models.architecture_decision import decision_in_active_organisation_or_404
+    decision = decision_in_active_organisation_or_404(decision_id)
+    if decision.ai_system_id is not None:
+        return jsonify({'error': 'An AI design review is decided on its review page, not edited here.'}), 403
     data = request.get_json() or {}
     updatable = ['title', 'status', 'context', 'decision', 'consequences', 'alternatives',
                  'horizon', 'authority_level', 'decision_type', 'enterprise_level',
@@ -277,13 +280,17 @@ def supersede_decision(decision_id):
     """ARB-005: Supersede a decision with a new one.
     Body: { new_decision_id: int }  — the ID of the decision that replaces this one.
     """
-    from app.models.architecture_decision import ArchitectureDecision
-    old = ArchitectureDecision.query.get_or_404(decision_id)
+    from app.models.architecture_decision import decision_in_active_organisation_or_404
+    old = decision_in_active_organisation_or_404(decision_id)
+    if old.ai_system_id is not None:
+        return jsonify({'error': 'An AI design review is decided on its review page, not superseded here.'}), 403
     data = request.get_json() or {}
     new_id = data.get('new_decision_id')
     if not new_id:
         return jsonify({'error': 'new_decision_id required'}), 400
-    new_decision = ArchitectureDecision.query.get_or_404(new_id)
+    new_decision = decision_in_active_organisation_or_404(new_id)
+    if new_decision.ai_system_id is not None:
+        return jsonify({'error': 'An AI design review cannot replace another decision.'}), 403
     if old.status == 'superseded':
         return jsonify({'error': 'Decision is already superseded'}), 400
     old.status = 'superseded'

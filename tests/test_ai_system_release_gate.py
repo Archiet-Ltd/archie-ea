@@ -27,6 +27,7 @@ from app.modules.enterprise_genome.services.ai_system_classification import (
     reject_classification,
 )
 from app.modules.enterprise_genome.services.ai_systems_seed import register_ai_system
+from tests._ai_eval_helpers import passing_evaluation
 
 BROWSER_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 
@@ -138,6 +139,7 @@ def test_gate_still_writes_its_own_keys(db_session, make_org):
     el = _system(db_session, org)
     _accept_class(db_session, el, org, "minimal")
     assert get_classification(el) == "minimal"
+    passing_evaluation(el, org.id)
     assert mark_released(el, org.id)["success"] is True
     assert get_release_state(el) == "released"
 
@@ -268,6 +270,7 @@ def test_reclassify_released_system_through_route_and_queue_resets_to_draft(
     arch = _user(db_session, org, "Architect", "arch")
     reviewer = _user(db_session, org, "Architect", "rev")
     _accept_class(db_session, el, org, "minimal")
+    passing_evaluation(el, org.id)
     assert mark_released(el, org.id)["success"] is True
 
     login_as(client, arch)
@@ -318,6 +321,7 @@ def test_unacceptable_system_cannot_be_released(db_session, make_org):
 def test_accepting_unacceptable_resets_released_system_to_draft(db_session, make_org):
     org = make_org("un2")
     el = _system(db_session, org)
+    passing_evaluation(el, org.id)
     assert mark_released(el, org.id)["success"] is True
     _accept_class(db_session, el, org, "unacceptable")
     assert get_release_state(el) == "draft"
@@ -584,6 +588,7 @@ def test_reclassification_rejects_only_this_orgs_pending_assessments(db_session,
     # B's gate is unaffected and can still release through its own assessment.
     _tick()
     accept_assessment(pending_b.id, org_b.id)
+    passing_evaluation(el_b, org_b.id)
     assert mark_released(el_b, org_b.id)["success"] is True
 
 
@@ -715,7 +720,9 @@ def test_route_chain_journey_create_then_seed_never_shows_released_high(
     assert "Fraud Scoring Engine" in by_name
     assert by_name["Fraud Scoring Engine"]["risk_class"] == "not set"
     assert by_name["Fraud Scoring Engine"]["release_state"] == "not set"
-    assert by_name["Fraud Scoring Engine"]["release_blocked_reason"] is None
+    # Nothing was released and nothing is evaluated: the only thing the
+    # register says is missing is the evaluation plan (R1-B55).
+    assert "no evaluation plan" in by_name["Fraud Scoring Engine"]["release_blocked_reason"]
 
 
 # --- L-1: classification proposals serialise on the element row --------------
@@ -817,7 +824,8 @@ def test_release_control_shown_only_to_administrators(app, db_session, make_org,
     release POST would be admitted) and for nobody else."""
     org = make_org("l4c")
     el = _system(db_session, org)
-    _accept_class(db_session, el, org, "minimal")  # releasable, no refusal reason
+    _accept_class(db_session, el, org, "minimal")
+    passing_evaluation(el, org.id)  # releasable, no refusal reason
     admin = _user(db_session, org, "Administrator", "l4admin")
     login_as(client, admin)
     body = client.get("/genome/ai-systems").get_data(as_text=True)

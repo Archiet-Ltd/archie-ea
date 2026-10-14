@@ -1,0 +1,82 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, empty_state %}
+
+{% block title %}AI design reviews — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6 space-y-6">
+  {{ page_shell(
+      title='AI design reviews',
+      subtitle='Submitted AI designs, checked against the approved patterns, the fencing rule and the oversight requirements before they are built.',
+      breadcrumb=[('Home', url_for('main.index')), ('AI design reviews', None)]
+  ) }}
+
+  {% if reviews %}
+  <table class="w-full rounded-lg border border-border bg-card text-sm" data-testid="ai-design-review-table">
+    <thead>
+      <tr class="border-b border-border text-left text-muted-foreground">
+        <th class="p-3">Reference</th>
+        <th class="p-3">Design</th>
+        <th class="p-3">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for review in reviews %}
+      <tr class="border-b border-border" data-testid="ai-design-review-row-{{ review.id }}">
+        <td class="p-3 font-mono">{{ review.decision_id or '—' }}</td>
+        <td class="p-3 font-medium text-foreground">
+          <a href="{{ url_for('ai_design_review.detail', review_id=review.id) }}" class="hover:underline">{{ review.title }}</a>
+        </td>
+        <td class="p-3" data-testid="ai-design-review-status-{{ review.id }}">{{ review.status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  {{ empty_state(icon='clipboard-check', headline='No AI designs submitted', body='Submit an AI design below and the board reviews it before it is built.', cta_label='Submit a design', cta_href='#submit-design') }}
+  {% endif %}
+
+  <div id="submit-design" class="rounded-lg border border-border bg-card p-4 max-w-2xl">
+    <h2 class="text-sm font-semibold text-muted-foreground mb-2">Submit a design</h2>
+    {% if systems %}
+    <form method="post" action="{{ url_for('ai_design_review.submit') }}" class="grid grid-cols-2 gap-2" data-testid="submit-design-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="text-xs text-muted-foreground">AI system
+        <select name="ai_system_id" class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+          {% for system in systems %}<option value="{{ system.id }}">{{ system.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="text-xs text-muted-foreground">Design title
+        <input type="text" name="title" maxlength="200" required class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+      </label>
+      <label class="text-xs text-muted-foreground">Pattern followed
+        <select name="pattern" class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+          <option value="">None named</option>
+          {% for pattern in patterns %}<option value="{{ pattern }}">{{ pattern }}</option>{% endfor %}
+          <option value="other">Other (not on the list)</option>
+        </select>
+      </label>
+      <span></span>
+      <label class="text-xs text-muted-foreground">Takes in retrieved or pasted content
+        <select name="ingests_untrusted_content" class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+          <option value="">Not answered</option><option value="yes">Yes</option><option value="no">No</option>
+        </select>
+      </label>
+      <label class="text-xs text-muted-foreground">That content is fenced before a prompt
+        <select name="untrusted_input_fenced" class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+          <option value="">Not answered</option><option value="yes">Yes</option><option value="no">No</option>
+        </select>
+      </label>
+      <label class="col-span-2 text-xs text-muted-foreground">Design description
+        <textarea name="context" rows="3" class="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"></textarea>
+      </label>
+      <div class="col-span-2">
+        <button type="submit" data-testid="submit-design-button" class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">Submit for review</button>
+      </div>
+    </form>
+    {% else %}
+    <p class="text-sm text-muted-foreground">No AI systems are registered yet. Register one in the AI Systems Register first.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

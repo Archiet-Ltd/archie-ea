@@ -16,6 +16,9 @@ Reuse
   element's ``acm_properties`` — not in ``custom_properties``.
 * The one owner record (``ApplicationOwner``) supplies the owner; no owner key
   in the profile's custom_properties.
+* The evaluation check (``ai_evaluation_service.evaluation_refusal_reason``,
+  R1-B55) is the last step of ``release_refusal_reason``: a release needs a
+  current evaluation run that meets the system's own thresholds.
 * ``AgentRegistration`` (``app/models/agent_registration.py``) governs the
   platform's own agents (owner, lifecycle status, activation gate). The AI
   system register here governs estate AI systems. The two are separate stores
@@ -620,7 +623,13 @@ def release_refusal_reason(element, organization_id: int) -> Optional[str]:
     if assessment_required(element) and not has_accepted_assessment(element, organization_id):
         return REFUSAL_MISSING_ASSESSMENT
 
-    return None
+    # R1-B55: a current, passing evaluation against the system's own
+    # thresholds. The reason names the missing or failing metric.
+    from app.modules.ai_chat.services.ai_evaluation_service import (
+        evaluation_refusal_reason,
+    )
+
+    return evaluation_refusal_reason(element, organization_id)
 
 
 def can_mark_released(element, organization_id: int) -> bool:

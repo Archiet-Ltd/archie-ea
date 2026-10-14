@@ -7,6 +7,8 @@ per migration-freeze policy.
 
 from datetime import datetime
 
+from sqlalchemy import event
+
 from .. import db
 from .mixins import TenantMixin
 
@@ -102,6 +104,19 @@ class ArchitectureDecision(TenantMixin, db.Model):
     reviewed_at = db.Column(db.DateTime, nullable=True)
     reviewed_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
 
+    # AI design conformance review (R1-B55, TB-0338, PB-0235). A board decision
+    # on an AI system's design is this same row, linked to the AI system (an
+    # ArchiMateElement the AI systems register models). ``ai_design_review``
+    # holds the submitted design declaration and, once the board decides, the
+    # deviations that were listed at that moment. Both are nullable so
+    # ``reconcile-schema`` adds them (ADR-0002); every other decision leaves
+    # them NULL.
+    ai_system_id = db.Column(
+        db.Integer, db.ForeignKey("archimate_elements.id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+    ai_design_review = db.Column(db.JSON, nullable=True)  # unrendered-field-ok: the declaration and listed deviations are shown on the AI design review page, which the register detail links to
+
     # Relationships
     created_by = db.relationship("User", foreign_keys=[created_by_id])
     decided_by = db.relationship("User", foreign_keys=[decided_by_id])
@@ -150,6 +165,8 @@ class ArchitectureDecision(TenantMixin, db.Model):
             "review_outcome": self.review_outcome,
             "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
             "reviewed_by_id": self.reviewed_by_id,
+            "ai_system_id": self.ai_system_id,
+            "ai_design_review": self.ai_design_review,
         }
 
     @property
@@ -516,3 +533,73 @@ class ArchitectureChangeNotice(db.Model):
         else:
             n = 1
         return f'ACN-{year}-{n:03d}'
+
+
+def _active_org_id():
+    from app.middleware.tenant_context import current_org_id
+
+    return current_org_id()
+
+
+def decision_in_active_organisation_or_404(decision_id):
+    """The decision with this id in the caller's ACTIVE organisation, or 404.
+
+    ``Model.query.get_or_404`` is a primary-key lookup and bypasses the tenant
+    filter, so it would hand one organisation another's decision. This names the
+    organisation, and answers 404 when it is unknown.
+    """
+    from flask import abort
+
+    org_id = _active_org_id()
+    if org_id is None:
+        abort(404)
+    return ArchitectureDecision.query.filter_by(
+        id=decision_id, organization_id=org_id
+    ).first_or_404()
+
+
+class AIDesignDecisionLocked(ValueError):
+    """An AI design review's decision can only change through the conformance service."""
+
+
+_AI_DESIGN_LOCKED_FIELDS = (
+    "status", "decided_by_id", "decided_at", "approved_by_id", "approved_at",
+    "rejection_reason", "ai_system_id", "ai_design_review", "created_by_id",
+    "superseded_by_id",
+)
+
+
+def _was_linked(state, target):
+    """Whether the row is an AI design review as stored, judged from the loaded
+    value and not the pending one: unlinking it in the same flush must not make
+    it look like an ordinary decision."""
+    history = state.attrs["ai_system_id"].history
+    stored = history.deleted[0] if history.deleted else target.ai_system_id
+    return stored is not None
+
+
+@event.listens_for(ArchitectureDecision, "before_update")
+def _ai_design_decision_status_is_the_boards(mapper, connection, target):
+    """The board's decision on an AI design (a row with ``ai_system_id``) is made,
+    and only made, by ``ai_design_conformance_service.record_decision``, which
+    writes with a single guarded UPDATE statement and never reaches this ORM
+    event. Any ORM write that changes the status, the decision fields or the
+    AI-system link of such a row, from any route now or later, is refused here."""
+    from sqlalchemy import inspect
+
+    state = inspect(target)
+    if not _was_linked(state, target):
+        return
+    for attribute in _AI_DESIGN_LOCKED_FIELDS:
+        if state.attrs[attribute].history.has_changes():
+            raise AIDesignDecisionLocked(
+                "An AI design review is decided on its review page, not edited here."
+            )
+
+
+@event.listens_for(ArchitectureDecision, "before_delete")
+def _ai_design_decision_is_not_deleted(mapper, connection, target):
+    from sqlalchemy import inspect
+
+    if _was_linked(inspect(target), target):
+        raise AIDesignDecisionLocked("An AI design review is a board record and is not deleted.")

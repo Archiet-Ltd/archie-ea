@@ -135,6 +135,18 @@ def is_ai_system(element) -> bool:
     return isinstance(props, dict) and AI_SYSTEM_MARKER in props
 
 
+def recorded_model_id(element):
+    """The model id recorded on the AI-system profile, or ``None`` when none is
+    recorded. The one reader: ``profile_from_element`` and the evaluation
+    check both use it, so they cannot disagree about which model a system
+    runs."""
+    props = element.custom_properties or {}
+    ai = props.get(AI_SYSTEM_MARKER) or {}
+    if not isinstance(ai, dict):
+        return None
+    return (ai.get("model_id") or "").strip() or None
+
+
 def profile_from_element(element) -> dict:
     """Project one AI-system ``ArchiMateElement`` into a typed profile dict.
 
@@ -156,7 +168,7 @@ def profile_from_element(element) -> dict:
     if not isinstance(gov, dict):
         gov = {}
 
-    model_id = (ai.get("model_id") or "").strip() or None
+    model_id = recorded_model_id(element)
 
     def _tri(val):
         # A tri-state governance flag: True / False / "unknown" (unrecorded).

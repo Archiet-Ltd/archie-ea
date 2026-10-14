@@ -234,6 +234,8 @@ else:
     # before the model that references it.
     from .agent_charter import *  # noqa - AgentCharter (R1-B22)
     from .agent_registration import *  # noqa - AgentRegistration (R1-B56)
+    from .ai_evaluation_plan import *  # noqa - AIEvaluationPlan (R1-B55)
+    from .ai_evaluation_run import *  # noqa - AIEvaluationRun (R1-B55)
 
     # Derivation Audit Models - APQC to ArchiMate derivation tracking (Phase 6.1)
 

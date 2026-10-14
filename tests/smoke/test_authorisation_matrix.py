@@ -204,6 +204,14 @@ POLICY = {
         "arb_member", "portfolio_manager", "cto", "security_architect",
         "data_architect", "compliance", "risk",
     },
+    # R1-B55: AI design conformance review list. Gated on the "governance"
+    # section (can_access_section), the same predicate and the same ten
+    # personas as the CTO scorecard above; the other personas are refused.
+    "/architecture/ai-design-reviews/": {
+        "solution_architect", "enterprise_architect", "business_architect",
+        "arb_member", "portfolio_manager", "cto", "security_architect",
+        "data_architect", "compliance", "risk",
+    },
     # The organisation's audit trail (query, export, verify). Gated by
     # governance_gate_reader_required: administrators, plus security
     # architects as readers. Every other persona is denied.
@@ -1385,3 +1393,116 @@ def test_ai_system_owner_delete_route_authorisation(
         max_redirects=0,
     )
     _expect_gate(response, archetype, AI_SYSTEMS_OWNER_WRITE_PERMITTED, "owner delete")
+
+
+# --- R1-B55: evaluation plan, run and release-check routes; AI design review --
+
+AI_DESIGN_REVIEW_PERMITTED = {
+    "solution_architect", "enterprise_architect", "business_architect",
+    "arb_member", "portfolio_manager", "cto", "security_architect",
+    "data_architect", "compliance", "risk", "platform_admin",
+}
+AI_DESIGN_DECISION_PERMITTED = {"arb_member", "platform_admin"}
+AI_EVALUATION_WRITE_PERMITTED = AI_SYSTEMS_ASSESS_PERMITTED
+
+
+@pytest.fixture
+def seeded_ai_design_review(seeded):
+    """A design under review on a fresh AI system in the seeded org, submitted by
+    no one in particular, so every probe has its own undecided review (a
+    permitted archetype's decision never leaves a decided one for the next)."""
+    import uuid
+
+    from app import create_app, db
+    from app.modules.ai_chat.services import ai_design_conformance_service as svc
+    from app.modules.enterprise_genome.services.ai_systems_seed import (
+        register_ai_system,
+    )
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        element = register_ai_system(
+            db.session, org_id, name="Matrix design probe %s" % uuid.uuid4().hex[:6],
+            provider="anthropic", model_id="claude-opus-5",
+        )
+        row = svc.submit_design(
+            element_id=element.id, organization_id=org_id, submitter_id=None,
+            title="Matrix probe design", context="", declaration={},
+        )
+        db.session.commit()
+        return row.id
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_ai_design_review_detail_route_authorisation(
+    archetype, page, live_server, seeded, seeded_ai_design_review
+):
+    """GET /architecture/ai-design-reviews/<id> carries the same governance
+    section gate as the list."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.get(
+        live_server + "/architecture/ai-design-reviews/%d" % seeded_ai_design_review,
+        max_redirects=0,
+    )
+    _expect_gate(response, archetype, AI_DESIGN_REVIEW_PERMITTED, "design review detail")
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_ai_design_review_submit_route_authorisation(
+    archetype, page, live_server, seeded, seeded_ai_system_element
+):
+    """POST /architecture/ai-design-reviews/submit is gated on the governance
+    section, like the pages it sits beside."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.post(
+        live_server + "/architecture/ai-design-reviews/submit",
+        form={"csrf_token": _csrf_token(page), "ai_system_id": "0", "title": "probe"},
+        max_redirects=0,
+    )
+    _expect_gate(response, archetype, AI_DESIGN_REVIEW_PERMITTED, "design review submit")
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_ai_design_review_decision_route_authorisation(
+    archetype, page, live_server, seeded, seeded_ai_design_review
+):
+    """POST /architecture/ai-design-reviews/<id>/decision is requires_role
+    arb_member: the board member decides; no other persona does."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.post(
+        live_server + "/architecture/ai-design-reviews/%d/decision" % seeded_ai_design_review,
+        form={"csrf_token": _csrf_token(page), "decision": "reject", "rationale": "probe"},
+        max_redirects=0,
+    )
+    _expect_gate(response, archetype, AI_DESIGN_DECISION_PERMITTED, "design review decision")
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_ai_system_evaluation_page_is_open_to_every_signed_in_persona(
+    archetype, page, live_server, seeded, seeded_ai_system_element
+):
+    """GET /genome/ai-systems/<id>/evaluation is @login_required only, like the
+    register it belongs to; the system is fenced to the caller's organisation."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.get(
+        live_server + "/genome/ai-systems/%d/evaluation" % seeded_ai_system_element,
+        max_redirects=0,
+    )
+    assert response.status == 200, "%s got %s" % (archetype, response.status)
+
+
+@pytest.mark.parametrize("route", ["evaluation/plan", "evaluation/run", "release-check"])
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_ai_system_evaluation_write_routes_authorisation(
+    archetype, route, page, live_server, seeded, seeded_ai_system_element
+):
+    """The plan, run and release-check POST routes are
+    permission_required(GENERAL), the same gate as classify and assess."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.post(
+        live_server + "/genome/ai-systems/%d/%s" % (seeded_ai_system_element, route),
+        form={"csrf_token": _csrf_token(page)},
+        max_redirects=0,
+    )
+    _expect_gate(response, archetype, AI_EVALUATION_WRITE_PERMITTED, route)
