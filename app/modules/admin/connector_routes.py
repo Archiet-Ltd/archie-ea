@@ -387,6 +387,19 @@ def m365_config_save():
         flash(str(exc), "error")
         return redirect(url_for("m365_connector.m365_config"))
 
+    if teams_webhook_url:
+        from app.services.m365_service import validate_teams_webhook_url
+
+        try:
+            validate_teams_webhook_url(teams_webhook_url)
+        except ValueError:  # BlockedOutboundURL
+            flash(
+                "The Teams webhook address must be a Microsoft Teams incoming "
+                "webhook (https).",
+                "error",
+            )
+            return redirect(url_for("m365_connector.m365_config"))
+
     existing = _load_org_connector(org_id, connector_type="m365")
     action = CONNECTOR_ACTION_UPDATE if existing else "create"
     payload = {
