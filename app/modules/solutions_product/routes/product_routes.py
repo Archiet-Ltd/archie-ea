@@ -419,6 +419,7 @@ def stop_preview_product(solution_id, bundle_id):
 
     if not _solution_in_active_org(solution_id):
         return _bundle_not_found(solution_id, bundle_id, with_detail=False)
+    # tenant-scoping-ok: keyed to the solution proven in the active organisation just above
     if not SolutionCodeBundle.query.filter_by(solution_id=solution_id, bundle_id=bundle_id).first():
         return _bundle_not_found(solution_id, bundle_id, with_detail=False)
 
