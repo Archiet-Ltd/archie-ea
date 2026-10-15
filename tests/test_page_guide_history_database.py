@@ -2,7 +2,7 @@
 
 Requires PostgreSQL; collected but not executed on the no-database workstation.
 No provider or generation boundary is invoked. User/session isolation is tested
-explicitly because ChatMessageEmbedding has no organization_id column.
+explicitly with organisation-scoped ChatMessageEmbedding rows.
 """
 import uuid
 from datetime import datetime, timedelta
@@ -38,13 +38,16 @@ def test_saved_history_read_clear_remain_user_and_scope_isolated(
     db_session.flush()
     user_ids = [user.id for user in users]
     rows = []
+    org_by_user_id = {user.id: user.organization_id for user in users}
 
     def add(user_id, page, scope, content, role='assistant'):
         row = ChatMessageEmbedding(
             user_id=user_id, chat_session_id=f'guide_user_{user_id}_{page}_{scope}',
             message_role=role, message_text=content, domain='guide',
             created_at=datetime(2026, 1, 1) + timedelta(seconds=len(rows)),
-            metadata_json={'page_key': page, 'scope_key': scope, 'guide_mode': True})
+            metadata_json={'page_key': page, 'scope_key': scope, 'guide_mode': True},
+            organization_id=org_by_user_id[user_id],
+        )
         db_session.add(row)
         rows.append(row)
 

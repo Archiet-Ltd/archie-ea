@@ -9,3 +9,5 @@ from app.modules.ai_chat.services.llm_cache import (  # noqa: F401
     LLMCache,
     get_cache,
 )
+
+get_llm_cache = get_cache

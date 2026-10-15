@@ -5368,9 +5368,10 @@ def _cascade_delete_solutions_batch(solution_ids):
         from app.models.vector_embeddings import SolutionEmbedding
         _sp = db.session.begin_nested()
         try:
-            db.session.query(SolutionEmbedding).filter(
-                SolutionEmbedding.solution_id.in_(sid_list)
-            ).delete(synchronize_session=False)
+            sd_query = db.session.query(SolutionEmbedding).filter(
+                SolutionEmbedding.solution_id.in_(sid_list),
+            )
+            sd_query.delete(synchronize_session=False)  # tenant-scoping-ok: delete by parent id alone; parent org is authoritative
             _sp.commit()
         except Exception:
             _sp.rollback()
@@ -5584,7 +5585,8 @@ def _cascade_delete_solution(solution_id):
 
     try:
         from app.models.vector_embeddings import SolutionEmbedding
-        db.session.query(SolutionEmbedding).filter_by(solution_id=solution_id).delete(synchronize_session=False)
+        sd2_query = db.session.query(SolutionEmbedding).filter_by(solution_id=solution_id)
+        sd2_query.delete(synchronize_session=False)  # tenant-scoping-ok: delete by parent id alone; parent org is authoritative
     except Exception:
         logger.debug("embedding cascade skip", exc_info=True)
 

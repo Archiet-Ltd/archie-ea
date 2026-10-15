@@ -110,13 +110,19 @@ def _column_snapshot(target):
 
 def _make_after_insert(table_label: str):
     def _after_insert(mapper, connection, target):
+        # Use a savepoint so a failure in the audit write does not
+        # abort the entire transaction — the exception is caught but
+        # psycopg2 still marks the connection dead without a rollback.
+        savepoint = connection.begin_nested()
         try:
             record_id = getattr(target, "id", None)
             _write_audit(
                 connection, "create", table_label, record_id,
                 new_value=_column_snapshot(target),
             )
+            savepoint.commit()
         except Exception:
+            savepoint.rollback()
             logger.debug("audit after_insert failed for %s", table_label, exc_info=True)
 
     return _after_insert
@@ -124,6 +130,7 @@ def _make_after_insert(table_label: str):
 
 def _make_after_update(table_label: str):
     def _after_update(mapper, connection, target):
+        savepoint = connection.begin_nested()
         try:
             record_id = getattr(target, "id", None)
 
@@ -139,13 +146,16 @@ def _make_after_update(table_label: str):
                     new_val[key] = _json_safe(hist.added[0] if hist.added else None)
 
             if not old_val and not new_val:
+                savepoint.rollback()
                 return  # nothing auditable changed
 
             _write_audit(
                 connection, "update", table_label, record_id,
                 old_value=old_val, new_value=new_val,
             )
+            savepoint.commit()
         except Exception:
+            savepoint.rollback()
             logger.debug("audit after_update failed for %s", table_label, exc_info=True)
 
     return _after_update
@@ -153,13 +163,16 @@ def _make_after_update(table_label: str):
 
 def _make_after_delete(table_label: str):
     def _after_delete(mapper, connection, target):
+        savepoint = connection.begin_nested()
         try:
             record_id = getattr(target, "id", None)
             _write_audit(
                 connection, "delete", table_label, record_id,
                 old_value=_column_snapshot(target),
             )
+            savepoint.commit()
         except Exception:
+            savepoint.rollback()
             logger.debug("audit after_delete failed for %s", table_label, exc_info=True)
 
     return _after_delete
