@@ -352,6 +352,14 @@ def _construct(model, kwargs):
         return row
 
 
+# Columns whose generic value (the model default, or none) puts the row in a state
+# the routes under test do not act on. Stated here, not inferred from a CHECK:
+# "submitted" with no review cycle is the legacy shape the typed-review constraint
+# allows, and is the state the review-board workflow routes operate on.
+SEED_VALUES = {
+    ("arb_review_items", "status"): "submitted",
+}
+
 _NOT_CONSTRAINED = object()
 
 
@@ -359,7 +367,7 @@ def _check_constrained_value(col):
     """A string column named by a CHECK constraint cannot carry a free-text marker.
 
     ``col IN ('a', 'b')`` admits only its listed values, so the first listed value
-    is used (a value the column's own default does not already supply). Any other
+    is used when the column has no default of its own. Any other
     CHECK that names a nullable column (a "typed shape" rule that wants a group of
     columns NULL together) is satisfied by leaving it NULL. A non-nullable column
     under such a rule has no generic value, so the caller keeps its marker.
@@ -374,8 +382,13 @@ def _check_constrained_value(col):
         text = str(constraint.sqltext)
         if not re.search(r"\b%s\b" % re.escape(col.name), text):
             continue
-        listed = re.search(r"\b%s\s+IN\s*\(([^)]*)\)" % re.escape(col.name), text)
-        if listed:
+        # Only a constraint that is nothing but the IN list names the column's
+        # whole domain; a column inside a larger rule keeps whatever the model's
+        # own default supplies.
+        listed = re.fullmatch(
+            r"\s*\(?\s*%s\s+IN\s*\(([^)]*)\)\s*\)?\s*" % re.escape(col.name), text
+        )
+        if listed and col.default is None and col.server_default is None:
             values = re.findall(r"'([^']*)'", listed.group(1))
             if values:
                 return values[0]
@@ -445,6 +458,9 @@ class Seeder:
             return self.org_id
         if col.name == "adm_phase":
             return "A"
+        override = SEED_VALUES.get((col.table.name, col.name))
+        if override is not None:
+            return override
         if col.foreign_keys:
             if col.nullable and _check_constrained_value(col) is None:
                 # A CHECK constraint ties this reference to the others (a typed

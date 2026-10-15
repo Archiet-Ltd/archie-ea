@@ -660,16 +660,20 @@ def test_concurrent_same_revision_freeze_serializes_and_leaves_one_version(
         event.remove(engine, "after_cursor_execute", pause_first)
 
     assert first.is_alive() is False and second.is_alive() is False
-    # The second worker names the same immutable operation (same actor, same
-    # payload, same option revision) under a rotated transport key. The database
-    # claim reconciles it to the first worker's result instead of rerunning the
-    # handler, so it is a replay of the one version, not a second one and not an
-    # error.
-    assert errors == []
-    assert len(results) == 2
-    assert sorted(result.created for result in results) == [False, True]
-    assert sorted(result.idempotent for result in results) == [False, True]
-    assert len({result.object_ids["option_version_id"] for result in results}) == 1
+    # Two interleavings are legitimate and the outcome depends on timing. If the
+    # second worker is blocked on the row lock when the first commits, it finds
+    # the revision moved and fails with stale_revision. If it only claims after
+    # the first result exists, the database claim reconciles its rotated
+    # transport key to that result and it is a replay. Either way exactly one
+    # worker created the version and nobody else created a second.
+    assert len(errors) <= 1
+    for error in errors:
+        assert isinstance(error, CommandConflict) and error.reason == "stale_revision"
+    assert len(results) + len(errors) == 2
+    assert sum(1 for result in results if result.created) == 1
+    assert {result.object_ids["option_version_id"] for result in results} != set() and len(
+        {result.object_ids["option_version_id"] for result in results}
+    ) == 1
     with Session(engine) as session:
         root = session.get(TransformationOption, scope.option_ids[0])
         count = session.scalar(
