@@ -1353,9 +1353,14 @@ def test_concurrent_same_revision_brief_freeze_serializes_one_snapshot(app, deci
         event.remove(engine, "after_cursor_execute", pause_first)
 
     assert first.is_alive() is False and second.is_alive() is False
-    assert len(results) == 1
-    assert len(errors) == 1 and isinstance(errors[0], CommandConflict)
-    assert errors[0].reason == "stale_revision"
+    # The second worker names the same immutable operation under a rotated
+    # transport key; the database claim reconciles it to the first worker's
+    # result (a replay of the one snapshot), it does not rerun the handler.
+    assert errors == []
+    assert len(results) == 2
+    assert sorted(result.created for result in results) == [False, True]
+    assert sorted(result.idempotent for result in results) == [False, True]
+    assert len({result.object_ids["decision_brief_version_id"] for result in results}) == 1
     with Session(engine) as session:
         assert session.scalar(
             select(func.count())

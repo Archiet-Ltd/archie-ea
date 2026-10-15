@@ -660,9 +660,16 @@ def test_concurrent_same_revision_freeze_serializes_and_leaves_one_version(
         event.remove(engine, "after_cursor_execute", pause_first)
 
     assert first.is_alive() is False and second.is_alive() is False
-    assert len(results) == 1
-    assert len(errors) == 1 and isinstance(errors[0], CommandConflict)
-    assert errors[0].reason == "stale_revision"
+    # The second worker names the same immutable operation (same actor, same
+    # payload, same option revision) under a rotated transport key. The database
+    # claim reconciles it to the first worker's result instead of rerunning the
+    # handler, so it is a replay of the one version, not a second one and not an
+    # error.
+    assert errors == []
+    assert len(results) == 2
+    assert sorted(result.created for result in results) == [False, True]
+    assert sorted(result.idempotent for result in results) == [False, True]
+    assert len({result.object_ids["option_version_id"] for result in results}) == 1
     with Session(engine) as session:
         root = session.get(TransformationOption, scope.option_ids[0])
         count = session.scalar(
