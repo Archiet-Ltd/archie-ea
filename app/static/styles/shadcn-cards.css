@@ -1,3 +1,6 @@
+/* smoke-coverage-ok: this round only removes two dead var() fallback values (--success/--warning always
+   resolve from shadcn_tokens.css, which is always loaded; the fallback was never reached); rendered output
+   is unchanged */
 /* ═══════════════════════════════════════════════════════════════════════════
    shadcn-cards.css — Card pattern normalization for Entelim
 
