@@ -11,6 +11,7 @@ Uses `requests` (already in requirements.txt) for webhook HTTP calls.
 import json
 import logging
 import os
+import re
 import time
 from datetime import datetime
 
@@ -25,6 +26,16 @@ _RETRY_DELAYS = [1, 2, 4]
 
 # Webhook HTTP timeout
 _WEBHOOK_TIMEOUT_SECONDS = 10
+
+# The only environment variables a webhook may name as its auth token source.
+# A name outside this pattern is never read, so a stored row cannot be used to
+# send DATABASE_URL, SECRET_KEY or an API key to an outside URL.
+WEBHOOK_AUTH_ENV_PATTERN = re.compile(r"^WEBHOOK_TOKEN_[A-Z0-9_]{1,40}$")
+
+
+def is_allowed_auth_header_env(name):
+    return isinstance(name, str) and bool(WEBHOOK_AUTH_ENV_PATTERN.fullmatch(name))
+
 
 # Valid event types
 VALID_EVENT_TYPES = {"spec_changed", "drift_detected", "compliance_failed"}
@@ -130,13 +141,34 @@ class DriftRemediationService:
 
         Returns True on success, False on failure.
         """
+        from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
+
         headers = {"Content-Type": "application/json"}
 
-        # Inject auth header from env var if configured
+        # Re-check the target at send time: rows stored before validation
+        # existed, or a host whose DNS now points inside, must not be called.
+        try:
+            validate_user_supplied_url(webhook.url)
+        except (BlockedOutboundURL, ValueError) as exc:
+            logger.warning("Webhook %s not sent: target refused (%s)", webhook.id, exc)
+            webhook.last_triggered_at = datetime.utcnow()
+            webhook.last_status = "failed"
+            webhook.failure_count = (webhook.failure_count or 0) + 1
+            db.session.commit()
+            return False
+
+        # Inject auth header from env var if configured. Only allow-listed
+        # names are read; anything else is ignored without touching os.environ.
         if webhook.auth_header_env:
-            auth_token = os.environ.get(webhook.auth_header_env)
-            if auth_token:
-                headers["Authorization"] = f"Bearer {auth_token}"
+            if is_allowed_auth_header_env(webhook.auth_header_env):
+                auth_token = os.environ.get(webhook.auth_header_env)
+                if auth_token:
+                    headers["Authorization"] = f"Bearer {auth_token}"
+            else:
+                logger.warning(
+                    "Webhook %s has a non-allow-listed auth_header_env; ignored",
+                    webhook.id,
+                )
 
         max_retries = webhook.retry_count or 3
         last_error = None
@@ -149,6 +181,7 @@ class DriftRemediationService:
                     headers=headers,
                     timeout=_WEBHOOK_TIMEOUT_SECONDS,
                     verify=True,
+                    allow_redirects=False,
                 )
 
                 if resp.status_code < 400:

@@ -16,6 +16,14 @@ import pytest
 pytestmark = pytest.mark.usefixtures("db_session")
 
 
+@pytest.fixture(autouse=True)
+def _internal_targets_allowed(app, monkeypatch):
+    """These tests are about the solution fence, not URL safety, and use
+    placeholder hosts that do not resolve. Internal targets are off by default,
+    so opt in the way a developer would."""
+    monkeypatch.setitem(app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", True)
+
+
 def _user(db_session, org_id, label):
     from werkzeug.security import generate_password_hash
 
