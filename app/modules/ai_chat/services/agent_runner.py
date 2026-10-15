@@ -182,6 +182,8 @@ class AgentRunner:
         self._context_text = ""
         self._estate_question = None
         self._nudged = False
+        self._gate_cache = None
+        self._context_struct = None
         # Tokens of the model call in flight, held back until the gate has
         # judged the text so a refused answer is never partly shown.
         self._held_tokens: Optional[list] = None
@@ -528,9 +530,11 @@ class AgentRunner:
         # earlier assistant turns do not: a fact someone asserted is not a fact
         # on record.
         self._grounding = Grounding()
+        self._grounding.add_context(self._context_struct)
         self._grounding.add_context(self._context_text)
-        self._estate_question = classify_estate_question(user_message)
+        self._estate_question = self._classify_estate(user_message, context)
         self._nudged = False
+        self._gate_cache = None
 
         # Get provider, model, and first available API key
         try:
@@ -641,7 +645,7 @@ class AgentRunner:
                     base_url=base_url,
                 )
             except Exception as e:
-                self._release_held_tokens(True)
+                self._release_held_tokens(False)
                 logger.exception("AgentRunner LLM call failed (iteration %d)", iteration)
                 return self._finalize(
                     self._fallback(f"LLM call failed: {e}"),
@@ -854,6 +858,8 @@ class AgentRunner:
                 # documents) is data, not instruction: it is fenced.
                 from app.modules.ai_chat.services.architect_persona_charters import fence_untrusted
 
+                # The structured rows the model is handed ground its answer.
+                self._context_struct = raw_ctx
                 ctx_block = fence_untrusted(
                     "LIVE ARCHITECTURE DATA", self._serialise_context(raw_ctx)
                 )
@@ -899,7 +905,7 @@ class AgentRunner:
         # What the turn may state: the fenced blocks the model was handed.
         # The client-supplied solution name is not grounding; the live-data and
         # portfolio blocks the system built are.
-        self._context_text = portfolio_block + ctx_block
+        self._context_text = portfolio_block
         return _AGENT_PREFIX + solution_block + portfolio_block + ctx_block + persona_note
 
     # ------------------------------------------------------------------ #
@@ -1470,22 +1476,53 @@ class AgentRunner:
             logger.warning("AgentRunner: failed to write run record", exc_info=True)
             return "Run record could not be written — the run completed but was not recorded"
 
+    @staticmethod
+    def _classify_estate(user_message: str, context) -> Optional[str]:
+        """The answer kind when this message is an estate question, else None.
+        A question is an estate question only if its wording asks one AND it
+        names an element or application of the organisation (same fenced
+        lookup the gate uses) or the request carries solution or element
+        context. Generic architecture questions are never estate questions."""
+        kind = classify_estate_question(user_message)
+        if not kind:
+            return None
+        if isinstance(context, dict) and (context.get("solution_id") or context.get("element_id")):
+            return kind
+        try:
+            from app.middleware.tenant_context import current_org_id
+
+            if organisation_names_in_text(user_message, current_org_id()):
+                return kind
+        except Exception:
+            logger.warning("AgentRunner: estate question lookup failed", exc_info=True)
+        return None
+
     def _find_uncited(self, text: str) -> list:
-        """Run the citation gate on *text* for this turn. An estate question
-        that reached its answer with no tool result is refused outright."""
+        """Run the citation gate on *text* for this turn, once per distinct
+        text. A failure of the gate or of the organisation-name lookup fails
+        CLOSED for an estate answer (an estate question, or a turn in which a
+        tool ran) and open only for a turn that never touched the estate."""
+        cached = self._gate_cache
+        if cached is not None and cached[0] == text:
+            return cached[1]
         try:
             from app.middleware.tenant_context import current_org_id
 
             org_names = organisation_names_in_text(text, current_org_id())
+            uncited = find_uncited_claims(
+                text,
+                self._grounding,
+                org_names=org_names,
+                estate_question=bool(self._estate_question),
+            )
         except Exception:
-            logger.warning("AgentRunner: organisation name lookup failed", exc_info=True)
-            org_names = set()
-        return find_uncited_claims(
-            text,
-            self._grounding,
-            org_names=org_names,
-            estate_question=bool(self._estate_question),
-        )
+            logger.warning("AgentRunner: citation gate failed", exc_info=True)
+            if self._estate_question or self._grounding.tool_results > 0:
+                uncited = [{"claim": "", "unsupported": ["the citation check could not run"]}]
+            else:
+                uncited = []
+        self._gate_cache = (text, uncited)
+        return uncited
 
     CITATION_REFUSAL = (
         "Not recorded: I can't give this answer, because it states facts about "
@@ -1506,14 +1543,7 @@ class AgentRunner:
         text = result.get("response")
         if result.get("error") or not isinstance(text, str) or not text.strip():
             return
-        try:
-            uncited = self._find_uncited(text)
-        except Exception:
-            # The gate failing closed would take every answer with it; a
-            # failure is logged and the answer is marked unchecked.
-            logger.warning("AgentRunner: citation gate failed", exc_info=True)
-            result["citation_gate"] = {"checked": False, "refused": False, "uncited_count": 0}
-            return
+        uncited = self._find_uncited(text)
         # Counts only: the result is spread into the stream's done event, and
         # the claims withheld must not reach the browser. They go to the run
         # record (see _record_run) and the log.

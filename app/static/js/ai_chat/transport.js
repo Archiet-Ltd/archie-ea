@@ -215,7 +215,9 @@
                         /* When the server's citation gate refused the answer, its
                            response is what the user sees, whatever was streamed
                            before it. */
-                        if (ev.citation_gate && ev.citation_gate.refused && ev.response) {
+                        if (ev.error && ev.response) {
+                            full = ev.response; /* partial tokens of a failed call are not shown */
+                        } else if (ev.citation_gate && ev.citation_gate.refused && ev.response) {
                             full = ev.response;
                         } else if (!full && ev.response) {
                             full = ev.response;

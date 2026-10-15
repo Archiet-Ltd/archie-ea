@@ -1599,6 +1599,19 @@ class ToolExecutor:
                 "reason": exc.reason,
             }
         body = envelope.present(record)
+        # The records the question was about (its seeds), named, so an answer
+        # that says "if X fails" cites X from the same result.
+        try:
+            from app.middleware.tenant_context import current_org_id
+            from app.modules.intelligence.services.query_service import _resolve_elements_batch
+
+            params = body.get("params") or {}
+            seeds = list(params.get("element_ids") or [])
+            if params.get("element_id") is not None:
+                seeds.append(params["element_id"])
+            body["subject_elements"] = _resolve_elements_batch(seeds, current_org_id())
+        except Exception:
+            body["subject_elements"] = {}
         rows = body.get("rows") or []
         citations = body.get("citations") or []
         shown = rows[: self.ANSWER_TOOL_MAX_ROWS]

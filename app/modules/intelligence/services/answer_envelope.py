@@ -101,8 +101,15 @@ def as_whole_number(raw: Any, name: str = "value") -> Any:
     """A positive whole number from an int or a string of digits, else *raw*
     unchanged (so ``normalise_params`` refuses it by name). The one coercer for
     ids that arrive as text from a model or a client."""
-    if isinstance(raw, str) and raw.strip().isdigit():
-        return _as_int(int(raw.strip()), name)
+    if isinstance(raw, str):
+        text = raw.strip()
+        # ASCII decimal digits only: str.isdigit() accepts superscripts and
+        # other digit-like characters that int() then refuses.
+        if text and text.isascii() and text.isdecimal():
+            try:
+                return _as_int(int(text), name)
+            except (ValueError, AnswerParamError):
+                return raw
     return raw
 
 
@@ -117,7 +124,8 @@ _QUESTION_CUES = (
         re.compile(
             r"what\s+(breaks|stops|fails|is affected|would break|depends)|"
             r"\bblast radius\b|\bimpact (of|if)\b|\bif\b.+\b(fails?|goes down|is retired|is decommissioned)\b|"
-            r"\b(depends?|depend) on\b|\bwhat (calls|uses)\b|\bwho owns\b",
+            r"\b(depends?|depend) on\b|\bwhat (calls|uses)\b|\bwho owns\b|"
+            r"\b(relies|rely|relied) on\b|\bconnected to\b|\b(everything|anything|which|what|list)\b.*\b(uses?|relies|connected)\b",
             re.I,
         ),
     ),

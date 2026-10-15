@@ -8,7 +8,26 @@ import pytest
 pytestmark = [pytest.mark.smoke]
 
 
-def test_the_browser_shows_the_refusal_when_a_preface_was_streamed_first(tmp_path):
+_REFUSED = (
+    [
+        {"type": "token", "text": "Payments Gateway depends on Exadata."},
+        {"type": "done", "response": "Not recorded: refused", "sources": [],
+         "citation_gate": {"checked": True, "refused": True, "uncited_count": 1}},
+    ],
+    "Not recorded: refused",
+)
+_FAILED = (
+    [
+        {"type": "token", "text": "Payments Gateway depends on Exadata and"},
+        {"type": "done", "response": "The AI request could not be completed.",
+         "error": "connection reset", "sources": []},
+    ],
+    "The AI request could not be completed.",
+)
+
+
+@pytest.mark.parametrize("events,expected", [_REFUSED, _FAILED])
+def test_the_browser_shows_the_server_answer_not_what_streamed_first(tmp_path, events, expected):
     """Run the real transport.js against a scripted event stream: tokens of an
     unsupported text arrive, then a done event whose citation gate refused.
     The text the user ends up with is the refusal."""
@@ -22,11 +41,6 @@ def test_the_browser_shows_the_refusal_when_a_preface_was_streamed_first(tmp_pat
         pytest.skip("node is not installed")
     root = Path(__file__).resolve().parents[2]
     transport = root / "app" / "static" / "js" / "ai_chat" / "transport.js"
-    events = [
-        {"type": "token", "text": "Payments Gateway depends on Exadata."},
-        {"type": "done", "response": "Not recorded: refused", "sources": [],
-         "citation_gate": {"checked": True, "refused": True, "uncited_count": 1}},
-    ]
     harness = tmp_path / "run.js"
     harness.write_text(
         """
@@ -59,4 +73,4 @@ window.ArchieChat.transport.streamMessage('{}', {
     )
     assert proc.returncode == 0, proc.stderr
     out = json.loads(proc.stdout.strip().splitlines()[-1])
-    assert out["final"] == "Not recorded: refused"
+    assert out["final"] == expected

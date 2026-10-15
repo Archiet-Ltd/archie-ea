@@ -344,8 +344,12 @@ def test_a_malformed_question_is_refused_with_a_reason(app, db_session, make_org
 # --------------------------------------------------------------------------- #
 
 
-def _grounded(*tool_results, mutating=()):
+def _grounded(*tool_results, mutating=(), context=None, context_text=None):
     grounding = Grounding()
+    if context is not None:
+        grounding.add_context(context)
+    if context_text is not None:
+        grounding.add_context(context_text)
     for result in tool_results:
         grounding.add_tool_result({"success": True, "result": result})
     for result in mutating:
@@ -362,8 +366,10 @@ IMPACT = {
     },
     "address": "a" * 32,
     "summary": {"total": 2},
+    "citations_total": 14,
 }
-ORG_NAMES = {"payments gateway", "ledger", "billing api", "exadata"}
+ORG_NAMES = {"payments gateway", "ledger", "billing api", "exadata", "core banking",
+             "api gateway", "customer", "sap s 4hana", "e commerce platform"}
 
 
 def _gate(text, grounding=None, org_names=ORG_NAMES, estate_question=False):
@@ -376,15 +382,16 @@ def _gate(text, grounding=None, org_names=ORG_NAMES, estate_question=False):
 @pytest.mark.parametrize(
     "text",
     [
-        "The Billing API serves Payments Gateway and Ledger. [ref:5]",
+        "The Billing API serves Payments Gateway and Ledger [ref:5] [ref:7] [ref:9].",
         "Both Payments Gateway and Ledger are impacted [ref:7] [ref:9].",
         "Only Ledger is impacted at depth 2. [ref:9]",
         "Payments Gateway and Ledger are impacted. [ref:" + "a" * 32 + "]",
         "2 applications are affected [ref:7].",
         "Two applications are affected [ref:7].",
+        "Ledger [ref:9] is impacted and so is Payments Gateway [ref:7].",
     ],
 )
-def test_a_marked_statement_about_returned_records_passes(text):
+def test_a_marker_attached_to_each_returned_record_passes(text):
     assert _gate(text) == []
 
 
@@ -398,12 +405,18 @@ def test_a_marked_statement_about_returned_records_passes(text):
         "Layered architectures keep presentation apart from data access.",
         "I will keep that in mind.",
         "Which application do you mean?",
+        "An API Gateway routes requests to the right service.",
+        "Every Customer journey should be mapped before you pick tools.",
+        "Put three servers behind a load balancer for resilience.",
+        "Start with four services first and split later.",
+        "Since 2020 most services are deployed in containers.",
+        "In 1999 there were 2000 hosts on that network of 5 servers.",
     ],
 )
-def test_general_guidance_naming_no_record_is_never_touched(text):
+def test_general_guidance_passes_with_or_without_a_lookup(text):
     assert _gate(text) == []
-    # and with no lookup this turn at all
     assert _gate(text, grounding=_grounded(), org_names=set()) == []
+    assert _gate(text, grounding=_grounded(), org_names=ORG_NAMES) == []
 
 
 @pytest.mark.parametrize(
@@ -417,9 +430,15 @@ def test_general_guidance_naming_no_record_is_never_touched(text):
         "Ledger consumes Exadata nightly.",
         "Payments Gateway is wired into Ledger.",
         "Payments Gateway is impacted [ref:999].",
+        # H1: a marker is evidence for its own record only.
+        "Core Banking [ref:7] is impacted.",
+        "Payments Gateway and Ledger are impacted [ref:7].",
+        "Payments Gateway [ref:9] is impacted.",
+        # A record no tool returned this turn, however it is marked.
+        "Core Banking depends on Ledger [ref:9].",
     ],
 )
-def test_a_statement_about_a_record_without_a_valid_marker_is_refused(text):
+def test_a_statement_about_a_record_without_its_own_marker_is_refused(text):
     assert _gate(text) != []
 
 
@@ -433,43 +452,138 @@ def test_a_statement_about_a_record_without_a_valid_marker_is_refused(text):
         "There are 14 applications downstream.",
     ],
 )
-def test_an_invented_count_is_refused_even_naming_no_record(text):
-    claims = _gate(text)
-    assert claims, text
+def test_an_invented_count_is_refused_when_the_question_was_looked_up(text):
+    assert _gate(text, estate_question=True) != []
 
 
-def test_a_count_must_match_what_a_tool_returned_not_any_digit_run():
+def test_a_count_binds_to_the_result_it_came_with():
+    other = {"rows": [], "total": 14, "address": "c" * 32,
+             "elements": {"3": {"id": 3, "name": "Other Thing"}}}
+    grounding = _grounded(IMPACT, other)
+    # 14 belongs to the other result, not to the one that returned Ledger.
+    assert _gate("14 applications depend on Ledger [ref:9].", grounding) != []
+    assert _gate("2 applications depend on Ledger [ref:9].", grounding) == []
+    # citations_total is not a count of the estate.
+    assert _gate("14 applications depend on Ledger [ref:9].") != []
+
+
+def test_a_count_is_checked_against_returned_counts_not_any_digit_run():
     grounding = _grounded({"rows": [], "total": 12, "address": "b" * 32, "note": "see 1043"})
-    assert _gate("12 applications are affected.", grounding) == []
-    assert _gate("1043 applications are affected.", grounding) != []
+    assert _gate("12 applications are affected.", grounding, estate_question=True) == []
+    assert _gate("1043 applications are affected.", grounding, estate_question=True) != []
+
+
+def test_a_year_is_never_a_count_even_next_to_a_record():
+    assert _gate("Ledger [ref:9] was retired in 2021 as 2 applications moved.") == []
 
 
 def test_an_estate_question_with_no_tool_result_is_refused_whatever_the_wording():
-    # Lowercase, no listed verb, no known record: still refused, because the
-    # question was never looked up.
     text = "oracle exadata sits underneath the settlement stack"
     assert _gate(text, grounding=_grounded(), org_names=set(), estate_question=True) != []
-    # A clarifying question is not an answer to refuse.
     assert _gate("Which element do you mean?", grounding=_grounded(),
                  org_names=set(), estate_question=True) == []
 
 
+def test_after_a_zero_row_answer_names_not_in_rows_are_still_refused():
+    empty = {"rows": [], "elements": {}, "address": "d" * 32, "summary": {"total": 0}}
+    grounding = _grounded(empty)
+    assert _gate("Core Banking depends on Ledger.", grounding, estate_question=True) != []
+    assert _gate("Nothing is recorded as depending on it.", grounding, estate_question=True) == []
+
+
+def test_clarifications_that_echo_the_user_are_not_refused():
+    text = "I could not find Core Bank in the estate."
+    assert _gate(text, grounding=_grounded(), estate_question=True) == []
+    assert _gate("I could not find Core Banking. Did you mean Core Banking Platform?",
+                 grounding=_grounded(), estate_question=True) == []
+
+
 def test_the_users_own_assertion_repeated_as_fact_is_refused():
-    # Nothing in the grounding but the user's claim: it never enters the gate.
     text = "Zephyr CRM depends on the Mainframe."
     assert _gate(text, grounding=_grounded(), org_names={"zephyr crm", "mainframe"}) != []
 
 
-def test_a_write_receipt_for_a_record_this_turn_created_passes():
-    grounding = _grounded(mutating=({"id": 41, "name": "Risk Register"},))
-    assert _gate("Created Risk Register for you.", grounding, org_names={"risk register"}) == []
+def test_a_write_receipt_only_exempts_the_record_the_write_created():
+    grounding = _grounded(IMPACT, mutating=({"id": 41, "name": "Risk Register",
+                                              "related": {"name": "Ledger"}},))
+    assert _gate("Created Risk Register for you.", grounding,
+                 org_names={"risk register"}) == []
+    # Ledger merely appeared inside the write result: it still needs its marker.
+    assert _gate("Ledger is impacted.", grounding) != []
 
 
 def test_marker_after_the_full_stop_still_belongs_to_the_sentence():
     assert _gate("Ledger is impacted. [ref:9]") == []
 
 
-def test_the_organisation_name_index_matches_whole_normalised_names_only(app, db_session, make_org):
+# --- H6: the injected context grounds an answer -------------------------------
+
+
+def test_a_correct_statement_from_the_injected_context_is_not_refused():
+    context = {"applications": [{"id": 31, "name": "Core Banking"}], "solution": {"id": 2, "name": "Payments"}}
+    grounding = _grounded(context=context)
+    assert _gate("This solution is linked to Core Banking.", grounding) == []
+    # A context row can also be cited with its marker.
+    assert _gate("Core Banking [ref:31] is linked.", grounding) == []
+    # A name the context does not carry is still refused.
+    assert _gate("This solution is linked to Ledger.", grounding) != []
+
+
+def test_unstructured_context_text_grounds_an_organisation_name_it_carries():
+    grounding = _grounded(context_text="Linked applications: Core Banking, Payments Gateway")
+    assert _gate("This solution is linked to Core Banking.", grounding) == []
+
+
+# --- H4/H5: names, punctuation and the one folding expression -----------------
+
+
+@pytest.mark.parametrize(
+    "stored,said",
+    [
+        ("SAP S/4HANA", "SAP S/4HANA"),
+        ("E-Commerce Platform", "E-Commerce Platform"),
+        ("O365 (Office)", "O365 (Office)"),
+        ("Billing  API", "Billing API"),
+    ],
+)
+def test_names_with_punctuation_and_double_spaces_are_found(
+    app, db_session, make_org, stored, said
+):
+    from app.modules.ai_chat.services.ai_hallucination_detector import (
+        organisation_names_in_text,
+        phrase_key,
+    )
+
+    org = make_org("b53-punct-" + uuid.uuid4().hex[:6])
+    _element(db_session, org.id, stored)
+    db_session.commit()
+
+    with app.test_request_context("/"):
+        found = organisation_names_in_text("We run %s for finance." % said, org.id)
+    assert phrase_key(stored) in found
+    # and the sentence side finds it as a record that needs its marker
+    assert _gate("We run %s for finance." % said, grounding=_grounded(),
+                 org_names=found) != []
+
+
+def test_generic_vocabulary_and_lowercase_single_words_never_trigger():
+    names = {"api gateway", "customer", "gateway", "ledger"}
+    grounding = _grounded()
+    assert _gate("An API Gateway routes requests.", grounding, org_names=names) == []
+    assert _gate("The customer pays by card.", grounding, org_names=names) == []
+    assert _gate("Every ledger entry is immutable.", grounding, org_names=names) == []
+    # Capitalised mid-sentence it is a record again.
+    assert _gate("We rely on Ledger every day.", grounding, org_names=names) != []
+    # A name the tool returned as written counts even when generic.
+    returned = _grounded({"rows": [], "elements": {"4": {"id": 4, "name": "Customer"}},
+                          "address": "e" * 32})
+    assert _gate("Customer is impacted.", returned, org_names=names) != []
+    assert _gate("Customer [ref:4] is impacted.", returned, org_names=names) == []
+
+
+def test_the_organisation_name_index_matches_whole_phrases_for_one_organisation(
+    app, db_session, make_org
+):
     from app.modules.ai_chat.services.ai_hallucination_detector import (
         organisation_names_in_text,
     )
@@ -482,10 +596,33 @@ def test_the_organisation_name_index_matches_whole_normalised_names_only(app, db
 
     with app.test_request_context("/"):
         found = organisation_names_in_text(
-            "the billing api calls exadata and the ledger service", org_a.id
+            "The Billing API calls Exadata and the Ledger service", org_a.id
         )
     assert found == {"billing api", "ledger"}, "another organisation's names never match"
-    assert organisation_names_in_text("billing api", None) == set()
+    assert organisation_names_in_text("Billing API", None) == set()
+
+
+def test_an_estate_question_needs_a_named_record_or_context(app, db_session, make_org):
+    org = make_org("b53-classify")
+    _element(db_session, org.id, "Settlement Stack")
+    db_session.commit()
+    with app.test_request_context("/"):
+        g.current_org_id = org.id
+        classify = AgentRunner._classify_estate
+        assert classify("what breaks if Settlement Stack fails?", {}) == "impact"
+        assert classify("what breaks if a load balancer fails?", {}) is None
+        assert classify("what breaks if a load balancer fails?", {"solution_id": 3}) == "impact"
+        assert classify("explain microservices", {"solution_id": 3}) is None
+
+
+def test_a_non_ascii_digit_is_an_invalid_parameter_not_a_crash(app, db_session, make_org):
+    org = make_org("b53-digits")
+    user = _user(db_session, org.id)
+    result = _call(app, user, org.id, "answer", {"question": "impact", "element_id": "²"})
+    assert result["success"] is False and result["code"] == "INVALID_PARAMETER"
+    result = _call(app, user, org.id, "answer",
+                   {"question": "impact", "element_id": "1", "max_depth": "٣"})
+    assert result["success"] is False
 
 
 def _runner_with(grounding):
@@ -497,7 +634,7 @@ def _runner_with(grounding):
 def test_the_runner_refuses_an_uncited_answer_and_keeps_the_claims_off_the_result():
     runner = _runner_with(_grounded(IMPACT))
     result = {
-        "response": "Payments Gateway depends on Exadata. [ref:12345]",
+        "response": "Payments Gateway depends on Exadata [ref:12345].",
         "sources": [],
         "actions_taken": [],
     }
@@ -597,7 +734,10 @@ def test_a_turn_that_calls_the_answer_tool_cites_the_rows_and_passes_the_gate(
     org = make_org("b53-turn")
     user = _user(db_session, org.id)
     root, mid, leaf = _estate(db_session, org.id, "Turn")
-    text = f"If Turn Root fails, Turn Mid [ref:{mid.id}] and Turn Leaf [ref:{leaf.id}] are impacted."
+    text = (
+        f"If Turn Root fails, Turn Mid and Turn Leaf are impacted "
+        f"[ref:{root.id}] [ref:{mid.id}] [ref:{leaf.id}]."
+    )
     script = [_call_answer(root.id), {"text": text}]
 
     result, _events, _runner, _seen = _run_turn(app, monkeypatch, script, user=user)
@@ -671,6 +811,8 @@ def test_an_estate_question_answered_from_memory_is_nudged_once_then_refused(
 ):
     org = make_org("b53-nudge")
     user = _user(db_session, org.id)
+    _element(db_session, org.id, "Settlement Stack")
+    db_session.commit()
     script = [
         {"text": "oracle exadata sits under the settlement stack"},
         {"text": "still no lookup, but it is the settlement stack"},
@@ -679,7 +821,7 @@ def test_an_estate_question_answered_from_memory_is_nudged_once_then_refused(
 
     result, _events, _runner, seen = _run_turn(
         app, monkeypatch, script, user=user, executed=executed,
-        message="what breaks if the settlement stack fails?",
+        message="what breaks if Settlement Stack fails?",
     )
 
     assert executed == []
@@ -831,3 +973,94 @@ def test_a_tool_result_reaches_the_model_inside_the_untrusted_fence():
     assert content.count("=== END TOOL RESULT find_applications ===") == 1
     assert content.rstrip().endswith("=== END TOOL RESULT find_applications ===")
     assert "=== BEGIN TOOL RESULT find_applications ===" in content
+
+
+# --------------------------------------------------------------------------- #
+# Failure modes                                                                #
+# --------------------------------------------------------------------------- #
+
+
+def test_a_failing_gate_fails_closed_for_an_estate_answer_at_both_call_sites(
+    app, db_session, make_org, monkeypatch
+):
+    from app.modules.ai_chat.services import agent_runner as module
+
+    org = make_org("b53-closed")
+    user = _user(db_session, org.id)
+    root, mid, _leaf = _estate(db_session, org.id, "Cl")
+
+    def _boom(*a, **k):
+        raise RuntimeError("lookup down")
+
+    monkeypatch.setattr(module, "organisation_names_in_text", _boom)
+    final = f"Cl Mid [ref:{mid.id}] is impacted."
+    script = [_call_answer(root.id), {"text": final}]
+
+    result, events, _r, _s = _run_turn(
+        app, monkeypatch, script, user=user, stream=True,
+        message="what breaks if Cl Root fails?",
+    )
+
+    assert result["response"] == AgentRunner.CITATION_REFUSAL
+    assert "".join(e["text"] for e in events if e.get("type") == "token") == ""
+
+
+def test_a_failing_gate_stays_open_for_a_turn_that_never_touched_the_estate(
+    app, db_session, make_org, monkeypatch
+):
+    from app.modules.ai_chat.services import agent_runner as module
+
+    org = make_org("b53-open")
+    user = _user(db_session, org.id)
+
+    def _boom(*a, **k):
+        raise RuntimeError("lookup down")
+
+    monkeypatch.setattr(module, "organisation_names_in_text", _boom)
+    script = [{"text": "Microservices split a system into small services."}]
+    result, _e, _r, _s = _run_turn(app, monkeypatch, script, user=user, message="explain microservices")
+    assert result["response"] == "Microservices split a system into small services."
+
+
+def test_the_gate_runs_once_per_answer(app, db_session, make_org, monkeypatch):
+    from app.modules.ai_chat.services import agent_runner as module
+
+    org = make_org("b53-once")
+    user = _user(db_session, org.id)
+    calls = []
+    original = module.organisation_names_in_text
+
+    def _count(text, org_id):
+        calls.append(text)
+        return original(text, org_id)
+
+    monkeypatch.setattr(module, "organisation_names_in_text", _count)
+    script = [{"text": "Layered architectures keep presentation apart from data access."}]
+    _run_turn(app, monkeypatch, script, user=user, message="explain layers")
+    assert len(calls) == 1
+
+
+def test_a_model_failure_midstream_shows_no_partial_text(app, db_session, make_org, monkeypatch):
+    from app.modules.ai_chat.services.llm_service_impl import LLMService
+
+    org = make_org("b53-fail")
+    user = _user(db_session, org.id)
+    events = []
+
+    def _partial_then_fail(self, provider, model, api_key, system_prompt, messages, tools,
+                           stream=False, base_url=None):
+        self._emit_token("Payments Gateway depends on Exadata and")
+        raise RuntimeError("connection reset")
+
+    monkeypatch.setattr(LLMService, "_get_configured_provider",
+                        staticmethod(lambda: ("anthropic", "claude-opus-5")))
+    monkeypatch.setattr(LLMService, "_get_all_api_keys", staticmethod(lambda provider: ["k"]))
+    monkeypatch.setattr(AgentRunner, "_call_llm", _partial_then_fail)
+    runner = AgentRunner(user_id=user.id, yield_event=events.append)
+    with app.test_request_context("/"):
+        g.current_org_id = org.id
+        result = runner.run(user_message="hello", domain="general", context={}, stream_mode=True)
+
+    assert "".join(e["text"] for e in events if e.get("type") == "token") == ""
+    assert result.get("error")
+    assert "Exadata" not in result["response"]
