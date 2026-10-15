@@ -393,7 +393,34 @@ def stop_preview_product(solution_id, bundle_id):
 
     DELETE /api/solutions/<id>/product/<bundle_id>/preview
     """
+    from app.middleware.tenant_context import current_org_id
+    from app.models.solution_models import Solution
+    from app.modules.solutions_product.models import SolutionCodeBundle
     from app.modules.solutions_product.services.sandbox_runner import SandboxRunner
+
+    # A preview container is stopped by bundle id alone, so ownership must be
+    # proven first: the solution is in the active organisation (named
+    # explicitly; the automatic filter is off when it is unknown) and the
+    # bundle belongs to that solution.
+    org_id = current_org_id()
+    solution = (
+        Solution.query.filter(
+            Solution.id == solution_id, Solution.organization_id == org_id
+        ).first()
+        if org_id is not None
+        else None
+    )
+    if solution is None:
+        return jsonify({"success": False, "error": "Solution not found"}), 404
+    # SolutionCodeBundle has no organisation column; it is filtered by the
+    # solution_id of the org-checked solution loaded just above.
+    # tenant-scoping-ok: scoped through the org-checked solution above
+    bundle = SolutionCodeBundle.query.filter_by(
+        solution_id=solution.id, bundle_id=bundle_id
+    ).first()
+    if bundle is None:
+        return jsonify({"success": False, "error": "Bundle not found"}), 404
+
     runner = SandboxRunner()
     runner.stop_preview(bundle_id)
     return jsonify({"success": True, "message": "Preview stopped"})
