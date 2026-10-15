@@ -96,6 +96,7 @@ class _Resp:
         self.closed = False
 
     def iter_content(self, chunk_size=1):
+        self.chunk_size = chunk_size
         for i in range(0, len(self._body), chunk_size):
             yield self._body[i : i + chunk_size]
 
@@ -211,6 +212,85 @@ def test_fetch_accepts_yaml(world, production_like, http_calls):
     c = _insert_contract(world, "https://api.example.com/openapi.yaml")
     resp = world.as_a().post(f"/api/enterprise/contracts/{c.id}/fetch-spec")
     assert resp.status_code == 200, resp.get_json()
+
+
+ALIAS_BOMB = "a: &a [x, x, x, x, x, x, x, x, x, x]\n" + "".join(
+    f"{chr(98 + i)}: &{chr(98 + i)} [" + ", ".join([f"*{chr(97 + i)}"] * 10) + "]\n" for i in range(8)
+)
+
+
+def test_fetch_refuses_a_yaml_alias_bomb_quickly_and_stores_nothing(world, production_like, http_calls):
+    import time
+
+    assert len(ALIAS_BOMB) < 1000  # a few hundred bytes that would expand to ~10^9 leaves
+    http_calls.reply = lambda: _Resp(body=ALIAS_BOMB, ctype="application/yaml")
+    c = _insert_contract(world, "https://api.example.com/openapi.yaml")
+    started = time.monotonic()
+    resp = world.as_a().post(f"/api/enterprise/contracts/{c.id}/fetch-spec")
+    assert time.monotonic() - started < 5
+    assert resp.status_code == 502
+    assert resp.get_json() == {"error": "Spec could not be parsed"}
+    from app.models.integration_contract import IntegrationContract
+
+    assert IntegrationContract.query.get(c.id).spec_content is None
+
+
+def test_fetch_yaml_without_aliases_still_parses(world, production_like, http_calls):
+    http_calls.reply = lambda: _Resp(
+        body="openapi: '3.0.0'\ninfo: {title: T}\npaths: {}\n", ctype="text/yaml"
+    )
+    c = _insert_contract(world, "https://api.example.com/openapi.yaml")
+    assert world.as_a().post(f"/api/enterprise/contracts/{c.id}/fetch-spec").status_code == 200
+
+
+@pytest.mark.parametrize(
+    "body",
+    ['{"openapi": "3.0.0", "paths": {}}', "openapi: '3.0.0'\npaths: {}\n"],
+    ids=["json", "yaml"],
+)
+def test_fetch_accepts_plain_text_that_parses_to_a_spec(world, production_like, http_calls, body):
+    http_calls.reply = lambda: _Resp(body=body, ctype="text/plain; charset=utf-8")
+    c = _insert_contract(world, "https://raw.githubusercontent.com/o/r/main/openapi")
+    resp = world.as_a().post(f"/api/enterprise/contracts/{c.id}/fetch-spec")
+    assert resp.status_code == 200, resp.get_json()
+
+
+@pytest.mark.parametrize(
+    "body",
+    ["<!doctype html><html><body>Sign in</body></html>", "just some words", "- a\n- b\n", ""],
+    ids=["html", "prose", "list", "empty"],
+)
+def test_fetch_plain_text_that_is_not_a_spec_is_refused(world, production_like, http_calls, body):
+    http_calls.reply = lambda: _Resp(body=body, ctype="text/plain")
+    c = _insert_contract(world, "https://api.example.com/page")
+    resp = world.as_a().post(f"/api/enterprise/contracts/{c.id}/fetch-spec")
+    assert resp.status_code == 502
+    assert "Sign in" not in resp.get_data(as_text=True)
+
+
+def test_fetch_asks_for_no_compression_and_refuses_compressed_answers(world, production_like, http_calls):
+    http_calls.reply = lambda: _Resp(headers={"Content-Encoding": "gzip"})
+    c = _insert_contract(world, "https://api.example.com/openapi.json")
+    resp = world.as_a().post(f"/api/enterprise/contracts/{c.id}/fetch-spec")
+    assert http_calls[0]["headers"]["Accept-Encoding"] == "identity"
+    assert resp.status_code == 502
+    from app.models.integration_contract import IntegrationContract
+
+    assert IntegrationContract.query.get(c.id).spec_content is None
+
+
+def test_fetch_reads_the_body_in_small_chunks(world, production_like, http_calls):
+    seen = []
+
+    class Spy(_Resp):
+        def iter_content(self, chunk_size=1):
+            seen.append(chunk_size)
+            return super().iter_content(chunk_size)
+
+    http_calls.reply = lambda: Spy(body=json.dumps({"openapi": "3.0.0"}))
+    c = _insert_contract(world, "https://api.example.com/openapi.json")
+    assert world.as_a().post(f"/api/enterprise/contracts/{c.id}/fetch-spec").status_code == 200
+    assert seen == [8192]
 
 
 def test_fetch_redirect_to_metadata_is_not_followed(world, production_like, http_calls):

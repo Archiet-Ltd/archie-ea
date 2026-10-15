@@ -29,10 +29,13 @@ from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
 
 #: Largest spec the server will read from a contract's spec_url.
 MAX_SPEC_BYTES = 2 * 1024 * 1024
-_SPEC_CHUNK_BYTES = 64 * 1024
+_SPEC_CHUNK_BYTES = 8 * 1024
 _SPEC_FETCH_TIMEOUT = (5, 15)  # connect, read
 _JSON_TYPES = {"application/json", "text/json"}
 _YAML_TYPES = {"application/yaml", "application/x-yaml", "text/yaml", "text/x-yaml"}
+# Raw-file hosts (raw.githubusercontent.com, GitLab raw) serve specs as plain
+# text. Accepted only when the body parses to a JSON or YAML object.
+_TEXT_TYPES = {"text/plain"}
 
 integration_contract_bp = Blueprint(
     "integration_contract_api",
@@ -141,6 +144,48 @@ def _contract_in_active_org(contract_id):
     return contract
 
 
+def _no_alias_yaml_loader():
+    """A SafeLoader that refuses YAML aliases.
+
+    Anchors and aliases let a few hundred bytes load as a shared graph with
+    billions of leaves ("billion laughs"); the byte cap cannot see that, and
+    serialising the result would exhaust the worker. A spec has no need of them.
+    """
+    import yaml
+
+    class _NoAliasLoader(yaml.SafeLoader):
+        def compose_node(self, parent, index):
+            if self.check_event(yaml.events.AliasEvent):
+                raise yaml.YAMLError("aliases are not allowed")
+            return super().compose_node(parent, index)
+
+    return _NoAliasLoader
+
+
+def _parse_spec(raw, kind):
+    """Parse a fetched spec body. ``kind`` is "json", "yaml" or "text" (either).
+
+    Raises ``ValueError`` with a caller-safe message.
+    """
+    import yaml
+
+    data = None
+    try:
+        if kind in ("json", "text"):
+            try:
+                data = json.loads(raw)
+            except ValueError:
+                if kind == "json":
+                    raise
+        if data is None:
+            data = yaml.load(raw, Loader=_no_alias_yaml_loader())  # noqa: S506 - SafeLoader subclass
+    except Exception:  # parse detail can echo the content
+        raise ValueError("Spec could not be parsed") from None
+    if not isinstance(data, dict):
+        raise ValueError("Spec must be a JSON or YAML object")
+    return data
+
+
 def _read_spec(url):
     """Fetch ``url`` with no redirects, a size cap and a JSON/YAML content type.
 
@@ -148,14 +193,14 @@ def _read_spec(url):
     safe to show the caller. Nothing about the remote side (addresses, error
     text, body) is put in that message.
     """
-    import yaml
-
     resp = http_requests.get(
         url,
         timeout=_SPEC_FETCH_TIMEOUT,
         allow_redirects=False,
         stream=True,
-        headers={"Accept": "application/json, application/yaml"},
+        # No compression: the bytes counted against the cap are the bytes parsed,
+        # so a small compressed body cannot expand to tens of megabytes.
+        headers={"Accept": "application/json, application/yaml", "Accept-Encoding": "identity"},
     )
     try:
         if 300 <= resp.status_code < 400:
@@ -165,8 +210,12 @@ def _read_spec(url):
         ctype = (resp.headers.get("Content-Type") or "").split(";")[0].strip().lower()
         is_json = ctype in _JSON_TYPES or ctype.endswith("+json")
         is_yaml = ctype in _YAML_TYPES or ctype.endswith("+yaml")
-        if not (is_json or is_yaml):
+        is_text = ctype in _TEXT_TYPES
+        if not (is_json or is_yaml or is_text):
             raise ValueError("Spec URL must serve JSON or YAML")
+        encoding = (resp.headers.get("Content-Encoding") or "identity").strip().lower()
+        if encoding not in ("", "identity"):
+            raise ValueError("Spec is too large")
         declared = resp.headers.get("Content-Length")
         if declared and declared.isdigit() and int(declared) > MAX_SPEC_BYTES:
             raise ValueError("Spec is too large")
@@ -178,14 +227,7 @@ def _read_spec(url):
             chunks.append(chunk)
     finally:
         resp.close()
-    raw = b"".join(chunks)
-    try:
-        data = json.loads(raw) if is_json else yaml.safe_load(raw)
-    except Exception:  # parse detail can echo the content
-        raise ValueError("Spec could not be parsed") from None
-    if not isinstance(data, dict):
-        raise ValueError("Spec must be a JSON or YAML object")
-    return data
+    return _parse_spec(b"".join(chunks), "json" if is_json else "yaml" if is_yaml else "text")
 
 
 # ── CRUD ─────────────────────────────────────────────────────────────────
