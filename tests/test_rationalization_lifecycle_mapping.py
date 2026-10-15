@@ -51,10 +51,10 @@ class TestNormalizeLifecycleStatus:
             ("4.1 Decom Decided", "deprecated"),
             ("4.2 decom planned", "deprecated"),
             ("4.3 read-only", "deprecated"),
-            # The gap this round closes: previously absent from the mapping
-            # table, silently falling through to the "operational" default --
-            # wrong for a code that, like its 4.1-4.3 siblings, means an
-            # application already in the decommissioning process.
+            # Absent from the mapping table silently falls through to the
+            # "operational" default -- wrong for a code that, like its
+            # 4.1-4.3 siblings, means an application already in the
+            # decommissioning process.
             ("4.4 STOPPED", "deprecated"),
             ("4.4 stopped", "deprecated"),
             # Decommissioned means retired, not merely deprecated -- matches
@@ -108,10 +108,9 @@ class TestMapDeploymentToLifecycle:
         assert result == {"lifecycle": "deprecated", "data_quality_flag": False}
 
     def test_decommissioned_resolves_to_retired_not_deprecated(self):
-        """The convergence this round makes: the duplicate ABACUS_LIFECYCLE_MAP
-        used to score a fully decommissioned application as merely
-        "deprecated" (-15), disagreeing with the canonical mapping's "retired"
-        (-30) for the exact same code."""
+        """A fully decommissioned application must score as "retired" (-30),
+        not merely "deprecated" (-15); a second, independent mapping used to
+        disagree with the canonical mapping for the exact same code."""
         result = RationalizationScoringService._map_deployment_to_lifecycle(
             _app(lifecycle_status="5. DECOMMISSIONED")
         )
@@ -148,11 +147,11 @@ class TestMapDeploymentToLifecycle:
 class TestScoreableLifecycleFilterIsCaseInsensitive:
     """The real product-facing paths (calculate_portfolio_scores,
     get_elimination_candidates, and the bulk-score "unscored" scope) filter
-    ApplicationComponent.lifecycle_status with SCOREABLE_LIFECYCLE_VALUES.
-    Before this round the list was upper-case/canonical-only and the SQL
-    filter was exact-case, so a lower-case-coded application (as occurs in
-    real Abacus data) never matched and was silently skipped by every one of
-    those paths regardless of how complete its data was."""
+    ApplicationComponent.lifecycle_status with SCOREABLE_LIFECYCLE_VALUES. If
+    that list were upper-case/canonical-only and the SQL filter exact-case, a
+    lower-case-coded application (as occurs in real Abacus data) would never
+    match and would be silently skipped by every one of those paths
+    regardless of how complete its data was."""
 
     def test_lower_case_abacus_coded_app_is_included_in_portfolio_scoring(
         self, app, db_session, make_org, tenant_ctx

@@ -178,13 +178,42 @@ def rationalization_dashboard():
 
         consolidation_count = ConsolidationListEntry.query.count()
         time_scored_count = ApplicationRationalizationScore.query.count()
+        roadmap_entry_filter = or_(
+            ConsolidationListEntry.recommended_action == "add_to_roadmap",
+            ConsolidationListEntry.roadmap_item_id.isnot(None),
+        )
         roadmap_count = ConsolidationListEntry.query.filter(
-            or_(
-                ConsolidationListEntry.recommended_action == "add_to_roadmap",
-                ConsolidationListEntry.roadmap_item_id.isnot(None),
-            )
+            roadmap_entry_filter
         ).count()
-        tracking_count = RationalizationBenefitsTracker.query.count()
+        # RationalizationBenefitsTracker carries no organization_id of its own
+        # (it is not a TenantMixin model), so a bare .query.count() read every
+        # tenant's rows -- confirmed by creating tracker rows under one
+        # organization and reading a nonzero cross-tenant count from another's
+        # context; the join below reads a correctly-scoped 0 for the same
+        # setup. Tracker rows are also created by the unrelated AI-chat
+        # approve path, not only for applications on the roadmap, so counting
+        # every tracker row (rather than only the ones whose application is
+        # on the roadmap) could exceed this stage's own denominator above
+        # (roadmap_count), e.g. "Track 3/1 (300%)". Restricting the numerator
+        # to trackers whose application is itself one of the roadmap_count
+        # rows keeps Track a true subset of its denominator, the same way
+        # Detect/Score/Plan are each a subset of total_apps.
+        roadmap_application_ids = db.session.query(
+            ConsolidationListEntry.application_id
+        ).filter(roadmap_entry_filter)
+        # tenant-scoping-ok: the join to ApplicationComponent (a TenantMixin model) carries the automatic per-organization SELECT filter, scoping this count to the current tenant's own applications.
+        tracking_count = (
+            RationalizationBenefitsTracker.query.join(
+                ApplicationComponent,
+                RationalizationBenefitsTracker.application_id == ApplicationComponent.id,
+            )
+            .filter(
+                RationalizationBenefitsTracker.application_id.in_(
+                    roadmap_application_ids
+                )
+            )
+            .count()
+        )
 
         # Combine duplicate group savings + consolidation list savings
         consolidation_savings = db.session.query(
