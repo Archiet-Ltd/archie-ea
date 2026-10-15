@@ -5776,7 +5776,20 @@ def api_create_element_comment(element_id):
     """Create a comment on an ArchiMate element."""
     from flask_login import current_user
 
+    from app.middleware.tenant_context import current_org_id
+    from app.models.archimate_core import ArchiMateElement
     from app.models.archimate_viewpoint import ArchimateElementComment
+
+    # The comment table carries no organisation column, so ownership is the
+    # element's. Name the active organisation explicitly (the automatic tenant
+    # filter is off when it is unknown) and answer 404 for a foreign or
+    # unknown element, exactly as the matching GET does.
+    org_id = current_org_id()
+    if org_id is None or not db.session.query(ArchiMateElement.id).filter(
+        ArchiMateElement.id == element_id,
+        ArchiMateElement.organization_id == org_id,
+    ).first():
+        return jsonify({"error": "ArchiMate element not found"}), 404
 
     data = request.get_json(silent=True) or {}
     comment_text = (data.get("comment_text") or "").strip()
