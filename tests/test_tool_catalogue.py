@@ -21,7 +21,7 @@ from app.modules.ai_chat.tools.registry import TOOL_SCHEMAS, TOOL_SCHEMA_BY_NAME
 
 
 VALID_RISK_CLASSES = {"read", "propose", "write", "external_action"}
-VALID_SURFACES = {"chat", "blueprint"}
+VALID_SURFACES = {"chat", "blueprint", "mcp"}
 
 
 class TestEveryToolHasNewFields:

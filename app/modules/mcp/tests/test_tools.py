@@ -605,45 +605,36 @@ class TestMeteringAndTenantContext:
 class TestStaticChecks:
     """Static assertions about the MCP module."""
 
-    def test_no_mcp_tool_imports_model_directly(self):
-        """No MCP tool module imports a model or service directly."""
+    def test_no_connector_tool_module_imports_model_directly(self):
+        """The module holding the connector's route-backed tools imports no model
+        or service directly: every tool goes through an existing route."""
         import ast
         import os
 
-        tools_dir = os.path.join(
-            os.path.dirname(__file__), "..", "tools"
+        filepath = os.path.join(
+            os.path.dirname(__file__), "..", "..", "ai_chat", "tools", "route_read_tools.py"
         )
         forbidden_imports = {
             "app.models", "ArchiMateElement", "ArchiMateRelationship",
             "IntelligenceQueryService", "ApplicationComponent",
         }
-        for filename in os.listdir(tools_dir):
-            if not filename.endswith(".py") or filename.startswith("_"):
-                continue
-            filepath = os.path.join(tools_dir, filename)
-            with open(filepath) as f:
-                try:
-                    tree = ast.parse(f.read())
-                except SyntaxError:
-                    continue
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Import):
-                    for alias in node.names:
-                        assert alias.name not in forbidden_imports, \
-                            f"{filename} imports {alias.name}"
-                elif isinstance(node, ast.ImportFrom):
-                    if node.module:
-                        assert node.module not in forbidden_imports, \
-                            f"{filename} imports from {node.module}"
+        with open(filepath, encoding="utf-8") as f:
+            tree = ast.parse(f.read())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    assert alias.name not in forbidden_imports,                         f"route_read_tools.py imports {alias.name}"
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                assert node.module not in forbidden_imports,                     f"route_read_tools.py imports from {node.module}"
 
     def test_search_elements_calls_only_canonical_route(self):
         """search_elements and get_element call only the canonical route."""
         import os
 
-        element_tools_path = os.path.join(
-            os.path.dirname(__file__), "..", "tools", "element_tools.py"
+        path = os.path.join(
+            os.path.dirname(__file__), "..", "..", "ai_chat", "tools", "route_read_tools.py"
         )
-        with open(element_tools_path) as f:
+        with open(path, encoding="utf-8") as f:
             source = f.read()
 
         # Must call the canonical route
@@ -657,8 +648,7 @@ class TestStaticChecks:
             "solution_design_routes",
         ]
         for forbidden_name in forbidden:
-            assert forbidden_name not in source, \
-                f"element_tools.py references forbidden duplicate: {forbidden_name}"
+            assert forbidden_name not in source,                 f"route_read_tools.py references forbidden duplicate: {forbidden_name}"
 
     def test_mcp_blueprint_does_not_import_duplicate_search_routes(self):
         """The MCP blueprint never imports the three duplicate search routes."""
