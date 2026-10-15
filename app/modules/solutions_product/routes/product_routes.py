@@ -12,6 +12,7 @@ from flask import Blueprint, jsonify, request, send_file
 from flask_login import login_required
 
 from app import db
+from app.middleware.tenant_decorators import org_admin_required
 from app.utils.pagination import safe_int_arg
 
 logger = logging.getLogger(__name__)
@@ -1246,17 +1247,27 @@ def get_compliance_schedule(solution_id):
 
 
 @solution_product_bp.route("/<int:solution_id>/compliance/run-all", methods=["POST"])
-@login_required
+@org_admin_required
 def run_all_compliance_checks(solution_id):
-    """Trigger immediate compliance checks for all solutions with schedules.
+    """Trigger immediate compliance checks for the scheduled solutions of the
+    caller's active organisation.
 
     POST /api/solutions/<id>/compliance/run-all
-    Admin-only: uses solution_id as a namespace anchor but runs all scheduled checks.
+    Admin-only (administrator of the active organisation, or platform admin):
+    each check calls the solution's service URL and may fire its webhooks, so a
+    plain member must not start them. solution_id must be a solution of the
+    active organisation, and the run is limited to that organisation's
+    solutions -- never to every organisation on the instance.
     """
+    from app.middleware.tenant_context import current_org_id
+    from app.models.solution_models import Solution
     from app.modules.solutions_product.services.drift_remediation_service import DriftRemediationService
+    from app.utils.route_guards import require_entity_in_active_org
+
+    require_entity_in_active_org(Solution, solution_id, description="Solution not found")
 
     svc = DriftRemediationService()
-    results = svc.schedule_checks()
+    results = svc.schedule_checks(organization_id=current_org_id())
 
     return jsonify({
         "success": True,
