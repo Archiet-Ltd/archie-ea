@@ -78,6 +78,12 @@ POLICY = {
     # impact endpoint they read, not by the page.
     "/intelligence/ask":       set(ARCHETYPES),
     "/intelligence/twin-map":  set(ARCHETYPES),
+    # R1-B30 (TB-0106): the Answers page (ask a set or risk question, list the
+    # organisation's stored answers). @login_required and no role gate, like Ask
+    # and Twin map, so every archetype reaches it; each stored answer is fenced
+    # to the organisation that asked it (an address from another organisation
+    # is a 404, pinned in the module tests and the journey).
+    "/intelligence/answers":   set(ARCHETYPES),
 # Model Health / Drift: carries @login_required and no role gate, so every
     # archetype is expected to reach it.
     "/genome/model-health/":   set(ARCHETYPES),
@@ -959,6 +965,70 @@ def test_intelligence_yield_route_rejects_anonymous_browser_session(page, live_s
     path = "/api/v1/intelligence/yield"
     response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert response is not None
+    assert response.status == 401
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_intelligence_answers_list_route_authorisation(archetype, page, live_server, seeded):
+    """R1-B30 (TB-0106): GET /api/v1/intelligence/answers (the organisation's
+    stored answers) carries only ``@login_required`` -- no enterprise-role
+    gate -- so every one of the eleven canonical archetypes is expected to
+    reach it once authenticated. Asking (POST) shares the gate and the
+    per-organisation fence; an address is opened through the unguessable
+    32-character token on ``/answers/<address>``, which is 404 for any other
+    organisation. Anonymous is covered separately below.
+    """
+    _login(page, live_server, seeded["emails"][archetype])
+    path = "/api/v1/intelligence/answers"
+    actual = _observe(page, live_server, path)
+    assert actual == ALLOWED, (
+        f"{archetype} could not reach {path}: expected ALLOWED (login_required only)"
+    )
+
+
+def test_intelligence_answers_routes_reject_anonymous_browser_session(page, live_server):
+    for path in ("/api/v1/intelligence/answers", "/api/v1/intelligence/answers/" + "a" * 32):
+        response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert response is not None
+        assert response.status == 401, path
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_intelligence_answers_ask_and_open_authorisation(archetype, page, live_server, seeded):
+    """R1-B30: POST /api/v1/intelligence/answers (ask) and GET
+    /api/v1/intelligence/answers/<address> (open) carry only ``@login_required``,
+    so no archetype is refused by a role gate. An empty question is the 400
+    that says so (a refused caller would get 401/403 before the body is read);
+    an address nobody was issued is the 404 an address of another organisation
+    also answers with."""
+    _login(page, live_server, seeded["emails"][archetype])
+    csrf_token = _csrf_token(page)
+    asked = page.request.post(
+        live_server + "/api/v1/intelligence/answers",
+        data={},
+        headers={"X-CSRFToken": csrf_token},
+        max_redirects=0,
+    )
+    assert asked.status == 400, (
+        "%s asking an answer: expected 400 (reached, empty question), got %s" % (archetype, asked.status)
+    )
+    opened = page.request.get(
+        live_server + "/api/v1/intelligence/answers/" + "a" * 32, max_redirects=0
+    )
+    assert opened.status == 404, (
+        "%s opening an unissued address: expected 404, got %s" % (archetype, opened.status)
+    )
+
+
+def test_intelligence_answers_ask_rejects_anonymous_browser_session(page, live_server):
+    page.goto(live_server + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    token = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.post(
+        live_server + "/api/v1/intelligence/answers",
+        data={"question": "set_impact"},
+        headers={"X-CSRFToken": token},
+        max_redirects=0,
+    )
     assert response.status == 401
 
 

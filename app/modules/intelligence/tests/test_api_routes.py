@@ -333,16 +333,18 @@ def test_expanded_chain_marks_an_unresolved_link_instead_of_dropping_it(
     assert "source_id" not in expanded[1]
 
 
-def test_module_registers_exactly_sixteen_routes(app):
+def test_module_registers_exactly_nineteen_routes(app):
     """The impact, risk, portfolio, programme, strategy, accountability,
     data, compliance, traceability, value-streams-at-risk, yield, catalogue
     list, catalogue run and ask routes all mount on this same existing
     blueprint rather than a new one each. Still exactly one blueprint, now
-    sixteen routes on it -- all six lenses of the catalogue, the L7 data
+    nineteen routes on it -- all six lenses of the catalogue, the L7 data
     lens, the L6 compliance lens, the traceability check over the impact
     walk, the Strategic value-streams-at-risk surface,
     recompute/derived/yield, and R1-B39's query catalogue (list + run) and
-    plain-language ask endpoints.
+    plain-language ask endpoints, and R1-B30's stored answers (ask, list and
+    open by address -- login_required, fenced to the caller's active
+    organisation, rows in the authorisation matrix).
     """
     rules = [
         rule for rule in app.url_map.iter_rules() if rule.endpoint.startswith("intelligence_api.")
@@ -365,6 +367,9 @@ def test_module_registers_exactly_sixteen_routes(app):
         "intelligence_api.query_catalogue_list",
         "intelligence_api.query_catalogue_run",
         "intelligence_api.ask_nl_question",
+        "intelligence_api.ask_answer",
+        "intelligence_api.list_answers",
+        "intelligence_api.get_answer",
     }
 
 
