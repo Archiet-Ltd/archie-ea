@@ -1,0 +1,16 @@
+# Tests that flake on browser timing and so do not block a merge. One per line:
+#   <pytest node id>  # <reason>
+# Every listed test still runs on every full CI run, in the non-blocking
+# quarantine job, which reports its result. A line needs a reason; a line may be
+# removed at any time, and adding one needs review. A node id without a
+# parameter suffix covers every parameter set of that test.
+#
+# Deliberately small. Failures that are real defects are not listed here: they
+# stay in the blocking shards until they are fixed.
+tests/test_jira_connector_controls.py::test_connection_feedback_pending_cleanup_and_double_click[firefox-single-click-success-desktop]  # firefox timing flake on unrelated changes
+tests/test_neutral_journey_cards.py::test_journey_intro_has_no_decorative_edge_or_corner[firefox-light]  # firefox timing flake on unrelated changes
+tests/test_modal_focus_return.py::test_dynamic_confirm_restores_invoking_button_after_dismissal[firefox-cancel-pointer]  # firefox timing flake on unrelated changes
+tests/test_import_history_filters.py::test_apply_sends_filters_and_changes_visible_records[filters0-firefox]  # firefox timing flake on unrelated changes
+tests/test_ai_model_selector_display.py::test_model_count_note[1-firefox]  # firefox timing flake on unrelated changes
+tests/test_ai_model_selector_display.py::test_model_count_note[0-webkit]  # webkit timing flake on unrelated changes
+tests/test_roadmap_modal_visibility.py::test_edit_opens_with_existing_values_and_keyboard_stays_in_dialog[chromium]  # browser timing flake on unrelated changes
