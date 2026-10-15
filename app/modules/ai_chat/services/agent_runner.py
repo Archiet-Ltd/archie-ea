@@ -15,7 +15,6 @@ Tools marked 'approve' tier are queued for user confirmation — not executed.
 from app.modules.ai_chat.tools.executor import ToolCall
 import json
 import logging
-import re
 from typing import Callable, Optional
 from app.modules.ai_chat.services.ai_hallucination_detector import (
     Grounding,
@@ -1493,25 +1492,14 @@ class AgentRunner:
             logger.warning("AgentRunner: failed to write run record", exc_info=True)
             return "Run record could not be written — the run completed but was not recorded"
 
-    _PRONOUN = re.compile(r"\b(it|its|that|them|their|this one|those|these)\b", re.IGNORECASE)
-    _GENERIC_TERMS = frozenset({
-        "togaf", "kafka", "cloud", "retries", "retry", "sla", "slo", "slas",
-        "microservices", "microservice", "kubernetes", "pattern", "patterns",
-        "design", "should", "how", "why", "best", "practice", "practices",
-        "principle", "principles", "vision", "migration", "explain", "example",
-        "generally", "typically", "docker", "terraform", "api", "apis", "queue",
-        "cache", "database", "monolith", "architecture", "framework",
-    })
-
-    @classmethod
-    def _classify_estate(cls, user_message: str, context, history=None) -> Optional[str]:
-        """The answer kind when this message is an estate question, else None.
-        The wording must match a cue AND the message must name an element or
-        application of the organisation (the gate's fenced lookup). A pronoun
-        follow-up ("what depends on it?") qualifies only when the previous
-        turn's stored answer resolves to a subject, the message matches a cue
-        and contains a pronoun, and no generic-vocabulary term. Solution or
-        element context and the mere presence of an earlier answer never do."""
+    @staticmethod
+    def _classify_estate(user_message: str, context=None, history=None) -> Optional[str]:
+        """The answer kind when this message is an estate question, else None:
+        its wording must match a cue AND the message itself must name an
+        element or application of the organisation (the gate's fenced
+        lookup). Context and earlier turns never make a question an estate
+        question; a follow-up gets no nudge, and an answer that names records
+        without markers is caught by the name rule anyway."""
         kind = classify_estate_question(user_message)
         if not kind:
             return None
@@ -1522,24 +1510,6 @@ class AgentRunner:
                 return kind
         except Exception:
             logger.warning("AgentRunner: estate question lookup failed", exc_info=True)
-        words = set(re.findall(r"[a-z0-9]+", str(user_message).lower()))
-        if not cls._PRONOUN.search(str(user_message)) or words & cls._GENERIC_TERMS:
-            return None
-        for prior in reversed(history or []):
-            if isinstance(prior, dict) and prior.get("role") == "assistant":
-                found = re.search(r"/intelligence/answers/([0-9a-f]{32})", str(prior.get("content") or ""))
-                if not found:
-                    return None
-                try:
-                    from app.modules.intelligence.services.answer_envelope import open_answer
-
-                    record = open_answer(found.group(1))
-                    params = (record.params or {}) if record is not None else {}
-                except Exception:
-                    return None
-                if params.get("element_id") or params.get("element_ids"):
-                    return kind
-                return None
         return None
 
     def _find_uncited(self, text: str) -> list:

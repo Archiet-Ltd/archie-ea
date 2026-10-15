@@ -284,26 +284,6 @@ _NO_ROWS_OK = re.compile(
     r"(?:rows|records|dependenc|dependents|results)\b|\bnone\b",
     re.IGNORECASE,
 )
-# Language that states how records relate or what happens when one fails.
-_IMPACT_LANGUAGE = re.compile(
-    r"\b(depends? on|depend(?:s|ed)? upon|dependent on|relies on|rely on|runs? on|"
-    r"hosted on|breaks?|would break|fail|fails|failed|failure|stops?|stopped|down|"
-    r"impacted|impacts?|affects?|affected|connects? to|connected to|calls?|"
-    r"serves?|serving|feeds?|consumes?|uses?|used by)\b",
-    re.IGNORECASE,
-)
-# What disqualifies a clarification: relationship language, ownership, and the
-# words that continue a sentence into a claim.
-_CLARIFY_RELATION = re.compile(
-    _IMPACT_LANGUAGE.pattern[:-3] + r"|owned by|owns|because|so|while|contradict\w*|"
-    r"stops?|fails?)\b",
-    re.IGNORECASE,
-)
-_CONNECTIVE = re.compile(
-    r"\b(?:because|so|while|and|but|though|although|since|whereas|which)\b|"
-    r"[:;,\u2014\u2013]|\s-+\s",
-    re.IGNORECASE,
-)
 # A quantity attached to an estate noun is checked only in a statement of fact
 # about the estate; advice never triggers it.
 _FACT_VERB = re.compile(
@@ -331,7 +311,7 @@ _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
 _NON_WORD = re.compile(r"[^a-z0-9]+")
 _ALNUM = re.compile(r"[A-Za-z0-9]+")
 _MAX_NGRAM = 6
-_MAX_CANDIDATES = 1500
+_MAX_DISTINCT_PHRASES = 20000
 
 
 def _words(value) -> List[str]:
@@ -526,59 +506,91 @@ _ZERO_WIDTH = "[\u200b\u200c\u200d\u2060\ufeff\u00ad]"
 _QUOTES = "[\u201c\u201d\u201e\u201f\u2018\u2019\u201a\u201b\u00ab\u00bb\u2039\u203a\u300c\u300d`\"]"
 
 
+class CandidateOverflow(Exception):
+    """The text has too many distinct phrases to look up; the caller fails
+    closed for an estate answer rather than skipping any."""
+
+
 def _clean_variants(text: str) -> List[str]:
     """The text with Markdown, HTML, typographic quotes, brackets (ordinary and
-    fullwidth), possessives, dashes and zero-width characters removed or
-    normalised. Variants: brackets kept (a name may carry them, O365 (Office)),
-    brackets dropped, slashes split (A/B names two records), ampersand as and."""
+    fullwidth), dashes and zero-width characters removed or normalised.
+    Variants: possessives stripped and as written (curly and straight
+    apostrophes folded to one), brackets kept (a name may carry them,
+    O365 (Office)) and dropped, slashes split (A/B names two records),
+    ampersand as and."""
     t = text.replace("&nbsp;", " ").replace("&amp;", "&").replace("\u00a0", " ")
     t = re.sub(r"<[^>]+>", " ", t)                                 # HTML tags
     t = re.sub(_ZERO_WIDTH, "", t)
     t = REF_MARKER.sub(" ", t)
     t = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", t)                 # [text](url) -> text
     t = re.sub("[\u2014\u2013\u2012\u2015]|--+", " ", t)           # dashes
-    t = re.sub("(?<=\\w)['\u2019]s(?!\\w)", "", t)                # possessive 's
-    t = re.sub(_QUOTES, " ", t)                                    # typographic quotes
-    t = re.sub("(?<!\\w)'|'(?!\\w)", " ", t)                       # ASCII quotes
-    t = re.sub("[`*~]+", " ", t)                                   # emphasis, code
-    t = re.sub("(?<!\\w)_+|_+(?!\\w)", " ", t)                     # _emphasis_
-    for open_, close in zip(_FULLWIDTH_OPEN, _FULLWIDTH_CLOSE):
-        t = t.replace(open_, "(").replace(close, ")")
-    bare = re.sub("[\\[\\](){}]", " ", t)
-    slash = t.replace("/", " ")
-    amp = t.replace("&", " and ")
-    return [t, bare, slash, amp]
+    t = t.replace("\u2019", "'").replace("\u2018", "'")              # one apostrophe
+    out: List[str] = []
+    for possessive in (False, True):
+        u = t
+        if possessive:
+            u = re.sub("(?<=\\w)'s(?!\\w)", "", u)                 # strip 's
+        u = re.sub(_QUOTES, " ", u)                                # typographic quotes
+        u = re.sub("(?<!\\w)'|'(?!\\w)", " ", u)                   # quote marks at edges
+        u = re.sub("[`*~]+", " ", u)                               # emphasis, code
+        u = re.sub("(?<!\\w)_+|_+(?!\\w)", " ", u)                 # _emphasis_
+        for open_, close in zip(_FULLWIDTH_OPEN, _FULLWIDTH_CLOSE):
+            u = u.replace(open_, "(").replace(close, ")")
+        out.extend([
+            u,
+            re.sub("[\\[\\](){}]", " ", u),
+            u.replace("/", " "),
+            u.replace("&", " and "),
+        ])
+    return out
 
 
 def candidate_phrases(text: str) -> set:
-    """Phrases of *text* worth looking up against the organisation's names:
-    every run of two to six words and every capitalised single word, with the
-    punctuation a name may carry (S/4HANA, E-Commerce) kept, folded with the
-    platform's one normaliser. Deduplicated and bounded."""
+    """Every distinct folded phrase of *text* worth looking up against the
+    organisation's names: runs of two to six words and capitalised single
+    words, punctuation a name may carry (S/4HANA, E-Commerce, Moody's) kept,
+    folded with the platform's one normaliser. Nothing is capped. For
+    pathological input (more than 20000 distinct phrases) the phrases that
+    contain a capitalised word are looked up and the rest are dropped; if
+    even those exceed the bound, CandidateOverflow is raised."""
     from app.utils.duplicate_guard import normalize_name
 
-    found: set = set()
+    everything: set = set()
+    capitalised: set = set()
     for variant in _clean_variants(text):
         tokens = variant.split()
+        if len(tokens) > 4 * _MAX_DISTINCT_PHRASES:
+            raise CandidateOverflow("text too long to look up")
         for size in range(1, _MAX_NGRAM + 1):
             for start in range(0, len(tokens) - size + 1):
-                raw = " ".join(tokens[start:start + size])
+                window = tokens[start:start + size]
+                raw = " ".join(window)
                 gram = _trim_phrase(raw)
                 if not gram:
                     continue
                 if size == 1 and not gram[:1].isupper():
                     continue
+                keys = []
                 key = normalize_name(gram)
                 if key and key not in _LEADING:
-                    found.add(key)
+                    keys.append(key)
                 # A name that ends in a full stop (Acme Inc.) is also looked
                 # up as written.
                 dotted = raw.strip(",;:!?\"'")
                 if dotted.endswith(".") and len(dotted) > 2:
-                    found.add(normalize_name(dotted))
-                if len(found) >= _MAX_CANDIDATES:
-                    return found
-    return found
+                    keys.append(normalize_name(dotted))
+                # A name stored with a typographic apostrophe.
+                keys += [k.replace("'", "\u2019") for k in keys if "'" in k]
+                has_cap = any(w[:1].isupper() for w in window)
+                for k in keys:
+                    everything.add(k)
+                    if has_cap:
+                        capitalised.add(k)
+    if len(everything) <= _MAX_DISTINCT_PHRASES:
+        return everything
+    if len(capitalised) <= _MAX_DISTINCT_PHRASES:
+        return capitalised
+    raise CandidateOverflow("too many distinct phrases to look up")
 
 
 def organisation_names_in_text(text: str, organization_id) -> set:
@@ -608,14 +620,16 @@ def organisation_names_in_text(text: str, organization_id) -> set:
     except Exception:  # pragma: no cover
         pass
     found: set = set()
+    ordered = sorted(phrases)
     for model in models:
-        rows = db.session.execute(
-            db.select(model.name).where(
-                model.organization_id == organization_id,
-                folded_column(model.name).in_(sorted(phrases)),
-            )
-        ).scalars()
-        found.update(phrase_key(n) for n in rows if n)
+        for offset in range(0, len(ordered), 500):
+            rows = db.session.execute(
+                db.select(model.name).where(
+                    model.organization_id == organization_id,
+                    folded_column(model.name).in_(ordered[offset:offset + 500]),
+                )
+            ).scalars()
+            found.update(phrase_key(n) for n in rows if n)
     found.discard("")
     return found
 
@@ -703,7 +717,7 @@ def _year(token: str) -> bool:
 
 
 def _check_sentence(sentence, grounding, tool_keys, context_keys, org_keys,
-                    question_names, estate_question, zero_rows, impact_rows):
+                    question_names, estate_question, zero_rows):
     """The unsupported parts of one statement (empty when it is supported)."""
     missing: List[str] = []
     markers = list(REF_MARKER.finditer(sentence))
@@ -715,10 +729,6 @@ def _check_sentence(sentence, grounding, tool_keys, context_keys, org_keys,
 
     check_generic = bool(estate_question and grounding.tool_results > 0)
     mentions = _mentions(sentence, tool_keys, context_keys, org_keys, markers, check_generic)
-    blanked = REF_MARKER.sub(" ", sentence)
-    for mention in sorted(mentions, key=lambda m: -m["start"]):
-        blanked = blanked[:mention["start"]] + " " * (mention["end"] - mention["start"]) + blanked[mention["end"]:]
-    impact_language = bool(_IMPACT_LANGUAGE.search(blanked))
     subject_keys = grounding.subject_names
 
     # Marker runs: consecutive markers separated only by whitespace. A run
@@ -748,9 +758,11 @@ def _check_sentence(sentence, grounding, tool_keys, context_keys, org_keys,
             if not covered:
                 missing.append("[ref:] marker for " + key)
         elif key in context_keys:
-            # Context rows ground what a record is, has or is owned by; they
-            # never ground a relationship or impact statement.
-            if impact_language and key not in subject_keys:
+            # The context grounds a sentence that names ONE record (what it
+            # is, has, or is owned by). A sentence naming two or more records
+            # asserts something between them, and every record in it must be
+            # grounded by this turn's rows, subject or markers.
+            if len(mentions) > 1 and key not in subject_keys:
                 missing.append("not in the answer rows: " + key)
         else:
             missing.append("not returned this turn: " + key)
@@ -800,32 +812,19 @@ def _is_non_count(text: str, match) -> bool:
 
 
 def _clarification_exempt(sentence, tool_keys, context_keys, org_keys, question_names) -> bool:
-    """A sentence is exempt only if it STARTS with a clarification phrase, has
-    no relationship language, no connective leading into a record name, no
-    count, and names only records the user's own question named."""
+    """A sentence is exempt only if it starts with a clarification phrase,
+    names AT MOST ONE record (a relationship needs two), that record is one
+    the user's own question named, it has no digit and no marker, and it is
+    at most 15 words."""
     text = sentence.strip()
     if not _CLARIFICATION_START.search(text):
         return False
-    markers = list(REF_MARKER.finditer(text))
-    if markers or _COUNT_CLAIM.search(text):
+    if len(text.split()) > 15 or re.search(r"\d", text) or REF_MARKER.search(text):
         return False
-    mentions = _mentions(text, tool_keys, context_keys, org_keys, markers)
-    blanked = text
-    for mention in sorted(mentions, key=lambda m: -m["start"]):
-        blanked = blanked[:mention["start"]] + " " * (mention["end"] - mention["start"]) + blanked[mention["end"]:]
-    body = _CLARIFICATION_START.sub(" ", blanked, count=1)
-    if _CLARIFY_RELATION.search(body):
+    mentions = _mentions(text, tool_keys, context_keys, org_keys, [])
+    if len(mentions) > 1:
         return False
-    for mention in mentions:
-        if _CONNECTIVE.search(text[:mention["start"]]):
-            return False
-        if mention["key"] not in question_names:
-            return False
-    # A connective followed by anything that looks like a new clause.
-    tail = text[_CLARIFICATION_START.search(text).end():]
-    if re.search(r"[:;\u2014\u2013]|\s-+\s", tail) and mentions:
-        return False
-    return True
+    return all(m["key"] in question_names for m in mentions)
 
 
 def find_uncited_claims(
@@ -863,7 +862,6 @@ def find_uncited_claims(
             context_keys.add(key)
     zero_rows = bool(estate_question and grounding.tool_results > 0
                      and grounding.rows_returned == 0)
-    impact_rows = bool(grounding.rows_returned > 0)
 
     uncited: List[Dict] = []
     for sentence in statements:
@@ -871,7 +869,7 @@ def find_uncited_claims(
             continue
         missing = _check_sentence(
             sentence, grounding, tool_keys, context_keys, org_keys,
-            question_names, estate_question, zero_rows, impact_rows,
+            question_names, estate_question, zero_rows,
         )
         if missing:
             uncited.append({"claim": sentence[:300], "unsupported": missing})

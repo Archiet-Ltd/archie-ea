@@ -1287,9 +1287,11 @@ def test_a_plain_clarification_naming_only_the_users_records_passes():
         "What happens to Kafka if that goes down?",
         "Does it depend on the cloud SLA?",
         "What breaks if it fails in a microservices pattern?",
+        "what else depends on it?",
+        "What risks affect a cloud migration?",
     ],
 )
-def test_a_generic_follow_up_after_a_cited_answer_is_not_an_estate_question(
+def test_no_follow_up_is_an_estate_question_without_a_record_in_the_message(
     app, db_session, make_org, message
 ):
     org = make_org("b53-followup-" + uuid.uuid4().hex[:6])
@@ -1297,20 +1299,23 @@ def test_a_generic_follow_up_after_a_cited_answer_is_not_an_estate_question(
     root, *_ = _estate(db_session, org.id, "Fol")
     first = _call(app, user, org.id, "answer", {"question": "impact", "element_id": root.id})
     history = [
-        {"role": "user", "content": "what breaks if Fol Root fails?"},
         {"role": "assistant",
          "content": "See " + first["result"]["page_url"] + " [ref:%s]" % first["result"]["address"]},
     ]
     with app.test_request_context("/"):
         g.current_org_id = org.id
-        assert AgentRunner._classify_estate(message, {}, history) is None, message
-        # The same pronoun follow-up, without generic vocabulary, is one.
-        assert AgentRunner._classify_estate("what else depends on it?", {}, history) == "impact"
-        # Another organisation's address never resolves.
-    other = make_org("b53-followup-other-" + uuid.uuid4().hex[:6])
+        assert AgentRunner._classify_estate(message, {"solution_id": 3}, history) is None, message
+
+
+def test_a_message_that_names_a_record_and_matches_a_cue_is_an_estate_question(
+    app, db_session, make_org
+):
+    org = make_org("b53-relies")
+    _element(db_session, org.id, "Core Banking")
+    db_session.commit()
     with app.test_request_context("/"):
-        g.current_org_id = other.id
-        assert AgentRunner._classify_estate("what else depends on it?", {}, history) is None
+        g.current_org_id = org.id
+        assert AgentRunner._classify_estate("What relies on Core Banking?", {}) == "impact"
 
 
 def test_a_generic_follow_up_gets_no_nudge_and_no_not_recorded(
@@ -1405,3 +1410,150 @@ def test_a_correct_count_without_a_marker_passes_when_it_is_the_answers_own_row_
     assert _gate("14 applications are affected.", estate_question=True) != []
     assert _gate("14 applications are affected [ref:" + "a" * 32 + "].",
                  estate_question=True) != []
+
+
+# --------------------------------------------------------------------------- #
+# Round 6: structural rules                                                    #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "I could not find a stored answer, so Clearing Hub depends on Core Banking.",
+        "I could not find a stored answer and Clearing Hub depends on Core Banking.",
+        "I could not find a stored answer while Clearing Hub depends on Core Banking.",
+        "I can't find a record - Clearing Hub stops when Core Banking fails.",
+        "I can't find a record: Clearing Hub stops when Core Banking fails.",
+        "Nothing is recorded, so Clearing Hub stops when Core Banking fails.",
+        "I could not find an owner for Clearing Hub because it depends on Core Banking.",
+        "There is no record contradicting that Clearing Hub depends on Core Banking.",
+        "I don't see anything else: Clearing Hub fails with Core Banking and 14 applications stop.",
+        "I could not find Core Banking, which is why Clearing Hub requires Treasury Feed.",
+    ],
+)
+def test_a_clarification_naming_two_records_or_a_count_is_checked_as_a_claim(text):
+    assert find_uncited_claims(
+        text, _grounded(), org_names=R5_NAMES,
+        question_names={"clearing hub", "core banking", "treasury feed"},
+    ) != [], text
+
+
+def test_a_short_one_record_clarification_about_the_users_own_record_passes():
+    asked = {"clearing hub", "core banking"}
+    assert find_uncited_claims(
+        "I could not find Clearing Hub in your estate.", _grounded(),
+        org_names=R5_NAMES, question_names=asked) == []
+    assert find_uncited_claims(
+        "I could not find Core Bank in your estate. Did you mean Core Banking?",
+        _grounded(), org_names=R5_NAMES, question_names=set()) == []
+    # Over fifteen words, a digit, or a record the user did not name: checked.
+    long_text = ("I could not find Clearing Hub in your estate although I looked "
+                 "through every one of the places that I know about today.")
+    assert find_uncited_claims(long_text, _grounded(), org_names=R5_NAMES,
+                               question_names=asked) != []
+    assert find_uncited_claims("I could not find Clearing Hub 2 times.", _grounded(),
+                               org_names=R5_NAMES, question_names=asked) != []
+    assert find_uncited_claims("I could not find Treasury Feed.", _grounded(),
+                               org_names=R5_NAMES, question_names=asked) != []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Clearing Hub requires Treasury Feed.",
+        "Treasury Feed is upstream of Clearing Hub.",
+        "An outage of Core Banking takes Clearing Hub offline.",
+        "Treasury Feed also requires Core Banking [ref:5].",
+    ],
+)
+def test_a_sentence_naming_two_records_is_not_grounded_by_the_context(text):
+    context = {"applications": [{"id": 1, "name": "Core Banking"},
+                                {"id": 2, "name": "Treasury Feed"},
+                                {"id": 3, "name": "Clearing Hub"}]}
+    for grounding, estate in ((_grounded(context=context), False),
+                              (_grounded(IMPACT, context=context), True)):
+        assert find_uncited_claims(
+            text, grounding, org_names=R5_NAMES, estate_question=estate) != [], text
+
+
+def test_a_sentence_naming_one_context_record_is_grounded_by_it():
+    context = {"applications": [{"id": 1, "name": "Core Banking", "owner": "Treasury team"}]}
+    grounding = _grounded(context=context)
+    for text in ("Core Banking is owned by the Treasury team.",
+                 "Core Banking is a payments application.",
+                 "This solution is linked to Core Banking."):
+        assert find_uncited_claims(text, grounding, org_names=R5_NAMES) == [], text
+
+
+def test_a_record_after_five_hundred_words_of_prose_is_still_found(app, db_session, make_org):
+    from app.modules.ai_chat.services.ai_hallucination_detector import (
+        organisation_names_in_text,
+    )
+
+    org = make_org("b53-long-" + uuid.uuid4().hex[:6])
+    _element(db_session, org.id, "Retail Payments Clearing Engine")
+    db_session.commit()
+    words = " ".join("word%d" % i for i in range(500))
+    text = words + ". Retail Payments Clearing Engine fails every night and stops settlement."
+    with app.test_request_context("/"):
+        found = organisation_names_in_text(text, org.id)
+    assert "retail payments clearing engine" in found
+    claims = find_uncited_claims(
+        "Retail Payments Clearing Engine fails every night and stops settlement.",
+        _grounded(), org_names=found,
+    )
+    assert claims != []
+
+
+def test_pathological_input_fails_closed_rather_than_skipping(app, db_session, make_org, monkeypatch):
+    from app.modules.ai_chat.services import ai_hallucination_detector as det
+
+    org = make_org("b53-overflow")
+    monkeypatch.setattr(det, "_MAX_DISTINCT_PHRASES", 50)
+    text = " ".join("Word%d" % i for i in range(400))
+    with app.test_request_context("/"):
+        with pytest.raises(det.CandidateOverflow):
+            det.organisation_names_in_text(text, org.id)
+
+
+def test_an_overflowing_estate_answer_is_refused_by_the_runner(monkeypatch):
+    from app.modules.ai_chat.services import agent_runner as module
+    from app.modules.ai_chat.services.ai_hallucination_detector import CandidateOverflow
+
+    def _overflow(*a, **k):
+        raise CandidateOverflow("too many")
+
+    monkeypatch.setattr(module, "organisation_names_in_text", _overflow)
+    runner = _runner_with(_grounded(IMPACT))
+    runner._estate_question = "impact"
+    result = {"response": "Ledger [ref:9] is impacted."}
+    runner._apply_citation_gate(result)
+    assert result["response"] == AgentRunner.CITATION_REFUSAL
+
+
+@pytest.mark.parametrize(
+    "said,stored,expected",
+    [
+        ("Moody's Feed fails nightly.", "Moody's Feed", "moody s feed"),
+        ("Moody\u2019s Feed fails nightly.", "Moody's Feed", "moody s feed"),
+        ("Lloyd's Link depends on Ledger.", "Lloyd's Link", "lloyd s link"),
+        ("Lloyd's Link depends on Ledger.", "Lloyd\u2019s Link", "lloyd s link"),
+        ("Core Banking's feed is late.", "Core Banking", "core banking"),
+    ],
+)
+def test_names_with_apostrophes_are_matched_to_their_rows(
+    app, db_session, make_org, said, stored, expected
+):
+    from app.modules.ai_chat.services.ai_hallucination_detector import (
+        organisation_names_in_text,
+    )
+
+    org = make_org("b53-apos-" + uuid.uuid4().hex[:6])
+    _element(db_session, org.id, stored)
+    db_session.commit()
+    with app.test_request_context("/"):
+        found = organisation_names_in_text(said, org.id)
+    assert expected in found, (said, found)
+    claims = find_uncited_claims(said, _grounded(), org_names=found)
+    assert claims != [], said
