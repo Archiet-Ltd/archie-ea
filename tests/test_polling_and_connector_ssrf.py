@@ -49,6 +49,16 @@ def production_like(monkeypatch):
         "getaddrinfo",
         lambda host, port, *a, **k: [(2, 1, 6, "", ("93.184.216.34", port))],
     )
+    # The stub answers for the host's own name too; that must not count as
+    # "the server's own address".
+    monkeypatch.setattr(guard, "_local_interface_addresses", lambda: set())
+
+
+@pytest.fixture
+def loopback_allowed(monkeypatch):
+    """The development setting: loopback targets are permitted, so real local
+    servers can stand in for the configured host and the redirect target."""
+    monkeypatch.setitem(current_app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", True)
 
 
 def _user(db_session, org, label):
@@ -224,7 +234,7 @@ def _serve(location=None):
     return server, handler
 
 
-def test_poll_probe_really_does_not_follow_a_redirect(two_users):
+def test_poll_probe_really_does_not_follow_a_redirect(two_users, loopback_allowed):
     """Real sockets, development configuration (loopback allowed): the redirect
     target must receive no request."""
     target, target_handler = _serve()
@@ -506,7 +516,7 @@ def test_connectors_still_call_an_ordinary_external_base_url(production_like, ai
 
 
 @pytest.mark.parametrize("index", [0, 1])
-def test_connectors_really_do_not_follow_a_redirect(index):
+def test_connectors_really_do_not_follow_a_redirect(index, loopback_allowed):
     """Real sockets, development configuration (loopback allowed): the host the
     request is redirected to receives nothing."""
     target, target_handler = _serve()

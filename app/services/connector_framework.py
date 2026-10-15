@@ -94,6 +94,11 @@ def validate_connector_config_urls(config) -> None:
             validate_connector_url(value)
 
 
+async def _refuse_redirect(session, trace_config_ctx, params):
+    """aiohttp trace hook: a connector call is never redirected."""
+    raise ConnectorURLRefused("The connector host answered with a redirect, which is not followed")
+
+
 class FieldMapping:
     """Field mapping DSL for API transformations."""
 
@@ -166,14 +171,16 @@ class BaseConnector(ABC):
         """An aiohttp session for calls to this connector's base_url.
 
         Checks the base URL first (every call, not only at save time) and
-        refuses redirects: ``max_redirects=1`` makes aiohttp raise on the first
-        redirect response instead of following it, so a permitted host cannot
+        refuses redirects: a trace hook raises when a redirect response arrives,
+        before aiohttp issues the next request, so a permitted host cannot
         bounce the request, with its credentials, to an internal address.
         """
         import aiohttp
 
         self._checked_base_url()
-        return aiohttp.ClientSession(max_redirects=1, **kwargs)
+        trace = aiohttp.TraceConfig()
+        trace.on_request_redirect.append(_refuse_redirect)
+        return aiohttp.ClientSession(trace_configs=[trace], **kwargs)
 
     def _same_origin_link(self, link: str) -> str:
         """A server-supplied continuation link, only if it stays on the base URL's host."""
