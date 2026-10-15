@@ -456,9 +456,12 @@ class ConnectorOrchestrator:
 
         try:
             if connector_type == "rest_api":
-                resp = requests.get(
-                    credentials.get("base_url", ""), timeout=10
-                )
+                from app.utils.ssrf_guard import validate_user_supplied_url
+
+                # The address is typed by the caller. Refused and unreachable
+                # targets answer identically, so this is not a port scanner.
+                url = validate_user_supplied_url(credentials.get("base_url", ""))
+                resp = requests.get(url, timeout=10, allow_redirects=False)
                 return {
                     "success": resp.status_code < 400,
                     "message": f"HTTP {resp.status_code}",
@@ -468,7 +471,8 @@ class ConnectorOrchestrator:
                 "message": "Connection parameters accepted (live test not yet implemented for this connector type)",
             }
         except Exception as e:
-            return {"success": False, "message": str(e)}
+            logger.info("Connector connection test failed: %s", e)
+            return {"success": False, "message": "Connection could not be established"}
 
     def _build_workflow(self, connector_type, credentials, object_mappings, target_api_url, frequency):
         """Build n8n workflow JSON using per-connector templates."""
