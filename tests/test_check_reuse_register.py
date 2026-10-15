@@ -501,14 +501,14 @@ def test_the_baseline_is_not_above_the_one_on_origin_main():
     assert raised == {}, f"baseline raised against origin/main: {raised}"
 
 
-# ------------------------------------------------------------------ design-tokens: six evasions found by the refuter
-#
+# ------------------------------------------------------------------ design-tokens: evading the regex
+
 # Each test below runs the real design-tokens entry (lifted from docs/reuse-register.yml, not a hand-copied
-# approximation) against one shape the refuter reproduced getting past the original regex: a one-line
-# declaration, a fallback on a real token name, an rgb()-form fallback, a :root block in a file outside
-# app/static/css and app/templates entirely, an inline style="--token: ..." attribute, and a redeclared
-# --info/--success/-emphasis token. A control case (the originally-specified single-line declaration plus a
-# --color-* hex fallback) is pinned to keep raising its original two violations.
+# approximation) against one shape that must still be caught: a one-line declaration, a fallback on a real
+# token name, an rgb()-form fallback, a :root block in a file outside app/static/css and app/templates
+# entirely, an inline style="--token: ..." attribute, and a redeclared --info/--success/-emphasis token. A
+# control case (the originally-specified single-line declaration plus a --color-* hex fallback) is pinned to
+# keep raising its original two violations.
 
 DESIGN_TOKEN_CANONICAL = (
     ":root {\n"
@@ -602,3 +602,118 @@ def test_evasion_6_info_success_and_emphasis_tokens_are_caught(tmp_path):
     # two redeclarations in one file is still one violation entry, naming both line numbers
     hit = next(f for f in fails if "design-tokens/token-declaration" in f)
     assert "app/static/css/x.css:1" in hit
+
+
+# ------------------------------------------------------------------ the reuse-ok marker and line numbers
+#
+# The declaration-matching regex must not let its leading whitespace class cross a newline: a declaration
+# on the line after an opening `{` or a `;` is a separate statement with its own line number, and the
+# reuse-ok marker convention ("on the matching line, or the line above it") only works if the gate agrees
+# on which line that is.
+
+
+def test_reuse_ok_marker_exempts_a_declaration_on_the_line_after_the_opening_brace(tmp_path):
+    """The documented exemption shape: the declaration does not share a line with `{`."""
+    files = {
+        "app/static/css/x.css": (
+            ":root {\n"
+            "  --primary: 0 0% 0%; /* reuse-ok: local override for a demo page */\n"
+            "}\n"
+        ),
+    }
+    assert _design_tokens_fails(tmp_path, files) == []
+
+
+def test_reuse_ok_marker_exempts_a_declaration_on_the_line_after_a_semicolon(tmp_path):
+    """Same shape, reached via the `;` alternative rather than `{`."""
+    files = {
+        "app/static/css/x.css": (
+            ":root { --foreground: 0 0% 0%;\n"
+            "  --primary: 0 0% 0%; /* reuse-ok: local override for a demo page */\n"
+            "}\n"
+        ),
+    }
+    fails = _design_tokens_fails(tmp_path, files)
+    # --foreground on the opening line is still an unexempted violation; only --primary is exempt
+    assert len(fails) == 1 and "x.css:1" in fails[0] and "x.css:2" not in fails[0]
+
+
+def test_a_mid_block_declaration_without_a_marker_reports_its_own_line_number(tmp_path):
+    """Without a marker the shape still fails, and each hit names the declaration's own line, not the
+    opening brace's."""
+    files = {
+        "app/static/css/x.css": (
+            ":root {\n"
+            "  --foreground: 0 0% 0%;\n"
+            "  --primary: 0 0% 0%;\n"
+            "}\n"
+        ),
+    }
+    fails = _design_tokens_fails(tmp_path, files)
+    hit = next(f for f in fails if "design-tokens/token-declaration" in f)
+    assert "x.css:2" in hit and "x.css:3" in hit
+    assert "x.css:1" not in hit
+
+
+# ------------------------------------------------------------------ design-tokens: fallback forms added later
+#
+# The fallback check originally only recognised a hex literal or an rgb()/rgba() call. Each test below pins
+# one further shape of literal colour smuggled past a var() fallback.
+
+
+def test_evasion_7_hsl_triplet_fallback_is_caught(tmp_path):
+    """The fallback is a bare HSL triplet, the natural form here since every token is stored as one."""
+    fails = _design_tokens_fails(
+        tmp_path, {"app/static/css/x.css": "a { color: hsl(var(--primary, 221 83% 53%)); }\n"})
+    assert any("design-tokens/hex-fallback" in f for f in fails)
+
+
+def test_evasion_8_fallback_wrapped_in_an_hsl_call_is_caught(tmp_path):
+    fails = _design_tokens_fails(
+        tmp_path, {"app/static/css/x.css": "a { color: var(--primary, hsl(0 0% 0%)); }\n"})
+    assert any("design-tokens/hex-fallback" in f for f in fails)
+
+
+def test_evasion_9_hsla_fallback_is_caught(tmp_path):
+    fails = _design_tokens_fails(
+        tmp_path, {"app/static/css/x.css": "a { color: var(--primary, hsla(0, 0%, 0%, 1)); }\n"})
+    assert any("design-tokens/hex-fallback" in f for f in fails)
+
+
+def test_evasion_10_named_colour_fallback_is_caught(tmp_path):
+    fails = _design_tokens_fails(
+        tmp_path, {"app/static/css/x.css": "a { color: var(--primary, blue); }\n"})
+    assert any("design-tokens/hex-fallback" in f for f in fails)
+
+
+def test_evasion_11_transparent_keyword_fallback_is_caught(tmp_path):
+    fails = _design_tokens_fails(
+        tmp_path, {"app/static/css/x.css": "a { color: var(--primary, transparent); }\n"})
+    assert any("design-tokens/hex-fallback" in f for f in fails)
+
+
+def test_a_non_token_variable_with_a_non_colour_fallback_is_not_a_hit(tmp_path):
+    """The new fallback forms are scoped to the protected token names: an unrelated custom property (its
+    own fallback, its own units) stays unaffected."""
+    files = {
+        "app/static/css/x.css": (
+            "a { border-radius: calc(var(--radius, 0.5rem) - 2px); }\n"
+            "b { z-index: var(--modal-z, 1000); }\n"
+            "c { color: hsl(var(--emerald-700, 142 71% 29%)); }\n"
+        ),
+    }
+    assert _design_tokens_fails(tmp_path, files) == []
+
+
+def test_layer_and_font_sans_tokens_are_now_protected(tmp_path):
+    """The 14 ArchiMate layer tokens (base + -emphasis) and --font-sans are declared only in
+    shadcn_tokens.css; a redeclaration anywhere else must be caught like any other token."""
+    files = {
+        "app/static/css/x.css": (
+            ".x { --layer-business: 1 2% 3%; --layer-business-emphasis: 1 2% 3%; }\n"
+            ":root { --font-sans: sans-serif; }\n"
+        ),
+    }
+    fails = _design_tokens_fails(tmp_path, files)
+    hit = next(f for f in fails if "design-tokens/token-declaration" in f)
+    assert "x.css:1" in hit and "x.css:2" in hit

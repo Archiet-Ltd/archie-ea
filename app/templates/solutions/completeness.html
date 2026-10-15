@@ -26,7 +26,7 @@
       <div
         class="w-40 h-40 rounded-full flex items-center justify-center"
         :style="`background: conic-gradient(
-          var(--gauge-color, #3b82f6) calc(${score}% * 3.6deg),
+          var(--gauge-color, #3b82f6) calc(${score}% * 3.6deg),{# reuse-ok: --gauge-color is a one-off gauge fill colour set from JS (style.setProperty below), not a design token; its var() fallback is a default for that same local property, not a second token source #}
           #e5e7eb calc(${score}% * 3.6deg)
         )`"
       >

@@ -39,16 +39,18 @@ entries:
       --info / --success / --warning / any -foreground or -emphasis variant etc. a second time in another
       stylesheet, a template's inline <style>, a brand-new file anywhere in the tree, or an inline
       style="--token: ..." attribute -- one token source means no second declaration in any form, on one
-      line or many. Do not fall back to a literal colour with var(--any-token, #hex) or
-      var(--any-token, rgb(...)/rgba(...)) either, on a --color-* name or a real token name: no var()
+      line or many. Do not fall back to a literal colour with var(--any-token, #hex),
+      var(--any-token, rgb(...)/rgba(...)/hsl(...)/hsla(...)), an HSL-triplet fallback
+      (var(--any-token, 0 0% 0%)), a named colour (var(--any-token, blue)) or a keyword
+      (var(--any-token, transparent)) either, on a --color-* name or a real token name: no var()
       fallback has ever been needed, because every token above is always defined in :root.
     must_not_create:
       - id: token-declaration
-        regex: '(?:^|[{;''"])\s*--(background|foreground|card|popover|primary|secondary|muted|accent|destructive|border|input|ring|radius|info|success|warning)(-foreground|-emphasis)?\s*:'
+        regex: '(?:^|[{;''"])[ \t]*--(background|foreground|card|popover|primary|secondary|muted|accent|destructive|border|input|ring|radius|info|success|warning|layer-motivation|layer-strategy|layer-business|layer-application|layer-technology|layer-implementation|layer-risk|font-sans)(-foreground|-emphasis)?\s*:'
         scope: ["."]
         suffixes: [.css, .scss, .html]
       - id: hex-fallback
-        regex: 'var\(\s*--[\w-]+\s*,\s*(#[0-9a-fA-F]{3,8}|rgba?\()'
+        regex: 'var\(\s*--[\w-]+\s*,\s*(#[0-9a-fA-F]{3,8}|rgba?\()|var\(\s*--(background|foreground|card|popover|primary|secondary|muted|accent|destructive|border|input|ring|radius|info|success|warning|layer-motivation|layer-strategy|layer-business|layer-application|layer-technology|layer-implementation|layer-risk|font-sans)(-foreground|-emphasis)?\s*,\s*(hsla?\(|\d[\d.]*\s+\d[\d.]*%\s+\d[\d.]*%|[a-zA-Z]+\s*\))'
         scope: ["."]
         suffixes: [.css, .scss, .html]
     known_exceptions:
@@ -74,10 +76,6 @@ entries:
         reason: standalone document rendered server-side to PDF (WeasyPrint) with its own styles, the same
           category as export_blueprint.html and export_sad.html; not named in the task that added this
           entry, found by running the gate
-      - path: app/templates/solutions/completeness.html
-        reason: --gauge-color is a one-off gauge fill colour set from JS (style.setProperty), not a design
-          token; its var() fallback is a default for that same local property, not a second token source
-
   - id: badge
     concept: Badges, status pills and the category pill above a public-page heading
     status: active
