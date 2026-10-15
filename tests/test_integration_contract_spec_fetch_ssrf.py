@@ -83,6 +83,9 @@ def production_like(monkeypatch):
         "getaddrinfo",
         lambda host, port, *a, **k: [(2, 1, 6, "", ("93.184.216.34", port))],
     )
+    # The stub answers for the host's own name too; that must not count as
+    # "the server's own address".
+    monkeypatch.setattr(guard, "_local_interface_addresses", lambda: set())
 
 
 class _Resp:
