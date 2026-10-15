@@ -30,6 +30,7 @@ _TOKEN_URL = "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
 TEAMS_WEBHOOK_HOST_SUFFIXES = (
     ".webhook.office.com",
     ".logic.azure.com",
+    ".environment.api.powerplatform.com",  # Teams Workflows webhooks
 )
 _TEAMS_OUTLOOK_HOST = "outlook.office.com"
 
@@ -52,7 +53,14 @@ def validate_teams_webhook_url(url) -> str:
     try:
         from flask import current_app
 
-        extra = tuple(current_app.config.get("TEAMS_WEBHOOK_EXTRA_HOST_SUFFIXES") or ())
+        raw = current_app.config.get("TEAMS_WEBHOOK_EXTRA_HOST_SUFFIXES") or ()
+        if isinstance(raw, str):
+            raw = raw.split(",")
+        # Every entry must be a dotted suffix, so "example.com" cannot also
+        # admit "evilexample.com".
+        extra = tuple(
+            "." + e.strip().lower().lstrip(".") for e in raw if e and e.strip()
+        )
     except RuntimeError:
         pass
     suffixes = TEAMS_WEBHOOK_HOST_SUFFIXES + tuple(extra)
@@ -63,7 +71,12 @@ def validate_teams_webhook_url(url) -> str:
     except ValueError:
         raise BlockedOutboundURL("URL not allowed")
     if host == _TEAMS_OUTLOOK_HOST:
-        if not path.startswith("/webhook"):
+        segments = path.split("/")
+        if (
+            not (path == "/webhook" or path.startswith("/webhook/"))
+            or ".." in segments
+            or "%2e" in path.lower()
+        ):
             raise BlockedOutboundURL("URL not allowed")
         suffixes = suffixes + (_TEAMS_OUTLOOK_HOST,)
     return validate_outbound_url(url, allowed_host_suffixes=suffixes, require_https=True)
@@ -174,7 +187,11 @@ class M365Service:
         try:
             webhook_url = validate_teams_webhook_url(channel_webhook_url)
         except Exception as exc:  # BlockedOutboundURL
-            logger.warning("COM-017: Teams webhook address refused: %s", exc)
+            logger.warning(
+                "COM-017: Teams webhook address refused at send (organisation %s): %s",
+                org_id,
+                exc,
+            )
             return
 
         try:

@@ -17,6 +17,7 @@ GOOD = [
     "https://contoso.webhook.office.com/webhookb2/abc@def/IncomingWebhook/x/y",
     "https://prod-12.westeurope.logic.azure.com:443/workflows/abc/triggers/manual/paths/invoke",
     "https://outlook.office.com/webhook/abc@def/IncomingWebhook/x/y",
+    "https://abc123.4f.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/w1/triggers/manual/paths/invoke?api-version=1",
 ]
 REFUSED = [
     "http://169.254.169.254/latest/meta-data/",
@@ -33,6 +34,10 @@ REFUSED = [
     "https://contoso.webhook.office.com\\@10.0.0.5/",
     "https://contoso.ｗebhook.office.com/x",  # non-ASCII host
     "ftp://contoso.webhook.office.com/x",
+    "https://evilenvironment.api.powerplatform.com/x",
+    "https://environment.api.powerplatform.com.attacker.example/x",
+    "https://outlook.office.com/webhookx/abc",
+    "https://outlook.office.com/webhook/../api/v2.0/me",
 ]
 
 
@@ -109,6 +114,23 @@ def test_extra_host_suffix_from_configuration_is_honoured(app, http_calls, monke
     assert len(http_calls) == 1
 
 
+def test_extra_suffix_without_leading_dot_does_not_admit_lookalike(app, http_calls, monkeypatch):
+    monkeypatch.setitem(app.config, "TEAMS_WEBHOOK_EXTRA_HOST_SUFFIXES", ["corp.example"])
+    _send("https://evilcorp.example/in")
+    assert http_calls == []
+    _send("https://teams.corp.example/in")
+    assert len(http_calls) == 1
+
+
+def test_refused_send_is_logged_with_organisation(http_calls, caplog):
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        _send("https://10.0.0.5/hook")
+    assert http_calls == []
+    assert any("organisation 1" in r.getMessage() for r in caplog.records)
+
+
 # --- save route ---------------------------------------------------------------
 
 
@@ -182,3 +204,24 @@ def test_save_without_webhook_still_works(client, login_as, admin, proposals):
     resp = _save(client, login_as, admin, "")
     assert resp.status_code == 302
     assert len(proposals) == 1
+
+
+def test_generic_connector_save_cannot_carry_the_webhook_address(
+    client, login_as, admin, proposals
+):
+    """The generic save refuses the key outright (it is treated as a secret),
+    so the address can only enter through the validated M365 form."""
+    import json
+
+    for url in ("https://10.0.0.5/hook", GOOD[0]):
+        login_as(client, admin)
+        resp = client.post(
+            "/admin/connectors",
+            data={
+                "connector_type": "m365",
+                "name": "x",
+                "config_json": json.dumps({"teams_webhook_url": url}),
+            },
+        )
+        assert resp.status_code == 302
+    assert proposals == []
