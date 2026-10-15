@@ -110,13 +110,12 @@ def create_connector(solution_id):
     except ConnectorNotPermitted as exc:
         return jsonify({"success": False, "error": str(exc)}), 403
 
-    from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
+    from app.utils.ssrf_guard import BlockedOutboundURL
 
     try:
-        validate_user_supplied_url(target_api_url)
-        base_url = credentials.get("base_url") if isinstance(credentials, dict) else None
-        if base_url:
-            validate_user_supplied_url(base_url)
+        ConnectorOrchestrator._check_workflow_urls(
+            credentials, target_api_url, connector_type, object_mappings
+        )
     except BlockedOutboundURL:
         return jsonify({"success": False, "error": "That address is not allowed."}), 400
 

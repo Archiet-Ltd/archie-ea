@@ -241,3 +241,127 @@ def test_create_failure_text_is_generic(scene, monkeypatch):
     resp = _create(scene, "https://api.example.com/v1")
     assert resp.status_code == 502
     assert "10.1.2.3" not in resp.get_data(as_text=True)
+
+
+# --- every address a builder can call is validated -----------------------------
+
+
+def _all_builders():
+    from app.modules.codegen.services import connector_orchestrator as co
+
+    builders = dict(co._WORKFLOW_BUILDERS)
+    builders["(generic)"] = co._build_generic_workflow
+    return builders
+
+
+def _address_keys(builder):
+    import inspect
+    import re
+
+    src = inspect.getsource(builder)
+    keys = set(re.findall(r'credentials\.get\(\s*"([A-Za-z0-9_]+)"', src))
+    return {
+        k for k in keys
+        if k.lower().endswith(("url", "uri", "endpoint"))
+        or k.lower().startswith("webhook")
+        or k.lower() in ("host", "hostname", "server")
+    }
+
+
+def test_every_builder_address_key_is_validated():
+    """A builder that reads an address-like credential key must have that key
+    validated before anything is stored or sent to n8n."""
+    from app.modules.codegen.services.connector_orchestrator import ConnectorOrchestrator
+    from app.utils.ssrf_guard import BlockedOutboundURL
+
+    seen = set()
+    for name, builder in _all_builders().items():
+        for key in _address_keys(builder):
+            seen.add(key)
+            with pytest.raises(BlockedOutboundURL):
+                ConnectorOrchestrator._check_workflow_urls(
+                    {key: "http://169.254.169.254/"}, "https://app.example.com", name
+                )
+    # The enumeration actually found the keys the review named.
+    assert {"instance_url", "server_url", "base_url", "host"} <= seen
+
+
+def test_nested_or_non_string_address_values_are_refused():
+    from app.modules.codegen.services.connector_orchestrator import ConnectorOrchestrator
+    from app.utils.ssrf_guard import BlockedOutboundURL
+
+    for creds in ({"instance_url": ["http://10.0.0.5"]}, {"webhook_url": 5}, "not-a-dict"):
+        with pytest.raises(BlockedOutboundURL):
+            ConnectorOrchestrator._check_workflow_urls(creds, "https://app.example.com")
+
+
+@pytest.mark.parametrize("key,ctype", [
+    ("instance_url", "servicenow"),
+    ("instance_url", "salesforce"),
+    ("server_url", "sap"),
+    ("webhook_url", "microsoft_teams"),
+])
+@pytest.mark.parametrize("url", [
+    "http://169.254.169.254",
+    "http://127.0.0.1:8080",
+    "http://１２７.0.0.1",
+])
+def test_create_refuses_address_keys_of_every_connector(scene, n8n_calls, monkeypatch, key, ctype, url):
+    monkeypatch.setitem(
+        __import__("flask").current_app.config,
+        "COMPLIANCE_APPROVED_CONNECTOR_TYPES",
+        ("rest_api", "sap", "salesforce", "microsoft_teams"),
+    )
+    resp = scene.client().post(
+        f"/solutions/{scene.own.id}/codegen/connectors",
+        json={"connector_type": ctype, "credentials": {key: url}, "target_api_url": "https://app.example.com"},
+    )
+    assert resp.status_code == 400
+    assert n8n_calls == []
+
+
+def test_servicenow_public_instance_builds_workflow_without_redirects(scene, n8n_calls):
+    resp = scene.client().post(
+        f"/solutions/{scene.own.id}/codegen/connectors",
+        json={
+            "connector_type": "servicenow",
+            "credentials": {"instance_url": "https://acme.service-now.com"},
+            "target_api_url": "https://app.example.com",
+        },
+    )
+    assert resp.status_code == 201, resp.get_json()
+    nodes = n8n_calls[0][2]["json"]["nodes"]
+    fetch = next(n for n in nodes if n["name"] == "Fetch")
+    push = next(n for n in nodes if n["name"] == "Push")
+    for node in (fetch, push):
+        assert node["parameters"]["options"]["redirect"]["redirect"]["followRedirects"] is False
+
+
+def test_sap_entity_is_encoded_and_dot_dot_refused(scene, n8n_calls, monkeypatch):
+    monkeypatch.setitem(
+        __import__("flask").current_app.config,
+        "COMPLIANCE_APPROVED_CONNECTOR_TYPES",
+        ("sap",),
+    )
+    ok = scene.client().post(
+        f"/solutions/{scene.own.id}/codegen/connectors",
+        json={
+            "connector_type": "sap",
+            "credentials": {"server_url": "https://sap.example.com"},
+            "object_mappings": {"Business Partner/x": {}},
+            "target_api_url": "https://app.example.com",
+        },
+    )
+    assert ok.status_code == 201, ok.get_json()
+    fetch = next(n for n in n8n_calls[0][2]["json"]["nodes"] if n["name"] == "Fetch")
+    assert "Business%20Partner%2Fx" in fetch["parameters"]["url"]
+    bad = scene.client().post(
+        f"/solutions/{scene.own.id}/codegen/connectors",
+        json={
+            "connector_type": "sap",
+            "credentials": {"server_url": "https://sap.example.com"},
+            "object_mappings": {"../../admin": {}},
+            "target_api_url": "https://app.example.com",
+        },
+    )
+    assert bad.status_code == 400

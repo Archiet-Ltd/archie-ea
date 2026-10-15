@@ -39,6 +39,15 @@ def _schedule_node(cron: str) -> dict:
     }
 
 
+#: n8n HTTP Request node option: never follow a redirect, so a permitted host
+#: cannot bounce a scheduled call to an internal address.
+_NO_REDIRECTS = {"redirect": {"redirect": {"followRedirects": False}}}
+
+
+_URL_KEY_SUFFIXES = ("url", "uri", "endpoint")
+_HOST_KEYS = ("host", "hostname", "server")
+
+
 def _push_node(target_api_url: str, connector_type: str) -> dict:
     """Standard push-to-Entelim node used by all workflows."""
     return {
@@ -49,6 +58,7 @@ def _push_node(target_api_url: str, connector_type: str) -> dict:
             "method": "POST",
             "body": "={{$json}}",
             "headers": {"parameters": [{"name": "X-Source-Connector", "value": connector_type}]},
+            "options": dict(_NO_REDIRECTS),
         },
     }
 
@@ -62,6 +72,19 @@ def _transform_node(connector_type: str) -> dict:
             "values": {"string": [{"name": "source", "value": connector_type}]}
         },
     }
+
+
+def _safe_path_segment(value) -> str:
+    """One URL path segment from a caller-chosen object name: encoded, and
+    refused when it is empty or climbs ('..')."""
+    from urllib.parse import quote
+
+    from app.utils.ssrf_guard import BlockedOutboundURL
+
+    text = str(value or "").strip()
+    if not text or ".." in text or "\\" in text:
+        raise BlockedOutboundURL("URL not allowed")
+    return quote(text, safe="")
 
 
 def _wrap_workflow(name: str, nodes: list, connections: dict) -> dict:
@@ -105,6 +128,7 @@ def _build_salesforce_workflow(connector_type, credentials, object_mappings, tar
 
 def _build_sap_workflow(connector_type, credentials, object_mappings, target_api_url, cron):
     entity = list(object_mappings.keys())[0] if object_mappings else "BusinessPartner"
+    entity = _safe_path_segment(entity)
     base = credentials.get("server_url", "").rstrip("/")
     nodes = [
         _schedule_node(cron),
@@ -116,7 +140,10 @@ def _build_sap_workflow(connector_type, credentials, object_mappings, target_api
                 "method": "GET",
                 "authentication": "genericCredentialType",
                 "genericAuthType": "httpBasicAuth",
-                "options": {"headers": {"parameters": [{"name": "sap-client", "value": credentials.get("client", "100")}]}},
+                "options": {
+                    "headers": {"parameters": [{"name": "sap-client", "value": credentials.get("client", "100")}]},
+                    **_NO_REDIRECTS,
+                },
             },
             "credentials": {
                 "httpBasicAuth": {
@@ -137,6 +164,7 @@ def _build_sap_workflow(connector_type, credentials, object_mappings, target_api
 
 def _build_servicenow_workflow(connector_type, credentials, object_mappings, target_api_url, cron):
     table = list(object_mappings.keys())[0] if object_mappings else "incident"
+    table = _safe_path_segment(table)
     base = credentials.get("instance_url", "").rstrip("/")
     nodes = [
         _schedule_node(cron),
@@ -148,6 +176,7 @@ def _build_servicenow_workflow(connector_type, credentials, object_mappings, tar
                 "method": "GET",
                 "authentication": "genericCredentialType",
                 "genericAuthType": "oAuth2Api",
+                "options": dict(_NO_REDIRECTS),
             },
             "credentials": {
                 "oAuth2Api": {
@@ -348,6 +377,7 @@ def _build_generic_workflow(connector_type, credentials, object_mappings, target
                 "url": credentials.get("base_url", ""),
                 "method": "GET",
                 "authentication": "genericCredentialType",
+                "options": dict(_NO_REDIRECTS),
             },
         },
         _transform_node(connector_type),
@@ -411,7 +441,7 @@ class ConnectorOrchestrator:
         """
         assert_connector_permitted(connector_type)
 
-        self._check_workflow_urls(credentials, target_api_url)
+        self._check_workflow_urls(credentials, target_api_url, connector_type, object_mappings)
 
         # Store credentials in vault (encrypted at rest)
         vault = CredentialVault()
@@ -477,19 +507,57 @@ class ConnectorOrchestrator:
             return {"success": False, "message": "Connection could not be established"}
 
     @staticmethod
-    def _check_workflow_urls(credentials, target_api_url) -> None:
-        from app.utils.ssrf_guard import validate_user_supplied_url
+    def _check_workflow_urls(credentials, target_api_url, connector_type=None, object_mappings=None) -> None:
+        """Validate every address the workflow will call, before anything is
+        stored or sent to n8n. Raises ``BlockedOutboundURL``.
 
-        # Both addresses are written into an HTTP-request node that n8n will
-        # call on a schedule; check them again here for every caller.
-        validate_user_supplied_url(target_api_url)
-        base_url = credentials.get("base_url") if isinstance(credentials, dict) else None
-        if base_url:
-            validate_user_supplied_url(base_url)
+        Structural, not key by key: the pushed-to address, every credential
+        value whose key names an address (``*url``, ``*uri``, ``endpoint``,
+        ``webhook*``), and the database host. Deliberately fails closed: a
+        credential key that holds an address is checked whether or not a
+        builder reads it today.
+        """
+        from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
+
+        for url in ConnectorOrchestrator.workflow_urls(credentials, target_api_url):
+            validate_user_supplied_url(url)
+
+        if connector_type in ("sap", "servicenow") and isinstance(object_mappings, dict):
+            for name in object_mappings:
+                _safe_path_segment(name)
+
+    @staticmethod
+    def workflow_urls(credentials, target_api_url) -> list:
+        """Every address a workflow built from these inputs would call."""
+        from app.utils.ssrf_guard import BlockedOutboundURL
+
+        urls = [target_api_url]
+        if credentials is None:
+            credentials = {}
+        if not isinstance(credentials, dict):
+            raise BlockedOutboundURL("URL not allowed")
+        for key, value in credentials.items():
+            lowered = str(key).lower()
+            if value in (None, ""):
+                continue
+            if lowered.endswith(_URL_KEY_SUFFIXES) or lowered.startswith("webhook"):
+                if not isinstance(value, str):
+                    raise BlockedOutboundURL("URL not allowed")
+                urls.append(value)
+            elif lowered in _HOST_KEYS:
+                if not isinstance(value, str) or any(c in value for c in "/@\\ ?#"):
+                    raise BlockedOutboundURL("URL not allowed")
+                port = credentials.get("port", 443)
+                try:
+                    port = int(port)
+                except (TypeError, ValueError):
+                    raise BlockedOutboundURL("URL not allowed")
+                urls.append(f"https://{value}:{port}/")
+        return urls
 
     def _build_workflow(self, connector_type, credentials, object_mappings, target_api_url, frequency):
         """Build n8n workflow JSON using per-connector templates."""
-        self._check_workflow_urls(credentials, target_api_url)
+        self._check_workflow_urls(credentials, target_api_url, connector_type, object_mappings)
         cron = FREQUENCY_TO_CRON.get(frequency, "0 * * * *")
         builder = _WORKFLOW_BUILDERS.get(connector_type, _build_generic_workflow)
         return builder(connector_type, credentials, object_mappings, target_api_url, cron)
