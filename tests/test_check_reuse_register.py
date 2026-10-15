@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 
 import pytest
+import yaml
 
 REPO = Path(__file__).resolve().parent.parent
 SCRIPT = REPO / "scripts" / "check_reuse_register.py"
@@ -498,3 +499,106 @@ def test_the_baseline_is_not_above_the_one_on_origin_main():
     mine = {k: sum(v.values()) for k, v in gate.load_baseline(REPO).items()}
     raised = {k: (main_totals.get(k, 0), n) for k, n in mine.items() if n > main_totals.get(k, 0)}
     assert raised == {}, f"baseline raised against origin/main: {raised}"
+
+
+# ------------------------------------------------------------------ design-tokens: six evasions found by the refuter
+#
+# Each test below runs the real design-tokens entry (lifted from docs/reuse-register.yml, not a hand-copied
+# approximation) against one shape the refuter reproduced getting past the original regex: a one-line
+# declaration, a fallback on a real token name, an rgb()-form fallback, a :root block in a file outside
+# app/static/css and app/templates entirely, an inline style="--token: ..." attribute, and a redeclared
+# --info/--success/-emphasis token. A control case (the originally-specified single-line declaration plus a
+# --color-* hex fallback) is pinned to keep raising its original two violations.
+
+DESIGN_TOKEN_CANONICAL = (
+    ":root {\n"
+    "  --background: 0 0% 100%;\n"
+    "  --foreground: 0 0% 0%;\n"
+    "  --primary: 0 0% 9%;\n"
+    "  --muted: 0 0% 96%;\n"
+    "  --border: 0 0% 90%;\n"
+    "  --radius: 0.5rem;\n"
+    "}\n"
+)
+
+
+def _design_tokens_entry():
+    """The design-tokens entry exactly as it ships in docs/reuse-register.yml."""
+    entries, problems = gate.load_register(REPO)
+    assert problems == []
+    return next(e for e in entries if e["id"] == "design-tokens")
+
+
+def _design_tokens_tree(tmp_path, files):
+    """A temp tree carrying only the real design-tokens entry (no known_exceptions: the proof files are
+    deliberately not any of them) plus a canonical shadcn_tokens.css, so check_canonicals passes."""
+    entry = dict(_design_tokens_entry())
+    entry["known_exceptions"] = []
+    register_text = yaml.safe_dump({"version": 1, "entries": [entry]}, sort_keys=False)
+    (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "docs" / "reuse-register.yml").write_text(register_text, encoding="utf-8")
+    (tmp_path / "app" / "static" / "css").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "app" / "static" / "css" / "shadcn_tokens.css").write_text(
+        DESIGN_TOKEN_CANONICAL, encoding="utf-8")
+    for rel, code in files.items():
+        path = tmp_path / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(code, encoding="utf-8")
+    return tmp_path
+
+
+def _design_tokens_fails(tmp_path, files):
+    return gate.run(_design_tokens_tree(tmp_path, files))[0]
+
+
+def test_design_tokens_control_case_still_raises_both_violations(tmp_path):
+    """The originally-specified shape (a lone-line declaration, a --color-* hex fallback) must keep failing."""
+    files = {
+        "app/static/css/public_site.css": "--primary: 0 0% 0%;\n",
+        "app/templates/public/x.html": '<div>{{ "var(--color-primary, #3b82f6)" }}</div>\n',
+    }
+    # the hex-fallback case needs the var() call outside a Jinja string so it is real markup
+    files["app/templates/public/x.html"] = "<div style=\"color: var(--color-primary, #3b82f6)\"></div>\n"
+    fails = _design_tokens_fails(tmp_path, files)
+    ids = {f.split("]")[0].lstrip("[") for f in fails}
+    assert ids == {"design-tokens/token-declaration", "design-tokens/hex-fallback"}
+    assert len(fails) == 2
+
+
+def test_evasion_1_one_line_declaration_is_caught(tmp_path):
+    fails = _design_tokens_fails(tmp_path, {"app/static/css/x.css": ".x{--primary:0 0% 0%}\n"})
+    assert any("design-tokens/token-declaration" in f for f in fails)
+
+
+def test_evasion_2_fallback_on_a_real_token_name_is_caught(tmp_path):
+    fails = _design_tokens_fails(
+        tmp_path, {"app/static/css/x.css": "a { color: var(--primary, #3b82f6); }\n"})
+    assert any("design-tokens/hex-fallback" in f for f in fails)
+
+
+def test_evasion_3_rgb_form_fallback_is_caught(tmp_path):
+    fails = _design_tokens_fails(
+        tmp_path, {"app/static/css/x.css": "a { color: var(--color-primary, rgb(1,2,3)); }\n"})
+    assert any("design-tokens/hex-fallback" in f for f in fails)
+
+
+def test_evasion_4_root_block_outside_the_old_scope_is_caught(tmp_path):
+    """A :root block in a brand-new file outside app/static/css and app/templates entirely."""
+    fails = _design_tokens_fails(
+        tmp_path, {"styles/new_tokens.css": ":root {\n  --primary: 0 0% 0%;\n}\n"})
+    assert any("design-tokens/token-declaration" in f and "styles/new_tokens.css" in f for f in fails)
+
+
+def test_evasion_5_inline_style_attribute_is_caught(tmp_path):
+    fails = _design_tokens_fails(
+        tmp_path, {"app/templates/public/x.html": '<div style="--primary: 0 0% 0%">x</div>\n'})
+    assert any("design-tokens/token-declaration" in f for f in fails)
+
+
+def test_evasion_6_info_success_and_emphasis_tokens_are_caught(tmp_path):
+    fails = _design_tokens_fails(
+        tmp_path, {"app/static/css/x.css": "a { --info: 0 0% 0%; --success-emphasis: 0 0% 0%; }\n"})
+    assert any("design-tokens/token-declaration" in f for f in fails)
+    # two redeclarations in one file is still one violation entry, naming both line numbers
+    hit = next(f for f in fails if "design-tokens/token-declaration" in f)
+    assert "app/static/css/x.css:1" in hit

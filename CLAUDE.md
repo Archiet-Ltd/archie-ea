@@ -888,11 +888,13 @@ outstanding; a paragraph does not.
 The repo is an extract of a larger private codebase, so some docs reference files that aren't here.
 Trust in this order: **`DESIGN.md` → `README.md` / `CONTRIBUTING.md` → `docs/` → everything else.**
 
-- **`QUICK_START.md`** — obsolete. Every file it points at (`DOMAIN.md`, `DATA_REALITY.md`,
-  `docs/design_system/*.json`, `scripts/guardrails/*`) is absent, so the claim/release task workflow
-  it describes cannot be run. `DESIGN.md`'s own "canonical source of truth" pointers to
-  `pattern_registry.json` / `token_map.json` are dangling for the same reason — `DESIGN.md` itself is
-  the source of truth, alongside `app/static/css/shadcn_tokens.css` and `tailwind.config.js`.
+- **`QUICK_START.md`** — obsolete. Most files it points at (`DOMAIN.md`, `DATA_REALITY.md`,
+  `scripts/guardrails/*`) are absent, so the claim/release task workflow it describes cannot be run;
+  its Step 3 pointer now goes to `app/static/css/shadcn_tokens.css` and `docs/reuse-register.yml`, the
+  same canonical pair `DESIGN.md` names. `DESIGN.md` itself is the source of truth, alongside
+  `app/static/css/shadcn_tokens.css` and `tailwind.config.js`; it no longer points at
+  `pattern_registry.json` / `token_map.json` — those never existed in this extract and both of
+  `DESIGN.md`'s own pointers were fixed to the files above.
 - **`ARCHITECT_QUICK_START.md`** — legacy internal doc. It describes `flask db upgrade`,
   `python manage.py recreate_db|setup_dev|runserver`, and port 5439; the current setup is
   `init-db` + `reconcile-schema` on 5432/whatever `DATABASE_URL` says. It also refers to
