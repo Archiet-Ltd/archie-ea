@@ -233,6 +233,17 @@ BANNED_CLAIMS = [
         "it) runs across the whole application portfolio from the dashboard -- there is no "
         "per-application view that shows it for one picked application",
     ),
+    (
+        "every organisation's data is scoped to that organisation",
+        "overclaims that no cross-organisation-capable database read exists today; "
+        "scripts/check_untenanted_reads.py's own ratchet baseline (verification_baseline.json: "
+        "untenanted_reads) is non-zero, so some pre-existing reads of organisation-owned data "
+        "still carry no automatic organisation filter. The true, verifiable claim is narrower: "
+        "models that carry the tenant mixin are filtered to the caller's organisation "
+        "automatically (app/middleware/tenant_isolation.py), and an automated check "
+        "(scripts/check_untenanted_reads.py, wired into scripts/verify.py) stops a new read or "
+        "write outside that filter from shipping, with a ratchet that can only tighten.",
+    ),
 ]
 
 # Front-matter keys that are metadata-only and must never appear as visible
