@@ -432,7 +432,6 @@ SHARED_MODELS = {
 # expected failure naming its owner (test_known_leak_is_still_open below), so it
 # turns red the moment the owner's fix lands and the entry must come out.
 _PR258 = "PR 258 (scoring/consolidation): consolidation entries are fenced through their application"
-_PR274 = "PR 274 and PR 218 edit solution_design_routes.py; the fix waits for them to land"
 KNOWN_LEAKS = {
     # PR 421 (one work package store) scoped the deliverable update and delete
     # through the organisation's own work packages; test_known_leak_is_still_open
@@ -441,14 +440,6 @@ KNOWN_LEAKS = {
     "DELETE /consolidation-list/api/entry/<int:entry_id>": _PR258,
     "PUT /consolidation-list/api/entry/<int:entry_id>": _PR258,
     "GET /consolidation-list/api/entry/<int:entry_id>/detail": _PR258,
-    # PR 220 and PR 218 landed (verified: test_known_leak_is_still_open was
-    # XPASS(strict) on every one of these 14 routes) -- all proven, not
-    # leaking, so their entries come out rather than mask a real regression.
-    "DELETE /solutions/<int:solution_id>/archimate-elements/<int:mapping_id>": _PR274,
-    "DELETE /solutions/<int:solution_id>/capabilities/<int:mapping_id>": _PR274,
-    "POST /solutions/<int:solution_id>/copilot-insights/<int:insight_id>/dismiss": _PR274,
-    "GET /solutions/api/<int:solution_id>/reasoning/<int:reasoning_id>": _PR274,
-    "GET /solutions/api/registry/specs/<int:spec_id>": _PR274,
 }
 
 # Parameters whose record the codebase reading no longer finds, because the lookup moved
