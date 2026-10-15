@@ -36,6 +36,69 @@ mappings_bp = Blueprint("mappings_v1", __name__, url_prefix="/api/v1/mappings")
 # ============================================================================
 
 
+def _owned_query(model):
+    """Query ``model`` limited to rows the caller's active organisation owns.
+
+    The mapping tables carry no organisation column, so ownership is the owner of the
+    parent: the application (application mappings) or the business capability (vendor
+    strategy mappings). No active organisation means no rows. A shared (organisation-less)
+    capability is not owned by anyone, so a tenant cannot change its mappings.
+    """
+    from sqlalchemy import false
+
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.unified_capability import UnifiedCapability
+    from app.utils.tenant import current_organization_id
+
+    query = db.session.query(model)
+    org_id = current_organization_id()
+    if org_id is None:
+        return query.filter(false())
+    if model is UnifiedCapabilityVendorOrganizationMapping:
+        return query.join(
+            UnifiedCapability, UnifiedCapability.id == model.unified_capability_id
+        ).filter(UnifiedCapability.organization_id == org_id)
+    return query.join(
+        ApplicationComponent, ApplicationComponent.id == model.application_component_id
+    ).filter(ApplicationComponent.organization_id == org_id)
+
+
+def _owned_get(model, mapping_id):
+    return _owned_query(model).filter(model.id == mapping_id).first()
+
+
+def _owns_application(application_id):
+    from app.models.application_portfolio import ApplicationComponent
+    from app.utils.tenant import current_organization_id
+
+    org_id = current_organization_id()
+    if org_id is None or not isinstance(application_id, int):
+        return False
+    return (
+        db.session.query(ApplicationComponent.id)
+        .filter(ApplicationComponent.id == application_id,
+                ApplicationComponent.organization_id == org_id)
+        .first()
+        is not None
+    )
+
+
+def _owns_capability(capability_id):
+    from app.models.unified_capability import UnifiedCapability
+    from app.utils.tenant import current_organization_id
+
+    org_id = current_organization_id()
+    if org_id is None or not isinstance(capability_id, int):
+        return False
+    return (
+        db.session.query(UnifiedCapability.id)
+        .filter(UnifiedCapability.id == capability_id,
+                UnifiedCapability.organization_id == org_id)
+        .first()
+        is not None
+    )
+
+
 def _build_filter_query(query, filters):
     """Build query with common filters."""
     if filters.get("search"):
@@ -371,7 +434,7 @@ def get_unified_to_application_mappings():
         page = safe_int_arg('page', 1, minimum=1)
         per_page = safe_int_arg('per_page', 50, minimum=1, maximum=500)
 
-        query = db.session.query(UnifiedCapabilityApplicationMapping)
+        query = _owned_query(UnifiedCapabilityApplicationMapping)
 
         # Filters
         if request.args.get("unified_capability_id"):
@@ -439,6 +502,10 @@ def create_unified_to_application_mapping():
         if not all(field in data for field in required):
             return error_response(f"Missing required fields: {required}", 400)
 
+        if not (_owns_application(data["application_id"])
+                and _owns_capability(data["unified_capability_id"])):
+            return not_found_response("Application or capability not found")
+
         # Check for duplicates
         existing = UnifiedCapabilityApplicationMapping.query.filter_by(
             unified_capability_id=data["unified_capability_id"],
@@ -474,7 +541,7 @@ def create_unified_to_application_mapping():
 def get_unified_to_application_mapping(mapping_id):
     """Get a specific UnifiedCapability → ApplicationComponent mapping."""
     try:
-        mapping = UnifiedCapabilityApplicationMapping.query.get(mapping_id)
+        mapping = _owned_get(UnifiedCapabilityApplicationMapping, mapping_id)
 
         if not mapping:
             return not_found_response("Mapping not found")
@@ -503,7 +570,7 @@ def get_unified_to_application_mapping(mapping_id):
 def update_unified_to_application_mapping(mapping_id):
     """Update a UnifiedCapability → ApplicationComponent mapping."""
     try:
-        mapping = UnifiedCapabilityApplicationMapping.query.get(mapping_id)
+        mapping = _owned_get(UnifiedCapabilityApplicationMapping, mapping_id)
 
         if not mapping:
             return not_found_response("Mapping not found")
@@ -538,7 +605,7 @@ def update_unified_to_application_mapping(mapping_id):
 def delete_unified_to_application_mapping(mapping_id):
     """Delete a UnifiedCapability → ApplicationComponent mapping."""
     try:
-        mapping = UnifiedCapabilityApplicationMapping.query.get(mapping_id)
+        mapping = _owned_get(UnifiedCapabilityApplicationMapping, mapping_id)
 
         if not mapping:
             return not_found_response("Mapping not found")
@@ -576,7 +643,7 @@ def get_unified_to_vendor_org_mappings():
         page = safe_int_arg('page', 1, minimum=1)
         per_page = safe_int_arg('per_page', 50, minimum=1, maximum=500)
 
-        query = db.session.query(UnifiedCapabilityVendorOrganizationMapping)
+        query = _owned_query(UnifiedCapabilityVendorOrganizationMapping)
 
         # Filters
         if request.args.get("unified_capability_id"):
@@ -656,6 +723,9 @@ def create_unified_to_vendor_org_mapping():
         if not all(field in data for field in required):
             return error_response(f"Missing required fields: {required}", 400)
 
+        if not _owns_capability(data["unified_capability_id"]):
+            return not_found_response("Capability not found")
+
         # Check for duplicates
         existing = UnifiedCapabilityVendorOrganizationMapping.query.filter_by(
             unified_capability_id=data["unified_capability_id"],
@@ -689,7 +759,7 @@ def create_unified_to_vendor_org_mapping():
 def get_unified_to_vendor_org_mapping(mapping_id):
     """Get a specific UnifiedCapability → VendorOrganization mapping."""
     try:
-        mapping = UnifiedCapabilityVendorOrganizationMapping.query.get(mapping_id)
+        mapping = _owned_get(UnifiedCapabilityVendorOrganizationMapping, mapping_id)
 
         if not mapping:
             return not_found_response("Mapping not found")
@@ -718,7 +788,7 @@ def get_unified_to_vendor_org_mapping(mapping_id):
 def update_unified_to_vendor_org_mapping(mapping_id):
     """Update a UnifiedCapability → VendorOrganization mapping."""
     try:
-        mapping = UnifiedCapabilityVendorOrganizationMapping.query.get(mapping_id)
+        mapping = _owned_get(UnifiedCapabilityVendorOrganizationMapping, mapping_id)
 
         if not mapping:
             return not_found_response("Mapping not found")
@@ -753,7 +823,7 @@ def update_unified_to_vendor_org_mapping(mapping_id):
 def delete_unified_to_vendor_org_mapping(mapping_id):
     """Delete a UnifiedCapability → VendorOrganization mapping."""
     try:
-        mapping = UnifiedCapabilityVendorOrganizationMapping.query.get(mapping_id)
+        mapping = _owned_get(UnifiedCapabilityVendorOrganizationMapping, mapping_id)
 
         if not mapping:
             return not_found_response("Mapping not found")
@@ -790,7 +860,7 @@ def get_application_to_vendor_mappings():
         page = safe_int_arg('page', 1, minimum=1)
         per_page = safe_int_arg('per_page', 50, minimum=1, maximum=500)
 
-        query = db.session.query(ApplicationVendorProductMapping)
+        query = _owned_query(ApplicationVendorProductMapping)
 
         # Filters
         if request.args.get("application_id"):
@@ -866,6 +936,9 @@ def create_application_to_vendor_mapping():
         if not all(field in data for field in required):
             return error_response(f"Missing required fields: {required}", 400)
 
+        if not _owns_application(data["application_id"]):
+            return not_found_response("Application not found")
+
         # Check for duplicates
         existing = ApplicationVendorProductMapping.query.filter_by(
             application_component_id=data["application_id"],
@@ -899,7 +972,7 @@ def create_application_to_vendor_mapping():
 def get_application_to_vendor_mapping(mapping_id):
     """Get a specific ApplicationComponent → VendorProduct mapping."""
     try:
-        mapping = ApplicationVendorProductMapping.query.get(mapping_id)
+        mapping = _owned_get(ApplicationVendorProductMapping, mapping_id)
 
         if not mapping:
             return not_found_response("Mapping not found")
@@ -935,7 +1008,7 @@ def get_application_to_vendor_mapping(mapping_id):
 def update_application_to_vendor_mapping(mapping_id):
     """Update an ApplicationComponent → VendorProduct mapping."""
     try:
-        mapping = ApplicationVendorProductMapping.query.get(mapping_id)
+        mapping = _owned_get(ApplicationVendorProductMapping, mapping_id)
 
         if not mapping:
             return not_found_response("Mapping not found")
@@ -975,7 +1048,7 @@ def update_application_to_vendor_mapping(mapping_id):
 def delete_application_to_vendor_mapping(mapping_id):
     """Delete an ApplicationComponent → VendorProduct mapping."""
     try:
-        mapping = ApplicationVendorProductMapping.query.get(mapping_id)
+        mapping = _owned_get(ApplicationVendorProductMapping, mapping_id)
 
         if not mapping:
             return not_found_response("Mapping not found")
@@ -1004,14 +1077,14 @@ def get_mappings_summary():
             db.session.query(func.count(TechnicalCapabilityVendorMapping.id)).scalar() or 0
         )
         unified_to_app = (
-            db.session.query(func.count(UnifiedCapabilityApplicationMapping.id)).scalar() or 0
+            _owned_query(UnifiedCapabilityApplicationMapping).count() or 0
         )
         unified_to_vendor_org = (
-            db.session.query(func.count(UnifiedCapabilityVendorOrganizationMapping.id)).scalar()
+            _owned_query(UnifiedCapabilityVendorOrganizationMapping).count()
             or 0
         )
         app_to_vendor = (
-            db.session.query(func.count(ApplicationVendorProductMapping.id)).scalar() or 0
+            _owned_query(ApplicationVendorProductMapping).count() or 0
         )
 
         total_mappings = tech_to_vendor + unified_to_app + unified_to_vendor_org + app_to_vendor
