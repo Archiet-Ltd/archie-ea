@@ -184,6 +184,7 @@ class AgentRunner:
         self._nudged = False
         self._gate_cache = None
         self._context_struct = None
+        self._question_names = set()
         # Tokens of the model call in flight, held back until the gate has
         # judged the text so a refused answer is never partly shown.
         self._held_tokens: Optional[list] = None
@@ -522,6 +523,7 @@ class AgentRunner:
         import uuid as _uuid
         self._turn_id = str(_uuid.uuid4())
 
+        self._context_struct = None
         # Build system prompt with live domain context
         system_prompt = self._build_system_prompt(domain, context, persona, user_message=user_message)
 
@@ -532,7 +534,14 @@ class AgentRunner:
         self._grounding = Grounding()
         self._grounding.add_context(self._context_struct)
         self._grounding.add_context(self._context_text)
-        self._estate_question = self._classify_estate(user_message, context)
+        self._estate_question = self._classify_estate(user_message, context, history)
+        self._question_names = set()
+        try:
+            from app.middleware.tenant_context import current_org_id
+
+            self._question_names = organisation_names_in_text(user_message, current_org_id())
+        except Exception:
+            logger.warning("AgentRunner: question name lookup failed", exc_info=True)
         self._nudged = False
         self._gate_cache = None
 
@@ -789,6 +798,8 @@ class AgentRunner:
                 "required_actions": required_actions,
                 "pending_approvals": pending_approvals,
                 "sources": sources,
+                # Text the system built from tool receipts, not model prose.
+                "system_generated": True,
             },
             user_message=user_message,
             domain=domain,
@@ -859,10 +870,15 @@ class AgentRunner:
                 from app.modules.ai_chat.services.architect_persona_charters import fence_untrusted
 
                 # The structured rows the model is handed ground its answer.
-                self._context_struct = raw_ctx
-                ctx_block = fence_untrusted(
-                    "LIVE ARCHITECTURE DATA", self._serialise_context(raw_ctx)
-                )
+                serialised = self._serialise_context(raw_ctx)
+                # Only what the model actually saw (whole keys are dropped
+                # when over budget) grounds anything.
+                try:
+                    seen = json.loads(serialised) if serialised else None
+                except ValueError:
+                    seen = None
+                self._context_struct = seen if isinstance(seen, dict) else None
+                ctx_block = fence_untrusted("LIVE ARCHITECTURE DATA", serialised)
         except Exception as e:
             logger.debug("AgentRunner: context build failed: %s", e)
 
@@ -1477,17 +1493,21 @@ class AgentRunner:
             return "Run record could not be written — the run completed but was not recorded"
 
     @staticmethod
-    def _classify_estate(user_message: str, context) -> Optional[str]:
+    def _classify_estate(user_message: str, context, history=None) -> Optional[str]:
         """The answer kind when this message is an estate question, else None.
-        A question is an estate question only if its wording asks one AND it
-        names an element or application of the organisation (same fenced
-        lookup the gate uses) or the request carries solution or element
-        context. Generic architecture questions are never estate questions."""
+        The wording must ask one AND the message must name an element or
+        application of the organisation (the gate's fenced lookup), or follow
+        a turn that was answered from a stored answer. Solution or element
+        context alone never makes a question an estate question."""
         kind = classify_estate_question(user_message)
         if not kind:
             return None
-        if isinstance(context, dict) and (context.get("solution_id") or context.get("element_id")):
-            return kind
+        for prior in reversed(history or []):
+            if isinstance(prior, dict) and prior.get("role") == "assistant":
+                content = str(prior.get("content") or "")
+                if "/intelligence/answers/" in content or "[ref:" in content:
+                    return kind
+                break
         try:
             from app.middleware.tenant_context import current_org_id
 
@@ -1514,6 +1534,7 @@ class AgentRunner:
                 self._grounding,
                 org_names=org_names,
                 estate_question=bool(self._estate_question),
+                question_names=self._question_names,
             )
         except Exception:
             logger.warning("AgentRunner: citation gate failed", exc_info=True)
@@ -1541,7 +1562,8 @@ class AgentRunner:
         under ``citation_gate``, and are never shown to the user.
         """
         text = result.get("response")
-        if result.get("error") or not isinstance(text, str) or not text.strip():
+        if result.get("error") or result.get("system_generated") \
+                or not isinstance(text, str) or not text.strip():
             return
         uncited = self._find_uncited(text)
         # Counts only: the result is spread into the stream's done event, and

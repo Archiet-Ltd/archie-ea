@@ -447,7 +447,7 @@ def test_a_statement_about_a_record_without_its_own_marker_is_refused(text):
     [
         "Fourteen applications are affected.",
         "1043 applications are affected.",
-        "Twenty one systems are impacted.",
+        "Twenty one applications are impacted.",
         "Dozens of applications are affected.",
         "There are 14 applications downstream.",
     ],
@@ -469,8 +469,12 @@ def test_a_count_binds_to_the_result_it_came_with():
 
 def test_a_count_is_checked_against_returned_counts_not_any_digit_run():
     grounding = _grounded({"rows": [], "total": 12, "address": "b" * 32, "note": "see 1043"})
-    assert _gate("12 applications are affected.", grounding, estate_question=True) == []
-    assert _gate("1043 applications are affected.", grounding, estate_question=True) != []
+    cite = " [ref:" + "b" * 32 + "]"
+    assert _gate("12 applications are affected." + cite, grounding, estate_question=True) == []
+    assert _gate("1043 applications are affected." + cite, grounding, estate_question=True) != []
+    # without its marker even the right count is not accepted: there is no
+    # fallback to every result of the turn
+    assert _gate("12 applications are affected.", grounding, estate_question=True) != []
 
 
 def test_a_year_is_never_a_count_even_next_to_a_record():
@@ -492,10 +496,30 @@ def test_after_a_zero_row_answer_names_not_in_rows_are_still_refused():
 
 
 def test_clarifications_that_echo_the_user_are_not_refused():
-    text = "I could not find Core Bank in the estate."
+    text = "I could not find Core Bank in your estate. Did you mean Core Banking?"
     assert _gate(text, grounding=_grounded(), estate_question=True) == []
-    assert _gate("I could not find Core Banking. Did you mean Core Banking Platform?",
-                 grounding=_grounded(), estate_question=True) == []
+    asked = {"core banking"}
+    assert find_uncited_claims(
+        "I could not find an owner for Core Banking.", _grounded(),
+        org_names=ORG_NAMES, estate_question=True, question_names=asked) == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "I could not find an owner for Core Banking, but Clearing Hub and Treasury Feed stop if it fails.",
+        "Clearing Hub is not recorded as critical, and it runs on Exadata.",
+        "I could not find Core Banking; Clearing Hub depends on it.",
+    ],
+)
+def test_a_clarification_does_not_exempt_the_claim_that_follows_it(text):
+    names = ORG_NAMES | {"clearing hub", "treasury feed"}
+    claims = find_uncited_claims(
+        text, _grounded(IMPACT), org_names=names, estate_question=True,
+        question_names={"core banking"},
+    )
+    assert claims != []
+    assert any("clearing hub" in " ".join(c["unsupported"]) for c in claims)
 
 
 def test_the_users_own_assertion_repeated_as_fact_is_refused():
@@ -611,8 +635,18 @@ def test_an_estate_question_needs_a_named_record_or_context(app, db_session, mak
         classify = AgentRunner._classify_estate
         assert classify("what breaks if Settlement Stack fails?", {}) == "impact"
         assert classify("what breaks if a load balancer fails?", {}) is None
-        assert classify("what breaks if a load balancer fails?", {"solution_id": 3}) == "impact"
-        assert classify("explain microservices", {"solution_id": 3}) is None
+        # Solution context alone never makes a question an estate question.
+        for question in (
+            "What risks affect a cloud migration?",
+            "Who owns the architecture vision in TOGAF?",
+            "What happens if a Kafka broker goes down?",
+            "How should I design retries if a downstream call fails?",
+            "what breaks if a load balancer fails?",
+        ):
+            assert classify(question, {"solution_id": 3}) is None, question
+        # A follow-up to a turn answered from a stored answer is one.
+        prior = [{"role": "assistant", "content": "See /intelligence/answers/" + "a" * 32}]
+        assert classify("what else depends on it?", {}, prior) == "impact"
 
 
 def test_a_non_ascii_digit_is_an_invalid_parameter_not_a_crash(app, db_session, make_org):
@@ -1035,9 +1069,9 @@ def test_the_gate_runs_once_per_answer(app, db_session, make_org, monkeypatch):
         return original(text, org_id)
 
     monkeypatch.setattr(module, "organisation_names_in_text", _count)
-    script = [{"text": "Layered architectures keep presentation apart from data access."}]
-    _run_turn(app, monkeypatch, script, user=user, message="explain layers")
-    assert len(calls) == 1
+    final = "Layered architectures keep presentation apart from data access."
+    _run_turn(app, monkeypatch, [{"text": final}], user=user, message="explain layers")
+    assert calls.count(final) == 1
 
 
 def test_a_model_failure_midstream_shows_no_partial_text(app, db_session, make_org, monkeypatch):
@@ -1064,3 +1098,136 @@ def test_a_model_failure_midstream_shows_no_partial_text(app, db_session, make_o
     assert "".join(e["text"] for e in events if e.get("type") == "token") == ""
     assert result.get("error")
     assert "Exadata" not in result["response"]
+
+
+# --------------------------------------------------------------------------- #
+# Round 4 rulings                                                              #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Ledger [ref:9] stops. To limit this, run at least three servers behind a load balancer.",
+        "Tier 1 applications should have a runbook.",
+    ],
+)
+def test_counts_are_not_checked_across_the_whole_answer(text):
+    assert _gate(text, estate_question=True) == []
+
+
+def test_a_solution_id_in_context_does_not_make_generic_questions_estate_questions(
+    app, db_session, make_org, monkeypatch
+):
+    org = make_org("b53-generic-q")
+    user = _user(db_session, org.id)
+    script = [{"text": "Use exponential backoff and cap the retries."}]
+    result, _e, _r, seen = _run_turn(
+        app, monkeypatch, script, user=user, context={"solution_id": 3},
+        message="How should I design retries if a downstream call fails?",
+    )
+    assert len(seen) == 1, "no nudge"
+    assert result["response"] == "Use exponential backoff and cap the retries."
+
+
+def test_context_names_do_not_ground_an_impact_statement_when_rows_were_returned():
+    context = {"applications": [{"id": 31, "name": "Treasury Feed"},
+                                {"id": 32, "name": "Clearing Hub"}],
+               "total_elements": 40}
+    grounding = _grounded(IMPACT, context=context)
+    names = ORG_NAMES | {"treasury feed", "clearing hub"}
+    claims = find_uncited_claims(
+        "If Ledger [ref:9] fails, Treasury Feed and Clearing Hub stop.",
+        grounding, org_names=names, estate_question=True,
+    )
+    assert claims and "not in the answer rows: treasury feed" in " ".join(claims[0]["unsupported"])
+    # Descriptive statements and quoted context counts are grounded by it.
+    assert find_uncited_claims("Treasury Feed is linked to this solution.", grounding,
+                               org_names=names, estate_question=True) == []
+    assert find_uncited_claims("Your estate has 40 elements.", grounding,
+                               org_names=names, estate_question=True) == []
+    assert find_uncited_claims("Your estate has 41 elements.", grounding,
+                               org_names=names, estate_question=True) != []
+
+
+def test_only_the_context_the_model_saw_is_kept(app, db_session, make_org, monkeypatch):
+    """The grounding is parsed from the serialised context (whole keys are
+    dropped when over budget), not from the full raw context."""
+    from app.modules.ai_chat.services import multi_domain_chat_service as mdc
+
+    org = make_org("b53-seen")
+    big = {"applications": [{"id": i, "name": "App %d" % i, "blob": "x" * 80} for i in range(400)],
+           "small": {"id": 1, "name": "Kept Row"}}
+    monkeypatch.setattr(
+        mdc.MultiDomainChatService, "get_domain_context",
+        lambda self, domain, ctx: {"success": True, "context": big},
+    )
+    runner = AgentRunner(user_id=1)
+    with app.test_request_context("/"):
+        g.current_org_id = org.id
+        runner._build_system_prompt("general", {}, None, user_message="hi")
+    seen = runner._context_struct
+    assert isinstance(seen, dict)
+    assert "applications" not in seen, "the dropped key was never seen by the model"
+    assert seen.get("small", {}).get("name") == "Kept Row"
+
+
+@pytest.mark.parametrize(
+    "said",
+    [
+        "**Core Banking**",
+        "`Core Banking`",
+        "Core Banking's",
+        "Core Banking’s",
+        "[Core Banking]",
+        "[Core Banking](https://example.test/x)",
+        "_Clearing Hub_",
+        "**S/4HANA**",
+        "path—Core Banking—fails",
+        "path – Core Banking – fails",
+    ],
+)
+def test_markdown_possessives_and_dashes_do_not_hide_a_record(app, db_session, make_org, said):
+    from app.modules.ai_chat.services.ai_hallucination_detector import (
+        organisation_names_in_text,
+    )
+
+    org = make_org("b53-md-" + uuid.uuid4().hex[:6])
+    for name in ("Core Banking", "Clearing Hub", "S/4HANA"):
+        _element(db_session, org.id, name)
+    db_session.commit()
+
+    with app.test_request_context("/"):
+        found = organisation_names_in_text("We depend on %s every day." % said, org.id)
+    expected = "clearing hub" if "Clearing" in said else "s 4hana" if "S/4" in said else "core banking"
+    assert expected in found
+
+
+def test_one_word_generic_names_are_checked_on_estate_answers_that_ran_a_tool():
+    names = {"customer"}
+    ran = _grounded(IMPACT)
+    assert _gate("We rely on Customer daily.", ran, org_names=names, estate_question=True) != []
+    assert _gate("We rely on Customer daily.", ran, org_names=names, estate_question=False) == []
+
+
+def test_a_zero_row_answer_refuses_names_the_question_did_not_use():
+    empty = {"rows": [], "elements": {}, "address": "d" * 32, "summary": {"total": 0}}
+    claims = find_uncited_claims(
+        "Treasury Feed and Ledger depend on Core Banking.", _grounded(empty),
+        org_names=ORG_NAMES | {"treasury feed"}, estate_question=True,
+        question_names={"core banking"},
+    )
+    assert claims
+    assert find_uncited_claims(
+        "Nothing is recorded as depending on Core Banking.", _grounded(empty),
+        org_names=ORG_NAMES, estate_question=True, question_names={"core banking"},
+    ) == []
+
+
+def test_the_iteration_cap_text_the_system_builds_is_not_gated():
+    runner = _runner_with(_grounded())
+    result = {"response": "Completed the available steps.\n- Created Ledger Core",
+              "system_generated": True}
+    runner._apply_citation_gate(result)
+    assert result["response"].startswith("Completed")
+    assert "citation_gate" not in result

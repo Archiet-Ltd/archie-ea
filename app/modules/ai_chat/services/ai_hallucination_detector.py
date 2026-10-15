@@ -250,6 +250,8 @@ _COUNT_KEYS = frozenset({
     "derived_count", "stale_count", "resolved_seed_count", "unresolved_count",
     "affected_count",
 })
+_NOT_COUNTS = frozenset({"citations_total", "rows_shown"})
+_COUNT_LIKE = re.compile(r"^(?:total|count)|(?:_total|_count)$")
 _ID_KEYS = frozenset({"id", "element_id", "risk_id", "root_element_id"})
 _NAME_KEYS = frozenset({"name", "title"})
 _LEADING = frozenset({
@@ -268,17 +270,43 @@ _GENERIC = frozenset({
     "frontend", "backend", "middleware", "integration", "capability",
     "business", "technology", "strategy", "layer", "ui", "sql", "rest",
 })
-_CLARIFICATION = re.compile(
-    r"\b(could not|couldn't|cannot|can't|did not|didn't|unable to) find\b|"
-    r"\bdid you mean\b|\bno (matching |such )?(record|element|application|match)|"
-    r"\bnot recorded\b|\bnothing (is )?recorded\b|\bI (don't|do not) see\b",
+# A clarification is exempt only when the clause STARTS with the phrase, and
+# only for records the user's own question named.
+_CLARIFICATION_START = re.compile(
+    r"^(?:i |we )?(?:could not|couldn't|cannot|can't|did not|didn't|was unable to|"
+    r"am unable to|do not|don't) (?:find|see)\b|"
+    r"^did you mean\b|^not recorded\b|^nothing (?:is )?recorded\b|"
+    r"^there (?:is|are) no (?:matching |such )?(?:records?|elements?|applications?|matches)\b",
+    re.IGNORECASE,
+)
+_CLAUSE_SPLIT = re.compile(
+    r",?\s+(?:but|though|although|however|yet)\s+|\s*;\s*|,"
+    + r"\s+and\s+",
     re.IGNORECASE,
 )
 _NO_ROWS_OK = re.compile(
-    r"\bnot recorded\b|\bnothing (is )?recorded\b|\bno (recorded|rows|records|"
-    r"dependenc|dependents|results)\b|\bnone\b",
+    r"\bnot recorded\b|\bnothing (?:is )?recorded\b|\bno (?:recorded |known )?"
+    r"(?:rows|records|dependenc|dependents|results)\b|\bnone\b",
     re.IGNORECASE,
 )
+# Language that states how records relate or what happens when one fails.
+_IMPACT_LANGUAGE = re.compile(
+    r"\b(depends? on|depend(?:s|ed)? upon|dependent on|relies on|rely on|runs? on|"
+    r"hosted on|breaks?|would break|fail|fails|failed|failure|stops?|stopped|down|"
+    r"impacted|impacts?|affects?|affected|connects? to|connected to|calls?|"
+    r"serves?|serving|feeds?|consumes?|uses?|used by|owned by|owns)\b",
+    re.IGNORECASE,
+)
+# Estate nouns whose attached quantity is checked even where no record is named.
+_ATTACHED_NOUNS = (
+    r"(?:applications?|elements?|dependents?|dependenc(?:y|ies)|relationships?)"
+)
+_NOT_A_COUNT_BEFORE = frozenset({
+    "tier", "level", "phase", "layer", "step", "type", "stage", "release",
+    "version", "v", "number", "no", "least", "most", "about", "around",
+    "roughly", "typically", "usually", "per", "each", "every", "top", "first",
+    "last", "next", "category", "class", "grade", "priority", "p", "wave",
+})
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
 _NON_WORD = re.compile(r"[^a-z0-9]+")
 _ALNUM = re.compile(r"[A-Za-z0-9]+")
@@ -326,6 +354,7 @@ class _ResultFacts:
         self.ref_names: Dict[str, set] = {}
         self.counts: set = set()
         self.rows = 0
+        self.subjects: set = set()
 
 
 def _facts_of(result: dict) -> _ResultFacts:
@@ -353,7 +382,9 @@ def _facts_of(result: dict) -> _ResultFacts:
                         nm = element.get("name")
                         if isinstance(nm, str) and nm.strip():
                             facts.ref_names.setdefault(str(ident), set()).add(phrase_key(nm))
-            elif key in _COUNT_KEYS and _is_int(value):
+            elif key in _NOT_COUNTS:
+                continue
+            elif (key in _COUNT_KEYS or _COUNT_LIKE.search(str(key))) and _is_int(value):
                 facts.counts.add(value)
             elif key == "rows" and isinstance(value, list):
                 facts.counts.add(len(value))
@@ -363,6 +394,10 @@ def _facts_of(result: dict) -> _ResultFacts:
     _walk(result, visit)
     facts.names.discard("")
     top = result.get("result") if isinstance(result, dict) else None
+    if isinstance(top, dict) and isinstance(top.get("subject_elements"), dict):
+        for element in top["subject_elements"].values():
+            if isinstance(element, dict) and isinstance(element.get("name"), str):
+                facts.subjects.add(phrase_key(element["name"]))
     if isinstance(top, dict) and isinstance(top.get("rows"), list):
         facts.rows = len(top["rows"])
     elif isinstance(top, list):
@@ -389,7 +424,9 @@ class Grounding:
         self.ref_names: Dict[str, set] = {}
         self.context_names: set = set()   # records the injected context carries
         self.context_text: str = ""       # keyed text of unstructured context
+        self.context_counts: set = set()  # counts the injected context states
         self.rows_returned = 0
+        self.subject_names: set = set()   # records the question itself was about
 
     def add_context(self, value) -> None:
         """Structured context the system injected (live data blocks): a dict
@@ -401,6 +438,7 @@ class Grounding:
             return
         facts = _facts_of({"success": True, "result": value})
         self.context_names.update(facts.names)
+        self.context_counts.update(facts.counts)
         self.refs.update(facts.refs)
         for ident, names in facts.ref_names.items():
             self.ref_names.setdefault(ident, set()).update(names)
@@ -423,6 +461,7 @@ class Grounding:
         self.names.update(facts.names)
         self.refs.update(facts.refs)
         self.rows_returned += facts.rows
+        self.subject_names.update(facts.subjects)
         for ident, names in facts.ref_names.items():
             self.ref_names.setdefault(ident, set()).update(names)
 
@@ -456,6 +495,20 @@ def _trim_phrase(phrase: str) -> str:
     return phrase
 
 
+def _clean_variants(text: str) -> List[str]:
+    """The text with Markdown emphasis, code, links, possessives and dashes
+    removed or normalised: once with brackets kept (a name may carry them,
+    O365 (Office)) and once with them dropped."""
+    t = REF_MARKER.sub(" ", text)
+    t = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", t)         # [text](url) -> text
+    t = re.sub("[\u2014\u2013\u2012\u2015]|--+", " ", t)      # dashes
+    t = re.sub("(?<=\\w)['\u2019]s(?!\\w)", "", t)           # possessive 's
+    t = re.sub("[`*~]+", " ", t)                                 # emphasis, code
+    t = re.sub("(?<!\\w)_+|_+(?!\\w)", " ", t)               # _emphasis_
+    bare = re.sub("[\\[\\](){}]", " ", t)
+    return [t, bare]
+
+
 def candidate_phrases(text: str) -> set:
     """Phrases of *text* worth looking up against the organisation's names:
     every run of two to six words and every capitalised single word, with the
@@ -463,20 +516,21 @@ def candidate_phrases(text: str) -> set:
     platform's one normaliser. Deduplicated and bounded."""
     from app.utils.duplicate_guard import normalize_name
 
-    tokens = text.split()
     found: set = set()
-    for size in range(1, _MAX_NGRAM + 1):
-        for start in range(0, len(tokens) - size + 1):
-            gram = _trim_phrase(" ".join(tokens[start:start + size]))
-            if not gram:
-                continue
-            if size == 1 and not gram[:1].isupper():
-                continue
-            key = normalize_name(gram)
-            if key and key not in _LEADING:
-                found.add(key)
-            if len(found) >= _MAX_CANDIDATES:
-                return found
+    for variant in _clean_variants(text):
+        tokens = variant.split()
+        for size in range(1, _MAX_NGRAM + 1):
+            for start in range(0, len(tokens) - size + 1):
+                gram = _trim_phrase(" ".join(tokens[start:start + size]))
+                if not gram:
+                    continue
+                if size == 1 and not gram[:1].isupper():
+                    continue
+                key = normalize_name(gram)
+                if key and key not in _LEADING:
+                    found.add(key)
+                if len(found) >= _MAX_CANDIDATES:
+                    return found
     return found
 
 
@@ -534,7 +588,7 @@ def _sentences(text: str) -> List[str]:
 
 
 def _mentions(sentence: str, tool_keys: set, context_keys: set, org_keys: set,
-              markers: list) -> List[Dict]:
+              markers: list, check_generic: bool = False) -> List[Dict]:
     """Record mentions in *sentence*: longest phrase first, no overlaps."""
     spans = []
     for match in _ALNUM.finditer(sentence):
@@ -560,7 +614,7 @@ def _mentions(sentence: str, tool_keys: set, context_keys: set, org_keys: set,
                 # An organisation name that nothing returned: generic
                 # vocabulary never triggers, and one word counts only when
                 # capitalised mid-sentence or next to a marker.
-                if key in _GENERIC:
+                if key in _GENERIC and not (check_generic and size == 1):
                     continue
                 if size == 1:
                     first = gram[0]
@@ -578,11 +632,122 @@ def _mentions(sentence: str, tool_keys: set, context_keys: set, org_keys: set,
     return found
 
 
+def _attached_counts(text: str):
+    """Quantities directly attached to an estate noun (applications, elements,
+    dependents ...), without the ones that are not counts of the estate (tier
+    1, at least three, a year)."""
+    for match in _COUNT_CLAIM.finditer(text):
+        token = match.group(1)
+        if token.lower() == "one":
+            continue
+        after = text[match.end(1):match.end()].split()
+        if not after or not re.fullmatch(_ATTACHED_NOUNS, after[-1].strip(".,;:!?"), re.I):
+            continue
+        if len(after) > 2 or (len(after) == 2 and after[0].lower() not in ("of", "more", "other")):
+            continue  # another word sits between quantity and noun: not "attached"
+        before = text[:match.start(1)].split()
+        if before and before[-1].lower().strip(".,;:()") in _NOT_A_COUNT_BEFORE:
+            continue
+        yield token
+
+
+def _year(token: str) -> bool:
+    return token.isdigit() and len(token) == 4 and 1900 <= int(token) <= 2100
+
+
+def _check_sentence(sentence, grounding, tool_keys, context_keys, org_keys,
+                    question_names, estate_question, zero_rows, impact_rows):
+    """The unsupported parts of one statement (empty when it is supported)."""
+    missing: List[str] = []
+    markers = list(REF_MARKER.finditer(sentence))
+    ids = [m.group(1) for m in markers]
+
+    for ident in ids:
+        if ident not in grounding.refs and ident not in grounding.ref_names:
+            missing.append("[ref:%s]" % ident)
+
+    check_generic = bool(estate_question and grounding.tool_results > 0)
+    mentions = _mentions(sentence, tool_keys, context_keys, org_keys, markers, check_generic)
+    blanked = REF_MARKER.sub(" ", sentence)
+    for mention in sorted(mentions, key=lambda m: -m["start"]):
+        blanked = blanked[:mention["start"]] + " " * (mention["end"] - mention["start"]) + blanked[mention["end"]:]
+    impact_language = bool(_IMPACT_LANGUAGE.search(blanked))
+    subject_keys = grounding.subject_names
+
+    # Marker runs: consecutive markers separated only by whitespace. A run
+    # covers the mentions between the previous run and itself.
+    runs: List[Dict] = []
+    for m in markers:
+        if runs and not sentence[runs[-1]["end"]:m.start()].strip():
+            runs[-1]["end"] = m.end()
+            runs[-1]["ids"].append(m.group(1))
+        else:
+            runs.append({"start": m.start(), "end": m.end(), "ids": [m.group(1)]})
+
+    for mention in mentions:
+        key = mention["key"]
+        if key in grounding.receipt_names:
+            continue
+        if zero_rows and key not in question_names and not (
+            _NO_ROWS_OK.search(sentence) and key in question_names
+        ):
+            missing.append("not in the question and no rows were returned: " + key)
+            continue
+        if key in tool_keys:
+            run = next((r for r in runs if r["start"] >= mention["end"]), None)
+            covered = run is not None and any(
+                key in grounding.ref_names.get(ident, ()) for ident in run["ids"]
+            )
+            if not covered:
+                missing.append("[ref:] marker for " + key)
+        elif key in context_keys:
+            # Context rows ground what a record is, owns or links to; they do
+            # not ground an impact statement when the answer returned rows.
+            if impact_rows and impact_language and key not in subject_keys:
+                missing.append("not in the answer rows: " + key)
+        else:
+            missing.append("not returned this turn: " + key)
+
+    # Counts: a sentence that names a record or carries a marker is checked in
+    # full; any other sentence only for a quantity attached to an estate noun.
+    if mentions or markers:
+        tokens = [
+            m.group(1) for m in _COUNT_CLAIM.finditer(REF_MARKER.sub("", sentence))
+            if m.group(1).lower() != "one"
+            and not _is_non_count(REF_MARKER.sub("", sentence), m)
+        ]
+    elif estate_question and (grounding.tool_results > 0 or grounding.context_counts):
+        tokens = list(_attached_counts(sentence))
+    else:
+        tokens = []
+    if tokens:
+        referenced = [
+            r for r in grounding.results
+            if any(m["key"] in r.names for m in mentions) or any(i in r.refs for i in ids)
+        ]
+        allowed: set = set(grounding.context_counts)
+        for r in referenced:
+            allowed |= r.counts
+        for token in tokens:
+            if _year(token):
+                continue
+            value = _count_value(token)
+            if value is None or value not in allowed:
+                missing.append(token)
+    return missing
+
+
+def _is_non_count(text: str, match) -> bool:
+    before = text[:match.start(1)].split()
+    return bool(before and before[-1].lower().strip(".,;:()") in _NOT_A_COUNT_BEFORE)
+
+
 def find_uncited_claims(
     response_text: str,
     grounding: Grounding,
     org_names: Optional[set] = None,
     estate_question: bool = False,
+    question_names: Optional[set] = None,
 ) -> List[Dict]:
     """Sentences of *response_text* that state a fact about the estate which a
     tool result of this turn does not support. An empty list means the answer
@@ -593,87 +758,48 @@ def find_uncited_claims(
         s for s in _sentences(response_text)
         if len(s) >= 8 and not s.rstrip().endswith("?")
     ]
+    question_names = set(question_names or ())
 
     if estate_question and grounding.tool_results == 0 and statements:
-        if not all(_CLARIFICATION.search(s) for s in statements):
+        if not all(_CLARIFICATION_START.search(s) for s in statements):
             return [{
                 "claim": statements[0][:300],
                 "unsupported": ["no record was read for an estate question"],
             }]
 
     tool_keys = set(grounding.names) | set(grounding.receipt_names)
+    tool_keys.discard("")
     context_keys = set(grounding.context_names)
     org_keys = set(org_names or ())
     for key in list(org_keys):
         # An organisation name the context text carries is context-grounded.
         if grounding.context_text and (" " + key + " ") in grounding.context_text:
             context_keys.add(key)
-    tool_keys.discard("")
+    zero_rows = bool(estate_question and grounding.tool_results > 0
+                     and grounding.rows_returned == 0)
+    impact_rows = bool(grounding.rows_returned > 0)
+
     uncited: List[Dict] = []
-
     for sentence in statements:
-        if _CLARIFICATION.search(sentence):
-            continue
-        missing: List[str] = []
-        markers = list(REF_MARKER.finditer(sentence))
-        ids = [m.group(1) for m in markers]
-
-        for ident in ids:
-            if ident not in grounding.refs and ident not in grounding.ref_names:
-                missing.append("[ref:%s]" % ident)
-
-        mentions = _mentions(sentence, tool_keys, context_keys, org_keys, markers)
-
-        # Marker runs: consecutive markers separated only by whitespace. A run
-        # covers the mentions between the previous run and itself.
-        runs: List[Dict] = []
-        for m in markers:
-            if runs and not sentence[runs[-1]["end"]:m.start()].strip():
-                runs[-1]["end"] = m.end()
-                runs[-1]["ids"].append(m.group(1))
-            else:
-                runs.append({"start": m.start(), "end": m.end(), "ids": [m.group(1)]})
-
-        for mention in mentions:
-            key = mention["key"]
-            if key in grounding.receipt_names:
-                continue
-            if key in tool_keys:
-                run = next((r for r in runs if r["start"] >= mention["end"]), None)
-                covered = run is not None and any(
-                    key in grounding.ref_names.get(ident, ()) for ident in run["ids"]
-                )
-                if not covered:
-                    missing.append("[ref:] marker for " + key)
-            elif key in context_keys:
-                continue
-            else:
-                missing.append("not returned this turn: " + key)
-
-        # Counts: checked where the sentence is about the estate.
-        about_estate = bool(mentions or markers) or (
-            estate_question and grounding.tool_results > 0
-        )
-        if about_estate:
-            referenced = [
-                r for r in grounding.results
-                if any(m["key"] in r.names for m in mentions)
-                or any(i in r.refs for i in ids)
-            ] or list(grounding.results)
-            allowed: set = set()
-            for r in referenced:
-                allowed |= r.counts
-            clean = REF_MARKER.sub("", sentence)
-            for match in _COUNT_CLAIM.finditer(clean):
-                token = match.group(1)
-                if token.lower() == "one":
-                    continue
-                value = _count_value(token)
-                if value is not None and 1900 <= value <= 2100 and token.isdigit() and len(token) == 4:
-                    continue
-                if value is None or value not in allowed:
-                    missing.append(token)
-
-        if missing:
-            uncited.append({"claim": sentence[:300], "unsupported": missing})
+        pieces = [sentence]
+        if _CLARIFICATION_START.search(sentence.strip()):
+            # Clause by clause: only the clause that starts with the phrase is
+            # a clarification, and only about names the user already used.
+            parts = [p.strip() for p in _CLAUSE_SPLIT.split(sentence) if p and p.strip()]
+            pieces = []
+            for index, part in enumerate(parts):
+                if index == 0 and _CLARIFICATION_START.search(part):
+                    named = {
+                        m["key"] for m in _mentions(part, tool_keys, context_keys, org_keys, [])
+                    }
+                    if named <= question_names:
+                        continue
+                pieces.append(part)
+        for piece in pieces:
+            missing = _check_sentence(
+                piece, grounding, tool_keys, context_keys, org_keys,
+                question_names, estate_question, zero_rows, impact_rows,
+            )
+            if missing:
+                uncited.append({"claim": piece[:300], "unsupported": missing})
     return uncited
