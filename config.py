@@ -155,6 +155,13 @@ class Config:
         "DERIVED_RECOMPUTE_INTERVAL_MINUTES", "10"
     )
 
+    # Per-organisation graph projection snapshot refresh — how often each
+    # organisation's stored projection is brought up to date from the event
+    # log. Default 5 minutes.
+    GRAPH_PROJECTION_INTERVAL_MINUTES = os.environ.get(
+        "GRAPH_PROJECTION_INTERVAL_MINUTES", "5"
+    )
+
     # Per-organisation model-health drift scan — recurring interval,
     # configurable downward. Default 60 minutes.
     MODEL_HEALTH_SCAN_INTERVAL_MINUTES = os.environ.get(
