@@ -75,7 +75,26 @@ def validate_connector_url(url) -> str:
     except BlockedOutboundURL as exc:
         logger.warning("Connector URL refused: %s", exc)
         raise ConnectorURLRefused("The connector URL is not an allowed address") from exc
-    return url.rstrip("/")
+    # A query or fragment on a base address would end up in the middle of the
+    # request path once a path is appended; a base is scheme, host and path only.
+    from urllib.parse import urlsplit, urlunsplit
+
+    parts = urlsplit(url)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, "", "")).rstrip("/")
+
+
+def connector_url_field_allowed(field) -> bool:
+    """Check a WTForms URL field with the outbound-URL guard before it is saved.
+
+    On refusal the reason is added to the field and nothing should be stored; on
+    success the field holds the cleaned URL.
+    """
+    try:
+        field.data = validate_connector_url(field.data)
+    except ConnectorURLRefused as exc:
+        field.errors = list(field.errors) + [str(exc)]
+        return False
+    return True
 
 
 def validate_connector_config_urls(config) -> None:

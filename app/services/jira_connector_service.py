@@ -230,6 +230,9 @@ class JiraConnectorService:
         except JiraConnectorError:
             logger.exception("jira_connector: failed to create Epic for ARBReviewItem %s", arb_decision_id)
             raise
+        except ValueError as exc:  # BlockedOutboundURL: the address is not allowed
+            logger.warning("jira_connector: Epic for ARBReviewItem %s not created: %s", arb_decision_id, exc)
+            raise JiraConnectorError("The Jira instance address is not an allowed address") from exc
 
         jira_key = result.get("key")
         jira_id = result.get("id")
@@ -273,17 +276,17 @@ class JiraConnectorService:
             return []
 
         jql = f"project={jira_project_key} AND labels=archie-import"
-        url = build_checked_url(self._instance_url(config), "/rest/api/3/search")
         headers = self._get_headers(config)
 
         try:
+            url = build_checked_url(self._instance_url(config), "/rest/api/3/search")
             result = self._handle_request(
                 "GET",
                 f"{url}?jql={jql}&maxResults=100"
                 "&fields=summary,description,status,priority,issuetype",
                 headers,
             )
-        except JiraConnectorError:
+        except (JiraConnectorError, ValueError):  # ValueError: BlockedOutboundURL
             logger.exception("jira_connector: pull_issues_to_backlog failed for project %s", jira_project_key)
             return []
 

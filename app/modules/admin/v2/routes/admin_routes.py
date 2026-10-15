@@ -49,19 +49,10 @@ from datetime import datetime, timedelta
 
 
 def _base_url_field_allowed(form) -> bool:
-    """Check a settings form's base_url with the outbound-URL guard before it is saved.
+    """Check a settings form's base_url with the outbound-URL guard before it is saved."""
+    from app.services.connector_framework import connector_url_field_allowed
 
-    On refusal the reason is added to the field (the page re-renders with it) and
-    nothing is stored. On success the stored value is the cleaned URL.
-    """
-    from app.services.connector_framework import ConnectorURLRefused, validate_connector_url
-
-    try:
-        form.base_url.data = validate_connector_url(form.base_url.data)
-    except ConnectorURLRefused as exc:
-        form.base_url.errors = list(form.base_url.errors) + [str(exc)]
-        return False
-    return True
+    return connector_url_field_allowed(form.base_url)
 from html import escape
 
 from werkzeug.exceptions import HTTPException

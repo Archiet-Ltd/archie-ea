@@ -660,3 +660,202 @@ def test_abacus_and_jira_settings_forms_refuse_internal_base_url(app, db_session
                 assert form.base_url.data == "https://api.example.com"
             else:
                 assert form.base_url.errors == ["The connector URL is not an allowed address"]
+
+
+# =============================================================================
+# Abacus pagination loops, driven through a stubbed session
+# =============================================================================
+
+
+class _FakePage:
+    status = 200
+
+    def __init__(self, payload):
+        import json as _json
+
+        self._text = _json.dumps(payload)
+
+    async def text(self):
+        return self._text
+
+    async def json(self, **kw):
+        import json as _json
+
+        return _json.loads(self._text)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    def release(self):
+        return None
+
+    async def wait_for_close(self):
+        return None
+
+    def close(self):
+        return None
+
+
+@pytest.fixture
+def abacus_pages(monkeypatch):
+    """Every request answers one page whose nextLink is ``abacus_pages.link``."""
+    import aiohttp
+
+    class Pages:
+        link = None
+        requests = []
+
+    state = Pages()
+    state.requests = []
+
+    async def fake_request(self, method, str_or_url, **kw):
+        state.requests.append(str(str_or_url))
+        item = {"EEID": "1", "Name": "A", "Description": "", "ComponentTypeName": "Application",
+                "Properties": [], "OutConnections": []}
+        return _FakePage({"value": [item], "@odata.nextLink": state.link})
+
+    monkeypatch.setattr(aiohttp.ClientSession, "_request", fake_request)
+    return state
+
+
+@pytest.mark.parametrize("method", ["fetch_applications", "fetch_capabilities"])
+@pytest.mark.parametrize(
+    "link",
+    ["http://169.254.169.254/latest/meta-data/", "https://elsewhere.example.org/api/Components"],
+)
+def test_abacus_foreign_next_link_is_not_followed(production_like, abacus_pages, monkeypatch, method, link):
+    from app.connectors.abacus import AbacusConnector
+
+    connector = _connector(AbacusConnector, "https://tenant.example.com")
+
+    async def token():
+        return "tok"
+
+    monkeypatch.setattr(connector, "_get_oauth_token", token)
+    abacus_pages.link = link
+    try:
+        asyncio.run(getattr(connector, method)())
+    except Exception:  # the refusal surfaces as an error; what matters is the request count
+        pass
+    assert len(abacus_pages.requests) == 1
+    assert abacus_pages.requests[0].startswith("https://tenant.example.com")
+
+
+@pytest.mark.parametrize("method", ["fetch_applications", "fetch_capabilities"])
+def test_abacus_same_host_next_link_is_followed(production_like, abacus_pages, monkeypatch, method):
+    from app.connectors.abacus import AbacusConnector
+
+    connector = _connector(AbacusConnector, "https://tenant.example.com")
+
+    async def token():
+        return "tok"
+
+    monkeypatch.setattr(connector, "_get_oauth_token", token)
+    monkeypatch.setattr(connector, "_transform_application", lambda a: a, raising=False)
+    monkeypatch.setattr(connector, "_transform_capability", lambda a: a, raising=False)
+    abacus_pages.link = "https://tenant.example.com/api/Components?$skip=1"
+    try:
+        asyncio.run(getattr(connector, method)())
+    except Exception:
+        pass
+    assert len(abacus_pages.requests) > 1  # the same-host link was followed
+
+
+# =============================================================================
+# Datadog (tenant-configured site), base-URL query, Jira failures, vendor ServiceNow
+# =============================================================================
+
+
+def _datadog(site):
+    from app.connectors.datadog import DatadogAPMConnector
+    from app.services.connector_framework import ConnectorType
+
+    cfg = SimpleNamespace(
+        id="d1", name="dd", connector_type=ConnectorType.APM,
+        config={"api_key": "k", "app_key": "a", "site": site},
+    )
+    return DatadogAPMConnector(cfg)
+
+
+@pytest.mark.parametrize(
+    "site",
+    ["127.0.0.1", "localhost", "169.254.169.254", "evil.com/x?", "datadoghq.com@10.0.0.1", "a.com:8080",
+     "http://x.com", "", "x"],
+)
+def test_datadog_site_that_is_not_a_plain_domain_is_never_called(production_like, aiohttp_calls, site):
+    connector = _datadog(site)
+    assert asyncio.run(connector.test_connection()) is False
+    assert aiohttp_calls == []
+
+
+def test_datadog_site_that_resolves_inside_is_never_called(monkeypatch, aiohttp_calls):
+    import app.utils.ssrf_guard as guard
+
+    monkeypatch.setitem(current_app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", False)
+    monkeypatch.setattr(
+        guard.socket, "getaddrinfo",
+        lambda host, port, *a, **k: [(2, 1, 6, "", ("169.254.169.254", port))],
+    )
+    monkeypatch.setattr(guard, "_local_interface_addresses", lambda: set())
+    assert asyncio.run(_datadog("datadoghq.com").test_connection()) is False
+    assert aiohttp_calls == []
+
+
+def test_datadog_ordinary_site_is_called(production_like, aiohttp_calls):
+    asyncio.run(_datadog("datadoghq.eu").test_connection())
+    assert aiohttp_calls and aiohttp_calls[0]["url"].startswith("https://api.datadoghq.eu/")
+
+
+def test_base_url_query_and_fragment_are_dropped_before_the_path_is_joined():
+    from app.services.connector_framework import validate_connector_url
+    from app.utils.ssrf_guard import build_checked_url
+
+    import app.utils.ssrf_guard as guard
+
+    base = validate_connector_url("https://acme.atlassian.net/jira?x=1#frag")
+    assert base == "https://acme.atlassian.net/jira"
+    # (name resolution is not needed to check the join itself)
+    assert f"{base}/rest/api/3/issue" == "https://acme.atlassian.net/jira/rest/api/3/issue"
+    assert guard.build_checked_url is build_checked_url
+
+
+def test_jira_push_and_pull_survive_a_refused_address(production_like, requests_calls, monkeypatch):
+    from app.services import jira_connector_service as jcs
+
+    svc = jcs.JiraConnectorService()
+    cfg = SimpleNamespace(config={"instance_url": "http://169.254.169.254", "enabled": True,
+                                  "email": "e", "api_token": "t"})
+    monkeypatch.setattr(svc, "_get_config", lambda: cfg)
+    monkeypatch.setattr(svc, "_get_headers", lambda c: {})
+    # pull: refused address means unconfigured, so an empty list and no request
+    assert svc.pull_issues_to_backlog(1, "ARCH") == []
+    # a stored address that is valid when read but refused at build time
+    monkeypatch.setattr(svc, "_instance_url", lambda c: "http://169.254.169.254")
+    assert svc.pull_issues_to_backlog(1, "ARCH") == []
+    assert requests_calls == []
+    # push: refusal is the connector's own error type, not a bare ValueError
+    import app.models.architecture_review_board as arb
+
+    item = SimpleNamespace(title="t", jira_issue_key=None, review_number="1", decision_rationale="")
+    monkeypatch.setattr(arb.ARBReviewItem, "query", SimpleNamespace(get=lambda _i: item))
+    monkeypatch.setattr(jcs, "_build_epic_description", lambda i, s: "d")
+    with pytest.raises(jcs.JiraConnectorError):
+        svc.push_arb_decision_to_epic(0, 1)
+    assert requests_calls == []
+
+
+def test_vendor_servicenow_connector_refuses_internal_instance_and_redirects(production_like, requests_calls, app):
+    from app.modules.vendors.connectors.servicenow_connector import ServiceNowConnector
+
+    bad = ServiceNowConnector(instance_url="http://169.254.169.254", username="u", password="p")
+    assert bad.health_check() is False
+    with pytest.raises(Exception):
+        bad._fetch_cmdb_applications()
+    assert requests_calls == []
+
+    good = ServiceNowConnector(instance_url="https://acme.service-now.com", username="u", password="p")
+    good.health_check()
+    assert requests_calls and requests_calls[0]["allow_redirects"] is False

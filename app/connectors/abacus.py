@@ -833,7 +833,8 @@ class AbacusConnector(BaseConnector):
                             # Check for pagination
                             next_link = data.get("@odata.nextLink")
                             if next_link:
-                                url = next_link
+                                # remote-supplied: may only continue on the configured host
+                                url = self._same_origin_link(next_link)
                                 params = {}
                                 skip = 0
                             elif len(raw_caps) < page_size:
