@@ -171,7 +171,10 @@ def rationalization_dashboard():
         from sqlalchemy import func, or_
 
         from app.models.consolidation_list import ConsolidationListEntry
-        from app.models.application_rationalization import ApplicationRationalizationScore
+        from app.models.application_rationalization import (
+            ApplicationRationalizationScore,
+            RationalizationBenefitsTracker,
+        )
 
         consolidation_count = ConsolidationListEntry.query.count()
         time_scored_count = ApplicationRationalizationScore.query.count()
@@ -181,6 +184,7 @@ def rationalization_dashboard():
                 ConsolidationListEntry.roadmap_item_id.isnot(None),
             )
         ).count()
+        tracking_count = RationalizationBenefitsTracker.query.count()
 
         # Combine duplicate group savings + consolidation list savings
         consolidation_savings = db.session.query(
@@ -198,6 +202,7 @@ def rationalization_dashboard():
             "consolidation_count": consolidation_count,
             "time_scored_count": time_scored_count,
             "roadmap_count": roadmap_count,
+            "tracking_count": tracking_count,
         }
 
         # H7: the pipeline stepper renders every stage as count/total, and every
@@ -3700,7 +3705,7 @@ def rationalization_bulk_score():
             from app.services.rationalization_scoring_service import (
                 RationalizationScoringService as _RSS,
             )
-            base_filter = ApplicationComponent.lifecycle_status.in_(
+            base_filter = db.func.lower(ApplicationComponent.lifecycle_status).in_(
                 _RSS.SCOREABLE_LIFECYCLE_VALUES
             )
             query = ApplicationComponent.query.filter(base_filter)

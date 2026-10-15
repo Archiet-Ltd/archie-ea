@@ -106,11 +106,11 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("applications", "/applications/", DEMO_PERSONA,
      "The application portfolio: lifecycle tiles, owner and vendor coverage, and each application's type, lifecycle stage and the capability it supports.",
      "Screenshot of the Applications module showing Lantern Quay Systems' portfolio tiles, data-quality coverage and application list with type, lifecycle stage and mapped capability."),
-    # Round 2 (MP-B1): repointed from the dashboard (/arb/) to the review
-    # ledger (/arb/reviews) -- the dashboard's own "AI queue triage" panel
-    # sat above the fold with only 4 seeded reviews behind it, which read as
-    # a toy demo rather than a governed queue. The ledger has no AI panel,
-    # and two dozen-plus real review items across every status/type/priority
+    # Points at the review ledger (/arb/reviews) rather than the dashboard
+    # (/arb/) -- the dashboard's own "AI queue triage" panel sat above the
+    # fold with only 4 seeded reviews behind it, which read as a toy demo
+    # rather than a governed queue. The ledger has no AI panel, and two
+    # dozen-plus real review items across every status/type/priority
     # (paginated) is the same screen at the volume the module actually
     # carries in use.
     ("arb", "/arb/reviews", DEMO_PERSONA,
@@ -172,17 +172,16 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
 # nothing here ever flips that front-matter. What's pending is only the
 # capture: each one's first screenshot/recording was reviewed and rejected
 # (empty data, the wrong screen, or a recording that never performs the use
-# case it claims), the file was removed, and round 2 reseeds what each
-# screen actually needs and recaptures it properly.
+# case it claims); the file is removed until each screen's actual seed data
+# is fixed and it can be recaptured properly.
 #
 # This dict (not just an absence from MODULE_CAPTURES) is what keeps the
 # registry-completeness tests strict: test_module_screenshots.py asserts
 # every live module/use-case is in MODULE_CAPTURES **or** named here, so a
 # module that quietly loses its capture without being added to this list
-# still fails the test, exactly as it would have before any pending list
-# existed. Round 2 deletes a name from here the same moment it adds the
-# slug back to the matching *_CAPTURES list above -- the two are meant to
-# be mutually exclusive, never both.
+# still fails the test. A name is deleted from here the same moment the
+# slug is added back to the matching *_CAPTURES list above -- the two are
+# meant to be mutually exclusive, never both.
 MODULE_CAPTURE_PENDING: dict[str, str] = {
     "integrations": (
         "connector health dashboard throws \"An internal error occurred\" on any "
@@ -255,8 +254,8 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
 
 # The one live use-case page: same screen as the capability-maturity module
 # (its own url_slug front-matter field points at the identical route).
-# Round 2 (MP-B1): captured once capability-maturity's own BusinessCapability
-# rows existed -- the module and this use-case page share the identical
+# Captured once capability-maturity's own BusinessCapability rows existed --
+# the module and this use-case page share the identical
 # /capability-maturity/heatmap route, so the fix that unblocked one unblocked
 # both.
 USE_CASE_SCREENSHOT_CAPTURES: list[tuple[str, str, str, str, str]] = [
@@ -272,9 +271,9 @@ USE_CASE_SCREENSHOT_PENDING: dict[str, str] = {}
 # since landed, so these are keyed the same way USE_CASE_SCREENSHOT_PENDING
 # above is: a rename, not a recapture. Each entry: (slug, steps,
 # persona_email, caption, alt_text) -- steps themselves only matter to the
-# capture script. Empty for round 1 -- see USE_CASE_VIDEO_PENDING below;
-# round 2 restores these once each recording actually performs the use case
-# it claims rather than touring past it.
+# capture script. Empty -- see USE_CASE_VIDEO_PENDING below; an entry is
+# restored here once its recording actually performs the use case it
+# claims rather than touring past it.
 USE_CASE_VIDEO_CAPTURES: list[tuple[str, list, str, str, str]] = []
 
 USE_CASE_VIDEO_PENDING: dict[str, str] = {
@@ -556,11 +555,11 @@ def use_case_redirect_target(old_filename_slug: str) -> str | None:
 # pixels are twice their CSS size, so the <img> width/height attributes halve them and the
 # image displays 1:1. Every other module image is a 1x capture and keeps its file size.
 #
-# "arb" moved out of this set in round 2 (MP-B1): its hero now comes from
+# "arb" is not in this set: its hero image comes from
 # scripts/capture_screenshots.py --modules (the review ledger at /arb/reviews,
 # a 1x capture like every other ordinary module), not from the 2x
 # capture_proof_assets.py crop of the dashboard -- see the MODULE_CAPTURES
-# entry below for why.
+# entry above for why.
 TWO_X_MODULE_IMAGES = frozenset({"applications"})
 
 

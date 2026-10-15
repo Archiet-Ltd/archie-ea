@@ -239,12 +239,12 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         users = _resolve_users(org_id)
 
         # ── ARB review items (arb.dashboard / arb.reviews read ARBReviewItem) ──
-        # Round 2 (MP-B1): the hero capture moved from arb.dashboard to
-        # arb.reviews (the "Full review ledger") because the dashboard's own
-        # AI queue triage panel sat above the fold and a 4-item queue read as
-        # a toy. The ledger has no AI panel at all, and a few dozen items
-        # across every status/type/priority gives it genuine, paginated
-        # volume (20/page) instead of a single screenful.
+        # The hero capture uses arb.reviews (the "Full review ledger") rather
+        # than arb.dashboard, because the dashboard's own AI queue triage
+        # panel sat above the fold and a 4-item queue read as a toy. The
+        # ledger has no AI panel at all, and a few dozen items across every
+        # status/type/priority gives it genuine, paginated volume (20/page)
+        # instead of a single screenful.
         from app.models.architecture_review_board import ARBReviewItem
 
         # Each item now carries a one- or two-sentence description
@@ -611,11 +611,10 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             print(f"  duplicate detection run did not complete: {type(exc).__name__}: {exc}")
 
         # ── Investment priorities (application <-> capability mapping) ─────
-        # Round 2 (MP-B1) widens this to full coverage across every
-        # UnifiedCapability row -- see the dedicated block further down,
-        # near the other investment-analysis fixes -- rather than just the
-        # first 8, so this import stays here for the modules that still read
-        # it directly above (duplicate detection's own capability linkage).
+        # Full coverage across every UnifiedCapability row is handled by the
+        # dedicated block further down, near the other investment-analysis
+        # fixes; this import stays here for the modules that still read it
+        # directly above (duplicate detection's own capability linkage).
         from app.models.unified_application_capability_mapping import (
             UnifiedApplicationCapabilityMapping,
         )
@@ -733,13 +732,13 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             created_by_id=demo_user_id
         ).count()
         if existing_impact_count == 0 and affected_app is not None:
-            # Round 2 (MP-B1): this loop's 4th variable was itself named
-            # "caps" (an int count, not the capability dict), silently
-            # shadowing the outer `caps = _resolve_caps(org_id)` dict for
-            # the rest of the function -- every block added below that reads
-            # `caps` (business capabilities, investment analysis, value
-            # streams) crashed with "'int' object has no attribute 'values'"
-            # the moment it ran after this loop. Renamed; behaviour unchanged.
+            # This loop's 4th variable must not be named "caps" (an int
+            # count, not the capability dict): that would silently shadow
+            # the outer `caps = _resolve_caps(org_id)` dict for the rest of
+            # the function, crashing every block below that reads `caps`
+            # (business capabilities, investment analysis, value streams)
+            # with "'int' object has no attribute 'values'" the moment it
+            # runs after this loop.
             for analysis_type, elem_type, severity, affected_caps_count, apps_count, procs in impact_rows:
                 db.session.add(ImpactAnalysisResult(
                     analysis_type=analysis_type, trigger_element_type=elem_type,
@@ -795,12 +794,12 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
 
         # ── Org chart (organization.chart reads BusinessActor + Composition/
         #    Aggregation ArchiMateRelationship) ─────────────────────────────
-        # Round 2 (MP-B1): round 1's capture showed the module's hub page
-        # (three link cards) because no BusinessActor hierarchy existed to
-        # draw -- build_org_tree() falls back to a flat list with zero
-        # relationships. BusinessActor auto-creates its own linked
-        # ArchiMateElement on insert (see the model's own docstring), so the
-        # composition edges below are added once each actor's element exists.
+        # Without a BusinessActor hierarchy, build_org_tree() falls back to a
+        # flat list with zero relationships and the module's capture shows
+        # only its hub page (three link cards). BusinessActor auto-creates
+        # its own linked ArchiMateElement on insert (see the model's own
+        # docstring), so the composition edges below are added once each
+        # actor's element exists.
         from app.models.business_layer import BusinessActor
 
         _actor_rows = [
@@ -864,14 +863,14 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         # ── Business capabilities (capability-maturity.heatmap reads
         #    BusinessCapability directly; roadmap_routes.py's gap detection
         #    reads the same table via ApplicationCapabilityCoverage) ───────
-        # Round 2 (MP-B1): round 1 only ever populated UnifiedCapability (a
-        # separate, later capability store -- see that model's own comment on
-        # business_capability being the projection's SOURCE, not a read
-        # target). capability-maturity, gap-analysis and roadmaps all read
-        # BusinessCapability, which stayed empty, so the heatmap showed "No
-        # capabilities yet" and the gap detector had nothing to flag. Rows
-        # below are a real, additional business-capability catalogue -- not a
-        # duplicate of UnifiedCapability, which keeps representing the
+        # UnifiedCapability (a separate, later capability store -- see that
+        # model's own comment on business_capability being the projection's
+        # SOURCE, not a read target) does not populate BusinessCapability.
+        # capability-maturity, gap-analysis and roadmaps all read
+        # BusinessCapability directly, so leaving it empty shows the heatmap
+        # "No capabilities yet" and gives the gap detector nothing to flag.
+        # Rows below are a real, additional business-capability catalogue --
+        # not a duplicate of UnifiedCapability, which keeps representing the
         # portfolio's capability-to-application investment view.
         from app.models.business_capabilities import ApplicationCapabilityCoverage, BusinessCapability
 
@@ -991,14 +990,12 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
 
         # ── Investment analysis (strategic.investment_matrix reads
         #    UnifiedCapability.industry_domain and UnifiedApplicationCapabilityMapping) ──
-        # Round 2 (MP-B1): round 1 mapped only the first 8 of 24
-        # UnifiedCapability rows to an application, and never set
-        # industry_domain on any of them -- so investment_prioritization_service's
-        # capability_domain fell through to "Unknown" and coverage_count read 0
-        # on every OTHER row (and on these 8 too, once the matrix is read
-        # fresh, since getattr(capability, 'business_domain', ...) is not a
-        # real column on this model). Every capability gets a domain and at
-        # least one mapped application below; a few are deliberately left
+        # Every UnifiedCapability row needs industry_domain set and at least
+        # one mapped application, or investment_prioritization_service's
+        # capability_domain falls through to "Unknown" and coverage_count
+        # reads 0 (getattr(capability, 'business_domain', ...) is not a real
+        # column on this model). Every capability gets a domain and at least
+        # one mapped application below; a few are deliberately left
         # under-covered (1 app, or a lower-strategic one) so the matrix still
         # shows a believable spread of priorities rather than "fully solved".
         _domain_cycle = [
@@ -1029,9 +1026,9 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
 
         # ── Value streams (value_stream.detail reads ValueStreamStage +
         #    CapabilityValueStreamMapping -- the BIZBOK stage/capability grid) ──
-        # Round 2 (MP-B1): the 4 ValueStream rows from round 1 had no stages
-        # and no capability mappings, so every stream's own detail page (the
-        # screen the content page actually points at) showed 0 of both.
+        # Every ValueStream row needs its own stages and capability mappings,
+        # or its detail page (the screen the content page actually points
+        # at) shows 0 of both.
         from app.models.unified_capability import ValueStream, ValueStreamStage, CapabilityValueStreamMapping
 
         _vs_stage_rows = {
@@ -1066,16 +1063,15 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
                     )
                     db.session.add(stage)
                     db.session.flush()
-                # Round 2 (MP-B1), second pass: this used to sit inside the
-                # "stage didn't exist yet" branch above, so a database that
-                # already had these stages (e.g. from an earlier capture run,
-                # before UnifiedCapability's write-time projection was caught
-                # up -- see apply-unified-capability-provenance-migration /
-                # project-capabilities above) would skip ever creating the
-                # capability link, leaving every stream's own "N capabilities"
-                # stuck at 0 even once cap_list_all stopped being empty. The
-                # mapping's own existence is checked independently of the
-                # stage's, so a re-run always catches up.
+                # Checked independently of the stage's own existence (not
+                # nested inside the "stage didn't exist yet" branch above),
+                # so a database that already had these stages (e.g. from an
+                # earlier capture run, before UnifiedCapability's write-time
+                # projection was caught up -- see
+                # apply-unified-capability-provenance-migration /
+                # project-capabilities above) still gets the capability link
+                # created rather than leaving every stream's own
+                # "N capabilities" stuck at 0. A re-run always catches up.
                 if cap_list_sorted and not CapabilityValueStreamMapping.query.filter_by(
                     value_stream_stage_id=stage.id
                 ).first():
@@ -1088,11 +1084,12 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
 
         # ── Application rationalization scores (unified_applications.
         #    rationalization_workbench reads ApplicationRationalizationScore) ──
-        # Round 2 (MP-B1): round 1 ran duplicate detection (the Rationalization
-        # dashboard's own stepper) but never scored any application, so the
-        # Decision Workbench -- the screen the content page's capture
-        # actually needs -- stayed on its "No scored applications found, run
-        # detection from the Dashboard" onboarding panel regardless.
+        # Running duplicate detection (the Rationalization dashboard's own
+        # stepper) alone never scores any application, so without the
+        # scoring below the Decision Workbench -- the screen the content
+        # page's capture actually needs -- stays on its "No scored
+        # applications found, run detection from the Dashboard" onboarding
+        # panel regardless.
         from app.models.application_rationalization import ApplicationRationalizationScore
         from app.services.rationalization_scoring_service import RationalizationScoringService
 
@@ -1182,8 +1179,8 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         # ── Consolidation list entries (rationalization dashboard's "Plan" /
         #    "Roadmap" / "Track" pipeline stepper reads ConsolidationListEntry,
         #    a separate table from the scores above) ──────────────────────
-        # Round 3 (MP-B1): the three applications already marked for sunset
-        # or decommissioning above are exactly the ones a real consolidation
+        # The three applications already marked for sunset or
+        # decommissioning above are exactly the ones a real consolidation
         # effort would already have logged -- this adds one entry per
         # application rather than inventing unrelated ones, so Plan's count
         # and Roadmap's count/total stop reading zero against a non-zero
@@ -1195,7 +1192,7 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             ("Document Management", "modernize", "under_review",
              "Sunsetting in favour of a managed records service; still used "
              "for compliance retrieval until the replacement is live."),
-            ("Alert Manager", "decommission", "approved",
+            ("Alert Manager", "decommission", "completed",
              "Decommissioned platform service; alerting now routes through "
              "Monitoring Dashboard."),
             ("Reporting Engine", "add_to_roadmap", "identified",
@@ -1218,6 +1215,32 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
             ))
         db.session.flush()
 
+        # ── Benefits tracking (rationalization dashboard's "Track" stage,
+        #    and tracking.html's financial summary) reads
+        #    RationalizationBenefitsTracker, a separate table from both the
+        #    scores and the consolidation list entries above -- without a
+        #    row here the stage reads 0 regardless of how much of the
+        #    portfolio is already planned or on the roadmap.
+        from app.models.application_rationalization import RationalizationBenefitsTracker
+
+        _tracked_app = apps.get("Reporting Engine")
+        if _tracked_app is not None and not RationalizationBenefitsTracker.query.filter_by(
+            application_id=_tracked_app.id
+        ).first():
+            _tracked_score = ApplicationRationalizationScore.query.filter_by(
+                application_component_id=_tracked_app.id
+            ).first()
+            db.session.add(RationalizationBenefitsTracker(
+                application_id=_tracked_app.id,
+                score_id=_tracked_score.id if _tracked_score else None,
+                projected_annual_savings=85000,
+                projected_risk_reduction="medium",
+                projected_simplification_score=60,
+                projected_timeline_months=9,
+                tracking_status="in_progress",
+            ))
+        db.session.flush()
+
         db.session.commit()
 
     # ── Globally-scoped data: no tenant_scope, not a seeded script concern ──
@@ -1229,14 +1252,14 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
 
     IndustryAPQCService().seed_default_frameworks()
 
-    # Round 2 (MP-B1): seed_default_frameworks() above only creates the
-    # framework rows themselves -- industry_apqc_dashboard's own per-framework
-    # stats (get_industry_statistics) count IndustryAPQCProcess rows, which
-    # stayed at zero, so every framework showed "0 processes". Each framework
-    # already carries its own real unique_process_areas/key_differentiators
-    # (APQC's own published category names, not invented here); this reuses
-    # that existing text as the process catalogue rather than writing a
-    # second list of names.
+    # seed_default_frameworks() above only creates the framework rows
+    # themselves -- industry_apqc_dashboard's own per-framework stats
+    # (get_industry_statistics) count IndustryAPQCProcess rows, which stay at
+    # zero unless populated, showing every framework as "0 processes". Each
+    # framework already carries its own real unique_process_areas/
+    # key_differentiators (APQC's own published category names, not invented
+    # here); this reuses that existing text as the process catalogue rather
+    # than writing a second list of names.
     from app.models.industry_apqc import IndustryAPQCFramework, IndustryAPQCProcess
 
     _CROSS_INDUSTRY_PROCESSES = [
@@ -1357,13 +1380,13 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
     # Batch import jobs (batch-import.dashboard): scoped by user_id only, no
     # organization_id column on this model at all.
     #
-    # Round 2 (MP-B1): round 1's rows left total_batches/batches_completed at
-    # their 0 defaults, so BatchImportJob.progress_percentage (batches_completed
-    # / total_batches) read 0/0 -> 0% on every job, and no BatchImportBatch rows
-    # existed at all, so list_jobs()'s elementsGenerated (SUM of
-    # BatchImportBatch.total_elements_generated) read 0 too -- both genuinely
-    # empty fields, not a product bug. Batches are added below, keyed by each
-    # job's own filename so a re-run stays idempotent.
+    # Without batches, total_batches/batches_completed stay at their 0
+    # defaults, so BatchImportJob.progress_percentage (batches_completed /
+    # total_batches) reads 0/0 -> 0% on every job, and no BatchImportBatch
+    # rows exist at all, so list_jobs()'s elementsGenerated (SUM of
+    # BatchImportBatch.total_elements_generated) reads 0 too -- both
+    # genuinely empty fields, not a product bug. Batches are added below,
+    # keyed by each job's own filename so a re-run stays idempotent.
     from app.models.batch_import import BatchImportBatch, BatchImportJob, BatchStatus
 
     job_rows = [

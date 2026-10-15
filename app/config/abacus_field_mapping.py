@@ -96,52 +96,58 @@ def parse_json(value: Any) -> Optional[Any]:
     return None
 
 
+# The one canonical, case-insensitive lifecycle mapping: standard A.R.C.I.E
+# status names plus every raw ABACUS numbered lifecycle code (format like
+# "2.1 STRATEGIC", "5. DECOMMISSIONED"), keyed lower-case. Every lifecycle
+# consumer that needs to recognize or normalize a lifecycle_status value
+# reads this one table rather than keeping its own copy.
+LIFECYCLE_STATUS_MAP: Dict[str, str] = {
+    # Standard A.R.C.I.E values
+    "production": "operational",
+    "prod": "operational",
+    "live": "operational",
+    "active": "operational",
+    "operational": "operational",
+    "development": "development",
+    "dev": "development",
+    "in development": "development",
+    "testing": "testing",
+    "test": "testing",
+    "qa": "testing",
+    "planning": "planning",
+    "planned": "planning",
+    "proposed": "planning",
+    "deprecated": "deprecated",
+    "retiring": "deprecated",
+    "end of life": "deprecated",
+    "retired": "retired",
+    "decommissioned": "retired",
+    "sunset": "retired",
+    # ABACUS numbered lifecycle codes
+    "2.1 strategic": "operational",
+    "2.2 tactical": "operational",
+    "1. undetermined": "planning",
+    "3. sunset": "deprecated",
+    "4.1 decom decided": "deprecated",
+    "4.2 decom planned": "deprecated",
+    "4.3 read-only": "deprecated",
+    "4.4 stopped": "deprecated",
+    "5. decommissioned": "retired",
+}
+
+
 def normalize_lifecycle_status(value: str) -> str:
     """Normalize lifecycle status to A.R.C.I.E format.
 
     Handles both standard status names AND raw ABACUS lifecycle codes
-    (numbered format like "2.1 STRATEGIC", "5. DECOMMISSIONED", etc.).
+    (numbered format like "2.1 STRATEGIC", "5. DECOMMISSIONED", etc.), in
+    any case, via the canonical LIFECYCLE_STATUS_MAP above.
     """
     if not value:
         return "operational"
 
     value_lower = str(value).lower().strip()
-
-    # Mapping table — standard names + ABACUS numbered codes
-    mapping = {
-        # Standard A.R.C.I.E values
-        "production": "operational",
-        "prod": "operational",
-        "live": "operational",
-        "active": "operational",
-        "operational": "operational",
-        "development": "development",
-        "dev": "development",
-        "in development": "development",
-        "testing": "testing",
-        "test": "testing",
-        "qa": "testing",
-        "planning": "planning",
-        "planned": "planning",
-        "proposed": "planning",
-        "deprecated": "deprecated",
-        "retiring": "deprecated",
-        "end of life": "deprecated",
-        "retired": "retired",
-        "decommissioned": "retired",
-        "sunset": "retired",
-        # ABACUS numbered lifecycle codes
-        "2.1 strategic": "operational",
-        "2.2 tactical": "operational",
-        "1. undetermined": "planning",
-        "3. sunset": "deprecated",
-        "4.1 decom decided": "deprecated",
-        "4.2 decom planned": "deprecated",
-        "4.3 read-only": "deprecated",
-        "5. decommissioned": "retired",
-    }
-
-    return mapping.get(value_lower, "operational")
+    return LIFECYCLE_STATUS_MAP.get(value_lower, "operational")
 
 
 # Mapping from lifecycle_status to deployment_status for ABACUS-imported apps.

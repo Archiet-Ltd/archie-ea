@@ -60,7 +60,7 @@
                 {'label': 'Score', 'count': stats.time_scored_count|default(0), 'total': total_apps, 'unit': 'scored', 'url': url_for('unified_applications.rationalization_workbench'), 'icon': 'bar-chart'},
                 {'label': 'Plan', 'count': stats.consolidation_count|default(0), 'total': total_apps, 'unit': 'in plan', 'url': '/consolidation-list', 'icon': 'clipboard-list'},
                 {'label': 'Roadmap', 'count': stats.roadmap_count|default(0), 'total': stats.consolidation_count|default(1), 'unit': 'items', 'url': url_for('unified_applications.rationalization_tracking'), 'icon': 'map'},
-                {'label': 'Track', 'count': 0, 'total': stats.roadmap_count|default(1), 'unit': 'active', 'url': url_for('unified_applications.rationalization_tracking'), 'icon': 'trending-up'}
+                {'label': 'Track', 'count': stats.tracking_count|default(0), 'total': stats.roadmap_count|default(1), 'unit': 'active', 'url': url_for('unified_applications.rationalization_tracking'), 'icon': 'trending-up'}
             ] %}
             {% for step in steps %}
             {% set pct = ((step.count / step.total * 100)|round|int) if step.total > 0 else 0 %}
