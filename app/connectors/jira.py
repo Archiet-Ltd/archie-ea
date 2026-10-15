@@ -17,7 +17,6 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
-import aiohttp
 
 from app.services.connector_framework import (
     BaseConnector,
