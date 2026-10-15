@@ -104,7 +104,9 @@ else:
 
 class Config:
     # Webhook and compliance-check URLs may point at loopback/private hosts only
-    # where this is True (Development and Testing). Production stays deny.
+    # where this is True. It is False everywhere by default; Development and
+    # Testing can opt in with the environment variable of the same name. No
+    # configuration class turns it on by itself, and Production never reads it.
     ALLOW_INTERNAL_WEBHOOK_TARGETS = False
     # Extra networks the outbound-URL guard refuses (comma-separated CIDRs).
     SSRF_BLOCKED_CIDRS = [
@@ -502,7 +504,9 @@ class Config:
 
 class DevelopmentConfig(Config):
     DEBUG = True
-    ALLOW_INTERNAL_WEBHOOK_TARGETS = True
+    ALLOW_INTERNAL_WEBHOOK_TARGETS = os.environ.get(
+        "ALLOW_INTERNAL_WEBHOOK_TARGETS", ""
+    ).lower() in ("1", "true", "yes")
     ASSETS_DEBUG = True
 
     # N+1 query detection — set SQLALCHEMY_ECHO=true in .env to enable query logging
@@ -551,7 +555,9 @@ class DevelopmentConfig(Config):
 
 class TestingConfig(Config):
     TESTING = True
-    ALLOW_INTERNAL_WEBHOOK_TARGETS = True
+    ALLOW_INTERNAL_WEBHOOK_TARGETS = os.environ.get(
+        "ALLOW_INTERNAL_WEBHOOK_TARGETS", ""
+    ).lower() in ("1", "true", "yes")
     # Pinned explicitly rather than left to inherit Flask's own default, which
     # falls back to the ambient FLASK_DEBUG/FLASK_ENV environment variables
     # (get_debug_flag()) whenever a config class leaves DEBUG unset. A

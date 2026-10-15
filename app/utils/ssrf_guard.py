@@ -30,6 +30,7 @@ convenience wrappers here do the former.
 
 import ipaddress
 import logging
+import re
 import socket
 from urllib.parse import urlparse
 
@@ -241,3 +242,26 @@ def clamp_timeout(value, default=10, low=1, high=30) -> int:
     if number != number or number in (float("inf"), float("-inf")):
         raise ValueError("timeout must be a number")
     return max(low, min(high, int(number)))
+
+
+#: A request path taken from stored spec data. It must be one absolute path:
+#: no authority (``@``), backslash, fragment, query, whitespace or control
+#: characters, which would let ``base + path`` name a different host.
+_SAFE_REQUEST_PATH = re.compile(r"^/(?!/)[A-Za-z0-9\-._~!$&'()*+,;=:%/{}\[\]]*$")
+
+
+def build_checked_url(base_url: str, path) -> str:
+    """Join a validated base URL and a spec-supplied path, then re-validate.
+
+    Raises :class:`BlockedOutboundURL` if the path is not a plain path or the
+    resulting URL fails :func:`validate_user_supplied_url`.
+    """
+    if not isinstance(path, str) or not _SAFE_REQUEST_PATH.fullmatch(path):
+        _refuse("request path is not a plain path")
+    if "@" in path or "\\" in path:
+        _refuse("request path contains authority characters")
+    final = f"{base_url.rstrip('/')}{path}"
+    base_host = urlparse(base_url).hostname
+    if urlparse(final).hostname != base_host:
+        _refuse("request URL host differs from the validated base")
+    return validate_user_supplied_url(final)

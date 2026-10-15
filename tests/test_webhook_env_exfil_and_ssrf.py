@@ -284,7 +284,13 @@ def test_external_https_webhook_still_works(world, production_like, http_calls):
     assert http_calls[0]["url"] == "https://hooks.example.com/x"
 
 
-def test_localhost_webhook_still_allowed_in_testing_config(world, http_calls):
+def test_localhost_webhook_refused_by_default(world, http_calls):
+    r = _create(world.as_a(), world.sol_a.id, url="http://localhost:9000/hook")
+    assert r.status_code == 400
+
+
+def test_localhost_webhook_allowed_with_explicit_opt_in(app, world, http_calls, monkeypatch):
+    monkeypatch.setitem(app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", True)
     r = _create(world.as_a(), world.sol_a.id, url="http://localhost:9000/hook")
     assert r.status_code == 201
 
@@ -337,7 +343,7 @@ def test_timeout_non_numeric_rejected(raw):
         clamp_timeout(raw)
 
 
-def test_compliance_check_route_400_on_non_numeric_timeout(world):
+def test_compliance_check_route_400_on_non_numeric_timeout(world, production_like):
     r = world.as_a().post(f"/api/solutions/{world.sol_a.id}/compliance/check",
                           json={"service_url": "https://hooks.example.com", "timeout": "abc"})
     assert r.status_code == 400
@@ -448,19 +454,129 @@ def test_refusal_message_is_generic(world, production_like, monkeypatch):
     assert "10.1.2.3" not in body and "resolve" not in body.lower()
 
 
-def test_internal_switch_follows_explicit_config_and_production_denies(app, monkeypatch):
-    import app.utils.ssrf_guard as guard
-    from config import Config, DevelopmentConfig, ProductionConfig, TestingConfig
+def test_internal_switch_is_off_by_default_and_not_set_by_any_class():
+    """With no opt-in variable and FLASK_CONFIG unset (so 'default', the
+    Development class), every configuration refuses internal targets."""
+    import os
+    import subprocess
+    import sys
 
-    assert Config.ALLOW_INTERNAL_WEBHOOK_TARGETS is False
-    assert ProductionConfig.ALLOW_INTERNAL_WEBHOOK_TARGETS is False
-    assert DevelopmentConfig.ALLOW_INTERNAL_WEBHOOK_TARGETS is True
-    assert TestingConfig.ALLOW_INTERNAL_WEBHOOK_TARGETS is True
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("FLASK_CONFIG", "ALLOW_INTERNAL_WEBHOOK_TARGETS")}
+    code = (
+        "import config as c;"
+        "print('RESULT', c.config['default'].ALLOW_INTERNAL_WEBHOOK_TARGETS,"
+        " c.DevelopmentConfig.ALLOW_INTERNAL_WEBHOOK_TARGETS,"
+        " c.TestingConfig.ALLOW_INTERNAL_WEBHOOK_TARGETS,"
+        " c.ProductionConfig.ALLOW_INTERNAL_WEBHOOK_TARGETS)"
+    )
+    out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True,
+                         text=True, timeout=120, cwd=os.getcwd())
+    line = [x for x in out.stdout.splitlines() if x.startswith("RESULT")][-1]
+    assert line == "RESULT False False False False", out.stdout + out.stderr
+
+    env["ALLOW_INTERNAL_WEBHOOK_TARGETS"] = "1"
+    out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True,
+                         text=True, timeout=120, cwd=os.getcwd())
+    line = [x for x in out.stdout.splitlines() if x.startswith("RESULT")][-1]
+    # Opt-in reaches Development and Testing only; Production never reads it.
+    assert line == "RESULT True True True False", out.stdout + out.stderr
+
+
+def test_guard_refuses_internal_when_config_flag_false(app, monkeypatch):
+    import app.utils.ssrf_guard as guard
+
     monkeypatch.setitem(app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", False)
-    # Neither TESTING, DEBUG nor FLASK_ENV can re-enable it.
     monkeypatch.setitem(app.config, "TESTING", True)
     monkeypatch.setenv("FLASK_ENV", "development")
     with app.app_context():
         assert guard.internal_targets_allowed() is False
         with pytest.raises(guard.BlockedOutboundURL):
             guard.validate_user_supplied_url("http://127.0.0.1/x")
+
+
+# --- spec-supplied request paths cannot change the host (base + path) ------------
+
+HOSTILE_PATHS = [
+    "@169.254.169.254/latest/meta-data/",
+    ":80@127.0.0.1:5432/x",
+    "/@169.254.169.254/x",
+    "//169.254.169.254/x",
+    "/a\\b",
+    "/a#frag",
+    "/a?x=1",
+    "/a b",
+    "/a\nb",
+    "",
+    None,
+]
+
+
+@pytest.mark.parametrize("path", HOSTILE_PATHS)
+def test_hostile_spec_paths_are_never_requested(production_like, monkeypatch, path):
+    import requests
+    from app.modules.solutions_product.services.compliance_checker import ComplianceChecker
+
+    sent = []
+    monkeypatch.setattr(requests, "request", lambda *a, **k: sent.append(a) or None)
+    monkeypatch.setattr(requests, "get", lambda *a, **k: sent.append(a) or None)
+    out = ComplianceChecker()._check_endpoint("https://public.example.com", "GET", path, None, 5)
+    assert out["status"] == "missing" and out["reason"] == "path not allowed"
+    assert sent == []
+
+
+def test_plain_spec_path_is_still_requested(production_like, monkeypatch):
+    import requests
+    from app.modules.solutions_product.services.compliance_checker import ComplianceChecker
+
+    sent = []
+
+    class Resp:
+        status_code = 200
+
+        def json(self):
+            return {}
+
+    monkeypatch.setattr(requests, "request", lambda method, url, **k: sent.append(url) or Resp())
+    out = ComplianceChecker()._check_endpoint("https://public.example.com", "GET", "/v1/orders/{id}", None, 5)
+    assert out["status"] == "exists"
+    assert sent == ["https://public.example.com/v1/orders/{id}"]
+
+
+def test_check_with_hostile_spec_path_never_reaches_internal_host(world, db_session, production_like, monkeypatch):
+    """Full check(): the spec holds a hostile path key next to a good one."""
+    import requests
+    from app.models.published_api_spec import PublishedAPISpec
+    from app.modules.solutions_product.services.compliance_checker import ComplianceChecker
+
+    spec = PublishedAPISpec(
+        solution_id=world.sol_a.id, spec_type="openapi", spec_version="1.0.0", status="published",
+        spec_content={"openapi": "3.0.0", "paths": {
+            "@169.254.169.254/latest/meta-data/": {"get": {}},
+            ":80@127.0.0.1:5432/x": {"get": {}},
+            "/v1/ok": {"get": {}},
+        }},
+    )
+    db_session.add(spec)
+    db_session.flush()
+    urls = []
+
+    class Resp:
+        status_code = 200
+
+        def json(self):
+            return {}
+
+    def record(*a, **k):
+        urls.append(a[1] if len(a) > 1 and isinstance(a[1], str) and a[1].startswith("http") else a[0])
+        return Resp()
+
+    monkeypatch.setattr(requests, "request", record)
+    monkeypatch.setattr(requests, "get", record)
+    monkeypatch.setattr(requests, "head", record)
+    out = ComplianceChecker().check(published_spec_id=spec.id, service_url="https://public.example.com")
+    assert out["success"] is True
+    assert urls, "the good path should have been requested"
+    for u in urls:
+        assert "169.254" not in u and "127.0.0.1" not in u and "@" not in u, u
+    assert any(u.endswith("/v1/ok") for u in urls)

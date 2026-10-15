@@ -243,7 +243,14 @@ class ComplianceChecker:
         Only sends GET or HEAD requests for safety. POST/PUT/etc. endpoints
         are checked with HEAD (existence only, no schema validation).
         """
-        url = f"{base_url}{path}"
+        from app.utils.ssrf_guard import BlockedOutboundURL, build_checked_url
+
+        # The path comes from stored spec data, not from the validated base:
+        # join it safely and re-validate the final URL before any request.
+        try:
+            url = build_checked_url(base_url, path)
+        except (BlockedOutboundURL, ValueError):
+            return {"status": "missing", "reason": "path not allowed"}
 
         # For non-GET methods, only check existence with HEAD
         use_method = "GET" if method == "GET" else "HEAD"
