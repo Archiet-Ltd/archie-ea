@@ -706,6 +706,8 @@ def check_compliance(solution_id):
         # A posted spec id is only honoured for this solution's own specs.
         if isinstance(spec_id, bool) or not isinstance(spec_id, int):
             return jsonify({"success": False, "error": "spec_id must be an integer"}), 400
+        # tenant-scoping-ok: PublishedAPISpec has no organisation column; it is
+        # keyed to this solution, which was proven to be the active organisation's above.
         own_spec = PublishedAPISpec.query.filter_by(id=spec_id, solution_id=solution_id).first()
         if own_spec is None:
             return jsonify({"success": False, "error": "Spec not found"}), 404
