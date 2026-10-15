@@ -258,7 +258,7 @@ def _words(value) -> List[str]:
     return _NON_WORD.sub(" ", normalize_name(value)).split()
 
 
-def normalise_name(value) -> str:
+def phrase_key(value) -> str:
     """Lower-cased, punctuation-free name with leading articles and quantifiers
     ('The', 'Both', 'Only', ...) removed, for exact comparison."""
     words = _words(value)
@@ -317,7 +317,7 @@ class Grounding:
         def visit(node: dict) -> None:
             name = node.get("name")
             if isinstance(name, str) and name.strip():
-                names.add(normalise_name(name))
+                names.add(phrase_key(name))
             for key, value in node.items():
                 is_int = isinstance(value, int) and not isinstance(value, bool)
                 if key in _ID_KEYS and is_int:
@@ -416,7 +416,7 @@ def organisation_names_in_text(text: str, organization_id) -> set:
                 func.lower(model.name).in_(list(phrases)),
             )
         ).scalars()
-        found.update(normalise_name(n) for n in rows if n)
+        found.update(phrase_key(n) for n in rows if n)
     found.discard("")
     return found
 
