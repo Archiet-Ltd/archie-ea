@@ -241,8 +241,33 @@ BANNED_CLAIMS = [
         "still carry no automatic organisation filter. The true, verifiable claim is narrower: "
         "models that carry the tenant mixin are filtered to the caller's organisation "
         "automatically (app/middleware/tenant_isolation.py), and an automated check "
-        "(scripts/check_untenanted_reads.py, wired into scripts/verify.py) stops a new read or "
-        "write outside that filter from shipping, with a ratchet that can only tighten.",
+        "(scripts/check_untenanted_reads.py, wired into scripts/verify.py) counts, on every "
+        "commit, how many reads outside that filter exist, and fails the build if a change "
+        "makes that count rise.",
+    ),
+    (
+        "built to hold organisation-specific data carries a marker",
+        "implies every model holding organisation-specific data carries the automatic-"
+        "filtering marker; 31 models have an organization_id column but no tenant mixin, "
+        "including User (app/models/user.py) -- the true, narrower claim is that models "
+        "which DO carry the marker are filtered automatically, not that every "
+        "organisation-specific model does",
+    ),
+    (
+        "stops a new database read or write from shipping",
+        "overstates the gate's coverage: it counts reads only "
+        "(scripts/check_untenanted_reads.py); the only write check "
+        "(scripts/check_raw_sql_tenancy.py --rule writes) catches raw-SQL UPDATE strings "
+        "only, against its own baseline of 5, not 0, and no check exists for an ORM insert "
+        "or update on an unfenced model",
+    ),
+    (
+        "only ever gets tighter",
+        "the gate passes whenever count <= baseline; closing a gap does not lower the "
+        "baseline automatically (that's a manual --update-baseline step) -- "
+        "verification_baseline.json's own _note14 records 272 reads of slack accumulating "
+        "this way before anyone noticed, and check_untenanted_reads.py --count measured "
+        "2349 against a baseline of 2361 on this page's own PR, i.e. slack exists right now",
     ),
 ]
 

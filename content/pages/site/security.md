@@ -15,15 +15,14 @@ unless you connect something that does.
 
 ## Tenant isolation is enforced, not just documented
 
-A database model built to hold organisation-specific data carries a marker that tells Entelim's data
-layer to filter it. Every read, update and insert against that data is scoped to the signed-in
-user's own organisation automatically — not a check a developer has to remember to add to each
-query.
+The architecture models, elements and related records you build inside Entelim carry an internal
+marker that ties them to your organisation. Wherever that marker is present, every read, update
+and delete the application makes against that data is scoped automatically to the signed-in
+organisation — not a check a developer has to remember to add to each query.
 
-An automated check also runs on every commit. It stops a new database read or write from shipping
-if it would let one organisation's query reach another's data without going through that automatic
-filter. Once a gap like that is closed, the check won't let it reopen: the bar it holds the code to
-only ever gets tighter.
+An automated check also runs on every commit, counting how many database reads reach
+organisation data without going through that automatic filter. That count has a fixed limit: a
+change that pushes it above the limit fails the build before it can merge.
 
 ## Passwords and sessions
 
