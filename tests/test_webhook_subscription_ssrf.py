@@ -427,3 +427,44 @@ def test_unknown_active_organisation_sees_nothing(world, production_like, monkey
     assert c.get(f"/api/webhooks/subscriptions/{sid}").status_code == 404
     assert c.get("/api/webhooks/subscriptions").get_json()["data"] == []
     assert c.delete(f"/api/webhooks/subscriptions/{sid}").status_code == 404
+
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://169.254.169.254\\xattacker.example/",
+        "https://169.254.169.254%5cxattacker.example/",
+        "https://169.254.169.254%5Cxattacker.example/",
+        "https://example.com/a\\b",
+        "https://example.com/a\x00b",
+        "https://example.com/a\x7fb",
+        "https://example.com/a b",
+        "https://example.com/\t",
+        " https://example.com/",
+        "https://example.com/ ",
+    ],
+)
+def test_guard_refuses_parser_differential_characters(production_like, url):
+    """Python and WHATWG parsers (Node, n8n) read a backslash differently; the
+    shared guard refuses it, control characters and whitespace outright."""
+    from app.utils.ssrf_guard import (
+        BlockedOutboundURL,
+        validate_outbound_url,
+        validate_user_supplied_url,
+    )
+
+    with pytest.raises(BlockedOutboundURL):
+        validate_outbound_url(url, allowed_host_suffixes=(), require_https=False)
+    with pytest.raises(BlockedOutboundURL):
+        validate_user_supplied_url(url)
+
+
+def test_guard_refuses_backslash_even_where_internal_targets_are_allowed(monkeypatch):
+    from flask import current_app
+
+    from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
+
+    monkeypatch.setitem(current_app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", True)
+    with pytest.raises(BlockedOutboundURL):
+        validate_user_supplied_url("http://127.0.0.1\\x.example/")

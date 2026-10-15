@@ -254,43 +254,45 @@ def _all_builders():
     return builders
 
 
-def _address_keys(builder):
+# Reviewed classification of every credential key any builder reads. A new key
+# fails the test below until someone classifies it here.
+ADDRESS_KEYS = {"instance_url", "server_url", "base_url", "host"}
+NON_ADDRESS_KEYS = {
+    "client_id", "client_secret", "client", "username", "password", "email",
+    "api_token", "tenant_id", "spreadsheet_id", "credentials_json", "port",
+    "database", "channel_id", "bot_token",
+}
+
+
+def _credential_keys(builder):
     import inspect
     import re
 
-    src = inspect.getsource(builder)
-    keys = set(re.findall(r'credentials\.get\(\s*"([A-Za-z0-9_]+)"', src))
-    return {
-        k for k in keys
-        if k.lower().endswith(("url", "uri", "endpoint"))
-        or k.lower().startswith("webhook")
-        or k.lower() in ("host", "hostname", "server")
-    }
+    return set(re.findall(r'credentials\.get\(\s*"([A-Za-z0-9_]+)"', inspect.getsource(builder)))
 
 
-def test_every_builder_address_key_is_validated():
-    """A builder that reads an address-like credential key must have that key
-    validated before anything is stored or sent to n8n."""
+def test_every_credential_key_is_classified_and_address_keys_are_validated():
     from app.modules.codegen.services.connector_orchestrator import ConnectorOrchestrator
     from app.utils.ssrf_guard import BlockedOutboundURL
 
-    seen = set()
-    for name, builder in _all_builders().items():
-        for key in _address_keys(builder):
-            seen.add(key)
-            with pytest.raises(BlockedOutboundURL):
-                ConnectorOrchestrator._check_workflow_urls(
-                    {key: "http://169.254.169.254/"}, "https://app.example.com", name
-                )
-    # The enumeration actually found the keys the review named.
-    assert {"instance_url", "server_url", "base_url", "host"} <= seen
+    found = set()
+    for builder in _all_builders().values():
+        found |= _credential_keys(builder)
+    assert found == ADDRESS_KEYS | NON_ADDRESS_KEYS, (
+        "classify new credential keys: " + repr(sorted(found ^ (ADDRESS_KEYS | NON_ADDRESS_KEYS)))
+    )
+    for key in sorted(ADDRESS_KEYS):
+        with pytest.raises(BlockedOutboundURL):
+            ConnectorOrchestrator._check_workflow_urls(
+                {key: "http://169.254.169.254/"}, "https://app.example.com"
+            )
 
 
 def test_nested_or_non_string_address_values_are_refused():
     from app.modules.codegen.services.connector_orchestrator import ConnectorOrchestrator
     from app.utils.ssrf_guard import BlockedOutboundURL
 
-    for creds in ({"instance_url": ["http://10.0.0.5"]}, {"webhook_url": 5}, "not-a-dict"):
+    for creds in ({"instance_url": ["http://10.0.0.5"]}, {"webhook_url": 5}, "not-a-dict", None, []):
         with pytest.raises(BlockedOutboundURL):
             ConnectorOrchestrator._check_workflow_urls(creds, "https://app.example.com")
 
@@ -365,3 +367,54 @@ def test_sap_entity_is_encoded_and_dot_dot_refused(scene, n8n_calls, monkeypatch
         },
     )
     assert bad.status_code == 400
+
+
+# --- nothing is stored when a request is refused --------------------------------
+
+
+@pytest.fixture
+def vault_calls(monkeypatch):
+    from app.modules.codegen.services import connector_orchestrator as co
+
+    calls = []
+    monkeypatch.setattr(
+        co.CredentialVault, "store", lambda self, *a, **k: calls.append((a, k))
+    )
+    return calls
+
+
+@pytest.mark.parametrize("credentials", [None, "text", ["a"], 5])
+def test_non_object_credentials_are_refused_before_the_vault(scene, n8n_calls, vault_calls, credentials):
+    resp = scene.client().post(
+        f"/solutions/{scene.own.id}/codegen/connectors",
+        json={"connector_type": "servicenow", "credentials": credentials,
+              "target_api_url": "https://app.example.com"},
+    )
+    assert resp.status_code == 400
+    assert vault_calls == [] and n8n_calls == []
+
+
+def test_route_refusal_never_reaches_the_vault(scene, n8n_calls, vault_calls):
+    resp = scene.client().post(
+        f"/solutions/{scene.own.id}/codegen/connectors",
+        json={"connector_type": "servicenow",
+              "credentials": {"instance_url": "http://169.254.169.254", "password": "x"},
+              "target_api_url": "https://app.example.com"},
+    )
+    assert resp.status_code == 400
+    assert vault_calls == [] and n8n_calls == []
+
+
+def test_direct_call_with_internal_servicenow_instance_is_refused(scene, n8n_calls, vault_calls):
+    from app.modules.codegen.services.connector_orchestrator import ConnectorOrchestrator
+    from app.utils.ssrf_guard import BlockedOutboundURL
+
+    with pytest.raises(BlockedOutboundURL):
+        ConnectorOrchestrator().create_sync_workflow(
+            solution_id=scene.own.id,
+            connector_type="servicenow",
+            credentials={"instance_url": "http://169.254.169.254"},
+            object_mappings={},
+            target_api_url="https://app.example.com",
+        )
+    assert vault_calls == [] and n8n_calls == []

@@ -532,8 +532,6 @@ class ConnectorOrchestrator:
         from app.utils.ssrf_guard import BlockedOutboundURL
 
         urls = [target_api_url]
-        if credentials is None:
-            credentials = {}
         if not isinstance(credentials, dict):
             raise BlockedOutboundURL("URL not allowed")
         for key, value in credentials.items():
