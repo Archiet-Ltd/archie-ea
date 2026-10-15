@@ -12,6 +12,7 @@ from __future__ import annotations
 import uuid
 
 import pytest
+from flask import current_app
 
 pytestmark = pytest.mark.usefixtures("db_session")
 
@@ -30,15 +31,10 @@ INTERNAL_URLS = [
 ]
 # Hosts whose non-ASCII spelling is turned into an ASCII (internal) one by the
 # HTTP client but looks like an unrelated name to a string check.
-# Passing needs the guard's non-ASCII host rejection (PR 612 hardening); until
-# that lands the shared guard lets these through, so the cases are not strict.
-_NEEDS_GUARD_HARDENING = pytest.mark.xfail(
-    strict=False, reason="shared guard (PR 612) must reject non-ASCII hosts"
-)
 NON_ASCII_HOSTS = [
-    pytest.param("http://１２７.0.0.1/", marks=_NEEDS_GUARD_HARDENING),  # full-width digits
-    pytest.param("http://127。0。0。1/", marks=_NEEDS_GUARD_HARDENING),  # ideographic full stops
-    pytest.param("http://localhost。/", marks=_NEEDS_GUARD_HARDENING),
+    "http://１２７.0.0.1/",  # full-width digits
+    "http://127。0。0。1/",  # ideographic full stops
+    "http://localhost。/",
 ]
 
 
@@ -88,7 +84,7 @@ def production_like(monkeypatch):
     so a test never touches the network."""
     import app.utils.ssrf_guard as guard
 
-    monkeypatch.setattr(guard, "internal_targets_allowed", lambda: False)
+    monkeypatch.setitem(current_app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", False)
     monkeypatch.setattr(
         guard.socket,
         "getaddrinfo",
@@ -170,7 +166,7 @@ def test_create_refuses_internal_target(world, production_like, http_calls, url)
 def test_create_refuses_name_that_resolves_inside(world, monkeypatch, http_calls):
     import app.utils.ssrf_guard as guard
 
-    monkeypatch.setattr(guard, "internal_targets_allowed", lambda: False)
+    monkeypatch.setitem(current_app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", False)
     monkeypatch.setattr(
         guard.socket, "getaddrinfo",
         lambda host, port, *a, **k: [(2, 1, 6, "", ("169.254.169.254", port))],
@@ -304,7 +300,7 @@ def test_stored_internal_url_is_not_called_at_send_time(world, production_like, 
 def test_name_that_starts_resolving_inside_is_not_called(world, monkeypatch, http_calls):
     import app.utils.ssrf_guard as guard
 
-    monkeypatch.setattr(guard, "internal_targets_allowed", lambda: False)
+    monkeypatch.setitem(current_app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", False)
     addr = {"ip": "93.184.216.34"}
     monkeypatch.setattr(
         guard.socket, "getaddrinfo",
