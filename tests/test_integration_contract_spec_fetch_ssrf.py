@@ -235,6 +235,59 @@ def test_fetch_refuses_a_yaml_alias_bomb_quickly_and_stores_nothing(world, produ
     assert IntegrationContract.query.get(c.id).spec_content is None
 
 
+def test_fetch_refuses_a_cheap_but_huge_yaml_document_quickly(world, production_like, http_calls):
+    import time
+
+    body = "a: [" + ",".join(["[]"] * 600000) + "]\n"  # ~1.8 MB, inside the byte cap
+    assert len(body) < 2 * 1024 * 1024
+    http_calls.reply = lambda: _Resp(body=body, ctype="application/yaml")
+    c = _insert_contract(world, "https://api.example.com/openapi.yaml")
+    started = time.monotonic()
+    resp = world.as_a().post(f"/api/enterprise/contracts/{c.id}/fetch-spec")
+    assert time.monotonic() - started < 2
+    assert resp.status_code == 502
+    assert resp.get_json()["error"] in ("Spec could not be parsed", "Spec is too large")
+    from app.models.integration_contract import IntegrationContract
+
+    assert IntegrationContract.query.get(c.id).spec_content is None
+
+
+def test_fetch_node_budget_refuses_a_yaml_document_under_the_byte_cap(world, production_like, http_calls):
+    import time
+
+    body = "a: [" + ",".join(["[]"] * 70000) + "]\n"
+    assert len(body) < 256 * 1024
+    http_calls.reply = lambda: _Resp(body=body, ctype="application/yaml")
+    c = _insert_contract(world, "https://api.example.com/openapi.yaml")
+    started = time.monotonic()
+    resp = world.as_a().post(f"/api/enterprise/contracts/{c.id}/fetch-spec")
+    assert time.monotonic() - started < 2
+    assert resp.status_code == 502
+    assert resp.get_json() == {"error": "Spec could not be parsed"}
+
+
+def test_fetch_refuses_a_deeply_nested_yaml_document(world, production_like, http_calls):
+    http_calls.reply = lambda: _Resp(body="a: " + "[" * 500 + "]" * 500 + "\n", ctype="application/yaml")
+    c = _insert_contract(world, "https://api.example.com/openapi.yaml")
+    resp = world.as_a().post(f"/api/enterprise/contracts/{c.id}/fetch-spec")
+    assert resp.status_code == 502
+
+
+def test_fetch_large_json_spec_still_loads_quickly(world, production_like, http_calls):
+    body = json.dumps({"openapi": "3.0.0", "paths": {f"/p{i}": {"get": {"summary": "x"}} for i in range(20000)}})
+    assert len(body) > 512 * 1024  # over the YAML cap: JSON keeps the full cap
+    http_calls.reply = lambda: _Resp(body=body, ctype="application/json")
+    c = _insert_contract(world, "https://api.example.com/openapi.json")
+    assert world.as_a().post(f"/api/enterprise/contracts/{c.id}/fetch-spec").status_code == 200
+
+
+def test_fetch_ordinary_sized_yaml_spec_still_loads(world, production_like, http_calls):
+    body = "openapi: '3.0.0'\npaths:\n" + "".join(f"  /p{i}:\n    get:\n      summary: x\n" for i in range(500))
+    http_calls.reply = lambda: _Resp(body=body, ctype="application/yaml")
+    c = _insert_contract(world, "https://api.example.com/openapi.yaml")
+    assert world.as_a().post(f"/api/enterprise/contracts/{c.id}/fetch-spec").status_code == 200
+
+
 def test_fetch_yaml_without_aliases_still_parses(world, production_like, http_calls):
     http_calls.reply = lambda: _Resp(
         body="openapi: '3.0.0'\ninfo: {title: T}\npaths: {}\n", ctype="text/yaml"

@@ -29,6 +29,12 @@ from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
 
 #: Largest spec the server will read from a contract's spec_url.
 MAX_SPEC_BYTES = 2 * 1024 * 1024
+# YAML is parsed in pure Python (about 65 microseconds a node), so a body inside
+# the byte cap can still pin a worker for a minute. YAML gets a lower byte cap
+# and a node and depth budget; JSON (a C parser) keeps the full cap.
+MAX_YAML_BYTES = 256 * 1024
+MAX_YAML_NODES = 20_000
+MAX_YAML_DEPTH = 64
 _SPEC_CHUNK_BYTES = 8 * 1024
 _SPEC_FETCH_TIMEOUT = (5, 15)  # connect, read
 _JSON_TYPES = {"application/json", "text/json"}
@@ -154,10 +160,20 @@ def _no_alias_yaml_loader():
     import yaml
 
     class _NoAliasLoader(yaml.SafeLoader):
+        _nodes = 0
+        _depth = 0
+
         def compose_node(self, parent, index):
             if self.check_event(yaml.events.AliasEvent):
                 raise yaml.YAMLError("aliases are not allowed")
-            return super().compose_node(parent, index)
+            self._nodes += 1
+            if self._nodes > MAX_YAML_NODES or self._depth > MAX_YAML_DEPTH:
+                raise yaml.YAMLError("document is too large or too deep")
+            self._depth += 1
+            try:
+                return super().compose_node(parent, index)
+            finally:
+                self._depth -= 1
 
     return _NoAliasLoader
 
@@ -171,13 +187,17 @@ def _parse_spec(raw, kind):
 
     data = None
     try:
-        if kind in ("json", "text"):
+        # JSON first whenever it could be JSON: it is parsed in C, and every
+        # JSON document is also YAML, so nothing legitimate is lost.
+        if kind == "json" or raw.lstrip()[:1] in (b"{", b"["):
             try:
                 data = json.loads(raw)
             except ValueError:
                 if kind == "json":
                     raise
         if data is None:
+            if len(raw) > MAX_YAML_BYTES:
+                raise ValueError("YAML spec is too large")
             data = yaml.load(raw, Loader=_no_alias_yaml_loader())  # noqa: S506 - SafeLoader subclass
     except Exception:  # parse detail can echo the content
         raise ValueError("Spec could not be parsed") from None
