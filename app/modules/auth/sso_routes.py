@@ -323,17 +323,19 @@ def admin_sso():
             )
             return redirect(url_for("sso.admin_sso"))
 
-        if idp_metadata_url:
-            from app.services.sso_service import check_idp_url
+        # SAML keeps this field for reference only (an issuer URI, an ADFS
+        # trust URL or a URN) and the server never fetches it.
+        if idp_metadata_url and protocol == "oidc":
+            from app.services.sso_service import IdpUnreachable, check_idp_url
             from app.utils.ssrf_guard import BlockedOutboundURL
 
             try:
                 check_idp_url(idp_metadata_url)
+            except IdpUnreachable:
+                flash("The identity provider could not be reached.", "error")
+                return redirect(url_for("sso.admin_sso"))
             except BlockedOutboundURL:
-                flash(
-                    "The identity provider metadata URL must be a public https address.",
-                    "error",
-                )
+                flash("That address is not allowed.", "error")
                 return redirect(url_for("sso.admin_sso"))
 
         if config is None:

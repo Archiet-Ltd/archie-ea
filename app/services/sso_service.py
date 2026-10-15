@@ -49,6 +49,7 @@ def check_idp_url(url) -> str:
     metadata addresses and non-ASCII hosts do not.
     """
     from app.utils.ssrf_guard import (
+        BlockedOutboundURL,
         internal_targets_allowed,
         validate_outbound_url,
         validate_user_supplied_url,
@@ -58,9 +59,44 @@ def check_idp_url(url) -> str:
         internal_ok = internal_targets_allowed()
     except RuntimeError:  # no application context: behave as production
         internal_ok = False
-    if internal_ok:
-        return validate_user_supplied_url(url)
-    return validate_outbound_url(url, allowed_host_suffixes=(), require_https=True)
+    try:
+        if internal_ok:
+            return validate_user_supplied_url(url)
+        return validate_outbound_url(url, allowed_host_suffixes=(), require_https=True)
+    except BlockedOutboundURL as exc:
+        if _host_does_not_resolve(url):
+            raise IdpUnreachable("URL not reachable") from exc
+        raise
+
+
+def _host_does_not_resolve(url) -> bool:
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+
+    try:
+        host = (urlparse(str(url).strip()).hostname or "").rstrip(".").lower()
+    except ValueError:
+        return False
+    if not host or not host.isascii() or host == "localhost" or host.endswith(".localhost"):
+        return False
+    try:
+        ipaddress.ip_address(host)
+        return False
+    except ValueError:
+        pass
+    try:
+        socket.getaddrinfo(host, 443)
+    except (socket.gaierror, UnicodeError):
+        return True
+    return False
+
+
+from app.utils.ssrf_guard import BlockedOutboundURL  # noqa: E402
+
+
+class IdpUnreachable(BlockedOutboundURL):
+    """The address is well formed but its name does not resolve."""
 
 
 class SSOService:
@@ -134,14 +170,30 @@ class SSOService:
             check_idp_url(metadata_url)
             resp = requests.get(metadata_url, timeout=10, allow_redirects=False)
             resp.raise_for_status()
-            doc = resp.json()
-            self._discovery_cache[metadata_url] = doc
-            return doc
+        except IdpUnreachable as exc:
+            logger.warning("OIDC discovery fetch failed: %s", exc)
+            raise SSONotConfiguredError(
+                "The identity provider could not be reached"
+            ) from exc
+        except BlockedOutboundURL as exc:
+            logger.warning("OIDC discovery address refused: %s", exc)
+            raise SSONotConfiguredError("That address is not allowed") from exc
         except Exception as exc:
             logger.warning("OIDC discovery fetch failed: %s", exc)
             raise SSONotConfiguredError(
-                "The identity provider's configuration could not be fetched"
+                "The identity provider could not be reached"
             ) from exc
+        try:
+            doc = resp.json()
+            if not isinstance(doc, dict):
+                raise ValueError("not an object")
+        except Exception as exc:
+            logger.warning("OIDC discovery document invalid: %s", exc)
+            raise SSONotConfiguredError(
+                "The identity provider did not return a valid configuration document"
+            ) from exc
+        self._discovery_cache[metadata_url] = doc
+        return doc
 
     def _get_jwks(self, jwks_uri: str, *, force: bool = False) -> dict:
         """Return the IdP's key set, from the cache while it is fresh."""

@@ -204,7 +204,7 @@ def test_admin_save_refuses_internal_metadata_url(monkeypatch, resolver, url):
         follow_redirects=True,
     )
     assert b"SSO configuration saved." not in resp.data
-    assert b"public https address" in resp.data
+    assert b"That address is not allowed" in resp.data
     assert state.persisted == before
 
 
@@ -224,3 +224,60 @@ def test_admin_save_accepts_public_metadata_url(monkeypatch, resolver):
         follow_redirects=True,
     )
     assert b"SSO configuration saved." in resp.data
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "http://www.okta.com/exk1abc2DEFghi3jk4l5",
+        "http://adfs.corp.example/adfs/services/trust",
+        "urn:federation:MicrosoftOnline",
+    ],
+)
+def test_saml_save_keeps_reference_only_metadata_values(monkeypatch, resolver, value):
+    application, state = _configuration_app(monkeypatch)
+    application.config["ALLOW_INTERNAL_WEBHOOK_TARGETS"] = False
+    client = application.test_client()
+    client.get("/test-entry")
+    resp = client.post(
+        "/admin/sso",
+        data={"protocol": "saml", "email_domain": "x.example", "idp_metadata_url": value},
+        follow_redirects=True,
+    )
+    assert b"SSO configuration saved." in resp.data
+    assert state.persisted["idp_metadata_url"] == value
+
+
+def test_unresolvable_host_says_could_not_be_reached(production_like, http, monkeypatch):
+    import socket
+
+    import app.utils.ssrf_guard as guard
+    from app.services.sso_service import SSONotConfiguredError
+
+    def nxdomain(host, port, *a, **k):
+        raise socket.gaierror(11001, "no such host")
+
+    monkeypatch.setattr(guard.socket, "getaddrinfo", nxdomain)
+    with pytest.raises(SSONotConfiguredError) as exc:
+        _svc()._fetch_oidc_discovery("https://nope.idp.example.com/.well-known")
+    assert str(exc.value) == "The identity provider could not be reached"
+    assert http == []
+
+
+def test_internal_address_says_not_allowed(production_like, http):
+    from app.services.sso_service import SSONotConfiguredError
+
+    with pytest.raises(SSONotConfiguredError) as exc:
+        _svc()._fetch_oidc_discovery("https://169.254.169.254/x")
+    assert str(exc.value) == "That address is not allowed"
+
+
+def test_invalid_document_has_its_own_message(production_like, http):
+    from app.services.sso_service import SSONotConfiguredError
+
+    http.reply = ["not", "an", "object"]
+    with pytest.raises(SSONotConfiguredError) as exc:
+        _svc()._fetch_oidc_discovery("https://idp.example.com/.well-known")
+    assert str(exc.value) == (
+        "The identity provider did not return a valid configuration document"
+    )
