@@ -9,6 +9,8 @@ execution behaviour:
 Tools always accept names (not IDs) — the EntityResolver converts them.
 """
 
+import re
+
 TOOL_SCHEMAS = [
     {
         "name": "create_solution",
@@ -1775,6 +1777,162 @@ TOOL_SCHEMAS = [
         "tier": "approve",
     },
 ]
+
+# ---------------------------------------------------------------------------
+# Read tools that answer by calling an existing JSON route in-process.
+#
+# These are the ten tools the assistant connector (the /mcp endpoint) serves.
+# They live here, in the one catalogue, rather than in a list of the
+# connector's own: the connector derives its tool list from the entries that
+# carry the "mcp" surface (see route_read_tools.connector_tools). Their handlers
+# are installed on ToolExecutor by route_read_tools. They are NOT offered to the
+# chat model: AgentRunner._build_tool_schemas keeps only tools whose surfaces
+# include "chat". All are read-only; a write tool must never carry "mcp".
+# ---------------------------------------------------------------------------
+def _route_read_tool(name, route, description, parameters):
+    # Published on the connector only. Each handler calls its route in-process
+    # with the caller's session, which needs a request context; the chat UI's
+    # streaming path runs tools on a worker thread with only an app context, so
+    # on "chat" the model would be handed ten failing tools. Serving them in chat
+    # needs a request-free execution path with its own tenancy review.
+    # risk_class and mutates are fixed to read-only because the helper refuses
+    # anything but a GET route: a route that writes needs its own entry.
+    for part in re.split(r"\s*[+|]\s*", route):
+        if not part.startswith("GET "):
+            raise ValueError(f"{name}: route tools are read-only, got {part!r}")
+    return {
+        "name": name,
+        "surfaces": ["mcp"],
+        "route": route,
+        "fenced_fields": [],
+        "risk_class": "read",
+        "mutates": False,
+        "record_types_written": [],
+        "description": description,
+        "parameters": parameters,
+        "tier": "auto",
+    }
+
+
+_ELEMENT_ID_PARAMETERS = {
+    "type": "object",
+    "properties": {
+        "element_id": {
+            "type": "integer",
+            "description": "The ArchiMate element id to query",
+        },
+    },
+    "required": ["element_id"],
+}
+
+TOOL_SCHEMAS.extend([
+    _route_read_tool(
+        "ask_impact",
+        "GET /api/v1/intelligence/impact/<element_id>",
+        "Ask what stops if an element fails, and who owns it. "
+        "Returns the cross-layer impact chain for an ArchiMate element.",
+        _ELEMENT_ID_PARAMETERS,
+    ),
+    _route_read_tool(
+        "ask_strategy",
+        "GET /api/v1/intelligence/strategy/<element_id>",
+        "Ask what strategic initiatives an element is linked to, "
+        "and how each is tracking against its budget.",
+        _ELEMENT_ID_PARAMETERS,
+    ),
+    _route_read_tool(
+        "ask_portfolio",
+        "GET /api/v1/intelligence/portfolio/<element_id>",
+        "Ask which application component an element maps to, "
+        "for rationalization and duplicate detection.",
+        _ELEMENT_ID_PARAMETERS,
+    ),
+    _route_read_tool(
+        "ask_programme",
+        "GET /api/v1/intelligence/programme/<element_id>",
+        "Ask what work packages an element is part of, "
+        "whether each is on time and on budget, and what each touches.",
+        _ELEMENT_ID_PARAMETERS,
+    ),
+    _route_read_tool(
+        "ask_risk",
+        "GET /api/v1/intelligence/risk/<element_id>",
+        "Ask what risks threaten an element, and what each risk touches.",
+        _ELEMENT_ID_PARAMETERS,
+    ),
+    _route_read_tool(
+        "ask_accountability",
+        "GET /api/v1/intelligence/accountability/<element_id>",
+        "Ask who is accountable for an element. "
+        "Currently returns an honest empty state — the ownership "
+        "reader is not yet built.",
+        _ELEMENT_ID_PARAMETERS,
+    ),
+    _route_read_tool(
+        "search_elements",
+        "GET /archimate/api/elements/search",
+        "Search ArchiMate elements by name. Returns matching elements "
+        "with their id, name, type, and layer — the identifiers the "
+        "lens tools need as input.",
+        {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Name substring to search for (case-insensitive)",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum results to return (default 30, max 200)",
+                },
+            },
+            "required": ["query"],
+        },
+    ),
+    _route_read_tool(
+        "get_element",
+        "GET /archimate/api/elements/<element_id>/detail",
+        "Get the full detail for one ArchiMate element: its type, "
+        "layer, description, linked solutions and capabilities.",
+        {
+            "type": "object",
+            "properties": {
+                "element_id": {
+                    "type": "integer",
+                    "description": "The ArchiMate element id to fetch",
+                },
+            },
+            "required": ["element_id"],
+        },
+    ),
+    _route_read_tool(
+        "list_canvases",
+        "GET /business-model/api/list + GET /business-case/api/list",
+        "List all Business Model Canvases and Business Cases "
+        "for the current organisation.",
+        {"type": "object", "properties": {}},
+    ),
+    _route_read_tool(
+        "get_canvas",
+        "GET /business-model/api/<canvas_id> | GET /business-case/api/<canvas_id>",
+        "Get the full detail of one Business Model Canvas or Business Case.",
+        {
+            "type": "object",
+            "properties": {
+                "canvas_type": {
+                    "type": "string",
+                    "description": "Either 'business_model' or 'business_case'",
+                    "enum": ["business_model", "business_case"],
+                },
+                "canvas_id": {
+                    "type": "integer",
+                    "description": "The canvas or business case id",
+                },
+            },
+            "required": ["canvas_type", "canvas_id"],
+        },
+    ),
+])
 
 # Index by name for O(1) lookup
 TOOL_SCHEMA_BY_NAME = {s["name"]: s for s in TOOL_SCHEMAS}

@@ -15,6 +15,24 @@ name: CI
 # UI, even though all jobs are skipped for non-`ci-fast` labels by the job-level
 # `if:` guards. The concurrency group's `cancel-in-progress` excludes labeled
 # events so that adding an unrelated label never cancels an in-progress CI run.
+# Two lanes. An ordinary pull-request push (opened, synchronize, reopened, no
+# `full-ci` label) runs the fast lane: the cheap gates (secret scan, static gates,
+# boot health, schema drift, SAST, dependency CVEs) and the `fast-tests` job, which
+# runs the test files the change touches. The eight pytest shards, the aggregate
+# `tests` job and the browser jobs are skipped on that push; a skipped job is not
+# a test result. The full suite runs on a push to main/master/the deploy branch,
+# on workflow_dispatch, and on a pull request that carries the `full-ci` label
+# (adding the label triggers it; every later push to that pull request runs it
+# again). A pull request is merged only after the full run on its final head.
+# Known quirk: a run started by the `labeled` event waits in the same concurrency
+# group as the run it follows, and a newer pending run replaces an older pending
+# one. If the full run never appears after `full-ci` is added, remove and re-add
+# the label; until a full run exists the merge gate sees 0 of 8 shards.
+# Accepted design limit: a Python file under app/ that no test imports selects no
+# tests in the fast lane. That is why a full run on the final head is mandatory
+# before merge; the fast lane is a quick signal, never merge evidence.
+# The lane is decided once, in the `changes` job; a job that needs the full suite
+# tests for `lane != 'fast'`, so an unanswered question runs everything.
 on:
   push:
     # main/master AND the branch production actually deploys from. That branch
@@ -75,16 +93,64 @@ jobs:
   changes:
     name: Detect changed paths
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     outputs:
       is_content_only: ${{ steps.detect.outputs.is_content_only }}
+      lane: ${{ steps.final.outputs.lane }}
     steps:
+      - name: Choose the lane
+        # An ordinary pull-request push runs the fast lane (the cheap gates plus
+        # the tests the change touches). Everything else runs the full suite: a
+        # push to a protected branch, a manual dispatch, and a pull request that
+        # carries the `full-ci` label, including each later push to that pull
+        # request. A job that needs the full suite tests for `lane != 'fast'`, so
+        # a missing answer runs everything rather than nothing.
+        id: lane
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HAS_FULL_CI: ${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ] && [ "$HAS_FULL_CI" != "true" ]; then
+            lane=fast
+          else
+            lane=full
+          fi
+          echo "lane=$lane" | tee -a "$GITHUB_OUTPUT"
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      - name: Escalate when the fast lane cannot cover the change
+        # A change to shared test or application wiring, or a wide change that
+        # matched few tests, runs the full suite even without the label. The
+        # selector runs from the base branch's copy (the checked-out copy only
+        # for the first introduction); any failure here means the full suite.
+        id: final
+        env:
+          LANE: ${{ steps.lane.outputs.lane }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          lane="$LANE"
+          if [ "$lane" = "fast" ]; then
+            base="origin/${BASE_REF:-main}"
+            selector="${RUNNER_TEMP}/changed_test_selection.py"
+            if ! git show "${base}:scripts/ci/changed_test_selection.py" > "$selector" 2>/dev/null; then
+              selector=scripts/ci/changed_test_selection.py
+            fi
+            if reason=$(python -I "$selector" --base "$base" --escalate); then
+              if [ -n "$reason" ]; then
+                lane=full
+                echo "Full suite required: $reason"
+                echo "### Full suite runs without the label: $reason" >> "$GITHUB_STEP_SUMMARY"
+              fi
+            else
+              lane=full
+              echo "The selector failed; running the full suite."
+            fi
+          fi
+          echo "lane=$lane" | tee -a "$GITHUB_OUTPUT"
       - name: Detect content-only changes
         id: detect
         # Run the detector as it exists on the base branch, so a pull request
@@ -113,7 +179,7 @@ jobs:
   content-page-tests:
     name: Content page tests
     needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only == 'true') && github.event_name == 'pull_request' }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only == 'true') && github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -184,7 +250,7 @@ jobs:
   secret-scan:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -216,7 +282,7 @@ jobs:
   fast_gate:
     name: Fast static checks (compile + lint)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -247,7 +313,7 @@ jobs:
   static-gates:
     name: Static gates (compile + ratchets)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     # The static tag includes route/navigation and CSRF coverage, which import
     # the real app, plus the reproducible CSS build. Install the application
     # dependencies and the exact standalone Tailwind binary those gates need;
@@ -279,7 +345,7 @@ jobs:
   boot-health:
     name: Boot health (no database)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     # Catches the class of failure nothing else here can see: a blueprint that
     # silently fails to register, or a url_for() endpoint that no longer resolves
     # (a BuildError 500 on every page rendering the sidebar).
@@ -340,7 +406,7 @@ jobs:
   tests-shard:
     name: Tests (pytest + coverage) — shard ${{ matrix.shard }}
     needs: [changes, fast_gate]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     # Same-repository runs (push/dispatch and same-repo PRs) select a runner
     # via repository variables: vars.CI_FAST_RUNNER takes precedence when the
     # PR carries the ci-fast label, vars.CI_SHARD_RUNNER routes to a managed
@@ -357,7 +423,7 @@ jobs:
       # same-repository runs (default 6 when the variable is unset).
       # GitHub-hosted runners (forked PRs) have no such limit, so all eight
       # shards start together there.
-      max-parallel: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && 8 || vars.CI_SHARD_MAX_PARALLEL || 6) || 8 }}
+      max-parallel: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && 8 || fromJSON(vars.CI_SHARD_MAX_PARALLEL || '6')) || 8 }}
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     services:
@@ -381,6 +447,9 @@ jobs:
       # tests/test_ci_nav_verification_lifecycle.py fails when this, the
       # matrix and the tests job's combine count disagree.
       CI_SHARD_TOTAL: "8"
+      # Tests listed in scripts/ci/quarantine.txt are deselected here and run,
+      # reported but not blocking, in the quarantine job.
+      CI_QUARANTINE_MODE: exclude
       COVERAGE_FILE: .coverage.${{ matrix.shard }}
     steps:
       - uses: actions/checkout@v5
@@ -463,6 +532,25 @@ jobs:
       # that projection would fail or skip here on a schema production never has.
       - name: Apply the capability provenance migration
         run: flask --app manage apply-unified-capability-provenance-migration
+      - name: Accept the quarantine list from the base branch
+        # A pull request cannot quarantine its own failing test: the list that
+        # counts is the base branch's, and this pull request's copy may only
+        # remove lines. Additions are ignored and reported. Pushes to protected
+        # branches use the checked-out list, which has already been reviewed.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch --quiet --depth=1 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+            tool="${RUNNER_TEMP}/quarantine_base.py"
+            if ! git show "origin/${BASE_REF}:scripts/ci/quarantine.py" > "$tool" 2>/dev/null; then
+              tool=scripts/ci/quarantine.py
+            fi
+            python -I "$tool" resolve --base "origin/${BASE_REF}" \
+              --out "${RUNNER_TEMP}/quarantine.txt" --list scripts/ci/quarantine.txt
+            echo "CI_QUARANTINE_FILE=${RUNNER_TEMP}/quarantine.txt" >> "$GITHUB_ENV"
+          fi
       - name: Run this shard's tests with coverage and route verification
         # route_verification.json is ignored execution evidence, scoped to
         # this shard's slice of the suite; the tests job below unions every
@@ -475,7 +563,7 @@ jobs:
           pytest -q --maxfail=20 --ignore=tests/smoke \
             --cov=app --cov-report= \
             -o xfail_strict=true --junitxml=backend-tests-${{ matrix.shard }}.xml \
-            -p scripts.route_verification_audit -p scripts.ci.test_sharding
+            -p scripts.route_verification_audit -p scripts.ci.quarantine -p scripts.ci.test_sharding
       - name: Run the assistant connector tests (connector switched on)
         # These need MCP_ENABLED and PUBLIC_BASE_URL at app creation, which the
         # sharded run leaves off; one shard runs them in their own pytest session.
@@ -501,10 +589,308 @@ jobs:
           # nothing to combine.
           include-hidden-files: true
 
+  # ---------------------------------------------------------------------------
+  # Fast lane. An ordinary pull-request push (no `full-ci` label) runs the cheap
+  # gates above plus this job: the test files the pull request changes and the
+  # test files that import a module it changes, on one runner. The eight shards
+  # and the browser jobs are skipped on that push; a skipped job is not a test
+  # result, and the pull request must not merge on the strength of this job
+  # alone: the full suite runs when the `full-ci` label is added, and again on
+  # every later push to a labelled pull request.
+  # ---------------------------------------------------------------------------
+  fast-tests:
+    name: Changed-file tests (fast lane)
+    needs: [changes, fast_gate]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && needs.changes.result == 'success' && needs.changes.outputs.lane == 'fast' && needs.fast_gate.result != 'failure' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: mirror.gcr.io/library/postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_test
+        ports: ["5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret
+      CI_QUARANTINE_MODE: exclude
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Select the tests this pull request touches
+        id: select
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        # Run the selector as it exists on the base branch, like the content-only
+        # detector, so a pull request cannot narrow its own selection. The
+        # checked-out copy is the fallback for the first introduction only.
+        run: |
+          BASE="origin/${BASE_REF:-main}"
+          SELECTOR="${RUNNER_TEMP}/changed_test_selection.py"
+          if ! git show "$BASE:scripts/ci/changed_test_selection.py" > "$SELECTOR" 2>/dev/null; then
+            SELECTOR=scripts/ci/changed_test_selection.py
+          fi
+          python -I "$SELECTOR" --base "$BASE" > fast-tests.txt
+          grep -c . fast-tests.txt || true
+          cat fast-tests.txt
+          if grep -q . fast-tests.txt; then
+            echo "any=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "any=false" >> "$GITHUB_OUTPUT"
+            echo "No test file is affected by this change; nothing to install or run."
+          fi
+          mapfile -t files < fast-tests.txt
+          echo "browsers=$(python -I "$SELECTOR" --browsers "${files[@]}")" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Fast lane"
+            echo "$(grep -c . fast-tests.txt || true) test files selected. The full suite runs when the pull request carries the full-ci label."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Create an isolated virtual environment for this job's dependencies
+        if: ${{ steps.select.outputs.any == 'true' }}
+        # Same reason as tests-shard: a self-hosted runner's leftover ~/.local
+        # site-packages must not shadow this job's dependencies.
+        run: |
+          python -m venv --clear .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Resolve the postgres service's mapped port
+        if: ${{ steps.select.outputs.any == 'true' }}
+        run: |
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+      - name: Install deps
+        if: ${{ steps.select.outputs.any == 'true' }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || {
+            echo "::warning::pip install from the cache failed; retrying without it"
+            pip install --no-cache-dir -r requirements.txt
+          }
+          pip install pytest-cov
+          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+      - uses: actions/setup-node@v4
+        if: ${{ steps.select.outputs.any == 'true' }}
+        with:
+          node-version: "22"
+      - name: Install the browsers the selected tests name
+        if: ${{ steps.select.outputs.any == 'true' }}
+        # Chromium always; Firefox and WebKit only when a selected file names
+        # them. The same host-wide lock as the shards, for the same reason.
+        env:
+          EXTRA_BROWSERS: ${{ steps.select.outputs.browsers }}
+        run: |
+          read -ra extra <<< "$EXTRA_BROWSERS"
+          for attempt in $(seq 1 10); do
+            if flock /tmp/archie-ci-browser-install.lock \
+                python -m playwright install --with-deps chromium "${extra[@]}"; then
+              exit 0
+            fi
+            echo "Browser install attempt $attempt failed; retrying in 60 seconds."
+            sleep 60
+          done
+          exit 1
+      - name: Create schema
+        if: ${{ steps.select.outputs.any == 'true' }}
+        run: |
+          python -c "import psycopg2" 2>/dev/null || pip install psycopg2-binary
+          flask --app manage init-db
+          flask --app manage schema-upgrade
+          flask --app manage reconcile-schema
+      - name: Apply the capability provenance migration
+        if: ${{ steps.select.outputs.any == 'true' }}
+        run: flask --app manage apply-unified-capability-provenance-migration
+      - name: Accept the quarantine list from the base branch
+        if: ${{ steps.select.outputs.any == 'true' }}
+        # A pull request cannot quarantine its own failing test: the list that
+        # counts is the base branch's, and this pull request's copy may only
+        # remove lines. Additions are ignored and reported. Pushes to protected
+        # branches use the checked-out list, which has already been reviewed.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch --quiet --depth=1 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+            tool="${RUNNER_TEMP}/quarantine_base.py"
+            if ! git show "origin/${BASE_REF}:scripts/ci/quarantine.py" > "$tool" 2>/dev/null; then
+              tool=scripts/ci/quarantine.py
+            fi
+            python -I "$tool" resolve --base "origin/${BASE_REF}" \
+              --out "${RUNNER_TEMP}/quarantine.txt" --list scripts/ci/quarantine.txt
+            echo "CI_QUARANTINE_FILE=${RUNNER_TEMP}/quarantine.txt" >> "$GITHUB_ENV"
+          fi
+      - name: Run the selected tests
+        if: ${{ steps.select.outputs.any == 'true' }}
+        run: |
+          if ! grep -q . fast-tests.txt; then
+            echo "No test file is affected by this change."
+            exit 0
+          fi
+          # One pytest run, so one junit file. Exit 5 means everything selected was
+          # quarantined (deselected), which is a pass here.
+          mapfile -t files < fast-tests.txt
+          status=0
+          pytest -q --maxfail=20 -o xfail_strict=true \
+            --junitxml=fast-tests.xml -p scripts.ci.quarantine "${files[@]}" || status=$?
+          if [ "$status" -ne 0 ] && [ "$status" -ne 5 ]; then
+            exit "$status"
+          fi
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: fast-tests-junit
+          path: fast-tests.xml
+          if-no-files-found: ignore
+
+  # Quarantined tests (scripts/ci/quarantine.txt): deselected from the blocking
+  # shards above, run here on every full run, reported but never blocking. Not a
+  # required check.
+  quarantine-tests:
+    name: Quarantined tests (non-blocking)
+    needs: [changes, fast_gate]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
+    continue-on-error: true
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
+    services:
+      postgres:
+        image: mirror.gcr.io/library/postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_test
+        ports: ["5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret
+      CI_QUARANTINE_MODE: only
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Create an isolated virtual environment for this job's dependencies
+        # Same reason as tests-shard: a self-hosted runner's leftover ~/.local
+        # site-packages must not shadow this job's dependencies.
+        run: |
+          python -m venv --clear .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Resolve the postgres service's mapped port
+        run: |
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || {
+            echo "::warning::pip install from the cache failed; retrying without it"
+            pip install --no-cache-dir -r requirements.txt
+          }
+          pip install pytest-cov
+          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install browsers for rendered UI regression tests
+        run: |
+          for attempt in $(seq 1 10); do
+            if flock /tmp/archie-ci-browser-install.lock \
+                python -m playwright install --with-deps chromium firefox webkit; then
+              exit 0
+            fi
+            echo "Browser install attempt $attempt failed; retrying in 60 seconds."
+            sleep 60
+          done
+          exit 1
+      - name: Create schema
+        run: |
+          python -c "import psycopg2" 2>/dev/null || pip install psycopg2-binary
+          flask --app manage init-db
+          flask --app manage schema-upgrade
+          flask --app manage reconcile-schema
+      - name: Apply the capability provenance migration
+        run: flask --app manage apply-unified-capability-provenance-migration
+      - name: Accept the quarantine list from the base branch
+        # A pull request cannot quarantine its own failing test: the list that
+        # counts is the base branch's, and this pull request's copy may only
+        # remove lines. Additions are ignored and reported. Pushes to protected
+        # branches use the checked-out list, which has already been reviewed.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch --quiet --depth=1 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+            tool="${RUNNER_TEMP}/quarantine_base.py"
+            if ! git show "origin/${BASE_REF}:scripts/ci/quarantine.py" > "$tool" 2>/dev/null; then
+              tool=scripts/ci/quarantine.py
+            fi
+            python -I "$tool" resolve --base "origin/${BASE_REF}" \
+              --out "${RUNNER_TEMP}/quarantine.txt" --list scripts/ci/quarantine.txt
+            echo "CI_QUARANTINE_FILE=${RUNNER_TEMP}/quarantine.txt" >> "$GITHUB_ENV"
+          fi
+      - name: Run the quarantined tests
+        # Exit code 5 is "nothing collected" (every entry removed or renamed).
+        run: |
+          pytest -q --ignore=tests/smoke -o xfail_strict=true \
+            --junitxml=quarantine-tests.xml -p scripts.ci.quarantine || [ $? -eq 5 ]
+      - name: Report the result
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import xml.etree.ElementTree as ET
+
+          try:
+              root = ET.parse("quarantine-tests.xml").getroot()
+          except (OSError, ET.ParseError):
+              print("no quarantine report produced")
+              raise SystemExit(0)
+          failed, total = [], 0
+          for case in root.iter("testcase"):
+              total += 1
+              if case.find("failure") is not None or case.find("error") is not None:
+                  failed.append(f"{case.get('classname', '')}::{case.get('name', '')}")
+          summary_line = f"Quarantined tests: {total} run, {len(failed)} failed (not blocking)"
+          lines = [f"### {summary_line}"]
+          lines += [f"- {name}" for name in failed]
+          for name in failed:
+              print(f"::warning::quarantined test failed: {name}")
+          print(f"::notice title=Quarantined tests::{summary_line}")
+          with open("quarantine-report.json", "w", encoding="utf-8") as handle:
+              json.dump({"run": total, "failed": failed}, handle, indent=2)
+          print("\n".join(lines))
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
+              handle.write("\n".join(lines) + "\n")
+          PY
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: quarantine-tests-junit
+          path: |
+            quarantine-tests.xml
+            quarantine-report.json
+          if-no-files-found: ignore
+
   tests:
     name: Tests (pytest + coverage)
     needs: [tests-shard, changes, fast_gate]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     # Same runner selection as tests-shard above: vars.CI_FAST_RUNNER takes
     # precedence when the PR carries the ci-fast label, vars.CI_SHARD_RUNNER
     # routes to a managed pool when set, otherwise the job falls back to the
@@ -627,7 +1013,7 @@ jobs:
   db-gates:
     name: Database gates (schema drift)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     services:
       postgres:
         image: mirror.gcr.io/library/postgres:16
@@ -697,7 +1083,7 @@ jobs:
   security-sast:
     name: SAST (bandit)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -739,7 +1125,7 @@ jobs:
     name: Browser journeys — main shard ${{ matrix.shard }}
     needs: [changes, fast_gate]
     runs-on: ubuntu-latest
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     strategy:
       fail-fast: false
       matrix:
@@ -817,7 +1203,7 @@ jobs:
     name: Browser journeys — adversarial
     needs: [changes, fast_gate]
     runs-on: ubuntu-latest
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     services:
       postgres:
         image: mirror.gcr.io/library/postgres:16
@@ -889,7 +1275,7 @@ jobs:
     name: Browser journeys — other
     needs: [changes, fast_gate]
     runs-on: ubuntu-latest
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     services:
       postgres:
         image: mirror.gcr.io/library/postgres:16
@@ -979,7 +1365,7 @@ jobs:
   smoke:
     name: Browser journeys (one per archetype)
     needs: [smoke-main, smoke-adversarial, smoke-other, changes, fast_gate]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -1028,7 +1414,7 @@ jobs:
   browser-compatibility:
     name: Browser compatibility (${{ matrix.browser }})
     needs: [changes, fast_gate]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -1124,7 +1510,7 @@ jobs:
   walkthrough:
     name: Level 10 archetype walkthrough
     needs: [changes, fast_gate]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     runs-on: ubuntu-latest
     # docs/TESTING_STANDARD.md level 10: not "does it break?" but "can this
     # archetype do their job, and could they have FOUND the page?". It runs as a
@@ -1194,7 +1580,7 @@ jobs:
   dependency-audit:
     name: Dependency CVEs (pip-audit)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     # A ratchet against scripts/ci/dependency_baseline.json: the count may fall,
     # never rise. The baseline is accepted risk, not proof of safety - every entry
     # is a real advisory a security review will ask about.

@@ -164,7 +164,7 @@ class ApplicationOwner(db.Model):
         rows = cls.query.filter(
             cls.application_id.in_(application_ids),
             cls.organization_id == organization_id,
-        ).all()
+        ).order_by(cls.id).all()
         result = {}
         for row in rows:
             result.setdefault(row.application_id, []).append(row)
@@ -292,7 +292,7 @@ class ApplicationOwner(db.Model):
             cls.element_type == element_type,
             cls.element_id.in_(element_ids),
             cls.organization_id == organization_id,
-        ).all()
+        ).order_by(cls.id).all()
         result = {}
         for row in rows:
             result.setdefault(row.element_id, []).append(row)
