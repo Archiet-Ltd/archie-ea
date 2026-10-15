@@ -266,6 +266,21 @@ def test_fetch_node_budget_refuses_a_yaml_document_under_the_byte_cap(world, pro
     assert resp.get_json() == {"error": "Spec could not be parsed"}
 
 
+def test_yaml_node_budget_boundary():
+    """The budget itself, without a clock: just over it is refused, just under loads."""
+    from app.modules.solutions_strategic.v2.routes import integration_contract_routes as r
+
+    def doc(n):
+        return ("a: [" + ",".join(["[]"] * n) + "]\n").encode()
+
+    under = r._parse_spec(doc(r.MAX_YAML_NODES - 10), "yaml")
+    assert len(under["a"]) == r.MAX_YAML_NODES - 10
+    with pytest.raises(ValueError, match="could not be parsed"):
+        r._parse_spec(doc(r.MAX_YAML_NODES + 10), "yaml")
+    with pytest.raises(ValueError, match="could not be parsed"):
+        r._parse_spec(("a: " + "[" * (r.MAX_YAML_DEPTH + 5) + "]" * (r.MAX_YAML_DEPTH + 5)).encode(), "yaml")
+
+
 def test_fetch_refuses_a_deeply_nested_yaml_document(world, production_like, http_calls):
     http_calls.reply = lambda: _Resp(body="a: " + "[" * 500 + "]" * 500 + "\n", ctype="application/yaml")
     c = _insert_contract(world, "https://api.example.com/openapi.yaml")

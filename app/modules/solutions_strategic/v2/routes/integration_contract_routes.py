@@ -198,7 +198,7 @@ def _parse_spec(raw, kind):
         if data is None:
             if len(raw) > MAX_YAML_BYTES:
                 raise ValueError("YAML spec is too large")
-            data = yaml.load(raw, Loader=_no_alias_yaml_loader())  # noqa: S506 - SafeLoader subclass
+            data = yaml.load(raw, Loader=_no_alias_yaml_loader())  # noqa: S506  # nosec B506 - SafeLoader subclass that also rejects aliases and caps nodes and depth
     except Exception:  # parse detail can echo the content
         raise ValueError("Spec could not be parsed") from None
     if not isinstance(data, dict):
