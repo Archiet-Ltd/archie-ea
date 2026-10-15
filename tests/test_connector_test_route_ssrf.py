@@ -99,6 +99,7 @@ def scene(db_session, make_org, client, login_as):
         )
 
     s.post = post
+    s.client = lambda: (login_as(client, user), client)[1]
     return s
 
 
@@ -167,3 +168,76 @@ def test_sibling_route_also_fenced_to_active_organisation(scene, client, login_a
     login_as(client, scene.user)
     resp = client.get(f"/solutions/{scene.foreign.id}/codegen/connectors")
     assert resp.status_code == 404
+
+
+# --- create route ---------------------------------------------------------------
+
+
+@pytest.fixture
+def n8n_calls(monkeypatch):
+    from app.modules.codegen.services import connector_orchestrator as co
+
+    calls = []
+
+    class R:
+        status_code = 200
+        text = ""
+
+        def json(self):
+            return {"id": "wf1"}
+
+    def fake(self, method, path, **kw):
+        calls.append((method, path, kw))
+        return R()
+
+    monkeypatch.setattr(co.ConnectorOrchestrator, "_n8n_request", fake)
+    return calls
+
+
+def _create(scene, base_url, target="https://app.example.com"):
+    return scene_client(scene).post(
+        f"/solutions/{scene.own.id}/codegen/connectors",
+        json={
+            "connector_type": "rest_api",
+            "credentials": {"base_url": base_url},
+            "target_api_url": target,
+        },
+    )
+
+
+def scene_client(scene):
+    return scene.client()
+
+
+@pytest.mark.parametrize(
+    "base,target",
+    [
+        ("http://169.254.169.254/latest/meta-data/", "https://app.example.com"),
+        ("https://api.example.com/", "http://169.254.169.254"),
+        ("http://127.0.0.1:5432/", "https://app.example.com"),
+        ("http://１２７.0.0.1/", "https://app.example.com"),
+    ],
+)
+def test_create_refuses_internal_addresses_and_builds_no_workflow(scene, n8n_calls, base, target):
+    resp = _create(scene, base, target)
+    assert resp.status_code == 400
+    assert n8n_calls == []
+    assert "169.254" not in resp.get_data(as_text=True)
+
+
+def test_create_with_public_addresses_builds_the_workflow(scene, n8n_calls):
+    resp = _create(scene, "https://api.example.com/v1")
+    assert resp.status_code == 201, resp.get_json()
+    assert n8n_calls and n8n_calls[0][1] == "/api/v1/workflows"
+
+
+def test_create_failure_text_is_generic(scene, monkeypatch):
+    from app.modules.codegen.services import connector_orchestrator as co
+
+    def boom(self, *a, **k):
+        raise RuntimeError("n8n unreachable: http://10.1.2.3:5678 refused")
+
+    monkeypatch.setattr(co.ConnectorOrchestrator, "_n8n_request", boom)
+    resp = _create(scene, "https://api.example.com/v1")
+    assert resp.status_code == 502
+    assert "10.1.2.3" not in resp.get_data(as_text=True)

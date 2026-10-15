@@ -110,6 +110,16 @@ def create_connector(solution_id):
     except ConnectorNotPermitted as exc:
         return jsonify({"success": False, "error": str(exc)}), 403
 
+    from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
+
+    try:
+        validate_user_supplied_url(target_api_url)
+        base_url = credentials.get("base_url") if isinstance(credentials, dict) else None
+        if base_url:
+            validate_user_supplied_url(base_url)
+    except BlockedOutboundURL:
+        return jsonify({"success": False, "error": "That address is not allowed."}), 400
+
     try:
         orch = ConnectorOrchestrator()
         connector = orch.create_sync_workflow(
@@ -126,9 +136,11 @@ def create_connector(solution_id):
             "n8n_workflow_id": connector.n8n_workflow_id,
             "sync_frequency": connector.sync_frequency,
         }), 201
+    except BlockedOutboundURL:
+        return jsonify({"success": False, "error": "That address is not allowed."}), 400
     except RuntimeError as exc:
         logger.error("Connector creation failed: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 502
+        return jsonify({"success": False, "error": "The connector could not be created."}), 502
 
 
 @codegen_bp.route("/solutions/<int:solution_id>/codegen/connectors/active", methods=["GET"])

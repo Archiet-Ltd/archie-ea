@@ -411,6 +411,8 @@ class ConnectorOrchestrator:
         """
         assert_connector_permitted(connector_type)
 
+        self._check_workflow_urls(credentials, target_api_url)
+
         # Store credentials in vault (encrypted at rest)
         vault = CredentialVault()
         vault.store(solution_id, connector_type, credentials)
@@ -474,8 +476,20 @@ class ConnectorOrchestrator:
             logger.info("Connector connection test failed: %s", e)
             return {"success": False, "message": "Connection could not be established"}
 
+    @staticmethod
+    def _check_workflow_urls(credentials, target_api_url) -> None:
+        from app.utils.ssrf_guard import validate_user_supplied_url
+
+        # Both addresses are written into an HTTP-request node that n8n will
+        # call on a schedule; check them again here for every caller.
+        validate_user_supplied_url(target_api_url)
+        base_url = credentials.get("base_url") if isinstance(credentials, dict) else None
+        if base_url:
+            validate_user_supplied_url(base_url)
+
     def _build_workflow(self, connector_type, credentials, object_mappings, target_api_url, frequency):
         """Build n8n workflow JSON using per-connector templates."""
+        self._check_workflow_urls(credentials, target_api_url)
         cron = FREQUENCY_TO_CRON.get(frequency, "0 * * * *")
         builder = _WORKFLOW_BUILDERS.get(connector_type, _build_generic_workflow)
         return builder(connector_type, credentials, object_mappings, target_api_url, cron)
