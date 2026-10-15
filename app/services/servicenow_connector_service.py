@@ -16,6 +16,8 @@ from typing import Any
 
 import requests
 
+from app.utils.ssrf_guard import build_checked_url
+
 logger = logging.getLogger(__name__)
 
 
@@ -95,7 +97,7 @@ class ServiceNowConnectorService:
                 "Authorization": f"Bearer {token}",
                 "Accept": "application/json",
             }
-            url = f"{_instance_base(config)}/api/now/table/cmdb_ci_appl"
+            url = build_checked_url(_instance_base(config), "/api/now/table/cmdb_ci_appl")
             params = {
                 "sysparm_fields": "name,sys_class_name,u_business_owner,sys_id",
                 "sysparm_limit": "1000",
@@ -184,7 +186,7 @@ class ServiceNowConnectorService:
                 "Content-Type": "application/json",
                 "Accept": "application/json",
             }
-            url = f"{_instance_base(config)}/api/now/table/change_request"
+            url = build_checked_url(_instance_base(config), "/api/now/table/change_request")
 
             approver_name = ""
             if arb_item.decided_by:
@@ -256,7 +258,7 @@ class ServiceNowConnectorService:
             org_id=org_id, connector_type="servicenow", credential_type="client_secret"
         )
 
-        token_url = f"{token_base}/oauth_token.do"
+        token_url = build_checked_url(token_base, "/oauth_token.do")
         resp = requests.post(
             token_url,
             data={

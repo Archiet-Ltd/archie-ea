@@ -18,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from types import SimpleNamespace
 
 import pytest
+from flask import current_app
 
 pytestmark = pytest.mark.usefixtures("db_session")
 
@@ -29,17 +30,11 @@ INTERNAL_URLS = [
     "http://10.0.0.5/",
     "http://192.168.1.10:8080/",
 ]
-# Passing needs the shared guard (PR 612 hardening) to reject non-ASCII hosts;
-# until it lands these cases are non-strict expected failures.
-_NEEDS_GUARD_HARDENING = pytest.mark.xfail(
-    strict=False, reason="shared guard (PR 612) must reject non-ASCII hosts"
-)
 NON_ASCII_HOSTS = [
-    pytest.param("http://１２７.0.0.1/", marks=_NEEDS_GUARD_HARDENING),  # full-width digits
-    pytest.param("http://127。0。0。1/", marks=_NEEDS_GUARD_HARDENING),  # ideographic full stops
-    pytest.param("http://localhost。/", marks=_NEEDS_GUARD_HARDENING),
+    "http://１２７.0.0.1/",  # full-width digits
+    "http://127。0。0。1/",  # ideographic full stops
+    "http://localhost。/",
 ]
-_NON_ASCII_PLAIN = [p.values[0] for p in NON_ASCII_HOSTS]
 SECRET = "client-secret-value-that-must-not-leave"
 
 
@@ -48,7 +43,7 @@ def production_like(monkeypatch):
     """Behave as outside development; resolve every name to a public address."""
     import app.utils.ssrf_guard as guard
 
-    monkeypatch.setattr(guard, "internal_targets_allowed", lambda: False)
+    monkeypatch.setitem(current_app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", False)
     monkeypatch.setattr(
         guard.socket,
         "getaddrinfo",
@@ -155,7 +150,7 @@ def test_poll_tool_never_probes_non_ascii_spellings_of_internal_hosts(two_users,
 def test_poll_tool_name_resolving_inside_is_not_probed(two_users, monkeypatch, opener):
     import app.utils.ssrf_guard as guard
 
-    monkeypatch.setattr(guard, "internal_targets_allowed", lambda: False)
+    monkeypatch.setitem(current_app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", False)
     monkeypatch.setattr(
         guard.socket, "getaddrinfo",
         lambda host, port, *a, **k: [(2, 1, 6, "", ("169.254.169.254", port))],
@@ -364,7 +359,7 @@ def test_servicenow_instance_that_starts_resolving_inside_is_refused(servicenow_
     from app.services.connector_framework import ConnectorURLRefused
     from app.services.servicenow_connector_service import ServiceNowConnectorService
 
-    monkeypatch.setattr(guard, "internal_targets_allowed", lambda: False)
+    monkeypatch.setitem(current_app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", False)
     monkeypatch.setattr(
         guard.socket, "getaddrinfo",
         lambda host, port, *a, **k: [(2, 1, 6, "", ("169.254.169.254", port))],
@@ -486,7 +481,7 @@ def test_connectors_never_call_an_internal_base_url(production_like, aiohttp_cal
 def test_connectors_refuse_a_base_url_that_starts_resolving_inside(monkeypatch, aiohttp_calls, index):
     import app.utils.ssrf_guard as guard
 
-    monkeypatch.setattr(guard, "internal_targets_allowed", lambda: False)
+    monkeypatch.setitem(current_app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", False)
     monkeypatch.setattr(
         guard.socket, "getaddrinfo",
         lambda host, port, *a, **k: [(2, 1, 6, "", ("169.254.169.254", port))],

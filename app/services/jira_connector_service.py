@@ -18,6 +18,7 @@ import requests
 
 from app import db
 from app.services.connector_framework import ConnectorConfig, ConnectorStatus
+from app.utils.ssrf_guard import build_checked_url
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +224,7 @@ class JiraConnectorService:
         }
 
         try:
-            url = f"{self._instance_url(config)}/rest/api/3/issue"
+            url = build_checked_url(self._instance_url(config), "/rest/api/3/issue")
             headers = self._get_headers(config)
             result = self._handle_request("POST", url, headers, json=payload)
         except JiraConnectorError:
@@ -272,7 +273,7 @@ class JiraConnectorService:
             return []
 
         jql = f"project={jira_project_key} AND labels=archie-import"
-        url = f"{self._instance_url(config)}/rest/api/3/search"
+        url = build_checked_url(self._instance_url(config), "/rest/api/3/search")
         headers = self._get_headers(config)
 
         try:
@@ -349,7 +350,7 @@ class JiraConnectorService:
             base = validate_connector_url(instance_url)
         except ConnectorURLRefused as exc:
             return {"status": "error", "message": str(exc)}
-        url = f"{base}/rest/api/3/myself"
+        url = build_checked_url(base, "/rest/api/3/myself")
         try:
             resp = requests.get(url, headers=headers, timeout=10, allow_redirects=False)
             if resp.status_code == 200:
