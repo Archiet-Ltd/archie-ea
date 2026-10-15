@@ -37,6 +37,41 @@ logger = logging.getLogger(__name__)
 consolidation_list_bp = Blueprint("consolidation_list", __name__, url_prefix="/consolidation-list")
 
 
+def _entries_query():
+    """Consolidation entries carry no organisation column of their own — they are scoped only
+    through the owning application, which does.
+
+    An INNER join to ``ApplicationComponent`` is required, not a convenience: the automatic
+    tenant filter installed in ``app/middleware/tenant_isolation.py`` (``TenantMixin`` +
+    ``do_orm_execute``) applies to every occurrence of a ``TenantMixin`` model in a statement,
+    including a joined one, so this reuses that fence rather than adding a second one — but for
+    a LEFT OUTER join SQLAlchemy places the injected predicate in the join's ON clause so it does
+    not drop unmatched left-side rows, which would let an entry whose application belongs to
+    another organisation come back anyway (with null application columns). An inner join has no
+    unmatched side to protect, so the same predicate excludes it correctly.
+    """
+    return ConsolidationListEntry.query.join(
+        ApplicationComponent,
+        ConsolidationListEntry.application_id == ApplicationComponent.id,
+    )
+
+
+def _get_entry_or_404(entry_id):
+    from werkzeug.exceptions import NotFound
+
+    entry = _entries_query().filter(ConsolidationListEntry.id == entry_id).first()
+    if entry is None:
+        raise NotFound()
+    return entry
+
+
+def _get_entry_in_org(entry_id):
+    """Same fence as ``_get_entry_or_404``, but returns ``None`` instead of raising — for call
+    sites (bulk actions, roadmap linking) that report a per-id error rather than 404ing the
+    whole request."""
+    return _entries_query().filter(ConsolidationListEntry.id == entry_id).first()
+
+
 @consolidation_list_bp.route("/")
 @login_required
 def dashboard():
@@ -75,11 +110,7 @@ def get_entries():
         per_page = safe_int_arg('per_page', 25, minimum=1, maximum=500) or 25
         per_page = max(10, min(per_page, 100))
 
-        filtered_query = ConsolidationListEntry.query.join(
-            ApplicationComponent,
-            ConsolidationListEntry.application_id == ApplicationComponent.id,
-            isouter=True,
-        )
+        filtered_query = _entries_query()
 
         # Map legacy status values for filtering
         if status_filter:
@@ -317,6 +348,16 @@ def add_to_list():
             try:
                 app_id_int = int(str(app_id))
 
+                # Get application to get name and cost info. This lookup is tenant-fenced
+                # (ApplicationComponent carries TenantMixin), and it MUST run before the
+                # "already in list" check below: an id from another organisation would
+                # otherwise reach the direct, unfenced ConsolidationListEntry query first,
+                # leaking whether that organisation has a pending entry for it.
+                app = ApplicationComponent.query.get(app_id_int)
+                if not app:
+                    errors.append(f"Application {app_id_int} not found")
+                    continue
+
                 # Check if already in list
                 existing = ConsolidationListEntry.query.filter_by(
                     application_id=app_id_int, status="pending"
@@ -324,12 +365,6 @@ def add_to_list():
 
                 if existing:
                     skipped_count += 1
-                    continue
-
-                # Get application to get name and cost info
-                app = ApplicationComponent.query.get(app_id_int)
-                if not app:
-                    errors.append(f"Application {app_id_int} not found")
                     continue
 
                 # Calculate estimated savings if available
@@ -388,7 +423,7 @@ def add_to_list():
 def get_entry_detail(entry_id):
     """Get enriched detail for a consolidation entry (lazy load on row expand)."""
     try:
-        entry = ConsolidationListEntry.query.get_or_404(entry_id)
+        entry = _get_entry_or_404(entry_id)
         app = entry.application
 
         # Financial
@@ -476,7 +511,7 @@ def get_entry_detail(entry_id):
 def update_entry(entry_id):
     """Update a consolidation list entry"""
     try:
-        entry = ConsolidationListEntry.query.get_or_404(entry_id)
+        entry = _get_entry_or_404(entry_id)
         data = request.get_json()
 
         # Update fields
@@ -601,7 +636,7 @@ def update_entry(entry_id):
 def remove_entry(entry_id):
     """Remove an entry from consolidation list"""
     try:
-        entry = ConsolidationListEntry.query.get_or_404(entry_id)
+        entry = _get_entry_or_404(entry_id)
         db.session.delete(entry)
         db.session.commit()
 
@@ -654,7 +689,7 @@ def bulk_action():
 
         for entry_id in entry_ids:
             try:
-                entry = ConsolidationListEntry.query.get(entry_id)
+                entry = _get_entry_in_org(entry_id)
                 if not entry:
                     errors.append(f"Entry {entry_id} not found")
                     continue
@@ -731,7 +766,7 @@ def create_roadmap_task():
         owner = data.get("owner")
 
         # Get the consolidation entry
-        entry = ConsolidationListEntry.query.get(entry_id)
+        entry = _get_entry_in_org(entry_id)
         if not entry:
             return jsonify({"success": False, "error": "Consolidation entry not found"}), 404
 
