@@ -90,6 +90,9 @@ def production_like(monkeypatch):
         "getaddrinfo",
         lambda host, port, *a, **k: [(2, 1, 6, "", ("93.184.216.34", port))],
     )
+    # The stub answers for the host's own name too; that must not count as
+    # "the server's own address".
+    monkeypatch.setattr(guard, "_local_interface_addresses", lambda: set())
 
 
 class _Resp:
@@ -302,6 +305,7 @@ def test_name_that_starts_resolving_inside_is_not_called(world, monkeypatch, htt
 
     monkeypatch.setitem(current_app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", False)
     addr = {"ip": "93.184.216.34"}
+    monkeypatch.setattr(guard, "_local_interface_addresses", lambda: set())
     monkeypatch.setattr(
         guard.socket, "getaddrinfo",
         lambda host, port, *a, **k: [(2, 1, 6, "", (addr["ip"], port))],
