@@ -19,12 +19,13 @@ HOOKS = ("after_begin", "do_orm_execute", "before_flush")
 
 
 def _hook_counts():
-    factory = db.session.session_factory
+    probe = db.session.session_factory()
     out = {}
     for name in HOOKS:
-        for fn in list(getattr(factory.dispatch, name)):
+        for fn in list(getattr(probe.dispatch, name)):
             key = (name, getattr(fn, "__name__", repr(fn)))
             out[key] = out.get(key, 0) + 1
+    probe.close()
     return out
 
 
@@ -34,7 +35,13 @@ def test_calling_install_tenant_filter_again_adds_no_hooks(app):
     before = _hook_counts()
     assert before, "the tenant hooks are not registered at all"
     # Every named hook is present exactly once.
-    assert all(count == 1 for key, count in before.items() if key[1].startswith("_")), before
+    for key in (
+        ("after_begin", "_set_database_tenant_after_begin"),
+        ("do_orm_execute", "_add_soft_delete_filter"),
+        ("do_orm_execute", "_add_tenant_filter"),
+        ("before_flush", "_set_tenant_on_new"),
+    ):
+        assert before.get(key) == 1, (key, before)
     for _ in range(5):
         install_tenant_filter(app)
     assert _hook_counts() == before
