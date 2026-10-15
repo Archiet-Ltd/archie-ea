@@ -38,6 +38,31 @@ class SSONotConfiguredError(Exception):
     """Raised when SSO is not configured or a required env var is missing."""
 
 
+def check_idp_url(url) -> str:
+    """Return ``url`` if the server may call it, else raise ``BlockedOutboundURL``.
+
+    One check for the saved metadata URL and for every URL read out of the
+    fetched discovery document (token, JWKS, userinfo). It is the shared
+    outbound guard: the host must resolve only to public addresses, and outside
+    development and testing the scheme must be https. A public identity
+    provider (Okta, Entra, Google) passes; loopback, private, link-local and
+    metadata addresses and non-ASCII hosts do not.
+    """
+    from app.utils.ssrf_guard import (
+        internal_targets_allowed,
+        validate_outbound_url,
+        validate_user_supplied_url,
+    )
+
+    try:
+        internal_ok = internal_targets_allowed()
+    except RuntimeError:  # no application context: behave as production
+        internal_ok = False
+    if internal_ok:
+        return validate_user_supplied_url(url)
+    return validate_outbound_url(url, allowed_host_suffixes=(), require_https=True)
+
+
 class SSOService:
     """Per-organisation SSO service (OIDC + SAML stub)."""
 
@@ -106,14 +131,16 @@ class SSOService:
         try:
             import requests
 
-            resp = requests.get(metadata_url, timeout=10)
+            check_idp_url(metadata_url)
+            resp = requests.get(metadata_url, timeout=10, allow_redirects=False)
             resp.raise_for_status()
             doc = resp.json()
             self._discovery_cache[metadata_url] = doc
             return doc
         except Exception as exc:
+            logger.warning("OIDC discovery fetch failed: %s", exc)
             raise SSONotConfiguredError(
-                f"Failed to fetch OIDC discovery document from {metadata_url}: {exc}"
+                "The identity provider's configuration could not be fetched"
             ) from exc
 
     def _get_jwks(self, jwks_uri: str, *, force: bool = False) -> dict:
@@ -126,11 +153,12 @@ class SSOService:
         if cached is not None and not force and time.monotonic() - cached[0] < self._JWKS_TTL_SECONDS:
             return cached[1]
         try:
-            jwks_resp = requests.get(jwks_uri, timeout=10)
+            check_idp_url(jwks_uri)
+            jwks_resp = requests.get(jwks_uri, timeout=10, allow_redirects=False)
             jwks_resp.raise_for_status()
             jwks = jwks_resp.json()
         except Exception as exc:
-            logger.warning("Failed to fetch JWKS from %s: %s", jwks_uri, exc)
+            logger.warning("Failed to fetch JWKS: %s", exc)
             raise SSONotConfiguredError(
                 "id_token verification failed: the identity provider's signing keys are unavailable"
             ) from exc
@@ -344,6 +372,14 @@ class SSOService:
                 "OIDC discovery document missing 'token_endpoint'"
             )
 
+        # The token endpoint comes from a fetched document. Check it before the
+        # client secret is put in a request; a refused host never receives it.
+        try:
+            check_idp_url(token_endpoint)
+        except Exception as exc:
+            logger.warning("Token endpoint refused: %s", exc)
+            raise SSONotConfiguredError("Token exchange failed") from exc
+
         client_secret = config.client_secret
         try:
             resp = requests.post(
@@ -356,23 +392,25 @@ class SSOService:
                     "client_secret": client_secret or "",
                 },
                 timeout=15,
+                allow_redirects=False,
             )
             resp.raise_for_status()
             token_data = resp.json()
         except Exception as exc:
-            raise SSONotConfiguredError(
-                f"Token exchange failed: {exc}"
-            ) from exc
+            logger.warning("Token exchange failed: %s", exc)
+            raise SSONotConfiguredError("Token exchange failed") from exc
 
         # Prefer userinfo endpoint for claims; fall back to id_token payload
         userinfo: dict = {}
         access_token = token_data.get("access_token", "")
         if userinfo_endpoint and access_token:
             try:
+                check_idp_url(userinfo_endpoint)
                 uinfo_resp = requests.get(
                     userinfo_endpoint,
                     headers={"Authorization": f"Bearer {access_token}"},
                     timeout=10,
+                    allow_redirects=False,
                 )
                 if uinfo_resp.status_code == 200:
                     userinfo = uinfo_resp.json()

@@ -323,6 +323,19 @@ def admin_sso():
             )
             return redirect(url_for("sso.admin_sso"))
 
+        if idp_metadata_url:
+            from app.services.sso_service import check_idp_url
+            from app.utils.ssrf_guard import BlockedOutboundURL
+
+            try:
+                check_idp_url(idp_metadata_url)
+            except BlockedOutboundURL:
+                flash(
+                    "The identity provider metadata URL must be a public https address.",
+                    "error",
+                )
+                return redirect(url_for("sso.admin_sso"))
+
         if config is None:
             if not org_id:
                 flash("Cannot save SSO config: no organisation associated.", "error")
