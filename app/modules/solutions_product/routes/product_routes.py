@@ -695,6 +695,16 @@ def check_compliance(solution_id):
     if not service_url.startswith(("http://", "https://")):
         return jsonify({"success": False, "error": "service_url must start with http:// or https://"}), 400
 
+    from app.utils.ssrf_guard import BlockedOutboundURL, clamp_timeout, validate_user_supplied_url
+
+    try:
+        validate_user_supplied_url(service_url)
+        check_timeout = clamp_timeout(body.get("timeout", 10))
+    except BlockedOutboundURL as exc:
+        return jsonify({"success": False, "error": f"service_url refused: {exc}"}), 400
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+
     spec_id = body.get("spec_id")
     if not spec_id:
         # Use latest published spec for this solution
@@ -724,7 +734,7 @@ def check_compliance(solution_id):
         result = checker.check(
             published_spec_id=spec_id,
             service_url=service_url,
-            timeout=body.get("timeout", 10),
+            timeout=check_timeout,
             checked_by_id=current_user.id if current_user and current_user.is_authenticated else None,
         )
     except Exception as e:
@@ -940,6 +950,25 @@ def create_webhook(solution_id):
                 "error": "HTTPS required for webhook URLs in production (HTTP allowed for localhost)",
             }), 400
 
+    from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
+    from app.modules.solutions_product.services.drift_remediation_service import (
+        is_allowed_auth_header_env,
+    )
+
+    try:
+        validate_user_supplied_url(url)
+    except BlockedOutboundURL as exc:
+        return jsonify({"success": False, "error": f"url refused: {exc}"}), 400
+
+    auth_header_env = body.get("auth_header_env")
+    if auth_header_env in ("", None):
+        auth_header_env = None
+    elif not is_allowed_auth_header_env(auth_header_env):
+        return jsonify({
+            "success": False,
+            "error": "auth_header_env must match WEBHOOK_TOKEN_<NAME> (capitals, digits, underscores)",
+        }), 400
+
     # Validate event types
     valid_types = {"spec_changed", "drift_detected", "compliance_failed"}
     event_types = body.get("event_types", ["spec_changed"])
@@ -960,7 +989,7 @@ def create_webhook(solution_id):
         solution_id=solution_id,
         url=url,
         event_types=event_types,
-        auth_header_env=body.get("auth_header_env"),
+        auth_header_env=auth_header_env,
         retry_count=retry_count,
         enabled=body.get("enabled", True),
     )
@@ -1014,9 +1043,15 @@ def update_webhook(solution_id, webhook_id):
     body = request.json or {}
 
     if "url" in body:
-        url = body["url"].strip()
+        url = body["url"].strip() if isinstance(body["url"], str) else ""
         if not url.startswith(("http://", "https://")):
             return jsonify({"success": False, "error": "url must start with http:// or https://"}), 400
+        from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
+
+        try:
+            validate_user_supplied_url(url)
+        except BlockedOutboundURL as exc:
+            return jsonify({"success": False, "error": f"url refused: {exc}"}), 400
         webhook.url = url
 
     if "event_types" in body:
@@ -1033,7 +1068,19 @@ def update_webhook(solution_id, webhook_id):
         webhook.event_types = event_types
 
     if "auth_header_env" in body:
-        webhook.auth_header_env = body["auth_header_env"]
+        from app.modules.solutions_product.services.drift_remediation_service import (
+            is_allowed_auth_header_env,
+        )
+
+        new_env = body["auth_header_env"]
+        if new_env in ("", None):
+            new_env = None
+        elif not is_allowed_auth_header_env(new_env):
+            return jsonify({
+            "success": False,
+            "error": "auth_header_env must match WEBHOOK_TOKEN_<NAME> (capitals, digits, underscores)",
+        }), 400
+        webhook.auth_header_env = new_env
 
     if "retry_count" in body:
         rc = body["retry_count"]

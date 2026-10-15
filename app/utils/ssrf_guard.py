@@ -103,6 +103,10 @@ def validate_outbound_url(url: str, allowed_host_suffixes=(), require_https=True
                 f"Host {host!r} is not on the allow-list for this integration"
             )
 
+    # Names that mean "this machine" whatever a resolver (or a test double) says.
+    if host == "localhost" or host.endswith(".localhost"):
+        raise BlockedOutboundURL(f"Host {host!r} is a loopback name")
+
     # A literal IP host skips DNS but must still be public.
     try:
         ipaddress.ip_address(host)
@@ -137,3 +141,50 @@ def validate_outbound_url(url: str, allowed_host_suffixes=(), require_https=True
 def validate_salesforce_instance_url(url: str) -> str:
     """Validate a Salesforce ``instance_url`` before it is fetched."""
     return validate_outbound_url(url, allowed_host_suffixes=SALESFORCE_HOST_SUFFIXES)
+
+
+def internal_targets_allowed() -> bool:
+    """True only in development or testing configuration.
+
+    Loopback and private addresses are legitimate webhook and compliance-check
+    targets on a developer machine; in any other configuration they are the
+    route to the host's own services and the cloud metadata address.
+    """
+    import os
+
+    from flask import current_app
+
+    if current_app.config.get("TESTING") or current_app.debug:
+        return True
+    return os.environ.get("FLASK_ENV", "").lower() in ("development", "testing")
+
+
+def validate_user_supplied_url(url: str) -> str:
+    """Check a URL a signed-in user gave us for the server to call.
+
+    Used for webhook targets and compliance-check service URLs, where no
+    host allow-list exists. Outside development and testing the host must
+    resolve only to public addresses (no loopback, link-local, private or
+    metadata). Callers must also send with ``allow_redirects=False``.
+    Raises :class:`BlockedOutboundURL`.
+    """
+    if internal_targets_allowed():
+        if not isinstance(url, str) or urlparse(url.strip()).scheme not in ("http", "https"):
+            raise BlockedOutboundURL("URL must start with http:// or https://")
+        return url
+    return validate_outbound_url(url, allowed_host_suffixes=(), require_https=False)
+
+
+def clamp_timeout(value, default=10, low=1, high=30) -> int:
+    """Return an int timeout in [low, high]; ValueError if not numeric."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        raise ValueError("timeout must be a number")
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("timeout must be a number") from exc
+    if number != number or number in (float("inf"), float("-inf")):
+        raise ValueError("timeout must be a number")
+    return max(low, min(high, int(number)))

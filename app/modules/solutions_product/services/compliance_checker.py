@@ -42,6 +42,22 @@ class ComplianceChecker:
         from app.models.compliance_check import RuntimeComplianceCheck
         from app.models.published_api_spec import PublishedAPISpec
 
+        from app.utils.ssrf_guard import (
+            BlockedOutboundURL,
+            clamp_timeout,
+            validate_user_supplied_url,
+        )
+
+        # Single choke point (manual and scheduled checks): refuse targets
+        # inside the host's network and bound the timeout.
+        try:
+            validate_user_supplied_url(service_url)
+            timeout = clamp_timeout(timeout)
+        except BlockedOutboundURL as exc:
+            return {"success": False, "error": f"service_url refused: {exc}"}
+        except ValueError as exc:
+            return {"success": False, "error": str(exc)}
+
         start_time = time.time()
 
         spec = PublishedAPISpec.query.get(published_spec_id)
@@ -157,6 +173,7 @@ class ComplianceChecker:
                 resp = requests.get(
                     f"{service_url}{path}",
                     timeout=timeout,
+                    allow_redirects=False,
                 )
                 if resp.status_code == 200:
                     data = resp.json()
@@ -236,7 +253,7 @@ class ComplianceChecker:
             resp = requests.request(
                 use_method, url,
                 timeout=timeout,
-                allow_redirects=True,
+                allow_redirects=False,
             )
             latency_ms = int((time.time() - start) * 1000)
 
@@ -247,7 +264,7 @@ class ComplianceChecker:
                 # Method not allowed for HEAD — try GET as fallback for existence
                 try:
                     start2 = time.time()
-                    resp2 = requests.get(url, timeout=timeout)
+                    resp2 = requests.get(url, timeout=timeout, allow_redirects=False)
                     latency_ms = int((time.time() - start2) * 1000)
                     if resp2.status_code == 404:
                         return {"status": "missing", "reason": "404 Not Found", "latency_ms": latency_ms}
