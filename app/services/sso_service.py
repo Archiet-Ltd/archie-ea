@@ -19,6 +19,8 @@ import secrets
 from typing import Optional
 from urllib.parse import urlencode
 
+from app.utils.ssrf_guard import BlockedOutboundURL
+
 logger = logging.getLogger(__name__)
 
 # Signing algorithms this service will ever accept for an id_token. "none"
@@ -49,7 +51,6 @@ def check_idp_url(url) -> str:
     metadata addresses and non-ASCII hosts do not.
     """
     from app.utils.ssrf_guard import (
-        BlockedOutboundURL,
         internal_targets_allowed,
         validate_outbound_url,
         validate_user_supplied_url,
@@ -59,44 +60,9 @@ def check_idp_url(url) -> str:
         internal_ok = internal_targets_allowed()
     except RuntimeError:  # no application context: behave as production
         internal_ok = False
-    try:
-        if internal_ok:
-            return validate_user_supplied_url(url)
-        return validate_outbound_url(url, allowed_host_suffixes=(), require_https=True)
-    except BlockedOutboundURL as exc:
-        if _host_does_not_resolve(url):
-            raise IdpUnreachable("URL not reachable") from exc
-        raise
-
-
-def _host_does_not_resolve(url) -> bool:
-    import ipaddress
-    import socket
-    from urllib.parse import urlparse
-
-    try:
-        host = (urlparse(str(url).strip()).hostname or "").rstrip(".").lower()
-    except ValueError:
-        return False
-    if not host or not host.isascii() or host == "localhost" or host.endswith(".localhost"):
-        return False
-    try:
-        ipaddress.ip_address(host)
-        return False
-    except ValueError:
-        pass
-    try:
-        socket.getaddrinfo(host, 443)
-    except (socket.gaierror, UnicodeError):
-        return True
-    return False
-
-
-from app.utils.ssrf_guard import BlockedOutboundURL  # noqa: E402
-
-
-class IdpUnreachable(BlockedOutboundURL):
-    """The address is well formed but its name does not resolve."""
+    if internal_ok:
+        return validate_user_supplied_url(url)
+    return validate_outbound_url(url, allowed_host_suffixes=(), require_https=True)
 
 
 class SSOService:
@@ -170,18 +136,12 @@ class SSOService:
             check_idp_url(metadata_url)
             resp = requests.get(metadata_url, timeout=10, allow_redirects=False)
             resp.raise_for_status()
-        except IdpUnreachable as exc:
-            logger.warning("OIDC discovery fetch failed: %s", exc)
-            raise SSONotConfiguredError(
-                "The identity provider could not be reached"
-            ) from exc
-        except BlockedOutboundURL as exc:
-            logger.warning("OIDC discovery address refused: %s", exc)
-            raise SSONotConfiguredError("That address is not allowed") from exc
         except Exception as exc:
+            # Refused, unresolvable and unreachable look the same to the
+            # caller; the reason is in the log only.
             logger.warning("OIDC discovery fetch failed: %s", exc)
             raise SSONotConfiguredError(
-                "The identity provider could not be reached"
+                "That address is not allowed or could not be reached"
             ) from exc
         try:
             doc = resp.json()

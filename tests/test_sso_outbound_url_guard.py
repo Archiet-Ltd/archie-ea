@@ -204,7 +204,7 @@ def test_admin_save_refuses_internal_metadata_url(monkeypatch, resolver, url):
         follow_redirects=True,
     )
     assert b"SSO configuration saved." not in resp.data
-    assert b"That address is not allowed" in resp.data
+    assert b"That address is not allowed or could not be reached" in resp.data
     assert state.persisted == before
 
 
@@ -248,7 +248,7 @@ def test_saml_save_keeps_reference_only_metadata_values(monkeypatch, resolver, v
     assert state.persisted["idp_metadata_url"] == value
 
 
-def test_unresolvable_host_says_could_not_be_reached(production_like, http, monkeypatch):
+def test_unresolvable_host_gives_the_same_answer_as_a_refused_one(production_like, http, monkeypatch):
     import socket
 
     import app.utils.ssrf_guard as guard
@@ -260,7 +260,7 @@ def test_unresolvable_host_says_could_not_be_reached(production_like, http, monk
     monkeypatch.setattr(guard.socket, "getaddrinfo", nxdomain)
     with pytest.raises(SSONotConfiguredError) as exc:
         _svc()._fetch_oidc_discovery("https://nope.idp.example.com/.well-known")
-    assert str(exc.value) == "The identity provider could not be reached"
+    assert str(exc.value) == "That address is not allowed or could not be reached"
     assert http == []
 
 
@@ -269,7 +269,7 @@ def test_internal_address_says_not_allowed(production_like, http):
 
     with pytest.raises(SSONotConfiguredError) as exc:
         _svc()._fetch_oidc_discovery("https://169.254.169.254/x")
-    assert str(exc.value) == "That address is not allowed"
+    assert str(exc.value) == "That address is not allowed or could not be reached"
 
 
 def test_invalid_document_has_its_own_message(production_like, http):
