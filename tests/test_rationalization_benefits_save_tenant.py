@@ -149,3 +149,27 @@ def test_post_against_a_non_existent_application_is_refused(
     )
 
     assert resp.status_code == 404
+
+
+def test_post_refused_when_organisation_unknown(
+    db_session, make_org, client, login_as, monkeypatch,
+):
+    """With no active organisation the automatic tenant filter is off, so a
+    guard that only relies on it would answer for every organisation. The
+    route must refuse even the caller's own application rather than fall
+    through, the same way the sibling comment-write route does."""
+    import app.middleware.tenant_context as tc
+
+    user_a, app_a, _app_b = _setup(db_session, make_org)
+
+    monkeypatch.setattr(tc, "current_org_id", lambda: None)
+    login_as(client, user_a)
+    resp = client.post(
+        f"/applications/rationalization/api/benefits/{app_a.id}",
+        json={"measurement_notes": "should not be written", "actual_annual_savings": 1},
+    )
+
+    assert resp.status_code == 404, resp.get_data(as_text=True)
+    assert _tracker_rows(db_session, app_a.id) == [], (
+        "a POST with no active organisation must not create a tracker row"
+    )

@@ -17,7 +17,7 @@ from app.services.rate_limiter import rate_limit
 
 from . import unified_applications_bp
 from app.utils.pagination import safe_int_arg
-from app.utils.route_guards import require_entity
+from app.utils.route_guards import require_entity, require_entity_in_active_org
 from app.utils.tenant_users import escape_like_literal
 
 logger = logging.getLogger(__name__)
@@ -3358,7 +3358,9 @@ def rationalization_save_benefits(app_id):
         RationalizationBenefitsTracker,
     )
 
-    require_entity(ApplicationComponent, app_id, description="Application not found")
+    require_entity_in_active_org(
+        ApplicationComponent, app_id, description="Application not found"
+    )
 
     try:
         data = request.get_json(silent=True) or {}
