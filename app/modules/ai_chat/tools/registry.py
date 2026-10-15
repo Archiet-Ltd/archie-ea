@@ -707,8 +707,11 @@ TOOL_SCHEMAS = [
         "mutates": False,
         "record_types_written": [],
         "description": (
-            "Show the blast radius if an ArchiMate element is retired or changed. "
-            "Read-only. Returns all downstream dependents across all 6 layers."
+            "Show what depends on an ArchiMate element, by name: the canonical impact "
+            "answer (the same rows as the Ask page and the Impact page), downstream, "
+            "to depth 3, over recorded (drawn) relationships only; derived "
+            "relationships are not included. Read-only. Use the answer tool for "
+            "other depths, directions or derived relationships."
         ),
         "parameters": {
             "type": "object",

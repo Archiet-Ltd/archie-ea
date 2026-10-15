@@ -312,6 +312,9 @@ class ToolExecutor:
         self._org_id = None  # cached lazily
         self._persona = persona
         self._charter_checked = None  # cached result of the charter check
+        # One stored answer per identical question per turn (an executor lives
+        # for one turn): a repeated call returns the same address.
+        self._answers_this_turn: dict = {}
 
     @staticmethod
     def _coverage(rows, total, noun):
@@ -1563,6 +1566,23 @@ class ToolExecutor:
     ANSWER_TOOL_MAX_CITATIONS = 100
 
     def _canonical_answer(self, kind: str, params: dict) -> dict:
+        import json as _json
+
+        from app.modules.intelligence.services import answer_envelope as envelope
+
+        try:
+            cache_key = (kind, _json.dumps(envelope.normalise_params(kind, params), sort_keys=True))
+        except envelope.AnswerParamError as exc:
+            return {"success": False, "error": str(exc), "code": "INVALID_PARAMETER"}
+        cached = self._answers_this_turn.get(cache_key)
+        if cached is not None:
+            return _json.loads(_json.dumps(cached))
+        out = self._store_answer(kind, params)
+        if out.get("success"):
+            self._answers_this_turn[cache_key] = _json.loads(_json.dumps(out))
+        return out
+
+    def _store_answer(self, kind: str, params: dict) -> dict:
         from app.modules.intelligence.services import answer_envelope as envelope
 
         try:
@@ -1602,22 +1622,18 @@ class ToolExecutor:
             )
         return {"success": True, "result": body, "message": message}
 
-    @staticmethod
-    def _whole_number(value):
-        if isinstance(value, str) and value.strip().isdigit():
-            return int(value.strip())
-        return value
-
     def _tool_answer(self, args: dict) -> dict:
         kind = args.get("question")
         # Only the question and its parameters reach the service: the
         # organisation is the caller's active one and is not an argument.
         params = {k: v for k, v in args.items() if k != "question"}
+        from app.modules.intelligence.services.answer_envelope import as_whole_number
+
         for key in ("element_id", "max_depth"):
             if key in params:
-                params[key] = self._whole_number(params[key])
+                params[key] = as_whole_number(params[key], key)
         if isinstance(params.get("element_ids"), list):
-            params["element_ids"] = [self._whole_number(v) for v in params["element_ids"]]
+            params["element_ids"] = [as_whole_number(v, "element_ids") for v in params["element_ids"]]
         return self._canonical_answer(kind if isinstance(kind, str) else "", params)
 
     # ------------------------------------------------------------------ #

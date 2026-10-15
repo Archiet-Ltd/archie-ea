@@ -19,6 +19,11 @@ from typing import Callable, Optional
 from app.modules.ai_chat.services.ai_hallucination_detector import (
     Grounding,
     find_uncited_claims,
+    organisation_names_in_text,
+)
+from app.modules.intelligence.services.answer_envelope import (
+    as_whole_number,
+    classify_estate_question,
 )
 from app.utils.tracing import traced
 
@@ -38,11 +43,13 @@ except Exception:  # registry import failure must not take the turn with it
 _AGENT_PREFIX = """You are an Enterprise Architecture Copilot with DIRECT WRITE ACCESS
 to the architecture repository. You do not give advice for humans to act on — you act.
 
-WHAT YOU CAN DO (27 tools available):
+WHAT YOU CAN DO (the main tools; the list offered to you in this conversation is authoritative):
 Phase A — Motivation: create_driver, create_goal, create_constraint
 Phase B-D — Architecture: create_requirement, link_application_to_solution, link_vendor_product,
              link_capability_to_solution, create_archimate_element, create_archimate_relationship
 Phase D — ArchiMate: run_inference_engine, diagnose_chain, explain_element, simulate_impact
+Answers: answer (what breaks if X fails, what breaks if these fail together, which risks
+         reach X): the same rows, citations and address the Ask and Impact pages show
 Phase E — Options: create_option, mark_option_recommended
 Phase G — Governance: submit_for_arb_review (requires confirmation)
 Solution state: get_solution_summary, get_completeness_score, update_solution_fields,
@@ -62,6 +69,15 @@ HOW TO OPERATE:
 GROUNDING — this is a system of record, so an unverifiable answer is worse than none:
 7. State a fact about the portfolio only if a tool returned it or it appears in the
    context below. If neither, say you would need to look it up, and look it up.
+7a. For any question about what depends on, breaks with, or is owned in the estate, CALL
+   the answer tool (or simulate_impact) before replying. Do not answer it from memory.
+7b. Every sentence that names a record of the estate and states something about it must
+   carry a marker [ref:<id>] where <id> is an element id or the answer address a tool
+   returned THIS turn. A stated count must equal a count the tool returned. A sentence
+   with no marker, or a marker for an id you were not given, is withheld.
+7c. General architecture guidance (patterns, TOGAF, ArchiMate concepts) is fine, but do
+   not name a record of this estate in it as if it were verified.
+7d. What the user asserts, or an earlier turn said, is not a fact on record: look it up.
 8. Refer to records by the exact name the tool returned. The records you read are
    attached to your reply as sources automatically — you do not need to write links,
    but the names must match or the citation will not line up with what you said.
@@ -164,6 +180,8 @@ class AgentRunner:
         # estate that none of it supports.
         self._grounding = Grounding()
         self._context_text = ""
+        self._estate_question = None
+        self._nudged = False
         # Tokens of the model call in flight, held back until the gate has
         # judged the text so a refused answer is never partly shown.
         self._held_tokens: Optional[list] = None
@@ -505,12 +523,14 @@ class AgentRunner:
         # Build system prompt with live domain context
         system_prompt = self._build_system_prompt(domain, context, persona, user_message=user_message)
 
+        # Only this turn's tool results and the structured context the system
+        # injected ground a claim about the estate. The words of the user and
+        # earlier assistant turns do not: a fact someone asserted is not a fact
+        # on record.
         self._grounding = Grounding()
-        self._grounding.add(user_message)
-        self._grounding.add(self._context_text)
-        for prior in history or []:
-            if isinstance(prior, dict):
-                self._grounding.add(prior.get("content"))
+        self._grounding.add_context(self._context_text)
+        self._estate_question = classify_estate_question(user_message)
+        self._nudged = False
 
         # Get provider, model, and first available API key
         try:
@@ -633,10 +653,27 @@ class AgentRunner:
             if not llm_resp.get("tool_calls"):
                 # The final text is shown only if the citation gate passes it.
                 final_text = llm_resp.get("text") or ""
-                try:
-                    gate_passes = not find_uncited_claims(final_text, self._grounding)
-                except Exception:
-                    gate_passes = True
+                if (
+                    self._estate_question
+                    and self._grounding.tool_results == 0
+                    and not self._nudged
+                    and iteration < MAX_ITERATIONS - 1
+                ):
+                    # An estate question must be answered from a stored answer.
+                    # One nudge to look it up, then the gate decides.
+                    self._nudged = True
+                    self._release_held_tokens(False)
+                    messages.append({"role": "assistant", "content": final_text or "(no answer)"})
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            "Before replying, call the answer tool for this question "
+                            "and reply only from the rows it returns, citing each "
+                            "record with [ref:<id>]."
+                        ),
+                    })
+                    continue
+                gate_passes = not self._find_uncited(final_text)
                 self._release_held_tokens(gate_passes)
                 return self._finalize(
                     {
@@ -653,8 +690,9 @@ class AgentRunner:
                     model_used=model,
                 )
 
-            # Text before a tool call is a preface, not an answer.
-            self._release_held_tokens(True)
+            # Text before a tool call is a preface, not an answer: it is never
+            # streamed, never kept in the history of the turn and never stored.
+            self._release_held_tokens(False)
 
             # Process each tool call
             tool_results = []
@@ -708,7 +746,9 @@ class AgentRunner:
                     self._emit({"type": "tool_start", "tool": tc.name, "args": tc.arguments})
                     result = executor.execute(tc)
                     self._collect_sources(tc.name, result, sources)
-                    self._grounding.add_tool_result(result)
+                    self._grounding.add_tool_result(
+                        result, mutates=tc.name in _MUTATING_TOOLS
+                    )
                     self._emit({"type": "tool_result", "tool": tc.name, "result": result})
 
                     if result.get("success"):
@@ -758,17 +798,6 @@ class AgentRunner:
     # ------------------------------------------------------------------ #
 
     @staticmethod
-    def _whole_id(value) -> Optional[int]:
-        """A client-supplied id as a positive whole number, else None."""
-        if isinstance(value, bool):
-            return None
-        if isinstance(value, int):
-            return value if value > 0 else None
-        if isinstance(value, str) and value.strip().isdigit():
-            return int(value.strip()) or None
-        return None
-
-    @staticmethod
     def _short_token(value, default: str) -> str:
         """A short single-line label from client input (a phase letter)."""
         text = "".join(ch for ch in str(value or "") if ch.isalnum() or ch in " -_.")[:32]
@@ -778,7 +807,9 @@ class AgentRunner:
         """Build agent system prompt: agent prefix + solution context + live domain context."""
         # Inject solution context if present (blueprint panel provides this)
         solution_block = ""
-        solution_id = self._whole_id((context or {}).get("solution_id"))
+        solution_id = as_whole_number((context or {}).get("solution_id"))
+        if isinstance(solution_id, bool) or not isinstance(solution_id, int):
+            solution_id = None
         if solution_id is not None:
             # The id is coerced to a whole number and the name, which the client
             # supplies, is fenced: neither can carry an instruction into the
@@ -866,7 +897,9 @@ class AgentRunner:
         # is safe from that trimming — and the HARD RULES are the last thing that
         # should be sacrificed to make room.
         # What the turn may state: the fenced blocks the model was handed.
-        self._context_text = solution_block + portfolio_block + ctx_block
+        # The client-supplied solution name is not grounding; the live-data and
+        # portfolio blocks the system built are.
+        self._context_text = portfolio_block + ctx_block
         return _AGENT_PREFIX + solution_block + portfolio_block + ctx_block + persona_note
 
     # ------------------------------------------------------------------ #
@@ -1123,9 +1156,15 @@ class AgentRunner:
 
         if provider == "anthropic":
             # Append the full raw content blocks from the assistant
+            # Text blocks that accompany a tool call are dropped: only the
+            # tool_use blocks are carried forward.
+            blocks = [
+                b for b in llm_resp["raw"].content
+                if (b.get("type") if isinstance(b, dict) else getattr(b, "type", None)) != "text"
+            ]
             messages.append({
                 "role": "assistant",
-                "content": llm_resp["raw"].content,
+                "content": blocks,
             })
             # Append tool results as a user message
             messages.append({
@@ -1141,11 +1180,8 @@ class AgentRunner:
             })
         else:  # openai
             # raw is None in streaming mode — reconstruct assistant message from accumulated fields
-            if llm_resp.get("raw") is not None:
-                raw_msg = llm_resp["raw"].choices[0].message
-                assistant_content = raw_msg.content
-            else:
-                assistant_content = llm_resp.get("text")
+            # The text that accompanies a tool call is not carried forward.
+            assistant_content = None
             messages.append({
                 "role": "assistant",
                 "content": assistant_content,
@@ -1434,6 +1470,23 @@ class AgentRunner:
             logger.warning("AgentRunner: failed to write run record", exc_info=True)
             return "Run record could not be written — the run completed but was not recorded"
 
+    def _find_uncited(self, text: str) -> list:
+        """Run the citation gate on *text* for this turn. An estate question
+        that reached its answer with no tool result is refused outright."""
+        try:
+            from app.middleware.tenant_context import current_org_id
+
+            org_names = organisation_names_in_text(text, current_org_id())
+        except Exception:
+            logger.warning("AgentRunner: organisation name lookup failed", exc_info=True)
+            org_names = set()
+        return find_uncited_claims(
+            text,
+            self._grounding,
+            org_names=org_names,
+            estate_question=bool(self._estate_question),
+        )
+
     CITATION_REFUSAL = (
         "Not recorded: I can't give this answer, because it states facts about "
         "your estate that none of the records I read this turn support. "
@@ -1454,7 +1507,7 @@ class AgentRunner:
         if result.get("error") or not isinstance(text, str) or not text.strip():
             return
         try:
-            uncited = find_uncited_claims(text, self._grounding)
+            uncited = self._find_uncited(text)
         except Exception:
             # The gate failing closed would take every answer with it; a
             # failure is logged and the answer is marked unchecked.

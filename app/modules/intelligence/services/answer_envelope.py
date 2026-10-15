@@ -97,6 +97,43 @@ def _as_int(raw: Any, name: str) -> int:
     return raw
 
 
+def as_whole_number(raw: Any, name: str = "value") -> Any:
+    """A positive whole number from an int or a string of digits, else *raw*
+    unchanged (so ``normalise_params`` refuses it by name). The one coercer for
+    ids that arrive as text from a model or a client."""
+    if isinstance(raw, str) and raw.strip().isdigit():
+        return _as_int(int(raw.strip()), name)
+    return raw
+
+
+# Natural-language cues for the three questions the service answers. The
+# assistant uses it to tell an estate question (which must be answered from a
+# stored answer) from general conversation.
+_QUESTION_CUES = (
+    (KIND_RISK_PROPAGATION, re.compile(r"\b(risks?)\b.*\b(reach|affect|touch|expos|propagat)", re.I)),
+    (KIND_SET_IMPACT, re.compile(r"\b(fail|fails|go down|are down|outage)\b.*\btogether\b|\btogether\b.*\b(fail|down)", re.I)),
+    (
+        KIND_IMPACT,
+        re.compile(
+            r"what\s+(breaks|stops|fails|is affected|would break|depends)|"
+            r"\bblast radius\b|\bimpact (of|if)\b|\bif\b.+\b(fails?|goes down|is retired|is decommissioned)\b|"
+            r"\b(depends?|depend) on\b|\bwhat (calls|uses)\b|\bwho owns\b",
+            re.I,
+        ),
+    ),
+)
+
+
+def classify_estate_question(message: Any) -> Optional[str]:
+    """The answer kind a user message asks, or None for anything else."""
+    if not isinstance(message, str) or not message.strip():
+        return None
+    for kind, pattern in _QUESTION_CUES:
+        if pattern.search(message):
+            return kind
+    return None
+
+
 def normalise_params(kind: str, raw: Dict[str, Any]) -> Dict[str, Any]:
     """The stored, canonical form of a question's parameters.
 

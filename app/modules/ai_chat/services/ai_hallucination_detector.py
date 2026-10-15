@@ -189,48 +189,92 @@ class AIHallucinationDetector:
 # Citation gate                                                                #
 # --------------------------------------------------------------------------- #
 #
-# analyze_response above scores prose for hedging patterns; it cannot tell a
-# real record from an invented one. The gate below answers the narrower
-# question the assistant has to be held to: does each sentence that states a
-# fact about the estate rest on something a tool returned (or the context the
-# model was given) this turn?
+# What it enforces. A sentence that names a record of the estate (a name found
+# in this turn's tool results, or an exact normalised match against the
+# organisation's own element and application names) and is a statement, not a
+# question, must carry a structured marker [ref:<element id or answer
+# address>] whose every id was returned by a tool this turn. A stated count
+# of estate things (digits or words) must equal a count a tool returned this
+# turn. A sentence that names no record and states no such count is general
+# guidance and is never touched.
 #
-# It is deterministic and conservative in the direction of refusing. A sentence
-# is a claim when it states a relation or a count about the estate. It is cited
-# when every named record and every count in it appears in the grounding text
-# (the tool results, the context and the user's own words). A claim sentence
-# that names nothing is cited only if some tool returned rows this turn.
+# What it does NOT catch, by design and on the record: a wrong or paraphrased
+# claim about a REAL record that carries a valid marker, and an invented name
+# that matches no record and is not backed by a lookup (that case is closed
+# upstream: an estate question that reached its final answer with no tool
+# result is refused through ``estate_question`` below, after one nudge to look
+# it up).
+#
+# Grounding is only (i) tool results returned in this turn and (ii) the
+# structured context the system itself injected. The user's words and earlier
+# assistant turns never ground a claim about the estate.
 
-_CLAIM_VERB = re.compile(
-    r"\b(depends? on|depend(?:s|ed)? upon|dependent on|is owned by|owned by|owns|"
-    r"runs? on|hosted on|hosts|breaks?|would break|will break|fails?|is impacted|"
-    r"are impacted|impacts?|affects?|affected|supports?|integrates? with|"
-    r"connects? to|connected to|calls?|serves?|serving|relies on|uses?|"
-    r"is used by|are used by|is end[- ]of[- ]life|reaches|exposes?)\b",
-    re.IGNORECASE,
+REF_MARKER = re.compile(r"\[ref:([^\]\s]+)\]", re.IGNORECASE)
+_NOUNS = (
+    r"(?:applications?|elements?|systems?|services?|components?|capabilit(?:y|ies)|"
+    r"risks?|dependenc(?:y|ies)|dependents?|relationships?|interfaces?|servers?|"
+    r"databases?|processes|owners?|solutions?|vendors?|contracts?|rows?|records?)"
+)
+_UNITS = {
+    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+    "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
+    "eighteen": 18, "nineteen": 19, "twenty": 20,
+}
+_TENS = {"thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70,
+         "eighty": 80, "ninety": 90}
+_VAGUE = ("dozens", "dozen", "hundreds", "thousands", "scores")
+_NUM_WORD = "|".join(
+    sorted(list(_UNITS) + list(_TENS) + ["hundred"] + list(_VAGUE), key=len, reverse=True)
 )
 _COUNT_CLAIM = re.compile(
-    r"\b(\d[\d,]*)\s+(?:\w+\s+){0,2}?(applications?|elements?|systems?|services?|"
-    r"components?|capabilit(?:y|ies)|risks?|dependenc(?:y|ies)|dependents?|"
-    r"relationships?|interfaces?|servers?|databases?|processes|owners?|solutions?|"
-    r"vendors?|contracts?|rows?|records?)\b",
+    r"\b(\d[\d,]*|(?:" + _NUM_WORD + r")(?:[ -](?:"
+    + "|".join(list(_UNITS) + list(_TENS))
+    + r"))?)\s+(?:\w+\s+){0,2}?" + _NOUNS + r"\b",
     re.IGNORECASE,
 )
-_ENTITY_PHRASE = re.compile(r"\b[A-Z][\w&./+-]*(?:\s+[A-Z][\w&./+-]*)*")
-# Capitalised words that are not estate records.
-_NOT_AN_ENTITY = frozenset(
-    {
-        "i", "the", "a", "an", "it", "this", "that", "these", "those", "there", "if",
-        "but", "and", "so", "in", "on", "for", "to", "yes", "no", "note", "also",
-        "archimate", "togaf", "business", "application", "technology", "motivation",
-        "strategy", "implementation", "physical", "layer", "answer", "not recorded",
-        "recorded", "ask", "impact", "drawn", "derived", "monday", "tuesday",
-        "wednesday", "thursday", "friday", "saturday", "sunday", "january", "february",
-        "march", "april", "may", "june", "july", "august", "september", "october",
-        "november", "december", "copilot", "entelim", "archie",
-    }
-)
+_COUNT_KEYS = frozenset({
+    "total", "count", "returned", "rows_total", "rows_shown", "explicit_count",
+    "derived_count", "stale_count", "citations_total", "resolved_seed_count",
+    "unresolved_count", "affected_count",
+})
+_ID_KEYS = frozenset({"id", "element_id", "risk_id", "root_element_id"})
+_LEADING = frozenset({
+    "the", "a", "an", "both", "only", "all", "every", "each", "any", "some",
+    "these", "those", "this", "that", "its", "their", "our", "your", "also",
+    "as", "i", "said", "and", "but", "so", "then", "if", "when", "while",
+})
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
+_NON_WORD = re.compile(r"[^a-z0-9]+")
+_MAX_NGRAM = 6
+_MAX_CANDIDATES = 3000
+
+
+def _words(value) -> List[str]:
+    """Words of *value* after the platform's one name normaliser (case and
+    whitespace, ``duplicate_guard.normalize_name``) with punctuation removed."""
+    from app.utils.duplicate_guard import normalize_name
+
+    return _NON_WORD.sub(" ", normalize_name(value)).split()
+
+
+def normalise_name(value) -> str:
+    """Lower-cased, punctuation-free name with leading articles and quantifiers
+    ('The', 'Both', 'Only', ...) removed, for exact comparison."""
+    words = _words(value)
+    while words and words[0] in _LEADING:
+        words.pop(0)
+    return " ".join(words)
+
+
+def _walk(value, visit) -> None:
+    if isinstance(value, dict):
+        visit(value)
+        for v in value.values():
+            _walk(v, visit)
+    elif isinstance(value, (list, tuple)):
+        for v in value:
+            _walk(v, visit)
 
 
 def _walk_text(value, out: list) -> None:
@@ -246,62 +290,209 @@ def _walk_text(value, out: list) -> None:
 
 
 class Grounding:
-    """What one assistant turn is allowed to state: everything a tool returned,
-    the context it was handed and the user's own words. Text, not structure, so
-    a tool the gate has never heard of is still a source."""
+    """What one assistant turn may state about the estate: the tool results of
+    this turn and the structured context the system injected. Nothing the user
+    typed and nothing an earlier turn said."""
 
     def __init__(self) -> None:
         self._parts: List[str] = []
         self.tool_results = 0
+        self.names: set = set()          # normalised record names a read returned
+        self.receipt_names: set = set()  # names a write of this turn created or changed
+        self.refs: set = set()           # ids and addresses a marker may cite
+        self.counts: set = set()         # counts a tool stated
 
-    def add(self, value) -> None:
+    def add_context(self, value) -> None:
+        """Structured context the system injected (live data blocks)."""
         pieces: list = []
         _walk_text(value, pieces)
         self._parts.append(" ".join(pieces).lower())
 
-    def add_tool_result(self, result) -> None:
-        if isinstance(result, dict) and result.get("success"):
-            self.tool_results += 1
-            self.add(result)
+    def add_tool_result(self, result, mutates: bool = False) -> None:
+        if not (isinstance(result, dict) and result.get("success")):
+            return
+        self.tool_results += 1
+        names: set = set()
+
+        def visit(node: dict) -> None:
+            name = node.get("name")
+            if isinstance(name, str) and name.strip():
+                names.add(normalise_name(name))
+            for key, value in node.items():
+                is_int = isinstance(value, int) and not isinstance(value, bool)
+                if key in _ID_KEYS and is_int:
+                    self.refs.add(str(value))
+                elif key == "address" and isinstance(value, str):
+                    self.refs.add(value)
+                elif key == "elements" and isinstance(value, dict):
+                    self.refs.update(str(k) for k in value)
+                elif key in _COUNT_KEYS and is_int:
+                    self.counts.add(value)
+                elif key in ("rows", "result", "citations") and isinstance(value, list):
+                    self.counts.add(len(value))
+                elif key in ("seed_element_ids", "element_ids") and isinstance(value, list):
+                    self.refs.update(str(v) for v in value if isinstance(v, int))
+
+        _walk(result, visit)
+        names.discard("")
+        if mutates:
+            self.receipt_names.update(names)
+        else:
+            self.names.update(names)
 
     @property
     def text(self) -> str:
         return " \n ".join(self._parts)
 
 
-def find_uncited_claims(response_text: str, grounding: Grounding) -> List[Dict]:
-    """Sentences of *response_text* that state a fact about the estate which
-    nothing in *grounding* supports. An empty list means the answer may be shown."""
+def _count_value(token: str):
+    """The integer a count token states, or None for a vague quantity."""
+    token = token.lower().replace(",", "")
+    if token.isdigit():
+        return int(token)
+    if token in _VAGUE:
+        return None
+    total = 0
+    for part in re.split(r"[ -]", token):
+        if part in _UNITS:
+            total += _UNITS[part]
+        elif part in _TENS:
+            total += _TENS[part]
+        elif part == "hundred":
+            total = max(total, 1) * 100
+        else:
+            return None
+    return total
+
+
+def candidate_phrases(text: str) -> set:
+    """Every 1..6-word normalised phrase of *text* (bounded): the candidates
+    looked up against the organisation's own names in one query."""
+    words = _words(text)
+    found: set = set()
+    for size in range(1, _MAX_NGRAM + 1):
+        for start in range(0, len(words) - size + 1):
+            phrase = " ".join(words[start:start + size])
+            if phrase and phrase not in _LEADING:
+                found.add(phrase)
+            if len(found) >= _MAX_CANDIDATES:
+                return found
+    return found
+
+
+def organisation_names_in_text(text: str, organization_id) -> set:
+    """Normalised names of the organisation's elements and applications that
+    appear in *text*: one query per model, fenced to the organisation. Empty
+    with no organisation."""
+    if organization_id is None or not text:
+        return set()
+    phrases = candidate_phrases(text)
+    if not phrases:
+        return set()
+    from sqlalchemy import func
+
+    from app.extensions import db
+
+    models = []
+    try:
+        from app.models import ArchiMateElement
+
+        models.append(ArchiMateElement)
+    except Exception:  # pragma: no cover - degraded module registration
+        pass
+    try:
+        from app.models.application_portfolio import ApplicationComponent
+
+        models.append(ApplicationComponent)
+    except Exception:  # pragma: no cover
+        pass
+    found: set = set()
+    # Names are compared whole and case-insensitively; punctuation is
+    # normalised again on the way out.
+    for model in models:
+        rows = db.session.execute(
+            db.select(model.name).where(
+                model.organization_id == organization_id,
+                func.lower(model.name).in_(list(phrases)),
+            )
+        ).scalars()
+        found.update(normalise_name(n) for n in rows if n)
+    found.discard("")
+    return found
+
+
+def _names_in(sentence: str, names: set) -> set:
+    words = _words(sentence)
+    hit: set = set()
+    for size in range(1, _MAX_NGRAM + 1):
+        for start in range(0, len(words) - size + 1):
+            phrase = " ".join(words[start:start + size])
+            if phrase in names:
+                hit.add(phrase)
+    return hit
+
+
+def _sentences(text: str) -> List[str]:
+    out: List[str] = []
+    for raw in _SENTENCE_SPLIT.split(text):
+        piece = raw.strip(" \t-*#>|")
+        if not piece:
+            continue
+        # A marker placed after the full stop belongs to the sentence before.
+        if out and not REF_MARKER.sub("", piece).strip(" .,;"):
+            out[-1] += " " + piece
+            continue
+        out.append(piece)
+    return out
+
+
+def find_uncited_claims(
+    response_text: str,
+    grounding: Grounding,
+    org_names: Optional[set] = None,
+    estate_question: bool = False,
+) -> List[Dict]:
+    """Sentences of *response_text* that state a fact about the estate which a
+    tool result of this turn does not support. An empty list means the answer
+    may be shown. See the notes above for what is and is not caught."""
     if not response_text or not response_text.strip():
         return []
-    haystack = grounding.text
-    uncited: List[Dict] = []
-    for raw in _SENTENCE_SPLIT.split(response_text):
-        sentence = raw.strip(" \t-*#>|")
-        if len(sentence) < 8 or sentence.endswith("?"):
-            continue
-        counts = _COUNT_CLAIM.findall(sentence)
-        if not (_CLAIM_VERB.search(sentence) or counts):
-            continue
+    statements = [
+        s for s in _sentences(response_text)
+        if len(s) >= 8 and not s.rstrip().endswith("?")
+    ]
 
+    if estate_question and grounding.tool_results == 0 and statements:
+        return [{
+            "claim": statements[0][:300],
+            "unsupported": ["no record was read for an estate question"],
+        }]
+
+    names = set(grounding.names) | set(grounding.receipt_names) | set(org_names or ())
+    names.discard("")
+    uncited: List[Dict] = []
+    for sentence in statements:
+        refs = REF_MARKER.findall(sentence)
+        clean = REF_MARKER.sub("", sentence)
         missing: List[str] = []
-        phrases = []
-        for match in _ENTITY_PHRASE.finditer(sentence):
-            phrase = match.group(0).strip().rstrip(".,;:/+&-")
-            first_word_alone = match.start() == 0 and " " not in phrase
-            if first_word_alone or phrase.lower() in _NOT_AN_ENTITY or len(phrase) < 3:
+
+        for match in _COUNT_CLAIM.finditer(clean):
+            if match.group(1).lower() == "one":
+                # "one element provides ..." is a pronoun-like use, not a count.
                 continue
-            phrases.append(phrase)
-            if phrase.lower() not in haystack:
-                missing.append(phrase)
-        for number, _noun in counts:
-            digits = number.replace(",", "")
-            if not re.search(r"(?<![\d.])%s(?![\d])" % re.escape(digits), haystack):
-                missing.append(number)
+            value = _count_value(match.group(1))
+            if value is None or value not in grounding.counts:
+                missing.append(match.group(1))
+
+        # A sentence about records this turn's own writes created or changed
+        # is a receipt of that write, not a reading of the estate.
+        named = {n for n in _names_in(clean, names) if n not in grounding.receipt_names}
+        if named:
+            if not refs:
+                missing.append("[ref:] marker for " + ", ".join(sorted(named)))
+            else:
+                missing.extend("[ref:%s]" % r for r in refs if r not in grounding.refs)
 
         if missing:
             uncited.append({"claim": sentence[:300], "unsupported": missing})
-        elif not phrases and not counts and grounding.tool_results == 0:
-            uncited.append({"claim": sentence[:300], "unsupported": []})
     return uncited
-
