@@ -160,6 +160,9 @@ def clone_session(session_id):
         db.session.commit()
 
         return jsonify({"success": True, "session_id": new_session.id})
+    except HTTPException:
+        # A 404 or 403 from the lookup is the refusal itself, not an internal error.
+        raise
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error cloning session {session_id}: {e}")

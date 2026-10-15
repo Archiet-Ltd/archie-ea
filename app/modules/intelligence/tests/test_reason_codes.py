@@ -117,11 +117,14 @@ _EXPECTED = {
     "drawn_by_not_recorded",
     "drawn_at_not_recorded",
     "rule_not_recorded",
+    "no_seed_elements",
+    "seed_limit_reached",
+    "rows_truncated",
 }
 
 
-def test_reason_codes_has_exactly_forty_nine_members():
-    assert len(REASON_CODES) == 49
+def test_reason_codes_has_exactly_fifty_two_members():
+    assert len(REASON_CODES) == 52
     assert REASON_CODES == frozenset(_EXPECTED)
 
 
