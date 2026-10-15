@@ -202,13 +202,20 @@ class BaseConnector(ABC):
         return aiohttp.ClientSession(trace_configs=[trace], **kwargs)
 
     def _same_origin_link(self, link: str) -> str:
-        """A server-supplied continuation link, only if it stays on the base URL's host."""
-        from urllib.parse import urlparse
+        """A server-supplied continuation link, only if it stays on the base URL's origin.
 
-        checked = validate_connector_url(link)
-        if urlparse(checked).netloc.lower() != urlparse(self._checked_base_url()).netloc.lower():
+        The guard and the origin comparison (scheme and host) apply to the link
+        as given; the link itself is returned unchanged, query string included,
+        because a paging token lives in the query.
+        """
+        from urllib.parse import urlsplit
+
+        validate_connector_url(link)  # raises ConnectorURLRefused if not allowed
+        got = urlsplit(link.strip())
+        want = urlsplit(self._checked_base_url())
+        if (got.scheme.lower(), got.netloc.lower()) != (want.scheme.lower(), want.netloc.lower()):
             raise ConnectorURLRefused("The connector URL is not an allowed address")
-        return checked
+        return link.strip()
 
     def validate_config(self) -> List[str]:
         """Validate connector configuration."""

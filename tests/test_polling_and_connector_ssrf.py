@@ -859,3 +859,50 @@ def test_vendor_servicenow_connector_refuses_internal_instance_and_redirects(pro
     good = ServiceNowConnector(instance_url="https://acme.service-now.com", username="u", password="p")
     good.health_check()
     assert requests_calls and requests_calls[0]["allow_redirects"] is False
+
+
+def test_abacus_paging_token_in_next_link_is_kept_and_pages_are_not_repeated(production_like, monkeypatch):
+    """Page 1 carries a nextLink with a $skiptoken; page 2 has none. Exactly two
+    requests, the second one carrying the token, each item returned once."""
+    import aiohttp
+
+    from app.connectors.abacus import AbacusConnector
+
+    requests_seen = []
+
+    async def fake_request(self, method, str_or_url, **kw):
+        url = str(str_or_url)
+        requests_seen.append(url)
+        if "skiptoken=abc" in url:
+            return _FakePage({"value": [{"Name": "B"}]})
+        return _FakePage({
+            "value": [{"Name": "A"}],
+            "@odata.nextLink": "https://tenant.example.com/api/Components?$skiptoken=abc",
+        })
+
+    monkeypatch.setattr(aiohttp.ClientSession, "_request", fake_request)
+    for method in ("fetch_applications", "fetch_capabilities"):
+        connector = _connector(AbacusConnector, "https://tenant.example.com")
+
+        async def token():
+            return "tok"
+
+        monkeypatch.setattr(connector, "_get_oauth_token", token)
+        monkeypatch.setattr(connector, "_transform_application", lambda a: a, raising=False)
+        monkeypatch.setattr(connector, "_transform_capability", lambda a: a, raising=False)
+        requests_seen.clear()
+        result = asyncio.run(getattr(connector, method)())
+        assert len(requests_seen) == 2, requests_seen
+        assert "skiptoken=abc" in requests_seen[1]
+        assert [r["Name"] for r in result] == ["A", "B"]
+
+
+def test_same_origin_link_compares_scheme_and_keeps_the_query(production_like):
+    from app.connectors.abacus import AbacusConnector
+    from app.services.connector_framework import ConnectorURLRefused
+
+    connector = _connector(AbacusConnector, "https://tenant.example.com")
+    link = "https://tenant.example.com/api/Components?$skiptoken=abc"
+    assert connector._same_origin_link(link) == link
+    with pytest.raises(ConnectorURLRefused):
+        connector._same_origin_link("http://tenant.example.com/api/Components?$skiptoken=abc")
