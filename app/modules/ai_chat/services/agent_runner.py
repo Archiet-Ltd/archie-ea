@@ -188,7 +188,8 @@ class AgentRunner:
         # Tokens of the model call in flight, held back until the gate has
         # judged the text so a refused answer is never partly shown.
         self._held_tokens: Optional[list] = None
-        self._withheld_claims: list = []
+        self._withheld_claims: list = []   # sentences refused (enforce mode)
+        self._would_withhold: list = []    # sentences logged only (log mode)
 
     GATE_MODES = ("log", "enforce", "off")
 
@@ -562,12 +563,15 @@ class AgentRunner:
             else self._classify_estate(user_message, context, history)
         )
         self._question_names = set()
-        try:
-            from app.middleware.tenant_context import current_org_id
+        self._withheld_claims = []
+        self._would_withhold = []
+        if self._gate_mode_now != "off":
+            try:
+                from app.middleware.tenant_context import current_org_id
 
-            self._question_names = organisation_names_in_text(user_message, current_org_id())
-        except Exception:
-            logger.warning("AgentRunner: question name lookup failed", exc_info=True)
+                self._question_names = organisation_names_in_text(user_message, current_org_id())
+            except Exception:
+                logger.warning("AgentRunner: question name lookup failed", exc_info=True)
         self._nudged = False
         self._gate_cache = None
 
@@ -1489,6 +1493,11 @@ class AgentRunner:
                         if self._withheld_claims
                         else {}
                     ),
+                    **(
+                        {"citation_gate_would_withhold": self._would_withhold}
+                        if self._would_withhold
+                        else {}
+                    ),
                 },
                 tools_called=[
                     {
@@ -1582,13 +1591,16 @@ class AgentRunner:
     )
 
     def _apply_citation_gate(self, result: dict) -> None:
-        """Refuse an answer whose factual claims about the estate cite nothing.
+        """Check an answer's statements about the estate against this turn's
+        tool results and context, according to ASSISTANT_CITATION_GATE_MODE.
 
-        A statement about the estate must rest on a row a tool returned this
-        turn (or on the context the model was handed). An answer with an
-        unsupported claim is replaced by an honest "not recorded", not shown
-        with a caveat. The claims withheld stay on the result for the audit,
-        under ``citation_gate``, and are never shown to the user.
+        "log" (default): the answer is shown unchanged; an answer the gate
+        would have refused is logged once (record names and reasons, not the
+        text) and its sentences are kept on the run record under
+        ``citation_gate_would_withhold``. "enforce": such an answer is replaced
+        by an honest "not recorded" and its sentences are kept under
+        ``citation_gate_withheld``. "off": nothing runs. The result carries
+        counts only (``citation_gate``); sentences never reach the browser.
         """
         mode = self._gate_mode_now
         text = result.get("response")
@@ -1614,9 +1626,12 @@ class AgentRunner:
             "uncited_count": len(uncited),
             "sources": len(result.get("sources") or []),
         }
-        self._withheld_claims = uncited
         if not uncited:
             return
+        if enforce:
+            self._withheld_claims = uncited
+        else:
+            self._would_withhold = uncited
         if enforce:
             logger.warning(
                 "AgentRunner: citation gate refused an answer (%d uncited claim(s))",

@@ -1718,3 +1718,33 @@ def test_the_prefix_does_not_promise_verification_or_blocking():
     assert "verified" not in lowered
     assert "blocked" not in lowered
     assert "[ref:<id>]" in _AGENT_PREFIX
+
+
+def test_off_mode_run_does_no_lookup_at_all(app, db_session, make_org, monkeypatch):
+    from app.modules.ai_chat.services import agent_runner as module
+
+    org = make_org("b53-off-run")
+    user = _user(db_session, org.id)
+    monkeypatch.setattr(AgentRunner, "_gate_mode", staticmethod(lambda: "off"))
+
+    def _boom(*a, **k):
+        raise AssertionError("no name lookup may run in off mode")
+
+    monkeypatch.setattr(module, "organisation_names_in_text", _boom)
+    text = "Ledger is impacted and Payments Gateway stops."
+    result, _e, _r, seen = _run_turn(
+        app, monkeypatch, [{"text": text}], user=user,
+        message="what breaks if Ledger fails?",
+    )
+    assert result["response"] == text
+    assert len(seen) == 1
+    assert "citation_gate" not in result
+
+
+def test_log_mode_sentences_are_recorded_under_would_withhold_not_withheld(monkeypatch):
+    runner = _mode_runner("log", monkeypatch)
+    runner._withheld_claims = []
+    result = {"response": "Ledger consumes Exadata nightly.", "sources": []}
+    runner._apply_citation_gate(result)
+    assert runner._withheld_claims == []
+    assert runner._would_withhold != []
