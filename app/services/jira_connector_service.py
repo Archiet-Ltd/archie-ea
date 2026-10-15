@@ -108,7 +108,20 @@ class JiraConnectorService:
         }
 
     def _instance_url(self, config: ConnectorConfig) -> str:
-        return (self._cfg_data(config).get("instance_url") or "").rstrip("/")
+        """The configured instance URL, or "" when unset or not an allowed address.
+
+        "" makes every caller treat the connector as unconfigured, so a saved URL
+        that now points inside the network is skipped rather than called.
+        """
+        from app.services.connector_framework import ConnectorURLRefused, validate_connector_url
+
+        raw = (self._cfg_data(config).get("instance_url") or "").rstrip("/")
+        if not raw:
+            return ""
+        try:
+            return validate_connector_url(raw)
+        except ConnectorURLRefused:
+            return ""
 
     # ------------------------------------------------------------------
     # HTTP wrapper
@@ -127,12 +140,18 @@ class JiraConnectorService:
         Returns the parsed JSON body on 2xx.
         Raises JiraConnectorError on non-2xx responses.
         """
-        resp = requests.request(method, url, headers=headers, json=json, timeout=10)
+        from app.services.connector_framework import ConnectorURLRefused, validate_connector_url
+
+        try:
+            validate_connector_url(url)
+        except ConnectorURLRefused as exc:
+            raise JiraConnectorError(str(exc)) from exc
+        resp = requests.request(
+            method, url, headers=headers, json=json, timeout=10, allow_redirects=False
+        )
         if not resp.ok:
-            raise JiraConnectorError(
-                f"Jira API {method} {url} returned {resp.status_code}: "
-                f"{resp.text[:300]}"
-            )
+            # Status only: the body is whatever the configured host answered.
+            raise JiraConnectorError(f"Jira API {method} returned {resp.status_code}")
         if resp.content:
             return resp.json()
         return {}
@@ -323,17 +342,25 @@ class JiraConnectorService:
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
-        url = f"{instance_url.rstrip('/')}/rest/api/3/myself"
+        from app.services.connector_framework import ConnectorURLRefused, validate_connector_url
+
+        # Before any request: the Basic credentials go to this host.
         try:
-            resp = requests.get(url, headers=headers, timeout=10)
+            base = validate_connector_url(instance_url)
+        except ConnectorURLRefused as exc:
+            return {"status": "error", "message": str(exc)}
+        url = f"{base}/rest/api/3/myself"
+        try:
+            resp = requests.get(url, headers=headers, timeout=10, allow_redirects=False)
             if resp.status_code == 200:
                 data = resp.json()
                 return {"status": "ok", "message": f"Connected as {data.get('displayName', email)}"}
-            return {"status": "error", "message": f"HTTP {resp.status_code}: {resp.text[:200]}"}
+            # Status only: never the answer of a user-chosen host.
+            return {"status": "error", "message": f"HTTP {resp.status_code}"}
         except requests.Timeout:
             return {"status": "error", "message": "Connection timed out (10s)"}
-        except Exception as exc:
-            return {"status": "error", "message": str(exc)[:200]}
+        except Exception:
+            return {"status": "error", "message": "Connection failed"}
 
 
 # ------------------------------------------------------------------

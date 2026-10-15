@@ -46,6 +46,22 @@ import hmac
 import hashlib
 import json
 from datetime import datetime, timedelta
+
+
+def _base_url_field_allowed(form) -> bool:
+    """Check a settings form's base_url with the outbound-URL guard before it is saved.
+
+    On refusal the reason is added to the field (the page re-renders with it) and
+    nothing is stored. On success the stored value is the cleaned URL.
+    """
+    from app.services.connector_framework import ConnectorURLRefused, validate_connector_url
+
+    try:
+        form.base_url.data = validate_connector_url(form.base_url.data)
+    except ConnectorURLRefused as exc:
+        form.base_url.errors = list(form.base_url.errors) + [str(exc)]
+        return False
+    return True
 from html import escape
 
 from werkzeug.exceptions import HTTPException
@@ -1567,7 +1583,7 @@ def abacus_settings():
 
     form = AbacusSettingsForm()
 
-    if form.validate_on_submit():
+    if form.validate_on_submit() and _base_url_field_allowed(form):
         import os
 
         credentials = {}
@@ -2453,7 +2469,7 @@ def jira_settings():
 
     form = JiraSettingsForm()
 
-    if form.validate_on_submit():
+    if form.validate_on_submit() and _base_url_field_allowed(form):
         credentials = {}
         if form.api_token.data and form.api_token.data.strip():
             credentials = {

@@ -18,6 +18,17 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+
+def _instance_base(config) -> str:
+    """The configured instance URL after the outbound-URL guard (raises ConnectorURLRefused).
+
+    Called before every request, and before the client secret is read, so a
+    refused URL never receives the secret.
+    """
+    from app.services.connector_framework import validate_connector_url
+
+    return validate_connector_url(config.instance_url)
+
 # ServiceNow OAuth2 token lifespan is 30 minutes; refresh with 60s margin
 _TOKEN_TTL_SECONDS = 29 * 60
 
@@ -84,7 +95,7 @@ class ServiceNowConnectorService:
                 "Authorization": f"Bearer {token}",
                 "Accept": "application/json",
             }
-            url = f"{config.instance_url.rstrip('/')}/api/now/table/cmdb_ci_appl"
+            url = f"{_instance_base(config)}/api/now/table/cmdb_ci_appl"
             params = {
                 "sysparm_fields": "name,sys_class_name,u_business_owner,sys_id",
                 "sysparm_limit": "1000",
@@ -94,12 +105,12 @@ class ServiceNowConnectorService:
             if ci_filter:
                 params["sysparm_query"] = ci_filter
 
-            resp = requests.get(url, headers=headers, params=params, timeout=10)
+            resp = requests.get(url, headers=headers, params=params, timeout=10, allow_redirects=False)
             if resp.status_code == 401:
                 self._token = None
                 token = self._get_token(config, org_id)
                 headers["Authorization"] = f"Bearer {token}"
-                resp = requests.get(url, headers=headers, params=params, timeout=10)
+                resp = requests.get(url, headers=headers, params=params, timeout=10, allow_redirects=False)
 
             resp.raise_for_status()
             records = resp.json().get("result", [])
@@ -173,7 +184,7 @@ class ServiceNowConnectorService:
                 "Content-Type": "application/json",
                 "Accept": "application/json",
             }
-            url = f"{config.instance_url.rstrip('/')}/api/now/table/change_request"
+            url = f"{_instance_base(config)}/api/now/table/change_request"
 
             approver_name = ""
             if arb_item.decided_by:
@@ -190,12 +201,12 @@ class ServiceNowConnectorService:
                 "type": "normal",
             }
 
-            resp = requests.post(url, json=payload, headers=headers, timeout=10)
+            resp = requests.post(url, json=payload, headers=headers, timeout=10, allow_redirects=False)
             if resp.status_code == 401:
                 self._token = None
                 token = self._get_token(config, org_id)
                 headers["Authorization"] = f"Bearer {token}"
-                resp = requests.post(url, json=payload, headers=headers, timeout=10)
+                resp = requests.post(url, json=payload, headers=headers, timeout=10, allow_redirects=False)
 
             resp.raise_for_status()
             data = resp.json().get("result", {})
@@ -237,13 +248,15 @@ class ServiceNowConnectorService:
         if self._token and now < self._token_expires_at:
             return self._token
 
+        token_base = _instance_base(config)  # before the secret is read
+
         from app.modules.codegen.services.credential_vault import OrgCredentialVault
 
         client_secret = OrgCredentialVault().retrieve(
             org_id=org_id, connector_type="servicenow", credential_type="client_secret"
         )
 
-        token_url = f"{config.instance_url.rstrip('/')}/oauth_token.do"
+        token_url = f"{token_base}/oauth_token.do"
         resp = requests.post(
             token_url,
             data={
@@ -252,6 +265,7 @@ class ServiceNowConnectorService:
                 "client_secret": client_secret,
             },
             timeout=10,
+            allow_redirects=False,
         )
         resp.raise_for_status()
         token_data = resp.json()

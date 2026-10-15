@@ -22,10 +22,23 @@ from dataclasses import dataclass
 from typing import List, Optional
 from urllib.parse import urlparse
 
+from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
+
 logger = logging.getLogger(__name__)
 
 _DEFAULT_TIMEOUT = 5  # seconds
 _MAX_URLS = 20
+_GENERIC_PROBE_ERROR = "not reachable"
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Turn a redirect into an HTTPError instead of following it."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_NO_REDIRECT_OPENER = urllib.request.build_opener(_NoRedirect)
 
 
 @dataclass
@@ -82,6 +95,8 @@ class InfrastructurePollingService:
                 if llm_results:
                     probed_sources.append("LLM APIs")
 
+            if additional_urls is not None and not isinstance(additional_urls, (list, tuple)):
+                return {"success": False, "error": "additional_urls must be a list of URLs"}
             if additional_urls:
                 for url in additional_urls[:_MAX_URLS]:
                     results.append(cls._probe_url(url, source="user_provided"))
@@ -117,9 +132,9 @@ class InfrastructurePollingService:
                     + (f" Delta: {len(delta_lines)} gap(s) vs modelled state." if delta_lines else " All endpoints up.")
                 ),
             }
-        except Exception as e:
+        except Exception:
             logger.exception("InfrastructurePollingService.poll_infrastructure failed")
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": "Infrastructure polling failed"}
 
     # ------------------------------------------------------------------ #
     # Source probers                                                        #
@@ -193,8 +208,20 @@ class InfrastructurePollingService:
     @classmethod
     def _probe_url(cls, url: str, source: str = "", timeout: int = _DEFAULT_TIMEOUT) -> EndpointStatus:
         import time
-        if not url or not url.startswith("http"):
-            return EndpointStatus(url=url, reachable=False, error="invalid URL (must start with http)", source=source)
+        if not isinstance(url, str) or not url.startswith("http"):
+            return EndpointStatus(
+                url=url if isinstance(url, str) else "", reachable=False,
+                error="invalid URL (must start with http)", source=source,
+            )
+
+        # Every probe, whoever supplied the URL, goes through the same guard as
+        # the webhooks. The answer is deliberately the same for "inside the
+        # network" and "does not resolve", so the tool is not a port scanner.
+        try:
+            validate_user_supplied_url(url)
+        except BlockedOutboundURL as exc:
+            logger.warning("poll_infrastructure: target refused (%s)", exc)
+            return EndpointStatus(url="", reachable=False, error=_GENERIC_PROBE_ERROR, source=source)
 
         # Redact any token in query string before logging
         parsed = urlparse(url)
@@ -203,21 +230,27 @@ class InfrastructurePollingService:
         try:
             start = time.monotonic()
             req = urllib.request.Request(safe_url, method="HEAD")
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with _NO_REDIRECT_OPENER.open(req, timeout=timeout) as resp:
                 elapsed_ms = int((time.monotonic() - start) * 1000)
                 return EndpointStatus(
                     url=safe_url, reachable=True,
                     status_code=resp.status, latency_ms=elapsed_ms, source=source,
                 )
         except urllib.error.HTTPError as e:
+            if 300 <= e.code < 400:
+                # A redirect is not followed and says nothing about where it led.
+                return EndpointStatus(
+                    url=safe_url, reachable=False, status_code=None,
+                    error=_GENERIC_PROBE_ERROR, source=source,
+                )
             # 4xx from the server = server reachable
-            elapsed_ms = int((time.monotonic() - start) * 1000) if 'start' in dir() else None  # type: ignore[arg-type]
             reachable = e.code < 500
             return EndpointStatus(
                 url=safe_url, reachable=reachable, status_code=e.code,
                 error=f"HTTP {e.code}" if not reachable else None, source=source,
             )
-        except (urllib.error.URLError, socket.timeout, OSError) as e:
-            return EndpointStatus(url=safe_url, reachable=False, error=str(e)[:80], source=source)
-        except Exception as e:  # noqa: BLE001
-            return EndpointStatus(url=safe_url, reachable=False, error=str(e)[:80], source=source)
+        except (urllib.error.URLError, socket.timeout, OSError):
+            # One answer for refused, closed, filtered, unresolvable and timed out.
+            return EndpointStatus(url=safe_url, reachable=False, error=_GENERIC_PROBE_ERROR, source=source)
+        except Exception:  # noqa: BLE001
+            return EndpointStatus(url=safe_url, reachable=False, error=_GENERIC_PROBE_ERROR, source=source)
