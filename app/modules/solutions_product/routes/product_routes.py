@@ -684,7 +684,13 @@ def check_compliance(solution_id):
     """
     from flask_login import current_user
     from app.models.published_api_spec import PublishedAPISpec
+    from app.models.solution_models import Solution
     from app.modules.solutions_product.services.compliance_checker import ComplianceChecker
+    from app.utils.route_guards import require_entity_in_active_org
+
+    # Published specs carry no organisation; the solution does. Resolve the
+    # solution in the active organisation before reading any spec.
+    require_entity_in_active_org(Solution, solution_id, description="Solution not found")
 
     body = request.json or {}
     service_url = body.get("service_url", "").strip()
@@ -696,6 +702,16 @@ def check_compliance(solution_id):
         return jsonify({"success": False, "error": "service_url must start with http:// or https://"}), 400
 
     spec_id = body.get("spec_id")
+    if spec_id:
+        # A posted spec id is only honoured for this solution's own specs.
+        if isinstance(spec_id, bool) or not isinstance(spec_id, int):
+            return jsonify({"success": False, "error": "spec_id must be an integer"}), 400
+        # PublishedAPISpec has no organisation column; it is keyed to this
+        # solution, which was proven to be the active organisation's above.
+        # tenant-scoping-ok: keyed to the solution proven in the active organisation
+        own_spec = PublishedAPISpec.query.filter_by(id=spec_id, solution_id=solution_id).first()
+        if own_spec is None:
+            return jsonify({"success": False, "error": "Spec not found"}), 404
     if not spec_id:
         # Use latest published spec for this solution
         latest_spec = (
@@ -921,7 +937,14 @@ def create_webhook(solution_id):
         "retry_count": 3
     }
     """
+    from app.models.solution_models import Solution
     from app.models.spec_webhook import SpecWebhook
+    from app.utils.route_guards import require_entity_in_active_org
+
+    # A webhook row has no organisation of its own and fire_webhooks selects by
+    # solution id alone, so the solution must be the caller's active
+    # organisation's before anything is registered against it.
+    require_entity_in_active_org(Solution, solution_id, description="Solution not found")
 
     body = request.json or {}
     url = (body.get("url") or "").strip()
