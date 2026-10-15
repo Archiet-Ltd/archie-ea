@@ -421,9 +421,6 @@ KNOWN_LEAKS = {
     # PR 421 (one work package store) scoped the deliverable update and delete
     # through the organisation's own work packages; test_known_leak_is_still_open
     # went XPASS(strict) on both, so their entries come out.
-    "DELETE /api/v1/mappings/application-to-vendor/<int:mapping_id>": "PR 269 (vendor/contract)",
-    "DELETE /api/v1/mappings/unified-to-application/<int:mapping_id>": "capability store brief",
-    "DELETE /api/v1/mappings/unified-to-vendor-org/<int:mapping_id>": "capability store brief",
     "DELETE /capability-map/api/archimate-mappings/<int:mapping_id>": "capability store brief",
     "DELETE /consolidation-list/api/entry/<int:entry_id>": _PR258,
     "PUT /consolidation-list/api/entry/<int:entry_id>": _PR258,
