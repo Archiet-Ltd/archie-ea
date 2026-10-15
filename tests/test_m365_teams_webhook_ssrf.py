@@ -38,6 +38,8 @@ REFUSED = [
     "https://environment.api.powerplatform.com.attacker.example/x",
     "https://outlook.office.com/webhookx/abc",
     "https://outlook.office.com/webhook/../api/v2.0/me",
+    "https://outlook.office.com/webhook/./x",
+    "https://outlook.office.com/webhook\@10.0.0.5/x",
 ]
 
 

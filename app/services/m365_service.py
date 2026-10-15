@@ -75,6 +75,8 @@ def validate_teams_webhook_url(url) -> str:
         if (
             not (path == "/webhook" or path.startswith("/webhook/"))
             or ".." in segments
+            or "." in segments
+            or "\\" in url
             or "%2e" in path.lower()
         ):
             raise BlockedOutboundURL("URL not allowed")
