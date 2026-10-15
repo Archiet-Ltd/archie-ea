@@ -13,6 +13,7 @@ import json
 import uuid
 
 import pytest
+from flask import current_app
 
 pytestmark = pytest.mark.usefixtures("db_session")
 
@@ -27,15 +28,10 @@ INTERNAL_URLS = [
     "http://192.168.1.10/spec",
     "file:///etc/passwd",
 ]
-# Passing needs the shared guard (PR 612 hardening) to reject non-ASCII hosts;
-# until it lands these cases are non-strict expected failures.
-_NEEDS_GUARD_HARDENING = pytest.mark.xfail(
-    strict=False, reason="shared guard (PR 612) must reject non-ASCII hosts"
-)
 NON_ASCII_HOSTS = [
-    pytest.param("http://１２７.0.0.1/spec.json", marks=_NEEDS_GUARD_HARDENING),  # full-width digits
-    pytest.param("http://127。0。0。1/spec.json", marks=_NEEDS_GUARD_HARDENING),  # ideographic full stops
-    pytest.param("http://localhost。/spec.json", marks=_NEEDS_GUARD_HARDENING),
+    "http://１２７.0.0.1/spec.json",  # full-width digits
+    "http://127。0。0。1/spec.json",  # ideographic full stops
+    "http://localhost。/spec.json",
 ]
 
 
@@ -81,7 +77,7 @@ def world(db_session, make_org, client, login_as):
 def production_like(monkeypatch):
     import app.utils.ssrf_guard as guard
 
-    monkeypatch.setattr(guard, "internal_targets_allowed", lambda: False)
+    monkeypatch.setitem(current_app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", False)
     monkeypatch.setattr(
         guard.socket,
         "getaddrinfo",
@@ -183,7 +179,7 @@ def test_fetch_never_calls_a_stored_internal_url(world, production_like, http_ca
 def test_fetch_of_name_that_now_resolves_inside_is_refused(world, monkeypatch, http_calls):
     import app.utils.ssrf_guard as guard
 
-    monkeypatch.setattr(guard, "internal_targets_allowed", lambda: False)
+    monkeypatch.setitem(current_app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", False)
     monkeypatch.setattr(
         guard.socket, "getaddrinfo",
         lambda host, port, *a, **k: [(2, 1, 6, "", ("169.254.169.254", port))],
