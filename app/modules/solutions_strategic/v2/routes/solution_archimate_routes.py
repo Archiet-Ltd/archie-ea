@@ -1063,8 +1063,19 @@ def propagate_stale(solution_id, element_id):
     (breadth-first, max 3 hops) to identify elements that may be stale
     because this element was edited or rejected.
     """
+    from app.middleware.tenant_context import current_org_id
     from app.models.archimate_core import ArchiMateRelationship
     from app.models.solution_models import SolutionArchiMateElement
+
+    # The solution-to-element junction has no organisation column, so the
+    # solution must be proven visible first. Name the active organisation
+    # explicitly (the automatic filter is off when it is unknown); a foreign
+    # or unknown solution is 404, never a membership answer.
+    org_id = current_org_id()
+    if org_id is None or not db.session.query(Solution.id).filter(
+        Solution.id == solution_id, Solution.organization_id == org_id
+    ).first():
+        return jsonify({"error": "Solution not found"}), 404
 
     # Get all element IDs in this solution for scope filtering
     linked = SolutionArchiMateElement.query.filter_by(
