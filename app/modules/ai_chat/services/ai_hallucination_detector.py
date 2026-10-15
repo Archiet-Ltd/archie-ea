@@ -758,12 +758,17 @@ def _check_sentence(sentence, grounding, tool_keys, context_keys, org_keys,
             if not covered:
                 missing.append("[ref:] marker for " + key)
         elif key in context_keys:
-            # The context grounds a sentence that names ONE record (what it
-            # is, has, or is owned by). A sentence naming two or more records
-            # asserts something between them, and every record in it must be
-            # grounded by this turn's rows, subject or markers.
-            if len(mentions) > 1 and key not in subject_keys:
-                missing.append("not in the answer rows: " + key)
+            # A marker after a context record must map to THAT record's id.
+            # Without one, the context grounds the record when the sentence
+            # carries no marker at all (every record in it is then one the
+            # model was handed); a sentence with markers needs each record to
+            # have its own.
+            run = next((r for r in runs if r["start"] >= mention["end"]), None)
+            if run is not None:
+                if not any(key in grounding.ref_names.get(i, ()) for i in run["ids"]):
+                    missing.append("marker does not belong to record: " + key)
+            elif markers and key not in subject_keys:
+                missing.append("[ref:] marker for " + key)
         else:
             missing.append("not returned this turn: " + key)
 

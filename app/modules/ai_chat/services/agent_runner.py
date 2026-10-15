@@ -71,12 +71,11 @@ GROUNDING — this is a system of record, so an unverifiable answer is worse tha
    context below. If neither, say you would need to look it up, and look it up.
 7a. For any question about what depends on, breaks with, or is owned in the estate, CALL
    the answer tool (or simulate_impact) before replying. Do not answer it from memory.
-7b. Every sentence that names a record of the estate and states something about it must
-   carry a marker [ref:<id>] where <id> is an element id or the answer address a tool
-   returned THIS turn. A stated count must equal a count the tool returned. A sentence
-   with no marker, or a marker for an id you were not given, is withheld.
-7c. General architecture guidance (patterns, TOGAF, ArchiMate concepts) is fine, but do
-   not name a record of this estate in it as if it were verified.
+7b. When you state a recorded fact about a record of the estate, cite it with a marker
+   [ref:<id>] where <id> is an element id or the answer address a tool returned this
+   turn. State counts as the tool returned them.
+7c. General architecture guidance (patterns, TOGAF, ArchiMate concepts) is fine; keep it
+   apart from statements about this estate.
 7d. What the user asserts, or an earlier turn said, is not a fact on record: look it up.
 8. Refer to records by the exact name the tool returned. The records you read are
    attached to your reply as sources automatically — you do not need to write links,
@@ -185,10 +184,33 @@ class AgentRunner:
         self._gate_cache = None
         self._context_struct = None
         self._question_names = set()
+        self._gate_mode_now = self._gate_mode()
         # Tokens of the model call in flight, held back until the gate has
         # judged the text so a refused answer is never partly shown.
         self._held_tokens: Optional[list] = None
         self._withheld_claims: list = []
+
+    GATE_MODES = ("log", "enforce", "off")
+
+    @staticmethod
+    def _gate_mode() -> str:
+        """ASSISTANT_CITATION_GATE_MODE: "log" (default: the answer is shown
+        unchanged and an answer the gate would refuse is logged), "enforce"
+        (the answer is replaced by "Not recorded") or "off". One place."""
+        import os
+
+        value = None
+        try:
+            from flask import current_app, has_app_context
+
+            if has_app_context():
+                value = current_app.config.get("ASSISTANT_CITATION_GATE_MODE")
+        except Exception:  # pragma: no cover - no application at all
+            value = None
+        if value is None:
+            value = os.environ.get("ASSISTANT_CITATION_GATE_MODE", "log")
+        value = str(value or "log").strip().lower()
+        return value if value in AgentRunner.GATE_MODES else "log"
 
     def _emit_token(self, text: str) -> None:
         """Stream a token, or hold it while the citation gate has not yet seen
@@ -534,7 +556,11 @@ class AgentRunner:
         self._grounding = Grounding()
         self._grounding.add_context(self._context_struct)
         self._grounding.add_context(self._context_text)
-        self._estate_question = self._classify_estate(user_message, context, history)
+        self._gate_mode_now = self._gate_mode()
+        self._estate_question = (
+            None if self._gate_mode_now == "off"
+            else self._classify_estate(user_message, context, history)
+        )
         self._question_names = set()
         try:
             from app.middleware.tenant_context import current_org_id
@@ -667,7 +693,8 @@ class AgentRunner:
                 # The final text is shown only if the citation gate passes it.
                 final_text = llm_resp.get("text") or ""
                 if (
-                    self._estate_question
+                    self._gate_mode_now == "enforce"
+                    and self._estate_question
                     and self._grounding.tool_results == 0
                     and not self._nudged
                     and iteration < MAX_ITERATIONS - 1
@@ -686,7 +713,12 @@ class AgentRunner:
                         ),
                     })
                     continue
-                gate_passes = not self._find_uncited(final_text)
+                if self._gate_mode_now == "enforce":
+                    gate_passes = not self._find_uncited(final_text)
+                else:
+                    # Monitor mode: the answer is shown unchanged; the gate
+                    # is evaluated (and logged) once, in _apply_citation_gate.
+                    gate_passes = True
                 self._release_held_tokens(gate_passes)
                 return self._finalize(
                     {
@@ -1533,7 +1565,9 @@ class AgentRunner:
             )
         except Exception:
             logger.warning("AgentRunner: citation gate failed", exc_info=True)
-            if self._estate_question or self._grounding.tool_results > 0:
+            if self._gate_mode_now == "enforce" and (
+                self._estate_question or self._grounding.tool_results > 0
+            ):
                 uncited = [{"claim": "", "unsupported": ["the citation check could not run"]}]
             else:
                 uncited = []
@@ -1556,27 +1590,67 @@ class AgentRunner:
         with a caveat. The claims withheld stay on the result for the audit,
         under ``citation_gate``, and are never shown to the user.
         """
+        mode = self._gate_mode_now
         text = result.get("response")
-        if result.get("error") or result.get("system_generated") \
+        if mode == "off" or result.get("error") or result.get("system_generated") \
                 or not isinstance(text, str) or not text.strip():
             return
-        uncited = self._find_uncited(text)
+        try:
+            uncited = self._find_uncited(text)
+        except Exception:
+            if mode == "enforce":
+                raise
+            logger.warning("AgentRunner: citation gate failed (monitor mode)", exc_info=True)
+            return
+        enforce = mode == "enforce"
         # Counts only: the result is spread into the stream's done event, and
         # the claims withheld must not reach the browser. They go to the run
         # record (see _record_run) and the log.
         result["citation_gate"] = {
             "checked": True,
-            "refused": bool(uncited),
+            "mode": mode,
+            "refused": bool(uncited) and enforce,
+            "would_refuse": bool(uncited),
             "uncited_count": len(uncited),
             "sources": len(result.get("sources") or []),
         }
         self._withheld_claims = uncited
-        if uncited:
+        if not uncited:
+            return
+        if enforce:
             logger.warning(
                 "AgentRunner: citation gate refused an answer (%d uncited claim(s))",
                 len(uncited),
             )
             result["response"] = self.CITATION_REFUSAL
+            return
+        self._log_would_refuse(uncited)
+
+    def _log_would_refuse(self, uncited: list) -> None:
+        """One structured WARNING per answer the gate would have refused. The
+        unverified record names are logged; the answer text is not."""
+        try:
+            from app.middleware.tenant_context import current_org_id
+
+            organization_id = current_org_id()
+        except Exception:
+            organization_id = None
+        reasons = []
+        for claim in uncited[:20]:
+            reasons.extend(str(item)[:120] for item in claim.get("unsupported", [])[:5])
+        event = {
+            "event": "citation_gate_would_refuse",
+            "mode": "log",
+            "organization_id": organization_id,
+            "conversation_id": self.chat_session_id,
+            "question_class": self._estate_question,
+            "unverified_sentences": len(uncited),
+            "reasons": reasons,
+        }
+        logger.warning(
+            "citation_gate_would_refuse %s", json.dumps(event, default=str),
+            extra={"gate_event": event},
+        )
 
     def _finalize(
         self,

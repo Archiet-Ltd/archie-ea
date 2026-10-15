@@ -32,6 +32,13 @@ from app.modules.ai_chat.tools.registry import TOOL_SCHEMA_BY_NAME, TOOL_SCHEMAS
 # --------------------------------------------------------------------------- #
 
 
+@pytest.fixture(autouse=True)
+def _enforce_mode(monkeypatch):
+    """The shipped default is monitor ("log") mode; the refusal tests below
+    exercise "enforce". The mode tests at the end set their own."""
+    monkeypatch.setattr(AgentRunner, "_gate_mode", staticmethod(lambda: "enforce"))
+
+
 def _user(db_session, org_id):
     from app.models.user import User
 
@@ -1137,7 +1144,7 @@ def test_context_names_do_not_ground_an_impact_statement_when_rows_were_returned
         "If Ledger [ref:9] fails, Treasury Feed and Clearing Hub stop.",
         grounding, org_names=names, estate_question=True,
     )
-    assert claims and "not in the answer rows: treasury feed" in " ".join(claims[0]["unsupported"])
+    assert claims and "treasury feed" in " ".join(claims[0]["unsupported"])
     # Descriptive statements and quoted context counts are grounded by it.
     assert find_uncited_claims("Treasury Feed is linked to this solution.", grounding,
                                org_names=names, estate_question=True) == []
@@ -1340,20 +1347,17 @@ def test_a_generic_follow_up_gets_no_nudge_and_no_not_recorded(
 @pytest.mark.parametrize(
     "text",
     [
-        "Core Banking depends on Treasury Feed and Clearing Hub.",
-        "If Clearing Hub fails, Treasury Feed and Core Banking stop.",
-        "Treasury Feed feeds Clearing Hub.",
+        "Core Banking depends on Treasury Feed and Settlement Hub.",
+        "If Settlement Hub fails, Treasury Feed and Core Banking stop.",
+        "Treasury Feed feeds Settlement Hub.",
     ],
 )
-def test_context_never_grounds_a_relationship_statement(text):
+def test_context_does_not_ground_a_record_it_does_not_carry(text):
     context = {"applications": [{"id": 1, "name": "Core Banking"},
                                 {"id": 2, "name": "Treasury Feed"},
                                 {"id": 3, "name": "Clearing Hub"}]}
-    grounding = _grounded(context=context)
-    assert find_uncited_claims(text, grounding, org_names=R5_NAMES, estate_question=False) != []
-    # and the same with rows returned
-    assert find_uncited_claims(text, _grounded(IMPACT, context=context),
-                               org_names=R5_NAMES, estate_question=True) != []
+    names = R5_NAMES | {"settlement hub"}
+    assert find_uncited_claims(text, _grounded(context=context), org_names=names) != []
 
 
 def test_context_grounds_a_descriptive_sentence_including_ownership():
@@ -1461,20 +1465,38 @@ def test_a_short_one_record_clarification_about_the_users_own_record_passes():
 @pytest.mark.parametrize(
     "text",
     [
-        "Clearing Hub requires Treasury Feed.",
-        "Treasury Feed is upstream of Clearing Hub.",
-        "An outage of Core Banking takes Clearing Hub offline.",
+        "Clearing Hub requires Treasury Feed and Ledger Core.",
+        "An outage of Core Banking takes Clearing Hub and Settlement Hub offline.",
         "Treasury Feed also requires Core Banking [ref:5].",
+        "Core Banking [ref:5] requires Treasury Feed.",
     ],
 )
-def test_a_sentence_naming_two_records_is_not_grounded_by_the_context(text):
+def test_a_multi_record_sentence_is_refused_unless_every_record_is_grounded_or_marked(text):
     context = {"applications": [{"id": 1, "name": "Core Banking"},
                                 {"id": 2, "name": "Treasury Feed"},
                                 {"id": 3, "name": "Clearing Hub"}]}
+    names = R5_NAMES | {"ledger core", "settlement hub"}
     for grounding, estate in ((_grounded(context=context), False),
                               (_grounded(IMPACT, context=context), True)):
         assert find_uncited_claims(
-            text, grounding, org_names=R5_NAMES, estate_question=estate) != [], text
+            text, grounding, org_names=names, estate_question=estate) != [], text
+
+
+def test_a_multi_record_sentence_of_context_records_without_markers_passes():
+    context = {"applications": [{"id": 1, "name": "Core Banking"},
+                                {"id": 2, "name": "Treasury Feed"},
+                                {"id": 3, "name": "Clearing Hub"}]}
+    grounding = _grounded(context=context)
+    for text in ("Clearing Hub requires Treasury Feed.",
+                 "Core Banking and Treasury Feed are both linked to this solution."):
+        assert find_uncited_claims(text, grounding, org_names=R5_NAMES) == [], text
+    # each record with its own marker also grounds the sentence
+    assert find_uncited_claims(
+        "Clearing Hub [ref:3] requires Treasury Feed [ref:2].", grounding,
+        org_names=R5_NAMES) == []
+    # a marker that belongs to another record does not
+    assert find_uncited_claims(
+        "Clearing Hub [ref:2] requires Treasury Feed.", grounding, org_names=R5_NAMES) != []
 
 
 def test_a_sentence_naming_one_context_record_is_grounded_by_it():
@@ -1557,3 +1579,142 @@ def test_names_with_apostrophes_are_matched_to_their_rows(
     assert expected in found, (said, found)
     claims = find_uncited_claims(said, _grounded(), org_names=found)
     assert claims != [], said
+
+
+# --------------------------------------------------------------------------- #
+# Monitor mode (the default) and the mode switch                               #
+# --------------------------------------------------------------------------- #
+
+LOG_EVENT = "citation_gate_would_refuse"
+
+# Answers the gate refuses in enforce mode, including the shapes the review of
+# the gate keeps finding (a context record with another record's marker, a
+# claim split across sentences, a name at the start of a sentence).
+WOULD_REFUSE = [
+    "Payments Gateway depends on Exadata [ref:12345].",
+    "Ledger [ref:7] is impacted.",
+    "Ledger is impacted. It takes Core Banking down.",
+    "Ledger consumes Exadata nightly.",
+    "Fourteen applications are affected.",
+]
+
+
+def _mode_runner(mode, monkeypatch):
+    monkeypatch.setattr(AgentRunner, "_gate_mode", staticmethod(lambda: mode))
+    runner = AgentRunner(user_id=1, chat_session_id="thread-77")
+    runner._grounding = _grounded(IMPACT)
+    runner._estate_question = "impact"
+    runner._question_names = set()
+    return runner
+
+
+@pytest.mark.parametrize("text", WOULD_REFUSE)
+def test_log_mode_shows_the_answer_unchanged_and_logs_one_event(text, monkeypatch, caplog):
+    import logging
+
+    runner = _mode_runner("log", monkeypatch)
+    result = {"response": text, "sources": []}
+    with caplog.at_level(logging.WARNING):
+        runner._apply_citation_gate(result)
+
+    assert result["response"] == text
+    assert result["citation_gate"]["refused"] is False
+    assert result["citation_gate"]["would_refuse"] is True
+    events = [r for r in caplog.records if LOG_EVENT in r.getMessage()]
+    assert len(events) == 1
+    record = events[0]
+    event = record.gate_event
+    assert event["conversation_id"] == "thread-77"
+    assert event["question_class"] == "impact"
+    assert event["unverified_sentences"] >= 1
+    assert event["reasons"]
+    assert "organization_id" in event
+    assert text not in record.getMessage(), "the answer text is not logged"
+
+
+@pytest.mark.parametrize("text", WOULD_REFUSE)
+def test_enforce_mode_still_refuses_the_same_answers(text, monkeypatch, caplog):
+    runner = _mode_runner("enforce", monkeypatch)
+    result = {"response": text, "sources": []}
+    runner._apply_citation_gate(result)
+    assert result["response"] == AgentRunner.CITATION_REFUSAL
+    assert result["citation_gate"]["refused"] is True
+
+
+@pytest.mark.parametrize("text", WOULD_REFUSE)
+def test_off_mode_runs_nothing(text, monkeypatch, caplog):
+    from app.modules.ai_chat.services import agent_runner as module
+
+    runner = _mode_runner("off", monkeypatch)
+
+    def _boom(*a, **k):
+        raise AssertionError("the gate must not run in off mode")
+
+    monkeypatch.setattr(module, "find_uncited_claims", _boom)
+    monkeypatch.setattr(module, "organisation_names_in_text", _boom)
+    result = {"response": text, "sources": []}
+    runner._apply_citation_gate(result)
+    assert result["response"] == text
+    assert "citation_gate" not in result
+    assert not [r for r in caplog.records if LOG_EVENT in r.getMessage()]
+
+
+@pytest.mark.parametrize("mode", ["log", "off"])
+def test_a_gate_exception_never_breaks_the_answer_in_log_or_off_mode(mode, monkeypatch):
+    from app.modules.ai_chat.services import agent_runner as module
+
+    runner = _mode_runner(mode, monkeypatch)
+
+    def _boom(*a, **k):
+        raise RuntimeError("gate down")
+
+    monkeypatch.setattr(module, "find_uncited_claims", _boom)
+    monkeypatch.setattr(module, "organisation_names_in_text", _boom)
+    result = {"response": "Ledger [ref:9] is impacted.", "sources": []}
+    runner._apply_citation_gate(result)
+    assert result["response"] == "Ledger [ref:9] is impacted."
+
+
+def test_the_default_mode_is_log_and_unknown_values_fall_back_to_it(monkeypatch):
+    monkeypatch.undo()
+    from flask import Flask
+
+    app = Flask(__name__)
+    with app.app_context():
+        assert AgentRunner._gate_mode() == "log"
+        app.config["ASSISTANT_CITATION_GATE_MODE"] = "ENFORCE"
+        assert AgentRunner._gate_mode() == "enforce"
+        app.config["ASSISTANT_CITATION_GATE_MODE"] = "banana"
+        assert AgentRunner._gate_mode() == "log"
+        app.config["ASSISTANT_CITATION_GATE_MODE"] = "off"
+        assert AgentRunner._gate_mode() == "off"
+
+
+def test_log_mode_turn_streams_the_answer_unchanged_and_never_nudges(
+    app, db_session, make_org, monkeypatch, caplog
+):
+    import logging
+
+    org = make_org("b53-logturn")
+    user = _user(db_session, org.id)
+    _element(db_session, org.id, "Settlement Stack")
+    db_session.commit()
+    monkeypatch.setattr(AgentRunner, "_gate_mode", staticmethod(lambda: "log"))
+    text = "oracle exadata sits under the settlement stack"
+    with caplog.at_level(logging.WARNING):
+        result, events, _r, seen = _run_turn(
+            app, monkeypatch, [{"text": text}], user=user, stream=True,
+            message="what breaks if Settlement Stack fails?",
+        )
+    assert len(seen) == 1, "no nudge turn in monitor mode"
+    assert result["response"] == text
+    assert "".join(e["text"] for e in events if e.get("type") == "token") == text
+
+
+def test_the_prefix_does_not_promise_verification_or_blocking():
+    from app.modules.ai_chat.services.agent_runner import _AGENT_PREFIX
+
+    lowered = _AGENT_PREFIX.lower()
+    assert "verified" not in lowered
+    assert "blocked" not in lowered
+    assert "[ref:<id>]" in _AGENT_PREFIX
