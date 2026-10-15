@@ -700,8 +700,8 @@ def check_compliance(solution_id):
     try:
         validate_user_supplied_url(service_url)
         check_timeout = clamp_timeout(body.get("timeout", 10))
-    except BlockedOutboundURL as exc:
-        return jsonify({"success": False, "error": f"service_url refused: {exc}"}), 400
+    except BlockedOutboundURL:
+        return jsonify({"success": False, "error": "service_url refused: URL not allowed"}), 400
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
 
@@ -957,8 +957,8 @@ def create_webhook(solution_id):
 
     try:
         validate_user_supplied_url(url)
-    except BlockedOutboundURL as exc:
-        return jsonify({"success": False, "error": f"url refused: {exc}"}), 400
+    except (BlockedOutboundURL, ValueError):
+        return jsonify({"success": False, "error": "url refused: URL not allowed"}), 400
 
     auth_header_env = body.get("auth_header_env")
     if auth_header_env in ("", None):
@@ -1050,8 +1050,8 @@ def update_webhook(solution_id, webhook_id):
 
         try:
             validate_user_supplied_url(url)
-        except BlockedOutboundURL as exc:
-            return jsonify({"success": False, "error": f"url refused: {exc}"}), 400
+        except (BlockedOutboundURL, ValueError):
+            return jsonify({"success": False, "error": "url refused: URL not allowed"}), 400
         webhook.url = url
 
     if "event_types" in body:

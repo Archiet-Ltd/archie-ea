@@ -51,20 +51,68 @@ SALESFORCE_HOST_SUFFIXES = (
 )
 
 
+_CGNAT = ipaddress.ip_network("100.64.0.0/10")
+
+
+def _refuse(detail: str):
+    """Log the specific reason; give the caller a message that reveals nothing
+    about resolution (open/closed hosts, resolved addresses)."""
+    logger.info("Outbound URL refused: %s", detail)
+    raise BlockedOutboundURL("URL not allowed")
+
+
+def _local_interface_addresses():
+    addrs = set()
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None):
+            addrs.add(info[4][0].split("%")[0])
+    except OSError:
+        pass
+    return addrs
+
+
+def _configured_blocked_networks():
+    try:
+        from flask import current_app
+
+        raw = current_app.config.get("SSRF_BLOCKED_CIDRS") or []
+    except RuntimeError:
+        raw = []
+    nets = []
+    for item in raw:
+        try:
+            nets.append(ipaddress.ip_network(str(item).strip(), strict=False))
+        except ValueError:
+            logger.warning("Ignoring invalid SSRF_BLOCKED_CIDRS entry")
+    return nets
+
+
 def _is_public_ip(addr: str) -> bool:
     try:
-        ip = ipaddress.ip_address(addr)
+        ip = ipaddress.ip_address(addr.split("%")[0])
     except ValueError:
         return False
-    return not (
+    mapped = getattr(ip, "ipv4_mapped", None)
+    if mapped is not None:
+        ip = mapped
+    if (
         ip.is_private
         or ip.is_loopback
-        or ip.is_link_local        # 169.254.0.0/16 — cloud metadata lives here
+        or ip.is_link_local        # 169.254.0.0/16 - cloud metadata lives here
         or ip.is_multicast
         or ip.is_reserved
         or ip.is_unspecified
         or getattr(ip, "is_site_local", False)
-    )
+        or (ip.version == 4 and ip in _CGNAT)
+        or not ip.is_global
+    ):
+        return False
+    if any(ip in net for net in _configured_blocked_networks() if net.version == ip.version):
+        return False
+    own = _local_interface_addresses()
+    if str(ip) in own or addr.split("%")[0] in own:
+        return False
+    return True
 
 
 def validate_outbound_url(url: str, allowed_host_suffixes=(), require_https=True) -> str:
@@ -73,39 +121,48 @@ def validate_outbound_url(url: str, allowed_host_suffixes=(), require_https=True
     ``allowed_host_suffixes`` is mandatory in practice: passing an empty tuple
     reduces this to the private-range block alone, which is a weaker control
     and should only be used where no meaningful allow-list exists.
+
+    The exception message is always generic; the reason is logged.
     """
     if not url or not isinstance(url, str):
-        raise BlockedOutboundURL("No URL supplied")
+        _refuse("no URL supplied")
 
-    parsed = urlparse(url.strip())
+    try:
+        parsed = urlparse(url.strip())
+        port = parsed.port
+        host = (parsed.hostname or "").strip().rstrip(".").lower()
+    except ValueError:
+        _refuse("malformed URL")
 
     if parsed.scheme not in ("https", "http"):
-        raise BlockedOutboundURL(
-            f"Scheme {parsed.scheme!r} is not permitted for an outbound fetch"
-        )
+        _refuse(f"scheme {parsed.scheme!r} not permitted")
     if require_https and parsed.scheme != "https":
-        raise BlockedOutboundURL("Outbound integration URLs must use https")
+        _refuse("https required")
 
-    host = (parsed.hostname or "").strip().rstrip(".").lower()
     if not host:
-        raise BlockedOutboundURL("URL has no host")
+        _refuse("no host")
+
+    # getaddrinfo (IDNA 2003) and requests/urllib3 (IDNA 2008 / UTS 46) can
+    # turn the same Unicode host into different ASCII names, so what we resolve
+    # is not what gets requested. Refuse non-ASCII hosts outright; a legitimate
+    # internationalised host can be supplied in its xn-- form.
+    if not host.isascii():
+        _refuse("non-ASCII host")
 
     # Credentials in the URL (user:pass@host) are a redirect/parse-confusion
     # vector and are never legitimate here.
     if parsed.username or parsed.password:
-        raise BlockedOutboundURL("Credentials embedded in URL are not permitted")
+        _refuse("embedded credentials")
 
     if allowed_host_suffixes:
         if not any(
             host == s.lstrip(".") or host.endswith(s) for s in allowed_host_suffixes
         ):
-            raise BlockedOutboundURL(
-                f"Host {host!r} is not on the allow-list for this integration"
-            )
+            _refuse(f"host {host!r} not on allow-list")
 
     # Names that mean "this machine" whatever a resolver (or a test double) says.
     if host == "localhost" or host.endswith(".localhost"):
-        raise BlockedOutboundURL(f"Host {host!r} is a loopback name")
+        _refuse("loopback name")
 
     # A literal IP host skips DNS but must still be public.
     try:
@@ -116,24 +173,20 @@ def validate_outbound_url(url: str, allowed_host_suffixes=(), require_https=True
 
     if literal_ip:
         if not _is_public_ip(host):
-            raise BlockedOutboundURL(
-                f"Host {host!r} resolves to a non-public address"
-            )
+            _refuse(f"{host!r} is a non-public address")
         return url
 
     try:
-        infos = socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80))
-    except socket.gaierror as exc:
-        raise BlockedOutboundURL(f"Host {host!r} does not resolve ({exc})") from exc
+        infos = socket.getaddrinfo(host, port or (443 if parsed.scheme == "https" else 80))
+    except (socket.gaierror, UnicodeError) as exc:
+        _refuse(f"{host!r} does not resolve ({exc})")
 
     addresses = {info[4][0] for info in infos}
     if not addresses:
-        raise BlockedOutboundURL(f"Host {host!r} does not resolve")
+        _refuse(f"{host!r} does not resolve")
     for addr in addresses:
         if not _is_public_ip(addr):
-            raise BlockedOutboundURL(
-                f"Host {host!r} resolves to non-public address {addr}"
-            )
+            _refuse(f"{host!r} resolves to non-public address {addr}")
 
     return url
 
@@ -144,19 +197,15 @@ def validate_salesforce_instance_url(url: str) -> str:
 
 
 def internal_targets_allowed() -> bool:
-    """True only in development or testing configuration.
+    """True only where the configuration says so (Development and Testing).
 
     Loopback and private addresses are legitimate webhook and compliance-check
-    targets on a developer machine; in any other configuration they are the
-    route to the host's own services and the cloud metadata address.
+    targets on a developer machine; elsewhere they are the route to the host's
+    own services and the cloud metadata address. Production defaults to deny.
     """
-    import os
-
     from flask import current_app
 
-    if current_app.config.get("TESTING") or current_app.debug:
-        return True
-    return os.environ.get("FLASK_ENV", "").lower() in ("development", "testing")
+    return bool(current_app.config.get("ALLOW_INTERNAL_WEBHOOK_TARGETS", False))
 
 
 def validate_user_supplied_url(url: str) -> str:
@@ -169,8 +218,12 @@ def validate_user_supplied_url(url: str) -> str:
     Raises :class:`BlockedOutboundURL`.
     """
     if internal_targets_allowed():
-        if not isinstance(url, str) or urlparse(url.strip()).scheme not in ("http", "https"):
-            raise BlockedOutboundURL("URL must start with http:// or https://")
+        try:
+            scheme = urlparse(url.strip()).scheme if isinstance(url, str) else ""
+        except ValueError:
+            scheme = ""
+        if scheme not in ("http", "https"):
+            raise BlockedOutboundURL("URL not allowed")
         return url
     return validate_outbound_url(url, allowed_host_suffixes=(), require_https=False)
 

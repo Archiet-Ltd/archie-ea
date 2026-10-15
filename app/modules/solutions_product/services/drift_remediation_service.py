@@ -149,7 +149,7 @@ class DriftRemediationService:
         # existed, or a host whose DNS now points inside, must not be called.
         try:
             validate_user_supplied_url(webhook.url)
-        except BlockedOutboundURL as exc:
+        except (BlockedOutboundURL, ValueError) as exc:
             logger.warning("Webhook %s not sent: target refused (%s)", webhook.id, exc)
             webhook.last_triggered_at = datetime.utcnow()
             webhook.last_status = "failed"

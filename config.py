@@ -103,6 +103,14 @@ else:
 
 
 class Config:
+    # Webhook and compliance-check URLs may point at loopback/private hosts only
+    # where this is True (Development and Testing). Production stays deny.
+    ALLOW_INTERNAL_WEBHOOK_TARGETS = False
+    # Extra networks the outbound-URL guard refuses (comma-separated CIDRs).
+    SSRF_BLOCKED_CIDRS = [
+        c.strip() for c in os.environ.get("SSRF_BLOCKED_CIDRS", "").split(",") if c.strip()
+    ]
+
     APP_NAME = os.environ.get("APP_NAME", "Entelim")
     SECRET_KEY = os.environ.get("SECRET_KEY")
     if not SECRET_KEY:
@@ -494,6 +502,7 @@ class Config:
 
 class DevelopmentConfig(Config):
     DEBUG = True
+    ALLOW_INTERNAL_WEBHOOK_TARGETS = True
     ASSETS_DEBUG = True
 
     # N+1 query detection — set SQLALCHEMY_ECHO=true in .env to enable query logging
@@ -542,6 +551,7 @@ class DevelopmentConfig(Config):
 
 class TestingConfig(Config):
     TESTING = True
+    ALLOW_INTERNAL_WEBHOOK_TARGETS = True
     # Pinned explicitly rather than left to inherit Flask's own default, which
     # falls back to the ambient FLASK_DEBUG/FLASK_ENV environment variables
     # (get_debug_flag()) whenever a config class leaves DEBUG unset. A

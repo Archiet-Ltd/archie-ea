@@ -85,6 +85,22 @@ def production_like(monkeypatch):
         guard.socket, "getaddrinfo",
         lambda host, port, *a, **k: [(2, 1, 6, "", ("93.184.216.34", port))],
     )
+    # The stub answers for the host's own name too; do not let that count as
+    # "the server's own address".
+    monkeypatch.setattr(guard, "_local_interface_addresses", lambda: set())
+
+
+def _spec(db_session, solution):
+    from app.models.published_api_spec import PublishedAPISpec
+
+    row = PublishedAPISpec(
+        solution_id=solution.id, spec_type="openapi", spec_version="1.0.0",
+        spec_content={"openapi": "3.0.0", "paths": {"/a": {"get": {}}}},
+        status="published",
+    )
+    db_session.add(row)
+    db_session.flush()
+    return row
 
 
 @pytest.fixture
@@ -273,28 +289,33 @@ def test_localhost_webhook_still_allowed_in_testing_config(world, http_calls):
     assert r.status_code == 201
 
 
-@pytest.mark.parametrize("url", BAD_URLS[:11])
-def test_compliance_check_rejects_internal_service_url(world, production_like, monkeypatch, url):
+@pytest.mark.parametrize("url", BAD_URLS[:10])
+def test_compliance_check_rejects_internal_service_url(world, db_session, production_like, monkeypatch, url):
     import requests
+
+    spec = _spec(db_session, world.sol_a)
 
     sent = []
     monkeypatch.setattr(requests, "get", lambda *a, **k: sent.append(a) or None)
     monkeypatch.setattr(requests, "request", lambda *a, **k: sent.append(a) or None)
     r = world.as_a().post(f"/api/solutions/{world.sol_a.id}/compliance/check",
-                          json={"service_url": url})
+                          json={"service_url": url, "spec_id": spec.id})
     assert r.status_code == 400, (url, r.get_json())
+    assert "refused" in r.get_json()["error"]
     assert sent == []
 
 
-def test_checker_refuses_internal_url_even_when_called_directly(world, production_like, monkeypatch):
+def test_checker_refuses_internal_url_even_when_called_directly(world, db_session, production_like, monkeypatch):
     """Scheduled checks reach ComplianceChecker without the route."""
     import requests
     from app.modules.solutions_product.services.compliance_checker import ComplianceChecker
 
     sent = []
     monkeypatch.setattr(requests, "get", lambda *a, **k: sent.append(a))
-    out = ComplianceChecker().check(published_spec_id=1, service_url="http://169.254.169.254")
+    spec = _spec(db_session, world.sol_a)
+    out = ComplianceChecker().check(published_spec_id=spec.id, service_url="http://169.254.169.254")
     assert out["success"] is False and sent == []
+    assert "refused" in out["error"]
 
 
 # --- timeout clamp (A-4) --------------------------------------------------------
@@ -322,8 +343,7 @@ def test_compliance_check_route_400_on_non_numeric_timeout(world):
     assert r.status_code == 400
 
 
-def test_compliance_check_route_passes_clamped_timeout(world, production_like, monkeypatch):
-    from app.models.published_api_spec import PublishedAPISpec  # noqa: F401
+def test_compliance_check_route_passes_clamped_timeout(world, db_session, production_like, monkeypatch):
     from app.modules.solutions_product.services import compliance_checker as cc
 
     seen = {}
@@ -332,9 +352,115 @@ def test_compliance_check_route_passes_clamped_timeout(world, production_like, m
         seen["timeout"] = timeout
         return {"success": True}
 
+    spec = _spec(db_session, world.sol_a)
     monkeypatch.setattr(cc.ComplianceChecker, "check", fake_check)
     r = world.as_a().post(f"/api/solutions/{world.sol_a.id}/compliance/check",
                           json={"service_url": "https://hooks.example.com", "timeout": 99999,
-                                "spec_id": 1})
+                                "spec_id": spec.id})
     assert r.status_code == 200
     assert seen["timeout"] == 30
+
+
+# --- review round: guard bypasses and hygiene ------------------------------------
+
+
+def test_non_ascii_host_is_refused_idna_differential(monkeypatch):
+    """getaddrinfo (IDNA 2003) maps the sharp-s host to 'fass'; requests (IDNA
+    2008) asks for 'xn--fa-hia'. Validate-then-request must not see two hosts."""
+    import app.utils.ssrf_guard as guard
+
+    def stub(host, port, *a, **k):
+        ip = "169.254.169.254" if host.startswith("xn--") else "93.184.216.34"
+        return [(2, 1, 6, "", (ip, port))]
+
+    monkeypatch.setattr(guard.socket, "getaddrinfo", stub)
+    monkeypatch.setattr(guard, "_local_interface_addresses", lambda: set())
+    with pytest.raises(guard.BlockedOutboundURL):
+        guard.validate_outbound_url("https://fa\u00df.attacker.example/x", require_https=False)
+    # The ASCII form is judged on what it really resolves to.
+    with pytest.raises(guard.BlockedOutboundURL):
+        guard.validate_outbound_url("https://xn--fa-hia.attacker.example/x", require_https=False)
+    assert guard.validate_outbound_url("https://fass.attacker.example/x", require_https=False)
+
+
+def test_non_ascii_webhook_url_rejected_by_route(world, production_like):
+    r = _create(world.as_a(), world.sol_a.id, url="https://fa\u00df.attacker.example/x")
+    assert r.status_code == 400
+
+
+@pytest.mark.parametrize("addr", ["100.64.0.1", "100.127.255.254", "::ffff:127.0.0.1",
+                                  "::ffff:169.254.169.254"])
+def test_cgnat_and_mapped_addresses_blocked(addr, monkeypatch):
+    import app.utils.ssrf_guard as guard
+
+    monkeypatch.setattr(guard, "_local_interface_addresses", lambda: set())
+    assert guard._is_public_ip(addr) is False
+
+
+def test_host_own_interface_address_blocked(monkeypatch):
+    import app.utils.ssrf_guard as guard
+
+    monkeypatch.setattr(guard, "_local_interface_addresses", lambda: {"93.184.216.34"})
+    assert guard._is_public_ip("93.184.216.34") is False
+    monkeypatch.setattr(guard, "_local_interface_addresses", lambda: set())
+    assert guard._is_public_ip("93.184.216.34") is True
+
+
+def test_configured_deny_list_blocks_cidr(app, monkeypatch):
+    import app.utils.ssrf_guard as guard
+
+    monkeypatch.setattr(guard, "_local_interface_addresses", lambda: set())
+    monkeypatch.setitem(app.config, "SSRF_BLOCKED_CIDRS", ["93.184.216.0/24"])
+    with app.test_request_context("/"):
+        assert guard._is_public_ip("93.184.216.34") is False
+        assert guard._is_public_ip("8.8.8.8") is True
+
+
+@pytest.mark.parametrize("url", ["http://[::1/x", "https://h.example:99999/", "http://h.example:abc/"])
+def test_malformed_urls_get_400_not_500(world, production_like, url):
+    r = _create(world.as_a(), world.sol_a.id, url=url)
+    assert r.status_code == 400
+    wid = _create(world.as_a(), world.sol_a.id, url="https://hooks.example.com/x").get_json()["webhook"]["id"]
+    u = world.as_a().put(f"/api/solutions/{world.sol_a.id}/webhooks/{wid}", json={"url": url})
+    assert u.status_code == 400
+
+
+def test_malformed_stored_url_is_skipped_at_send_time(world, production_like, http_calls):
+    from app import db
+    from app.models.spec_webhook import SpecWebhook
+    from app.modules.solutions_product.services.drift_remediation_service import DriftRemediationService
+
+    row = SpecWebhook(solution_id=world.sol_a.id, url="http://[::1/x", event_types=["spec_changed"])
+    db.session.add(row)
+    db.session.flush()
+    assert DriftRemediationService()._fire_single_webhook(row, {"event": "t"}) is False
+    assert http_calls == []
+
+
+def test_refusal_message_is_generic(world, production_like, monkeypatch):
+    import app.utils.ssrf_guard as guard
+
+    monkeypatch.setattr(guard.socket, "getaddrinfo",
+                        lambda host, port, *a, **k: [(2, 1, 6, "", ("10.1.2.3", port))])
+    r = _create(world.as_a(), world.sol_a.id, url="https://internal.example.com/x")
+    assert r.status_code == 400
+    body = r.get_data(as_text=True)
+    assert "10.1.2.3" not in body and "resolve" not in body.lower()
+
+
+def test_internal_switch_follows_explicit_config_and_production_denies(app, monkeypatch):
+    import app.utils.ssrf_guard as guard
+    from config import Config, DevelopmentConfig, ProductionConfig, TestingConfig
+
+    assert Config.ALLOW_INTERNAL_WEBHOOK_TARGETS is False
+    assert ProductionConfig.ALLOW_INTERNAL_WEBHOOK_TARGETS is False
+    assert DevelopmentConfig.ALLOW_INTERNAL_WEBHOOK_TARGETS is True
+    assert TestingConfig.ALLOW_INTERNAL_WEBHOOK_TARGETS is True
+    monkeypatch.setitem(app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", False)
+    # Neither TESTING, DEBUG nor FLASK_ENV can re-enable it.
+    monkeypatch.setitem(app.config, "TESTING", True)
+    monkeypatch.setenv("FLASK_ENV", "development")
+    with app.app_context():
+        assert guard.internal_targets_allowed() is False
+        with pytest.raises(guard.BlockedOutboundURL):
+            guard.validate_user_supplied_url("http://127.0.0.1/x")

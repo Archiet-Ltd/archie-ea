@@ -53,8 +53,8 @@ class ComplianceChecker:
         try:
             validate_user_supplied_url(service_url)
             timeout = clamp_timeout(timeout)
-        except BlockedOutboundURL as exc:
-            return {"success": False, "error": f"service_url refused: {exc}"}
+        except BlockedOutboundURL:
+            return {"success": False, "error": "service_url refused: URL not allowed"}
         except ValueError as exc:
             return {"success": False, "error": str(exc)}
 
