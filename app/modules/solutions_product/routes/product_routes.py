@@ -23,6 +23,29 @@ solution_product_bp = Blueprint(
 )
 
 
+def _solution_in_active_org(solution_id) -> bool:
+    """True when the solution belongs to the caller's active organisation.
+
+    Bundles, previews and pushes are keyed by solution id + bundle id on a
+    table with no organisation column, so every bundle route proves the
+    solution first. Fails closed when the active organisation is unknown.
+    """
+    from app.models.solution_models import Solution
+    from app.utils.route_guards import entity_in_active_org
+
+    return entity_in_active_org(Solution, solution_id)
+
+
+def _bundle_not_found(solution_id, bundle_id, *, with_detail=True):
+    """The one 404 for an unknown bundle -- also the answer for a solution the
+    caller cannot see, so a foreign solution is indistinguishable from a
+    missing bundle."""
+    body = {"success": False, "error": "Bundle not found"}
+    if with_detail:
+        body["detail"] = f"No bundle with ID '{bundle_id}' exists for solution {solution_id}."
+    return jsonify(body), 404
+
+
 @solution_product_bp.route("/<int:solution_id>/product/generate", methods=["POST"])
 @login_required
 def generate_product(solution_id):
@@ -218,17 +241,16 @@ def run_product(solution_id, bundle_id):
     )
     from app.modules.solutions_product.services.sandbox_runner import SandboxRunner
 
+    if not _solution_in_active_org(solution_id):
+        return _bundle_not_found(solution_id, bundle_id)
+
     record = SolutionCodeBundle.query.filter_by(
         solution_id=solution_id,
         bundle_id=bundle_id,
     ).first()
 
     if not record:
-        return jsonify({
-            "success": False,
-            "error": "Bundle not found",
-            "detail": f"No bundle with ID '{bundle_id}' exists for solution {solution_id}.",
-        }), 404
+        return _bundle_not_found(solution_id, bundle_id)
 
     # Regenerate code (deterministic = same output from same spec)
     try:
@@ -285,17 +307,16 @@ def download_product(solution_id, bundle_id):
         DeterministicCodeGenerator,
     )
 
+    if not _solution_in_active_org(solution_id):
+        return _bundle_not_found(solution_id, bundle_id)
+
     record = SolutionCodeBundle.query.filter_by(
         solution_id=solution_id,
         bundle_id=bundle_id,
     ).first()
 
     if not record:
-        return jsonify({
-            "success": False,
-            "error": "Bundle not found",
-            "detail": f"No bundle with ID '{bundle_id}' exists for solution {solution_id}.",
-        }), 404
+        return _bundle_not_found(solution_id, bundle_id)
 
     # Regenerate code (deterministic)
     try:
@@ -350,16 +371,16 @@ def preview_product(solution_id, bundle_id):
     )
     from app.modules.solutions_product.services.sandbox_runner import SandboxRunner
 
+    if not _solution_in_active_org(solution_id):
+        return _bundle_not_found(solution_id, bundle_id, with_detail=False)
+
     record = SolutionCodeBundle.query.filter_by(
         solution_id=solution_id,
         bundle_id=bundle_id,
     ).first()
 
     if not record:
-        return jsonify({
-            "success": False,
-            "error": "Bundle not found",
-        }), 404
+        return _bundle_not_found(solution_id, bundle_id, with_detail=False)
 
     try:
         bundle = build_product_spec_bundle(solution_id)
@@ -393,7 +414,15 @@ def stop_preview_product(solution_id, bundle_id):
 
     DELETE /api/solutions/<id>/product/<bundle_id>/preview
     """
+    from app.modules.solutions_product.models import SolutionCodeBundle
     from app.modules.solutions_product.services.sandbox_runner import SandboxRunner
+
+    if not _solution_in_active_org(solution_id):
+        return _bundle_not_found(solution_id, bundle_id, with_detail=False)
+    # tenant-scoping-ok: keyed to the solution proven in the active organisation just above
+    if not SolutionCodeBundle.query.filter_by(solution_id=solution_id, bundle_id=bundle_id).first():
+        return _bundle_not_found(solution_id, bundle_id, with_detail=False)
+
     runner = SandboxRunner()
     runner.stop_preview(bundle_id)
     return jsonify({"success": True, "message": "Preview stopped"})
@@ -420,17 +449,16 @@ def push_to_github(solution_id, bundle_id):
         GitIntegrationService,
     )
 
+    if not _solution_in_active_org(solution_id):
+        return _bundle_not_found(solution_id, bundle_id)
+
     record = SolutionCodeBundle.query.filter_by(
         solution_id=solution_id,
         bundle_id=bundle_id,
     ).first()
 
     if not record:
-        return jsonify({
-            "success": False,
-            "error": "Bundle not found",
-            "detail": f"No bundle with ID '{bundle_id}' exists for solution {solution_id}.",
-        }), 404
+        return _bundle_not_found(solution_id, bundle_id)
 
     # Regenerate code (deterministic = same output from same spec)
     try:
@@ -625,15 +653,13 @@ def synthesize_business_logic(solution_id, bundle_id):
     calls the BusinessLogicSynthesizer for each, and stores the generated
     handler bodies back into spec_data.synthesized_handlers.
     """
-    from app.models.solution_models import Solution
     from app.modules.solutions_product.models import SolutionCodeBundle
     from app.modules.solutions_product.services.business_logic_synthesizer import (
         BusinessLogicSynthesizer,
     )
 
-    solution = Solution.query.get(solution_id)
-    if not solution:
-        return jsonify({"success": False, "error": "Solution not found"}), 404
+    if not _solution_in_active_org(solution_id):
+        return _bundle_not_found(solution_id, bundle_id)
 
     record = SolutionCodeBundle.query.filter_by(
         solution_id=solution_id,
@@ -641,11 +667,7 @@ def synthesize_business_logic(solution_id, bundle_id):
     ).first()
 
     if not record:
-        return jsonify({
-            "success": False,
-            "error": "Bundle not found",
-            "detail": f"No bundle with ID '{bundle_id}' exists for solution {solution_id}.",
-        }), 404
+        return _bundle_not_found(solution_id, bundle_id)
 
     try:
         synthesizer = BusinessLogicSynthesizer()
