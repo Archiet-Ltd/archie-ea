@@ -3992,6 +3992,14 @@ def webhook_settings():
         if webhook_type not in ("generic", "teams", "slack"):
             webhook_type = "generic"
 
+        from app.services.webhook_service import WebhookTargetRefused, validate_webhook_url
+
+        try:
+            url = validate_webhook_url(url)
+        except WebhookTargetRefused as exc:
+            flash(f"Webhook URL refused: {exc}", "error")
+            return redirect(url_for("admin.webhook_settings"))
+
         if not selected_events:
             selected_events = ["*"]
 
