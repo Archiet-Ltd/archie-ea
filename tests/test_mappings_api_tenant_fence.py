@@ -149,7 +149,103 @@ def test_a_mapping_cannot_be_created_against_another_organisations_application(
     _login(client, login_as, db_session, w["user_a"])
     resp = client.post("/api/v1/mappings/application-to-vendor", json={
         "application_id": w["rows"]["b"]["comp"], "vendor_product_id": w["product"] + 0})
-    assert resp.status_code in (404, 409), resp.get_json()
+    # 409 would tell the caller the foreign application already has this mapping.
+    assert resp.status_code == 404, resp.get_json()
     resp = client.post("/api/v1/mappings/unified-to-application", json={
         "unified_capability_id": w["rows"]["a"]["cap"], "application_id": w["rows"]["b"]["comp"]})
     assert resp.status_code == 404, resp.get_json()
+
+
+def _reference_capability(db_session):
+    from app.models.unified_capability import UnifiedCapability
+
+    cap = UnifiedCapability(name=f"Ref {uuid.uuid4().hex[:8]}", scope="reference", organization_id=None)
+    db_session.add(cap)
+    db_session.commit()
+    cap_id = cap.id
+    db_session.expunge_all()
+    return cap_id
+
+
+def test_a_shared_reference_capability_can_be_mapped_to_the_callers_own_application(
+    app, db_session, make_org, client, login_as
+):
+    from app.models.capability_to_vendor_mapping import UnifiedCapabilityApplicationMapping
+
+    w = _world(db_session, make_org)
+    ref = _reference_capability(db_session)
+    _login(client, login_as, db_session, w["user_a"])
+    resp = client.post("/api/v1/mappings/unified-to-application", json={
+        "unified_capability_id": ref, "application_id": w["rows"]["a"]["comp"]})
+    assert resp.status_code == 201, resp.get_json()
+    created = resp.get_json()["data"]["id"]
+    row = db_session.get(UnifiedCapabilityApplicationMapping, created)
+    assert row.application_component_id == w["rows"]["a"]["comp"]
+    assert row.unified_capability_id == ref
+    # a foreign application is still refused, and nothing is written for it
+    before = db_session.execute(text(
+        "select count(*) from unified_capability_application_mappings")).scalar()
+    resp = client.post("/api/v1/mappings/unified-to-application", json={
+        "unified_capability_id": ref, "application_id": w["rows"]["b"]["comp"]})
+    assert resp.status_code == 404, resp.get_json()
+    assert db_session.execute(text(
+        "select count(*) from unified_capability_application_mappings")).scalar() == before
+
+
+def test_a_shared_reference_capability_is_refused_for_vendor_organisation_mappings(
+    app, db_session, make_org, client, login_as
+):
+    w = _world(db_session, make_org)
+    ref = _reference_capability(db_session)
+    _login(client, login_as, db_session, w["user_a"])
+    resp = client.post("/api/v1/mappings/unified-to-vendor-org", json={
+        "unified_capability_id": ref, "vendor_organization_id": w["vendor"]})
+    assert resp.status_code == 404, resp.get_json()
+
+
+def test_another_organisations_capability_is_refused_for_an_application_mapping(
+    app, db_session, make_org, client, login_as
+):
+    w = _world(db_session, make_org)
+    _login(client, login_as, db_session, w["user_a"])
+    resp = client.post("/api/v1/mappings/unified-to-application", json={
+        "unified_capability_id": w["rows"]["b"]["cap"], "application_id": w["rows"]["a"]["comp"]})
+    assert resp.status_code == 404, resp.get_json()
+
+
+def test_ids_that_are_integer_like_strings_work_and_booleans_are_refused(
+    app, db_session, make_org, client, login_as
+):
+    w = _world(db_session, make_org)
+    ref = _reference_capability(db_session)
+    _login(client, login_as, db_session, w["user_a"])
+    own_app = w["rows"]["a"]["comp"]
+    # True == 1 in Python: it must never resolve to the row with id 1
+    for bad in (True, False, 1.5, "", " ", "abc", "1; drop", -1, 0, 10**12, None, [1]):
+        resp = client.post("/api/v1/mappings/unified-to-application", json={
+            "unified_capability_id": w["rows"]["a"]["cap"], "application_id": bad})
+        assert resp.status_code == 404, (bad, resp.status_code, resp.get_json())
+        resp = client.post("/api/v1/mappings/application-to-vendor", json={
+            "application_id": bad, "vendor_product_id": w["product"]})
+        assert resp.status_code == 404, (bad, resp.status_code, resp.get_json())
+    resp = client.post("/api/v1/mappings/unified-to-application", json={
+        "unified_capability_id": str(ref), "application_id": f" {own_app} "})
+    assert resp.status_code == 201, resp.get_json()
+    # the existing own mapping is a duplicate (not a not-found) for the owner
+    resp = client.post("/api/v1/mappings/application-to-vendor", json={
+        "application_id": str(own_app), "vendor_product_id": w["product"]})
+    assert resp.status_code != 404, resp.get_json()
+
+
+def test_a_mapping_is_refused_without_an_active_organisation(app, db_session, make_org, client, login_as):
+    w = _world(db_session, make_org)
+    _login(client, login_as, db_session, w["user_a"])
+    from app.api.v1 import mappings
+
+    with app.test_request_context():
+        from unittest import mock
+
+        with mock.patch("app.utils.tenant.current_organization_id", return_value=None):
+            assert mappings._owns_application(w["rows"]["a"]["comp"]) is False
+            assert mappings._owns_capability(w["rows"]["a"]["cap"]) is False
+            assert mappings._sees_capability(w["rows"]["a"]["cap"]) is False

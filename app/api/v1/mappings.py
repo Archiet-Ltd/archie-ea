@@ -67,36 +67,68 @@ def _owned_get(model, mapping_id):
     return _owned_query(model).filter(model.id == mapping_id).first()
 
 
+def _as_id(value):
+    """An integer row id from a JSON value, or None.
+
+    Integer-like strings are accepted; booleans (which are ints in Python), floats, blanks
+    and out-of-range numbers are not ids.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str):
+        value = value.strip()
+        if not value.isascii() or not value.isdigit():
+            return None
+        value = int(value)
+    if not isinstance(value, int) or not 0 < value <= 2147483647:
+        return None
+    return value
+
+
 def _owns_application(application_id):
+    """True when the application belongs to the caller's active organisation."""
     from app.models.application_portfolio import ApplicationComponent
+    from app.utils.route_guards import entity_exists
     from app.utils.tenant import current_organization_id
 
-    org_id = current_organization_id()
-    if org_id is None or not isinstance(application_id, int):
+    # The automatic tenant filter is off without an organisation, so refuse explicitly.
+    app_id = _as_id(application_id)
+    if current_organization_id() is None or app_id is None:
         return False
-    return (
-        db.session.query(ApplicationComponent.id)
-        .filter(ApplicationComponent.id == application_id,
-                ApplicationComponent.organization_id == org_id)
-        .first()
-        is not None
-    )
+    return entity_exists(ApplicationComponent, app_id)
 
 
 def _owns_capability(capability_id):
+    """True when the capability is owned by the caller's active organisation.
+
+    Strict owner semantics: a shared reference capability is not owned by anyone.
+    """
     from app.models.unified_capability import UnifiedCapability
     from app.utils.tenant import current_organization_id
 
     org_id = current_organization_id()
-    if org_id is None or not isinstance(capability_id, int):
+    cap_id = _as_id(capability_id)
+    if org_id is None or cap_id is None:
         return False
     return (
         db.session.query(UnifiedCapability.id)
-        .filter(UnifiedCapability.id == capability_id,
+        .filter(UnifiedCapability.id == cap_id,
                 UnifiedCapability.organization_id == org_id)
         .first()
         is not None
     )
+
+
+def _sees_capability(capability_id):
+    """True when the capability is the caller's own or a shared reference capability."""
+    from app.models.unified_capability import UnifiedCapability
+    from app.utils.tenant import current_organization_id
+
+    org_id = current_organization_id()
+    cap_id = _as_id(capability_id)
+    if org_id is None or cap_id is None:
+        return False
+    return UnifiedCapability.visible_to_organization(cap_id, org_id) is not None
 
 
 def _build_filter_query(query, filters):
@@ -502,9 +534,13 @@ def create_unified_to_application_mapping():
         if not all(field in data for field in required):
             return error_response(f"Missing required fields: {required}", 400)
 
+        # The row is owned through the application, so a shared reference capability is
+        # allowed here; the strict owner rule stays on the vendor-organisation family.
         if not (_owns_application(data["application_id"])
-                and _owns_capability(data["unified_capability_id"])):
+                and _sees_capability(data["unified_capability_id"])):
             return not_found_response("Application or capability not found")
+        data["application_id"] = _as_id(data["application_id"])
+        data["unified_capability_id"] = _as_id(data["unified_capability_id"])
 
         # Check for duplicates
         existing = UnifiedCapabilityApplicationMapping.query.filter_by(
@@ -725,6 +761,7 @@ def create_unified_to_vendor_org_mapping():
 
         if not _owns_capability(data["unified_capability_id"]):
             return not_found_response("Capability not found")
+        data["unified_capability_id"] = _as_id(data["unified_capability_id"])
 
         # Check for duplicates
         existing = UnifiedCapabilityVendorOrganizationMapping.query.filter_by(
@@ -938,6 +975,7 @@ def create_application_to_vendor_mapping():
 
         if not _owns_application(data["application_id"]):
             return not_found_response("Application not found")
+        data["application_id"] = _as_id(data["application_id"])
 
         # Check for duplicates
         existing = ApplicationVendorProductMapping.query.filter_by(
