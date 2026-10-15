@@ -316,15 +316,20 @@ class DriftRemediationService:
 
         return result
 
-    def schedule_checks(self):
-        """Find all solutions with scheduled checks and run them.
+    def schedule_checks(self, organization_id=None):
+        """Find solutions with scheduled checks and run them.
 
-        Called by a background job on a timer.
         Reads schedule from solution metadata_json.compliance_schedule.
+        ``organization_id`` limits the run to one organisation's solutions
+        (every request-driven caller passes it); left as None it covers every
+        solution, which only a system job running outside any tenant may do.
         """
         from app.models.solution_models import Solution
 
-        solutions = Solution.query.all()
+        query = Solution.query
+        if organization_id is not None:
+            query = query.filter(Solution.organization_id == organization_id)
+        solutions = query.all()
         results = []
 
         for solution in solutions:
