@@ -279,11 +279,6 @@ _CLARIFICATION_START = re.compile(
     r"^there (?:is|are) no (?:matching |such )?(?:records?|elements?|applications?|matches)\b",
     re.IGNORECASE,
 )
-_CLAUSE_SPLIT = re.compile(
-    r",?\s+(?:but|though|although|however|yet)\s+|\s*;\s*|,"
-    + r"\s+and\s+",
-    re.IGNORECASE,
-)
 _NO_ROWS_OK = re.compile(
     r"\bnot recorded\b|\bnothing (?:is )?recorded\b|\bno (?:recorded |known )?"
     r"(?:rows|records|dependenc|dependents|results)\b|\bnone\b",
@@ -294,7 +289,32 @@ _IMPACT_LANGUAGE = re.compile(
     r"\b(depends? on|depend(?:s|ed)? upon|dependent on|relies on|rely on|runs? on|"
     r"hosted on|breaks?|would break|fail|fails|failed|failure|stops?|stopped|down|"
     r"impacted|impacts?|affects?|affected|connects? to|connected to|calls?|"
-    r"serves?|serving|feeds?|consumes?|uses?|used by|owned by|owns)\b",
+    r"serves?|serving|feeds?|consumes?|uses?|used by)\b",
+    re.IGNORECASE,
+)
+# What disqualifies a clarification: relationship language, ownership, and the
+# words that continue a sentence into a claim.
+_CLARIFY_RELATION = re.compile(
+    _IMPACT_LANGUAGE.pattern[:-3] + r"|owned by|owns|because|so|while|contradict\w*|"
+    r"stops?|fails?)\b",
+    re.IGNORECASE,
+)
+_CONNECTIVE = re.compile(
+    r"\b(?:because|so|while|and|but|though|although|since|whereas|which)\b|"
+    r"[:;,\u2014\u2013]|\s-+\s",
+    re.IGNORECASE,
+)
+# A quantity attached to an estate noun is checked only in a statement of fact
+# about the estate; advice never triggers it.
+_FACT_VERB = re.compile(
+    r"\b(has|have|had|there (?:is|are)|downstream|upstream|are affected|is affected|"
+    r"affected|impacted|depend(?:s|ent)?|"
+    r"stop|stops|break|breaks)\b",
+    re.IGNORECASE,
+)
+_ADVICE = re.compile(
+    r"\b(consider|keep|use|aim|target|should|recommend\w*|prefer|avoid|try|plan|"
+    r"ensure|make sure|you can|you could|you might|let us)\b",
     re.IGNORECASE,
 )
 # Estate nouns whose attached quantity is checked even where no record is named.
@@ -355,6 +375,7 @@ class _ResultFacts:
         self.counts: set = set()
         self.rows = 0
         self.subjects: set = set()
+        self.row_counts: set = set()   # counts of this result's own answer rows
 
 
 def _facts_of(result: dict) -> _ResultFacts:
@@ -400,6 +421,10 @@ def _facts_of(result: dict) -> _ResultFacts:
                 facts.subjects.add(phrase_key(element["name"]))
     if isinstance(top, dict) and isinstance(top.get("rows"), list):
         facts.rows = len(top["rows"])
+        facts.row_counts.add(len(top["rows"]))
+        for holder in (top, top.get("summary")):
+            if isinstance(holder, dict) and _is_int(holder.get("total")):
+                facts.row_counts.add(holder["total"])
     elif isinstance(top, list):
         facts.rows = len(top)
         facts.counts.add(len(top))
@@ -495,18 +520,34 @@ def _trim_phrase(phrase: str) -> str:
     return phrase
 
 
+_FULLWIDTH_OPEN = "\uff08\uff3b\uff5b\u3010\u300c\u300e\u3008"
+_FULLWIDTH_CLOSE = "\uff09\uff3d\uff5d\u3011\u300d\u300f\u3009"
+_ZERO_WIDTH = "[\u200b\u200c\u200d\u2060\ufeff\u00ad]"
+_QUOTES = "[\u201c\u201d\u201e\u201f\u2018\u2019\u201a\u201b\u00ab\u00bb\u2039\u203a\u300c\u300d`\"]"
+
+
 def _clean_variants(text: str) -> List[str]:
-    """The text with Markdown emphasis, code, links, possessives and dashes
-    removed or normalised: once with brackets kept (a name may carry them,
-    O365 (Office)) and once with them dropped."""
-    t = REF_MARKER.sub(" ", text)
-    t = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", t)         # [text](url) -> text
-    t = re.sub("[\u2014\u2013\u2012\u2015]|--+", " ", t)      # dashes
-    t = re.sub("(?<=\\w)['\u2019]s(?!\\w)", "", t)           # possessive 's
-    t = re.sub("[`*~]+", " ", t)                                 # emphasis, code
-    t = re.sub("(?<!\\w)_+|_+(?!\\w)", " ", t)               # _emphasis_
+    """The text with Markdown, HTML, typographic quotes, brackets (ordinary and
+    fullwidth), possessives, dashes and zero-width characters removed or
+    normalised. Variants: brackets kept (a name may carry them, O365 (Office)),
+    brackets dropped, slashes split (A/B names two records), ampersand as and."""
+    t = text.replace("&nbsp;", " ").replace("&amp;", "&").replace("\u00a0", " ")
+    t = re.sub(r"<[^>]+>", " ", t)                                 # HTML tags
+    t = re.sub(_ZERO_WIDTH, "", t)
+    t = REF_MARKER.sub(" ", t)
+    t = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", t)                 # [text](url) -> text
+    t = re.sub("[\u2014\u2013\u2012\u2015]|--+", " ", t)           # dashes
+    t = re.sub("(?<=\\w)['\u2019]s(?!\\w)", "", t)                # possessive 's
+    t = re.sub(_QUOTES, " ", t)                                    # typographic quotes
+    t = re.sub("(?<!\\w)'|'(?!\\w)", " ", t)                       # ASCII quotes
+    t = re.sub("[`*~]+", " ", t)                                   # emphasis, code
+    t = re.sub("(?<!\\w)_+|_+(?!\\w)", " ", t)                     # _emphasis_
+    for open_, close in zip(_FULLWIDTH_OPEN, _FULLWIDTH_CLOSE):
+        t = t.replace(open_, "(").replace(close, ")")
     bare = re.sub("[\\[\\](){}]", " ", t)
-    return [t, bare]
+    slash = t.replace("/", " ")
+    amp = t.replace("&", " and ")
+    return [t, bare, slash, amp]
 
 
 def candidate_phrases(text: str) -> set:
@@ -521,7 +562,8 @@ def candidate_phrases(text: str) -> set:
         tokens = variant.split()
         for size in range(1, _MAX_NGRAM + 1):
             for start in range(0, len(tokens) - size + 1):
-                gram = _trim_phrase(" ".join(tokens[start:start + size]))
+                raw = " ".join(tokens[start:start + size])
+                gram = _trim_phrase(raw)
                 if not gram:
                     continue
                 if size == 1 and not gram[:1].isupper():
@@ -529,6 +571,11 @@ def candidate_phrases(text: str) -> set:
                 key = normalize_name(gram)
                 if key and key not in _LEADING:
                     found.add(key)
+                # A name that ends in a full stop (Acme Inc.) is also looked
+                # up as written.
+                dotted = raw.strip(",;:!?\"'")
+                if dotted.endswith(".") and len(dotted) > 2:
+                    found.add(normalize_name(dotted))
                 if len(found) >= _MAX_CANDIDATES:
                     return found
     return found
@@ -701,9 +748,9 @@ def _check_sentence(sentence, grounding, tool_keys, context_keys, org_keys,
             if not covered:
                 missing.append("[ref:] marker for " + key)
         elif key in context_keys:
-            # Context rows ground what a record is, owns or links to; they do
-            # not ground an impact statement when the answer returned rows.
-            if impact_rows and impact_language and key not in subject_keys:
+            # Context rows ground what a record is, has or is owned by; they
+            # never ground a relationship or impact statement.
+            if impact_language and key not in subject_keys:
                 missing.append("not in the answer rows: " + key)
         else:
             missing.append("not returned this turn: " + key)
@@ -716,7 +763,12 @@ def _check_sentence(sentence, grounding, tool_keys, context_keys, org_keys,
             if m.group(1).lower() != "one"
             and not _is_non_count(REF_MARKER.sub("", sentence), m)
         ]
-    elif estate_question and (grounding.tool_results > 0 or grounding.context_counts):
+    elif (
+        estate_question
+        and (grounding.tool_results > 0 or grounding.context_counts)
+        and _FACT_VERB.search(sentence)
+        and not _ADVICE.search(sentence)
+    ):
         tokens = list(_attached_counts(sentence))
     else:
         tokens = []
@@ -728,6 +780,11 @@ def _check_sentence(sentence, grounding, tool_keys, context_keys, org_keys,
         allowed: set = set(grounding.context_counts)
         for r in referenced:
             allowed |= r.counts
+        if not referenced:
+            # No record or marker to tie it to: a count that equals the count
+            # of this turn's own answer rows is accepted.
+            for r in grounding.results:
+                allowed |= r.row_counts
         for token in tokens:
             if _year(token):
                 continue
@@ -740,6 +797,35 @@ def _check_sentence(sentence, grounding, tool_keys, context_keys, org_keys,
 def _is_non_count(text: str, match) -> bool:
     before = text[:match.start(1)].split()
     return bool(before and before[-1].lower().strip(".,;:()") in _NOT_A_COUNT_BEFORE)
+
+
+def _clarification_exempt(sentence, tool_keys, context_keys, org_keys, question_names) -> bool:
+    """A sentence is exempt only if it STARTS with a clarification phrase, has
+    no relationship language, no connective leading into a record name, no
+    count, and names only records the user's own question named."""
+    text = sentence.strip()
+    if not _CLARIFICATION_START.search(text):
+        return False
+    markers = list(REF_MARKER.finditer(text))
+    if markers or _COUNT_CLAIM.search(text):
+        return False
+    mentions = _mentions(text, tool_keys, context_keys, org_keys, markers)
+    blanked = text
+    for mention in sorted(mentions, key=lambda m: -m["start"]):
+        blanked = blanked[:mention["start"]] + " " * (mention["end"] - mention["start"]) + blanked[mention["end"]:]
+    body = _CLARIFICATION_START.sub(" ", blanked, count=1)
+    if _CLARIFY_RELATION.search(body):
+        return False
+    for mention in mentions:
+        if _CONNECTIVE.search(text[:mention["start"]]):
+            return False
+        if mention["key"] not in question_names:
+            return False
+    # A connective followed by anything that looks like a new clause.
+    tail = text[_CLARIFICATION_START.search(text).end():]
+    if re.search(r"[:;\u2014\u2013]|\s-+\s", tail) and mentions:
+        return False
+    return True
 
 
 def find_uncited_claims(
@@ -781,25 +867,12 @@ def find_uncited_claims(
 
     uncited: List[Dict] = []
     for sentence in statements:
-        pieces = [sentence]
-        if _CLARIFICATION_START.search(sentence.strip()):
-            # Clause by clause: only the clause that starts with the phrase is
-            # a clarification, and only about names the user already used.
-            parts = [p.strip() for p in _CLAUSE_SPLIT.split(sentence) if p and p.strip()]
-            pieces = []
-            for index, part in enumerate(parts):
-                if index == 0 and _CLARIFICATION_START.search(part):
-                    named = {
-                        m["key"] for m in _mentions(part, tool_keys, context_keys, org_keys, [])
-                    }
-                    if named <= question_names:
-                        continue
-                pieces.append(part)
-        for piece in pieces:
-            missing = _check_sentence(
-                piece, grounding, tool_keys, context_keys, org_keys,
-                question_names, estate_question, zero_rows, impact_rows,
-            )
-            if missing:
-                uncited.append({"claim": piece[:300], "unsupported": missing})
+        if _clarification_exempt(sentence, tool_keys, context_keys, org_keys, question_names):
+            continue
+        missing = _check_sentence(
+            sentence, grounding, tool_keys, context_keys, org_keys,
+            question_names, estate_question, zero_rows, impact_rows,
+        )
+        if missing:
+            uncited.append({"claim": sentence[:300], "unsupported": missing})
     return uncited

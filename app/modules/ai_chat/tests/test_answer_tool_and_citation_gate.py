@@ -472,9 +472,10 @@ def test_a_count_is_checked_against_returned_counts_not_any_digit_run():
     cite = " [ref:" + "b" * 32 + "]"
     assert _gate("12 applications are affected." + cite, grounding, estate_question=True) == []
     assert _gate("1043 applications are affected." + cite, grounding, estate_question=True) != []
-    # without its marker even the right count is not accepted: there is no
-    # fallback to every result of the turn
-    assert _gate("12 applications are affected.", grounding, estate_question=True) != []
+    # without a marker the count passes only because it equals the count of
+    # this turn's own answer rows
+    assert _gate("12 applications are affected.", grounding, estate_question=True) == []
+    assert _gate("13 applications are affected.", grounding, estate_question=True) != []
 
 
 def test_a_year_is_never_a_count_even_next_to_a_record():
@@ -644,10 +645,6 @@ def test_an_estate_question_needs_a_named_record_or_context(app, db_session, mak
             "what breaks if a load balancer fails?",
         ):
             assert classify(question, {"solution_id": 3}) is None, question
-        # A follow-up to a turn answered from a stored answer is one.
-        prior = [{"role": "assistant", "content": "See /intelligence/answers/" + "a" * 32}]
-        assert classify("what else depends on it?", {}, prior) == "impact"
-
 
 def test_a_non_ascii_digit_is_an_invalid_parameter_not_a_crash(app, db_session, make_org):
     org = make_org("b53-digits")
@@ -1231,3 +1228,180 @@ def test_the_iteration_cap_text_the_system_builds_is_not_gated():
     runner._apply_citation_gate(result)
     assert result["response"].startswith("Completed")
     assert "citation_gate" not in result
+
+
+# --------------------------------------------------------------------------- #
+# Round 5 rulings                                                              #
+# --------------------------------------------------------------------------- #
+
+R5_NAMES = ORG_NAMES | {"clearing hub", "treasury feed", "core banking", "acme inc"}
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "I could not find a stored answer, so Clearing Hub depends on Core Banking.",
+        "I could not find a stored answer and Clearing Hub depends on Core Banking.",
+        "I could not find a stored answer while Clearing Hub depends on Core Banking.",
+        "I can't find a record - Clearing Hub stops when Core Banking fails.",
+        "I can't find a record: Clearing Hub stops when Core Banking fails.",
+        "Nothing is recorded, so Clearing Hub stops when Core Banking fails.",
+        "I could not find an owner for Clearing Hub because it depends on Core Banking.",
+        "There is no record contradicting that Clearing Hub depends on Core Banking.",
+        "I don't see anything else: Clearing Hub fails with Core Banking and 14 applications stop.",
+    ],
+)
+def test_a_clarification_never_carries_a_claim_in_the_same_sentence(text):
+    claims = find_uncited_claims(
+        text, _grounded(), org_names=R5_NAMES, estate_question=False,
+        question_names={"clearing hub", "core banking"},
+    )
+    assert claims != [], text
+
+
+def test_a_plain_clarification_naming_only_the_users_records_passes():
+    assert find_uncited_claims(
+        "I could not find Core Bank in your estate. Did you mean Core Banking?",
+        _grounded(), org_names=R5_NAMES, question_names=set(),
+    ) == []
+    assert find_uncited_claims(
+        "I could not find an owner for Core Banking.", _grounded(),
+        org_names=R5_NAMES, question_names={"core banking"},
+    ) == []
+    # ... but not about a record the user did not name, and not with a count.
+    assert find_uncited_claims(
+        "I could not find an owner for Clearing Hub.", _grounded(),
+        org_names=R5_NAMES, question_names={"core banking"},
+    ) != []
+    assert find_uncited_claims(
+        "I could not find 14 applications for Core Banking.", _grounded(),
+        org_names=R5_NAMES, question_names={"core banking"},
+    ) != []
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "What depends on it in TOGAF?",
+        "How should I design retries if it fails?",
+        "What happens to Kafka if that goes down?",
+        "Does it depend on the cloud SLA?",
+        "What breaks if it fails in a microservices pattern?",
+    ],
+)
+def test_a_generic_follow_up_after_a_cited_answer_is_not_an_estate_question(
+    app, db_session, make_org, message
+):
+    org = make_org("b53-followup-" + uuid.uuid4().hex[:6])
+    user = _user(db_session, org.id)
+    root, *_ = _estate(db_session, org.id, "Fol")
+    first = _call(app, user, org.id, "answer", {"question": "impact", "element_id": root.id})
+    history = [
+        {"role": "user", "content": "what breaks if Fol Root fails?"},
+        {"role": "assistant",
+         "content": "See " + first["result"]["page_url"] + " [ref:%s]" % first["result"]["address"]},
+    ]
+    with app.test_request_context("/"):
+        g.current_org_id = org.id
+        assert AgentRunner._classify_estate(message, {}, history) is None, message
+        # The same pronoun follow-up, without generic vocabulary, is one.
+        assert AgentRunner._classify_estate("what else depends on it?", {}, history) == "impact"
+        # Another organisation's address never resolves.
+    other = make_org("b53-followup-other-" + uuid.uuid4().hex[:6])
+    with app.test_request_context("/"):
+        g.current_org_id = other.id
+        assert AgentRunner._classify_estate("what else depends on it?", {}, history) is None
+
+
+def test_a_generic_follow_up_gets_no_nudge_and_no_not_recorded(
+    app, db_session, make_org, monkeypatch
+):
+    org = make_org("b53-followup-turn")
+    user = _user(db_session, org.id)
+    root, *_ = _estate(db_session, org.id, "Ft")
+    first = _call(app, user, org.id, "answer", {"question": "impact", "element_id": root.id})
+    history = [
+        {"role": "assistant", "content": "See " + first["result"]["page_url"]},
+    ]
+    script = [{"text": "Use exponential backoff with jitter and cap the attempts."}]
+    result, _e, _r, seen = _run_turn(
+        app, monkeypatch, script, user=user, history=history,
+        message="How should I design retries if it fails?",
+    )
+    assert len(seen) == 1
+    assert result["response"].startswith("Use exponential backoff")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Core Banking depends on Treasury Feed and Clearing Hub.",
+        "If Clearing Hub fails, Treasury Feed and Core Banking stop.",
+        "Treasury Feed feeds Clearing Hub.",
+    ],
+)
+def test_context_never_grounds_a_relationship_statement(text):
+    context = {"applications": [{"id": 1, "name": "Core Banking"},
+                                {"id": 2, "name": "Treasury Feed"},
+                                {"id": 3, "name": "Clearing Hub"}]}
+    grounding = _grounded(context=context)
+    assert find_uncited_claims(text, grounding, org_names=R5_NAMES, estate_question=False) != []
+    # and the same with rows returned
+    assert find_uncited_claims(text, _grounded(IMPACT, context=context),
+                               org_names=R5_NAMES, estate_question=True) != []
+
+
+def test_context_grounds_a_descriptive_sentence_including_ownership():
+    context = {"applications": [{"id": 1, "name": "Core Banking", "owner": "Treasury team"}]}
+    grounding = _grounded(context=context)
+    assert find_uncited_claims(
+        "Core Banking is owned by the Treasury team.", grounding,
+        org_names=R5_NAMES, estate_question=False,
+    ) == []
+
+
+@pytest.mark.parametrize(
+    "said,stored,expected",
+    [
+        ("“Core Banking”", "Core Banking", "core banking"),
+        ("«Core Banking»", "Core Banking", "core banking"),
+        ("（Core Banking）", "Core Banking", "core banking"),
+        ("Core Banking/Clearing Hub", "Clearing Hub", "clearing hub"),
+        ("<b>Core Banking</b>", "Core Banking", "core banking"),
+        ("Core​ Banking", "Core Banking", "core banking"),
+        ("Acme Inc.", "Acme Inc.", "acme inc"),
+        ("Research & Development", "Research and Development", "research and development"),
+    ],
+)
+def test_typographic_forms_still_find_the_record(app, db_session, make_org, said, stored, expected):
+    from app.modules.ai_chat.services.ai_hallucination_detector import (
+        organisation_names_in_text,
+    )
+
+    org = make_org("b53-typo-" + uuid.uuid4().hex[:6])
+    _element(db_session, org.id, stored)
+    db_session.commit()
+    with app.test_request_context("/"):
+        found = organisation_names_in_text("We depend on %s every day." % said, org.id)
+    assert expected in found, (said, found)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Consider splitting the monolith into two applications.",
+        "Keep 2 applications warm in standby.",
+        "You should run 3 elements per release.",
+    ],
+)
+def test_advice_with_a_number_attached_to_an_estate_noun_passes(text):
+    assert _gate(text, estate_question=True) == []
+
+
+def test_a_correct_count_without_a_marker_passes_when_it_is_the_answers_own_row_count():
+    # IMPACT has two rows and total 2: the count of this turn's own answer.
+    assert _gate("2 applications are affected.", estate_question=True) == []
+    # ... a different count is still refused, marker or no marker.
+    assert _gate("14 applications are affected.", estate_question=True) != []
+    assert _gate("14 applications are affected [ref:" + "a" * 32 + "].",
+                 estate_question=True) != []
