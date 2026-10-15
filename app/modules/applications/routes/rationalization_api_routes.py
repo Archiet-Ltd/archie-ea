@@ -3358,6 +3358,8 @@ def rationalization_save_benefits(app_id):
         RationalizationBenefitsTracker,
     )
 
+    require_entity(ApplicationComponent, app_id, description="Application not found")
+
     try:
         data = request.get_json(silent=True) or {}
         tracker = RationalizationBenefitsTracker.query.filter_by(
