@@ -485,15 +485,22 @@ class RationalizationScoringService:
             lifecycle: str — the canonical lifecycle status
             data_quality_flag: bool — True if the mapping is uncertain
         """
-        # Check lifecycle_status first (may be Abacus code or canonical value)
+        # Check lifecycle_status first (may be Abacus code or canonical value).
+        # ABACUS_LIFECYCLE_MAP's own keys are upper-cased Abacus codes
+        # ("2.1 STRATEGIC"), but the app's lower-cased convention for the
+        # same codes ("2.1 strategic" -- see list_views.py's own
+        # func.lower() comparisons and the lifecycle filter dropdown) is
+        # just as valid an Abacus code and was never matching here, so
+        # every application using that convention looked lifecycle-unknown
+        # regardless of how complete its data actually was.
         ls = (app.lifecycle_status or "").strip()
         if ls:
             abacus_map = RationalizationScoringService.ABACUS_LIFECYCLE_MAP
-            if ls in abacus_map:
-                return {"lifecycle": abacus_map[ls], "data_quality_flag": False}
+            if ls.upper() in abacus_map:
+                return {"lifecycle": abacus_map[ls.upper()], "data_quality_flag": False}
             # Already a canonical value
-            if ls in ("operational", "testing", "development", "deprecated", "retired", "planning"):
-                return {"lifecycle": ls, "data_quality_flag": False}
+            if ls.lower() in ("operational", "testing", "development", "deprecated", "retired", "planning"):
+                return {"lifecycle": ls.lower(), "data_quality_flag": False}
             # Unknown lifecycle value — treat as operational with flag
             return {"lifecycle": "operational", "data_quality_flag": True}
 

@@ -833,6 +833,33 @@ _APP_OWNERS = [
     ("Data Warehouse", "System Administrator", "technical"),
 ]
 
+# application_name -> primary owner's display name, read off from _APP_OWNERS
+# above. ApplicationComponent.application_owner is a plain text column on the
+# application itself (distinct from the ApplicationOwner join table rows
+# created below from this same list) -- RationalizationScoringService.
+# evaluate_readiness() reads that column directly, so without it every
+# seeded application fails the "owner" readiness dimension regardless of
+# the ApplicationOwner rows that exist.
+_APP_PRIMARY_OWNER = {
+    app_name: owner_display_name
+    for app_name, owner_display_name, ownership_type in _APP_OWNERS
+    if ownership_type == "primary"
+}
+
+# application lifecycle code -> a risk level a company would realistically
+# have already recorded for applications at that stage: a strategic
+# investment gets a technical/business risk review as a matter of course,
+# and an application already marked for sunset or decommissioning gets one
+# as part of that decision. The plain tactical workhorses below are not
+# given a level here -- in a real portfolio not every application has had
+# its risk assessed yet, which is exactly the condition
+# evaluate_readiness()'s "risk" dimension exists to surface.
+_RISK_LEVEL_BY_LIFECYCLE = {
+    "2.1 strategic": "low",
+    "3. sunset": "high",
+    "5. decommissioned": "critical",
+}
+
 # ── capabilities with maturity ─────────────────────────────────────────────
 
 _CAPABILITIES = [
@@ -1256,6 +1283,7 @@ def seed_demo_company() -> dict:
                 continue
             el = elements.get(el_name)
             profile = _APP_PROFILE.get(app_name)
+            risk_level = _RISK_LEVEL_BY_LIFECYCLE.get(profile[0]) if profile else None
             app = ApplicationComponent(
                 name=app_name,
                 organization_id=org_id,
@@ -1272,6 +1300,9 @@ def seed_demo_company() -> dict:
                 infrastructure_cost_monthly=2500,
                 business_criticality="high",
                 strategic_importance="high",
+                application_owner=_APP_PRIMARY_OWNER.get(app_name),
+                technical_risk=risk_level,
+                business_risk=risk_level,
             )
             db.session.add(app)
             apps_created += 1
@@ -1297,6 +1328,18 @@ def seed_demo_company() -> dict:
                 changed = True
             if not app.vendor_name:
                 app.vendor_name = profile[2]
+                changed = True
+            if not app.application_owner:
+                owner_name = _APP_PRIMARY_OWNER.get(app_name)
+                if owner_name:
+                    app.application_owner = owner_name
+                    changed = True
+            risk_level = _RISK_LEVEL_BY_LIFECYCLE.get(profile[0])
+            if risk_level and not app.technical_risk:
+                app.technical_risk = risk_level
+                changed = True
+            if risk_level and not app.business_risk:
+                app.business_risk = risk_level
                 changed = True
             profile_updated += changed
         if profile_updated:

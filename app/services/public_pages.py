@@ -236,17 +236,20 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
     # The plateau and work-package data behind this frame is genuinely
     # fixed (three described plateaus, each with a non-zero, uneven
     # "gap(s) assigned" count); what still fails the bar is the "AI
-    # Generated" metric tile, which reads 0 after running the product's
-    # own gap-detection route. That route (gap_archimate_service.py)
-    # creates its detected gaps without ever setting Gap.auto_generated,
-    # the flag this tile counts -- a service bug, not a seed gap, and
-    # outside what a module/seed-data change can fix.
+    # Generated" metric tile, which reads 0 no matter what the gap
+    # detection route stores. The tile is computed client-side as
+    # `this.gaps.filter(g => g.auto_generated)` (capability_roadmap.html),
+    # and `this.gaps` is populated from GET /capability-map/api/roadmap/gaps
+    # (roadmap_routes.py, api_roadmap_gaps), which builds its gap list on
+    # the fly from BusinessCapability coverage and never reads stored Gap
+    # rows or emits an auto_generated key at all -- a service bug, not a
+    # seed gap, and outside what a module/seed-data change can fix.
     "roadmaps": (
-        "the 'AI Generated' metric tile reads 0 even after running the "
-        "product's own gap-detection route: that route never sets "
-        "Gap.auto_generated on the gaps it creates, so the tile it feeds "
-        "cannot read non-zero from any amount of seed data; recapture "
-        "once the detection service sets that flag"
+        "the 'AI Generated' metric tile reads 0 regardless of seed data: "
+        "it is computed from the roadmap gaps API response, which builds "
+        "its gap list on the fly from capability coverage and never emits "
+        "an auto_generated field for the tile to count; recapture once "
+        "that API response carries the flag"
     ),
 }
 

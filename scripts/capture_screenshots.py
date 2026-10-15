@@ -219,6 +219,7 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
 
     from app import db
     from app.commands.seed_demo_company import (
+        _APP_PROFILE,
         _resolve_apps,
         _resolve_caps,
         _resolve_elements,
@@ -453,9 +454,9 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         _diagrams_hero_name = diagram_names[0]
 
         # Layer rows, top to bottom: business, application, technology.
-        # Width 220 (>= the brief's 200 floor) and 300px horizontal spacing
-        # (>= the 280 floor) so a two-line name never overprints the type
-        # label the way it did at the old 180px/260px grid.
+        # Width 220 and 300px horizontal spacing give a two-line name room
+        # so it never overprints the type label the way it did at the old
+        # 180px/260px grid.
         _hero_layers = [
             ("Evaluate calibration", "Validate measurement accuracy",
              "Compute drift trend", "Generate calibration certificate"),
@@ -465,7 +466,7 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         _hero_element_names = [name for row in _hero_layers for name in row]
         # (source name, target name, relationship type) -- every one of
         # these is a real row _RELATIONSHIPS already seeds; none invented
-        # here. 11 pairs, comfortably over the brief's floor of 8.
+        # here. 11 pairs, enough that the hero shows many connecting lines.
         _hero_relationship_pairs = [
             ("Calibration Ledger", "Evaluate calibration", "Assignment"),
             ("Calibration Ledger", "Evaluate calibration", "Serving"),
@@ -1093,6 +1094,7 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         # actually needs -- stayed on its "No scored applications found, run
         # detection from the Dashboard" onboarding panel regardless.
         from app.models.application_rationalization import ApplicationRationalizationScore
+        from app.services.rationalization_scoring_service import RationalizationScoringService
 
         # The Disposition Breakdown panel and the "Decision Ready" /
         # "Insufficient Evidence" tiles read disposition_action and
@@ -1101,47 +1103,118 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         # neither, so the panel rendered empty regardless of the TIME
         # action already shown elsewhere on the page.
         #
-        # The product's own scoring path, RationalizationScoringService
-        # (the same one POST /applications/rationalization/api/bulk-score
-        # calls), derives is_decision_ready from evaluate_readiness(), which
-        # requires three high-severity fields on the application itself:
-        # application_owner, a recognised lifecycle_status, and
-        # technical_risk or business_risk. seed_demo_company() never sets
-        # application_owner (ownership here lives in the separate
-        # ApplicationOwner table, not that column), so every application
-        # would fail that one dimension and the service would return
-        # is_decision_ready=False across the board -- a worse, less
-        # truthful "Insufficient Evidence" wall than a real mix. Keeping the
-        # hand-written rows and setting disposition_action/is_decision_ready
-        # directly (the brief's offered fallback) gives the panel the real
-        # three-or-more non-zero dispositions the acceptance bar asks for.
+        # is_decision_ready is computed here by calling the product's own
+        # RationalizationScoringService.evaluate_readiness() against each
+        # seeded application -- the same call POST
+        # /applications/rationalization/api/bulk-score makes -- rather than
+        # set the flag directly, so the dashboard's readiness tiles reflect
+        # an application's actual recorded fields (owner, lifecycle, risk):
+        # seed_demo_company() now sets application_owner and lifecycle_status
+        # on every application and technical_risk/business_risk on the ones a
+        # real company would already have assessed (its strategic
+        # applications and the ones already marked for sunset or
+        # decommissioning), leaving the plain tactical workhorses without a
+        # risk assessment the way an in-progress real inventory would. That
+        # produces a genuine, data-driven split between decision-ready and
+        # insufficient-evidence applications rather than a uniform flag.
         _time_actions = ["TOLERATE", "INVEST", "MIGRATE", "ELIMINATE"]
         _time_to_disposition = {
             "TOLERATE": "retain", "INVEST": "refactor",
             "MIGRATE": "replace", "ELIMINATE": "retire",
         }
         _priorities = ["critical", "high", "medium", "low"]
-        for i, app_row in enumerate(apps_list[:12]):
+        # Applications already marked for sunset or decommissioning score low
+        # on health rather than following the general index-based curve below
+        # -- an application a company is retiring is not, in reality, a
+        # healthy one, and this is what gives the Health Distribution panel's
+        # "Critical" bucket a genuine, non-zero entry.
+        _SUNSET_LIFECYCLES = {"3. sunset", "5. decommissioned"}
+        for i, app_row in enumerate(apps_list):
             if ApplicationRationalizationScore.query.filter_by(
                 application_component_id=app_row.id
             ).first():
                 continue
-            action = _time_actions[i % len(_time_actions)]
+            profile = _APP_PROFILE.get(app_row.name)
+            is_sunsetting = bool(profile) and profile[0] in _SUNSET_LIFECYCLES
+            if is_sunsetting:
+                action = "ELIMINATE"
+                technical_score = 8 + (i * 3) % 14
+                business_score = 10 + (i * 5) % 14
+                cost_score = 12 + (i * 7) % 12
+                vendor_score = 10 + (i * 2) % 14
+                overall_score = round(
+                    (technical_score + business_score + cost_score + vendor_score) / 4
+                )
+            else:
+                action = _time_actions[i % len(_time_actions)]
+                technical_score = 40 + (i * 7) % 55
+                business_score = 35 + (i * 11) % 60
+                cost_score = 30 + (i * 13) % 65
+                vendor_score = 45 + (i * 5) % 50
+                overall_score = 38 + (i * 9) % 58
+
+            readiness = RationalizationScoringService.evaluate_readiness(app_row)
+            disposition = (
+                _time_to_disposition[action]
+                if readiness["is_decision_ready"]
+                else "insufficient_evidence"
+            )
             db.session.add(ApplicationRationalizationScore(
                 application_component_id=app_row.id,
-                technical_health_score=40 + (i * 7) % 55,
-                business_value_score=35 + (i * 11) % 60,
-                cost_efficiency_score=30 + (i * 13) % 65,
-                vendor_risk_score=45 + (i * 5) % 50,
-                overall_health_score=38 + (i * 9) % 58,
+                technical_health_score=technical_score,
+                business_value_score=business_score,
+                cost_efficiency_score=cost_score,
+                vendor_risk_score=vendor_score,
+                overall_health_score=overall_score,
                 rationalization_action=action,
-                disposition_action=_time_to_disposition[action],
-                is_decision_ready=True,
+                disposition_action=disposition,
+                is_decision_ready=readiness["is_decision_ready"],
+                readiness_dimensions=readiness["dimensions"],
+                readiness_score=readiness["readiness_score"],
                 priority=_priorities[i % len(_priorities)],
-                priority_score=90 - i * 6,
+                priority_score=max(10, 90 - i * 4),
                 action_rationale=f"{action.title()}: scored from technical health, business "
                                  f"value, cost efficiency and vendor risk signals.",
                 review_status="reviewed" if i % 2 == 0 else "draft",
+            ))
+        db.session.flush()
+
+        # ── Consolidation list entries (rationalization dashboard's "Plan" /
+        #    "Roadmap" / "Track" pipeline stepper reads ConsolidationListEntry,
+        #    a separate table from the scores above) ──────────────────────
+        # Round 3 (MP-B1): the three applications already marked for sunset
+        # or decommissioning above are exactly the ones a real consolidation
+        # effort would already have logged -- this adds one entry per
+        # application rather than inventing unrelated ones, so Plan's count
+        # and Roadmap's count/total stop reading zero against a non-zero
+        # scored portfolio.
+        from app.models.consolidation_list import ConsolidationListEntry
+
+        _CONSOLIDATION_ENTRIES = [
+            # (app_name, recommended_action, status, notes)
+            ("Document Management", "modernize", "under_review",
+             "Sunsetting in favour of a managed records service; still used "
+             "for compliance retrieval until the replacement is live."),
+            ("Alert Manager", "decommission", "approved",
+             "Decommissioned platform service; alerting now routes through "
+             "Monitoring Dashboard."),
+            ("Reporting Engine", "add_to_roadmap", "identified",
+             "Sunsetting; reporting workloads are being planned onto the "
+             "lakehouse migration already on the roadmap."),
+        ]
+        for app_name, recommended_action, status, notes in _CONSOLIDATION_ENTRIES:
+            app_row = apps.get(app_name)
+            if app_row is None:
+                continue
+            if ConsolidationListEntry.query.filter_by(application_id=app_row.id).first():
+                continue
+            db.session.add(ConsolidationListEntry(
+                application_id=app_row.id,
+                source_type="manual",
+                recommended_action=recommended_action,
+                priority="medium",
+                status=status,
+                notes=notes,
             ))
         db.session.flush()
 
@@ -1788,12 +1861,29 @@ def run_public_pages_capture() -> int:
                         page = context.new_page()
                         _login(page, base, email, demo_password)
                         _visit_and_check(page, base, path, slug)
+                        # The guided-walkthrough launcher (and the
+                        # equivalent AI-assistant launcher on public-facing
+                        # layouts) is a floating round button fixed to the
+                        # bottom-right corner of every authenticated page --
+                        # on pages whose own content reaches that corner
+                        # (e.g. rationalization's Disposition Breakdown
+                        # panel) it sits on top of real numbers in the shot.
+                        # A <style> tag is blocked by the page's own CSP
+                        # (style-src-elem requires a nonce this script
+                        # doesn't have), so set the property directly on
+                        # each element instead.
+                        page.evaluate(
+                            "() => { ['guided-mode-trigger', 'guided-mode-panel', "
+                            "'unified-ai-chat-fab'].forEach((id) => { "
+                            "const el = document.getElementById(id); "
+                            "if (el) el.style.setProperty('display', 'none', 'important'); }); }"
+                        )
                         if slug == "diagrams":
                             # Use the composer's own existing
-                            # fit-to-content control (Constraint 4) rather
-                            # than invent a second way to frame a diagram --
-                            # the default zoom clipped the badge/toolbar at
-                            # the right edge once the hero had a real layout.
+                            # fit-to-content control rather than invent a
+                            # second way to frame a diagram -- the default
+                            # zoom clipped the badge/toolbar at the right
+                            # edge once the hero had a real layout.
                             fit_button = page.locator(
                                 'button[title="Fit to content (Ctrl+0)"]'
                             )
