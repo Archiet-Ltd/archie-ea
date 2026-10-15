@@ -6,6 +6,7 @@ Handles creation/deletion of ArchiMate application-layer elements
 elements to application components.
 """
 
+from werkzeug.exceptions import HTTPException
 from flask import current_app, flash, jsonify, redirect, request, url_for
 from flask_login import login_required
 
@@ -51,6 +52,9 @@ def delete_application_function(app_id, func_id):
 
         return jsonify({"success": True})
 
+    except HTTPException:
+        # A 404 or 403 from the lookup is the refusal itself, not an internal error.
+        raise
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error deleting application function: {str(e)}")
@@ -109,6 +113,9 @@ def add_application_process(app_id):
             }
         )
 
+    except HTTPException:
+        # A 404 or 403 from the lookup is the refusal itself, not an internal error.
+        raise
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error adding application process: {str(e)}")
@@ -170,6 +177,9 @@ def add_data_object(app_id):
             }
         )
 
+    except HTTPException:
+        # A 404 or 403 from the lookup is the refusal itself, not an internal error.
+        raise
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error adding data object: {str(e)}")
@@ -197,6 +207,9 @@ def delete_data_object(app_id, obj_id):
 
         return jsonify({"success": True})
 
+    except HTTPException:
+        # A 404 or 403 from the lookup is the refusal itself, not an internal error.
+        raise
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error deleting data object: {str(e)}")

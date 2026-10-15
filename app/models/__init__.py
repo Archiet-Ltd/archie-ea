@@ -311,6 +311,9 @@ else:
     from .technology_layer import *  # noqa - Node, Device, SystemSoftware, TechnologyInterface, Path, CommunicationNetwork, TechnologyService
     from .truly_missing_models import *  # noqa - Solution, SolutionPattern, SolutionContract
     from .adm_kanban import ADMPhase, KanbanBoard, KanbanCard, KanbanCardComment, KanbanCardAttachment, ADMPhaseStep  # noqa: F401
+    # Registers card_archimate_elements and its backref on ArchiMateElement before any create_all, so
+    # deleting an element never queries a table that was not created (import-order dependence).
+    from . import adm_kanban_junctions  # noqa: F401
     from .solution_architect_models import *  # noqa - SolutionAnalysisSession, SolutionProblemDefinition, etc.
     from app.models.solution_architect_models import RequirementChangeLog  # noqa: F401
     from .solution_lifecycle_models import *  # noqa - SolutionRisk, SolutionTCOItem, SolutionMetric, SolutionPlateau
