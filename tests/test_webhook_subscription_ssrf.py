@@ -118,6 +118,7 @@ def http_calls(monkeypatch):
         return calls.reply()
 
     monkeypatch.setattr(requests, "post", fake_post)
+    monkeypatch.setattr("app.services.webhook_service.time.sleep", lambda *_: None)
     monkeypatch.setattr(requests, "get", lambda *a, **k: pytest.fail("unexpected GET"))
     return calls
 
@@ -198,7 +199,7 @@ def test_create_accepts_ordinary_external_url_and_sends_without_redirects(
 def test_create_without_active_organisation_is_refused(world, production_like, monkeypatch):
     import app.services.webhook_service as svc
 
-    monkeypatch.setattr(svc, "_active_org_id", lambda: None)
+    monkeypatch.setattr(svc, "current_org_id", lambda: None)
     resp = _create(world.as_a(), url="https://hooks.example.com/in")
     assert resp.status_code == 403
     from app.models.webhook import WebhookSubscription
@@ -411,7 +412,7 @@ def test_same_user_in_another_active_organisation_sees_nothing(world, production
     sid = _create(world.as_a(), url="https://hooks.example.com/in").get_json()["data"]["id"]
     import app.services.webhook_service as svc
 
-    monkeypatch.setattr(svc, "_active_org_id", lambda: world.org_b.id)
+    monkeypatch.setattr(svc, "current_org_id", lambda: world.org_b.id)
     c = world.as_a()
     assert c.get(f"/api/webhooks/subscriptions/{sid}").status_code == 404
     assert c.get("/api/webhooks/subscriptions").get_json()["data"] == []
@@ -421,7 +422,7 @@ def test_unknown_active_organisation_sees_nothing(world, production_like, monkey
     sid = _create(world.as_a(), url="https://hooks.example.com/in").get_json()["data"]["id"]
     import app.services.webhook_service as svc
 
-    monkeypatch.setattr(svc, "_active_org_id", lambda: None)
+    monkeypatch.setattr(svc, "current_org_id", lambda: None)
     c = world.as_a()
     assert c.get(f"/api/webhooks/subscriptions/{sid}").status_code == 404
     assert c.get("/api/webhooks/subscriptions").get_json()["data"] == []

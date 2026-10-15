@@ -15,6 +15,7 @@ import requests
 from flask import current_app
 
 from app.extensions import db
+from app.middleware.tenant_context import current_org_id
 from app.models.webhook import WebhookDelivery, WebhookEvent, WebhookSubscription
 from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
 
@@ -104,13 +105,6 @@ def sanitize_webhook_headers(headers) -> Dict[str, str]:
     return clean
 
 
-def _active_org_id():
-    """The caller's active organisation, or None (callers then see nothing)."""
-    from app.middleware.tenant_context import current_org_id
-
-    return current_org_id()
-
-
 class WebhookService:
     """Service for managing webhook subscriptions and event delivery"""
 
@@ -137,7 +131,7 @@ class WebhookService:
         organisation is known (a subscription with no organisation would be
         read by every organisation).
         """
-        org_id = _active_org_id()
+        org_id = current_org_id()
         if org_id is None:
             raise PermissionError("No active organisation")
         url = validate_webhook_url(url)
@@ -170,7 +164,7 @@ class WebhookService:
         """Get all subscriptions for a user"""
         # user_id column is varchar; current_user.id is int -> cast to avoid
         # "operator does not exist: character varying = integer".
-        org_id = _active_org_id()
+        org_id = current_org_id()
         if org_id is None:
             return []
         return WebhookSubscription.query.filter_by(
@@ -179,7 +173,7 @@ class WebhookService:
 
     def get_subscription(self, subscription_id: str, user_id: str) -> Optional[WebhookSubscription]:
         """Get a specific subscription for a user"""
-        org_id = _active_org_id()
+        org_id = current_org_id()
         if org_id is None:
             return None
         return WebhookSubscription.query.filter_by(
@@ -303,7 +297,7 @@ class WebhookService:
         self, event_type: str, payload: Dict
     ) -> List[WebhookSubscription]:
         """Find subscriptions that match the event"""
-        org_id = _active_org_id()
+        org_id = current_org_id()
         if org_id is None:
             return []
         subscriptions = WebhookSubscription.query.filter_by(
@@ -613,7 +607,7 @@ class WebhookService:
 
     def get_events(self, limit: int = 50, offset: int = 0) -> List[WebhookEvent]:
         """Get webhook events (admin function)"""
-        org_id = _active_org_id()
+        org_id = current_org_id()
         if org_id is None:
             return []
         return (
@@ -626,7 +620,7 @@ class WebhookService:
 
     def retry_event(self, event_id: str) -> bool:
         """Retry delivering a failed event"""
-        org_id = _active_org_id()
+        org_id = current_org_id()
         if org_id is None:
             return False
         event = WebhookEvent.query.filter_by(id=event_id, organization_id=org_id).first()
