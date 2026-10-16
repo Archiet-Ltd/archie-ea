@@ -1528,7 +1528,10 @@ def test_contested_domain_refuses_password_sign_in_and_records_it(app, db_sessio
     assert "/auth/sso/initiate" not in resp.headers.get("Location", "")
     assert _session_user_id(client) is None
     assert failures
-    assert any("claimed by more than one" in m for m in _flashes(client))
+    # The login page renders (and so consumes) the flashed message, so read the body.
+    assert resp.status_code == 200
+    assert "claimed by more than one organisation" in resp.get_data(as_text=True)
+    assert "Invalid email or password" not in resp.get_data(as_text=True)
 
     initiate = _anonymous_client(app).get(f"/auth/sso/initiate?email={member.email}")
     assert initiate.status_code == 409
