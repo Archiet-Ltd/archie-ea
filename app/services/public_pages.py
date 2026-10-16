@@ -285,10 +285,16 @@ _ALLOWED_TAGS = {
     "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "li",
     "ol", "p", "pre", "strong", "table", "tbody", "td", "th",
     "thead", "tr", "ul",
+    # The captured-screenshot figure a content page may carry inline: the same
+    # figure/picture/img markup public/_partials/_page_media.html renders for a module page.
+    "figure", "figcaption", "picture", "source",
 }
 _ALLOWED_ATTRS = {
     "a": ["href", "title"],
-    "img": ["src", "alt", "title"],
+    "img": ["src", "alt", "title", "width", "height", "loading", "decoding", "class"],
+    "figure": ["class"],
+    "figcaption": ["class"],
+    "source": ["media", "srcset", "width", "height"],
     "th": ["align"],
     "td": ["align"],
     # id is not an XSS vector; allowed so a page's own headings can carry a
