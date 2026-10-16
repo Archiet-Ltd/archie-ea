@@ -6,6 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
 url_slug: /use-cases/risk-and-control-gaps
+icon: shield-off
 ---
 
 # Which risks and control gaps touch this goal, and who owns the mitigation?

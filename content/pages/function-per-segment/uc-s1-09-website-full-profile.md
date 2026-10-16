@@ -8,6 +8,7 @@ cta: waiting_list
 capture_status: not_applicable_not_yet_built
 url_slug: /use-cases/website-full-profile
 also_serves: [S2]
+icon: book-user
 ---
 
 # Read our site and propose our segments, value proposition, channels and competitors

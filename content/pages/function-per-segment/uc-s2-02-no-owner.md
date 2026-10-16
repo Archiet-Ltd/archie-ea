@@ -7,6 +7,7 @@ source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: not_applicable_not_yet_built
 cta: waiting_list
 url_slug: /use-cases/systems-with-no-owner
+icon: user-x
 ---
 
 # Which systems have no owner, and which owner is a single point of failure?
