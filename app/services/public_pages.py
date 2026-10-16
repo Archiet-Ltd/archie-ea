@@ -19,6 +19,7 @@ Directory layout maps to URL families:
 
 from __future__ import annotations
 
+import functools
 import json
 import re
 from dataclasses import dataclass, field
@@ -49,6 +50,7 @@ MERGED_PAGES: dict[str, str] = {
     "/modules/batch-import": "/modules/architecture-model",
     "/modules/duplicate-detection": "/modules/rationalization",
     "/modules/gap-analysis": "/modules/roadmaps",
+    "/modules/integrations": "/connectors",
     "/modules/investment-analysis": "/modules/business-case",
     "/modules/my-applications": "/use-cases/what-i-own",
     "/modules/projects": "/use-cases/programme-tracking",
@@ -60,31 +62,9 @@ MERGED_PAGES: dict[str, str] = {
 }
 
 HELD_PAGE_URLS: frozenset[str] = frozenset({
-    "/modules/capability-maturity",
-    "/use-cases/capability-maturity-heatmap",
-    "/modules/industry-apqc",
-    "/modules/integrations",
-    "/use-cases/canvas-dependencies",
-    "/use-cases/lean-canvas",
-    "/use-cases/reference-packs",
-    "/use-cases/website-first-look",
-    "/use-cases/website-full-profile",
-    "/use-cases/systems-with-no-owner",
-    "/use-cases/import-from-jira-and-github",
-    "/use-cases/match-systems-across-jira-and-servicenow",
-    "/use-cases/architecture-change-tracking",
-    "/use-cases/pagerduty-and-datadog-incidents",
-    "/use-cases/connector-candidates",
-    "/use-cases/leanix-ardoq-import",
-    "/use-cases/servicenow-cmdb-mapping",
-    "/use-cases/ai-assistant-for-your-architecture",
-    "/use-cases/derivation-yield",
-    "/use-cases/workforce-planning",
-    "/use-cases/adopt-reference-pack",
-    "/use-cases/see-your-own-twin",
-    "/use-cases/set-up-in-an-afternoon",
-    "/use-cases/demo-on-a-company-like-mine",
-    "/use-cases/what-we-can-and-cannot-tell",
+    # /docs has no front-matter state field of its own (it is a plain site
+    # page, not a module/use-case), so is_held's state-based half cannot see
+    # it -- this is its only hold mechanism.
     "/docs",
 })
 
@@ -221,6 +201,12 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
     ),
     "roadmaps": "0 gaps detected; plateaus with no description and 0 gaps",
     "value-streams": "0 stages and 0 capabilities on every value stream",
+    "digital-twin": (
+        "no seeded demonstration organisation or browser available when the "
+        "page was written to capture Ask with an impact answer and the "
+        "provenance drawer open, the twin map, or model history with a "
+        "seeded change -- needs a real capture run, not a placeholder"
+    ),
 }
 
 # The one live use-case page: same screen as the capability-maturity module
@@ -271,6 +257,8 @@ FAMILY_DIR_MAP = {
     "dogfood": "dogfood",
     "site": "site",
     "legal": "legal",
+    "role": "roles",
+    "connector": "connectors",
 }
 
 FAMILY_URL_PREFIX = {
@@ -284,6 +272,8 @@ FAMILY_URL_PREFIX = {
     "site": "",
     # Same shape as "site", but only published while LEGAL_PAGES_ENABLED is on.
     "legal": "",
+    "role": "/roles",
+    "connector": "/connectors",
 }
 
 _md = markdown.Markdown(extensions=["extra"])
@@ -361,22 +351,33 @@ class PublicPage:
         """Out of the sitemap, llms.txt/llms-full.txt and every nav/index
         listing, but still reachable at its own URL with a noindex tag.
 
-        True for a HOLD-verdict page (``HELD_PAGE_URLS`` -- not built yet)
-        and for a page withdrawn from discovery via front matter
-        ``state: not_planned`` (a feature that shipped as a page, then had
-        its release item pulled, with nothing left to build towards) --
-        both are the same "still reachable, just not advertised" case to
-        every caller, so one property covers both reasons.
+        True for a HOLD-verdict page (``HELD_PAGE_URLS`` -- a hold with no
+        front-matter mechanism of its own, e.g. a site page like /docs) and
+        for any page whose own front matter sets an explicit ``state`` other
+        than ``"on_main"`` -- ``missing``, ``briefed``, ``in_review``,
+        ``held`` and ``not_planned`` are all the same "not ready to
+        advertise" case from this property's point of view, so a page is
+        trusted to say so of itself rather than needing a second,
+        hand-maintained list entry kept in sync by hand. A page with no
+        ``state`` field at all (most site/vs/legal pages) is not held by
+        this half of the check -- only ``HELD_PAGE_URLS`` can hold those.
+
+        This was two checks before (``HELD_PAGE_URLS`` plus a literal
+        ``state == "not_planned"`` match): a page whose state had moved on
+        to ``on_main`` could still sit in ``HELD_PAGE_URLS`` from before it
+        was finished, with nothing forcing the two back into agreement
+        (found live: /use-cases/import-from-jira-and-github and
+        /modules/industry-apqc, both on_main, both still noindexed). One
+        check, with the page's own state as the only thing that can say
+        "ready", removes that drift instead of auditing it by hand again.
 
         A MERGE-verdict page (``MERGED_PAGES``) is a different case --
         its own URL 301s to a parent instead of rendering at all -- so it
         is not folded into this property; see load_feed_pages(), which
         checks both ``is_held`` and ``MERGED_PAGES`` separately.
         """
-        return (
-            self.url in HELD_PAGE_URLS
-            or self.front_matter.get("state") == "not_planned"
-        )
+        state = self.front_matter.get("state")
+        return self.url in HELD_PAGE_URLS or (state is not None and state != "on_main")
 
     @property
     def description(self) -> str | None:
@@ -666,6 +667,33 @@ def load_all_pages() -> list[PublicPage]:
     return pages
 
 
+def _content_fingerprint() -> tuple[tuple[str, int], ...]:
+    """Mtime fingerprint of every content file, used to invalidate the
+    cached URL-to-page map in ``_pages_by_url()`` below without re-running
+    markdown + bleach over every content file on each call."""
+    if not CONTENT_ROOT.is_dir():
+        return ()
+    return tuple(sorted(
+        (str(p), p.stat().st_mtime_ns) for p in CONTENT_ROOT.rglob("*.md")
+    ))
+
+
+@functools.lru_cache(maxsize=1)
+def _pages_by_url_for_fingerprint(fingerprint: tuple[tuple[str, int], ...]) -> dict[str, PublicPage]:
+    return {p.url: p for p in load_all_pages()}
+
+
+def _pages_by_url() -> dict[str, PublicPage]:
+    """URL-to-page map, cached per process and invalidated whenever a
+    content file is added, removed or edited (the fingerprint argument is
+    the cache key). ``build_landing()`` calls this instead of rebuilding
+    ``load_all_pages()`` -- markdown and bleach over every content file --
+    on every landing-page request; a cache miss costs one ``stat()`` per
+    content file to compute the fingerprint, not a full reparse.
+    """
+    return _pages_by_url_for_fingerprint(_content_fingerprint())
+
+
 def load_feed_pages() -> list[PublicPage]:
     """Every public page that belongs in a "lists every page" surface: the
     sitemap, /llms.txt, /llms-full.txt, the /vs hub, and any per-family
@@ -823,6 +851,8 @@ _BREADCRUMB_PARENTS: dict[str, tuple[str, str]] = {
     "module": ("Features", "/features"),
     "function-per-segment": ("Use cases", "/use-cases"),
     "comparison": ("Compare", "/vs"),
+    "role": ("Roles", "/roles"),
+    "connector": ("Connectors", "/connectors"),
 }
 
 
@@ -844,6 +874,184 @@ def _breadcrumb_list_items(page: PublicPage, site_url: str) -> list[dict[str, An
         }
         for position, (name, path) in enumerate(trail, start=1)
     ]
+
+
+# ── Hubs: /roles, /connectors, /features (feed-built lists) ─────────────────
+# One ordered label table per family (front-matter key -> heading), and one
+# grouping function every hub shares. A page with a missing or unknown key
+# lands in a final "More" group.
+
+ROLE_GROUPS: tuple[tuple[str, str], ...] = (
+    ("architecture", "Architecture"),
+    ("technology-leadership", "Technology leadership"),
+    ("portfolio-procurement-finance", "Portfolio, procurement and finance"),
+    ("security-risk-compliance", "Security, risk and compliance"),
+    ("owners", "Owners"),
+)
+
+CONNECTOR_GROUPS: tuple[tuple[str, str], ...] = (
+    ("ai-assistants", "AI assistants"),
+    ("sign-in", "Sign-in"),
+    ("service-management-and-delivery", "Service management and delivery"),
+    ("collaboration", "Collaboration"),
+)
+
+# family -> (front-matter key, ordered label table)
+_HUB_GROUP_TABLES: dict[str, tuple[str, tuple[tuple[str, str], ...]]] = {
+    "role": ("role_group", ROLE_GROUPS),
+    "connector": ("connector_group", CONNECTOR_GROUPS),
+}
+
+# Non-page entries: (heading, target URLs). Link text is each target page's
+# own title from load_feed_pages(); a target not in the feed is dropped.
+ROLE_HUB_EXTRA_ENTRIES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Architecture review board members", (
+        "/modules/arb",
+        "/use-cases/architecture-review-board",
+    )),
+    ("IT operations", (
+        "/use-cases/what-breaks-and-who-gets-called",
+        "/use-cases/what-happens-if-a-supplier-fails",
+        "/use-cases/contract-renewals",
+    )),
+)
+
+CONNECTOR_HUB_EXTRA_ENTRIES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("File imports", (
+        "/use-cases/import-archimate-model",
+        "/modules/architecture-model",
+    )),
+)
+
+
+def _title_key(page: PublicPage) -> str:
+    return page.title.lower()
+
+
+def family_hub_groups(
+    family: str,
+    *,
+    group_key: str | None = None,
+    labels: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    """The one grouping function behind every hub: the feed pages of *family*
+    grouped by a front-matter key, pages sorted by title (case-insensitive),
+    empty groups omitted.
+
+    Roles and connectors use their own ordered tables, with anything whose
+    key is missing or unknown in a final "More" group. /use-cases passes
+    ``group_key="segment_id"`` and its segment labels (a mapping): groups in
+    sorted key order, an unknown key labelled by itself ("More" when empty).
+    """
+    pages = [p for p in load_feed_pages() if p.family == family]
+    by_key: dict[str, list[PublicPage]] = {}
+
+    if group_key is not None:
+        for page in pages:
+            by_key.setdefault(str(page.front_matter.get(group_key) or ""), []).append(page)
+        mapping = labels or {}
+        return [
+            {"label": mapping.get(key, key or "More"), "pages": sorted(by_key[key], key=_title_key)}
+            for key in sorted(by_key)
+        ]
+
+    group_key, table = _HUB_GROUP_TABLES[family]
+    known = {key for key, _ in table}
+    extra: list[PublicPage] = []
+    for page in pages:
+        key = str(page.front_matter.get(group_key) or "")
+        if key in known:
+            by_key.setdefault(key, []).append(page)
+        else:
+            extra.append(page)
+    groups = [
+        {"label": label, "pages": sorted(by_key[key], key=_title_key)}
+        for key, label in table
+        if by_key.get(key)
+    ]
+    if extra:
+        groups.append({"label": "More", "pages": sorted(extra, key=_title_key)})
+    return groups
+
+
+def hub_extra_entries(
+    entries: tuple[tuple[str, tuple[str, ...]], ...],
+) -> list[dict[str, Any]]:
+    """Resolve non-page entries against the feed: only targets that are live
+    feed pages are linked, titled with their own page title."""
+    by_url = {p.url: p for p in load_feed_pages()}
+    resolved = []
+    for label, urls in entries:
+        pages = [by_url[u] for u in urls if u in by_url]
+        if pages:
+            resolved.append({"label": label, "pages": pages})
+    return resolved
+
+
+def role_siblings(page: PublicPage) -> list[dict[str, Any]]:
+    """The "Other roles" strip for a role page: every other role-family feed
+    page (sorted by title) as one group, then the non-page role entries as
+    further groups. Never the page itself."""
+    others = sorted(
+        (p for p in load_feed_pages() if p.family == "role" and p.url != page.url),
+        key=_title_key,
+    )
+    groups = hub_extra_entries(ROLE_HUB_EXTRA_ENTRIES)
+    if others:
+        groups.insert(0, {"label": "", "pages": others})
+    return groups
+
+
+def build_hub_jsonld(
+    name: str,
+    path: str,
+    description: str | None,
+    pages: list[PublicPage],
+    body_html: str | None = None,
+) -> str:
+    """Structured data for a hub: CollectionPage with an ItemList of every
+    linked page, a BreadcrumbList (Home > hub) and an FAQPage only when the
+    hub's own intro has a real FAQ section. One @graph, one script block."""
+    site_url = SITE_URL
+    collection: dict[str, Any] = {
+        "@type": "CollectionPage",
+        "url": f"{site_url}{path}",
+        "name": name,
+    }
+    if description:
+        collection["description"] = description
+    collection["mainEntity"] = {
+        "@type": "ItemList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": position,
+                "url": f"{site_url}{page.url}",
+                "name": page.title,
+            }
+            for position, page in enumerate(pages, start=1)
+        ],
+    }
+    nodes: list[dict[str, Any]] = [
+        collection,
+        {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Home", "item": f"{site_url}/"},
+                {"@type": "ListItem", "position": 2, "name": name, "item": f"{site_url}{path}"},
+            ],
+        },
+    ]
+    if body_html:
+        faq_questions = _extract_faq_questions(body_html)
+        if faq_questions:
+            nodes.append({
+                "@type": "FAQPage",
+                "url": f"{site_url}{path}",
+                "mainEntity": faq_questions,
+            })
+    ld = {"@context": "https://schema.org", "@graph": nodes}
+    return Markup(_escape_for_script_block(json.dumps(ld, indent=2, ensure_ascii=False)))
 
 
 def _escape_for_script_block(serialised: str) -> str:
@@ -1090,3 +1298,362 @@ def _jsonld_faq(page: PublicPage, site_url: str) -> dict[str, Any]:
         "url": f"{site_url}{page.url}",
         "mainEntity": _extract_faq_questions(page.body_html),
     }
+
+
+# ── Landing layout (module, use-case and comparison pages) ──────────────────
+# These three families render as a landing page (hero, alternating section
+# bands, link lists as cards, a closing action band) instead of one prose
+# column; every other family keeps the document layout. Keyed on
+# ``page.family`` (the content directory), never ``page.page_family``, so
+# front matter cannot switch a legal or site page into it.
+
+LANDING_FAMILIES: frozenset[str] = frozenset({"module", "function-per-segment", "comparison"})
+
+# The one segment-label table: the /use-cases index groups by it and a
+# use-case page's hero names its segment from it.
+USE_CASE_SEGMENT_LABELS: dict[str, str] = {
+    "S1": "Startups",
+    "S2": "Scale-ups",
+    "S3": "Enterprise architecture teams",
+    "S4": "Services and operations",
+}
+
+# The one icon table: a page's own ``icon:`` front matter wins; a family with
+# no per-page icon falls back here. Lucide names, checked against the vendored
+# v0.344.0 bundle (static/vendor/lucide.min.js).
+_FAMILY_DEFAULT_ICON: dict[str, str] = {
+    "module": "layout-grid",
+    "function-per-segment": "help-circle",
+    "comparison": "scale",
+}
+
+_ICON_NAME_RE = re.compile(r"[a-z0-9-]+")
+_VOID_ELEMENTS = frozenset({"br", "hr", "img"})
+
+
+@dataclass
+class LandingCard:
+    url: str
+    title_html: Markup
+    description: str | None
+    icon: str
+
+
+@dataclass
+class LandingSection:
+    id: str
+    heading_html: Markup
+    body_html: Markup
+    cards: list[LandingCard] | None = None
+    # "callout" (a use-case page's own "The question" -- rendered as a
+    # left-ruled attention box, B-03) or "figure_band" (its "What Entelim
+    # answers" -- rendered beside the page's screenshot/recording when one
+    # exists, text-only otherwise, B-02's band shape). "default" for every
+    # other section on every page family, which keeps the plain prose/card
+    # band unchanged. See _SECTION_VARIANT_HEADINGS below.
+    variant: str = "default"
+
+
+# Use-case pages only (checked against page.family, never page.page_family,
+# same guard build_landing() uses for LANDING_FAMILIES): the exact, lowercased
+# plain-text heading that turns a section into the callout or figure-band
+# variant. A page whose second heading reads "What Entelim is building" (not
+# yet live) or something else entirely (e.g. the one longer FAQ-style use
+# case with no "The question" heading at all) simply keeps the default prose
+# band -- this table does not require every use-case file to share the same
+# shape, only recognises the two headings that do.
+_SECTION_VARIANT_HEADINGS: dict[str, str] = {
+    "the question": "callout",
+    "what entelim answers": "figure_band",
+}
+
+
+@dataclass
+class Landing:
+    title: str
+    icon: str
+    lead_html: Markup | None
+    intro_html: Markup | None
+    sections: list[LandingSection]
+    breadcrumb: tuple[str, str] | None
+    segment_label: str | None
+    primary_action: tuple[str, str]
+    secondary_action: tuple[str, str] = ("See pricing", "/pricing")
+
+
+@dataclass
+class _Node:
+    """One depth-0 node of an HTML fragment: an element (``tag`` set) or a
+    run of text (``tag`` None). Offsets index into the parsed string."""
+
+    tag: str | None
+    attrs: dict[str, str | None]
+    start: int
+    end: int
+    inner_start: int
+    inner_end: int
+
+
+def _top_level_nodes(fragment: str) -> list[_Node]:
+    """Split ``fragment`` into its depth-0 nodes, tracking element depth with
+    ``html.parser.HTMLParser``. Void elements (br, hr, img) do not change
+    depth, so an ``<h2>`` inside a ``<blockquote>`` or a list is never a
+    depth-0 node. Input is bleach output, so tags are balanced."""
+    from html.parser import HTMLParser
+
+    line_starts = [0]
+    for index, char in enumerate(fragment):
+        if char == "\n":
+            line_starts.append(index + 1)
+
+    nodes: list[_Node] = []
+
+    class _Splitter(HTMLParser):
+        def __init__(self) -> None:
+            super().__init__(convert_charrefs=False)
+            self.depth = 0
+            self.open: _Node | None = None
+            self.text_start: int | None = None
+
+        def _offset(self) -> int:
+            line, col = self.getpos()
+            return line_starts[line - 1] + col
+
+        def _close_text(self, at: int) -> None:
+            if self.text_start is not None:
+                nodes.append(_Node(None, {}, self.text_start, at, self.text_start, at))
+                self.text_start = None
+
+        def _text(self) -> None:
+            if self.depth == 0 and self.text_start is None:
+                self.text_start = self._offset()
+
+        def handle_data(self, data: str) -> None:
+            self._text()
+
+        def handle_entityref(self, name: str) -> None:
+            self._text()
+
+        def handle_charref(self, name: str) -> None:
+            self._text()
+
+        def handle_starttag(self, tag: str, attrs: list) -> None:
+            start = self._offset()
+            starttag = self.get_starttag_text() or ""
+            if self.depth == 0:
+                self._close_text(start)
+                if tag in _VOID_ELEMENTS:
+                    end = start + len(starttag)
+                    nodes.append(_Node(tag, dict(attrs), start, end, end, end))
+                    return
+                self.open = _Node(tag, dict(attrs), start, -1, start + len(starttag), -1)
+            if tag not in _VOID_ELEMENTS:
+                self.depth += 1
+
+        def handle_startendtag(self, tag: str, attrs: list) -> None:
+            start = self._offset()
+            if self.depth == 0:
+                self._close_text(start)
+                end = start + len(self.get_starttag_text() or "")
+                nodes.append(_Node(tag, dict(attrs), start, end, end, end))
+
+        def handle_endtag(self, tag: str) -> None:
+            if tag in _VOID_ELEMENTS:
+                return
+            start = self._offset()
+            self.depth = max(self.depth - 1, 0)
+            if self.depth == 0 and self.open is not None:
+                node = self.open
+                node.inner_end = start
+                node.end = fragment.index(">", start) + 1
+                nodes.append(node)
+                self.open = None
+
+    splitter = _Splitter()
+    splitter.feed(fragment)
+    splitter.close()
+    splitter._close_text(len(fragment))
+    if splitter.open is not None:  # unbalanced input: keep the rest whole
+        node = splitter.open
+        node.end = node.inner_end = len(fragment)
+        nodes.append(node)
+    return nodes
+
+
+def _is_blank(fragment: str, node: _Node) -> bool:
+    return node.tag is None and not fragment[node.start:node.end].strip()
+
+
+def _element_nodes(fragment: str, nodes: list[_Node]) -> list[_Node] | None:
+    """The element nodes of ``nodes``, or ``None`` when any depth-0 text
+    beside them is more than whitespace."""
+    elements = []
+    for node in nodes:
+        if node.tag is None:
+            if not _is_blank(fragment, node):
+                return None
+            continue
+        elements.append(node)
+    return elements
+
+
+def _fragment(html: str) -> Markup | None:
+    """Sanitize a slice of a page body again (so it is balanced and marked
+    trusted in the one place that does that), or ``None`` when empty."""
+    html = html.strip()
+    if not html:
+        return None
+    return _sanitize_html(html)
+
+
+def _slugify(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
+def _plain_text(html: str) -> str:
+    import html as _html
+
+    return " ".join(_html.unescape(re.sub(r"<[^>]+>", "", html)).split())
+
+
+def page_icon(page: PublicPage) -> str:
+    """The Lucide icon name for ``page``: its own ``icon`` front matter when
+    that is a non-empty string of lowercase letters, digits and hyphens, else
+    its family's default, else ``"link"``."""
+    own = page.front_matter.get("icon")
+    if isinstance(own, str) and _ICON_NAME_RE.fullmatch(own):
+        return own
+    return _FAMILY_DEFAULT_ICON.get(page.family, "link")
+
+
+def _link_list_cards(body: str, pages_by_url: dict[str, PublicPage]) -> list[LandingCard] | None:
+    """Cards for a section whose body is exactly one ``<ul>`` of items that
+    each hold one internal link and nothing else; ``None`` otherwise."""
+    elements = _element_nodes(body, _top_level_nodes(body))
+    if not elements or len(elements) != 1 or elements[0].tag != "ul":
+        return None
+    ul = elements[0]
+    ul_inner = body[ul.inner_start:ul.inner_end]
+    items = _element_nodes(ul_inner, _top_level_nodes(ul_inner))
+    if not items or any(item.tag != "li" for item in items):
+        return None
+
+    cards: list[LandingCard] = []
+    for item in items:
+        li_inner = ul_inner[item.inner_start:item.inner_end]
+        links = _element_nodes(li_inner, _top_level_nodes(li_inner))
+        if not links or len(links) != 1 or links[0].tag != "a":
+            return None
+        link = links[0]
+        href = link.attrs.get("href") or ""
+        # Internal means a site path: "//host" is protocol-relative, external.
+        if not href.startswith("/") or href.startswith("//"):
+            return None
+        title_html = _fragment(li_inner[link.inner_start:link.inner_end])
+        if title_html is None:
+            return None
+        target = pages_by_url.get(href.split("#", 1)[0].split("?", 1)[0])
+        cards.append(LandingCard(
+            url=href,
+            title_html=title_html,
+            description=target.description if target is not None else None,
+            icon=page_icon(target) if target is not None else "link",
+        ))
+    return cards
+
+
+def build_landing(page: PublicPage) -> Landing | None:
+    """The landing-page view of ``page`` for public/_partials/_landing.html,
+    or ``None`` when ``page.family`` keeps the document layout.
+
+    Splits the sanitized body at its depth-0 ``<h1>`` and ``<h2>`` elements:
+    the first paragraph after the ``<h1>`` is the hero lead, anything else
+    before the first ``<h2>`` is the intro, and each ``<h2>`` starts a
+    section. A section whose body is only a list of internal links becomes a
+    card grid, each card described and iconed from its target page. Every
+    fragment passes through ``_sanitize_html()`` again before it is stored.
+    """
+    if page.family not in LANDING_FAMILIES:
+        return None
+
+    from flask import url_for
+
+    body = str(page.body_html)
+    nodes = _top_level_nodes(body)
+
+    h1_index = next((i for i, n in enumerate(nodes) if n.tag == "h1"), None)
+    before_h1 = ""
+    if h1_index is not None:
+        before_h1 = body[:nodes[h1_index].start]
+        rest = nodes[h1_index + 1:]
+        cursor = nodes[h1_index].end
+    else:
+        rest = nodes
+        cursor = 0
+
+    lead_html = None
+    first_element = next((n for n in rest if not _is_blank(body, n)), None)
+    if first_element is not None and first_element.tag == "p":
+        inner = body[first_element.inner_start:first_element.inner_end]
+        inner_elements = _element_nodes(inner, _top_level_nodes(inner))
+        if inner_elements and len(inner_elements) == 1 and inner_elements[0].tag in ("em", "strong"):
+            only = inner_elements[0]
+            inner = inner[only.inner_start:only.inner_end]
+        lead_html = _fragment(inner)
+        cursor = first_element.end
+
+    h2_nodes = [n for n in rest if n.tag == "h2"]
+    intro_end = h2_nodes[0].start if h2_nodes else len(body)
+    intro_html = _fragment(before_h1 + body[cursor:intro_end])
+
+    pages_by_url: dict[str, PublicPage] | None = None
+    sections: list[LandingSection] = []
+    used_ids: set[str] = set()
+    for index, h2 in enumerate(h2_nodes):
+        heading = body[h2.inner_start:h2.inner_end]
+        heading_text = _plain_text(heading)
+        base_id = h2.attrs.get("id") or _slugify(heading_text) or "section"
+        section_id, suffix = base_id, 2
+        while section_id in used_ids:
+            section_id = f"{base_id}-{suffix}"
+            suffix += 1
+        used_ids.add(section_id)
+
+        section_end = h2_nodes[index + 1].start if index + 1 < len(h2_nodes) else len(body)
+        section_body = body[h2.end:section_end]
+        cards = None
+        if "<ul" in section_body:
+            if pages_by_url is None:
+                pages_by_url = _pages_by_url()
+            cards = _link_list_cards(section_body.strip(), pages_by_url)
+        variant = "default"
+        if page.family == "function-per-segment":
+            variant = _SECTION_VARIANT_HEADINGS.get(heading_text.strip().lower(), "default")
+        sections.append(LandingSection(
+            id=section_id,
+            heading_html=_fragment(heading) or Markup(""),
+            body_html=_fragment(section_body) or Markup(""),
+            cards=cards,
+            variant=variant,
+        ))
+
+    parent = _BREADCRUMB_PARENTS.get(page.family)
+    segment_label = None
+    if page.family == "function-per-segment":
+        segment_label = USE_CASE_SEGMENT_LABELS.get(page.front_matter.get("segment_id", ""))
+
+    if page.cta == "waiting_list":
+        primary_action = ("Tell us you need this", "#feature-interest")
+    else:
+        primary_action = ("Start free", url_for("account.register"))
+
+    return Landing(
+        title=page.title,
+        icon=page_icon(page),
+        lead_html=lead_html,
+        intro_html=intro_html,
+        sections=sections,
+        breadcrumb=parent,
+        segment_label=segment_label,
+        primary_action=primary_action,
+    )

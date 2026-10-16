@@ -7,6 +7,7 @@ source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
 url_slug: /use-cases/derivation-yield
+icon: percent
 ---
 
 # How many connections did the model work out for us, and can I open any one to its proof?

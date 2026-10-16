@@ -9,6 +9,7 @@ answers_use_cases:
   - {id: UC-S3-08, segment: S3}
 capture_status: live
 cta: plans
+icon: shield-alert
 ---
 
 # Risk Register

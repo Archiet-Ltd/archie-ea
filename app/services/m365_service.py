@@ -24,6 +24,66 @@ logger = logging.getLogger(__name__)
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 _TOKEN_URL = "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
 
+#: Hosts a Teams incoming webhook is served from. ``outlook.office.com`` is
+#: accepted only under ``/webhook``. ``TEAMS_WEBHOOK_EXTRA_HOST_SUFFIXES`` in
+#: the app configuration adds to this list (sovereign clouds, a gateway).
+TEAMS_WEBHOOK_HOST_SUFFIXES = (
+    ".webhook.office.com",
+    ".logic.azure.com",
+    ".environment.api.powerplatform.com",  # Teams Workflows webhooks
+)
+_TEAMS_OUTLOOK_HOST = "outlook.office.com"
+
+
+def validate_teams_webhook_url(url) -> str:
+    """Return ``url`` if it is a Microsoft Teams webhook address, else raise
+    ``app.utils.ssrf_guard.BlockedOutboundURL`` (generic message).
+
+    Uses the shared outbound guard (https, ASCII host, no credentials, public
+    addresses only) with a Microsoft host allow-list on top.
+    """
+    from urllib.parse import urlparse
+
+    from app.utils.ssrf_guard import BlockedOutboundURL, validate_outbound_url
+
+    if not isinstance(url, str) or not url.strip():
+        raise BlockedOutboundURL("URL not allowed")
+    url = url.strip()
+    extra = ()
+    try:
+        from flask import current_app
+
+        raw = current_app.config.get("TEAMS_WEBHOOK_EXTRA_HOST_SUFFIXES") or ()
+        if isinstance(raw, str):
+            raw = raw.split(",")
+        # Every entry must be a dotted suffix, so "example.com" cannot also
+        # admit "evilexample.com".
+        extra = tuple(
+            "." + e.strip().lower().lstrip(".") for e in raw if e and e.strip()
+        )
+    except RuntimeError:
+        pass
+    suffixes = TEAMS_WEBHOOK_HOST_SUFFIXES + tuple(extra)
+    try:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower().rstrip(".")
+        path = parsed.path or ""
+    except ValueError:
+        raise BlockedOutboundURL("URL not allowed")
+    if host == _TEAMS_OUTLOOK_HOST:
+        segments = path.split("/")
+        if (
+            not (path == "/webhook" or path.startswith("/webhook/"))
+            or ".." in segments
+            or "." in segments
+            or "\\" in url
+            or "%2e" in path.lower()
+        ):
+            raise BlockedOutboundURL("URL not allowed")
+        suffixes = suffixes + (_TEAMS_OUTLOOK_HOST,)
+    return validate_outbound_url(url, allowed_host_suffixes=suffixes, require_https=True)
+
+
 # Module-level token cache: connector_id → {access_token, expires_at}
 _token_cache: dict = {}
 
@@ -127,15 +187,26 @@ class M365Service:
         }
 
         try:
+            webhook_url = validate_teams_webhook_url(channel_webhook_url)
+        except Exception as exc:  # BlockedOutboundURL
+            logger.warning(
+                "COM-017: Teams webhook address refused at send (organisation %s): %s",
+                org_id,
+                exc,
+            )
+            return
+
+        try:
             resp = requests.post(
-                channel_webhook_url,
+                webhook_url,
                 json=card,
                 timeout=10,
                 headers={"Content-Type": "application/json"},
+                allow_redirects=False,
             )
             resp.raise_for_status()
         except Exception:
-            logger.exception("COM-017: Teams notification failed (title='%s')", title)
+            logger.warning("COM-017: Teams notification failed (title='%s')", title)
 
     # ------------------------------------------------------------------ #
     # Internal helpers                                                     #
@@ -170,26 +241,45 @@ class M365Service:
         cfg_data = config.config or {}
         tenant_id = cfg_data.get("tenant_id", "")
         client_id = cfg_data.get("client_id", "")
-        client_secret_stored = cfg_data.get("client_secret", "")
 
-        if not (tenant_id and client_id and client_secret_stored):
-            logger.warning("COM-017: M365 config is missing required credentials")
-            return None
+        # N1 (cloud-review-pr448-505c3c2e-v1.md): connector_routes.py's save
+        # path stores the secret only in the per-organisation vault, never
+        # on this row, so reading the row left every new setup without a
+        # secret and every rotation still using the old one. Read the vault
+        # first; fall back to the legacy row (its own decryption path) only
+        # for a value that predates the vault-only save path.
+        client_secret = None
+        if config.organization_id:
+            from app.modules.codegen.services.credential_vault import OrgCredentialVault
 
-        try:
-            from app.modules.codegen.services.credential_encryption import (
-                decrypt_credential,
-            )
-
-            raw = client_secret_stored
-            if isinstance(raw, str):
-                raw = raw.encode()
-            client_secret = decrypt_credential(raw)
-        except Exception:
-            logger.warning("COM-017: Failed to decrypt M365 client_secret")
-            return None
+            vault = OrgCredentialVault()
+            client_secret = vault.retrieve(config.organization_id, "m365", "client_secret")
+            if not client_secret:
+                # N6: a connector added through the generic /admin/connectors
+                # page stores its secret under the "credentials" blob, not
+                # this connector type's named key.
+                generic = vault.retrieve_credentials(config.organization_id, "m365") or {}
+                client_secret = generic.get("credential") or None
 
         if not client_secret:
+            client_secret_stored = cfg_data.get("client_secret", "")
+            if not (tenant_id and client_id and client_secret_stored):
+                logger.warning("COM-017: M365 config is missing required credentials")
+                return None
+            try:
+                from app.modules.codegen.services.credential_encryption import (
+                    decrypt_credential,
+                )
+
+                raw = client_secret_stored
+                if isinstance(raw, str):
+                    raw = raw.encode()
+                client_secret = decrypt_credential(raw)
+            except Exception:
+                logger.warning("COM-017: Failed to decrypt M365 client_secret")
+                return None
+
+        if not (tenant_id and client_id and client_secret):
             logger.warning("COM-017: Decrypted client_secret is empty")
             return None
 

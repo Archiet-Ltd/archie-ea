@@ -8,6 +8,7 @@ roadmap_citation: "roadmap-v2.md 'Next: December 2026 to February 2027' — name
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
 url_slug: /use-cases/canvas-dependencies
+icon: git-branch
 ---
 
 # Which boxes on my canvas depend on things we have not built, hired or signed yet?

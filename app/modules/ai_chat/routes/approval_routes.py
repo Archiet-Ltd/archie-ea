@@ -3,7 +3,9 @@
 from flask import jsonify, render_template, request
 from flask_login import current_user, login_required
 
+from app.models.ai_chat_crud_approval import AIChatCRUDApproval
 from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+from app.utils.route_guards import require_entity_json
 
 from . import unified_ai_chat_bp
 
@@ -46,6 +48,25 @@ def approver_queue():
     return jsonify(result), _decision_status(result)
 
 
+@unified_ai_chat_bp.route("/approvals/decided", methods=["GET"])
+@login_required
+def decided_approvals():
+    """The organisation's latest approved and rejected proposals, with reasons."""
+    result = _approval_service().get_recent_decisions()
+    return jsonify(result), _decision_status(result)
+
+
+@unified_ai_chat_bp.route("/approvals/<int:approval_id>/impact", methods=["GET"])
+@login_required
+def approval_impact(approval_id):
+    """What approving this proposal would affect: services, interfaces, owners."""
+    _, missing = require_entity_json(AIChatCRUDApproval, approval_id, label="Approval")
+    if missing:
+        return missing
+    result = _approval_service().get_approval_impact(approval_id)
+    return jsonify(result), _decision_status(result)
+
+
 @unified_ai_chat_bp.route("/approvals/<int:approval_id>/approve", methods=["POST"])
 @login_required
 def approve_pending_approval(approval_id):
@@ -54,6 +75,9 @@ def approve_pending_approval(approval_id):
     # (static/js/ai_chat/approval_modal.js) raised AttributeError and 500'd. The
     # queue itself worked - the blueprint page reaches it via a different route -
     # so the flow was sound and only this call site was wrong.
+    _, missing = require_entity_json(AIChatCRUDApproval, approval_id, label="Approval")
+    if missing:
+        return missing
     result = _approval_service().approve_and_execute(approval_id, current_user.id)
     return jsonify(result), _decision_status(result)
 
@@ -61,6 +85,9 @@ def approve_pending_approval(approval_id):
 @unified_ai_chat_bp.route("/approvals/<int:approval_id>/reject", methods=["POST"])
 @login_required
 def reject_pending_approval(approval_id):
+    _, missing = require_entity_json(AIChatCRUDApproval, approval_id, label="Approval")
+    if missing:
+        return missing
     payload = request.get_json(silent=True) or {}
     reason = payload.get("reason")
     result = _approval_service().reject_approval(approval_id, reason)
@@ -87,6 +114,8 @@ def approval_inbox():
 __all__ = [
     "pending_approvals",
     "approver_queue",
+    "decided_approvals",
+    "approval_impact",
     "approve_pending_approval",
     "reject_pending_approval",
     "approval_inbox",

@@ -10,6 +10,7 @@ answers_use_cases:
 capture_status: live
 cta: plans
 description: "Contract management software with a renewals dashboard, licence entitlements against use, spend by contract type and vendor, and a licence compliance view."
+icon: shopping-cart
 ---
 
 # Contract management software

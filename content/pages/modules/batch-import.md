@@ -9,6 +9,7 @@ answers_use_cases:
   - {id: UC-S4-02, segment: S4}
 capture_status: live
 cta: plans
+icon: upload
 ---
 
 # Batch Import

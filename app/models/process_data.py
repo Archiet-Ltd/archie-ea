@@ -589,96 +589,21 @@ class DataEntity(TenantMixin, db.Model):
         return f"<DataEntity {self.name} ({self.entity_type})>"
 
     def ensure_archimate_element(self):
-        """Ensure this data entity has an ArchiMate element (Data Object)."""
-        from .archimate_core import ArchiMateElement  # Local import to avoid circular dependency
+        """Ensure this data entity has an ArchiMate element (Data Object).
 
-        if self.archimate_element_id:
-            element = ArchiMateElement.query.get(self.archimate_element_id)
-            if element:
-                return element
+        The one element writer handles the stale-pointer case (linked element
+        deleted) itself, so this delegates straight to it.
+        """
+        from app.services.archimate_backbone import ensure_archimate_element
 
-        element = ArchiMateElement(
-            name=self.name,
-            type="DataObject",
-            layer="application",
-            description=self.description or f"Data object for entity: {self.name}",
-        )
-        db.session.add(element)
-        db.session.flush()
-
-        self.archimate_element_id = element.id
-        return element
+        return ensure_archimate_element(self)
 
 
-# Auto-create an ArchiMate element when a DataEntity is created, mirroring the
-# strategy_layer.py pattern (see app/models/strategy_layer.py::_link_strategy_archimate).
-#
-# ArchiMate 3.2 is the backbone, not a view — but ArchiMate 3.2 has no "DataEntity"
-# element type. A DataEntity is a data-architecture catalogue concept, so it mirrors
-# as the closest ArchiMate 3.2 fit: an Application-layer "DataObject" (this is what
-# ``ensure_archimate_element`` above already builds, but nothing on the create path
-# called it — ``create_data_entity`` in data_architecture_routes.py inserted the row
-# directly, so entities created via the UI never got an element. The AI assistant,
-# which reads the ArchiMate layer, would report none of them existed even though the
-# catalogue page listed them).
-#
-# This runs as a mapper ``after_insert`` event, i.e. INSIDE the unit-of-work flush.
-# Writing through ``db.session`` there (session.add + flush) would be a reentrant
-# flush — "Session is already flushing" — so this writes through the event's own
-# ``connection`` (Core, not the session) and reflects the new FK with
-# ``set_committed_value`` so no further flush is provoked. A Core insert does NOT
-# re-fire ORM mapper events, so there is no cascade.
-#
-# DataEntity is TenantMixin as of ADR-0003, so the mirror takes its tenant from
-# the row itself: before_flush stamps target.organization_id before the flush
-# that fires this event, making it strictly more reliable than the ambient
-# g.current_org_id (which the ArchiMateElement column default would otherwise
-# read, and which is absent outside a request context).
-def _link_data_entity_archimate(connection, target, organization_id=None):
-    """Create the ArchiMateElement and point ``target.archimate_element_id`` at it.
-
-    ``organization_id`` is an explicit override for callers that hold rows
-    predating tenancy (the backfill command). Left as ``None`` (the
-    mapper-event call site), the tenant is read from ``target.organization_id``,
-    falling back to ArchiMateElement.organization_id's own column default, which resolves the
-    tenant from ``g.current_org_id``.
-    """
-    from sqlalchemy.orm.attributes import set_committed_value
-
-    from .archimate_core import ArchiMateElement
-
-    archimate_table = ArchiMateElement.__table__
-    values = {
-        "name": target.name,
-        "type": "DataObject",
-        "layer": "application",
-        "description": target.description or f"Data object for entity: {target.name}",
-    }
-    effective_org = (
-        organization_id
-        if organization_id is not None
-        else getattr(target, "organization_id", None)
-    )
-    if effective_org is not None:
-        values["organization_id"] = effective_org
-
-    result = connection.execute(archimate_table.insert().values(**values))
-    new_id = result.inserted_primary_key[0]
-
-    connection.execute(
-        target.__table__.update()
-        .where(target.__table__.c.id == target.id)
-        .values(archimate_element_id=new_id)
-    )
-    # keep the in-memory object consistent without marking it dirty (no re-flush)
-    set_committed_value(target, "archimate_element_id", new_id)
-
-
-@event.listens_for(DataEntity, "after_insert")
-def create_archimate_data_entity(mapper, connection, target):
-    """Automatically create/link an ArchiMateElement (type DataObject) for a new DataEntity."""
-    if not target.archimate_element_id:
-        _link_data_entity_archimate(connection, target)
+# DataEntity's ArchiMate element is now created by the shared
+# flush listener in app/services/archimate_backbone.py, which is also the
+# writer used by app/commands/backfill_domain_elements.py. The raw-insert
+# after_insert listener and its helper were removed; nothing else may write a
+# DataEntity element.
 
 
 def _ensure_archimate_relationship(

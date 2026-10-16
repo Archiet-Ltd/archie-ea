@@ -6,6 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
 url_slug: /use-cases/architecture-map-for-due-diligence
+icon: map
 ---
 
 # Give the acquirer or the auditor a current architecture picture we did not draw by hand

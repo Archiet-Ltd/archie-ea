@@ -486,7 +486,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 69 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 72 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -508,8 +508,9 @@ to reconfirm the count before trusting it:**
 | `raw-sql-tenancy` | raw SQL on a tenant table with no `organization_id` predicate | ratchet @ 0 |
 | `raw-sql-tenancy-writes` | raw SQL writing `organization_id` outside the canonical backfill | ratchet @ 5 |
 | `tenant-scoping` | ORM queries on a tenant-owned-but-unmixed model with no org predicate | ratchet @ 0 |
-| `untenanted-reads` | a read (`db.select`, `.query`, `session.get`) of ANY model with no `TenantMixin`, with no org predicate in the statement | ratchet @ 2633; a bare `tenant-scoping-ok` (no reason) or an org word inside another name does not clear a read |
+| `untenanted-reads` | a read (`db.select`, `.query`, `session.get`) of ANY model with no `TenantMixin`, with no org predicate in the statement | ratchet @ 2361; a bare `tenant-scoping-ok` (no reason) or an org word inside another name does not clear a read |
 | `unfenced-tables` | a database table with no `TenantMixin` that is not listed in `scripts/unfenced_tables.txt` (a new one is a decision) | ratchet @ 0 |
+| `reuse-register` | a second copy of a concept registered in `docs/reuse-register.yml` (a definition matching a `must_not_create` pattern outside the canonical file and the known exceptions), or a canonical file or symbol that no longer exists; the failure prints what to reuse (`python scripts/check_reuse_register.py --entries`) | zero over per-file counts in `scripts/reuse_register_baseline.json` that only fall; `--update-baseline` refuses to raise one |
 | `llm-boundary` | a codegen emitter calling an LLM directly | ratchet @ 0 |
 | `evidence-contract` | behavioural changes/checkers missing evidence or provenance | ratchet @ 29 |
 | `untyped-property-writes` | direct ArchiMate element property writes bypassing the typed writer | ratchet @ 1 |
@@ -557,6 +558,8 @@ to reconfirm the count before trusting it:**
 | `schema-drift` | ORM/database column drift | must pass (needs DB) |
 | `tests` | behavioural regression | must pass (needs DB) |
 | `nav-verified` | a new sidebar route with no test loading it | ratchet @ 0, carries no tags |
+| `interface-contract-unlisted` | a token-accepting /api/v1 route missing from the committed contract subset, or with an incompatible scope | must be 0 |
+| `interface-contract-unimplemented` | a contract-subset operation with no matching token-accepting route | ratchet @ 0 |
 | `docs-drift` | CLAUDE.md/DELIVERY_CONTRACT.md gate claims disagreeing with build_gates() | must be 0 |
 | `public-repo-hygiene` | a docs/buckets/ directory or path reference in this public repository | must be 0 |
 | `background-mechanisms` | a background-work mechanism (rq, celery, apscheduler, thread, process pool, detached subprocess) missing from `docs/background-mechanisms.yml`, or a stale entry | ratchet @ 29 thread instances in 22 files; keyed on file, kind and function |
