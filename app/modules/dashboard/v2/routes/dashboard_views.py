@@ -707,12 +707,20 @@ def api_overview_chart():
     )
 
 
+_AUTHORITY_ROLES = frozenset({
+    "platform_admin", "arb_member", "enterprise_architect", "cto",
+    "portfolio_manager", "procurement",
+})
+
+
 @dashboard_bp_v2.route("/api/onboarding-complete", methods=["POST"])
 @timed_route
 @login_required
 def api_onboarding_complete():
     """PLT-040: Mark user onboarding as complete, optionally update enterprise_role."""
     import datetime
+
+    from app.middleware.tenant_decorators import is_platform_admin
 
     data = request.get_json(silent=True) or {}
     new_role = data.get("enterprise_role")
@@ -722,6 +730,18 @@ def api_onboarding_complete():
         "cto", "application_manager", "procurement",
     }
     if new_role and new_role in valid_roles:
+        # A saved role must never raise the caller's own privilege. These
+        # personas carry authority somewhere (board voting, administration,
+        # portfolio and procurement decisions, architecture sign-off), so a
+        # person can only confirm one they already hold; otherwise an
+        # administrator assigns it (or the one is_platform_admin predicate
+        # holds). The rest are views and can be chosen freely.
+        if (
+            new_role in _AUTHORITY_ROLES
+            and current_user.enterprise_role != new_role
+            and not is_platform_admin(current_user)
+        ):
+            return jsonify({"success": False, "error": "Role not permitted"}), 403
         current_user.enterprise_role = new_role
     current_user.onboarding_completed_at = datetime.datetime.utcnow()
     try:
