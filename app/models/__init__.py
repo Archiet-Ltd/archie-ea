@@ -127,6 +127,7 @@ else:
     from .capability_governance import *  # noqa - CapabilityGovernanceDecision
     from .compliance_models import *  # noqa
     from .application_compliance import *  # noqa - ApplicationComplianceControl (application-to-control mapping)
+    from .control_test import *  # noqa - ControlTest (design and operating tests of an adopted control)
     from .regulatory_framework import *  # noqa - FrameworkAdoption (tenant-hybrid framework catalogue)
     from .regulatory_change import *  # noqa - RegulatoryChange, RegulatoryChangeImpact (regulatory change tracker)
     from .cost_fact import *  # noqa - CostFact, ExchangeRate (one cost fact store)

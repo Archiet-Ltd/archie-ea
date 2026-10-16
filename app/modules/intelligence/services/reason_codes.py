@@ -132,6 +132,10 @@ REASON_CODES = frozenset(
         # unknown, not that everything passed.
         "no_compliance_controls_recorded",
         "no_control_evidence",
+        # A control whose evidence is recorded but whose validity period has
+        # passed: the evidence exists and is out of date, a different fact from
+        # none recorded.
+        "control_evidence_expired",
         "no_policy_scan_recorded",
         # The programme lens's own plateau/gap block: a work package's stored
         # plateau_id/gap_id may be unset (a nullable FK), or, in principle,

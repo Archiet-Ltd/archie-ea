@@ -124,7 +124,7 @@ _EXPECTED = {
 }
 
 
-def test_reason_codes_has_exactly_fifty_two_members():
+def test_reason_codes_has_exactly_fifty_three_members():
     assert len(REASON_CODES) == 53
     assert REASON_CODES == frozenset(_EXPECTED)
 

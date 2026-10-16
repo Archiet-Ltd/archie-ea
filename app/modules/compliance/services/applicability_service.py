@@ -16,6 +16,11 @@ from app.models.compliance_models import ComplianceControl, RegulatoryFramework
 from app.models.regulatory_change import RegulatoryChange, RegulatoryChangeImpact
 from app.models.regulatory_framework import FrameworkAdoption
 from app.models.technology_layer import Node
+from app.modules.compliance.services.control_evidence import (
+    GAP_STATES,
+    HELD_STATES,
+    evidence_state,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -242,15 +247,18 @@ class ApplicabilityService:
                 "title": control.title,
                 "implementation_status": ac.implementation_status,
                 "evidence_url": ac.evidence_url,
+                "evidence_state": evidence_state(ac),
+                "evidence_valid_until": (
+                    ac.evidence_valid_until.isoformat() if ac.evidence_valid_until else None
+                ),
                 "notes": ac.notes,
                 "evidence_source": None,
             }
 
-            has_own_evidence = (
-                ac.evidence_url is not None and ac.evidence_url.strip() != ""
-            )
-
-            if not has_own_evidence:
+            # The one evidence rule decides: a control with no evidence of its
+            # own, or evidence that has passed its validity date, may take a
+            # confirmed harmonised partner's evidence that is in date.
+            if entry["evidence_state"] in GAP_STATES:
                 source = None
 
                 # Forward: this control points to a harmonised partner
@@ -264,11 +272,7 @@ class ApplicabilityService:
                             organization_id=organization_id,
                             control_id=partner.id,
                         ).first()
-                        if (
-                            partner_ac is not None
-                            and partner_ac.evidence_url is not None
-                            and partner_ac.evidence_url.strip() != ""
-                        ):
+                        if partner_ac is not None and evidence_state(partner_ac) in HELD_STATES:
                             source = {
                                 "control_id": partner.id,
                                 "control_code": partner.control_code,
@@ -278,6 +282,7 @@ class ApplicabilityService:
                                     else None
                                 ),
                                 "evidence_url": partner_ac.evidence_url,
+                                "evidence_state": evidence_state(partner_ac),
                                 "notes": partner_ac.notes,
                             }
 
@@ -292,11 +297,7 @@ class ApplicabilityService:
                             organization_id=organization_id,
                             control_id=partner.id,
                         ).first()
-                        if (
-                            partner_ac is not None
-                            and partner_ac.evidence_url is not None
-                            and partner_ac.evidence_url.strip() != ""
-                        ):
+                        if partner_ac is not None and evidence_state(partner_ac) in HELD_STATES:
                             source = {
                                 "control_id": partner.id,
                                 "control_code": partner.control_code,
@@ -306,12 +307,14 @@ class ApplicabilityService:
                                     else None
                                 ),
                                 "evidence_url": partner_ac.evidence_url,
+                                "evidence_state": evidence_state(partner_ac),
                                 "notes": partner_ac.notes,
                             }
                             break
 
                 if source is not None:
                     entry["evidence_url"] = source["evidence_url"]
+                    entry["evidence_state"] = source["evidence_state"]
                     entry["notes"] = source["notes"]
                     entry["evidence_source"] = {
                         "control_id": source["control_id"],
