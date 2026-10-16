@@ -7,7 +7,7 @@ existing is read differently, altered or dropped. Idempotent: each table,
 column and index is created only when absent.
 
 Revision ID: 20261016_control_tests
-Revises: 20261016_technical_debt_rls
+Revises: 20261016_compliance_org_rls
 Create Date: 2026-10-16
 """
 import sqlalchemy as sa
@@ -15,7 +15,7 @@ from alembic import op
 from sqlalchemy import inspect
 
 revision = "20261016_control_tests"
-down_revision = "20261016_technical_debt_rls"
+down_revision = "20261016_compliance_org_rls"
 branch_labels = None
 depends_on = None
 
