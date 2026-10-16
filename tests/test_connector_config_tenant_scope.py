@@ -16,6 +16,14 @@ import pytest
 pytestmark = pytest.mark.usefixtures("db_session")
 
 
+@pytest.fixture(autouse=True)
+def _connector_hosts_need_no_dns(app, monkeypatch):
+    """These tests save connector addresses on made-up hosts. The outbound-URL
+    guard resolves a name before accepting it, which a made-up host cannot do, so
+    they run with the development setting that skips resolution."""
+    monkeypatch.setitem(app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", True)
+
+
 # --------------------------------------------------------------------- #
 # Helpers                                                                #
 # --------------------------------------------------------------------- #

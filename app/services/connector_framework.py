@@ -52,6 +52,72 @@ from app.models.connector_config import (  # noqa: F401
 logger = logging.getLogger(__name__)
 
 
+class ConnectorURLRefused(ValueError):
+    """A connector base URL the server must not call. The message is safe to show."""
+
+
+def validate_connector_url(url) -> str:
+    """Return ``url`` stripped of surrounding space and a trailing slash, or raise.
+
+    The one check for every connector base URL (ServiceNow, Jira, Abacus):
+    ``validate_user_supplied_url``, the same guard the webhooks use. Applied when
+    a URL is saved and again before every call, because a saved name can start
+    resolving to an internal address. The guard's detail (resolved addresses) is
+    logged, not returned.
+    """
+    from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
+
+    if not isinstance(url, str) or not url.strip():
+        raise ConnectorURLRefused("A connector URL is required")
+    url = url.strip()
+    try:
+        validate_user_supplied_url(url)
+    except BlockedOutboundURL as exc:
+        logger.warning("Connector URL refused: %s", exc)
+        raise ConnectorURLRefused("The connector URL is not an allowed address") from exc
+    # A query or fragment on a base address would end up in the middle of the
+    # request path once a path is appended; a base is scheme, host and path only.
+    from urllib.parse import urlsplit, urlunsplit
+
+    parts = urlsplit(url)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, "", "")).rstrip("/")
+
+
+def connector_url_field_allowed(field) -> bool:
+    """Check a WTForms URL field with the outbound-URL guard before it is saved.
+
+    On refusal the reason is added to the field and nothing should be stored; on
+    success the field holds the cleaned URL.
+    """
+    try:
+        field.data = validate_connector_url(field.data)
+    except ConnectorURLRefused as exc:
+        field.errors = list(field.errors) + [str(exc)]
+        return False
+    return True
+
+
+def validate_connector_config_urls(config) -> None:
+    """Check every URL-valued setting in a connector config dict (raises ConnectorURLRefused).
+
+    A setting counts as a URL when its name ends in ``url`` or is ``endpoint``
+    and its value is a non-empty string. Used where a free-form config object is
+    saved, so a base URL cannot be slipped in under a connector type that has no
+    form of its own.
+    """
+    if not isinstance(config, dict):
+        return
+    for key, value in config.items():
+        name = str(key).lower()
+        if (name.endswith("url") or name == "endpoint") and isinstance(value, str) and value.strip():
+            validate_connector_url(value)
+
+
+async def _refuse_redirect(session, trace_config_ctx, params):
+    """aiohttp trace hook: a connector call is never redirected."""
+    raise ConnectorURLRefused("The connector host answered with a redirect, which is not followed")
+
+
 class FieldMapping:
     """Field mapping DSL for API transformations."""
 
@@ -115,6 +181,41 @@ class BaseConnector(ABC):
         # Default implementation - can be overridden
         self.logger.info(f"Received incremental sync event: {event_data}")
         return {"status": "processed", "records": 1}
+
+    def _checked_base_url(self) -> str:
+        """The configured base_url, after the outbound-URL guard. Raises ConnectorURLRefused."""
+        return validate_connector_url((self.config.config or {}).get("base_url"))
+
+    def _outbound_session(self, **kwargs):
+        """An aiohttp session for calls to this connector's base_url.
+
+        Checks the base URL first (every call, not only at save time) and
+        refuses redirects: a trace hook raises when a redirect response arrives,
+        before aiohttp issues the next request, so a permitted host cannot
+        bounce the request, with its credentials, to an internal address.
+        """
+        import aiohttp
+
+        self._checked_base_url()
+        trace = aiohttp.TraceConfig()
+        trace.on_request_redirect.append(_refuse_redirect)
+        return aiohttp.ClientSession(trace_configs=[trace], **kwargs)
+
+    def _same_origin_link(self, link: str) -> str:
+        """A server-supplied continuation link, only if it stays on the base URL's origin.
+
+        The guard and the origin comparison (scheme and host) apply to the link
+        as given; the link itself is returned unchanged, query string included,
+        because a paging token lives in the query.
+        """
+        from urllib.parse import urlsplit
+
+        validate_connector_url(link)  # raises ConnectorURLRefused if not allowed
+        got = urlsplit(link.strip())
+        want = urlsplit(self._checked_base_url())
+        if (got.scheme.lower(), got.netloc.lower()) != (want.scheme.lower(), want.netloc.lower()):
+            raise ConnectorURLRefused("The connector URL is not an allowed address")
+        return link.strip()
 
     def validate_config(self) -> List[str]:
         """Validate connector configuration."""

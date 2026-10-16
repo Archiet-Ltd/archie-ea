@@ -26,6 +26,14 @@ import pytest
 pytestmark = pytest.mark.usefixtures("db_session")
 
 
+@pytest.fixture(autouse=True)
+def _connector_hosts_need_no_dns(app, monkeypatch):
+    """The stored instance addresses are made-up hosts. The outbound-URL guard
+    resolves a name before accepting it, which a made-up host cannot do, so these
+    tests run with the development setting that skips resolution."""
+    monkeypatch.setitem(app.config, "ALLOW_INTERNAL_WEBHOOK_TARGETS", True)
+
+
 @pytest.fixture
 def org_a(make_org):
     return make_org("migrate-creds-a")
@@ -102,7 +110,7 @@ def _mock_token_response(monkeypatch, captured):
         def json(self):
             return {"access_token": "bearer-" + uuid.uuid4().hex, "expires_in": 1740}
 
-    def _fake_post(url, data=None, timeout=None):
+    def _fake_post(url, data=None, timeout=None, allow_redirects=True):
         captured.append(data)
         return _Resp()
 
