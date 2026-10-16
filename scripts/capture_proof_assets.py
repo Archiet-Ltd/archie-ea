@@ -222,7 +222,10 @@ def capture_home_product(browser, base, password, wide: bool) -> tuple[int, int]
             page.wait_for_timeout(600)
     _tidy(page)
     # The build stamp line in the sidebar footer is not part of the product shown.
-    page.add_style_tag(content="[data-testid='sidebar'] p[title^='Build identifier'] { display: none !important; }")
+    page.evaluate(
+        """() => document.querySelectorAll("[data-testid='sidebar'] p[title^='Build identifier']")
+                 .forEach((e) => { e.style.display = 'none'; })"""
+    )
     text = page.inner_text("body")
     if re.search(r"(?<!\d)0 of \d+ applications in the portfolio have a vendor", text) or "Not mapped" in text:
         raise SystemExit("home product: vendor or capability columns are empty; run seed-demo-company first")
