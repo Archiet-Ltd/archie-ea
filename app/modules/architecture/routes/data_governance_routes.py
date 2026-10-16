@@ -16,6 +16,7 @@ from flask_login import current_user, login_required
 from app import db
 from app.models.all_missing_models import LogicalDataModel
 from app.modules.architecture.services import data_sor_service as sor
+from app.modules.architecture.services.data_architecture_service import DataArchitectureService
 from app.modules.architecture.services.data_model_validation_service import (
     DATA_STANDARDS,
     DataModelValidationService,
@@ -39,6 +40,7 @@ def _tabs(active):
         ("Undeclared copies", url_for("data_governance.undeclared_copies"), active == "copies"),
         ("Master data domains", url_for("data_governance.domains"), active == "domains"),
         ("Standards check", url_for("data_governance.models"), active == "models"),
+        ("Sharing agreements", url_for("data_governance.sharing_agreements"), active == "agreements"),
         ("No steward", url_for("data_governance.no_steward"), active == "no_steward"),
         ("Retention breaches", url_for("data_governance.retention_breaches"), active == "retention"),
         ("Data issues", url_for("data_governance.data_issues"), active == "issues"),
@@ -294,6 +296,125 @@ def model_standards(model_id):
         result=result,
         standards=DATA_STANDARDS,
         tabs=_tabs("models"),
+    )
+
+
+@data_governance_bp.route("/lineage/<int:element_id>")
+@login_required
+def lineage_view(element_id):
+    """R1-B80: multi-hop lineage held from source through every
+    transformation, with the owner at each hop."""
+    guard = _guard()
+    if guard:
+        return guard
+    result = DataArchitectureService.multi_hop_lineage(element_id, g.current_org_id, max_hops=5)
+    if not result["hops"]:
+        return render_template("errors/404.html"), 404
+    return render_template(
+        "data_governance/lineage_view.html",
+        hops=result["hops"],
+        truncated=result["truncated"],
+        start_element_id=element_id,
+        tabs=_tabs("lineage"),
+    )
+
+
+@data_governance_bp.route("/sharing-agreements")
+@login_required
+def sharing_agreements():
+    """R1-B80: the data-sharing agreement register (PB-0355)."""
+    guard = _guard()
+    if guard:
+        return guard
+    from app.models.data_sharing_agreement import DataSharingAgreement
+
+    rows = (
+        DataSharingAgreement.query.filter(DataSharingAgreement.organization_id == g.current_org_id)
+        .order_by(DataSharingAgreement.name)
+        .all()
+    )
+    return render_template(
+        "data_governance/sharing_agreements.html", agreements=rows, tabs=_tabs("agreements"),
+    )
+
+
+@data_governance_bp.route("/sharing-agreements/new", methods=["GET", "POST"])
+@login_required
+def new_sharing_agreement():
+    """R1-B80: register a new data-sharing agreement, linked to flows and
+    a vendor."""
+    guard = _guard()
+    if guard:
+        return guard
+    from app.models.all_missing_models import DataLineage
+    from app.models.data_sharing_agreement import DataSharingAgreement
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    vendors = VendorOrganization.query.order_by(VendorOrganization.name).all()
+    preselected_flow_id = request.args.get("flow_id", type=int)
+
+    unagreed_ids = DataSharingAgreement.unagreed_flow_ids(g.current_org_id)
+    unagreed_flows = []
+    if unagreed_ids:
+        flow_rows = DataLineage.query.filter(DataLineage.id.in_(unagreed_ids)).all()
+        unagreed_flows = [
+            {"id": f.id, "label": f"Flow #{f.id}: element {f.archimate_element_id} → {f.target_archimate_element_id}"}
+            for f in flow_rows
+        ]
+
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        vendor_organization_id = request.form.get("vendor_organization_id", type=int)
+        if not name or not vendor_organization_id:
+            flash("Name and vendor are required.", "error")
+            return redirect(url_for("data_governance.new_sharing_agreement"))
+        agreement = DataSharingAgreement(
+            name=name,
+            vendor_organization_id=vendor_organization_id,
+            organization_id=g.current_org_id,
+            description=(request.form.get("description") or "").strip() or None,
+            transfer_basis=(request.form.get("transfer_basis") or "").strip() or None,
+            created_by_id=current_user.id,
+        )
+        flow_ids = request.form.getlist("flow_ids", type=int)
+        if flow_ids:
+            agreement.flows = DataLineage.query.filter(
+                DataLineage.id.in_(flow_ids),
+                DataLineage.organization_id == g.current_org_id,
+            ).all()
+        db.session.add(agreement)
+        db.session.commit()
+        flash("Data sharing agreement registered.", "success")
+        return redirect(url_for("data_governance.sharing_agreements"))
+
+    return render_template(
+        "data_governance/new_sharing_agreement.html",
+        vendors=vendors,
+        unagreed_flows=unagreed_flows,
+        preselected_flow_id=preselected_flow_id,
+        tabs=_tabs("agreements"),
+    )
+
+
+@data_governance_bp.route("/impact/<int:element_id>")
+@login_required
+def downstream_impact_view(element_id):
+    """R1-B80 (PB-0116): assess downstream impact of a change to
+    *element_id* -- every consumer, ranked by business criticality."""
+    guard = _guard()
+    if guard:
+        return guard
+    result = DataArchitectureService.downstream_impact(element_id, g.current_org_id, max_hops=5)
+    if not result["consumers"] and not DataArchitectureService.multi_hop_lineage(
+        element_id, g.current_org_id, max_hops=1
+    )["hops"]:
+        return render_template("errors/404.html"), 404
+    return render_template(
+        "data_governance/downstream_impact.html",
+        consumers=result["consumers"],
+        truncated=result["truncated"],
+        start_element_id=element_id,
+        tabs=_tabs("lineage"),
     )
 
 

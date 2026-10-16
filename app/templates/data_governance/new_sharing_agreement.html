@@ -1,0 +1,64 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+
+{% block title %}New data sharing agreement — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6">
+  {{ page_shell(
+      title='New data sharing agreement',
+      subtitle='Register an agreement covering a data flow to or from a vendor.',
+      breadcrumb=[('Home', url_for('main.index')), ('Data governance', url_for('data_governance.entities')), ('Sharing agreements', url_for('data_governance.sharing_agreements')), ('New', None)],
+      tabs=tabs
+  ) }}
+  <form method="post" action="{{ url_for('data_governance.new_sharing_agreement') }}" class="max-w-xl space-y-4 rounded-lg border border-border bg-card p-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div>
+      <label for="name" class="block text-sm font-medium text-foreground">Name</label>
+      <input type="text" id="name" name="name" required
+             class="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground">
+    </div>
+    <div>
+      <label for="vendor_organization_id" class="block text-sm font-medium text-foreground">Vendor</label>
+      <select id="vendor_organization_id" name="vendor_organization_id" required
+              class="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground">
+        <option value="" disabled selected>Select a vendor&hellip;</option>
+        {% for vendor in vendors %}
+        <option value="{{ vendor.id }}">{{ vendor.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="description" class="block text-sm font-medium text-foreground">Description</label>
+      <textarea id="description" name="description" rows="3"
+                class="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"></textarea>
+    </div>
+    <div>
+      <label for="transfer_basis" class="block text-sm font-medium text-foreground">Transfer basis</label>
+      <input type="text" id="transfer_basis" name="transfer_basis"
+             class="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground">
+    </div>
+    {% if unagreed_flows %}
+    <div>
+      <label class="block text-sm font-medium text-foreground">Flows this agreement covers</label>
+      <div class="mt-1 space-y-1 rounded-md border border-border bg-background p-3">
+        {% for flow in unagreed_flows %}
+        <label class="flex items-center gap-2 text-sm text-foreground">
+          <input type="checkbox" name="flow_ids" value="{{ flow.id }}"
+                 {% if preselected_flow_id and flow.id == preselected_flow_id %}checked{% endif %}>
+          {{ flow.label }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    <div class="flex items-center gap-3 pt-2">
+      <button type="submit"
+              class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 bg-primary text-primary-foreground hover:bg-primary/90">
+        Register agreement
+      </button>
+      <a href="{{ url_for('data_governance.sharing_agreements') }}" class="text-sm text-muted-foreground hover:text-foreground">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
