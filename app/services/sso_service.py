@@ -95,6 +95,9 @@ class SSODomainConflictError(SSONotConfiguredError):
     that domain fails closed: neither SSO nor password is offered."""
 
 
+# The DNS label under which an organisation publishes its one-time proof for a domain.
+_DNS_CHALLENGE_LABEL = "_entelim-challenge"
+
 _MSG_DOMAIN_CONFLICT = (
     "Sign-in for this email domain is unavailable because it is claimed by more "
     "than one organisation. Contact your administrator."
@@ -165,11 +168,23 @@ class SSOService:
         matches = []
         try:
             from app.models.sso_config import SSOConfig
+            from app.models.sso_domain_claim import SSODomainClaim
 
             # tenant-scoping-ok: resolving SSO config by email domain happens
-            # pre-authentication (no org context yet) -- the domain match
-            # itself is the scoping mechanism.
-            configs = SSOConfig.query.filter_by(enabled=True).all()
+            # pre-authentication (no org context yet) -- the verified domain
+            # claim itself is the scoping mechanism: a configuration answers
+            # for a domain only when its organisation has proved it controls it.
+            owners = [
+                row.organization_id
+                for row in SSODomainClaim.query.filter(
+                    SSODomainClaim.domain == domain, SSODomainClaim.verified_at.isnot(None)
+                ).all()
+            ]
+            configs = (
+                SSOConfig.query.filter(SSOConfig.enabled.is_(True), SSOConfig.organization_id.in_(owners)).all()
+                if owners
+                else []
+            )
             matches = [config for config in configs if domain in config.email_domains]
         except Exception as exc:
             logger.warning("SSO config lookup failed (non-fatal): %s", exc)
@@ -273,18 +288,128 @@ class SSOService:
         if not wanted:
             return {}
         from app.models.sso_config import SSOConfig
+        from app.models.sso_domain_claim import SSODomainClaim
 
         # tenant-scoping-ok: a domain claim is checked against every other
-        # organisation's configuration; only domains and org ids are read.
-        query = SSOConfig.query
+        # organisation's verified claims; only domains and org ids are read.
+        query = SSODomainClaim.query.filter(
+            SSODomainClaim.domain.in_(sorted(wanted)), SSODomainClaim.verified_at.isnot(None)
+        )
         if org_id is not None:
-            query = query.filter(SSOConfig.organization_id != org_id)
+            query = query.filter(SSODomainClaim.organization_id != org_id)
         claimed = {}
-        for config in query.filter(SSOConfig.enabled.is_(True)).all():
-            for domain in config.email_domains:
-                if domain in wanted:
-                    claimed.setdefault(domain, config.organization_id)
+        for claim in query.all():
+            holder = SSOConfig.query.filter_by(organization_id=claim.organization_id).first()
+            # A claim held by a disabled configuration, or one that no longer lists the
+            # domain, holds nothing back.
+            if holder is not None and holder.enabled and claim.domain in holder.email_domains:
+                claimed.setdefault(claim.domain, claim.organization_id)
         return claimed
+
+    # ------------------------------------------------------------------
+    # Domain ownership proof (DNS TXT)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def challenge_record_name(domain: str) -> str:
+        return f"{_DNS_CHALLENGE_LABEL}.{domain}"
+
+    @staticmethod
+    def _lookup_txt(name: str) -> list:
+        """The TXT strings published at *name*; empty on any failure, so an unanswered,
+        refused or malformed lookup never counts as proof."""
+        try:
+            import dns.resolver
+
+            resolver = dns.resolver.Resolver()
+            resolver.lifetime = 5.0
+            answers = resolver.resolve(name, "TXT")
+            return [b"".join(rdata.strings).decode("utf-8", "replace") for rdata in answers]
+        except Exception as exc:
+            logger.info("DNS TXT lookup for %s found nothing: %s", name, exc)
+            return []
+
+    def sync_domain_claims(self, org_id: int, domains) -> None:
+        """Keep one claim row per domain the organisation lists: a new domain gets a fresh
+        token and no proof; a domain no longer listed loses its claim (and so its proof).
+        Does not commit."""
+        import secrets as _secrets
+
+        from app import db
+        from app.models.sso_domain_claim import SSODomainClaim
+
+        wanted = set(domains)
+        existing = {c.domain: c for c in SSODomainClaim.query.filter_by(organization_id=org_id).all()}
+        for domain, claim in existing.items():
+            if domain not in wanted:
+                db.session.delete(claim)
+        for domain in sorted(wanted - set(existing)):
+            db.session.add(
+                SSODomainClaim(organization_id=org_id, domain=domain, token=_secrets.token_hex(16))
+            )
+        db.session.flush()
+
+    def domain_claims_for(self, org_id: int) -> list:
+        from app.models.sso_domain_claim import SSODomainClaim
+
+        return SSODomainClaim.query.filter_by(organization_id=org_id).order_by(SSODomainClaim.domain).all()
+
+    def verified_domains_for(self, org_id) -> list:
+        """The domains organisation *org_id* has proved it controls."""
+        from app.models.sso_domain_claim import SSODomainClaim
+
+        if org_id is None:
+            return []
+        # tenant-scoping-ok: read before sign-in, keyed by the organisation named in the call.
+        return [
+            c.domain
+            for c in SSODomainClaim.query.filter(
+                SSODomainClaim.organization_id == org_id, SSODomainClaim.verified_at.isnot(None)
+            ).all()
+        ]
+
+    def verify_domain(self, org_id: int, raw_domain: str):
+        """Check the DNS TXT proof for one of the organisation's listed domains.
+
+        Returns ``(True, message)`` once the token is published and the claim is recorded.
+        A domain another organisation holds under an enabled configuration that still lists
+        it is refused; a stale claim (its configuration disabled, or the domain unlisted)
+        is released first. Commits on success.
+        """
+        from datetime import datetime
+
+        from app import db
+        from app.models.sso_config import SSOConfig, normalise_email_domain
+        from app.models.sso_domain_claim import SSODomainClaim
+
+        domain = normalise_email_domain(raw_domain)
+        claim = SSODomainClaim.query.filter_by(organization_id=org_id, domain=domain).first()
+        config = SSOConfig.query.filter_by(organization_id=org_id).first()
+        if claim is None or config is None or domain not in config.email_domains:
+            return False, "Add the domain to your single sign-on settings and save before verifying it."
+        if claim.verified_at is not None:
+            return True, f"{domain} is already verified."
+        name = self.challenge_record_name(domain)
+        if claim.token not in {value.strip() for value in self._lookup_txt(name)}:
+            return False, f"No TXT record with the expected value was found at {name}. DNS changes can take a while to appear."
+        holders = self.domains_claimed_by_other_orgs(org_id, [domain])
+        if domain in holders:
+            return False, f"{domain} is already used by another organisation's single sign-on."
+        # Release any stale verified claim on the domain, then record this one.
+        for other in SSODomainClaim.query.filter(
+            SSODomainClaim.domain == domain,
+            SSODomainClaim.organization_id != org_id,
+            SSODomainClaim.verified_at.isnot(None),
+        ).all():
+            other.verified_at = None
+        db.session.flush()
+        claim.verified_at = datetime.utcnow()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return False, f"{domain} could not be verified because another organisation holds it."
+        return True, f"{domain} is verified."
 
     def domain_claim_problem(self, org_id, raw_email_domain: Optional[str]) -> Optional[str]:
         """Why organisation *org_id* may not save *raw_email_domain*, or None.
@@ -752,7 +877,11 @@ class SSOService:
                 user.last_name = family_name
 
         config = getattr(org, "sso_config", None) if org is not None else None
-        configured_domains = config.email_domains if config is not None else []
+        configured_domains = (
+            [d for d in config.email_domains if d in set(self.verified_domains_for(org.id))]
+            if config is not None and org is not None
+            else []
+        )
         domain = email.rsplit("@", 1)[1] if "@" in email else ""
         send_connection_notice = False
 

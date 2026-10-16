@@ -89,6 +89,10 @@ def test_sso_just_in_time_provisioning_at_the_limit_is_refused(db_session):
     org = _org(db_session, "sso")
     db_session.add(SSOConfig(organization_id=org.id, protocol="oidc", enabled=True,
                              email_domain="example.com"))
+    db_session.flush()
+    from tests._sso_claims import verify_domains
+
+    verify_domains(db_session, org, "example.com")
     _fill(db_session, org, 3)
     email = f"sso-{uuid.uuid4().hex[:8]}@example.com"
 
@@ -107,6 +111,10 @@ def test_sso_callback_at_the_limit_tells_the_person_why(app, db_session, client,
     db_session.add(SSOConfig(organization_id=org.id, protocol="oidc", enabled=True,
                              client_id="c", idp_metadata_url="https://idp.example/.well-known",
                              email_domain="example.com"))
+    db_session.flush()
+    from tests._sso_claims import verify_domains
+
+    verify_domains(db_session, org, "example.com")
     _fill(db_session, org, 3)
     db_session.commit()
     email = f"sso-{uuid.uuid4().hex[:8]}@example.com"
