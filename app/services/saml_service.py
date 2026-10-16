@@ -46,6 +46,21 @@ _SAML_NS = {
 # allowance as the OIDC id_token leeway in sso_service.py.
 _CLOCK_SKEW_SECONDS = 120
 
+_NAMEID_FORMAT_TRANSIENT = "urn:oasis:names:tc:SAML:2.0:nameid-format:transient"
+# SAML V2.0 Subject Identifier Attributes Profile, in order of preference.
+_STABLE_SUBJECT_ATTRIBUTES = (
+    "urn:oasis:names:tc:SAML:attribute:pairwise-id",
+    "urn:oasis:names:tc:SAML:attribute:subject-id",
+)
+_NAMEID_FORMAT_PERSISTENT = "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"
+_MSG_MISSING_SUBJECT = (
+    "Your identity provider did not send a stable sign-in identifier: no pairwise-id or "
+    "subject-id attribute and no persistent NameID (a transient, email-address or "
+    "unspecified-format NameID can be reissued to a different person, so it is never used). "
+    "Ask your administrator to have it send one of those."
+)
+_MSG_TRANSIENT_SUBJECT = _MSG_MISSING_SUBJECT
+
 
 class SAMLVerificationError(SSONotConfiguredError):
     """Raised when a SAML AuthnRequest cannot be built or a Response's
@@ -306,14 +321,23 @@ class SAMLService:
                 return None
 
     def _extract_claims(self, assertion) -> dict:
-        """Pull email/name/sub out of the Subject and AttributeStatement."""
+        """Pull email/name/sub out of the Subject and AttributeStatement.
+
+        The subject is the first stable identifier present, in this order:
+        the pairwise-id attribute, the subject-id attribute, a persistent
+        NameID. A transient, email-address or unspecified-format NameID (or
+        none) is never the subject, because the identity provider may
+        reissue it to a different person; it can still supply the address
+        when it contains one (never a transient value). The assertion is
+        refused when no stable subject exists.
+        """
         claims: dict = {}
 
         name_id = assertion.find("saml:Subject/saml:NameID", namespaces=_SAML_NS)
-        if name_id is not None and name_id.text:
-            claims["sub"] = name_id.text.strip()
-            if "@" in name_id.text:
-                claims["email"] = name_id.text.strip().lower()
+        name_id_text = (name_id.text or "").strip() if name_id is not None else ""
+        name_id_format = (name_id.get("Format") or "").strip() if name_id is not None else ""
+        if name_id_text and name_id_format != _NAMEID_FORMAT_TRANSIENT and "@" in name_id_text:
+            claims["email"] = name_id_text.lower()
 
         for attr in assertion.findall(
             "saml:AttributeStatement/saml:Attribute", namespaces=_SAML_NS
@@ -336,6 +360,18 @@ class SAMLService:
                 claims.setdefault("family_name", value)
             else:
                 claims.setdefault(name, value)
+
+        subject = ""
+        for attribute in _STABLE_SUBJECT_ATTRIBUTES:
+            subject = (claims.get(attribute) or "").strip()
+            if subject:
+                break
+        if not subject and name_id_text and name_id_format == _NAMEID_FORMAT_PERSISTENT:
+            subject = name_id_text
+        if not subject:
+            claims.pop("sub", None)
+            raise SAMLVerificationError(_MSG_MISSING_SUBJECT)
+        claims["sub"] = subject
 
         if not claims.get("email"):
             raise SAMLVerificationError(
