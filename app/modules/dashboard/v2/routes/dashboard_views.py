@@ -50,6 +50,39 @@ def overview():
         format_health_score,
     )
 
+    # Five-screen onboarding entry point: mirrors the retired first-login
+    # modal's gating condition (app/templates/layouts/admin_base.html), now a
+    # real redirect instead of a client-side overlay -- the overlay's own
+    # inline comments (ARCH-107/ARCH-040) record the bug class this avoids
+    # (a full-viewport modal silently eating an established user's first
+    # click). Scoped to this one landing route, not a global before_request,
+    # so no other page's navigation changes.
+    #
+    # Deliberately NOT identical to the modal: compute_nav_counts()'s own
+    # docstring records that VendorOrganization carries no organization_id at
+    # all, so its "vendors" count is platform-wide, not per-tenant -- checked
+    # directly against the shared test database while building this (242
+    # vendor rows total), which makes "is this workspace empty" true for
+    # every organisation only until the FIRST vendor exists anywhere on the
+    # whole platform, after which no brand-new organisation is ever detected
+    # as empty again. The modal has carried this same defect since ARCH-107;
+    # left unchanged there per the "don't break its dedicated tests" call
+    # above, but not worth inheriting into new code that has its own tests
+    # asserting the opposite behaviour. Applications, elements and
+    # capabilities are genuinely organization_id-scoped by compute_nav_counts
+    # and stay in the check.
+    if not current_user.onboarding_completed_at:
+        from app._bootstrap.context_processors import compute_nav_counts
+
+        _counts = compute_nav_counts(g.current_org_id) if getattr(g, "current_org_id", None) else {}
+        _workspace_is_empty = not (
+            (_counts.get("applications", 0) or 0)
+            + (_counts.get("elements", 0) or 0)
+            + (_counts.get("capabilities", 0) or 0)
+        )
+        if _workspace_is_empty:
+            return redirect(url_for("onboarding.index"))
+
     metrics = {
         "applications": 0,
         "vendors": 0,
@@ -711,19 +744,17 @@ def api_overview_chart():
 @timed_route
 @login_required
 def api_onboarding_complete():
-    """PLT-040: Mark user onboarding as complete, optionally update enterprise_role."""
-    import datetime
+    """PLT-040: Mark user onboarding as complete, optionally update enterprise_role.
+
+    Called by the retired first-login modal (layouts/admin_base.html), kept
+    as a safety net there. Shares its write with the five-screen flow's own
+    onboarding.finish/onboarding.skip via completion.mark_complete -- one
+    valid-role set, not a second copy that can drift (this endpoint's own
+    copy had quietly dropped business_architect)."""
+    from app.modules.onboarding.services import completion
 
     data = request.get_json(silent=True) or {}
-    new_role = data.get("enterprise_role")
-    valid_roles = {
-        "solution_architect", "enterprise_architect",
-        "arb_member", "portfolio_manager", "platform_admin",
-        "cto", "application_manager", "procurement",
-    }
-    if new_role and new_role in valid_roles:
-        current_user.enterprise_role = new_role
-    current_user.onboarding_completed_at = datetime.datetime.utcnow()
+    completion.mark_complete(current_user, data.get("enterprise_role"))
     try:
         db.session.commit()
     except Exception as exc:
