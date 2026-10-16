@@ -23,6 +23,9 @@ Usage (the app must already be running against the seeded database):
     DEMO_USER_PASSWORD=... python scripts/capture_proof_assets.py \
         --base http://127.0.0.1:5100
 
+The home page's product window (the whole /applications/ screen, sidebar and top bar
+included) is written to app/static/img/home/product-portfolio*.webp.
+
 Writes WebP files under app/static/img/ and prints their CSS width/height.
 """
 from __future__ import annotations
@@ -198,6 +201,61 @@ def capture_home_impact(browser, base, password, wide: bool) -> tuple[int, int]:
     return size
 
 
+def capture_home_product(browser, base, password, wide: bool) -> tuple[int, int]:
+    """The product window under the home hero: the real /applications/ screen.
+
+    Desktop: the whole 1280x800 viewport (sidebar, top bar, content), above the fold.
+    Phone: the 358px content column from the page heading down to the last whole
+    row or card that ends within 780 CSS px of crop height.
+    """
+    vw, vh = (1280, 800) if wide else (390, 844)
+    ctx = browser.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=DPR)
+    page = ctx.new_page()
+    _login(page, base, DEMO_EMAIL, password)
+    page.goto(base + "/applications/", wait_until="networkidle")
+    page.wait_for_timeout(1500)
+    _dismiss_onboarding(page)
+    if wide:
+        aside = page.locator("[data-testid='sidebar']")
+        if aside.bounding_box()["width"] < 200:
+            page.locator("button.sidebar-collapse-btn").click()
+            page.wait_for_timeout(600)
+    _tidy(page)
+    # The build stamp line in the sidebar footer is not part of the product shown.
+    page.add_style_tag(content="[data-testid='sidebar'] p[title^='Build identifier'] { display: none !important; }")
+    text = page.inner_text("body")
+    if re.search(r"(?<!\d)0 of \d+ applications in the portfolio have a vendor", text) or "Not mapped" in text:
+        raise SystemExit("home product: vendor or capability columns are empty; run seed-demo-company first")
+    for label in ("Active Portfolio", "Strategic", "Tactical", "Sunset/Decom Pipeline", "Decommissioned"):
+        tile = page.get_by_text(label, exact=True).first.locator(
+            "xpath=ancestor::*[contains(@class,'rounded')][1]"
+        ).inner_text()
+        figures = re.findall(r"(?<![\d.])\d[\d,]*(?![\d.])", tile)
+        if not figures or int(figures[0].replace(",", "")) == 0:
+            raise SystemExit(f"home product: headline tile {label!r} reads zero or empty; run seed-demo-company first")
+    page.evaluate("window.scrollTo(0, 0)")
+    if wide:
+        clip = {"x": 0, "y": 0, "width": vw, "height": vh}
+        png = page.screenshot(clip=clip)
+    else:
+        main = _box(page, "main")
+        top = _box(page, "h1")["y"] - 8
+        rows = page.locator("[data-testid^='app-row-']")
+        bottom = top
+        for i in range(rows.count()):
+            box = rows.nth(i).bounding_box()
+            if box and box["height"] > 0 and box["y"] + box["height"] - top <= 780:
+                bottom = box["y"] + box["height"] + 4
+        if bottom == top:
+            raise SystemExit("home product: no application rows within the phone crop")
+        clip = {"x": main["x"] + 16, "y": top, "width": 358, "height": bottom - top}
+        png = _shoot(page, clip)
+    name = "product-portfolio.webp" if wide else "product-portfolio-mobile.webp"
+    size = _webp(png, IMG / "home" / name)
+    ctx.close()
+    return size
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", default="http://127.0.0.1:5100")
@@ -215,6 +273,7 @@ def main() -> int:
         try:
             for label, fn in (
                 ("home impact answer", capture_home_impact),
+                ("home product window", capture_home_product),
                 ("applications", capture_applications),
                 ("arb", capture_arb),
             ):
