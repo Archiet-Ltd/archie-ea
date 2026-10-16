@@ -529,6 +529,10 @@ class User(UserMixin, db.Model):
         "weekly_digest": True,
         "digest_frequency": "weekly",
         "mention_notifications": True,
+        # Usage-analytics opt-out (Settings > Enable Analytics, unchecked).
+        # Defaults to False (tracked) to match ENABLE_USAGE_ANALYTICS being on
+        # by default.
+        "analytics_opt_out": False,
         "show_archimate_names": False,
     }
 
@@ -545,12 +549,15 @@ class User(UserMixin, db.Model):
         return prefs.get(key, self._DEFAULT_NOTIFICATION_PREFS.get(key, True))
 
     def set_notification_preferences(self, prefs_dict):
-        """Update notification_preferences from a validated dict.
+        """Merge validated keys into notification_preferences. Only known keys are stored.
 
-        Only known keys are stored. A known key that is not in *prefs_dict*
-        keeps its current value: the display preference (``show_archimate_names``)
-        lives in this same JSON, so saving the notification form, which does not
-        carry it, must not reset it.
+        Merges into whatever is already stored rather than replacing it outright: this
+        column holds more than one caller's preferences (e.g. the five notification
+        toggles on the account page, the usage-analytics opt-out set from Settings, and
+        the display preference ``show_archimate_names``), and a caller that only knows
+        about its own keys -- account_routes.py's save_notification_preferences always
+        rebuilds its own five-key dict -- must not silently erase a key some other route
+        wrote here.
         """
         import json
 

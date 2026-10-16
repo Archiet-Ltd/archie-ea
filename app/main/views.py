@@ -1319,6 +1319,28 @@ def settings():
     return render_template("settings/index.html")
 
 
+@main.route("/settings/analytics-opt-out", methods=["POST"])
+@login_required
+def set_analytics_opt_out():
+    """Turn usage-page-view tracking off (or back on) for the signed-in user.
+
+    Deliberately `@login_required` only, not `@admin_required`: the page-view
+    tracker applies to every signed-in user's own requests, not only a
+    platform admin's, so the control that turns it off must be reachable by
+    every signed-in user too. Stored through the model's own preference
+    setter, which merges into the existing preference dict rather than
+    replacing it, so saving some other preference elsewhere never silently
+    turns tracking back on.
+    """
+    data = request.get_json(silent=True) or request.form
+    raw = data.get("enabled", "true") if data else "true"
+    enabled = str(raw).strip().lower() not in ("false", "0", "off", "")
+    current_user.set_notification_preferences({"analytics_opt_out": not enabled})
+    db.session.add(current_user)
+    db.session.commit()
+    return jsonify({"status": "ok", "analytics_opt_out": not enabled})
+
+
 @main.route("/api/system-settings", methods=["GET"])
 @login_required
 # system_settings is a GLOBAL table with no organization_id, so this is not
