@@ -16,13 +16,17 @@ from typing import Optional
 from sqlalchemy import event
 
 from .. import db
+from .mixins.core import TenantMixin
 
 
-class TechnicalDebt(db.Model):
+class TechnicalDebt(TenantMixin, db.Model):
     """
     Technical Debt model for tracking and managing technical debt.
 
     Tracks technical debt items, their impact, prioritization, and remediation.
+    Inherits ``TenantMixin`` (same as every per-organisation model) so each
+    row belongs to exactly one organisation: reads and counts are scoped by
+    the tenant isolation layer, and inserts carry the current organisation.
 
     Examples:
     - "Legacy Authentication Code" debt: High priority, 40 hours to fix

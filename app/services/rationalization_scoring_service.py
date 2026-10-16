@@ -38,6 +38,18 @@ from app.services.decorators import transactional
 logger = logging.getLogger(__name__)
 
 
+def _average_dimension(rows, attribute):
+    """Average a score attribute over the rows that measured it.
+
+    An unmeasured input is stored as None; averaging only the measured rows
+    keeps the portfolio average truthful, and None is reported when nothing
+    in the portfolio measured that input."""
+    values = [getattr(s, attribute) for s in rows if getattr(s, attribute) is not None]
+    if not values:
+        return None
+    return round(sum(values) / len(values), 2)
+
+
 class RationalizationScoringService:
     """
     Service for calculating application rationalization scores using TIME framework.
@@ -64,8 +76,8 @@ class RationalizationScoringService:
       compatibility.  Use get_disposition_label() for human-readable rendering.
     """
 
-    # RAT-118: Model versioning and calibration
-    # CAP-020: bumped to 2.1 — capability coverage now influences overall score
+    # Model versioning and calibration
+    # bumped to 2.1 — capability coverage now influences overall score
     MODEL_VERSION = "2.1"  # Current scoring model version
     MODEL_CALIBRATION_HISTORY = []  # Populated by calibration runs
 
@@ -98,7 +110,7 @@ class RationalizationScoringService:
 
     @classmethod
     def compute_calibration_adjustments(cls, app_ids=None):
-        """RAT-118: Compute calibration adjustments based on realized outcomes.
+        """Compute calibration adjustments based on realized outcomes.
 
         Compares projected vs actual benefits for completed rationalization actions
         and suggests weight/threshold adjustments. Does NOT mutate historical records.
@@ -384,7 +396,7 @@ class RationalizationScoringService:
         dimensions["lifecycle"] = not lifecycle_info["data_quality_flag"]
 
         # --- cost ---
-        # R1-B08 PR 2: repointed through the one accessor (has_recorded_cost
+        # repointed through the one accessor (has_recorded_cost
         # checks the canonical column, then the legacy per-category columns
         # for a row never re-imported since -- see its own docstring).
         dimensions["cost"] = has_recorded_cost(app)
@@ -526,7 +538,7 @@ class RationalizationScoringService:
         version only when it is true.
 
         A registered formula is used only when it names every required
-        dimension; an incomplete one (R1-B34 review finding C) is treated
+        dimension; an incomplete one is treated
         exactly as if nothing were registered, rather than partially
         overriding ScoringConfiguration with some dimensions missing.
         """
@@ -542,11 +554,49 @@ class RationalizationScoringService:
         return scoring_config.get_weights_dict(), None
 
     @staticmethod
+    def _measured_inputs(technical_value, business_value, cost_value, vendor_value):
+        """The four score inputs that were actually measured, as a list of
+        (dimension_key, score) pairs.
+
+        An input with no measurement is carried as None everywhere -- never
+        a baseline number that looks measured. Both scoring surfaces call
+        this so calculate_app_score and get_evidence_trail agree on which
+        inputs participated in the overall score."""
+        return [
+            (key, value)
+            for key, value in (
+                ("technical_health", technical_value),
+                ("business_value", business_value),
+                ("cost_efficiency", cost_value),
+                ("vendor_risk", vendor_value),
+            )
+            if value is not None
+        ]
+
+    @staticmethod
+    def _reweighted_overall(weights, measured):
+        """Weighted overall over the measured inputs only.
+
+        This is the same re-weighting rule the executive dashboard health
+        score uses: an unmeasured input neither fabricates a number nor
+        drags the overall down; the measured inputs are re-weighted over
+        their combined weight. The fallback of 0.0 is unreachable in
+        practice -- the technical and business dimensions always measure --
+        and only guards the division."""
+        if not measured:
+            return 0.0
+        total_weight = sum(weights[key] for key, _ in measured)
+        if total_weight <= 0:
+            return 0.0
+        return sum(value * weights[key] for key, value in measured) / total_weight
+
+    @staticmethod
     @transactional
     def calculate_app_score(
         application_id: int,
         app: Optional[ApplicationComponent] = None,
         scoring_config: Optional[ScoringConfiguration] = None,
+        risk_scores_by_app: Optional[Dict[int, List[int]]] = None,
     ) -> Optional[ApplicationRationalizationScore]:
         """
         Calculate comprehensive rationalization score for an application.
@@ -558,6 +608,9 @@ class RationalizationScoringService:
             application_id: Application component ID
             app: Optional pre-loaded ApplicationComponent (avoids redundant query)
             scoring_config: Optional custom ScoringConfiguration to use
+            risk_scores_by_app: Optional risk-register scores already read for a
+                batch of applications (see ``_load_risk_scores``); without it
+                the rows for this one application are read.
 
         Returns:
             ApplicationRationalizationScore object or None on error.
@@ -586,29 +639,34 @@ class RationalizationScoringService:
             technical_score, tech_evidence = RationalizationScoringService._calculate_technical_health(app)
             business_score, biz_evidence = RationalizationScoringService._calculate_business_value(app)
             cost_score, cost_evidence = RationalizationScoringService._calculate_cost_efficiency(app)
-            vendor_result = RationalizationScoringService._calculate_vendor_risk(app)
+            vendor_result = RationalizationScoringService._calculate_vendor_risk(
+                app, risk_scores_by_app=risk_scores_by_app
+            )
             vendor_score = vendor_result["score"]
             vendor_evidence = vendor_result.get("evidence", [])
 
-            # Capability coverage dimension (CAP-020: now contributes to overall score)
+            # Capability coverage dimension (now contributes to overall score)
             capability_result = RationalizationScoringService._compute_capability_score(application_id)
 
-            # R1-B34 (TB-0135): one shared resolver, also used by
+            # one shared resolver, also used by
             # get_evidence_trail below, so both surfaces answer with the
             # same weights. See _resolve_overall_weights's own docstring.
             weights, active_formula = RationalizationScoringService._resolve_overall_weights(
                 app, scoring_config, active_policy,
             )
 
-            # Calculate weighted overall score using resolved weights.
-            overall_score = (
-                technical_score * weights["technical_health"]
-                + business_score * weights["business_value"]
-                + cost_score * weights["cost_efficiency"]
-                + vendor_score * weights["vendor_risk"]
+            # Calculate the weighted overall score from the measured inputs
+            # only. An input that was not measured (cost with no cost record,
+            # risk with no vendor/risk-register record) is carried as None --
+            # never a baseline number -- so the overall is re-weighted over
+            # the inputs that were actually measured, and both surfaces state
+            # how many of the four inputs participated.
+            measured = RationalizationScoringService._measured_inputs(
+                technical_score, business_score, cost_score, vendor_score,
             )
+            overall_score = RationalizationScoringService._reweighted_overall(weights, measured)
 
-            # CAP-020: Apply capability coverage adjustment (+/-10 pts max).
+            # Apply capability coverage adjustment (+/-10 pts max).
             # Apps supporting critical L1-L2 capabilities receive a bonus;
             # apps with no capability mappings receive a penalty.
             cap_adjustment = capability_result.get("capability_adjustment", 0.0)
@@ -630,43 +688,55 @@ class RationalizationScoringService:
                 "factor": "Technical Health",
                 "dimension": "technical_health",
                 "weight": tech_weight_pct,
-                "raw_value": round(technical_score, 2),
-                "contribution": round(technical_score * weights["technical_health"], 2),
+                "raw_value": None if technical_score is None else round(technical_score, 2),
+                "contribution": None if technical_score is None else round(technical_score * weights["technical_health"], 2),
                 "source": "ApplicationComponent (deployment_model, architecture_style, technology_age_years, technical_risk, lifecycle_status)",
                 "rationale": f"Technical health score of {technical_score:.1f} contributes {technical_score * weights['technical_health']:.1f} pts to overall score (weight {tech_weight_pct}%)",
+                "measured": technical_score is not None,
                 "sub_factors": tech_evidence,
             })
             evidence_trail.append({
                 "factor": "Business Value",
                 "dimension": "business_value",
                 "weight": biz_weight_pct,
-                "raw_value": round(business_score, 2),
-                "contribution": round(business_score * weights["business_value"], 2),
+                "raw_value": None if business_score is None else round(business_score, 2),
+                "contribution": None if business_score is None else round(business_score * weights["business_value"], 2),
                 "source": "ApplicationComponent (business_criticality, strategic_importance, ApplicationProcessSupport)",
                 "rationale": f"Business value score of {business_score:.1f} contributes {business_score * weights['business_value']:.1f} pts to overall score (weight {biz_weight_pct}%)",
+                "measured": business_score is not None,
                 "sub_factors": biz_evidence,
             })
             evidence_trail.append({
                 "factor": "Cost Efficiency",
                 "dimension": "cost_efficiency",
                 "weight": cost_weight_pct,
-                "raw_value": round(cost_score, 2),
-                "contribution": round(cost_score * weights["cost_efficiency"], 2),
-                "source": "ApplicationComponent (total_cost_of_ownership, license_cost, maintenance_cost, infrastructure_cost, user_count) — TODO(Release 2): use cost accessor",
-                "rationale": f"Cost efficiency score of {cost_score:.1f} contributes {cost_score * weights['cost_efficiency']:.1f} pts to overall score (weight {cost_weight_pct}%)",
+                "raw_value": None if cost_score is None else round(cost_score, 2),
+                "contribution": None if cost_score is None else round(cost_score * weights["cost_efficiency"], 2),
+                "source": "cost accessor (ApplicationComponent.total_cost_of_ownership + legacy cost fields), CapabilityCostAllocation, user_count",
+                "rationale": (
+                    f"Cost efficiency score of {cost_score:.1f} contributes {cost_score * weights['cost_efficiency']:.1f} pts to overall score (weight {cost_weight_pct}%)"
+                    if cost_score is not None
+                    else f"Cost input not measured — no cost record exists for this application (weight {cost_weight_pct}%); overall re-weighted over the measured inputs"
+                ),
+                "measured": cost_score is not None,
                 "sub_factors": cost_evidence,
             })
             evidence_trail.append({
                 "factor": "Vendor Risk",
                 "dimension": "vendor_risk",
                 "weight": vendor_weight_pct,
-                "raw_value": round(vendor_score, 2),
-                "contribution": round(vendor_score * weights["vendor_risk"], 2),
-                "source": "VendorOrganization (enterprise_readiness_score, financial_health_score, innovation_score, acquisition_risk), VendorProduct (product_maturity, end_of_life_date, compliance_standards)",
-                "rationale": f"Vendor risk score of {vendor_score:.1f} contributes {vendor_score * weights['vendor_risk']:.1f} pts to overall score (weight {vendor_weight_pct}%)",
+                "raw_value": None if vendor_score is None else round(vendor_score, 2),
+                "contribution": None if vendor_score is None else round(vendor_score * weights["vendor_risk"], 2),
+                "source": "VendorOrganization (enterprise_readiness_score, financial_health_score, innovation_score, acquisition_risk), VendorProduct (product_maturity, end_of_life_date, compliance_standards), risks register",
+                "rationale": (
+                    f"Vendor risk score of {vendor_score:.1f} contributes {vendor_score * weights['vendor_risk']:.1f} pts to overall score (weight {vendor_weight_pct}%)"
+                    if vendor_score is not None
+                    else f"Risk input not measured — no vendor link and no risk-register row for this application (weight {vendor_weight_pct}%); overall re-weighted over the measured inputs"
+                ),
+                "measured": vendor_score is not None,
                 "sub_factors": vendor_evidence,
             })
-            # CAP-020: Capability coverage dimension — now contributes to overall
+            # Capability coverage dimension — now contributes to overall
             # score via adjustment and influences TIME action via SPOF L1-L2 flag.
             cap_sub_factors = []
             if capability_result["score"] > 0:
@@ -683,7 +753,7 @@ class RationalizationScoringService:
                 })
             if capability_result.get("business_capability_count", 0) > 0:
                 cap_sub_factors.append({
-                    "factor": "Business Capability Coverage (CAP-020)",
+                    "factor": "Business Capability Coverage",
                     "weight": None,
                     "raw_value": capability_result.get("capability_score", 0),
                     "contribution": cap_adjustment,
@@ -766,7 +836,7 @@ class RationalizationScoringService:
                     app=app,
                 )
 
-            # CAP-020: SPOF L1-L2 override — if the app is the sole supporter of any
+            # SPOF L1-L2 override — if the app is the sole supporter of any
             # L1 or L2 capability, ELIMINATE is blocked because retiring it would leave
             # a critical capability gap.  Downgrade to TOLERATE (retain until a
             # replacement is mapped).
@@ -809,17 +879,17 @@ class RationalizationScoringService:
                 db.session.add(score)
 
             # Update all fields
-            score.technical_health_score = round(technical_score, 2)
-            score.business_value_score = round(business_score, 2)
-            score.cost_efficiency_score = round(cost_score, 2)
-            score.vendor_risk_score = round(vendor_score, 2)
+            score.technical_health_score = None if technical_score is None else round(technical_score, 2)
+            score.business_value_score = None if business_score is None else round(business_score, 2)
+            score.cost_efficiency_score = None if cost_score is None else round(cost_score, 2)
+            score.vendor_risk_score = None if vendor_score is None else round(vendor_score, 2)
             score.overall_health_score = round(overall_score, 2)
             score.rationalization_action = time_action
             score.action_rationale = justification
             score.assessment_date = datetime.utcnow().date()
             score.scoring_model_version = scoring_config.configuration_version
 
-            # R1-B34 (TB-0135): `active_formula` here is the same object
+            # `active_formula` here is the same object
             # resolved above when the overall score was computed -- it is
             # None whenever the FormulaRegister's weights were NOT the ones
             # actually used (missing or incomplete), so this column never
@@ -838,7 +908,7 @@ class RationalizationScoringService:
                 overall_score=float(overall_score),
                 technical_score=float(technical_score),
                 business_score=float(business_score),
-                cost_score=float(cost_score),
+                cost_score=float(cost_score) if cost_score is not None else None,
                 app=app,
             )
             score.disposition_action = disposition.value
@@ -970,21 +1040,22 @@ class RationalizationScoringService:
             vendor_score = vendor_result["score"]
             vendor_evidence = vendor_result.get("evidence", [])
 
-            # R1-B34 (TB-0135): the same resolver calculate_app_score uses,
-            # so this re-derived trail never disagrees with the saved score
-            # (review finding A).
+            # the same resolver calculate_app_score uses,
+            # so this re-derived trail never disagrees with the saved score.
             weights, _active_formula = RationalizationScoringService._resolve_overall_weights(
                 app, scoring_config, active_policy,
             )
 
-            overall_score = (
-                technical_score * weights["technical_health"]
-                + business_score * weights["business_value"]
-                + cost_score * weights["cost_efficiency"]
-                + vendor_score * weights["vendor_risk"]
+            # Same re-weighting rule as calculate_app_score: unmeasured inputs
+            # (cost with no cost record, risk with no vendor/risk-register
+            # record) are null, and the overall is re-weighted over the
+            # measured ones.
+            measured = RationalizationScoringService._measured_inputs(
+                technical_score, business_score, cost_score, vendor_score,
             )
+            overall_score = RationalizationScoringService._reweighted_overall(weights, measured)
 
-            # CAP-020: Capability coverage (read-only, no DB writes)
+            # Capability coverage (read-only, no DB writes)
             et_cap_result = RationalizationScoringService._compute_capability_score(application_id)
             et_cap_adjustment = et_cap_result.get("capability_adjustment", 0.0)
             overall_score = max(0.0, min(100.0, overall_score + et_cap_adjustment))
@@ -999,45 +1070,57 @@ class RationalizationScoringService:
                     "factor": "Technical Health",
                     "dimension": "technical_health",
                     "weight": tech_weight_pct,
-                    "raw_value": round(technical_score, 2),
-                    "contribution": round(technical_score * weights["technical_health"], 2),
+                    "raw_value": None if technical_score is None else round(technical_score, 2),
+                    "contribution": None if technical_score is None else round(technical_score * weights["technical_health"], 2),
                     "source": "ApplicationComponent (deployment_model, architecture_style, technology_age_years, technical_risk, lifecycle_status)",
                     "rationale": f"Technical health score of {technical_score:.1f} contributes {technical_score * weights['technical_health']:.1f} pts to overall score (weight {tech_weight_pct}%)",
+                    "measured": technical_score is not None,
                     "sub_factors": tech_evidence,
                 },
                 {
                     "factor": "Business Value",
                     "dimension": "business_value",
                     "weight": biz_weight_pct,
-                    "raw_value": round(business_score, 2),
-                    "contribution": round(business_score * weights["business_value"], 2),
+                    "raw_value": None if business_score is None else round(business_score, 2),
+                    "contribution": None if business_score is None else round(business_score * weights["business_value"], 2),
                     "source": "ApplicationComponent (business_criticality, strategic_importance, ApplicationProcessSupport)",
                     "rationale": f"Business value score of {business_score:.1f} contributes {business_score * weights['business_value']:.1f} pts to overall score (weight {biz_weight_pct}%)",
+                    "measured": business_score is not None,
                     "sub_factors": biz_evidence,
                 },
                 {
                     "factor": "Cost Efficiency",
                     "dimension": "cost_efficiency",
                     "weight": cost_weight_pct,
-                    "raw_value": round(cost_score, 2),
-                    "contribution": round(cost_score * weights["cost_efficiency"], 2),
-                    "source": "ApplicationComponent (total_cost_of_ownership, license_cost, maintenance_cost, infrastructure_cost, user_count) — TODO(Release 2): use cost accessor",
-                    "rationale": f"Cost efficiency score of {cost_score:.1f} contributes {cost_score * weights['cost_efficiency']:.1f} pts to overall score (weight {cost_weight_pct}%)",
+                    "raw_value": None if cost_score is None else round(cost_score, 2),
+                    "contribution": None if cost_score is None else round(cost_score * weights["cost_efficiency"], 2),
+                    "source": "cost accessor (ApplicationComponent.total_cost_of_ownership + legacy cost fields), CapabilityCostAllocation, user_count",
+                    "rationale": (
+                        f"Cost efficiency score of {cost_score:.1f} contributes {cost_score * weights['cost_efficiency']:.1f} pts to overall score (weight {cost_weight_pct}%)"
+                        if cost_score is not None
+                        else f"Cost input not measured — no cost record exists for this application (weight {cost_weight_pct}%); overall re-weighted over the measured inputs"
+                    ),
+                    "measured": cost_score is not None,
                     "sub_factors": cost_evidence,
                 },
                 {
                     "factor": "Vendor Risk",
                     "dimension": "vendor_risk",
                     "weight": vendor_weight_pct,
-                    "raw_value": round(vendor_score, 2),
-                    "contribution": round(vendor_score * weights["vendor_risk"], 2),
-                    "source": "VendorOrganization (enterprise_readiness_score, financial_health_score, innovation_score, acquisition_risk), VendorProduct (product_maturity, end_of_life_date, compliance_standards)",
-                    "rationale": f"Vendor risk score of {vendor_score:.1f} contributes {vendor_score * weights['vendor_risk']:.1f} pts to overall score (weight {vendor_weight_pct}%)",
+                    "raw_value": None if vendor_score is None else round(vendor_score, 2),
+                    "contribution": None if vendor_score is None else round(vendor_score * weights["vendor_risk"], 2),
+                    "source": "VendorOrganization (enterprise_readiness_score, financial_health_score, innovation_score, acquisition_risk), VendorProduct (product_maturity, end_of_life_date, compliance_standards), risks register",
+                    "rationale": (
+                        f"Vendor risk score of {vendor_score:.1f} contributes {vendor_score * weights['vendor_risk']:.1f} pts to overall score (weight {vendor_weight_pct}%)"
+                        if vendor_score is not None
+                        else f"Risk input not measured — no vendor link and no risk-register row for this application (weight {vendor_weight_pct}%); overall re-weighted over the measured inputs"
+                    ),
+                    "measured": vendor_score is not None,
                     "sub_factors": vendor_evidence,
                 },
             ]
 
-            # CAP-020: Capability coverage evidence trail
+            # Capability coverage evidence trail
             et_cap_sub_factors = []
             if et_cap_result["score"] > 0:
                 et_cap_sub_factors.append({
@@ -1053,7 +1136,7 @@ class RationalizationScoringService:
                 })
             if et_cap_result.get("business_capability_count", 0) > 0:
                 et_cap_sub_factors.append({
-                    "factor": "Business Capability Coverage (CAP-020)",
+                    "factor": "Business Capability Coverage",
                     "weight": None,
                     "raw_value": et_cap_result.get("capability_score", 0),
                     "contribution": et_cap_adjustment,
@@ -1134,7 +1217,7 @@ class RationalizationScoringService:
                     app=app,
                 )
 
-            # CAP-020: SPOF L1-L2 override in evidence trail path
+            # SPOF L1-L2 override in evidence trail path
             if et_cap_result.get("spof_l1_l2", False) and time_action == "ELIMINATE":
                 time_action = "TOLERATE"
             disposition, disp_confidence, disp_uncertainty_reasons = RationalizationScoringService._derive_disposition(
@@ -1142,7 +1225,7 @@ class RationalizationScoringService:
                 overall_score=float(overall_score),
                 technical_score=float(technical_score),
                 business_score=float(business_score),
-                cost_score=float(cost_score),
+                cost_score=float(cost_score) if cost_score is not None else None,
                 app=app,
             )
             readiness = RationalizationScoringService.evaluate_readiness(app)
@@ -1186,10 +1269,10 @@ class RationalizationScoringService:
                 "scoring_config_name": scoring_config.name,
                 "policy_applied": policy_applied,
                 "scores": {
-                    "technical_health": round(technical_score, 2),
-                    "business_value": round(business_score, 2),
-                    "cost_efficiency": round(cost_score, 2),
-                    "vendor_risk": round(vendor_score, 2),
+                    "technical_health": None if technical_score is None else round(technical_score, 2),
+                    "business_value": None if business_score is None else round(business_score, 2),
+                    "cost_efficiency": None if cost_score is None else round(cost_score, 2),
+                    "vendor_risk": None if vendor_score is None else round(vendor_score, 2),
                     "capability_coverage": et_cap_result,
                     "capability_adjustment": et_cap_adjustment,
                     "overall": round(overall_score, 2),
@@ -1203,6 +1286,11 @@ class RationalizationScoringService:
                 },
                 "overall_score": round(overall_score, 2),
                 "time_action": time_action,
+                "inputs_measured": len(measured),
+                "inputs_total": 4,
+                "overall_statement": (
+                    f"Overall score re-weighted from {len(measured)} of 4 measured inputs"
+                ),
                 "time_action_tentative": not readiness["is_decision_ready"],
                 "disposition_action": final_disposition_value,
                 "disposition_confidence": final_confidence,
@@ -1239,7 +1327,7 @@ class RationalizationScoringService:
 
         Sources queried (merged, de-duplicated by capability name):
         1. unified_application_capability_mapping + unified_capabilities
-        2. application_capability_mapping + business_capability (CAP-020)
+        2. application_capability_mapping + business_capability
 
         Scoring weights by capability level:
         - L1: 3.0 weight (strategic)
@@ -1306,7 +1394,7 @@ class RationalizationScoringService:
                 .all()
             )
 
-            # ── Source 2: BusinessCapability mappings (CAP-020) ──
+            # ── Source 2: BusinessCapability mappings ──
             biz_cap_mappings = (
                 db.session.query(
                     ApplicationCapabilityMapping.business_capability_id,
@@ -1342,7 +1430,7 @@ class RationalizationScoringService:
                     base_weight += l1_critical_bonus
                 total_score += base_weight
 
-            # ── CAP-020: BusinessCapability level-weighted score ──
+            # ── BusinessCapability level-weighted score ──
             # L1 = 3.0, L2 = 2.0, L3+ = 1.0
             biz_cap_level_weights = {1: 3.0, 2: 2.0}
             biz_cap_weighted_total = 0.0
@@ -1420,7 +1508,7 @@ class RationalizationScoringService:
                 ]
                 has_spof = len(spof_capabilities) > 0
 
-            # ── SPOF detection (BusinessCapability — CAP-020) ──
+            # ── SPOF detection (BusinessCapability) ──
             spof_l1_l2 = False
 
             if biz_cap_ids:
@@ -2006,7 +2094,7 @@ class RationalizationScoringService:
         evidence: List[Dict] = []
 
         # --- Prefer structured cost fields on ApplicationComponent ---
-        # R1-B08 PR 2: repointed through the one accessor (same TCO-first,
+        # repointed through the one accessor (same TCO-first,
         # legacy-sum-fallback behaviour this inlined before, now the one
         # home for it rather than a copy at each call site).
         annual_cost, cost_source = get_annual_cost_with_source(app)
@@ -2077,14 +2165,18 @@ class RationalizationScoringService:
                         "rationale": f"Cost per user {cpu_label} adds {cpu_delta:+d} pts",
                     })
         else:
+            # Unmeasured input: nothing recorded in the one cost accessor.
+            # Carry None (the surface renders a dash) instead of the 50.0
+            # baseline, which would present an unmeasured input as a number.
             evidence.append({
                 "factor": "Annual Cost (TCO)",
                 "weight": None,
                 "raw_value": None,
-                "contribution": 0,
-                "source": "ApplicationComponent (no cost data available)",
-                "rationale": "No cost data found; no cost adjustment applied",
+                "contribution": None,
+                "source": "cost accessor (no cost record)",
+                "rationale": "Cost input not measured: no cost record exists for this application",
             })
+            return None, evidence
 
         # Check for redundancy via capability mappings
         # ApplicationComponent has no direct business_capability_id; uses capability_mappings relationship
@@ -2142,7 +2234,43 @@ class RationalizationScoringService:
         return max(0.0, min(score, 100.0)), evidence
 
     @staticmethod
-    def _calculate_vendor_risk(app: ApplicationComponent) -> dict:
+    def _load_risk_scores(app_ids) -> Dict[int, List[int]]:
+        """Read the risk-register scores for the given applications in one query.
+
+        The register rows are reached through the solutions each application
+        realises. Returns ``{application_id: [effective likelihood x impact,
+        ...]}`` with one entry per distinct register row; applications with no
+        row are absent.
+        """
+        ids = [i for i in app_ids if i is not None]
+        if not ids:
+            return {}
+        from app.models.risk import Risk  # noqa: PLC0415
+        from app.models.solution_models import solution_applications  # noqa: PLC0415
+
+        rows = (
+            db.session.query(Risk, solution_applications.c.application_component_id)
+            .join(
+                solution_applications,
+                solution_applications.c.solution_id == Risk.solution_id,
+            )
+            .filter(solution_applications.c.application_component_id.in_(ids))
+            .all()
+        )
+        seen = set()
+        result: Dict[int, List[int]] = {}
+        for risk, app_id in rows:
+            if (app_id, risk.id) in seen:
+                continue
+            seen.add((app_id, risk.id))
+            result.setdefault(app_id, []).append(risk._effective_score)
+        return result
+
+    @staticmethod
+    def _calculate_vendor_risk(
+        app: ApplicationComponent,
+        risk_scores_by_app: Optional[Dict[int, List[int]]] = None,
+    ) -> dict:
         """
         Calculate vendor risk score (0 - 100, higher = lower risk).
 
@@ -2167,21 +2295,54 @@ class RationalizationScoringService:
         )
 
         if not vendor_link:
-            # No vendor = potential in-house app = higher risk (no support)
+            # Risk input measured only when the registers actually say
+            # something about this application: either a vendor link on
+            # application_component_vendor_products (the vendor registers) or
+            # a row on the one risk register (risks), reached through the
+            # solutions this application realises. With neither, the input is
+            # unmeasured and carried as None — the surface renders a dash, not
+            # the old fabricated 40.
+            if risk_scores_by_app is None:
+                risk_scores_by_app = RationalizationScoringService._load_risk_scores([app.id])
+            register_scores = risk_scores_by_app.get(app.id) or []
+            if register_scores:
+                # Risk-register rows exist for this application, so the risk
+                # posture IS assessed: the mean likelihood x impact (1-25)
+                # across its rows, inverted onto the 0-100 scale where higher
+                # means lower risk.
+                mean_risk = sum(register_scores) / len(register_scores)
+                register_score = round(max(0.0, min(100.0, 100.0 - (mean_risk / 25.0) * 100.0)), 1)
+                return {
+                    "score": register_score,
+                    "vendor_lock_in_level": None,
+                    "vendor_viability_score": None,
+                    "exit_complexity": None,
+                    "exit_cost_estimate": None,
+                    "alternative_vendors_available": None,
+                    "evidence": [{
+                        "factor": "Risk Register",
+                        "weight": None,
+                        "raw_value": round(mean_risk, 2),
+                        "contribution": None,
+                        "source": "application_component_vendor_products (no link found); risks register rows present",
+                        "rationale": f"No vendor product linked; {len(register_scores)} risk register row(s) with mean likelihood x impact {mean_risk:.1f} of 25, scored {register_score:.1f}",
+                    }],
+                }
+
             return {
-                "score": 40.0,
+                "score": None,
                 "vendor_lock_in_level": None,
                 "vendor_viability_score": None,
                 "exit_complexity": None,
                 "exit_cost_estimate": None,
                 "alternative_vendors_available": None,
                 "evidence": [{
-                    "factor": "Vendor Link",
+                    "factor": "Risk Input",
                     "weight": None,
                     "raw_value": None,
-                    "contribution": -10,
-                    "source": "application_component_vendor_products (no link found)",
-                    "rationale": "No vendor product linked; scored as 40 (in-house / unsupported app penalty)",
+                    "contribution": None,
+                    "source": "application_component_vendor_products / risks register (no record for this application)",
+                    "rationale": "Risk input not measured: no vendor link and no risk-register row for this application; shown as a dash instead of a fabricated number",
                 }],
             }
 
@@ -2715,7 +2876,7 @@ class RationalizationScoringService:
                 uncertainty_reasons.append("Score near threshold boundary")
 
             # Cost dimension gap — TCO analysis requires at least one cost field
-            # R1-B08 PR 2: repointed through the one accessor.
+            # repointed through the one accessor.
             if not has_recorded_cost(app):
                 uncertainty_reasons.append("No cost data for TCO analysis")
 
@@ -2828,7 +2989,11 @@ class RationalizationScoringService:
             return "ELIMINATE"
 
         # Check if app would qualify for ELIMINATE based on scores
-        qualifies_for_eliminate = overall_score < 40 or (business_score < 40 and cost_score < 40)
+        # (cost_score is None when the cost input was not measured — it can
+        # never qualify an elimination it did not participate in)
+        qualifies_for_eliminate = overall_score < 40 or (
+            business_score < 40 and cost_score is not None and cost_score < 40
+        )
 
         if qualifies_for_eliminate:
             # Check for blocking dependencies before recommending ELIMINATE
@@ -2898,15 +3063,20 @@ class RationalizationScoringService:
         elif business_score < 40:
             justifications.append("Limited business value or redundant functionality.")
 
-        # Cost justification
-        if cost_score > 70:
-            justifications.append("Excellent cost efficiency and TCO optimization.")
-        elif cost_score < 40:
-            justifications.append("High cost burden relative to value delivered.")
+        # Cost justification (None = cost input not measured — no assertion)
+        if cost_score is not None:
+            if cost_score > 70:
+                justifications.append("Excellent cost efficiency and TCO optimization.")
+            elif cost_score < 40:
+                justifications.append("High cost burden relative to value delivered.")
+        else:
+            justifications.append("Cost input not measured (no cost record); excluded from the overall score.")
 
-        # Vendor risk justification
-        if vendor_score < 40:
+        # Vendor risk justification (None = risk input not measured)
+        if vendor_score is not None and vendor_score < 40:
             justifications.append("Elevated vendor concentration or sustainability risk.")
+        elif vendor_score is None:
+            justifications.append("Risk input not measured (no vendor link or risk-register row); excluded from the overall score.")
 
         # Action-specific recommendations
         action_recommendations = {
@@ -2977,6 +3147,11 @@ class RationalizationScoringService:
                     if s.application_component_id not in recent_scores_map:
                         recent_scores_map[s.application_component_id] = s
 
+            # One batched read of the risk register for the whole portfolio.
+            risk_scores_by_app = RationalizationScoringService._load_risk_scores(
+                [a.id for a in apps]
+            )
+
             for app in apps:
                 try:
                     # Check if recent score exists (within 30 days)
@@ -2992,7 +3167,9 @@ class RationalizationScoringService:
                             continue
 
                     # Calculate new score (pass pre-loaded app to avoid N+1 re-fetch)
-                    score = RationalizationScoringService.calculate_app_score(app.id, app=app)
+                    score = RationalizationScoringService.calculate_app_score(
+                        app.id, app=app, risk_scores_by_app=risk_scores_by_app
+                    )
 
                     if score:
                         scores_list.append(score)
@@ -3007,7 +3184,9 @@ class RationalizationScoringService:
                     logger.error(f"Error processing app {app.id}: {e}")
                     results["errors"] += 1
 
-            # Calculate averages
+            # Calculate averages — unmeasured inputs (cost/risk with no record) are
+            # None and are excluded from their dimension average; an average
+            # with nothing measured reports None rather than a fabricated 0.
             if scores_list:
                 results["average_scores"]["overall"] = round(
                     sum(s.overall_health_score for s in scores_list) / len(scores_list), 2
@@ -3018,11 +3197,11 @@ class RationalizationScoringService:
                 results["average_scores"]["business"] = round(
                     sum(s.business_value_score for s in scores_list) / len(scores_list), 2
                 )
-                results["average_scores"]["cost"] = round(
-                    sum(s.cost_efficiency_score for s in scores_list) / len(scores_list), 2
+                results["average_scores"]["cost"] = _average_dimension(
+                    scores_list, "cost_efficiency_score"
                 )
-                results["average_scores"]["vendor"] = round(
-                    sum(s.vendor_risk_score for s in scores_list) / len(scores_list), 2
+                results["average_scores"]["vendor"] = _average_dimension(
+                    scores_list, "vendor_risk_score"
                 )
 
             db.session.commit()
@@ -3086,7 +3265,7 @@ class RationalizationScoringService:
                         "overall_score": score.overall_health_score,
                         "time_action": score.rationalization_action,
                         # Canonical 7R disposition — may be None for scores calculated
-                        # before RAT-103 was deployed; callers should handle None gracefully.
+                        # before this was deployed; callers should handle None gracefully.
                         "disposition_action": score.disposition_action,
                         "disposition_confidence": score.disposition_confidence,
                         "confidence_reasons": score.confidence_reasons or [],
@@ -3568,8 +3747,12 @@ class RationalizationScoringService:
             return "ELIMINATE"
 
         # Determine whether elimination is score-driven.
+        # (cost_score is None when the cost input was not measured — it can
+        # never qualify an elimination it did not participate in)
         qualifies_for_eliminate = overall_score < eliminate_below or (
-            business_score < eliminate_below and cost_score < eliminate_below
+            business_score < eliminate_below
+            and cost_score is not None
+            and cost_score < eliminate_below
         )
 
         if qualifies_for_eliminate:

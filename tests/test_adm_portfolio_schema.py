@@ -161,12 +161,35 @@ def scratch_databases_adm():
     admin.dispose()
 
 
+def _script_directory():
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    directory = REPO / "migrations"
+    config = Config(str(directory / "alembic.ini"))
+    config.set_main_option("script_location", str(directory))
+    return ScriptDirectory.from_config(config)
+
+
+def _repo_head():
+    heads = _script_directory().get_heads()
+    assert len(heads) == 1, heads
+    return heads[0]
+
+
+def _ancestors(revision):
+    return {rev.revision for rev in _script_directory().iterate_revisions(revision, "base")}
+
+
 def test_init_db_then_schema_upgrade_builds_and_fences_the_tables(deployed):
     url, output = deployed
     engine = create_engine(url)
     try:
         assert _present(engine) == [True] * len(ADM_TABLES)
-        assert SCHEMA._recorded(url) == _script().get_heads(), output
+        # The recorded revision is the repository's single head (a later revision
+        # may sit above the fence), and the fence is part of its history.
+        assert SCHEMA._recorded(url) == [_repo_head()], output
+        assert RLS_REVISION in _ancestors(_repo_head())
         for table in FENCED_TABLES:
             names, enabled = _policies(engine, table)
             assert enabled and names == POLICIES, table
@@ -229,22 +252,10 @@ def test_revision_builds_the_shape_create_all_builds_and_refences(deployed):
         engine.dispose()
 
 
-def _script():
-    from alembic.config import Config
-    from alembic.script import ScriptDirectory
-
-    directory = REPO / "migrations"
-    config = Config(str(directory / "alembic.ini"))
-    config.set_main_option("script_location", str(directory))
-    return ScriptDirectory.from_config(config)
-
-
 def test_revision_chain_is_linear_and_contains_the_fencing_revision():
-    script = _script()
-    heads = script.get_heads()
-    assert len(heads) == 1
-    # Later revisions may sit on top; the fencing revision stays in the chain.
-    assert RLS_REVISION in {r.revision for r in script.walk_revisions(base="base", head=heads[0])}
+    script = _script_directory()
+    assert len(script.get_heads()) == 1
+    assert RLS_REVISION in _ancestors(_repo_head())
     assert script.get_revision(RLS_REVISION).down_revision == TABLES_REVISION
     assert script.get_revision(TABLES_REVISION).down_revision == PARENT_REVISION
 
