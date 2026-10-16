@@ -106,9 +106,16 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("applications", "/applications/", DEMO_PERSONA,
      "The application portfolio: lifecycle tiles, owner and vendor coverage, and each application's type, lifecycle stage and the capability it supports.",
      "Screenshot of the Applications module showing Lantern Quay Systems' portfolio tiles, data-quality coverage and application list with type, lifecycle stage and mapped capability."),
-    ("arb", "/arb/", DEMO_PERSONA,
-     "The Architecture Review Board hub: review volume, pending decisions, approval rate and cycle time.",
-     "Screenshot of the Architecture Review Board hub showing total and pending reviews, approval rate, cycle time and the review status chart."),
+    # Points at the review ledger (/arb/reviews) rather than the dashboard
+    # (/arb/) -- the dashboard's own "AI queue triage" panel sat above the
+    # fold with only 4 seeded reviews behind it, which read as a toy demo
+    # rather than a governed queue. The ledger has no AI panel, and two
+    # dozen-plus real review items across every status/type/priority
+    # (paginated) is the same screen at the volume the module actually
+    # carries in use.
+    ("arb", "/arb/reviews", DEMO_PERSONA,
+     "The Architecture Review Board's review ledger: every submission with its status, type, priority and submission date, filterable across the full governance queue.",
+     "Screenshot of the Architecture Review Board's review ledger listing submitted review items with their status, type, priority and submission date."),
     ("architecture-model", "/architecture/", DEMO_PERSONA,
      "The ArchiMate element browser, spanning the business, application, technology and motivation layers.",
      "Screenshot of the Architecture Model module's ArchiMate element browser."),
@@ -118,12 +125,21 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("business-model-canvas", "/business-model/", DEMO_PERSONA,
      "The business model canvas library, with each canvas's operating-model archetype.",
      "Screenshot of the Business Model Canvas module's canvas library."),
+    ("capability-maturity", "/capability-maturity/heatmap", DEMO_PERSONA,
+     "The capability maturity heatmap: current vs target maturity for every assessed capability, grouped by domain.",
+     "Screenshot of the Capability Maturity heatmap showing current and target maturity levels grouped by domain."),
     ("compliance-frameworks", "/dashboard/compliance", DEMO_PERSONA,
      "The compliance frameworks dashboard, tracking framework coverage across the estate.",
      "Screenshot of the Compliance Frameworks module's dashboard."),
+    ("diagrams", "/archimate/composer", DEMO_PERSONA,
+     "A saved diagram open in the ArchiMate Composer, with its elements laid out on the canvas.",
+     "Screenshot of the ArchiMate Composer with a saved diagram's elements open on the canvas."),
     ("duplicate-detection", "/duplicate-detection/simple", DEMO_PERSONA,
      "The duplicate detection dashboard, flagging applications that may overlap in function.",
      "Screenshot of the Duplicate Detection module's dashboard."),
+    ("industry-apqc", "/industry-apqc/", DEMO_PERSONA,
+     "The Industry APQC dashboard, showing each industry framework's process catalogue and benchmarks.",
+     "Screenshot of the Industry APQC dashboard listing industry frameworks with their process counts and benchmarks."),
     ("my-applications", "/my-applications/", APP_MANAGER_PERSONA,
      "An application owner's personal dashboard of the applications they're responsible for.",
      "Screenshot of the My Applications module's owner dashboard."),
@@ -136,6 +152,9 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("projects", "/enterprise/implementation/work-packages", DEMO_PERSONA,
      "The work packages list, tracking delivery programmes in progress.",
      "Screenshot of the Projects module's work packages list."),
+    ("rationalization", "/applications/rationalization", DEMO_PERSONA,
+     "The rationalization dashboard, past onboarding, with real detection groups, scored applications and a savings estimate.",
+     "Screenshot of the Rationalization dashboard showing detection groups, scored applications and estimated savings."),
     ("risk-register", "/risks/", DEMO_PERSONA,
      "The risk register, with likelihood, impact and a mitigation plan recorded for each risk.",
      "Screenshot of the Risk Register module."),
@@ -153,17 +172,16 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
 # nothing here ever flips that front-matter. What's pending is only the
 # capture: each one's first screenshot/recording was reviewed and rejected
 # (empty data, the wrong screen, or a recording that never performs the use
-# case it claims), the file was removed, and round 2 reseeds what each
-# screen actually needs and recaptures it properly.
+# case it claims); the file is removed until each screen's actual seed data
+# is fixed and it can be recaptured properly.
 #
 # This dict (not just an absence from MODULE_CAPTURES) is what keeps the
 # registry-completeness tests strict: test_module_screenshots.py asserts
 # every live module/use-case is in MODULE_CAPTURES **or** named here, so a
 # module that quietly loses its capture without being added to this list
-# still fails the test, exactly as it would have before any pending list
-# existed. Round 2 deletes a name from here the same moment it adds the
-# slug back to the matching *_CAPTURES list above -- the two are meant to
-# be mutually exclusive, never both.
+# still fails the test. A name is deleted from here the same moment the
+# slug is added back to the matching *_CAPTURES list above -- the two are
+# meant to be mutually exclusive, never both.
 MODULE_CAPTURE_PENDING: dict[str, str] = {
     "integrations": (
         "connector health dashboard throws \"An internal error occurred\" on any "
@@ -172,63 +190,90 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
         "app/models/connector_config.py declares all three as plain strings -- "
         "pre-existing bug, unrelated file, out of scope to fix here"
     ),
-    "capability-maturity": (
-        "heat map showed \"No capabilities yet\" for an organisation that has 24 "
-        "capabilities elsewhere (investment-analysis) -- this screen reads a "
-        "different capability store than the one seeded; a reuse-register-shaped "
-        "bug, separate brief owed"
-    ),
-    "batch-import": (
-        "completed jobs rendered at 0% progress and 0 elements generated -- "
-        "reads broken, not done; needs a real completed run with actual elements"
-    ),
-    "org-chart": (
-        "captured screen was the module's hub page (three link cards), not the "
-        "organisation chart itself -- needs actors/hierarchy seeded and the "
-        "/organization/chart route captured instead"
-    ),
-    "diagrams": (
-        "captured screen was a list of diagram names, not a rendered diagram -- "
-        "needs a diagram actually open in the Composer"
-    ),
-    "industry-apqc": "0 processes shown on every seeded framework",
-    "investment-analysis": "domain Unknown and 0 apps coverage on every capability row",
-    "gap-analysis": "type None on every row",
-    "rationalization": (
-        "captured screen was the \"Get started\" onboarding panel, not the "
-        "rationalization view itself -- needs scores past onboarding"
-    ),
-    "roadmaps": "0 gaps detected; plateaus with no description and 0 gaps",
-    "value-streams": "0 stages and 0 capabilities on every value stream",
     "digital-twin": (
         "no seeded demonstration organisation or browser available when the "
         "page was written to capture Ask with an impact answer and the "
         "provenance drawer open, the twin map, or model history with a "
         "seeded change -- needs a real capture run, not a placeholder"
     ),
+    # The org chart's own layout cannot honestly be captured at this
+    # organisation's real size (see org_chart.js) -- recapture after the
+    # layout fix lands, not by shrinking the seeded headcount to hide it.
+    "org-chart": (
+        "org chart layout overprints sibling team nodes and clips the "
+        "right-hand branch once a level has more than about six teams "
+        "(org_chart.js spaces leaves by SVG width, not node width); "
+        "recapture after the layout fix"
+    ),
+    # These four pages redirect before they ever render (see this file's
+    # own MERGED_PAGES above), so a visitor never sees their image --
+    # captured or not. Named here rather than fixed, since fixing a screen
+    # nobody reaches is the wrong priority, with what a reversal would
+    # need first.
+    "batch-import": (
+        "redirects to /modules/architecture-model before it renders "
+        "(MERGED_PAGES); a reversal would need a real cost tile and real "
+        "Type/Started columns first, both dash-only today"
+    ),
+    "gap-analysis": (
+        "redirects to /modules/roadmaps before it renders (MERGED_PAGES); "
+        "its own caption promises gaps by type and priority, which the "
+        "shared roadmap frame does not show, so a reversal needs its own "
+        "screen built first"
+    ),
+    "investment-analysis": (
+        "redirects to /modules/business-case before it renders "
+        "(MERGED_PAGES); a reversal would need the AI-suggestion panel "
+        "above the fold reworked, a non-zero critical-priorities tile and "
+        "matching domain labels first"
+    ),
+    "value-streams": (
+        "redirects to /use-cases/value-streams-at-risk before it renders "
+        "(MERGED_PAGES); a reversal would need a non-zero critical-streams "
+        "tile first"
+    ),
+    # The plateau and work-package data behind this frame is genuinely
+    # fixed (three described plateaus, each with a non-zero, uneven
+    # "gap(s) assigned" count); what still fails the bar is the "AI
+    # Generated" metric tile, which reads 0 no matter what the gap
+    # detection route stores. The tile is computed client-side as
+    # `this.gaps.filter(g => g.auto_generated)` (capability_roadmap.html),
+    # and `this.gaps` is populated from GET /capability-map/api/roadmap/gaps
+    # (roadmap_routes.py, api_roadmap_gaps), which builds its gap list on
+    # the fly from BusinessCapability coverage and never reads stored Gap
+    # rows or emits an auto_generated key at all -- a service bug, not a
+    # seed gap, and outside what a module/seed-data change can fix.
+    "roadmaps": (
+        "the 'AI Generated' metric tile reads 0 regardless of seed data: "
+        "it is computed from the roadmap gaps API response, which builds "
+        "its gap list on the fly from capability coverage and never emits "
+        "an auto_generated field for the tile to count; recapture once "
+        "that API response carries the flag"
+    ),
 }
 
 # The one live use-case page: same screen as the capability-maturity module
-# (its own url_slug front-matter field points at the identical route). Empty
-# for the same reason as capability-maturity above -- see
-# USE_CASE_SCREENSHOT_PENDING.
-USE_CASE_SCREENSHOT_CAPTURES: list[tuple[str, str, str, str, str]] = []
+# (its own url_slug front-matter field points at the identical route).
+# Captured once capability-maturity's own BusinessCapability rows existed --
+# the module and this use-case page share the identical
+# /capability-maturity/heatmap route, so the fix that unblocked one unblocked
+# both.
+USE_CASE_SCREENSHOT_CAPTURES: list[tuple[str, str, str, str, str]] = [
+    ("capability-maturity-heatmap", "/capability-maturity/heatmap", DEMO_PERSONA,
+     "The capability maturity heatmap, read as a value-stream risk answer: current vs target maturity for every assessed capability.",
+     "Screenshot of the capability maturity heatmap showing current and target maturity levels for every assessed capability."),
+]
 
-USE_CASE_SCREENSHOT_PENDING: dict[str, str] = {
-    "capability-maturity-heatmap": (
-        "same capability-maturity heat map issue as the module above -- "
-        "\"No capabilities yet\""
-    ),
-}
+USE_CASE_SCREENSHOT_PENDING: dict[str, str] = {}
 
 # Four multi-step use cases keyed by the readable /use-cases/<slug> form --
 # the pending URL rewrite from /use-cases/uc-* to this readable form has
 # since landed, so these are keyed the same way USE_CASE_SCREENSHOT_PENDING
 # above is: a rename, not a recapture. Each entry: (slug, steps,
 # persona_email, caption, alt_text) -- steps themselves only matter to the
-# capture script. Empty for round 1 -- see USE_CASE_VIDEO_PENDING below;
-# round 2 restores these once each recording actually performs the use case
-# it claims rather than touring past it.
+# capture script. Empty -- see USE_CASE_VIDEO_PENDING below; an entry is
+# restored here once its recording actually performs the use case it
+# claims rather than touring past it.
 USE_CASE_VIDEO_CAPTURES: list[tuple[str, list, str, str, str]] = []
 
 USE_CASE_VIDEO_PENDING: dict[str, str] = {
@@ -509,7 +554,13 @@ def use_case_redirect_target(old_filename_slug: str) -> str | None:
 # Module images captured at 2x device pixel ratio by scripts/capture_proof_assets.py: their file
 # pixels are twice their CSS size, so the <img> width/height attributes halve them and the
 # image displays 1:1. Every other module image is a 1x capture and keeps its file size.
-TWO_X_MODULE_IMAGES = frozenset({"applications", "arb"})
+#
+# "arb" is not in this set: its hero image comes from
+# scripts/capture_screenshots.py --modules (the review ledger at /arb/reviews,
+# a 1x capture like every other ordinary module), not from the 2x
+# capture_proof_assets.py crop of the dashboard -- see the MODULE_CAPTURES
+# entry above for why.
+TWO_X_MODULE_IMAGES = frozenset({"applications"})
 
 
 def _screenshot_density(slug: str, page_family: str) -> int:

@@ -269,6 +269,10 @@ _ELEMENTS = [
     ("Baseline Architecture", "Plateau", "implementation"),
     ("Transition State 1", "Plateau", "implementation"),
     ("Target Architecture", "Plateau", "implementation"),
+    # The second, overlapping "Current State"/"Future State" pair that
+    # used to sit here was removed -- the plateau timeline is one
+    # three-stage chain (Baseline Architecture, Transition State 1,
+    # Target Architecture), not two competing ones.
     ("Calibration throughput gap", "Gap", "implementation"),
     ("Field service coverage gap", "Gap", "implementation"),
     ("Inventory visibility gap", "Gap", "implementation"),
@@ -390,8 +394,6 @@ _ELEMENTS = [
     ("Real-time Dashboard", "Deliverable", "implementation"),
     ("Automated Test Suite", "Deliverable", "implementation"),
     ("Disaster Recovery Runbook", "Deliverable", "implementation"),
-    ("Current State", "Plateau", "implementation"),
-    ("Future State", "Plateau", "implementation"),
     ("Data quality gap", "Gap", "implementation"),
     ("Integration coverage gap", "Gap", "implementation"),
     ("Skills shortage gap", "Gap", "implementation"),
@@ -549,7 +551,6 @@ _RELATIONSHIPS = [
     # Plateau transitions
     ("Baseline Architecture", "Transition State 1", "Triggering"),
     ("Transition State 1", "Target Architecture", "Triggering"),
-    ("Current State", "Future State", "Triggering"),
     # Gap associations
     ("Calibration throughput gap", "Calibration Automation Phase 1", "Association"),
     ("Field service coverage gap", "Field Tester Rollout", "Association"),
@@ -832,6 +833,33 @@ _APP_OWNERS = [
     ("Data Warehouse", "System Administrator", "technical"),
 ]
 
+# application_name -> primary owner's display name, read off from _APP_OWNERS
+# above. ApplicationComponent.application_owner is a plain text column on the
+# application itself (distinct from the ApplicationOwner join table rows
+# created below from this same list) -- RationalizationScoringService.
+# evaluate_readiness() reads that column directly, so without it every
+# seeded application fails the "owner" readiness dimension regardless of
+# the ApplicationOwner rows that exist.
+_APP_PRIMARY_OWNER = {
+    app_name: owner_display_name
+    for app_name, owner_display_name, ownership_type in _APP_OWNERS
+    if ownership_type == "primary"
+}
+
+# application lifecycle code -> a risk level a company would realistically
+# have already recorded for applications at that stage: a strategic
+# investment gets a technical/business risk review as a matter of course,
+# and an application already marked for sunset or decommissioning gets one
+# as part of that decision. The plain tactical workhorses below are not
+# given a level here -- in a real portfolio not every application has had
+# its risk assessed yet, which is exactly the condition
+# evaluate_readiness()'s "risk" dimension exists to surface.
+_RISK_LEVEL_BY_LIFECYCLE = {
+    "2.1 strategic": "low",
+    "3. sunset": "high",
+    "5. decommissioned": "critical",
+}
+
 # ── capabilities with maturity ─────────────────────────────────────────────
 
 _CAPABILITIES = [
@@ -1046,12 +1074,22 @@ _WORK_PACKAGES = [
 # ── plateaus ───────────────────────────────────────────────────────────────
 
 _PLATEAUS = [
-    # (name, sequence_order, archimate_element_name)
-    ("Baseline Architecture", 1, "Baseline Architecture"),
-    ("Transition State 1", 2, "Transition State 1"),
-    ("Target Architecture", 3, "Target Architecture"),
-    ("Current State", 1, "Current State"),
-    ("Future State", 2, "Future State"),
+    # (name, sequence_order, archimate_element_name, description, target_date_days_from_today)
+    ("Baseline Architecture", 1, "Baseline Architecture",
+     "The estate as Lantern Quay runs it today: calibration rigs, field "
+     "scheduling and the supplier panel operating largely as separate, "
+     "manually reconciled systems.",
+     0),
+    ("Transition State 1", 2, "Transition State 1",
+     "The calibration ledger integrates directly with the automated rigs, "
+     "the event backbone moves onto the managed platform, and the supplier "
+     "base consolidates onto one panel.",
+     270),
+    ("Target Architecture", 3, "Target Architecture",
+     "Every governed gap closed: a digital twin of the calibration lab, "
+     "predictive maintenance running on integrated sensor data, and current "
+     "compliance reporting across a fully consolidated estate.",
+     545),
 ]
 
 # ── gaps ───────────────────────────────────────────────────────────────────
@@ -1245,6 +1283,7 @@ def seed_demo_company() -> dict:
                 continue
             el = elements.get(el_name)
             profile = _APP_PROFILE.get(app_name)
+            risk_level = _RISK_LEVEL_BY_LIFECYCLE.get(profile[0]) if profile else None
             app = ApplicationComponent(
                 name=app_name,
                 organization_id=org_id,
@@ -1261,6 +1300,9 @@ def seed_demo_company() -> dict:
                 infrastructure_cost_monthly=2500,
                 business_criticality="high",
                 strategic_importance="high",
+                application_owner=_APP_PRIMARY_OWNER.get(app_name),
+                technical_risk=risk_level,
+                business_risk=risk_level,
             )
             db.session.add(app)
             apps_created += 1
@@ -1286,6 +1328,18 @@ def seed_demo_company() -> dict:
                 changed = True
             if not app.vendor_name:
                 app.vendor_name = profile[2]
+                changed = True
+            if not app.application_owner:
+                owner_name = _APP_PRIMARY_OWNER.get(app_name)
+                if owner_name:
+                    app.application_owner = owner_name
+                    changed = True
+            risk_level = _RISK_LEVEL_BY_LIFECYCLE.get(profile[0])
+            if risk_level and not app.technical_risk:
+                app.technical_risk = risk_level
+                changed = True
+            if risk_level and not app.business_risk:
+                app.business_risk = risk_level
                 changed = True
             profile_updated += changed
         if profile_updated:
@@ -1577,13 +1631,16 @@ def seed_demo_company() -> dict:
             .all()
         }
         plateaus_created = 0
-        for name, seq, el_name in _PLATEAUS:
+        _plateau_today = _dt.date.today()
+        for name, seq, el_name, description, days_out in _PLATEAUS:
             if name in existing_plateaus:
                 continue
             el = elements.get(el_name)
             plateau = Plateau(
                 name=name,
+                description=description,
                 sequence_order=seq,
+                target_date=_plateau_today + _dt.timedelta(days=days_out),
                 organization_id=org_id,
                 archimate_element_id=el.id if el else None,
             )
