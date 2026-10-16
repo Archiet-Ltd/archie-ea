@@ -104,6 +104,7 @@ _EXPECTED = {
     "no_lineage_recorded",
     "no_compliance_controls_recorded",
     "no_control_evidence",
+    "control_evidence_expired",
     "no_policy_scan_recorded",
     "no_plateau_recorded",
     "no_gap_recorded",
@@ -124,7 +125,7 @@ _EXPECTED = {
 
 
 def test_reason_codes_has_exactly_fifty_two_members():
-    assert len(REASON_CODES) == 52
+    assert len(REASON_CODES) == 53
     assert REASON_CODES == frozenset(_EXPECTED)
 
 

@@ -1,0 +1,26 @@
+{
+  "source_system": "Ledger Scanner",
+  "items": [
+    {
+      "control_code": "SYNC-1",
+      "evidence_url": "https://scanner.example.com/reports/access-review-2026-q3",
+      "collected_at": "2026-09-30T08:15:00",
+      "valid_until": "2027-03-31T00:00:00",
+      "summary": "Quarterly access review completed with no open findings"
+    },
+    {
+      "control_code": "SYNC-2",
+      "evidence_url": "https://scanner.example.com/reports/backup-restore-test",
+      "collected_at": "2026-10-02T11:40:00",
+      "valid_until": "2026-12-31T00:00:00",
+      "summary": "Restore test of the nightly backup passed"
+    },
+    {
+      "control_code": "SYNC-3",
+      "evidence_url": "https://scanner.example.com/reports/patch-compliance",
+      "collected_at": "2026-10-05T17:05:00",
+      "valid_until": "2027-01-15T00:00:00",
+      "summary": "All servers patched within the agreed window"
+    }
+  ]
+}

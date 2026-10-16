@@ -44,6 +44,7 @@ REPO = Path(__file__).resolve().parents[1]
 MIGRATION_PATH = REPO / "migrations" / "versions" / "20261008_row_level_security.py"
 NOTIF_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261011_notif_rls.py"
 TECHDEBT_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261016_technical_debt_rls.py"
+CONTROL_TESTS_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261016_control_tests_rls.py"
 RUNTIME_ROLE = "archie_rls_test_runtime"
 RUNTIME_PASSWORD = uuid.uuid4().hex  # test-only role; regenerated each run
 
@@ -58,6 +59,7 @@ def _load_migration(path, name):
 MIGRATION = _load_migration(MIGRATION_PATH, "rls_migration_under_test")
 NOTIF_MIGRATION = _load_migration(NOTIF_MIGRATION_PATH, "notif_rls_migration_under_test")
 TECHDEBT_MIGRATION = _load_migration(TECHDEBT_MIGRATION_PATH, "techdebt_rls_migration_under_test")
+CONTROL_TESTS_MIGRATION = _load_migration(CONTROL_TESTS_MIGRATION_PATH, "control_tests_rls_migration_under_test")
 
 
 def _apply_policies(engine):
@@ -89,6 +91,14 @@ def _apply_techdebt_policies(engine):
         context = MigrationContext.configure(connection)
         with Operations.context(context):
             TECHDEBT_MIGRATION.upgrade()
+
+
+def _apply_control_tests_policies(engine):
+    """Run the control-tests fence upgrade() on ``engine`` (idempotent)."""
+    with engine.begin() as connection:
+        context = MigrationContext.configure(connection)
+        with Operations.context(context):
+            CONTROL_TESTS_MIGRATION.upgrade()
 
 
 class RlsEnv:
@@ -153,6 +163,7 @@ def rls(app, _schema):
     _apply_policies(owner)
     _apply_notif_policies(owner)
     _apply_techdebt_policies(owner)
+    _apply_control_tests_policies(owner)
     runtime = create_engine(
         url.set(username=RUNTIME_ROLE, password=RUNTIME_PASSWORD), poolclass=NullPool
     )
@@ -791,6 +802,67 @@ def test_technical_debt_is_scoped_to_the_session_organisation(rls, world):
             )
     with rls.runtime_tx(None) as connection:
         assert _count(connection, "technical_debt") == 0
+
+
+def test_control_tests_are_scoped_to_the_session_organisation(rls, world):
+    a, b = world.org("a"), world.org("b")
+    with rls.owner.begin() as connection:
+        framework_id = connection.execute(
+            text(
+                "INSERT INTO regulatory_frameworks (code, name, category, status) "
+                "VALUES (:c, 'RLS framework', 'security', 'active') RETURNING id"
+            ),
+            {"c": f"RLS{uuid.uuid4().hex[:8]}"},
+        ).scalar_one()
+        control_id = connection.execute(
+            text(
+                "INSERT INTO compliance_controls (framework_id, control_code, title) "
+                "VALUES (:f, 'RLS-1', 'RLS control') RETURNING id"
+            ),
+            {"f": framework_id},
+        ).scalar_one()
+        adopted = {
+            o: connection.execute(
+                text(
+                    "INSERT INTO application_compliance_controls "
+                    "(control_id, implementation_status, organization_id, created_at, updated_at) "
+                    "VALUES (:c, 'planned', :o, now(), now()) RETURNING id"
+                ),
+                {"c": control_id, "o": o},
+            ).scalar_one()
+            for o in (a, b)
+        }
+        ids = [
+            connection.execute(
+                text(
+                    "INSERT INTO control_tests "
+                    "(application_control_id, test_kind, result, tested_at, created_at, organization_id) "
+                    "VALUES (:r, 'design', 'effective', now(), now(), :o) RETURNING id"
+                ),
+                {"r": adopted[o], "o": o},
+            ).scalar_one()
+            for o in (a, b)
+        ]
+    world.extra_deletes.append(("compliance_controls", "id", [control_id]))
+    world.extra_deletes.append(("regulatory_frameworks", "id", [framework_id]))
+    with rls.runtime_tx(a) as connection:
+        seen = {r[0] for r in connection.execute(text("SELECT id FROM control_tests"))}
+        # An unqualified update reaches only the session organisation's row.
+        updated = connection.execute(text("UPDATE control_tests SET result = 'exception'")).rowcount
+    assert ids[0] in seen and ids[1] not in seen
+    assert updated == 1
+    with rls.runtime_tx(a) as connection:
+        with pytest.raises(DBAPIError):
+            connection.execute(
+                text(
+                    "INSERT INTO control_tests (application_control_id, test_kind, result, tested_at, "
+                    "created_at, organization_id) VALUES (:r, 'design', 'effective', now(), now(), :o)"
+                ),
+                {"r": adopted[b], "o": b},
+            )
+    with rls.runtime_tx(None) as connection:
+        assert _count(connection, "control_tests") == 0
+    assert _owner_value(rls, "SELECT result FROM control_tests WHERE id = :i", i=ids[1]) == "effective"
 
 
 def test_event_log_partitioned_parent_is_filtered(rls, world):

@@ -1112,6 +1112,111 @@ def test_application_technology_links_refuse_a_read_only_account(
     assert response.status == 403, "a Viewer wrote a technology link: %s" % response.status
 
 
+# Control evidence on an adopted control: listing its tests carries @login_required only,
+# recording a test and saving evidence (validity date, owner) carry
+# require_roles(admin, architect, business_architect, security_architect, compliance,
+# compliance_officer). Every seeded archetype holds the Architect (or Administrator) role,
+# so every one may write; a read-only Viewer is refused; another organisation's row is a 404
+# for everyone.
+CONTROL_EVIDENCE_PATH = "/dashboard/api/compliance/mappings/%d"
+
+
+def _adopted_control_row(org_id, code):
+    import uuid
+
+    from app import create_app, db
+    from app.models.application_compliance import ApplicationComplianceControl
+    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+
+    app = create_app("testing")
+    with app.app_context():
+        framework = RegulatoryFramework(code="AM%s" % uuid.uuid4().hex[:6], name="Matrix Framework", category="security")
+        db.session.add(framework)
+        db.session.flush()
+        control = ComplianceControl(framework_id=framework.id, control_code=code, title="Matrix control")
+        db.session.add(control)
+        db.session.flush()
+        row = ApplicationComplianceControl(
+            organization_id=org_id, control_id=control.id, implementation_status="planned",
+        )
+        db.session.add(row)
+        db.session.commit()
+        return row.id
+
+
+@pytest.fixture(scope="module")
+def seeded_adopted_control(seeded):
+    return _adopted_control_row(seeded["ids"]["org"], "MX-1")
+
+
+@pytest.fixture(scope="module")
+def foreign_adopted_control(seeded):
+    import uuid
+
+    from app import create_app, db
+    from app.models.organization import Organization
+
+    app = create_app("testing")
+    with app.app_context():
+        suffix = uuid.uuid4().hex[:8]
+        other = Organization(name="Matrix other %s" % suffix, slug="matrix-other-%s" % suffix)
+        db.session.add(other)
+        db.session.commit()
+        other_id = other.id
+    return _adopted_control_row(other_id, "MX-2")
+
+
+def _json_request(page, method, url, body, csrf_token):
+    return page.request.fetch(
+        url, method=method, data=body,
+        headers={"X-CSRFToken": csrf_token, "Content-Type": "application/json"},
+        max_redirects=0,
+    )
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_control_evidence_routes_authorisation(archetype, page, live_server, seeded, seeded_adopted_control):
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    token = _csrf_token(page)
+    url = live_server + CONTROL_EVIDENCE_PATH % seeded_adopted_control
+
+    listing = page.request.get(url + "/tests")
+    assert listing.status == 200, "%s could not list control tests: %s" % (archetype, listing.status)
+    # An empty test body names no kind or result: a permitted caller gets the 400 that says so,
+    # a refused one would get the role gate's 403 before the body is read.
+    recorded = _json_request(page, "POST", url + "/tests", {}, token)
+    assert recorded.status == 400, "%s recording a test: expected 400, got %s" % (archetype, recorded.status)
+    saved = _json_request(page, "PUT", url, {"evidence_valid_until": "not a date"}, token)
+    assert saved.status == 400, "%s saving evidence: expected 400, got %s" % (archetype, saved.status)
+
+
+def test_control_evidence_routes_refuse_a_read_only_account(
+    page, live_server, seeded, technology_links_viewer, seeded_adopted_control
+):
+    _login(page, live_server, technology_links_viewer)
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    token = _csrf_token(page)
+    url = live_server + CONTROL_EVIDENCE_PATH % seeded_adopted_control
+
+    assert page.request.get(url + "/tests").status == 200
+    assert _json_request(page, "POST", url + "/tests", {"test_kind": "design", "result": "effective"}, token).status == 403
+    assert _json_request(page, "PUT", url, {"evidence_url": "https://evidence.example/x"}, token).status == 403
+
+
+def test_control_evidence_routes_hide_another_organisations_row(
+    page, live_server, seeded, foreign_adopted_control
+):
+    _login(page, live_server, seeded["emails"]["compliance"])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    token = _csrf_token(page)
+    url = live_server + CONTROL_EVIDENCE_PATH % foreign_adopted_control
+
+    assert page.request.get(url + "/tests").status == 404
+    assert _json_request(page, "POST", url + "/tests", {"test_kind": "design", "result": "effective"}, token).status == 404
+    assert _json_request(page, "PUT", url, {"evidence_url": "https://evidence.example/x"}, token).status == 404
+
+
 OVERSIGHT_CLASSIFICATION_PERMITTED = {
     "platform_admin",
 }
