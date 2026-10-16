@@ -25,6 +25,78 @@
 version: 1
 entries:
 
+  - id: design-tokens
+    concept: Colour, radius and type tokens for every page (one token file; the public marketing
+      palette is a scoped class in it)
+    status: active
+    canonical:
+      path: app/static/css/shadcn_tokens.css
+      symbols: ["--background", "--foreground", "--primary", "--muted", "--border", "--radius"]
+    reuse: >
+      Add or change a colour, radius or type token only in shadcn_tokens.css, inside @layer base. To
+      scope a different palette to one page family, add a class in that same file (see .theme-marketing)
+      and set it on <body> via a template block; do not declare --background / --primary / --border /
+      --info / --success / --warning / any -foreground or -emphasis variant etc. a second time in another
+      stylesheet, a template's inline <style>, a brand-new file anywhere in the tree, or an inline
+      style="--token: ..." attribute -- one token source means no second declaration in any form, on one
+      line or many. Do not fall back to a literal colour with var(--any-token, #hex),
+      var(--any-token, rgb(...)/rgba(...)/hsl(...)/hsla(...)), an HSL-triplet fallback
+      (var(--any-token, 0 0% 0%)), a named colour (var(--any-token, blue)) or a keyword
+      (var(--any-token, transparent)) either, on a --color-* name or a real token name: no var()
+      fallback has ever been needed, because every token above is always defined in :root.
+    must_not_create:
+      - id: token-declaration
+        regex: '(?:^|[{;''"])[ \t]*--(background|foreground|card|popover|primary|secondary|muted|accent|destructive|border|input|ring|radius|info|success|warning|layer-motivation|layer-strategy|layer-business|layer-application|layer-technology|layer-implementation|layer-risk|font-sans)(-foreground|-emphasis)?\s*:'
+        scope: ["."]
+        suffixes: [.css, .scss, .html]
+      - id: hex-fallback
+        regex: 'var\(\s*--[\w-]+\s*,\s*(#[0-9a-fA-F]{3,8}|rgba?\()|var\(\s*--(background|foreground|card|popover|primary|secondary|muted|accent|destructive|border|input|ring|radius|info|success|warning|layer-motivation|layer-strategy|layer-business|layer-application|layer-technology|layer-implementation|layer-risk|font-sans)(-foreground|-emphasis)?\s*,\s*(hsla?\(|\d[\d.]*\s+\d[\d.]*%\s+\d[\d.]*%|[a-zA-Z]+\s*\))'
+        scope: ["."]
+        suffixes: [.css, .scss, .html]
+    known_exceptions:
+      - path: app/templates/errors/400.html
+        reason: self-contained error page that must render without the application stylesheet
+      - path: app/templates/errors/401.html
+        reason: self-contained error page that must render without the application stylesheet
+      - path: app/templates/errors/403.html
+        reason: self-contained error page that must render without the application stylesheet
+      - path: app/templates/errors/404.html
+        reason: self-contained error page that must render without the application stylesheet
+      - path: app/templates/errors/429.html
+        reason: self-contained error page that must render without the application stylesheet
+      - path: app/templates/errors/500.html
+        reason: self-contained error page that must render without the application stylesheet
+      - path: app/templates/errors/503.html
+        reason: self-contained error page that must render without the application stylesheet
+      - path: app/templates/solutions/export_blueprint.html
+        reason: standalone downloadable document with its own styles
+      - path: app/templates/solutions/export_sad.html
+        reason: standalone downloadable document with its own styles
+      - path: app/templates/solutions/export_executive.html
+        reason: standalone document rendered server-side to PDF (WeasyPrint) with its own styles, the same
+          category as export_blueprint.html and export_sad.html; not named in the task that added this
+          entry, found by running the gate
+  - id: badge
+    concept: Badges, status pills and the category pill above a public-page heading
+    status: active
+    canonical:
+      path: app/templates/components/badge.html
+      symbols: [badge]
+    reuse: >
+      import `badge` from components/badge.html; status values use components/status_badge.html; do not
+      hand-roll a rounded-full bordered label or define a pill/chip/eyebrow macro
+    must_not_create:
+      - id: pill-macro
+        regex: '{%-?\s*macro\s+(\w*pill\w*|\w*chip\w*|\w*eyebrow\w*)\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+    known_exceptions:
+      - path: app/templates/macros/nav_macros_shadcn.html
+        reason: pill_tabs is a tab bar, not a label
+      - path: app/templates/capability_maturity/line_of_sight.html
+        reason: authenticated page's local pill macro, predates the register; repointing it is outside the
+          public-page scope
+
   - id: capability-visibility
     concept: A capability looked up by id and caller's organisation
     status: active

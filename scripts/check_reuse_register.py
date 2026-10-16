@@ -19,9 +19,10 @@ beside it. This script is the gate that makes the list binding.
 What it checks
 --------------
 (a) Every ``active`` entry's canonical file exists and defines every listed symbol
-    (``name`` for a module-level function or class, ``Class.method`` for a method, or a
-    ``{% macro name(`` for a template). A canonical that moved or was renamed fails, so
-    the register cannot rot into a list of dead links.
+    (``name`` for a module-level function or class, ``Class.method`` for a method, a
+    ``{% macro name(`` for a template, or a ``--name:`` custom-property declaration for
+    a ``.css`` canonical). A canonical that moved or was renamed fails, so the register
+    cannot rot into a list of dead links.
 (b) Every ``must_not_create`` regex is run over its scope (default: ``app/**/*.py``).
     A match in any file other than the canonical file or a ``known_exceptions`` path is
     a *hit*. Hits that already existed are recorded per pattern and per file in
@@ -179,6 +180,11 @@ def missing_symbols(root: Path, canonical_path: str, symbols) -> tuple[bool, lis
     if path.suffix == ".py":
         have = _py_symbols(text)
         return True, [s for s in symbols if s not in have]
+    if path.suffix == ".css":
+        return True, [
+            s for s in symbols
+            if not re.search(r"(?m)(^|[\s;{])" + re.escape(s) + r"\s*:", text)
+        ]
     return True, [s for s in symbols if not re.search(MACRO.replace("NAME", re.escape(s)), text)]
 
 

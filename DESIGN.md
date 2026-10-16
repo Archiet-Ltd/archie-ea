@@ -2,8 +2,8 @@
 
 > **For AI agents:** Read this file before editing any template or UI file.
 > This describes the complete design system used by this Flask + Tailwind CSS + shadcn/ui + Alpine.js application.
-> The canonical source of truth for patterns is `docs/design_system/pattern_registry.json`.
-> The canonical color token map is `docs/design_system/token_map.json`.
+> The source of truth is `app/static/css/shadcn_tokens.css` (tokens, including the `.theme-marketing`
+> public palette) and `tailwind.config.js`; `docs/reuse-register.yml` is the register that enforces it.
 
 ---
 
@@ -113,6 +113,17 @@ Note on blue: `bg-blue-500` maps to `bg-info`, not `bg-primary`, despite the tab
 above. In light mode the two are the same colour, but `--primary` becomes near-white
 in dark mode (`210 40% 98%`), which would turn every blue info badge white for
 dark-theme users. `--info` tracks blue in both.
+
+### Public marketing theme
+
+`.theme-marketing` and `.dark .theme-marketing` in `shadcn_tokens.css` hold a neutral palette for the
+public marketing pages, scoped as a class rather than a second token file. It is opt-in: set
+`{% block body_theme %}theme-marketing{% endblock %}` in a template that extends
+`layouts/public_base.html`. No template sets it yet; the marketing templates that will are filled in
+as that work lands. Login, registration, MFA, OAuth consent, shared artefacts and the demo page keep
+the product palette (no `body_theme` override). No other CSS, SCSS or template file may declare
+`--background`, `--primary`, `--border` or any other core token — the `reuse-register` gate enforces
+this (`docs/reuse-register.yml`, entry `design-tokens`).
 
 ---
 
@@ -649,4 +660,4 @@ motivation layer (Driver/Goal/Outcome/Principle + ArchiMate element) via the
 
 ---
 
-*Authoritative sources: `docs/design_system/pattern_registry.json` · `docs/design_system/token_map.json` · `app/static/css/shadcn_tokens.css` · `tailwind.config.js`*
+*Authoritative sources: `app/static/css/shadcn_tokens.css` · `tailwind.config.js` · enforced by `docs/reuse-register.yml`*
