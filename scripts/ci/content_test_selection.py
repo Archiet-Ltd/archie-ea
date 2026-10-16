@@ -16,7 +16,7 @@ from pathlib import Path
 # content/pages/site and the machine-readable .txt / .xml routes.
 PUBLIC_ROUTES = (
     r"pricing|vs|use-cases|modules|vision|legal|connectors|"
-    r"about|features|contact|docs|privacy|security|terms|"
+    r"about|changelog|features|contact|docs|privacy|security|terms|"
     r"architecture-health-check|team-annual-onboarding|"
     r"data-processing-agreement|cookie-policy|refund-policy|commercial-licence|"
     r"how-archiet-runs-on-entelim|roles|"

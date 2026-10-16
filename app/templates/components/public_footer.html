@@ -44,6 +44,7 @@
         <h3 class="font-semibold text-foreground">Legal</h3>
         <ul class="space-y-2 text-sm text-muted-foreground">
           <li><a href="/security" class="hover:text-foreground transition-colors">Security</a></li>
+          <li><a href="/changelog" class="hover:text-foreground transition-colors">Changelog</a></li>
           {% for link in legal_links %}
           <li><a href="{{ link.href }}" class="hover:text-foreground transition-colors" data-legal-link="{{ link.slug }}">{{ link.label }}</a></li>
           {% endfor %}

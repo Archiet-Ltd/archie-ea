@@ -2772,3 +2772,30 @@ def test_new_role_page_appears_everywhere_with_no_other_edit(app):
         assert "https://entelim.org/roles/zzz-e2e-role</loc>" in client.get("/sitemap.xml").data.decode()
         rules = _parse_robots_rules(_ROBOTS_TXT_PATH.read_text(encoding="utf-8"))
         assert _robots_allows(rules, "/roles/zzz-e2e-role")
+
+
+_ROADMAP_VOICE = re.compile(r"Q[1-4] ?20\d\d|\bopens in\b|\barrives?\b|\bNext:")
+_SELL_PAGE_SOURCES = [
+    "app/templates/main/index.html",
+    "app/templates/public/pricing.html",
+    "content/pages/site/about.md",
+    "content/pages/site/features.md",
+]
+
+
+@pytest.mark.parametrize("path", _SELL_PAGE_SOURCES)
+def test_sell_pages_carry_no_roadmap_language(path):
+    """Roadmap voice lives only on the changelog page, never on a page that
+    sells or explains the product as it is today."""
+    root = Path(__file__).resolve().parents[1]
+    text = (root / path).read_text(encoding="utf-8")
+    assert _ROADMAP_VOICE.findall(text) == [], path
+
+
+def test_changelog_page_holds_the_dated_plan():
+    from app.services.public_pages import load_page
+
+    page = load_page("site", slug="changelog")
+    assert page is not None
+    for quarter in ("Q4 2026", "Q1 2027", "Q2 2027", "Q3 2027"):
+        assert quarter in page.body_html

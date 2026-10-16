@@ -968,7 +968,7 @@ def public_dogfood():
 
 @main.route(
     "/<any(about, security, privacy, terms, contact, features, pricing, docs, "
-    "'architecture-health-check', 'team-annual-onboarding'):slug>"
+    "'architecture-health-check', 'team-annual-onboarding', changelog):slug>"
 )
 def public_site_page(slug):
     """A fixed top-level marketing/legal page (one file per page under content/pages/site/)."""
