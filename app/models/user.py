@@ -1,3 +1,5 @@
+import logging
+
 from flask import current_app
 from flask_login import AnonymousUserMixin, UserMixin
 from itsdangerous import BadSignature, SignatureExpired
@@ -8,6 +10,27 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from .. import db, login_manager
 from .validators import validate_email as validate_model_email
+
+logger = logging.getLogger(__name__)
+
+# The one password hash method and cost the platform writes. The sign-in
+# form's claimed-domain check (sso_service.config_for_login) verifies only
+# hashes in exactly this format, so every address costs the same; change it
+# only together with a rehash plan.
+PASSWORD_HASH_METHOD = "scrypt:32768:8:1"
+
+
+def password_hash_is_current(stored_hash):
+    """True when ``stored_hash`` was written with PASSWORD_HASH_METHOD and is
+    complete enough that checking it always runs the full hash: method, salt
+    and hash, separated by ``$``. A value with the right method but missing a
+    part is not current, so it is checked against the dummy like any other
+    unrecognised value."""
+    if not isinstance(stored_hash, str) or not stored_hash:
+        return False
+    parts = stored_hash.split("$", 2)
+    return len(parts) == 3 and parts[0] == PASSWORD_HASH_METHOD
+
 
 # ── Enterprise RBAC role constants (ENT-068, updated NS-001) ─────────────────────────
 ROLE_SOLUTION_ARCHITECT = "solution_architect"
@@ -415,10 +438,16 @@ class User(UserMixin, db.Model):
 
     @password.setter
     def password(self, password):
-        self.password_hash = generate_password_hash(password)
+        self.password_hash = generate_password_hash(password, method=PASSWORD_HASH_METHOD)
 
     def verify_password(self, password):
-        return check_password_hash(self.password_hash, password)
+        try:
+            return check_password_hash(self.password_hash, password)
+        except ValueError:
+            logger.warning(
+                "user %s has a password hash in an unrecognised format", self.id
+            )
+            return False
 
     # ---------------- Token Methods ----------------
 
