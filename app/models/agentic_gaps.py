@@ -2,6 +2,13 @@
 Agentic Gap Implementation Models
 
 Tracks agent execution history, configurations, and results for the agentic-gaps system.
+
+The agentic-gaps page, its route module and its script were removed as a
+retired surface with no buyer question behind it. These three tables stay:
+each still exists in the database and this module is still imported by
+app/modules/architecture/services/agentic_gap_implementation_service.py, so
+dropping the tables is a separate, evidence-backed data decision, not a
+navigation change.
 """
 
 import json
