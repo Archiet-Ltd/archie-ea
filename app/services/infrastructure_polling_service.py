@@ -1,8 +1,10 @@
 """
-Real-time Infrastructure Polling Service
+Infrastructure Reachability Check
 
-Checks configured API endpoints and cloud connectors against the modelled
-state in Entelim. Reports delta: what's modelled vs what's reachable.
+An on-demand HTTP reachability probe, run when requested from the AI chat
+tool. It does not poll continuously and does not call any cloud provider
+API — it sends a HEAD request to configured URLs and reports whether each
+one responded.
 
 Scope (MVP):
   - ABACUSConnector endpoints (already configured, just check reachability)
@@ -62,13 +64,18 @@ class EndpointStatus:
 
 
 class InfrastructurePollingService:
+    """On-demand reachability check, not a real-time poller.
+
+    Each call sends a fresh HEAD request to the configured URLs; there is
+    no background loop, schedule, or cached state between calls.
+    """
 
     @classmethod
     def poll_infrastructure(cls, include_abacus: bool = True,
                              include_llm: bool = True,
                              additional_urls: Optional[List[str]] = None) -> dict:
         """
-        Check infrastructure endpoints and return reachability report.
+        Check infrastructure endpoints on demand and return a reachability report.
 
         Returns: {
           "success": True,
