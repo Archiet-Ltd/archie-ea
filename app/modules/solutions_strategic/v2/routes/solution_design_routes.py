@@ -58,7 +58,7 @@ from app.models.solution_governance import SolutionNotification
 from app.jobs.tenant_safe_job import tenant_scope
 from app.models.solution_models import Solution
 from app.utils.tenant_users import escape_like_literal
-from app.utils.route_guards import require_entity
+from app.utils.route_guards import entity_exists, load_entity, require_entity, require_entity_json
 from app.services.feature_flag_service import FeatureFlagService
 from app.utils.pagination import safe_int_arg
 
@@ -3140,6 +3140,15 @@ def get_copilot_insights(solution_id: int):
 @login_required
 def dismiss_copilot_insight(solution_id: int, insight_id: int):
     """Dismiss a CopilotInsight — it will not reappear."""
+    from app.middleware.tenant_context import current_org_id
+
+    # No active organisation: the automatic tenant filter is off, so the
+    # solution check below would pass for every solution. Refuse up front.
+    if current_org_id() is None:
+        abort(404)
+    _solution, missing = require_entity_json(Solution, solution_id, label="Solution")
+    if missing:
+        return missing
     from app.models.copilot_insight import CopilotInsight
     insight = CopilotInsight.query.filter_by(id=insight_id, solution_id=solution_id).first_or_404()
     insight.dismissed = True
@@ -3156,6 +3165,13 @@ def dismiss_copilot_insight(solution_id: int, insight_id: int):
 @login_required
 def api_reasoning_detail(solution_id, reasoning_id):
     """Return AI reasoning state detail for explainability modal."""
+    from app.middleware.tenant_context import current_org_id
+
+    # No active organisation: the automatic tenant filter is off, so the
+    # solution check below would pass for every solution. Refuse up front.
+    if current_org_id() is None:
+        abort(404)
+    require_entity(Solution, solution_id, description="Reasoning state not found")
     try:
         from app.models.solution_reasoning import SolutionAIReasoningState
         state = SolutionAIReasoningState.query.filter_by(
@@ -3904,10 +3920,17 @@ def api_registry_get_spec(spec_id):
 
     GET /solutions/api/registry/specs/<spec_id>
     """
+    from app.middleware.tenant_context import current_org_id
     from app.models.published_api_spec import PublishedAPISpec
 
-    spec = PublishedAPISpec.query.get(spec_id)
-    if not spec:
+    # No active organisation: the automatic tenant filter is off, so the
+    # solution check below would pass for every spec. Refuse up front.
+    if current_org_id() is None:
+        abort(404)
+
+    # The spec carries no organisation of its own; its solution does.
+    spec = load_entity(PublishedAPISpec, spec_id)
+    if spec is None or not entity_exists(Solution, spec.solution_id):
         return jsonify({"success": False, "error": "Spec not found"}), 404
 
     data = spec.to_dict()
@@ -3924,12 +3947,19 @@ def api_registry_download_openapi(spec_id):
     GET /solutions/api/registry/specs/<spec_id>/openapi
     Returns the spec_content JSON as a downloadable file.
     """
+    from app.middleware.tenant_context import current_org_id
     from app.models.published_api_spec import PublishedAPISpec
     from flask import Response
     import json as json_mod
 
-    spec = PublishedAPISpec.query.get(spec_id)
-    if not spec:
+    # No active organisation: the automatic tenant filter is off, so the
+    # solution check below would pass for every spec. Refuse up front.
+    if current_org_id() is None:
+        abort(404)
+
+    # The spec carries no organisation of its own; its solution does.
+    spec = load_entity(PublishedAPISpec, spec_id)
+    if spec is None or not entity_exists(Solution, spec.solution_id):
         return jsonify({"success": False, "error": "Spec not found"}), 404
 
     filename = f"openapi-solution-{spec.solution_id}-v{spec.spec_version}.json"
@@ -6822,13 +6852,36 @@ def update_solution_capabilities(solution_id: int):
 @audit_log("delete_solution_capability")
 def delete_solution_capability(solution_id: int, mapping_id: int):
     """Remove a capability mapping from a solution."""
+    from app.middleware.tenant_context import current_org_id
+
+    # No active organisation: the automatic tenant filter is off, so the
+    # solution check below would pass for every solution. Refuse up front.
+    if current_org_id() is None:
+        abort(404)
+    solution, missing = require_entity_json(Solution, solution_id, label="Solution")
+    if missing:
+        return missing
     try:
+        from app.models.solution_architect_models import SolutionProblemDefinition
         from app.models.solution_models import SolutionCapabilityMapping
 
-        mapping = SolutionCapabilityMapping.query.filter_by(
-            id=mapping_id
-        ).first()
-        if not mapping:
+        mapping = load_entity(SolutionCapabilityMapping, mapping_id)
+        belongs_to_solution = mapping is not None and mapping.solution_id == solution_id
+        if mapping is not None and not belongs_to_solution and mapping.solution_id is None:
+            # The capability-based planning path: the mapping carries no
+            # solution_id of its own and is reached only through the solution's
+            # analysis session's problem definition.
+            problem_definition = (
+                SolutionProblemDefinition.query.filter_by(
+                    session_id=solution.analysis_session_id
+                ).first()
+                if solution.analysis_session_id
+                else None
+            )
+            belongs_to_solution = (
+                problem_definition is not None and mapping.problem_id == problem_definition.id
+            )
+        if not belongs_to_solution:
             return jsonify({"success": False, "error": "Capability mapping not found"}), 404
 
         db.session.delete(mapping)
@@ -6985,13 +7038,25 @@ def update_solution_archimate_elements(solution_id: int):
 @login_required
 def delete_solution_archimate_element(solution_id: int, mapping_id: int):
     """Remove an ArchiMate element mapping from a solution."""
+    from app.middleware.tenant_context import current_org_id
+
+    # No active organisation: the automatic tenant filter is off, so the
+    # solution check below would pass for every solution. Refuse up front.
+    if current_org_id() is None:
+        abort(404)
+    _solution, missing = require_entity_json(Solution, solution_id, label="Solution")
+    if missing:
+        return missing
+
+    from app.models.solution_models import SolutionArchiMateElement
+
+    mapping = SolutionArchiMateElement.query.filter_by(
+        id=mapping_id, solution_id=solution_id
+    ).first()
+    if mapping is None:
+        return jsonify({"success": False, "error": "ArchiMate element mapping not found"}), 404
+
     try:
-        from app.models.solution_models import SolutionArchiMateElement
-
-        mapping = SolutionArchiMateElement.query.filter_by(
-            id=mapping_id, solution_id=solution_id
-        ).first_or_404()
-
         db.session.delete(mapping)
         db.session.commit()
 

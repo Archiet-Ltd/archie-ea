@@ -173,6 +173,14 @@ def connectors_save():
         )
         return redirect(url_for("m365_connector.connectors_index"))
 
+    from app.services.connector_framework import ConnectorURLRefused, validate_connector_config_urls
+
+    try:
+        validate_connector_config_urls(config)
+    except ConnectorURLRefused as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("m365_connector.connectors_index"))
+
     action = CONNECTOR_ACTION_UPDATE if existing_id else CONNECTOR_ACTION_CREATE
     payload = {
         "connector_type": connector_type,
@@ -549,6 +557,14 @@ def servicenow_config_save():
         mapping["ci_query_filter"] = ci_filter
 
     enabled = request.form.get("enabled") == "on"
+
+    from app.services.connector_framework import ConnectorURLRefused, validate_connector_url
+
+    try:
+        instance_url = validate_connector_url(instance_url) if instance_url else ""
+    except ConnectorURLRefused as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("m365_connector.servicenow_config"))
     existing = _load_org_connector(org_id, connector_type="servicenow")
     action = CONNECTOR_ACTION_UPDATE if existing else "create"
     payload = {
@@ -720,6 +736,14 @@ def jira_config_save():
 
     if not instance_url or not email:
         flash("Instance URL and email are required.", "error")
+        return redirect(url_for("m365_connector.jira_config"))
+
+    from app.services.connector_framework import ConnectorURLRefused, validate_connector_url
+
+    try:
+        instance_url = validate_connector_url(instance_url)
+    except ConnectorURLRefused as exc:
+        flash(str(exc), "error")
         return redirect(url_for("m365_connector.jira_config"))
 
     try:
