@@ -69,6 +69,7 @@ _MSG_LINKED_ELSEWHERE = (
     "This account is linked to a different sign-in. Contact your administrator."
 )
 _MSG_PASSWORD_ONLY = "This account signs in with a password."
+_MSG_SERVICE_ACCOUNT = "This account is a service account and cannot sign in through single sign-on."
 _MSG_OTHER_ORGANISATION = (
     "This email address belongs to a different organisation's "
     "account and cannot sign in through this organisation's SSO."
@@ -350,8 +351,26 @@ class SSOService:
             raise SSONotConfiguredError(
                 "The identity provider did not return a valid configuration document"
             ) from exc
+        self._check_issuer_bound_to_address(metadata_url, doc)
         self._discovery_cache[metadata_url] = doc
         return doc
+
+    @staticmethod
+    def _check_issuer_bound_to_address(metadata_url: str, doc: dict) -> None:
+        """The issuer a discovery document names must be the issuer the address it was
+        fetched from implies (OpenID Connect Discovery 4.3): the address minus
+        ``/.well-known/openid-configuration``. A document that names another issuer, or an
+        address that is not a provider's well-known address, is refused, so a configuration
+        can only ever trust tokens from the provider whose address the administrator entered
+        (a shared multi-tenant endpoint whose issuer is a template never matches)."""
+        suffix = "/.well-known/openid-configuration"
+        issuer = str(doc.get("issuer") or "").strip()
+        base = (metadata_url or "").split("?", 1)[0].split("#", 1)[0]
+        if not base.endswith(suffix) or not issuer or issuer.rstrip("/") != base[: -len(suffix)].rstrip("/"):
+            logger.warning("OIDC discovery issuer %r is not bound to address %r", issuer, metadata_url)
+            raise SSONotConfiguredError(
+                "The identity provider's configuration document names a different issuer than its address"
+            )
 
     def _get_jwks(self, jwks_uri: str, *, force: bool = False) -> dict:
         """Return the IdP's key set, from the cache while it is fresh."""
@@ -610,10 +629,30 @@ class SSOService:
             logger.warning("Token exchange failed: %s", exc)
             raise SSONotConfiguredError("Token exchange failed") from exc
 
-        # Prefer userinfo endpoint for claims; fall back to id_token payload
-        userinfo: dict = {}
+        # The signed id_token is the only source of identity. It is required and verified
+        # (signature, issuer, audience, expiry, nonce); an unsigned userinfo response is never
+        # preferred over it. Userinfo may add claims the id_token lacks, but only for the same
+        # subject and never in place of a claim the id_token carries.
+        id_token = token_data.get("id_token", "")
+        if not id_token:
+            raise SSONotConfiguredError("id_token verification failed: the identity provider sent no id_token")
+        try:
+            claims = self._verify_id_token(
+                id_token,
+                config,
+                discovery,
+                expected_nonce or "",
+                access_token=token_data.get("access_token") or None,
+            )
+        except SSONotConfiguredError:
+            raise
+        except Exception as exc:
+            logger.warning("id_token verification failed: %s", exc)
+            raise SSONotConfiguredError("id_token verification failed") from exc
+
         access_token = token_data.get("access_token", "")
         if userinfo_endpoint and access_token:
+            userinfo: dict = {}
             try:
                 check_idp_url(userinfo_endpoint)
                 uinfo_resp = requests.get(
@@ -623,29 +662,18 @@ class SSOService:
                     allow_redirects=False,
                 )
                 if uinfo_resp.status_code == 200:
-                    userinfo = uinfo_resp.json()
+                    parsed = uinfo_resp.json()
+                    userinfo = parsed if isinstance(parsed, dict) else {}
             except Exception as exc:
-                logger.warning("Userinfo fetch failed (falling back to id_token): %s", exc)
+                logger.warning("Userinfo fetch failed (using the id_token alone): %s", exc)
+            if userinfo:
+                if str(userinfo.get("sub", "")) != str(claims.get("sub", "")):
+                    logger.warning("Userinfo subject does not match the id_token subject")
+                    raise SSONotConfiguredError("id_token verification failed: userinfo is for a different subject")
+                for key, value in userinfo.items():
+                    claims.setdefault(key, value)
 
-        # Fall back: verify id_token signature and extract claims
-        if not userinfo:
-            id_token = token_data.get("id_token", "")
-            if id_token:
-                try:
-                    userinfo = self._verify_id_token(
-                        id_token,
-                        config,
-                        discovery,
-                        expected_nonce or "",
-                        access_token=token_data.get("access_token") or None,
-                    )
-                except SSONotConfiguredError:
-                    raise
-                except Exception as exc:
-                    logger.warning("id_token verification failed: %s", exc)
-                    raise SSONotConfiguredError("id_token verification failed") from exc
-
-        return userinfo
+        return claims
 
     # ------------------------------------------------------------------
     # User provisioning
@@ -746,6 +774,8 @@ class SSOService:
             if linked is not None:
                 if linked.is_platform_admin:
                     raise SSONotConfiguredError(_MSG_PASSWORD_ONLY)
+                if getattr(linked, "is_service_user", False):
+                    raise SSONotConfiguredError(_MSG_SERVICE_ACCOUNT)
                 _refresh_names(linked)
                 if not linked.confirmed:
                     linked.confirmed = True
@@ -778,6 +808,8 @@ class SSOService:
             else:
                 if user.is_platform_admin:
                     raise SSONotConfiguredError(_MSG_PASSWORD_ONLY)
+                if getattr(user, "is_service_user", False):
+                    raise SSONotConfiguredError(_MSG_SERVICE_ACCOUNT)
                 if user.external_id and (
                     user.external_id != sub
                     or (user.sso_provider or _ORG_SSO_PROVIDER) != _ORG_SSO_PROVIDER
@@ -808,7 +840,8 @@ class SSOService:
         The one way a sign-in link is cleared, used by the Team page and by
         the operator runbook. Only a member of organisation *org_id* is
         reached, never a platform administrator. A member with no link is
-        returned unchanged. Each reset writes an ``sso_link_reset`` audit
+        returned unchanged. A reset ends the account's existing sessions and
+        connected assistants. Each reset writes an ``sso_link_reset`` audit
         event that carries neither the old subject nor the address; a failed
         audit write is logged and never undoes the reset.
 
@@ -829,6 +862,14 @@ class SSOService:
             raise PermissionError("A platform administrator's sign-in cannot be reset here.")
         if not user.external_id:
             return user
+
+        # End every session the account holds first. A link that is cleared while the old
+        # sign-in's sessions stay open leaves exactly the access the reset is meant to
+        # remove; ending them first means a failure here leaves the link in place, so the
+        # reset can simply be tried again.
+        from app.services import session_registry
+
+        session_registry.revoke_all_for_user(user.id, "sso_link_reset")
 
         previous_provider = user.sso_provider
         user.external_id = None

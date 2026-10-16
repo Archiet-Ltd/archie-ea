@@ -29,6 +29,7 @@ from flask_login import current_user
 
 from app.decorators import admin_required
 from app.extensions import db
+from app.middleware.tenant_context import current_org_id
 from app.services.billing_plans import PlanLimitReached
 from app.services.sso_service import SSODomainConflictError, SSONotConfiguredError, SSOService
 
@@ -299,7 +300,9 @@ def admin_sso():
     from app import db
     from app.models.sso_config import SSOConfig
 
-    org_id = getattr(current_user, "organization_id", None)
+    # The organisation the administrator is working in, which the role check judged, not
+    # their home organisation.
+    org_id = current_org_id()
     config = SSOConfig.query.filter_by(organization_id=org_id).first() if org_id else None
 
     if request.method == "POST":
@@ -388,7 +391,9 @@ def admin_sso_test_initiate():
     """
     from app.models.sso_config import SSOConfig
 
-    org_id = getattr(current_user, "organization_id", None)
+    # The organisation the administrator is working in, which the role check judged, not
+    # their home organisation.
+    org_id = current_org_id()
     config = SSOConfig.query.filter_by(organization_id=org_id).first() if org_id else None
     if config is None:
         flash("Save an SSO configuration before testing it.", "error")

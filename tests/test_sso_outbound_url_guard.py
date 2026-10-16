@@ -177,7 +177,11 @@ def test_public_identity_provider_flow_still_works(production_like, http, monkey
         "userinfo_endpoint": "https://graph.example-idp.com/oidc/userinfo",
     }
     monkeypatch.setattr(SSOService, "_fetch_oidc_discovery", lambda self, u: doc)
-    http.reply = {"access_token": "tok", "sub": "u1", "email": "a@b.example"}
+    monkeypatch.setattr(
+        SSOService, "_verify_id_token",
+        lambda self, *a, **k: {"sub": "u1", "email": "a@b.example"},
+    )
+    http.reply = {"access_token": "tok", "id_token": "signed", "sub": "u1", "email": "a@b.example"}
     claims = _svc().handle_oidc_callback(
         _config(), "code", "state", "https://app.example.com/cb"
     )

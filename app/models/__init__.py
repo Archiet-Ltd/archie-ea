@@ -82,6 +82,7 @@ else:
     # default, so an ADD-only reconcile can apply it.
     from .artefact_share import ArtefactShareLink  # noqa: F401
     from .sso_config import *  # noqa
+    from .sso_assertion_id import *  # noqa - SSOAssertionId (SAML assertion ids already used to sign someone in)
     # Session registry (server-side revocation on logout / password change).
     from .user_session import UserSession  # noqa: F401
     from .error_event import ErrorEvent  # noqa: F401 - server + client error telemetry

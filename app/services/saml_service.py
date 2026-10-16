@@ -159,14 +159,13 @@ class SAMLService:
         XML; a <ds:Signature> is present on the <Response> or its
         <Assertion> and validates against ``config.idp_x509_cert`` (the
         operator-entered trust anchor, never a cert read from the document);
-        the Issuer matches ``config.idp_metadata_url``'s configured entity
-        (falls back to accepting any Issuer when none is configured, same
-        posture as OIDC's audience check); the Conditions window
-        (NotBefore/NotOnOrAfter, with clock-skew leeway) covers now; the
-        Audience, when present, names this SP's entity id; and
-        InResponseTo, when both the response and ``expected_request_id``
-        carry one, matches -- refusing a response replayed from a different
-        login attempt.
+        the Issuer is the identity provider's entity id the administrator
+        entered (refused when none was entered); Conditions are present, their
+        window (NotBefore/NotOnOrAfter, with clock-skew leeway) covers now and
+        an Audience names this SP's entity id; a bearer subject confirmation is
+        addressed (Recipient) to this service's ACS URL and has not expired;
+        InResponseTo is present and is the request this login sent; and the
+        assertion's ID has not been used before.
 
         Args:
             config: :class:`app.models.sso_config.SSOConfig` instance.
@@ -221,17 +220,116 @@ class SAMLService:
         if assertion is None:
             raise SAMLVerificationError("Verified document has no <Assertion>")
 
+        acs = self.acs_url(base_url)
+        self._check_issuer(verified_root, assertion, config)
         self._check_conditions(assertion, config, base_url)
-
-        if expected_request_id:
-            in_response_to = verified_root.get("InResponseTo")
-            if in_response_to and in_response_to != expected_request_id:
-                raise SAMLVerificationError(
-                    "SAMLResponse InResponseTo does not match this login attempt "
-                    "(possible replay of a response from a different request)"
-                )
+        self._check_subject_confirmation(verified_root, assertion, acs, expected_request_id)
+        self._consume_assertion_id(config, assertion)
 
         return self._extract_claims(assertion)
+
+    @staticmethod
+    def _check_issuer(verified_root, assertion, config) -> None:
+        """The assertion, and the response when it is the signed element, must name the
+        identity provider the administrator entered. With none entered every response is
+        refused: an Issuer read from the response proves nothing about who sent it."""
+        expected = (getattr(config, "idp_entity_id", None) or "").strip()
+        if not expected:
+            raise SAMLVerificationError(
+                "SAML config has no identity provider entity id; sign-in is refused until one is entered"
+            )
+        issuers = []
+        assertion_issuer = assertion.find("saml:Issuer", namespaces=_SAML_NS)
+        if assertion_issuer is None or not (assertion_issuer.text or "").strip():
+            raise SAMLVerificationError("SAMLResponse assertion names no issuer")
+        issuers.append((assertion_issuer.text or "").strip())
+        if verified_root is not assertion:
+            response_issuer = verified_root.find("saml:Issuer", namespaces=_SAML_NS)
+            if response_issuer is not None and (response_issuer.text or "").strip():
+                issuers.append((response_issuer.text or "").strip())
+        if any(issuer != expected for issuer in issuers):
+            raise SAMLVerificationError("SAMLResponse was issued by a different identity provider")
+
+    @staticmethod
+    def _check_subject_confirmation(verified_root, assertion, acs: str, expected_request_id) -> None:
+        """A bearer confirmation addressed to this service, still current, and answering this
+        login. ``InResponseTo`` is required and must be the request this login sent: it is read
+        from the signed element (the assertion's confirmation, and the response when the
+        response is what was signed), never from an unsigned part of the document."""
+        if not expected_request_id:
+            raise SAMLVerificationError("SAMLResponse cannot be matched to a sign-in this session started")
+        now = datetime.now(timezone.utc)
+        confirmations = [
+            c
+            for c in assertion.findall("saml:Subject/saml:SubjectConfirmation", namespaces=_SAML_NS)
+            if c.get("Method") == "urn:oasis:names:tc:SAML:2.0:cm:bearer"
+        ]
+        if not confirmations:
+            raise SAMLVerificationError("SAMLResponse assertion has no bearer subject confirmation")
+        satisfied = False
+        answered = []
+        for confirmation in confirmations:
+            data = confirmation.find("saml:SubjectConfirmationData", namespaces=_SAML_NS)
+            if data is None:
+                continue
+            if data.get("Recipient") != acs:
+                continue
+            not_on_or_after = SAMLService._parse_instant(data.get("NotOnOrAfter") or "")
+            if not_on_or_after is None or now >= not_on_or_after + _skew():
+                continue
+            if data.get("InResponseTo"):
+                answered.append(data.get("InResponseTo"))
+            satisfied = True
+            break
+        if not satisfied:
+            raise SAMLVerificationError(
+                "SAMLResponse subject confirmation is not addressed to this service or has expired"
+            )
+        if verified_root is not assertion and verified_root.get("InResponseTo"):
+            answered.append(verified_root.get("InResponseTo"))
+        if not answered:
+            raise SAMLVerificationError("SAMLResponse does not say which sign-in it answers")
+        if any(value != expected_request_id for value in answered):
+            raise SAMLVerificationError(
+                "SAMLResponse InResponseTo does not match this login attempt "
+                "(possible replay of a response from a different request)"
+            )
+
+    @staticmethod
+    def _consume_assertion_id(config, assertion) -> None:
+        """Remember the assertion's id until it expires, refusing one already used.
+
+        The id is written under a unique constraint, so two responses carrying the same
+        assertion cannot both succeed, even on two workers at once."""
+        from sqlalchemy.exc import IntegrityError
+
+        from app import db
+        from app.models.sso_assertion_id import SSOAssertionId
+
+        assertion_id = (assertion.get("ID") or "").strip()
+        if not assertion_id:
+            raise SAMLVerificationError("SAMLResponse assertion has no ID")
+        conditions = assertion.find("saml:Conditions", namespaces=_SAML_NS)
+        expires = SAMLService._parse_instant(conditions.get("NotOnOrAfter") or "") if conditions is not None else None
+        remember_until = (expires or datetime.now(timezone.utc)) + _skew() + _skew()
+        try:
+            # Expired ids can never be replayed (the assertion itself is expired), so drop them.
+            SSOAssertionId.query.filter(SSOAssertionId.expires_at < datetime.utcnow()).delete(
+                synchronize_session=False
+            )
+            with db.session.begin_nested():
+                db.session.add(
+                    SSOAssertionId(
+                        organization_id=config.organization_id,
+                        assertion_id=assertion_id[:255],
+                        expires_at=remember_until.replace(tzinfo=None),
+                    )
+                )
+                db.session.flush()
+            db.session.commit()
+        except IntegrityError as exc:
+            db.session.rollback()
+            raise SAMLVerificationError("SAMLResponse assertion has already been used") from exc
 
     def _verify_signature(self, raw_xml: bytes, idp_x509_cert: str):
         """Verify the XML-DSig signature on ``raw_xml`` against the IdP's
@@ -274,10 +372,14 @@ class SAMLService:
         """Check Conditions NotBefore/NotOnOrAfter and Audience."""
         conditions = assertion.find("saml:Conditions", namespaces=_SAML_NS)
         now = datetime.now(timezone.utc)
+        if conditions is None:
+            raise SAMLVerificationError("SAMLResponse assertion has no Conditions")
 
         if conditions is not None:
             not_before = conditions.get("NotBefore")
             not_on_or_after = conditions.get("NotOnOrAfter")
+            if not not_on_or_after:
+                raise SAMLVerificationError("SAMLResponse assertion has no expiry (NotOnOrAfter)")
             if not_before:
                 nb = self._parse_instant(not_before)
                 if nb is not None and now < nb - _skew():
@@ -298,12 +400,11 @@ class SAMLService:
                 )
                 if el.text
             ]
-            if audiences:
-                expected = config.sp_entity_id_or_default(base_url)
-                if expected not in audiences:
-                    raise SAMLVerificationError(
-                        "SAMLResponse audience does not name this service provider"
-                    )
+            expected = config.sp_entity_id_or_default(base_url)
+            if not audiences or expected not in audiences:
+                raise SAMLVerificationError(
+                    "SAMLResponse audience does not name this service provider"
+                )
 
     @staticmethod
     def _parse_instant(value: str):
