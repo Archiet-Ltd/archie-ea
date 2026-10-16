@@ -20,6 +20,8 @@ from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship, A
 # Entelim's own importer tolerates it by lowercasing again on the way back in.
 _PASCAL_CASE_REL_TYPES: dict[str, str] = {t: t.capitalize() for t in RELATIONSHIP_TYPES}
 
+_ACCESS_MODE_TO_OEF = {"read": "Read", "write": "Write", "readwrite": "ReadWrite"}
+
 
 class ArchiMateOEFService:
     """Service for ArchiMate Open Exchange Format XML export.
@@ -234,6 +236,11 @@ class ArchiMateOEFService:
                 "source": f"id-{source_id}",
                 "target": f"id-{target_id}",
             }
+            # An access relationship's read/write meaning travels with it; the
+            # format's default when accessType is absent is Write.
+            access_type = _ACCESS_MODE_TO_OEF.get((rel.access_mode or "").lower())
+            if rel_type_key == "access" and access_type:
+                rel_attrib["accessType"] = access_type
             ET.SubElement(relationships_el, f"{{{self.ARCHIMATE_NS}}}relationship", rel_attrib)
 
         # <organizations> — O-02: folder structure was previously dropped entirely on

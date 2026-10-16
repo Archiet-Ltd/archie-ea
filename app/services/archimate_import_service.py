@@ -360,6 +360,11 @@ class ArchiMateImportService:
                     if doc_el is not None and doc_el.text
                     else None
                 )
+                for _extra in elem.findall(_tag("documentation"))[1:]:
+                    skipped.append((
+                        "extra language documentation", elem_name or identifier, identifier,
+                        "only the first documentation text is imported",
+                    ))
                 for _extra in elem.findall(_tag("name"))[1:]:
                     skipped.append((
                         "extra language name", elem_name or identifier, identifier,
@@ -418,6 +423,13 @@ class ArchiMateImportService:
                     for prop in props_container.findall(_tag("property")):
                         pd_ref = prop.get("propertyDefinitionRef", "")
                         value_el = prop.find(_tag("value"))
+                        for _extra in prop.findall(_tag("value"))[1:]:
+                            skipped.append((
+                                "extra language value",
+                                f"{elem_name or identifier} / {property_defs.get(pd_ref, pd_ref)}",
+                                identifier,
+                                "only the first value of a property is imported",
+                            ))
                         value = (
                             value_el.text.strip()
                             if value_el is not None and value_el.text
@@ -460,6 +472,37 @@ class ArchiMateImportService:
                     continue
 
                 rel_label = _first_name(rel) or identifier
+                if identifier:
+                    skipped.append((
+                        "relationship identifier", rel_label, identifier,
+                        "the file's identifier is not stored",
+                    ))
+                access_mode = None
+                handled = {"identifier", "source", "target", f"{{{_XSI_NS}}}type",
+                           "xsi:type", "type"}
+                access_type = rel.get("accessType")
+                if access_type is not None:
+                    handled.add("accessType")
+                    mapped = self.ACCESS_TYPE_TO_MODE.get(access_type.strip().lower(), "?")
+                    if rel_type.lower() != "access" or mapped == "?":
+                        skipped.append((
+                            "relationship access type / direction", rel_label, identifier,
+                            f"accessType '{access_type}' is not stored for this relationship",
+                        ))
+                    else:
+                        access_mode = mapped
+                if rel.get("isDirected") is not None:
+                    handled.add("isDirected")
+                    skipped.append((
+                        "relationship access type / direction", rel_label, identifier,
+                        "isDirected is not stored; the direction is not kept",
+                    ))
+                for attr in rel.attrib:
+                    if attr not in handled and not attr.startswith("{"):
+                        skipped.append((
+                            "relationship attribute", f"{rel_label} / {attr}", identifier,
+                            f"the attribute '{attr}' is not imported",
+                        ))
                 if rel.find(_tag("name")) is not None:
                     skipped.append((
                         "relationship name", rel_label, identifier,
@@ -489,7 +532,23 @@ class ArchiMateImportService:
                     "source": source,
                     "target": target,
                     "description": rel_description,
+                    "access_mode": access_mode,
                 })
+
+        # --- Model-level properties and documentation ---
+        for _doc in root.findall(_tag("documentation")):
+            skipped.append((
+                "model documentation", model_name or "model", "",
+                "model-level documentation is not imported",
+            ))
+        model_props = root.find(_tag("properties"))
+        if model_props is not None:
+            for prop in model_props.findall(_tag("property")):
+                ref = prop.get("propertyDefinitionRef", "")
+                skipped.append((
+                    "model property", property_defs.get(ref, ref) or "model", "",
+                    "model-level properties are not imported",
+                ))
 
         # --- Views and folders: not imported, and said so ---
         views_container = root.find(_tag("views"))
@@ -523,33 +582,52 @@ class ArchiMateImportService:
     # a few examples, so the returned list stays small on a large file.
     UNSUPPORTED_DETAIL_LIMIT = 5
 
+    # OEF accessType to the stored access_mode ("Access" = unspecified).
+    ACCESS_TYPE_TO_MODE = {
+        "access": None, "read": "read", "write": "write", "readwrite": "readwrite",
+    }
+
     @classmethod
     def _summarise_unsupported(cls, skipped) -> List[Dict[str, Any]]:
-        """One entry per construct, or one per kind (count + examples) above the limit."""
-        by_kind: Dict[str, List[Tuple[str, str, str, str]]] = {}
-        for row in skipped:
-            by_kind.setdefault(row[0], []).append(row)
+        """Entries for (kind, where, identifier, reason) rows, aggregated per kind."""
+        return cls._aggregate_entries([
+            {
+                "kind": kind, "element": where, "identifier": identifier,
+                "key": None, "value": None, "reason": reason, "count": 1,
+            }
+            for kind, where, identifier, reason in skipped
+        ])
+
+    @classmethod
+    def _aggregate_entries(cls, entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Keep up to UNSUPPORTED_DETAIL_LIMIT entries of a kind as they are;
+        above that, one entry with the count and the first few examples."""
+        by_kind: Dict[str, List[Dict[str, Any]]] = {}
+        for entry in entries:
+            by_kind.setdefault(entry["kind"], []).append(entry)
         out: List[Dict[str, Any]] = []
         for kind, rows in by_kind.items():
             if len(rows) <= cls.UNSUPPORTED_DETAIL_LIMIT:
-                for _kind, where, identifier, reason in rows:
-                    out.append({
-                        "kind": kind, "element": where, "identifier": identifier,
-                        "key": None, "value": None, "reason": reason, "count": 1,
-                    })
+                out.extend(rows)
                 continue
+            examples = []
+            for row in rows[: cls.UNSUPPORTED_DETAIL_LIMIT]:
+                name = row["element"]
+                if row.get("key"):
+                    name = f"{name} / {row['key']}"
+                examples.append({
+                    "name": name, "identifier": row.get("identifier", ""),
+                    "reason": row["reason"],
+                })
             out.append({
                 "kind": kind,
                 "element": f"{len(rows)} found",
                 "identifier": "",
                 "key": None,
                 "value": None,
-                "reason": rows[0][3],
+                "reason": rows[0]["reason"],
                 "count": len(rows),
-                "examples": [
-                    {"name": r[1], "identifier": r[2]}
-                    for r in rows[: cls.UNSUPPORTED_DETAIL_LIMIT]
-                ],
+                "examples": examples,
             })
         return out
 
@@ -605,6 +683,7 @@ class ArchiMateImportService:
                 "source": source_ref,
                 "target": target_ref,
                 "description": rel.get("description"),
+                "access_mode": rel.get("access_mode"),
             }
 
             if source_type is None or target_type is None:
@@ -841,6 +920,7 @@ class ArchiMateImportService:
         element_results: List[Dict[str, Any]] = []
         relationship_results: List[Dict[str, Any]] = []
         unrepresentable: List[Dict[str, Any]] = list(parsed_data.get("unrepresentable", []))
+        property_refusals: List[Dict[str, Any]] = []
         model_name_full = (parsed_data.get("model_name") or "").strip()
         if len(model_name_full) > self.MAX_NAME_LENGTH:
             unrepresentable.append({
@@ -1036,7 +1116,7 @@ class ArchiMateImportService:
                 continue
 
             # Only an element that was written reports what it could not keep.
-            unrepresentable.extend(pending_unrepresentable)
+            property_refusals.extend(pending_unrepresentable)
 
             if created_row is not None:
                 domain = self._create_domain_row(created_row)
@@ -1104,6 +1184,7 @@ class ArchiMateImportService:
                             # "ruling constrains offer" is the reason the edge
                             # exists, and it must survive the import.
                             description=rel.get("description"),
+                            access_mode=rel.get("access_mode"),
                             architecture_id=model_id,
                         )
                         db.session.add(new_rel)
@@ -1165,6 +1246,8 @@ class ArchiMateImportService:
             created, updated, skipped, failed,
             relationships_created, relationships_skipped, len(relationships_failed),
         )
+
+        unrepresentable.extend(self._aggregate_entries(property_refusals))
 
         return {
             "created": created,
