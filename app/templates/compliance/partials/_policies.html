@@ -1,0 +1,154 @@
+{% from 'components/empty_state.html' import empty_state %}
+{# Policies with clauses bound to controls: publish, new version, bind a clause, the
+   applications each clause governs, and "Check now". Reads `policies`, `bindable_controls`
+   and `can_record_control_work`. #}
+<section class="bg-card text-card-foreground rounded-lg border border-border overflow-hidden" data-testid="policies" x-data="policiesPanel()">
+    <div class="px-5 py-4 border-b border-border flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 class="text-base font-semibold text-foreground">Policies</h2>
+            <p class="mt-1 text-sm text-muted-foreground">Each clause is bound to a control; the applications mapped to that control are the ones it governs.</p>
+        </div>
+        {% if can_record_control_work %}
+        <div class="flex gap-3">
+            <button type="button" @click="startPolicy()" class="inline-flex items-center rounded-md border border-border px-3 py-2 text-sm">New policy</button>
+            <button type="button" @click="check()" :disabled="busy" class="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50" data-testid="check-now">Check now</button>
+        </div>
+        {% endif %}
+    </div>
+    {% if can_record_control_work %}
+    <div x-show="creating" x-cloak class="px-5 py-4 border-b border-border bg-muted/30" data-testid="new-policy-form">
+        <label for="new-policy-name" class="block text-sm font-medium text-foreground/80 mb-1">Policy name</label>
+        <input id="new-policy-name" type="text" x-model="policyName" class="w-full max-w-md px-3 py-2 border border-border rounded-md bg-background" autocomplete="off">
+        <div class="mt-3 flex gap-3">
+            <button type="button" @click="createPolicy()" :disabled="busy" class="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">Create draft</button>
+            <button type="button" @click="creating = false" class="inline-flex items-center rounded-md border border-border px-3 py-2 text-sm">Cancel</button>
+        </div>
+    </div>
+    {% endif %}
+    {% if policies %}
+    {% for p in policies %}
+    <div class="px-5 py-4 border-b border-border last:border-0" data-testid="policy" data-policy-id="{{ p.id }}">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <span class="font-medium text-foreground">{{ p.name }}</span>
+                <span class="ml-2 text-xs text-muted-foreground" data-testid="policy-state">
+                    {% if p.state == 'draft' %}Draft{% elif p.state == 'current' %}Version {{ p.version_number }}, in force{% else %}Version {{ p.version_number }}, replaced{% endif %}
+                </span>
+            </div>
+            {% if can_record_control_work %}
+            <div class="flex gap-3">
+                {% if p.state == 'draft' %}
+                <button type="button" @click="publish({{ p.id }})" :disabled="busy" class="text-sm text-primary underline">Publish</button>
+                {% elif p.state == 'current' %}
+                <button type="button" @click="newVersion({{ p.id }})" :disabled="busy" class="text-sm text-primary underline">New version</button>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% if p.clauses %}
+        <div class="mt-3 overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-muted-foreground border-b border-border">
+                        <th class="py-2 pr-4 font-medium">Clause</th>
+                        <th class="py-2 pr-4 font-medium">Control</th>
+                        <th class="py-2 font-medium">Applications it governs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in p.clauses %}
+                    <tr class="border-b border-border last:border-0 align-top" data-testid="clause-row">
+                        <td class="py-2 pr-4 text-foreground">{{ c.clause_ref }}{% if c.clause_text %}<div class="text-xs text-muted-foreground">{{ c.clause_text }}</div>{% endif %}</td>
+                        <td class="py-2 pr-4 text-foreground">{{ c.control_code or '—' }}<div class="text-xs text-muted-foreground">{{ c.control_title or '' }}</div></td>
+                        <td class="py-2" data-testid="governed-applications">
+                            {% if c.applications %}
+                            {% for a in c.applications %}
+                            <div data-testid="governed-application">{{ a.application_name }}
+                                <span class="text-xs text-muted-foreground">{{ a.owners|join(', ') if a.owners else '—' }}</span>
+                                {% if not a.met %}<span class="text-xs text-destructive-emphasis">control not met</span>{% endif %}
+                            </div>
+                            {% endfor %}
+                            {% else %}—{% endif %}
+                            {% if can_record_control_work and p.state == 'draft' %}
+                            <button type="button" class="mt-1 text-xs text-primary underline" @click="unbind({{ p.id }}, {{ c.id }})">Remove clause</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        {% if can_record_control_work and p.state == 'draft' %}
+        <div class="mt-3 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end" data-testid="bind-clause-form">
+            <div>
+                <label for="clause-ref-{{ p.id }}" class="block text-sm font-medium text-foreground/80 mb-1">Clause</label>
+                <input id="clause-ref-{{ p.id }}" type="text" class="w-full px-3 py-2 border border-border rounded-md bg-background" autocomplete="off" x-model="clauseRef">
+            </div>
+            <div>
+                <label for="clause-text-{{ p.id }}" class="block text-sm font-medium text-foreground/80 mb-1">What it requires</label>
+                <input id="clause-text-{{ p.id }}" type="text" class="w-full px-3 py-2 border border-border rounded-md bg-background" autocomplete="off" x-model="clauseText">
+            </div>
+            <div>
+                <label for="clause-control-{{ p.id }}" class="block text-sm font-medium text-foreground/80 mb-1">Control</label>
+                <select id="clause-control-{{ p.id }}" class="w-full px-3 py-2 border border-border rounded-md bg-background" x-model="controlId">
+                    <option value="">Choose a control</option>
+                    {% for ctl in bindable_controls %}
+                    <option value="{{ ctl.id }}">{{ ctl.framework_code }} {{ ctl.code }}: {{ ctl.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="button" @click="bind({{ p.id }})" :disabled="busy" class="inline-flex items-center justify-center rounded-md border border-border px-3 py-2 text-sm">Bind clause</button>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    {{ empty_state(icon='scroll-text', title='No policies yet', description='Write a policy, bind each clause to a control, and publish it.', padding='py-10') }}
+    {% endif %}
+</section>
+<script>
+    function policiesPanel() {
+        return {
+            busy: false, creating: false, policyName: '', clauseRef: '', clauseText: '', controlId: '',
+            startPolicy() { this.creating = true; },
+            run(request, success) {
+                const self = this;
+                this.busy = true;
+                return request
+                    .then(function (data) {
+                        Platform.toast.success(success);
+                        window.location.reload();
+                        return data;
+                    })
+                    .catch(function (err) {
+                        self.busy = false;
+                        const message = err && err.message ? err.message : 'Could not save. Please try again.';
+                        Platform.toast.error(message);
+                        throw err;
+                    });
+            },
+            createPolicy() {
+                if (!this.policyName.trim()) { Platform.toast.error('Give the policy a name.'); return Promise.resolve(); }
+                return this.run(Platform.fetch.post('/dashboard/api/compliance/policies', { name: this.policyName }), 'Draft created.');
+            },
+            bind(policyId) {
+                if (!this.clauseRef.trim() || !this.controlId) { Platform.toast.error('Give the clause a reference and choose a control.'); return Promise.resolve(); }
+                return this.run(Platform.fetch.post('/dashboard/api/compliance/policies/' + policyId + '/clauses',
+                    { clause_ref: this.clauseRef, clause_text: this.clauseText, control_id: parseInt(this.controlId, 10) }), 'Clause bound.');
+            },
+            unbind(policyId, bindingId) {
+                return this.run(Platform.fetch.delete('/dashboard/api/compliance/policies/' + policyId + '/clauses/' + bindingId), 'Clause removed.');
+            },
+            publish(policyId) {
+                return this.run(Platform.fetch.post('/dashboard/api/compliance/policies/' + policyId + '/publish', {}), 'Published.');
+            },
+            newVersion(policyId) {
+                return this.run(Platform.fetch.post('/dashboard/api/compliance/policies/' + policyId + '/versions', {}), 'New draft version created.');
+            },
+            check() {
+                return this.run(Platform.fetch.post('/dashboard/api/compliance/policies/check', {}), 'Checked.');
+            }
+        };
+    }
+</script>

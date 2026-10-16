@@ -22,7 +22,8 @@ from flask import (
 )
 from flask_login import login_required
 
-from app.decorators import audit_log
+from app.decorators import audit_log, require_roles
+from app.modules.compliance.roles import COMPLIANCE_WRITE_ROLES
 from sqlalchemy import or_, text
 
 from .. import db
@@ -726,6 +727,7 @@ def api_consolidation_statistics():
 
 @unified_low_priority_bp.route("/api/policy-monitoring/scan", methods=["POST"])
 @login_required
+@require_roles(*COMPLIANCE_WRITE_ROLES)
 @audit_log("compliance_scan")
 def api_scan_compliance():
     """API endpoint to trigger compliance scan"""

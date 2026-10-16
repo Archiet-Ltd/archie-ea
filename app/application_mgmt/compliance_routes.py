@@ -11,32 +11,32 @@ from app.decorators import audit_log, require_roles
 from app.middleware.tenant_context import current_org_id
 from app.models.application_compliance import ApplicationComplianceControl
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+from app.modules.compliance.roles import COMPLIANCE_WRITE_ROLES
 from app.modules.compliance.services.control_assurance_service import (
     ControlNotFound,
     list_control_tests,
     record_control_test,
     update_control_evidence,
 )
-from app.modules.compliance.services.evidence_gap_service import evidence_gaps
+from app.modules.compliance.services.applicability_service import ApplicabilityService
+from app.modules.compliance.services.evidence_gap_service import compliance_findings
+from app.modules.solutions_strategic.v2.services.policy_monitoring_service import PolicyMonitoringService
 from app.utils.route_guards import require_entity
 
 
-CONTROL_WORK_ROLES = (
-    "admin",
-    "architect",
-    "business_architect",
-    "security_architect",
-    "compliance",
-    "compliance_officer",
-)
+CONTROL_WORK_ROLES = COMPLIANCE_WRITE_ROLES
 
 
 def _can_record_control_work() -> bool:
     """Whether to offer the record-a-test and assign-an-owner actions: the persona side of
     what the write routes below accept. The routes decide; this only keeps the page from
     offering actions that will be refused."""
+    from app.models.user import Permission
     from app.utils.role_access import get_user_role, is_admin
 
+    # A read-only account (no general permission) holds no write role however it is labelled.
+    if not current_user.can(Permission.GENERAL):
+        return False
     role = get_user_role(current_user)
     return is_admin(current_user) or role in CONTROL_WORK_ROLES or role.endswith("_architect")
 
@@ -87,19 +87,30 @@ def compliance_frameworks_dashboard():
         status = m.implementation_status or "planned"
         mapped_by_status[status] = mapped_by_status.get(status, 0) + 1
 
-    gaps = None
-    gaps_error = False
+    findings = None
+    policies = []
+    bindable_controls = []
+    findings_error = False
     try:
-        gaps = evidence_gaps(current_org_id())
-    except Exception:  # noqa: BLE001 - the page still renders; the section says it could not load
-        current_app.logger.exception("Could not build the evidence gap list")
+        org_id = current_org_id()
+        findings = compliance_findings(org_id)
+        policies = PolicyMonitoringService.policies_overview(org_id)
+        bindable_controls = PolicyMonitoringService.bindable_controls(org_id)
+    except Exception:  # noqa: BLE001 - the page still renders; the sections say they could not load
+        current_app.logger.exception("Could not build the compliance findings")
         db.session.rollback()
-        gaps_error = True
+        findings_error = True
 
     return render_template(
         "compliance/frameworks_dashboard.html",
-        evidence_gaps=gaps,
-        evidence_gaps_error=gaps_error,
+        findings=findings,
+        evidence_gaps=(
+            {"rows": findings["evidence"], "total": findings["evidence_total"]} if findings else None
+        ),
+        evidence_gaps_error=findings_error,
+        policies=policies,
+        bindable_controls=bindable_controls,
+        assessment_statuses=ApplicabilityService.ASSESSMENT_STATUSES,
         can_record_control_work=_can_record_control_work(),
         frameworks=framework_rows,
         total_frameworks=len(framework_rows),

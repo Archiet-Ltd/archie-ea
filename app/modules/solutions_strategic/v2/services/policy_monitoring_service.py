@@ -18,9 +18,10 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import Integer, desc, func
+from sqlalchemy import Integer, desc, func, or_
 
 from app import db
+from app.middleware.tenant_context import current_org_id
 from app.models.application_portfolio import ApplicationComponent
 from app.models.policy_monitoring import (
     ArchitecturePolicy,
@@ -30,6 +31,21 @@ from app.models.policy_monitoring import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class PolicyNotFound(LookupError):
+    """The policy (or clause binding) is not in the caller's organisation."""
+
+
+class PolicyRefused(ValueError):
+    """The change is not allowed in the policy's current state or with these values."""
+
+
+# A violation raised from a policy clause is told apart from every other kind by this
+# opening, which names the clause and the control (never the policy version or the reason,
+# which can change while it stays the same violation).
+def _clause_violation_prefix(clause_ref: str, control_code: str) -> str:
+    return f"Clause {clause_ref} needs control {control_code}: "
 
 
 class PolicyMonitoringService:
@@ -127,12 +143,14 @@ class PolicyMonitoringService:
             return None
 
     @staticmethod
-    def create_policy(data: Dict[str, Any]) -> Dict[str, Any]:
+    def create_policy(data: Dict[str, Any], organization_id: Optional[int] = None) -> Dict[str, Any]:
         """
         Create a new architecture policy.
 
         Args:
             data: Policy data dictionary
+            organization_id: the owning organisation, named explicitly when the caller has
+                one (otherwise the tenant context sets it on save)
 
         Returns:
             Dictionary with success status and created policy or error
@@ -172,6 +190,8 @@ class PolicyMonitoringService:
                 exemption_allowed=data.get("exemption_allowed", True),
                 exemption_approval_required=data.get("exemption_approval_required", True),
             )
+            if organization_id is not None:
+                policy.organization_id = organization_id
 
             db.session.add(policy)
             db.session.commit()
@@ -285,24 +305,37 @@ class PolicyMonitoringService:
     # =========================================================================
 
     @staticmethod
-    def scan_application_compliance(application_id: int) -> Dict[str, Any]:
+    def scan_application_compliance(
+        application_id: int, organization_id: Optional[int] = None
+    ) -> Dict[str, Any]:
         """
         Check an application against all active policies.
 
+        Every read names the organisation (``organization_id``, else the active one); with no
+        organisation known, or an application that belongs to another one, the answer is
+        "not found" and nothing is read or written.
+
         Args:
             application_id: The application ID to scan
+            organization_id: The organisation to scan within (default: the active one)
 
         Returns:
             Dictionary with scan results and violations found
         """
         try:
-            application = ApplicationComponent.query.get(application_id)
+            org_id = organization_id if organization_id is not None else current_org_id()
+            if org_id is None:
+                return {"success": False, "error": "Application not found"}
+            application = ApplicationComponent.query.filter_by(
+                id=application_id, organization_id=org_id
+            ).first()
             if not application:
                 return {"success": False, "error": "Application not found"}
 
             # Get all active and effective policies
             active_policies = ArchitecturePolicy.query.filter(
-                ArchitecturePolicy.is_active == True
+                ArchitecturePolicy.organization_id == org_id,
+                ArchitecturePolicy.is_active == True,
             ).all()
 
             effective_policies = [p for p in active_policies if p.is_effective()]
@@ -316,6 +349,7 @@ class PolicyMonitoringService:
                 if not result["compliant"]:
                     # Check if violation already exists
                     existing_violation = PolicyViolation.query.filter(
+                        PolicyViolation.organization_id == org_id,
                         PolicyViolation.policy_id == policy.id,
                         PolicyViolation.entity_type == "application",
                         PolicyViolation.entity_id == application.id,
@@ -325,6 +359,7 @@ class PolicyMonitoringService:
                     if not existing_violation:
                         # Create new violation
                         violation = PolicyViolation(
+                            organization_id=org_id,
                             policy_id=policy.id,
                             entity_type="application",
                             entity_id=application.id,
@@ -347,12 +382,14 @@ class PolicyMonitoringService:
 
             # Update or create compliance status
             compliance_status = ComplianceStatus.query.filter(
+                ComplianceStatus.organization_id == org_id,
                 ComplianceStatus.entity_type == "application",
                 ComplianceStatus.entity_id == application.id,
             ).first()
 
             if not compliance_status:
                 compliance_status = ComplianceStatus(
+                    organization_id=org_id,
                     entity_type="application",
                     entity_id=application.id,
                     entity_name=application.name,
@@ -361,6 +398,7 @@ class PolicyMonitoringService:
 
             # Get current exemption count
             exemption_count = PolicyViolation.query.filter(
+                PolicyViolation.organization_id == org_id,
                 PolicyViolation.entity_type == "application",
                 PolicyViolation.entity_id == application.id,
                 PolicyViolation.status == "exempted",
@@ -395,15 +433,24 @@ class PolicyMonitoringService:
             return {"success": False, "error": str(e)}
 
     @staticmethod
-    def scan_all_applications() -> Dict[str, Any]:
+    def scan_all_applications(organization_id: Optional[int] = None) -> Dict[str, Any]:
         """
-        Run compliance scan on all applications.
+        Run compliance scan on all applications of one organisation.
+
+        Args:
+            organization_id: The organisation to scan (default: the active one); with none
+                known nothing is scanned.
 
         Returns:
             Dictionary with overall scan results
         """
         try:
-            applications = ApplicationComponent.query.all()
+            org_id = organization_id if organization_id is not None else current_org_id()
+            applications = (
+                ApplicationComponent.query.filter_by(organization_id=org_id).all()
+                if org_id is not None
+                else []
+            )
 
             results = {
                 "success": True,
@@ -414,7 +461,7 @@ class PolicyMonitoringService:
             }
 
             for app in applications:
-                scan_result = PolicyMonitoringService.scan_application_compliance(app.id)
+                scan_result = PolicyMonitoringService.scan_application_compliance(app.id, org_id)
 
                 if scan_result.get("success"):
                     results["applications_scanned"] += 1
@@ -1355,3 +1402,445 @@ class PolicyMonitoringService:
         except Exception as e:
             logger.error(f"Error getting dashboard data: {e}")
             return {"success": False, "error": str(e)}
+
+    # =========================================================================
+    # Published policies with clauses bound to controls
+    # =========================================================================
+
+    @staticmethod
+    def _own_policy(organization_id: Optional[int], policy_id: int) -> ArchitecturePolicy:
+        """The organisation's own policy by id; another organisation's id is not found."""
+        if organization_id is None:
+            raise PolicyNotFound("no organisation")
+        policy = db.session.execute(
+            db.select(ArchitecturePolicy)
+            .where(ArchitecturePolicy.id == policy_id)
+            .where(ArchitecturePolicy.organization_id == organization_id)
+        ).scalar_one_or_none()
+        if policy is None:
+            raise PolicyNotFound(str(policy_id))
+        return policy
+
+    @staticmethod
+    def _clause_bindings(organization_id: int, policy_id: int):
+        from app.models.policy_clause_control import PolicyClauseControl
+
+        return list(
+            db.session.execute(
+                db.select(PolicyClauseControl)
+                .where(PolicyClauseControl.organization_id == organization_id)
+                .where(PolicyClauseControl.policy_id == policy_id)
+                .order_by(PolicyClauseControl.clause_ref, PolicyClauseControl.id)
+            ).scalars()
+        )
+
+    @staticmethod
+    def publish_policy(organization_id: Optional[int], policy_id: int, actor_id: Optional[int]) -> Dict[str, Any]:
+        """Publish a draft policy: number it, record who published it and when, make it active.
+
+        Refused for a policy with no clause bound to a control and for one already
+        published. Publishing a new version also retires the version it supersedes (its
+        violations stay linked to it). Clause violations are checked straight away.
+        """
+        policy = PolicyMonitoringService._own_policy(organization_id, policy_id)
+        if policy.published_at is not None:
+            raise PolicyRefused("This policy is already published")
+        if not PolicyMonitoringService._clause_bindings(organization_id, policy.id):
+            raise PolicyRefused("Bind at least one clause to a control before publishing")
+
+        previous = None
+        if policy.supersedes_id is not None:
+            previous = db.session.execute(
+                db.select(ArchitecturePolicy)
+                .where(ArchitecturePolicy.id == policy.supersedes_id)
+                .where(ArchitecturePolicy.organization_id == organization_id)
+            ).scalar_one_or_none()
+        policy.version_number = ((previous.version_number or 0) + 1) if previous is not None else 1
+        policy.published_at = datetime.utcnow()
+        policy.published_by_id = actor_id
+        policy.is_active = True
+        if previous is not None:
+            previous.is_active = False
+        db.session.flush()
+        checked = PolicyMonitoringService.detect_clause_violations(organization_id)
+        return {"policy": policy.to_dict(), "check": checked}
+
+    @staticmethod
+    def new_policy_version(organization_id: Optional[int], policy_id: int, actor_id: Optional[int]) -> Dict[str, Any]:
+        """Copy a published policy and its clause bindings into a draft of the next version."""
+        from app.models.policy_clause_control import PolicyClauseControl
+
+        source = PolicyMonitoringService._own_policy(organization_id, policy_id)
+        if source.published_at is None:
+            raise PolicyRefused("Only a published policy can have a new version")
+        pending = db.session.execute(
+            db.select(ArchitecturePolicy.id)
+            .where(ArchitecturePolicy.organization_id == organization_id)
+            .where(ArchitecturePolicy.supersedes_id == source.id)
+            .where(ArchitecturePolicy.published_at.is_(None))
+        ).first()
+        if pending is not None:
+            raise PolicyRefused("A draft of the next version already exists")
+        draft = ArchitecturePolicy(
+            organization_id=organization_id,
+            name=source.name,
+            description=source.description,
+            category=source.category,
+            policy_type=source.policy_type,
+            scope=source.scope,
+            rule_definition=source.rule_definition,
+            severity=source.severity,
+            enforcement_level=source.enforcement_level,
+            effective_date=source.effective_date,
+            expiry_date=source.expiry_date,
+            owner_id=source.owner_id,
+            is_active=False,
+            exemption_allowed=source.exemption_allowed,
+            exemption_approval_required=source.exemption_approval_required,
+            supersedes_id=source.id,
+        )
+        db.session.add(draft)
+        db.session.flush()
+        for binding in PolicyMonitoringService._clause_bindings(organization_id, source.id):
+            db.session.add(
+                PolicyClauseControl(
+                    organization_id=organization_id,
+                    policy_id=draft.id,
+                    clause_ref=binding.clause_ref,
+                    clause_text=binding.clause_text,
+                    control_id=binding.control_id,
+                    created_by_id=actor_id,
+                )
+            )
+        db.session.flush()
+        return {"policy": draft.to_dict()}
+
+    @staticmethod
+    def _control_is_adopted(organization_id: int, control_id: int) -> bool:
+        """True when the control belongs to a framework the organisation has adopted, or the
+        organisation already tracks that control on one of its own rows."""
+        from app.models.application_compliance import ApplicationComplianceControl
+        from app.models.compliance_models import ComplianceControl
+        from app.models.regulatory_framework import FrameworkAdoption
+
+        adopted_frameworks = (
+            db.select(FrameworkAdoption.framework_id)
+            .where(FrameworkAdoption.organization_id == organization_id)
+            .where(FrameworkAdoption.status == "active")
+        )
+        tracked_controls = db.select(ApplicationComplianceControl.control_id).where(
+            ApplicationComplianceControl.organization_id == organization_id
+        )
+        return (
+            db.session.execute(
+                db.select(ComplianceControl.id)
+                .where(ComplianceControl.id == control_id)
+                .where(
+                    or_(
+                        ComplianceControl.framework_id.in_(adopted_frameworks),
+                        ComplianceControl.id.in_(tracked_controls),
+                    )
+                )
+            ).first()
+            is not None
+        )
+
+    @staticmethod
+    def bind_clause(
+        organization_id: Optional[int],
+        policy_id: int,
+        clause_ref: str,
+        clause_text: Optional[str],
+        control_id: int,
+        actor_id: Optional[int],
+    ):
+        """Bind a clause of a draft policy to a control the organisation tracks."""
+        from app.models.policy_clause_control import PolicyClauseControl
+
+        policy = PolicyMonitoringService._own_policy(organization_id, policy_id)
+        if policy.published_at is not None:
+            raise PolicyRefused("A published policy cannot be changed; make a new version")
+        ref = (clause_ref or "").strip()
+        if not ref or len(ref) > 50:
+            raise PolicyRefused("A clause needs a reference of up to 50 characters")
+        if not PolicyMonitoringService._control_is_adopted(organization_id, control_id):
+            raise PolicyRefused("That control is not part of a framework your organisation has adopted")
+        duplicate = db.session.execute(
+            db.select(PolicyClauseControl.id)
+            .where(PolicyClauseControl.organization_id == organization_id)
+            .where(PolicyClauseControl.policy_id == policy.id)
+            .where(PolicyClauseControl.clause_ref == ref)
+            .where(PolicyClauseControl.control_id == control_id)
+        ).first()
+        if duplicate is not None:
+            raise PolicyRefused("That clause is already bound to that control")
+        binding = PolicyClauseControl(
+            organization_id=organization_id,
+            policy_id=policy.id,
+            clause_ref=ref,
+            clause_text=(clause_text or "").strip() or None,
+            control_id=control_id,
+            created_by_id=actor_id,
+        )
+        db.session.add(binding)
+        db.session.flush()
+        return binding
+
+    @staticmethod
+    def unbind_clause(organization_id: Optional[int], policy_id: int, binding_id: int) -> None:
+        """Remove a clause binding from a draft policy."""
+        from app.models.policy_clause_control import PolicyClauseControl
+
+        policy = PolicyMonitoringService._own_policy(organization_id, policy_id)
+        if policy.published_at is not None:
+            raise PolicyRefused("A published policy cannot be changed; make a new version")
+        binding = db.session.execute(
+            db.select(PolicyClauseControl)
+            .where(PolicyClauseControl.id == binding_id)
+            .where(PolicyClauseControl.policy_id == policy.id)
+            .where(PolicyClauseControl.organization_id == organization_id)
+        ).scalar_one_or_none()
+        if binding is None:
+            raise PolicyNotFound(str(binding_id))
+        db.session.delete(binding)
+        db.session.flush()
+
+    @staticmethod
+    def governed_applications(organization_id: Optional[int], policy_id: int) -> List[Dict[str, Any]]:
+        """Per clause, the applications it governs: those the organisation maps to the bound
+        control, with their owners and whether the control is met on each."""
+        from app.models.application_compliance import ApplicationComplianceControl
+        from app.models.application_owner import ApplicationOwner
+        from app.models.control_test import ControlTest
+        from app.modules.compliance.services.control_evidence import (
+            GAP_STATES,
+            INEFFECTIVE,
+            effectiveness,
+            evidence_state,
+        )
+
+        policy = PolicyMonitoringService._own_policy(organization_id, policy_id)
+        bindings = PolicyMonitoringService._clause_bindings(organization_id, policy.id)
+        if not bindings:
+            return []
+        control_ids = sorted({b.control_id for b in bindings})
+        mapped = db.session.execute(
+            db.select(ApplicationComplianceControl, ApplicationComponent)
+            .join(ApplicationComponent, ApplicationComponent.id == ApplicationComplianceControl.application_id)
+            .where(ApplicationComplianceControl.organization_id == organization_id)
+            .where(ApplicationComponent.organization_id == organization_id)
+            .where(ApplicationComplianceControl.control_id.in_(control_ids))
+            .order_by(ApplicationComponent.name, ApplicationComplianceControl.id)
+        ).all()
+        tests: Dict[int, list] = {}
+        if mapped:
+            for test in db.session.execute(
+                db.select(ControlTest)
+                .where(ControlTest.organization_id == organization_id)
+                .where(ControlTest.application_control_id.in_([m.id for m, _ in mapped]))
+            ).scalars():
+                tests.setdefault(test.application_control_id, []).append(test)
+        owners = ApplicationOwner.get_display_rows_for_applications(
+            sorted({c.id for _, c in mapped}), organization_id
+        ) if mapped else {}
+        by_control: Dict[int, list] = {}
+        for mapping, component in mapped:
+            state = evidence_state(mapping)
+            effect = effectiveness(tests.get(mapping.id, []))
+            by_control.setdefault(mapping.control_id, []).append({
+                "application_id": component.id,
+                "application_name": component.name,
+                "owners": [o["user_name"] for o in owners.get(component.id, [])],
+                "evidence_state": state,
+                "effectiveness": effect,
+                "met": state not in GAP_STATES and effect != INEFFECTIVE,
+            })
+        return [
+            {**b.to_dict(), "applications": by_control.get(b.control_id, [])}
+            for b in bindings
+        ]
+
+    @staticmethod
+    def detect_clause_violations(
+        organization_id: Optional[int], as_of: Optional[datetime] = None
+    ) -> Dict[str, int]:
+        """Raise a violation for every governed application whose bound control is not met, and
+        close it when the control is met again.
+
+        A governed application is one the organisation maps to the bound control. "Not met" is
+        the evidence rule saying missing or expired, or the control's latest tests failing. One
+        open violation exists per (policy, application, clause, control): a repeat check adds
+        none, and a violation an administrator has exempted is left alone. Runs when a policy is
+        published and when someone presses "Check now", never on page load.
+        """
+        from app.models.application_compliance import ApplicationComplianceControl
+        from app.models.control_test import ControlTest
+        from app.modules.compliance.services.control_evidence import (
+            EXPIRED,
+            GAP_STATES,
+            INEFFECTIVE,
+            MISSING,
+            effectiveness,
+            evidence_state,
+        )
+
+        result = {"raised": 0, "updated": 0, "remediated": 0, "open": 0}
+        if organization_id is None:
+            return result
+        moment = as_of or datetime.utcnow()
+        policies = [
+            p
+            for p in db.session.execute(
+                db.select(ArchitecturePolicy)
+                .where(ArchitecturePolicy.organization_id == organization_id)
+                .where(ArchitecturePolicy.is_active == True)  # noqa: E712
+                .where(ArchitecturePolicy.published_at.isnot(None))
+            ).scalars()
+            if p.is_effective()
+        ]
+        for policy in policies:
+            bindings = PolicyMonitoringService._clause_bindings(organization_id, policy.id)
+            if not bindings:
+                continue
+            mapped = db.session.execute(
+                db.select(ApplicationComplianceControl, ApplicationComponent)
+                .join(ApplicationComponent, ApplicationComponent.id == ApplicationComplianceControl.application_id)
+                .where(ApplicationComplianceControl.organization_id == organization_id)
+                .where(ApplicationComponent.organization_id == organization_id)
+                .where(ApplicationComplianceControl.control_id.in_(sorted({b.control_id for b in bindings})))
+            ).all()
+            tests: Dict[int, list] = {}
+            if mapped:
+                for test in db.session.execute(
+                    db.select(ControlTest)
+                    .where(ControlTest.organization_id == organization_id)
+                    .where(ControlTest.application_control_id.in_([m.id for m, _ in mapped]))
+                ).scalars():
+                    tests.setdefault(test.application_control_id, []).append(test)
+            for binding in bindings:
+                code = binding.control.control_code if binding.control else str(binding.control_id)
+                prefix = _clause_violation_prefix(binding.clause_ref, code)
+                for mapping, component in mapped:
+                    if mapping.control_id != binding.control_id:
+                        continue
+                    state = evidence_state(mapping, moment)
+                    effect = effectiveness(tests.get(mapping.id, []))
+                    reasons = []
+                    if state == MISSING:
+                        reasons.append("no evidence recorded")
+                    elif state == EXPIRED:
+                        reasons.append("evidence has expired")
+                    if effect == INEFFECTIVE:
+                        reasons.append("the latest test failed")
+                    met = state not in GAP_STATES and effect != INEFFECTIVE
+                    existing = db.session.execute(
+                        db.select(PolicyViolation)
+                        .where(PolicyViolation.organization_id == organization_id)
+                        .where(PolicyViolation.policy_id == policy.id)
+                        .where(PolicyViolation.entity_type == "application")
+                        .where(PolicyViolation.entity_id == component.id)
+                        .where(PolicyViolation.violation_details.startswith(prefix, autoescape=True))
+                        .where(PolicyViolation.status.in_(["open", "acknowledged", "exempted"]))
+                        .order_by(PolicyViolation.id)
+                    ).scalars().first()
+                    if existing is not None and existing.status == "exempted":
+                        continue
+                    if met:
+                        if existing is not None:
+                            existing.status = "remediated"
+                            existing.remediated_at = moment
+                            existing.remediation_notes = "The bound control is met again."
+                            result["remediated"] += 1
+                        continue
+                    details = f"{prefix}{'; '.join(reasons)} (policy version {policy.version_number or 1})"
+                    if existing is None:
+                        db.session.add(
+                            PolicyViolation(
+                                organization_id=organization_id,
+                                policy_id=policy.id,
+                                entity_type="application",
+                                entity_id=component.id,
+                                entity_name=component.name,
+                                violation_details=details,
+                                severity=policy.severity,
+                                status="open",
+                                detected_at=moment,
+                            )
+                        )
+                        result["raised"] += 1
+                    elif existing.violation_details != details:
+                        existing.violation_details = details
+                        result["updated"] += 1
+        db.session.flush()
+        result["open"] = db.session.execute(
+            db.select(func.count(PolicyViolation.id))
+            .where(PolicyViolation.organization_id == organization_id)
+            .where(PolicyViolation.entity_type == "application")
+            .where(PolicyViolation.violation_details.startswith("Clause ", autoescape=True))
+            .where(PolicyViolation.status.in_(["open", "acknowledged"]))
+        ).scalar_one()
+        return result
+
+    @staticmethod
+    def policies_overview(organization_id: Optional[int]) -> List[Dict[str, Any]]:
+        """The organisation's policies for the compliance dashboard: each with its state (draft,
+        current or superseded), its clauses and the applications each clause governs."""
+        if organization_id is None:
+            return []
+        # Published policies and drafts. An older rule-based policy that is simply active
+        # (never published, never versioned) is not part of this list.
+        policies = list(
+            db.session.execute(
+                db.select(ArchitecturePolicy)
+                .where(ArchitecturePolicy.organization_id == organization_id)
+                .where(
+                    ArchitecturePolicy.published_at.isnot(None)
+                    | (ArchitecturePolicy.is_active == False)  # noqa: E712
+                    | ArchitecturePolicy.is_active.is_(None)
+                )
+                .order_by(ArchitecturePolicy.name, ArchitecturePolicy.version_number.desc().nullsfirst())
+            ).scalars()
+        )
+        out = []
+        for policy in policies:
+            if policy.published_at is None:
+                state = "draft"
+            elif policy.is_active:
+                state = "current"
+            else:
+                state = "superseded"
+            entry = policy.to_dict()
+            entry["state"] = state
+            entry["clauses"] = PolicyMonitoringService.governed_applications(organization_id, policy.id)
+            out.append(entry)
+        return out
+
+    @staticmethod
+    def bindable_controls(organization_id: Optional[int], limit: int = 1000) -> List[Dict[str, Any]]:
+        """Controls a clause may be bound to: those of adopted frameworks and those the
+        organisation already tracks."""
+        from app.models.application_compliance import ApplicationComplianceControl
+        from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+        from app.models.regulatory_framework import FrameworkAdoption
+
+        if organization_id is None:
+            return []
+        adopted = (
+            db.select(FrameworkAdoption.framework_id)
+            .where(FrameworkAdoption.organization_id == organization_id)
+            .where(FrameworkAdoption.status == "active")
+        )
+        tracked = db.select(ApplicationComplianceControl.control_id).where(
+            ApplicationComplianceControl.organization_id == organization_id
+        )
+        rows = db.session.execute(
+            db.select(ComplianceControl, RegulatoryFramework.code)
+            .join(RegulatoryFramework, RegulatoryFramework.id == ComplianceControl.framework_id)
+            .where(or_(ComplianceControl.framework_id.in_(adopted), ComplianceControl.id.in_(tracked)))
+            .order_by(RegulatoryFramework.code, ComplianceControl.control_code)
+            .limit(limit)
+        ).all()
+        return [
+            {"id": c.id, "code": c.control_code, "title": c.title, "framework_code": code}
+            for c, code in rows
+        ]

@@ -46,3 +46,23 @@ PROPERTY_TEMPLATES = [
         "sort_order": 30,
     },
 ]
+
+
+# The privacy-impact-assessment status of a processing activity. A processing activity is an
+# information object of the model; element types are stored both as ArchiMate CamelCase and as
+# snake_case, so the template is registered under both spellings.
+for _activity_type in (
+    "DataObject", "BusinessObject", "Representation", "Contract", "Product",
+    "data_object", "business_object", "representation", "contract", "product",
+):
+    PROPERTY_TEMPLATES.append({
+        "archimate_type": _activity_type,
+        "property_key": "privacy_assessment_status",
+        "display_name": "Privacy assessment status",
+        "property_type": "enum",
+        "enum_options": ["not_started", "in_progress", "completed", "not_required"],
+        "default_value": None,
+        "required_for_tier": "important",
+        "help_text": "Where the data protection impact assessment for this processing activity stands.",
+        "sort_order": 50,
+    })

@@ -72,6 +72,17 @@ class ArchitecturePolicy(TenantMixin, db.Model):
     # Status
     is_active = Column(Boolean, default=True, index=True)
 
+    # Versioning: a policy is a draft until it is published; publishing numbers it
+    # (previous version plus one) and records who published it and when. A new
+    # version points at the version it supersedes. All nullable, so a policy
+    # written before versions existed reads as an unnumbered, unpublished draft.
+    version_number = Column(Integer, nullable=True)
+    published_at = Column(DateTime, nullable=True)
+    published_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    supersedes_id = Column(
+        Integer, ForeignKey("architecture_policies.id", ondelete="SET NULL"), nullable=True
+    )
+
     # Exemption settings
     exemption_allowed = Column(Boolean, default=True)
     exemption_approval_required = Column(Boolean, default=True)
@@ -113,6 +124,9 @@ class ArchitecturePolicy(TenantMixin, db.Model):
             "expiry_date": self.expiry_date.isoformat() if self.expiry_date else None,
             "owner_id": self.owner_id,
             "is_active": self.is_active,
+            "version_number": self.version_number,
+            "published_at": self.published_at.isoformat() if self.published_at else None,
+            "supersedes_id": self.supersedes_id,
             "exemption_allowed": self.exemption_allowed,
             "exemption_approval_required": self.exemption_approval_required,
             "created_at": self.created_at.isoformat() if self.created_at else None,

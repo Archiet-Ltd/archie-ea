@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -203,6 +204,122 @@ def evidence_gaps(organization_id: Optional[int], as_of: Optional[datetime] = No
     )
     total = len(rows)
     return {**empty, "rows": rows[:_ROW_LIMIT], "total": total}
+
+
+_CLAUSE_DETAILS = re.compile(r"^Clause (?P<ref>.+?) needs control (?P<code>.+?): ")
+
+
+def _violation_rows(organization_id: int) -> List[Dict[str, Any]]:
+    """Open policy violations raised from published policy clauses, with the same four keys
+    (evidence, provenance, confidence, trace) every finding carries. Two batched reads."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.policy_clause_control import PolicyClauseControl
+    from app.models.policy_monitoring import ArchitecturePolicy, PolicyViolation
+
+    rows = db.session.execute(
+        db.select(PolicyViolation, ArchitecturePolicy)
+        .join(ArchitecturePolicy, ArchitecturePolicy.id == PolicyViolation.policy_id)
+        .where(PolicyViolation.organization_id == organization_id)
+        .where(ArchitecturePolicy.organization_id == organization_id)
+        .where(PolicyViolation.entity_type == "application")
+        .where(PolicyViolation.violation_details.startswith("Clause ", autoescape=True))
+        .where(PolicyViolation.status.in_(["open", "acknowledged"]))
+        .order_by(PolicyViolation.id)
+    ).all()
+    if not rows:
+        return []
+    components = {
+        c.id: c
+        for c in db.session.execute(
+            db.select(ApplicationComponent)
+            .where(ApplicationComponent.organization_id == organization_id)
+            .where(ApplicationComponent.id.in_({v.entity_id for v, _ in rows if v.entity_id is not None}))
+        ).scalars()
+    }
+    bindings = {}
+    for binding in db.session.execute(
+        db.select(PolicyClauseControl)
+        .where(PolicyClauseControl.organization_id == organization_id)
+        .where(PolicyClauseControl.policy_id.in_({p.id for _, p in rows}))
+    ).scalars():
+        bindings[(binding.policy_id, binding.clause_ref, binding.control.control_code if binding.control else None)] = binding
+    out = []
+    for violation, policy in rows:
+        match = _CLAUSE_DETAILS.match(violation.violation_details or "")
+        clause_ref, control_code = (match.group("ref"), match.group("code")) if match else (None, None)
+        binding = bindings.get((policy.id, clause_ref, control_code))
+        component = components.get(violation.entity_id)
+        out.append({
+            "kind": "policy_violation",
+            "id": violation.id,
+            "policy_id": policy.id,
+            "policy_name": policy.name,
+            "policy_version": policy.version_number,
+            "clause_ref": clause_ref,
+            "control_code": control_code,
+            "application_id": violation.entity_id,
+            "application_name": component.name if component is not None else violation.entity_name,
+            "severity": violation.severity,
+            "status": violation.status,
+            "detected_on": _day(violation.detected_at),
+            "details": (violation.violation_details or "").split(": ", 1)[-1],
+            "evidence": violation.violation_details or "—",
+            "provenance": {"source": "policy check", "who": "—", "collected_at": _day(violation.detected_at)},
+            "confidence": None,
+            "confidence_basis": "drawn_facts_only",
+            "trace": {
+                "policy_id": policy.id,
+                "policy_version": policy.version_number,
+                "clause_ref": clause_ref,
+                "control_id": binding.control_id if binding is not None else None,
+                "application_id": violation.entity_id,
+                "element_id": getattr(component, "archimate_element_id", None),
+            },
+        })
+    return out
+
+
+def _privacy_rows(organization_id: int) -> List[Dict[str, Any]]:
+    from app.modules.compliance.services.applicability_service import ApplicabilityService
+
+    out = []
+    for flag in ApplicabilityService.privacy_assessment_flags(organization_id):
+        facts = {c["key"]: c["facts"] for c in flag["criteria"]}
+        out.append({
+            "kind": "privacy_assessment",
+            **flag,
+            "evidence": "; ".join(f"{c['label']}: {', '.join(c['facts'])}" for c in flag["criteria"]) or "—",
+            "provenance": {"source": "model", "who": "—", "collected_at": None},
+            "confidence": None,
+            "confidence_basis": "drawn_facts_only",
+            "trace": {"element_id": flag["element_id"], "facts": facts},
+        })
+    return out
+
+
+def compliance_findings(organization_id: Optional[int], as_of: Optional[datetime] = None) -> Dict[str, Any]:
+    """The one compliance findings list: evidence gaps and ineffective controls, open policy
+    violations on governed applications, and processing activities that meet a privacy
+    assessment criterion. Every row carries ``kind`` and the four keys ``evidence``,
+    ``provenance``, ``confidence`` and ``trace``. Read-only; a fixed number of queries
+    however many rows come back."""
+    if organization_id is None:
+        return {"evidence": [], "policy_violations": [], "privacy_assessments": [],
+                "evidence_total": 0, "total": 0,
+                "as_of": (as_of or datetime.utcnow()).isoformat()}
+    gaps = evidence_gaps(organization_id, as_of)
+    evidence = [{"kind": "evidence", **row} for row in gaps["rows"]]
+    violations = _violation_rows(organization_id)
+    privacy = _privacy_rows(organization_id)
+    return {
+        "evidence": evidence,
+        "policy_violations": violations,
+        "privacy_assessments": privacy,
+        "evidence_total": gaps["total"],
+        "total": gaps["total"] + len(violations) + len(privacy),
+        "as_of": gaps["as_of"],
+        "exposure_limit": gaps["exposure_limit"],
+    }
 
 
 def propose_control_evidence(

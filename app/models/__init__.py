@@ -287,6 +287,7 @@ else:
 
     # Policy Monitoring Module - Architecture policy management and compliance tracking
     from .policy_monitoring import *  # noqa - ArchitecturePolicy, PolicyViolation, ComplianceStatus, PolicyExemption
+    from .policy_clause_control import *  # noqa - PolicyClauseControl (a policy clause bound to a compliance control)
 
     # Project Management Models
     from .project_models import *  # noqa - Project, Task, Milestone, ProjectNote, ProjectResource

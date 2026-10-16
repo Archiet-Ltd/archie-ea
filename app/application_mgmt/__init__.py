@@ -19,6 +19,7 @@ from . import (
     business_layer_routes,  # noqa: F401
     compliance_routes,
     framework_catalogue_routes,
+    policy_clause_routes,  # noqa: F401
     consolidation_routes,  # noqa: F401
     crud_routes,  # noqa: F401
     custom_field_routes,

@@ -48,6 +48,35 @@ class ApplicabilityService:
         ],
     }
 
+    @staticmethod
+    def rule_matches(value: Any, rule: Dict[str, Any]) -> bool:
+        """Whether *value* satisfies one ``{"operator": ..., "value": ...}`` rule.
+
+        ``eq``: equal. ``in``: a member of the rule's list. ``contains``: the rule's value is
+        one of the tags held in a JSON text field or list. ``mentions_any``: any item of the
+        value (a string or a list of strings) contains any of the rule's terms, ignoring case.
+        A missing value matches nothing; an unknown operator excludes nothing.
+        """
+        if value is None:
+            return False
+        op = rule["operator"]
+        if op == "eq":
+            return value == rule["value"]
+        if op == "in":
+            return value in rule["value"]
+        if op == "contains":
+            # compliance_tags is a JSON text field
+            import json
+            try:
+                tags = json.loads(value) if isinstance(value, str) else value
+            except (json.JSONDecodeError, TypeError):
+                tags = []
+            return rule["value"] in tags
+        if op == "mentions_any":
+            items = value if isinstance(value, (list, tuple, set)) else [value]
+            return any(term in str(item).lower() for item in items for term in rule["value"])
+        return True
+
     @classmethod
     def evaluate_node(cls, node: Node, framework_code: str) -> bool:
         """Return True if *node* is in scope for *framework_code*."""
@@ -56,24 +85,133 @@ class ApplicabilityService:
             return True  # no rules = everything in scope
 
         for rule in rules:
-            field_val = getattr(node, rule["field"], None)
-            if field_val is None:
+            if not cls.rule_matches(getattr(node, rule["field"], None), rule):
                 return False
-            op = rule["operator"]
-            if op == "eq" and field_val != rule["value"]:
-                return False
-            if op == "in" and field_val not in rule["value"]:
-                return False
-            if op == "contains":
-                # compliance_tags is a JSON text field
-                import json
-                try:
-                    tags = json.loads(field_val) if isinstance(field_val, str) else field_val
-                except (json.JSONDecodeError, TypeError):
-                    tags = []
-                if rule["value"] not in tags:
-                    return False
         return True
+
+    # ------------------------------------------------------------------ #
+    # Privacy-impact-assessment flags
+    # ------------------------------------------------------------------ #
+
+    ASSESSMENT_STATUS_KEY = "privacy_assessment_status"
+    ASSESSMENT_STATUSES = ("not_started", "in_progress", "completed", "not_required")
+
+    # A fixed list in code, over recorded facts only: no score and no weighting.
+    PRIVACY_ASSESSMENT_CRITERIA: List[Dict[str, Any]] = [
+        {
+            "key": "special_category_data",
+            "label": "Special-category data",
+            "rule": {"field": "data_categories", "operator": "mentions_any", "value": [
+                "health", "biometric", "genetic", "racial", "ethnic", "political", "religio",
+                "philosoph", "trade union", "sex life", "sexual orientation", "criminal",
+            ]},
+        },
+        {
+            "key": "automated_evaluation",
+            "label": "Automated evaluation by an AI system",
+            "rule": {"field": "uses_ai_system", "operator": "eq", "value": True},
+        },
+        {
+            "key": "vulnerable_data_subjects",
+            "label": "Vulnerable data subjects",
+            "rule": {"field": "data_categories", "operator": "mentions_any",
+                     "value": ["child", "patient", "employee"]},
+        },
+    ]
+
+    @classmethod
+    def privacy_assessment_flags(cls, organization_id: Optional[int]) -> List[Dict[str, Any]]:
+        """The organisation's processing activities that meet at least one impact-assessment
+        criterion, with the criteria named, the facts that met each, the reading and the
+        recorded assessment status.
+
+        One criterion met reads "assessment to consider"; two or more read "assessment likely
+        required". Facts come from the data slice of the model (data categories on the
+        information object, the AI systems that access it); an activity with no recorded
+        category and no AI system is absent, never guessed at.
+        """
+        from app.models.models import ArchiMateElement
+        from app.modules.codegen.services.genome_data_slice import build_data_genome_slice
+        from app.modules.enterprise_genome.services.ai_system_profile import is_ai_system
+
+        if organization_id is None:
+            return []
+        activities = build_data_genome_slice(organization_id).get("processing_activities", [])
+        element_ids = sorted(
+            {a["provenance"]["archimate_element_id"] for a in activities}
+            | {s["archimate_element_id"] for a in activities for s in a.get("systems", [])}
+        )
+        elements = {}
+        if element_ids:
+            elements = {
+                e.id: e
+                for e in db.session.execute(
+                    db.select(ArchiMateElement)
+                    .where(ArchiMateElement.organization_id == organization_id)
+                    .where(ArchiMateElement.id.in_(element_ids))
+                ).scalars()
+            }
+        flags: List[Dict[str, Any]] = []
+        for activity in activities:
+            element_id = activity["provenance"]["archimate_element_id"]
+            categories = list(activity.get("data_categories") or [])
+            ai_names = [
+                s["name"]
+                for s in activity.get("systems", [])
+                if elements.get(s["archimate_element_id"]) is not None
+                and is_ai_system(elements[s["archimate_element_id"]])
+            ]
+            facts = {"data_categories": categories, "uses_ai_system": bool(ai_names)}
+            met = []
+            for criterion in cls.PRIVACY_ASSESSMENT_CRITERIA:
+                rule = criterion["rule"]
+                value = facts.get(rule["field"]) or None
+                if not cls.rule_matches(value, rule):
+                    continue
+                if rule["field"] == "uses_ai_system":
+                    shown = list(ai_names)
+                else:
+                    shown = [c for c in categories if any(t in str(c).lower() for t in rule["value"])]
+                met.append({"key": criterion["key"], "label": criterion["label"], "facts": shown})
+            if not met:
+                continue
+            element = elements.get(element_id)
+            recorded = ((getattr(element, "acm_properties", None) or {}).get(cls.ASSESSMENT_STATUS_KEY) or {}).get("value")
+            flags.append({
+                "activity_name": activity["name"],
+                "element_id": element_id,
+                "criteria": met,
+                "reading": "assessment likely required" if len(met) >= 2 else "assessment to consider",
+                "status": recorded if recorded in cls.ASSESSMENT_STATUSES else None,
+            })
+        return flags
+
+    @classmethod
+    def set_privacy_assessment_status(
+        cls, organization_id: Optional[int], element_id: int, status: str
+    ):
+        """Record the assessment status on a processing activity through the typed property
+        writer. The element must be one of the organisation's own information objects."""
+        from app.models.models import ArchiMateElement
+        from app.modules.architecture_assistant.property_service import PropertyService
+        from app.modules.codegen.services.genome_data_slice import DATA_OBJECT_TYPES, _norm_type
+
+        if organization_id is None:
+            raise LookupError("no organisation")
+        if status not in cls.ASSESSMENT_STATUSES:
+            raise ValueError("status must be one of " + ", ".join(cls.ASSESSMENT_STATUSES))
+        element = db.session.execute(
+            db.select(ArchiMateElement)
+            .where(ArchiMateElement.id == element_id)
+            .where(ArchiMateElement.organization_id == organization_id)
+        ).scalar_one_or_none()
+        if element is None:
+            raise LookupError(str(element_id))
+        if _norm_type(element.type) not in DATA_OBJECT_TYPES:
+            raise ValueError("That element is not a processing activity")
+        PropertyService().set_element_property(element, cls.ASSESSMENT_STATUS_KEY, status, source="user")
+        db.session.flush()
+        return element
 
     @classmethod
     def get_in_scope_nodes(

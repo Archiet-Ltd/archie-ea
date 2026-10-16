@@ -173,3 +173,110 @@
         };
     }
 </script>
+
+{% if findings %}
+<section class="bg-card text-card-foreground rounded-lg border border-border overflow-hidden" data-testid="policy-violations">
+    <div class="px-5 py-4 border-b border-border">
+        <h2 class="text-base font-semibold text-foreground">Policy violations</h2>
+        <p class="mt-1 text-sm text-muted-foreground">Applications where a control a policy clause depends on is not met.</p>
+    </div>
+    {% if findings.policy_violations %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-left text-muted-foreground border-b border-border">
+                    <th class="px-5 py-3 font-medium">Policy</th>
+                    <th class="px-5 py-3 font-medium">Clause</th>
+                    <th class="px-5 py-3 font-medium">Control</th>
+                    <th class="px-5 py-3 font-medium">Application</th>
+                    <th class="px-5 py-3 font-medium">What is wrong</th>
+                    <th class="px-5 py-3 font-medium">Since</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in findings.policy_violations %}
+                <tr class="border-b border-border last:border-0" data-testid="policy-violation-row">
+                    <td class="px-5 py-3 text-foreground">{{ v.policy_name }}{% if v.policy_version %} <span class="text-xs text-muted-foreground">version {{ v.policy_version }}</span>{% endif %}</td>
+                    <td class="px-5 py-3 text-foreground">{{ v.clause_ref or '—' }}</td>
+                    <td class="px-5 py-3 text-foreground">{{ v.control_code or '—' }}</td>
+                    <td class="px-5 py-3 text-foreground">{{ v.application_name or '—' }}</td>
+                    <td class="px-5 py-3 text-muted-foreground">{{ v.details or '—' }}</td>
+                    <td class="px-5 py-3 text-muted-foreground">{{ v.detected_on or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="px-5 py-4 text-sm text-muted-foreground">No policy clause is breached by any application right now.</p>
+    {% endif %}
+</section>
+
+<section class="bg-card text-card-foreground rounded-lg border border-border overflow-hidden" data-testid="privacy-assessments" x-data="privacyAssessmentPanel()">
+    <div class="px-5 py-4 border-b border-border">
+        <h2 class="text-base font-semibold text-foreground">Processing activities that may need an impact assessment</h2>
+        <p class="mt-1 text-sm text-muted-foreground">One criterion met means an assessment is worth considering; two or more mean one is likely required.</p>
+    </div>
+    {% if findings.privacy_assessments %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-left text-muted-foreground border-b border-border">
+                    <th class="px-5 py-3 font-medium">Processing activity</th>
+                    <th class="px-5 py-3 font-medium">Criteria met</th>
+                    <th class="px-5 py-3 font-medium">Reading</th>
+                    <th class="px-5 py-3 font-medium">Assessment</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in findings.privacy_assessments %}
+                <tr class="border-b border-border last:border-0 align-top" data-testid="privacy-row" data-activity-element="{{ f.element_id }}">
+                    <td class="px-5 py-3 font-medium text-foreground">{{ f.activity_name }}</td>
+                    <td class="px-5 py-3 text-foreground">
+                        {% for c in f.criteria %}
+                        <div>{{ c.label }}{% if c.facts %}: <span class="text-muted-foreground">{{ c.facts|join(', ') }}</span>{% endif %}</div>
+                        {% endfor %}
+                    </td>
+                    <td class="px-5 py-3 text-foreground" data-testid="privacy-reading">{{ f.reading|capitalize }}</td>
+                    <td class="px-5 py-3">
+                        {% if can_record_control_work %}
+                        <label class="sr-only" for="assessment-{{ f.element_id }}">Assessment status for {{ f.activity_name }}</label>
+                        <select id="assessment-{{ f.element_id }}" class="px-2 py-1 border border-border rounded-md bg-background"
+                                @change="save({{ f.element_id }}, $event.target.value)">
+                            <option value="" {% if not f.status %}selected{% endif %}>—</option>
+                            {% for st in assessment_statuses %}
+                            <option value="{{ st }}" {% if f.status == st %}selected{% endif %}>{{ st.replace('_', ' ')|capitalize }}</option>
+                            {% endfor %}
+                        </select>
+                        {% else %}
+                        <span data-testid="privacy-status">{{ f.status.replace('_', ' ')|capitalize if f.status else '—' }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    {{ empty_state(icon='shield-check', title='No processing activity meets an assessment criterion', description='Activities appear here when their recorded data or the systems that use it meet a criterion.', padding='py-10') }}
+    {% endif %}
+</section>
+<script>
+    function privacyAssessmentPanel() {
+        return {
+            save(elementId, status) {
+                if (!status) { return Promise.resolve(); }
+                return Platform.fetch.post('/dashboard/api/compliance/privacy-assessments/' + elementId + '/status', { status: status })
+                    .then(function () {
+                        Platform.toast.success('Saved.');
+                        window.location.reload();
+                    })
+                    .catch(function (err) {
+                        Platform.toast.error('Could not save. Please try again.');
+                        throw err;
+                    });
+            }
+        };
+    }
+</script>
+{% endif %}
