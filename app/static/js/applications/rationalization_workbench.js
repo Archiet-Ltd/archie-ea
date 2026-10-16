@@ -365,7 +365,13 @@ function workbenchApp() {
                         return { dimension: dim.dimension || dim.name || '—', factors: factors };
                     });
 
-                    self.breakdownData = { dimensions: dims, top_factors: topFactors };
+                    self.breakdownData = {
+                        dimensions: dims,
+                        top_factors: topFactors,
+                        inputs_measured: data.inputs_measured,
+                        inputs_total: data.inputs_total,
+                        overall_statement: data.overall_statement || ''
+                    };
                     self.breakdownLoading = false;
 
                     // Render mini radar
