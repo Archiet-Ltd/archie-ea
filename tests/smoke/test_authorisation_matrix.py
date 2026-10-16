@@ -62,6 +62,7 @@ POLICY = {
     "/my-applications/":       {"application_manager"},
     "/my-applications/list":   {"application_manager"},
     "/my-applications/health": {"application_manager"},
+    "/my-applications/completeness": {"application_manager"},
     "/applications/ownership-coverage": {"cto", "portfolio_manager"},
     # The duplicate lookup in the Add Application dialog carries the same
     # @require_roles("admin", "architect") as the create route it precedes.
