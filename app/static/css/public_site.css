@@ -164,7 +164,12 @@
   .public-site .home-lead { font-size: 1.25rem; }
 }
 @media (min-width: 1024px) { .public-site .home-display { font-size: 4.5rem; } }
-.public-site .home-hero { padding-block: 6rem; background: hsl(var(--background)); }
+.public-site .home-hero { position: relative; padding-block: 6rem; background: hsl(var(--background)); }
+.public-site .home-hero::before {
+  content: ""; display: none; position: absolute; inset-block: 0; left: 50%; width: min(100%, 1400px);
+  transform: translateX(-50%); pointer-events: none; border-inline: 1px solid hsl(var(--border));
+}
+@media (min-width: 640px) { .public-site .home-hero::before { display: block; } }
 @media (min-width: 1024px) { .public-site .home-hero { padding-block: 8rem; } }
 
 /* layout_rhythm.home_section (80px), section_divider (1px border colour), rails (1px, from 640px) */
@@ -223,7 +228,7 @@
 }
 
 /* layout_rhythm.list_emphasis and note_block */
-.public-site .home-emphasis-list { list-style: none; margin: 0; padding: 0; }
+.public-site .home-emphasis-list { list-style: none; padding: 0; }
 .public-site .home-emphasis-list > li {
   border-left: 2px solid hsl(var(--border)); padding-left: 1.25rem;
   font-size: 1rem; line-height: 1.75rem; color: hsl(var(--muted-foreground));
@@ -236,7 +241,7 @@
 }
 
 /* Roadmap stepper: a 1px line with an 8px dot per stage; one row of five from 768px, a vertical line below */
-.public-site .home-stepper { list-style: none; margin: 0; padding: 0; display: grid; gap: 2rem; }
+.public-site .home-stepper { list-style: none; padding: 0; display: grid; gap: 2rem; }
 .public-site .home-stepper > li { position: relative; padding-left: 1.5rem; }
 .public-site .home-stepper > li::before {
   content: ""; position: absolute; left: 3.5px; top: 0.5rem; bottom: -2rem; border-left: 1px solid hsl(var(--border));
@@ -284,4 +289,4 @@
 /* Closing call to action: centred, 96px block padding, the section divider above */
 .public-site .home-closing { border-top: 1px solid hsl(var(--border)); padding-block: 6rem; text-align: center; background: hsl(var(--background)); }
 .public-site .home-closing .home-h2 { margin-top: 1rem; }
-.public-site .home-closing .home-section-lead { margin-inline: auto; max-width: 42rem; }
+.public-site .home-closing .home-section-lead { margin-inline: auto; max-width: 42rem; text-wrap: balance; }
