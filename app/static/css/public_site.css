@@ -18,6 +18,7 @@
 @media (min-width: 640px) { .public-site .public-container { padding-inline: 1.5rem; } }
 @media (min-width: 768px) { .public-site .public-container { padding-block: 6rem; } }
 .public-site .public-page-content > * { max-width: 42.5rem; margin-inline: auto; }
+.public-site .landing-band .public-page-content > * { margin-inline: 0; }
 .public-site .public-page-content > table,
 .public-site .public-page-content > pre,
 .public-site .public-page-content > figure,
