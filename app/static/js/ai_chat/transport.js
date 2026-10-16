@@ -212,7 +212,16 @@
                            discarding the very message the server had just
                            written to the transcript. */
                         if (ev.error && !ev.response) throw new Error(ev.error);
-                        if (!full && ev.response) full = ev.response;
+                        /* When the server's citation gate refused the answer, its
+                           response is what the user sees, whatever was streamed
+                           before it. */
+                        if (ev.error && ev.response) {
+                            full = ev.response; /* partial tokens of a failed call are not shown */
+                        } else if (ev.citation_gate && ev.citation_gate.refused && ev.response) {
+                            full = ev.response;
+                        } else if (!full && ev.response) {
+                            full = ev.response;
+                        }
                         // actions_taken rides the done event already (chat_core
                         // spreads the whole agent result); it names every tool that
                         // ran and what it returned, which is what the evidence trail
