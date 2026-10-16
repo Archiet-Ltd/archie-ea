@@ -132,6 +132,9 @@ def test_bad_values_are_refused_with_a_message(app, db_session, make_org, client
     )
     assert bad.status_code == 400 and "test_kind" in bad.get_json()["error"]
     login_as(client, officer)
+    status = client.put(f"/dashboard/api/compliance/mappings/{row_a.id}", json={"implementation_status": "done-ish"})
+    assert status.status_code == 400 and "implementation_status" in status.get_json()["error"]
+    login_as(client, officer)
     date = client.put(f"/dashboard/api/compliance/mappings/{row_a.id}", json={"evidence_valid_until": "next year"})
     assert date.status_code == 400
 

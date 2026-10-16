@@ -566,6 +566,16 @@ def test_approving_a_proposal_writes_the_evidence_with_source_connector(app, db_
     assert rows["mfa-enforced"].evidence_url is None and rows["offboarding"].evidence_url is None
 
 
+def test_a_pending_proposal_cannot_be_accepted_around_the_queue(app, db_session, make_org):
+    org = make_org("conn-direct")
+    rows = _stage_three(db_session, org)
+    [first, *_] = _propose_all(org, rows, None)
+    db_session.commit()
+    assert accept_control_evidence(first.id, org.id, None) is False
+    db_session.expire_all()
+    assert rows["access-reviews"].evidence_url is None
+
+
 def test_self_approval_is_refused_and_writes_nothing(app, db_session, make_org):
     from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService, SelfApprovalError
 

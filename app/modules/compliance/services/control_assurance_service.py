@@ -16,6 +16,10 @@ from app.modules.compliance.services.control_evidence import effectiveness
 
 _UNSET = object()
 
+IMPLEMENTATION_STATUSES = (
+    "planned", "in_progress", "implemented", "verified", "not_applicable", "waived",
+)
+
 
 class ControlNotFound(LookupError):
     """The adopted control row is not in the caller's organisation."""
@@ -115,6 +119,8 @@ def update_control_evidence(
     """
     control = _own_control(organization_id, control_row_id)
     if implementation_status is not _UNSET:
+        if implementation_status not in IMPLEMENTATION_STATUSES:
+            raise ValueError(f"implementation_status must be one of {', '.join(IMPLEMENTATION_STATUSES)}")
         control.implementation_status = implementation_status
     if notes is not _UNSET:
         control.notes = notes

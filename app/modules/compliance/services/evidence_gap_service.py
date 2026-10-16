@@ -252,17 +252,14 @@ def propose_control_evidence(
     )
 
 
-def accept_control_evidence(
-    approval_id: int,
-    organization_id: int,
-    accepted_by: Optional[int] = None,
-) -> bool:
+def accept_control_evidence(approval_id: int, organization_id: int, accepted_by: Optional[int] = None) -> bool:
     """Write the evidence a ``control_evidence`` proposal carries onto its control row.
 
-    Acts only on a proposal of ``organization_id`` that is still open (pending, or claimed
-    as approved by the queue just before it dispatches here). A refused or already
-    executed proposal writes nothing and returns ``False``. Re-checks that the control row
-    belongs to the proposal's organisation before writing.
+    Acts only on a proposal of ``organization_id`` that the approval queue has claimed as
+    approved and is dispatching right now; the approver, the audit trail and the refusal of
+    self-approval are the queue's. A pending, refused or already executed proposal writes
+    nothing and returns ``False``. Re-checks that the control row belongs to the proposal's
+    organisation before writing.
     """
     from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
     from app.models.application_compliance import ApplicationComplianceControl
@@ -271,7 +268,7 @@ def accept_control_evidence(
         AIChatCRUDApproval.query.filter_by(
             id=approval_id, organization_id=organization_id, entity_type=ENTITY_CONTROL_EVIDENCE
         )
-        .filter(AIChatCRUDApproval.status.in_((ApprovalStatus.PENDING, ApprovalStatus.APPROVED)))
+        .filter(AIChatCRUDApproval.status == ApprovalStatus.APPROVED)
         .first()
     )
     if approval is None or approval.executed_at is not None:
@@ -298,11 +295,7 @@ def accept_control_evidence(
         logger.error("accept_control_evidence: control %s is not in organisation %s", control_row_id, organization_id)
         return False
 
-    if approval.status == ApprovalStatus.PENDING:
-        approval.approve(accepted_by)
-        db.session.add(approval)
-        db.session.flush()
-
+    logger.info("accept_control_evidence: approval %s accepted by user %s", approval_id, accepted_by)
     mapping.evidence_url = evidence_url[:500]
     mapping.evidence_collected_at = collected_at
     mapping.evidence_valid_until = valid_until

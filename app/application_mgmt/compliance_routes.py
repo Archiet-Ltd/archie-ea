@@ -235,7 +235,7 @@ def update_compliance_mapping(mapping_id):
     changes = {}
     try:
         if "implementation_status" in data:
-            changes["implementation_status"] = str(data["implementation_status"])[:20]
+            changes["implementation_status"] = data["implementation_status"]
         if "notes" in data:
             changes["notes"] = data["notes"]
         if "evidence_url" in data:
