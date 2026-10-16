@@ -984,3 +984,80 @@ def test_layer_and_font_sans_tokens_are_now_protected(tmp_path):
     fails = _design_tokens_fails(tmp_path, files)
     hit = next(f for f in fails if "design-tokens/token-declaration" in f)
     assert "x.css:1" in hit and "x.css:2" in hit
+
+
+# Shapes that once slipped past the public-component patterns: element-qualified selectors, a rule written on one
+# line inside an at-rule or a nesting block, and minified output. Each is written alone into a new stylesheet.
+BYPASS_SHAPES = [
+    ".pricing-page a.public-btn { height: 3rem; }",
+    "button.public-btn { background: red; }",
+    ".pricing-page article.public-card { padding: 0; }",
+    "div.pricing-card { padding: 2rem; }",
+    "a.cta-btn { height: 3rem; }",
+    "details.faq { border: 0; }",
+    ".pricing-page table.pp-table { width: 100%; }",
+    "@media (min-width: 0px) { .pricing-page .public-btn { height: 2.75rem; border-radius: 0.5rem; } }",
+    "@media all { .pricing-btn { height: 3rem; background: red; } }",
+    "@media all { .faq summary { padding: 1rem 0; font-weight: 600; } }",
+    "@supports (display: grid) { .pricing-page .public-faq summary { font-size: 2rem; } }",
+    ".pricing-page { .public-btn { height: 3rem; } }",
+    ".x{margin:0}.pricing-btn{height:3rem}",
+    ".pricing-page .public-faq summary { font-size: 1.0625rem; padding: 1rem 0; }",
+    ".pricing-page .public-btn--primary { height: 2.75rem; border-radius: 0.5rem; }",
+    ".pricing-page .public-card { padding: 1.5rem; border-radius: 0.75rem; }",
+    ".public-pricing-btn { display: inline-flex; }",
+    ".faq-item summary { cursor: pointer; }",
+    ".button-primary { color: red; }",
+    ".timeline li { display: grid; }",
+    "@media (min-width: 1024px) { .pricing-page .pp-plans > .public-card > a { min-height: 3.875rem; } }",
+]
+
+# Layout-only rules the register must keep allowing.
+LAYOUT_ONLY = [
+    ".pricing-page .public-btn { display: inline-flex; margin-top: 1rem; width: 100%; }",
+    "@media (min-width: 640px) { .pricing-page .pp-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); } }",
+    "@media (min-width: 768px) { .pricing-page h2 { font-size: 1.875rem; } }",
+    ".pricing-page .pp-section { margin-top: 4rem; }",
+    ".pricing-page .public-card { position: relative; overflow: hidden; }",
+    "a.link { color: red; } p.lead { margin: 0 0 1rem; }",
+]
+
+
+def _extra_css_tree(tmp_path, css_text):
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "reuse-register.yml").write_text(
+        (REPO / "docs" / "reuse-register.yml").read_text(encoding="utf-8"), encoding="utf-8")
+    css = tmp_path / "app" / "static" / "css"
+    css.mkdir(parents=True)
+    (css / "public_site.css").write_text(
+        (REPO / "app/static/css/public_site.css").read_text(encoding="utf-8"), encoding="utf-8")
+    (css / "public_extra.css").write_text(css_text + "\n", encoding="utf-8")
+    return tmp_path
+
+
+@pytest.mark.parametrize("shape", BYPASS_SHAPES)
+def test_a_bypass_shape_in_a_new_stylesheet_fails(tmp_path, shape):
+    fails, _ = _run(_extra_css_tree(tmp_path, shape))
+    assert any("app/static/css/public_extra.css" in f for f in fails), (shape, fails)
+
+
+@pytest.mark.parametrize("rule", LAYOUT_ONLY)
+def test_a_layout_only_rule_in_a_new_stylesheet_passes(tmp_path, rule):
+    fails, _ = _run(_extra_css_tree(tmp_path, rule))
+    assert [f for f in fails if f.startswith("[public-")] == [], (rule, fails)
+
+
+def test_update_baseline_refuses_a_new_key_unless_allowed_and_names_each_one(tmp_path):
+    root = _tree(tmp_path, extra={"app/a.py": COPY}, baseline={"other/key": {"app/z.py": 1}})
+    entries, _ = gate.load_register(root)
+    path = root / "scripts" / "reuse_register_baseline.json"
+    before = path.read_text()
+
+    ok, messages = gate.update_baseline(root, entries)
+    assert ok is False
+    assert any("name-matching/normaliser" in m and "--allow-new-keys" in m for m in messages)
+    assert path.read_text() == before
+
+    ok, messages = gate.update_baseline(root, entries, allow_new_keys=True)
+    assert ok is True
+    assert any(m.startswith("new key written: name-matching/normaliser") for m in messages)

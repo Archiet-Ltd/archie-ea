@@ -47,6 +47,17 @@
 .pricing-page .pp-for { margin: 0.5rem 0 1.25rem; min-height: 3.5rem; color: var(--pp-muted); font-size: 0.9375rem; line-height: 1.5; }
 .pricing-page .pp-price { font-size: 3rem; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; margin: 0; }
 .pricing-page .pp-price small { display: inline-block; font-size: 0.9375rem; font-weight: 400; letter-spacing: 0; color: var(--pp-muted); margin-left: 0.25rem; }
+.pricing-page .pp-from { font-size: 0.9375rem; font-weight: 400; letter-spacing: 0; color: var(--pp-muted); }
+/* Four across (1024 and up): the content box is 168px wide, so the numeral is 40px and the "From" and "/year" parts
+   sit on their own lines. Each card joins the grid's seven rows (title, audience, price, note, button, spacer, list),
+   so the title, price, note and button rows are as tall as the tallest card's and the four buttons share one line. */
+@media (min-width: 1024px) {
+  .pricing-page .pp-plans { row-gap: 0; }
+  .pricing-page .pp-plans > .public-card { display: grid; grid-row: span 7; grid-template-rows: subgrid; row-gap: 0; align-content: start; }
+  .pricing-page .pp-plans .pp-price { font-size: 2.5rem; }
+  .pricing-page .pp-plans .pp-list { align-content: start; }
+  .pricing-page .pp-plans .pp-price small, .pricing-page .pp-plans .pp-from { display: block; margin: 0.125rem 0 0; line-height: 1.4; }
+}
 .pricing-page .pp-note { margin: 0.5rem 0 1.25rem; min-height: 2.75rem; color: var(--pp-muted); font-size: 0.875rem; line-height: 1.5; font-variant-numeric: tabular-nums; }
 .pricing-page .pp-list { list-style: none; margin: 1.5rem 0 0; padding: 1.5rem 0 0; border-top: 1px solid var(--pp-border); display: grid; gap: 0.75rem; font-size: 0.9375rem; line-height: 1.5; }
 .pricing-page .pp-list li { position: relative; padding-left: 1.5rem; }
@@ -54,7 +65,10 @@
 .pricing-page .pp-list .pp-lead-in { font-weight: 600; padding-left: 0; }
 .pricing-page .pp-list .pp-lead-in::before { display: none; }
 /* Plan-card buttons wrap (their label can take two lines in a narrow column), so the four across share one height. */
-@media (min-width: 1024px) { .pricing-page .pp-plans > .public-card > a { min-height: 3.875rem; } }
+@media (min-width: 1024px) {
+/* reuse-ok: equal plan-button height in a row of four; the plan cards are the only place a button label wraps to two lines */
+  .pricing-page .pp-plans > .public-card > a { min-height: 3.875rem; }
+}
 .pricing-page .pp-alt { margin-top: 0.75rem; text-align: center; font-size: 0.875rem; min-height: 1.25rem; }
 
 /* Comparison table: the shared .public-table--fit, with a header that stays in view and centred value cells.

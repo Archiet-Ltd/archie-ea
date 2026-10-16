@@ -233,7 +233,7 @@ def check_canonicals(root: Path, entries) -> tuple[list[str], list[str]]:
             if exists and not missing and canonical.get("symbols"):
                 notes.append(f"[{eid}] pending canonical has landed: set status to active")
         for x in e.get("known_exceptions") or []:
-            if not (root / x["path"]).exists():
+            if not x["path"].endswith("*") and not (root / x["path"]).exists():
                 notes.append(f"[{eid}] known exception {x['path']} does not exist here")
     return fails, notes
 
@@ -258,7 +258,7 @@ def _is_exception(rel: str, entry) -> bool:
         return True
     for x in entry.get("known_exceptions") or []:
         path = x["path"]
-        if rel == path or (path.endswith("/") and rel.startswith(path)):
+        if rel == path or (path.endswith(("/", "*")) and rel.startswith(path.rstrip("*"))):
             return True
     return False
 
@@ -444,9 +444,10 @@ def compare(entries, hits, baseline, root: Path) -> tuple[list[str], list[str]]:
 # ---------------------------------------------------------------- baseline update
 
 
-def update_baseline(root: Path, entries, baseline_path: Path | None = None):
+def update_baseline(root: Path, entries, baseline_path: Path | None = None, allow_new_keys: bool = False):
     """(ok, messages). Writes the current counts only if no existing key rises and no file is added to one. A key
-    with no entry yet is written as the tree has it; the live test against origin/main bounds it."""
+    with no entry yet (a pattern new to the register, or one that had no hits) is refused unless allow_new_keys is
+    set, and every key written that way is named in the messages; the live test against origin/main bounds it."""
     path = baseline_path or (root / BASELINE)
     current = counts_of(find_hits(root, entries))
     old = load_baseline(root, path) if path.exists() else None
@@ -454,11 +455,16 @@ def update_baseline(root: Path, entries, baseline_path: Path | None = None):
     if old is not None:
         for key, files in current.items():
             if key not in old:
-                continue  # a pattern with no baseline entry yet: its hits are bounded by the tree (ratchet_problems)
+                if allow_new_keys:
+                    messages.append(f"new key written: {key} {dict(sorted(files.items()))}")
+                else:
+                    messages.append(f"refused: {key} has no baseline entry and would gain one "
+                                    f"({', '.join(sorted(files))}); pass --allow-new-keys for a pattern new to the register")
+                continue
             grown = excess_of(root, {r: [0] * n for r, n in files.items()}, old.get(key, {}))
             if grown:
                 messages.append(f"refused: {key} would rise in {', '.join(sorted(grown))}")
-        if messages:
+        if any(m.startswith("refused") for m in messages):
             messages.append("The baseline only falls. Reuse the canonical implementation, or add a "
                             "known_exceptions entry with a reason to the register.")
             return False, messages
@@ -507,6 +513,8 @@ def main(argv=None) -> int:
     parser.add_argument("--count", action="store_true")
     parser.add_argument("--entries", action="store_true")
     parser.add_argument("--update-baseline", action="store_true")
+    parser.add_argument("--allow-new-keys", action="store_true",
+                        help="with --update-baseline: also write a key the baseline has no entry for (a pattern new to the register)")
     args = parser.parse_args(argv)
     root = args.root.resolve()
     if args.entries or args.update_baseline:
@@ -517,7 +525,7 @@ def main(argv=None) -> int:
         if args.entries:
             print_entries(entries)
             return 0
-        ok, messages = update_baseline(root, entries)
+        ok, messages = update_baseline(root, entries, allow_new_keys=args.allow_new_keys)
         print("\n".join(messages))
         return 0 if ok else 1
     fails, notes = run(root)
