@@ -30,7 +30,7 @@ from flask_login import current_user
 from app.decorators import admin_required
 from app.extensions import db
 from app.services.billing_plans import PlanLimitReached
-from app.services.sso_service import SSONotConfiguredError, SSOService
+from app.services.sso_service import SSODomainConflictError, SSONotConfiguredError, SSOService
 
 _log = logging.getLogger(__name__)
 
@@ -64,7 +64,10 @@ def sso_initiate():
     if not email:
         return jsonify({"error": "email parameter required"}), 400
 
-    config = _svc.get_config_for_email(email)
+    try:
+        config = _svc.get_config_for_email(email)
+    except SSODomainConflictError as exc:
+        return jsonify({"error": str(exc)}), 409
     if config is None or not config.enabled:
         return jsonify({"error": "No SSO configured for this email domain"}), 404
 

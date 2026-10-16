@@ -481,7 +481,7 @@ def test_v1_login_does_not_redirect_another_orgs_user_to_the_claiming_idp(monkey
 # --------------------------------------------------------------------------- #
 
 
-def test_contested_domain_fails_closed_to_password(db_session, make_org, caplog):
+def test_contested_domain_fails_closed(db_session, make_org, caplog):
     from app.services.sso_service import SSOService
 
     contested = _domain("contested")
@@ -489,9 +489,13 @@ def test_contested_domain_fails_closed_to_password(db_session, make_org, caplog)
     second = _configure_sso(db_session, make_org("scope-contest-b"), f"spare.example, {contested.upper()}")
     address = f"someone@{contested}"
 
+    from app.services.sso_service import SSODomainConflictError
+
     with caplog.at_level(logging.WARNING, logger="app.services.sso_service"):
-        assert SSOService().get_config_for_email(address) is None
-        assert SSOService().config_for_login(address, _PASSWORD) is None
+        with pytest.raises(SSODomainConflictError):
+            SSOService().get_config_for_email(address)
+        with pytest.raises(SSODomainConflictError):
+            SSOService().config_for_login(address, _PASSWORD)
 
     warnings = [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]
     assert any(str(first.id) in m and str(second.id) in m for m in warnings), warnings
@@ -766,9 +770,9 @@ def test_saml_transient_nameid_without_a_stable_subject_is_refused():
     persistent = SAMLService()._extract_claims(_assertion(
         " persistent-1 ", name_id_format=_PERSISTENT, attributes=(("email", "erin@acme.example"),)))
     assert persistent["sub"] == "persistent-1"
-    plain = SAMLService()._extract_claims(_assertion("Carol@Acme.example"))
-    assert plain["sub"] == "Carol@Acme.example"
-    assert plain["email"] == "carol@acme.example"
+    # With no Format the NameID is unspecified: it is the address, never the subject.
+    with pytest.raises(SAMLVerificationError):
+        SAMLService()._extract_claims(_assertion("Carol@Acme.example"))
 
 
 # --------------------------------------------------------------------------- #
@@ -1448,3 +1452,80 @@ def test_password_less_admin_recovers_through_their_own_mailbox_before_sso_is_di
 
     sweep._clear_g()
     assert second_client.get("/admin/sso").status_code == 200
+
+
+# --------------------------------------------------------------------------- #
+# Hardening after review                                                        #
+# --------------------------------------------------------------------------- #
+
+
+def test_wrong_password_for_an_account_outside_the_claiming_org_is_recorded(db_session, make_org, monkeypatch):
+    from app.services import auth_audit
+    from app.services.sso_service import SSOService
+
+    claimed = _domain("recordcorp")
+    config = _configure_sso(db_session, make_org("scope-record-x"), claimed)
+    outsider = _make_user(db_session, make_org("scope-record-y"), f"pat@{claimed}", password=_PASSWORD)
+    own_member = _make_user(db_session, make_org("scope-record-z"), f"sam@{claimed}", password=_PASSWORD)
+    own_member.organization_id = config.organization_id
+    db_session.commit()
+
+    failures = []
+    monkeypatch.setattr(auth_audit, "record_login_failure", lambda email=None: failures.append(email))
+
+    # Wrong password: redirected as before, but the failure is recorded.
+    assert SSOService().config_for_login(outsider.email, "wrong-password").id == config.id
+    assert failures == [outsider.email]
+    # Right password: proceeds to the password check, nothing recorded.
+    assert SSOService().config_for_login(outsider.email, _PASSWORD) is None
+    assert failures == [outsider.email]
+    # The claiming organisation's own member is redirected to the IdP, not a failure.
+    assert SSOService().config_for_login(own_member.email, _PASSWORD).id == config.id
+    assert failures == [outsider.email]
+
+
+def test_disabled_configuration_holds_no_domain_claim(db_session, make_org):
+    from app.services.sso_service import SSOService
+
+    domain = _domain("dormant")
+    holder = make_org("scope-dormant-a")
+    other = make_org("scope-dormant-b")
+    _configure_sso(db_session, holder, domain, enabled=False)
+    assert SSOService().domain_claim_problem(other.id, domain) is None
+
+    live = _domain("live")
+    _configure_sso(db_session, make_org("scope-live-a"), live)
+    assert SSOService().domain_claim_problem(other.id, live) is not None
+
+
+def test_domain_claim_collides_across_spellings(db_session, make_org):
+    from app.services.sso_service import SSOService
+
+    domain = _domain("spelling")
+    _configure_sso(db_session, make_org("scope-spell-a"), f"{domain.upper()}.")
+    other = make_org("scope-spell-b")
+    assert SSOService().domain_claim_problem(other.id, domain) is not None
+    assert SSOService().domain_claim_problem(other.id, f"{domain}.") is not None
+
+
+def test_contested_domain_refuses_password_sign_in_and_records_it(app, db_session, make_org, monkeypatch):
+    from app.services import auth_audit
+
+    contested = _domain("contested-login")
+    _configure_sso(db_session, make_org("scope-cl-a"), contested)
+    _configure_sso(db_session, make_org("scope-cl-b"), contested)
+    member = _make_user(db_session, make_org("scope-cl-c"), f"vic@{contested}", password=_PASSWORD)
+    db_session.commit()
+
+    failures = []
+    monkeypatch.setattr(auth_audit, "record_login_failure", lambda email=None: failures.append(email))
+
+    client = _anonymous_client(app)
+    resp = _post_login(client, member.email)
+    assert "/auth/sso/initiate" not in resp.headers.get("Location", "")
+    assert _session_user_id(client) is None
+    assert failures
+    assert any("claimed by more than one" in m for m in _flashes(client))
+
+    initiate = _anonymous_client(app).get(f"/auth/sso/initiate?email={member.email}")
+    assert initiate.status_code == 409

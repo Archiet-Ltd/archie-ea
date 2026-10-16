@@ -79,18 +79,23 @@ def login():
     if form.validate_on_submit():
         # COM-005: Check email-domain SSO config before password auth.
         # config_for_login decides (one decision shared with the v1 login).
+        _sso_conflict = False
         try:
-            from app.services.sso_service import SSOService
+            from app.services.sso_service import SSODomainConflictError, SSOService
 
             _sso_cfg = SSOService().config_for_login(form.email.data, form.password.data)
             if _sso_cfg is not None:
                 return redirect(
                     url_for("sso.sso_initiate", email=form.email.data)
                 )
+        except SSODomainConflictError:
+            # Two enabled configurations claim this domain: neither SSO nor
+            # password sign-in is offered for it (already audited).
+            _sso_conflict = True
         except Exception as _sso_exc:
             _log.warning("SSO domain check failed; falling back to the password path", exc_info=True)
 
-        user = _svc.authenticate(form.email.data, form.password.data)
+        user = None if _sso_conflict else _svc.authenticate(form.email.data, form.password.data)
         if user is not None:
             # R1-B12 PR 2 (TB-0144/PB-0100): an administrator must complete
             # multi-factor before the login finishes, whether they are
@@ -137,6 +142,12 @@ def login():
                 safe_next_url(_landing, url_for("dashboard.overview"))
             )
         else:
+            if _sso_conflict:
+                flash(
+                    "Sign-in for this email domain is unavailable because it is claimed by "
+                    "more than one organisation. Contact your administrator.",
+                    "form-error",
+                )
             try:
                 audit_logger.log_authentication(success=False)
             except Exception:  # fabricated-ok: guarded skip on error; emits no fabricated value — audit log is fire-and-forget
@@ -146,7 +157,8 @@ def login():
             from app.services import auth_audit
 
             auth_audit.record_login_failure(form.email.data)
-            flash("Invalid email or password.", "form-error")
+            if not _sso_conflict:
+                flash("Invalid email or password.", "form-error")
     return render_template("account/login.html", form=form)
 
 

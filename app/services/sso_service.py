@@ -89,6 +89,17 @@ class SSONotConfiguredError(Exception):
     """Raised when SSO is not configured or a required env var is missing."""
 
 
+class SSODomainConflictError(SSONotConfiguredError):
+    """Two enabled SSO configurations claim the same email domain. Sign-in for
+    that domain fails closed: neither SSO nor password is offered."""
+
+
+_MSG_DOMAIN_CONFLICT = (
+    "Sign-in for this email domain is unavailable because it is claimed by more "
+    "than one organisation. Contact your administrator."
+)
+
+
 class SSOService:
     """Per-organisation SSO service (OIDC + SAML stub)."""
 
@@ -108,9 +119,11 @@ class SSOService:
     def get_config_for_email(self, email: str):
         """Return the enabled SSOConfig whose domain matches *email*, or None.
 
-        When more than one enabled configuration lists the domain, none of
-        them is returned: the address falls back to password sign-in and a
-        warning names the configurations involved.
+        When more than one enabled configuration lists the domain the lookup
+        fails closed: :class:`SSODomainConflictError` is raised, a warning
+        names the configurations involved and an audit event is recorded.
+        Callers refuse sign-in for the address rather than fall back to no
+        enforcement.
 
         Args:
             email: User's email address (e.g. "alice@acme.com").
@@ -120,7 +133,10 @@ class SSOService:
         """
         if not email or "@" not in email:
             return None
-        domain = email.split("@", 1)[1].strip().lower()
+        from app.models.sso_config import normalise_email_domain
+
+        domain = normalise_email_domain(email.rsplit("@", 1)[1])
+        matches = []
         try:
             from app.models.sso_config import SSOConfig
 
@@ -129,15 +145,6 @@ class SSOService:
             # itself is the scoping mechanism.
             configs = SSOConfig.query.filter_by(enabled=True).all()
             matches = [config for config in configs if domain in config.email_domains]
-            if len(matches) > 1:
-                logger.warning(
-                    "More than one enabled SSO configuration lists the same email "
-                    "domain (config ids %s); using password sign-in for it.",
-                    sorted(config.id for config in matches),
-                )
-                return None
-            if matches:
-                return matches[0]
         except Exception as exc:
             logger.warning("SSO config lookup failed (non-fatal): %s", exc)
             try:
@@ -145,7 +152,33 @@ class SSOService:
                 db.session.rollback()
             except Exception as exc:
                 logger.debug("suppressed error in SSOService.get_config_for_email (app/services/sso_service.py): %s", exc)
-        return None
+            return None
+        if len(matches) > 1:
+            ids = sorted(config.id for config in matches)
+            logger.warning(
+                "More than one enabled SSO configuration lists the same email "
+                "domain (config ids %s); sign-in for it is refused.",
+                ids,
+            )
+            self._record_failed_login(email)
+            raise SSODomainConflictError(_MSG_DOMAIN_CONFLICT)
+        return matches[0] if matches else None
+
+    @staticmethod
+    def _record_failed_login(email) -> None:
+        """Record a failed sign-in attempt the way the password path does. Never raises."""
+        try:
+            from app.security.audit import audit_logger
+
+            audit_logger.log_authentication(success=False)
+        except Exception as exc:
+            logger.warning("Audit log failed on login failure: %s", exc)
+        try:
+            from app.services import auth_audit
+
+            auth_audit.record_login_failure(email)
+        except Exception as exc:
+            logger.warning("Login failure record failed: %s", exc)
 
     def config_for_login(self, email: str, password: str):
         """The enabled SSOConfig the sign-in form should send *email* to, or None.
@@ -188,15 +221,18 @@ class SSOService:
         usable = password_hash_is_current(stored_hash)
         password_ok = check_password_hash(stored_hash if usable else _DUMMY_PASSWORD_HASH, password or "")
         password_ok = password_ok and usable
-        if (
-            password_ok
-            and user is not None
-            and (
-                user.organization_id != config.organization_id
-                or getattr(user, "is_platform_admin", False)
-            )
-        ):
-            return None
+        outside_or_admin = user is not None and (
+            user.organization_id != config.organization_id
+            or getattr(user, "is_platform_admin", False)
+        )
+        if outside_or_admin:
+            if password_ok:
+                return None
+            # A wrong password for an account this configuration does not own
+            # is a failed password sign-in like any other: record it before
+            # the redirect so the attempt is counted and visible.
+            if password:
+                self._record_failed_login(email)
         return config
 
     # ------------------------------------------------------------------
@@ -205,7 +241,8 @@ class SSOService:
 
     def domains_claimed_by_other_orgs(self, org_id, domains) -> dict:
         """``{domain: organization_id}`` for each of *domains* that another
-        organisation's SSO configuration already lists, enabled or not."""
+        organisation's enabled SSO configuration lists. A disabled configuration
+        holds no claim."""
         wanted = set(domains)
         if not wanted:
             return {}
@@ -217,7 +254,7 @@ class SSOService:
         if org_id is not None:
             query = query.filter(SSOConfig.organization_id != org_id)
         claimed = {}
-        for config in query.all():
+        for config in query.filter(SSOConfig.enabled.is_(True)).all():
             for domain in config.email_domains:
                 if domain in wanted:
                     claimed.setdefault(domain, config.organization_id)
