@@ -12,7 +12,7 @@ where ``init-db`` or ``reconcile-schema`` got there first is a no-op. The
 row-level-security fence for ``control_tests`` is the next revision.
 
 Revision ID: 20261016_control_evidence
-Revises: 20261016_technical_debt_rls
+Revises: 20261016_compliance_org_rls
 Create Date: 2026-10-16
 """
 import sqlalchemy as sa
@@ -20,7 +20,7 @@ from alembic import op
 from sqlalchemy import inspect
 
 revision = "20261016_control_evidence"
-down_revision = "20261016_technical_debt_rls"
+down_revision = "20261016_compliance_org_rls"
 branch_labels = None
 depends_on = None
 
