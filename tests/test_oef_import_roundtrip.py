@@ -44,7 +44,7 @@ OEF = """<?xml version="1.0" encoding="UTF-8"?>
     <propertyDefinition identifier="propid-source" type="string"><name>source</name></propertyDefinition>
   </propertyDefinitions>
 </model>
-""".replace("{long_name}", "G" * 130)
+""".replace("{long_name}", "G" * 260)
 
 
 @pytest.fixture
@@ -84,7 +84,7 @@ def test_parser_flags_names_longer_than_the_column_instead_of_letting_execute_ab
     """DOGFOOD-001: preview said 0 errors, execute rolled back everything on one 269-char name."""
     e4 = next(e for e in parsed["elements"] if e["identifier"] == "E4")
     assert e4["invalid"].startswith("name_too_long")
-    assert any("E4" in err and "100" in err for err in parsed["errors"])
+    assert any("E4" in err and "255" in err for err in parsed["errors"])
 
 
 # ---------------------------------------------------------------- execute (DB)

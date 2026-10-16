@@ -1586,6 +1586,8 @@ function composerApp() {
                 return Platform.fetch.post('/archimate/api/elements/materialize', { elements: toMaterialize }, { silent: true })
                     .then(function(data) {
                         let map = data.element_id_map || {};
+                        let cutNote = ComposerPersistence.notImportedMessage(null, data.truncated_names);
+                        if (cutNote) _toast('warning', cutNote);
                         let realSrc = map[String(srcElementId)] || srcElementId;
                         let realTgt = map[String(tgtElementId)] || tgtElementId;
                         // Adopt the new DB ids on the canvas cells — same pattern the
@@ -5068,6 +5070,8 @@ function composerApp() {
                         }
                     });
                     _toast('success', 'Imported ' + (stats.elements_created || 0) + ' new + ' + (stats.elements_linked || 0) + ' linked elements');
+                    let leftOut = ComposerPersistence.notImportedMessage(data.unrepresentable, data.truncated_names);
+                    if (leftOut) _toast('warning', leftOut);
                     self.statusText = 'Import complete: ' + elements.length + ' elements, ' + rels.length + ' relationships';
                     self.fitCanvas();
                     /* GAP-INT-003: Render annotation cards for imported relationships */

@@ -24,7 +24,7 @@ against the ``archimate_elements`` table.
 from app.utils import safe_xml  # untrusted XML: entity-expansion safe
 import logging
 import xml.etree.ElementTree as ET
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from app import db
 
@@ -159,7 +159,7 @@ class ArchiMateImportService:
     # DOGFOOD-001: the parser checks these so preview reports what execute
     # will refuse, instead of one over-long name aborting the whole import
     # with a raw ``StringDataRightTruncation`` from the database.
-    MAX_NAME_LENGTH = 100
+    MAX_NAME_LENGTH = 255
     MAX_TYPE_LENGTH = 50
 
     # DOGFOOD-003 (relationship-validity authority audit): this class used to
@@ -303,6 +303,13 @@ class ArchiMateImportService:
         elements: List[Dict[str, Any]] = []
         relationships: List[Dict[str, Any]] = []
         errors: List[str] = []
+        # Constructs the file holds that this importer does not represent,
+        # as (kind, where, identifier, reason) rows; summarised at the end.
+        skipped: List[Tuple[str, str, str, str]] = []
+
+        def _first_name(el) -> str:
+            n = el.find(_tag("name"))
+            return n.text.strip() if n is not None and n.text else ""
 
         # --- Property definitions (id -> name) ---
         # DOGFOOD-004: OEF stores properties indirectly — each <property> on
@@ -321,6 +328,13 @@ class ArchiMateImportService:
                 )
                 if pd_id:
                     property_defs[pd_id] = pd_name
+                declared = (pd.get("type") or "").strip()
+                if declared and declared.lower() != "string":
+                    skipped.append((
+                        "declared property type", pd_name, pd_id,
+                        f"the declared type '{declared}' is ignored; each value is "
+                        "checked against the property's template instead",
+                    ))
 
         # --- Elements ---
         elements_container = root.find(_tag("elements"))
@@ -346,6 +360,22 @@ class ArchiMateImportService:
                     if doc_el is not None and doc_el.text
                     else None
                 )
+                for _extra in elem.findall(_tag("documentation"))[1:]:
+                    skipped.append((
+                        "extra language documentation", elem_name or identifier, identifier,
+                        "only the first documentation text is imported",
+                    ))
+                for _extra in elem.findall(_tag("name"))[1:]:
+                    skipped.append((
+                        "extra language name", elem_name or identifier, identifier,
+                        "only the first name is imported; other-language names are not kept",
+                    ))
+                if identifier:
+                    skipped.append((
+                        "element identifier", elem_name or identifier, identifier,
+                        "the file's identifier links relationships during the "
+                        "import but is not stored",
+                    ))
 
                 layer = self.TYPE_TO_LAYER.get(elem_type, "")
                 if not layer:
@@ -393,6 +423,13 @@ class ArchiMateImportService:
                     for prop in props_container.findall(_tag("property")):
                         pd_ref = prop.get("propertyDefinitionRef", "")
                         value_el = prop.find(_tag("value"))
+                        for _extra in prop.findall(_tag("value"))[1:]:
+                            skipped.append((
+                                "extra language value",
+                                f"{elem_name or identifier} / {property_defs.get(pd_ref, pd_ref)}",
+                                identifier,
+                                "only the first value of a property is imported",
+                            ))
                         value = (
                             value_el.text.strip()
                             if value_el is not None and value_el.text
@@ -434,6 +471,56 @@ class ArchiMateImportService:
                     )
                     continue
 
+                rel_label = _first_name(rel) or identifier
+                if identifier:
+                    skipped.append((
+                        "relationship identifier", rel_label, identifier,
+                        "the file's identifier is not stored",
+                    ))
+                handled = {"identifier", "source", "target", f"{{{_XSI_NS}}}type",
+                           "xsi:type", "type"}
+                access_type = rel.get("accessType")
+                if access_type is not None:
+                    handled.add("accessType")
+                    skipped.append((
+                        "relationship access type", f"{rel_label} ({access_type})", identifier,
+                        "the access direction is not stored; the relationship imports as a plain Access"
+                        if rel_type.lower() == "access"
+                        else "the access type is not stored for this relationship",
+                    ))
+                if rel.get("isDirected") is not None:
+                    handled.add("isDirected")
+                    skipped.append((
+                        "relationship access type / direction", rel_label, identifier,
+                        "isDirected is not stored; the direction is not kept",
+                    ))
+                for attr in rel.attrib:
+                    if attr not in handled and not attr.startswith("{"):
+                        skipped.append((
+                            "relationship attribute", f"{rel_label} / {attr}", identifier,
+                            f"the attribute '{attr}' is not imported",
+                        ))
+                if rel.find(_tag("name")) is not None:
+                    skipped.append((
+                        "relationship name", rel_label, identifier,
+                        "relationship names are not imported",
+                    ))
+                rel_props = rel.find(_tag("properties"))
+                if rel_props is not None:
+                    for prop in rel_props.findall(_tag("property")):
+                        ref = prop.get("propertyDefinitionRef", "")
+                        skipped.append((
+                            "relationship property",
+                            property_defs.get(ref, ref) or rel_label,
+                            identifier,
+                            "relationship properties are not imported",
+                        ))
+
+                for _extra in rel.findall(_tag("documentation"))[1:]:
+                    skipped.append((
+                        "extra language documentation", rel_label, identifier,
+                        "only the first documentation text is imported",
+                    ))
                 rel_doc_el = rel.find(_tag("documentation"))
                 rel_description = (
                     rel_doc_el.text.strip()
@@ -449,13 +536,109 @@ class ArchiMateImportService:
                     "description": rel_description,
                 })
 
+        # --- Model-level properties and documentation ---
+        for _doc in root.findall(_tag("documentation")):
+            skipped.append((
+                "model documentation", model_name or "model", "",
+                "model-level documentation is not imported",
+            ))
+        model_props = root.find(_tag("properties"))
+        if model_props is not None:
+            for prop in model_props.findall(_tag("property")):
+                ref = prop.get("propertyDefinitionRef", "")
+                skipped.append((
+                    "model property", property_defs.get(ref, ref) or "model", "",
+                    "model-level properties are not imported",
+                ))
+
+        # --- Views and folders: not imported, and said so ---
+        views_container = root.find(_tag("views"))
+        if views_container is not None:
+            for view in views_container.iter(_tag("view")):
+                skipped.append((
+                    "view", _first_name(view) or view.get("identifier", ""),
+                    view.get("identifier", ""), "views are not imported",
+                ))
+        orgs_container = root.find(_tag("organizations"))
+        if orgs_container is not None:
+            for item in orgs_container.iter(_tag("item")):
+                label = item.find(_tag("label"))
+                if label is not None:
+                    skipped.append((
+                        "folder",
+                        (label.text or "").strip() or item.get("identifier", ""),
+                        item.get("identifier", ""), "folders are not imported",
+                    ))
+
         return {
             "model_name": model_name,
             "elements": elements,
             "relationships": relationships,
             "errors": errors,
+            "unrepresentable": self._summarise_unsupported(skipped),
             "source_xml": xml_content,
         }
+
+    # A kind with more constructs than this is one entry with a count and
+    # a few examples, so the returned list stays small on a large file.
+    UNSUPPORTED_DETAIL_LIMIT = 5
+
+    # Longest text echoed back into the report for any one field.
+    UNSUPPORTED_TEXT_LIMIT = 80
+
+    @classmethod
+    def _clip(cls, value):
+        if isinstance(value, str) and len(value) > cls.UNSUPPORTED_TEXT_LIMIT:
+            return value[: cls.UNSUPPORTED_TEXT_LIMIT - 3] + "..."
+        return value
+
+    @classmethod
+    def _summarise_unsupported(cls, skipped) -> List[Dict[str, Any]]:
+        """Entries for (kind, where, identifier, reason) rows, aggregated per kind."""
+        return cls._aggregate_entries([
+            {
+                "kind": kind, "element": where, "identifier": identifier,
+                "key": None, "value": None, "reason": reason, "count": 1,
+            }
+            for kind, where, identifier, reason in skipped
+        ])
+
+    @classmethod
+    def _aggregate_entries(cls, entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Keep up to UNSUPPORTED_DETAIL_LIMIT entries of a kind as they are;
+        above that, one entry with the count and the first few examples."""
+        by_kind: Dict[str, List[Dict[str, Any]]] = {}
+        for entry in entries:
+            entry = {
+                k: (cls._clip(v) if k in ("element", "identifier", "key", "value", "reason") else v)
+                for k, v in entry.items()
+            }
+            by_kind.setdefault(entry["kind"], []).append(entry)
+        out: List[Dict[str, Any]] = []
+        for kind, rows in by_kind.items():
+            if len(rows) <= cls.UNSUPPORTED_DETAIL_LIMIT:
+                out.extend(rows)
+                continue
+            examples = []
+            for row in rows[: cls.UNSUPPORTED_DETAIL_LIMIT]:
+                name = row["element"]
+                if row.get("key"):
+                    name = f"{name} / {row['key']}"
+                examples.append({
+                    "name": name, "identifier": row.get("identifier", ""),
+                    "reason": row["reason"],
+                })
+            out.append({
+                "kind": kind,
+                "element": f"{len(rows)} found",
+                "identifier": "",
+                "key": None,
+                "value": None,
+                "reason": rows[0]["reason"],
+                "count": len(rows),
+                "examples": examples,
+            })
+        return out
 
     # ------------------------------------------------------------------
     # Relationship classification — shared by preview and execute so the
@@ -652,6 +835,7 @@ class ArchiMateImportService:
             },
             "relationships": relationships_preview,
             "errors": parsed_data.get("errors", []),
+            "unrepresentable": list(parsed_data.get("unrepresentable", [])),
         }
 
     # ------------------------------------------------------------------
@@ -743,13 +927,25 @@ class ArchiMateImportService:
         created_ids: List[int] = []
         element_results: List[Dict[str, Any]] = []
         relationship_results: List[Dict[str, Any]] = []
+        unrepresentable: List[Dict[str, Any]] = list(parsed_data.get("unrepresentable", []))
+        property_refusals: List[Dict[str, Any]] = []
+        model_name_full = (parsed_data.get("model_name") or "").strip()
+        if len(model_name_full) > self.MAX_NAME_LENGTH:
+            unrepresentable.append({
+                "kind": "model name", "element": model_name_full[:40] + "...",
+                "identifier": "", "key": None, "value": None, "count": 1,
+                "reason": (
+                    f"the model name has {len(model_name_full)} characters; it is cut to "
+                    f"{self.MAX_NAME_LENGTH} in the import record"
+                ),
+            })
 
         # Snapshot for restore: opened before anything is written, on the
         # import's own session-log row; None outside a signed-in request.
         from app.services import import_snapshot_service
 
         snapshot = import_snapshot_service.begin(
-            strategy=strategy, model_name=(parsed_data.get("model_name") or "")[:100]
+            strategy=strategy, model_name=(parsed_data.get("model_name") or "")[:255]
         )
         model_id = self._record_model(ArchitectureModel, parsed_data)
         if snapshot is not None:
@@ -767,22 +963,57 @@ class ArchiMateImportService:
                 "status": status,
             })
 
-        def _write_properties(target_row, props: Dict[str, str], merge: bool) -> None:
+        def _write_properties(target_row, props: Dict[str, str], merge: bool) -> list:
             """Persist parsed <properties> onto custom_properties (DOGFOOD-004).
 
             Every property is a literal key, value as parsed — no renaming,
             no coercion. ``archie:imported_at`` is the one namespaced,
             reserved key, recording provenance for a future model-age
             measurement (ADR 0009 names no field of its own).
+
+            A value is kept in ``custom_properties`` only when the typed write
+            accepted it (or the key has no template). A refused value is
+            returned, never stored, so an export cannot carry it back out.
+
+            Returns a list of (key, value, reason) tuples for properties
+            that could not be represented as typed values.
             """
+            from app.modules.architecture_assistant.property_service import (
+                PropertyService,
+                PropertyValidationError,
+                ReservedPropertyError,
+            )
+
+            unrepresentable: list = []
             if not props:
-                return
+                return unrepresentable
             base = dict(target_row.custom_properties or {}) if merge else {}
-            base.update(props)
+            psvc = PropertyService()
+            for key, value in props.items():
+                try:
+                    psvc.set_element_property(
+                        target_row, key, value, source="import"
+                    )
+                except ReservedPropertyError:
+                    unrepresentable.append(
+                        (key, value, "This property is set by the system and cannot be imported.")
+                    )
+                    continue
+                except PropertyValidationError as exc:
+                    unrepresentable.append((key, value, str(exc)))
+                    continue
+                except Exception:
+                    unrepresentable.append(
+                        (key, value, "Could not store this property value.")
+                    )
+                    continue
+                base[key] = value
             base["archie:imported_at"] = datetime.now(timezone.utc).isoformat()
             target_row.custom_properties = base
+            return unrepresentable
 
         for elem in elements:
+            pending_unrepresentable: List[Dict[str, Any]] = []
             name = elem["name"].strip()
             name_lower = name.lower()
             elem_type = elem["type"]
@@ -825,7 +1056,16 @@ class ArchiMateImportService:
                             architecture_id=model_id,
                         )
                         db.session.add(new_elem)
-                        _write_properties(new_elem, props, merge=False)
+                        for key, val, reason in _write_properties(new_elem, props, merge=False):
+                            pending_unrepresentable.append({
+                                "kind": "property",
+                                "count": 1,
+                                "element": name,
+                                "identifier": identifier,
+                                "key": key,
+                                "value": val,
+                                "reason": reason,
+                            })
                         db.session.flush()
                         if identifier:
                             id_map[identifier] = {"db_id": new_elem.id, "type": elem_type}
@@ -840,7 +1080,16 @@ class ArchiMateImportService:
                             snapshot.note_updated_element(existing)
                         if description is not None:
                             existing.description = description
-                        _write_properties(existing, props, merge=True)
+                        for key, val, reason in _write_properties(existing, props, merge=True):
+                            pending_unrepresentable.append({
+                                "kind": "property",
+                                "count": 1,
+                                "element": name,
+                                "identifier": identifier,
+                                "key": key,
+                                "value": val,
+                                "reason": reason,
+                            })
                         db.session.flush()
                         if identifier:
                             id_map[identifier] = {"db_id": existing.id, "type": existing.type}
@@ -873,6 +1122,9 @@ class ArchiMateImportService:
                     "was still imported."
                 )
                 continue
+
+            # Only an element that was written reports what it could not keep.
+            property_refusals.extend(pending_unrepresentable)
 
             if created_row is not None:
                 domain = self._create_domain_row(created_row)
@@ -992,6 +1244,7 @@ class ArchiMateImportService:
                 "model_id": None,
                 "element_results": [],
                 "relationship_results": [],
+                "unrepresentable": [],
             }
 
         logger.info(
@@ -1000,6 +1253,8 @@ class ArchiMateImportService:
             created, updated, skipped, failed,
             relationships_created, relationships_skipped, len(relationships_failed),
         )
+
+        unrepresentable.extend(self._aggregate_entries(property_refusals))
 
         return {
             "created": created,
@@ -1014,6 +1269,7 @@ class ArchiMateImportService:
             "model_id": model_id,
             "element_results": element_results,
             "relationship_results": relationship_results,
+            "unrepresentable": unrepresentable,
         }
 
     # ------------------------------------------------------------------
@@ -1034,7 +1290,7 @@ class ArchiMateImportService:
         try:
             with db.session.begin_nested():
                 record = model_cls(
-                    name=name[:100],
+                    name=name[:255],
                     version="1.0",
                     model_data=parsed_data.get("source_xml"),
                 )

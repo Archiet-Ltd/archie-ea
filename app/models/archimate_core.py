@@ -35,7 +35,7 @@ if _FAST_INIT:
         __table_args__ = {"extend_existing": True}
 
         id = db.Column(db.Integer, primary_key=True)
-        name = db.Column(db.String(100), nullable=False)
+        name = db.Column(db.String(255), nullable=False)
         version = db.Column(db.String(20))
         model_data = db.Column(db.Text)
         is_default = db.Column(db.Boolean, default=False, nullable=True)
@@ -434,7 +434,7 @@ class OtherRelationship(db.Model):
     __tablename__ = "other_relationships"
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100))
+    name = db.Column(db.String(255))
     relationship_type = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text)
     architecture_id = db.Column(db.Integer, nullable=True)
