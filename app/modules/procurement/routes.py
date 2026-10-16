@@ -14,6 +14,7 @@ from flask_login import current_user, login_required
 
 from app.decorators import requires_procurement, requires_procurement_or_finance
 from app.models.application_portfolio import VendorContract
+from app.models.contract_application import ContractApplication
 from app.models.license_entitlement import LicenseEntitlement
 
 from . import procurement_bp
@@ -23,6 +24,7 @@ from . import procurement_bp
 from .services import (
     get_contract_amounts,
     get_days_until_renewal,
+    get_last_day_to_cancel,
     get_renewal_summary,
     get_renewal_urgency,
     get_spend_by_category,
@@ -135,10 +137,16 @@ def contract_detail(contract_id):
         organization_id=org_id
     ).all()
 
+    # Get applications linked to this contract
+    linked_applications = ContractApplication.get_applications_for_contract(
+        contract_id, org_id
+    )
+
     return render_template(
         "procurement/contract_detail.html",
         contract=contract,
         licenses=licenses,
+        linked_applications=linked_applications,
     )
 
 
@@ -167,12 +175,19 @@ def renewals_dashboard():
         if days is None:
             continue
         if days <= days_filter:  # includes expired (negative days)
+            last_day = get_last_day_to_cancel(c)
             items.append({
                 "contract": c,
                 "urgency": get_renewal_urgency(c),
                 "days_until_renewal": days,
+                "last_day_to_cancel": last_day,
             })
-    items.sort(key=lambda i: i["days_until_renewal"])
+    # Sort by last day to cancel (ascending), then by days until renewal.
+    # Contracts with no last day to cancel sort after those with one.
+    items.sort(key=lambda i: (
+        i["last_day_to_cancel"] is None,
+        i["last_day_to_cancel"] or date.max,
+    ))
 
     return render_template(
         "procurement/renewals_dashboard.html",

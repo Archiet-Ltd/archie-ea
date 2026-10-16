@@ -23,6 +23,17 @@ def get_days_until_renewal(contract: VendorContract) -> Optional[int]:
     return (target_date - date.today()).days
 
 
+def get_last_day_to_cancel(contract: VendorContract) -> Optional[date]:
+    """Calculate the last day to cancel this contract.
+
+    Last day to cancel = renewal_date - notice_period_days.
+    Returns None if either renewal_date or notice_period_days is missing.
+    """
+    if not contract.renewal_date or contract.notice_period_days is None:
+        return None
+    return contract.renewal_date - timedelta(days=contract.notice_period_days)
+
+
 def get_renewal_urgency(contract: VendorContract) -> str:
     """
     Determine renewal urgency level based on days remaining.

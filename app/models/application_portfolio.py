@@ -819,7 +819,7 @@ class VendorContract(TenantMixin, db.Model):
     end_date = Column(db.Date)
     renewal_date = Column(db.Date)
     auto_renewal = Column(db.Boolean, default=False)
-    notice_period_days = Column(db.Integer, default=90)
+    notice_period_days = Column(db.Integer, nullable=True)
 
     # License and usage terms
     license_type = Column(
