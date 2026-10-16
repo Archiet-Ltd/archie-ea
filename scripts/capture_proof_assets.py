@@ -238,6 +238,8 @@ def capture_home_product(browser, base, password, wide: bool) -> tuple[int, int]
         if not figures or int(figures[0].replace(",", "")) == 0:
             raise SystemExit(f"home product: headline tile {label!r} reads zero or empty; run seed-demo-company first")
     if wide:
+        page.locator("[data-testid='btn-density-toggle']").click()
+        page.wait_for_timeout(300)
         # The tiles, banner and filters fill the first 800px; scroll the content the way a
         # user would until the list card sits under the top bar, so the rows show.
         page.evaluate(
@@ -245,7 +247,7 @@ def capture_home_product(browser, base, password, wide: bool) -> tuple[int, int]
               const card = document.querySelector("[data-testid='filter-bar']").parentElement;
               let el = card.parentElement;
               while (el && !/(auto|scroll)/.test(getComputedStyle(el).overflowY)) el = el.parentElement;
-              (el || document.scrollingElement).scrollTop += card.getBoundingClientRect().top - 150;
+              (el || document.scrollingElement).scrollTop += card.getBoundingClientRect().top - 105;
             }"""
         )
         page.wait_for_timeout(500)
@@ -260,7 +262,7 @@ def capture_home_product(browser, base, password, wide: bool) -> tuple[int, int]
         top = _box(page, "h1")["y"] - 8
         # Whole blocks only: the tiles, the data-quality banner, then the cards if they fit.
         bottom = top
-        for sel in ("[role='region'][aria-label='Portfolio statistics']", "div.border-warning\/30", "[data-testid^='mobile-card-']"):
+        for sel in ("[role='region'][aria-label='Portfolio statistics'] > *", "[data-testid^='mobile-card-']"):
             for i in range(page.locator(sel).count()):
                 box = page.locator(sel).nth(i).bounding_box()
                 if box and box["height"] > 0 and box["y"] + box["height"] + 8 - top <= 780:
