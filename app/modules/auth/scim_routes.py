@@ -28,6 +28,7 @@ from functools import wraps
 from flask import Blueprint, Response, g, jsonify, request, url_for
 
 from app.extensions import db
+from app.middleware.tenant_context import current_org_id
 from app.services import auth_audit, provisioning_service
 from app.services.billing_plans import PlanLimitReached
 from app.services.provisioning_service import ProvisioningError
@@ -151,10 +152,6 @@ def _route(rule, methods):
         return scim_bp.route(rule, methods=methods)(guarded)
 
     return decorator
-
-
-def _org_id():
-    return g.current_org_id
 
 
 def _actor():
@@ -361,7 +358,7 @@ def _user_resource(user):
 
 
 def _group_resource(group):
-    org_id = _org_id()
+    org_id = current_org_id()
     members = []
     for uid in provisioning_service.group_member_ids(org_id, group.id):
         user = provisioning_service.get_user(org_id, uid)
@@ -397,14 +394,14 @@ def _list_response(resources, total, start):
 
 
 def _user_or_404(user_id):
-    user = provisioning_service.get_user(_org_id(), user_id)
+    user = provisioning_service.get_user(current_org_id(), user_id)
     if user is None:
         raise provisioning_service.NotFoundError("Resource not found.")
     return user
 
 
 def _group_or_404(group_id):
-    group = provisioning_service.get_group(_org_id(), group_id)
+    group = provisioning_service.get_group(current_org_id(), group_id)
     if group is None:
         raise provisioning_service.NotFoundError("Resource not found.")
     return group
@@ -422,7 +419,7 @@ def scim_list_users():
     from app.models.user import User
 
     start, count = _paging()
-    query = provisioning_service.users_of_org(_org_id())
+    query = provisioning_service.users_of_org(current_org_id())
     flt = request.args.get("filter")
     if flt:
         match = _USER_FILTER.match(flt)
@@ -450,7 +447,7 @@ def scim_get_user(user_id):
 def scim_create_user():
     attrs = _attrs_from_resource(_json_body())
     user, _created, _changed = provisioning_service.create_or_update_user(
-        _org_id(), attrs, source=provisioning_service.SOURCE_SCIM, actor=_actor()
+        current_org_id(), attrs, source=provisioning_service.SOURCE_SCIM, actor=_actor()
     )
     resource = _user_resource(user)
     return scim_response(resource, 201, {"Location": resource["meta"]["location"]})
@@ -461,7 +458,7 @@ def scim_replace_user(user_id):
     user = _user_or_404(user_id)
     attrs = _attrs_from_resource(_json_body())
     user, _created, _changed = provisioning_service.create_or_update_user(
-        _org_id(), attrs, source=provisioning_service.SOURCE_SCIM, user=user, actor=_actor()
+        current_org_id(), attrs, source=provisioning_service.SOURCE_SCIM, user=user, actor=_actor()
     )
     return scim_response(_user_resource(user))
 
@@ -471,7 +468,7 @@ def scim_patch_user(user_id):
     user = _user_or_404(user_id)
     attrs = _attrs_from_patch(_json_body())
     user, _created, _changed = provisioning_service.create_or_update_user(
-        _org_id(), attrs, source=provisioning_service.SOURCE_SCIM, user=user, actor=_actor()
+        current_org_id(), attrs, source=provisioning_service.SOURCE_SCIM, user=user, actor=_actor()
     )
     return scim_response(_user_resource(user))
 
@@ -479,7 +476,7 @@ def scim_patch_user(user_id):
 @_route("/Users/<user_id>", ["DELETE"])
 def scim_delete_user(user_id):
     user = _user_or_404(user_id)
-    provisioning_service.require_sole_organisation(user, _org_id())
+    provisioning_service.require_sole_organisation(user, current_org_id())
     provisioning_service.deactivate_user(
         user, reason=provisioning_service.REASON_LEAVER, actor=_actor()
     )
@@ -515,7 +512,7 @@ def scim_list_groups():
         if not match:
             raise ProvisioningError("Unsupported filter.", scim_type="invalidFilter")
         name = match.group("value")
-    groups = provisioning_service.list_groups(_org_id(), name)
+    groups = provisioning_service.list_groups(current_org_id(), name)
     total = len(groups)
     page = groups[start - 1:start - 1 + count] if count and start <= total else []
     return _list_response([_group_resource(g_) for g_ in page], total, start)
@@ -529,10 +526,10 @@ def scim_get_group(group_id):
 @_route("/Groups", ["POST"])
 def scim_create_group():
     body = _json_body()
-    group, _created = provisioning_service.create_group(_org_id(), body.get("displayName"), _actor())
+    group, _created = provisioning_service.create_group(current_org_id(), body.get("displayName"), _actor())
     if body.get("members"):
         provisioning_service.add_group_members(
-            _org_id(), group, _member_ids(body["members"]), _actor()
+            current_org_id(), group, _member_ids(body["members"]), _actor()
         )
     resource = _group_resource(group)
     return scim_response(resource, 201, {"Location": resource["meta"]["location"]})
@@ -553,7 +550,7 @@ def scim_replace_group(group_id):
     body = _json_body()
     _check_display_name(group, body)
     provisioning_service.set_group_members(
-        _org_id(), group, _member_ids(body.get("members") or []), _actor()
+        current_org_id(), group, _member_ids(body.get("members") or []), _actor()
     )
     return scim_response(_group_resource(group))
 
@@ -568,7 +565,7 @@ def scim_patch_group(group_id):
     ops = body.get("Operations")
     if not isinstance(ops, list) or not ops:
         raise ProvisioningError("Operations must be a non-empty list.", scim_type="invalidSyntax")
-    org_id = _org_id()
+    org_id = current_org_id()
     for operation in ops:
         if not isinstance(operation, dict):
             raise ProvisioningError("Each operation must be an object.", scim_type="invalidSyntax")
@@ -624,7 +621,7 @@ def _members_op(org_id, group, op, ids):
 @_route("/Groups/<group_id>", ["DELETE"])
 def scim_delete_group(group_id):
     group = _group_or_404(group_id)
-    provisioning_service.delete_group(_org_id(), group, _actor())
+    provisioning_service.delete_group(current_org_id(), group, _actor())
     return Response(status=204)
 
 

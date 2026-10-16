@@ -204,11 +204,11 @@ def init_session_policy(app):
             session.clear()
             logout_user()
             logger.info("Request refused for deactivated user %s", _deactivated.get_id())
-            from app.services import auth_audit
+            from app.services import auth_audit, session_registry
 
             auth_audit.record_session_rejected(_deactivated, "user_deactivated")
             resp = _reject_response(
-                request, "deactivated", "This account is not active. Contact your administrator."
+                request, "deactivated", session_registry.INACTIVE_ACCOUNT_MESSAGE
             )
             _force_clear_remember_cookie(resp)
             return resp

@@ -333,6 +333,7 @@ class ApplicationOwner(db.Model):
         ).first() is not None
 
     @classmethod
+    # reuse-ok: the one duplicate-owner lookup, used by both owner writers and the leaver transfer; not a name matcher
     def find_duplicate(
         cls,
         user_id,

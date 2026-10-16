@@ -86,12 +86,24 @@ def test_v3_01_org_ids_for_and_is_org_admin_anywhere_ignore_login_state(db_sessi
     assert rbac_service.is_org_admin_anywhere(person) is True
 
 
+def _body_without_docstring(fn):
+    """The function's source with its docstring removed (the docstring may explain, not do)."""
+    import ast
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(fn)))
+    node = tree.body[0]
+    if node.body and isinstance(node.body[0], ast.Expr) and isinstance(node.body[0].value, ast.Constant)             and isinstance(node.body[0].value.value, str):
+        node.body = node.body[1:] or [ast.Pass()]
+    return ast.unparse(node)
+
+
 def test_v3_01_readers_do_not_touch_the_session_and_the_old_ones_are_gone():
     from app.services import provisioning_service
     from app.services.rbac_service import rbac_service
 
     for fn in (rbac_service.org_ids_for, rbac_service.is_org_admin_anywhere):
-        src = inspect.getsource(fn)
+        src = _body_without_docstring(fn)
         for banned in ("accessible_organizations", "is_authenticated", "is_active", "current_user", "session"):
             assert banned not in src, (fn.__name__, banned)
         assert not re.search(r"\bg\.", src)
@@ -554,3 +566,90 @@ def test_a_refused_organisation_sign_in_leaves_a_deactivated_record_unchanged(db
     assert returned.id == member.id and not returned.is_active
     db_session.refresh(member)
     assert _state(member) == before
+
+
+# ---------------------------------------------------------------------------
+# Stored-pair rules of the global callbacks
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("label", _LABELS)
+def test_same_provider_different_subject_is_refused(app, db_session, make_org, monkeypatch, label):
+    _org_c, org_b = _orgs(db_session, make_org, f"pairs{label}")
+    member = make_user(db_session, org_b, "pairs", external_id="sub-a", sso_provider="google")
+    before = _state(member)
+    resp, snap = _run_callback(
+        app, monkeypatch, _module(label), {"email": member.email, "sub": "sub-b"}, trusted=True
+    )
+    assert "_user_id" not in snap and "_mfa_pending_user_id" not in snap
+    db_session.refresh(member)
+    assert _state(member) == before
+
+
+@pytest.mark.parametrize("label", _LABELS)
+def test_different_provider_same_email_trusted_signs_in_and_keeps_the_pair(
+    app, db_session, make_org, monkeypatch, label
+):
+    _org_c, org_b = _orgs(db_session, make_org, f"diffp{label}")
+    member = make_user(db_session, org_b, "diffp", external_id="okta-sub", sso_provider="okta")
+    _resp, snap = _run_callback(
+        app, monkeypatch, _module(label), {"email": member.email, "sub": "g-sub"}, trusted=True
+    )
+    assert snap.get("_user_id") == str(member.id)
+    db_session.refresh(member)
+    assert (member.external_id, member.sso_provider) == ("okta-sub", "okta")
+
+
+@pytest.mark.parametrize("label", _LABELS)
+def test_an_organisation_sso_user_signs_in_through_the_global_okta_button(
+    app, db_session, make_org, monkeypatch, label
+):
+    from app.services.sso_service import SSOService
+
+    _org_c, org_b = _orgs(db_session, make_org, f"orgthenglobal{label}")
+    member = make_user(db_session, org_b, "orgsso")
+    SSOService().provision_user(org_b, {"email": member.email, "sub": "okta-sub", "name": "Org Sso"})
+    db_session.refresh(member)
+    assert member.sso_provider == "oidc"
+    _resp, snap = _run_callback(
+        app, monkeypatch, _module(label), {"email": member.email, "sub": "okta-sub"},
+        provider="okta", trusted=True,
+    )
+    assert snap.get("_user_id") == str(member.id)
+
+
+@pytest.mark.parametrize("label", _LABELS)
+def test_a_response_with_no_subject_for_an_account_with_one_is_refused(
+    app, db_session, make_org, monkeypatch, label
+):
+    _org_c, org_b = _orgs(db_session, make_org, f"nosub{label}")
+    member = make_user(db_session, org_b, "nosub", external_id="sub-a", sso_provider="google")
+    before = _state(member)
+    _resp, snap = _run_callback(
+        app, monkeypatch, _module(label), {"email": member.email}, trusted=True
+    )
+    assert "_user_id" not in snap and "_mfa_pending_user_id" not in snap
+    db_session.refresh(member)
+    assert _state(member) == before
+
+
+@pytest.mark.parametrize("label", _LABELS)
+def test_a_deactivated_user_with_a_legacy_azure_pair_is_refused_before_any_write(
+    app, db_session, make_org, monkeypatch, label
+):
+    from app.models.audit_log import AuditLog
+
+    _org_c, org_b = _orgs(db_session, make_org, f"legacy{label}")
+    member = make_user(db_session, org_b, "legacy", external_id="legacy-sub", sso_provider="azure")
+    _retire(db_session, member, True)
+    before = _state(member)
+    audit_rows = AuditLog.query.filter_by(record_id=member.id).count()
+
+    claims = {"email": f"new-{uuid.uuid4().hex[:6]}@example.com", "sub": "legacy-sub",
+              "tid": "contoso", "oid": "new-oid"}
+    _resp, snap = _run_callback(app, monkeypatch, _module(label), claims, provider="azure")
+
+    assert "_user_id" not in snap and "_mfa_pending_user_id" not in snap
+    db_session.refresh(member)
+    assert _state(member) == before
+    assert AuditLog.query.filter_by(record_id=member.id).count() == audit_rows

@@ -316,7 +316,7 @@ def test_f04_a_non_administrator_through_a_global_callback_lands_signed_in(
 
 
 @pytest.mark.parametrize("label", ["v1", "v2"])
-def test_d03_a_global_callback_never_replaces_a_set_external_id_and_refuses_the_sign_in(
+def test_d03_a_global_callback_never_replaces_a_set_external_id(
     app, db_session, make_org, monkeypatch, label
 ):
     module = {name: mod for name, mod, _ in _callbacks()}[label]
@@ -327,7 +327,9 @@ def test_d03_a_global_callback_never_replaces_a_set_external_id_and_refuses_the_
 
     resp, snap = _run_callback(app, monkeypatch, module, userinfo, trusted=True)
 
-    assert "_user_id" not in snap and "_mfa_pending_user_id" not in snap
+    # A stored pair for another provider is not a stored pair for this one:
+    # the trusted email match signs in and leaves the stored pair alone.
+    assert snap.get("_user_id") == str(member.id)
     db_session.refresh(member)
     assert member.external_id == "scim-set-id"
     assert member.sso_provider == "entra"

@@ -653,7 +653,14 @@ def sso_callback(provider):
     # unaffected by the email-claim trust checks below, exactly like
     # account_routes.py v1's sso_callback. Previously this route had no
     # subject-based lookup at all and re-resolved by email on every login.
-    user = find_linked_user(provider, userinfo, User) if external_id else None
+    user = find_linked_user(provider, userinfo, User, migrate=False) if external_id else None
+    if user is not None and not user.is_active:
+        # Refused before anything is written: no legacy-link migration and
+        # no audit row that touches the user.
+        flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
+        return redirect(url_for("account.login"))
+    if user is not None:
+        user = find_linked_user(provider, userinfo, User)
     if user is not None and User.normalize_email(email) != User.normalize_email(user.email):
         # Subject match, but the IdP's current email claim no longer
         # matches the stored address -- informational (the subject anchor

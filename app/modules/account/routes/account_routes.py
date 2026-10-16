@@ -683,7 +683,14 @@ def sso_callback(provider):
 
     # tenant-scoping-ok: pre-auth SSO callback, no org context yet -- scoped
     # by the (external_id, sso_provider) pair, which is unique per IdP.
-    user = find_linked_user(provider, userinfo, User)
+    user = find_linked_user(provider, userinfo, User, migrate=False)
+    if user is not None and not user.is_active:
+        # Refused before anything is written: no legacy-link migration and
+        # no audit row that touches the user.
+        flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
+        return redirect(url_for("account.login"))
+    if user is not None:
+        user = find_linked_user(provider, userinfo, User)
     if user is not None and User.normalize_email(email) != User.normalize_email(user.email):
         # Subject match, but the IdP's current email claim no longer
         # matches the stored address -- informational (the subject anchor

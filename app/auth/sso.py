@@ -257,7 +257,7 @@ def external_id_for(provider, userinfo):
     return userinfo.get("sub") or ""
 
 
-def find_linked_user(provider, userinfo, user_model):
+def find_linked_user(provider, userinfo, user_model, *, migrate=True):
     """Look up a user already linked to this (provider, subject) pair --
     the immutable-subject identity anchor that must keep authenticating a
     returning user unaffected by the email-claim trust checks below, even
@@ -274,6 +274,10 @@ def find_linked_user(provider, userinfo, user_model):
     expected to commit this mutation along with the rest of its unit of
     work. Okta is unaffected: it always matched on `sub` and keeps doing so.
 
+    With ``migrate=False`` the lookup is read-only: a legacy link is
+    recognised but its stored ``external_id`` is not rewritten, so a caller
+    can refuse a deactivated user before anything is written.
+
     Returns the matching user, or None when no link exists yet.
     """
     if provider == "azure":
@@ -286,7 +290,8 @@ def find_linked_user(provider, userinfo, user_model):
             user = user_model.query.filter_by(external_id=legacy_sub, sso_provider=provider).first()
             if user is not None:
                 # Migrate a pre-fix link to the new tenant-qualified scheme.
-                user.external_id = composite
+                if migrate:
+                    user.external_id = composite
                 return user
         return None
 
@@ -353,17 +358,21 @@ def sso_email_claim_is_trusted_for(provider, userinfo, existing_user):
 
 
 def sso_pair_belongs_to_other_subject(candidate, provider, external_id):
-    """True when *candidate* already carries a stored (external_id,
-    sso_provider) pair that differs from the one the claims name.
+    """True when a trusted email match must be refused because *candidate*
+    already has a stored subject that these claims do not prove.
 
-    A trusted email match may first-link an account that has no stored
-    subject; it never signs in, or links, an account whose stored subject is
-    a different one -- that is a different person (or a different provider
-    identity) claiming the same address. Shared by both global callbacks.
+    Refused: the stored pair is for the same provider under a different
+    subject, or the claims carry no subject at all for an account that has
+    one. A stored pair for a different provider (including organisation SSO's
+    "oidc") is not a stored pair for this one: that case follows the
+    no-stored-pair path and the stored pair is left as it is. Shared by both
+    global callbacks.
     """
-    if not candidate.external_id or not external_id:
+    if not candidate.external_id:
         return False
-    return candidate.external_id != external_id or candidate.sso_provider != provider
+    if not external_id:
+        return True
+    return candidate.sso_provider == provider and candidate.external_id != external_id
 
 
 def create_sso_user(*, email, first_name, last_name, external_id, sso_provider):
