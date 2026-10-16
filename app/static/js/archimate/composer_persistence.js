@@ -17,7 +17,11 @@ let ComposerPersistence = (function() {
     /* A short, non-blocking sentence for content an import could not keep:
        counts plus the first five examples. Returns '' when nothing was left out. */
     function notImportedMessage(unrepresentable, truncatedNames) {
-        let items = unrepresentable || [];
+        /* File identifiers are never stored, in every file; they stay in the
+           returned list but are not "left out" content worth a toast. */
+        let items = (unrepresentable || []).filter(function(item) {
+            return item.kind !== 'element identifier' && item.kind !== 'relationship identifier';
+        });
         let cut = truncatedNames || [];
         if (!items.length && !cut.length) return '';
         let total = 0;

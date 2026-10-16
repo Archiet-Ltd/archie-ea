@@ -54,14 +54,17 @@ def _by_kind(parsed):
     return out
 
 
-def test_relationship_access_type_is_carried_not_dropped():
+def test_relationship_access_type_is_reported():
     parsed = ArchiMateImportService().parse_oef_xml(OEF_MODIFIERS)
-    r1 = next(r for r in parsed["relationships"] if r["identifier"] == "R1")
-    assert r1["access_mode"] == "read"
+    assert all("access_mode" not in r for r in parsed["relationships"])
     kinds = _by_kind(parsed)
-    # Only the access type on a non-access relationship, and isDirected, are reported.
-    labels = sorted(i["element"] for i in kinds["relationship access type / direction"])
-    assert labels == ["R2", "R3"]
+    access = kinds["relationship access type"]
+    assert [i["identifier"] for i in access] == ["R1", "R3"]
+    assert access[0]["element"] == "R1 (Read)"
+    assert access[0]["reason"] == (
+        "the access direction is not stored; the relationship imports as a plain Access"
+    )
+    assert [i["element"] for i in kinds["relationship access type / direction"]] == ["R2"]
     assert [i["element"] for i in kinds["relationship attribute"]] == ["R3 / custom"]
 
 
@@ -74,10 +77,22 @@ def test_other_unstored_content_is_reported():
     assert kinds["model property"][0]["element"] == "tag"
 
 
-def test_exporter_maps_access_modes():
-    from app.services import archimate_oef_service as mod
+def test_second_language_relationship_documentation_is_reported():
+    xml = OEF_MODIFIERS.replace(
+        '<relationship identifier="R2" source="A1" target="D1" xsi:type="Association" isDirected="true"/>',
+        '<relationship identifier="R2" source="A1" target="D1" xsi:type="Association">'
+        '<documentation xml:lang="en">a</documentation><documentation xml:lang="de">b</documentation>'
+        '</relationship>',
+    )
+    kinds = _by_kind(ArchiMateImportService().parse_oef_xml(xml))
+    assert any(i["element"] == "R2" for i in kinds["extra language documentation"])
 
-    assert mod._ACCESS_MODE_TO_OEF == {"read": "Read", "write": "Write", "readwrite": "ReadWrite"}
+
+def test_reported_text_is_bounded():
+    entries = [{"kind": "property", "element": "E" * 500, "identifier": "", "key": "k" * 500,
+                "value": "v" * 500, "reason": "r" * 500, "count": 1}]
+    out = ArchiMateImportService._aggregate_entries(entries)[0]
+    assert all(len(out[k]) <= 80 for k in ("element", "key", "value", "reason"))
 
 
 def test_many_property_refusals_become_one_entry():
@@ -138,6 +153,14 @@ def test_composer_message_has_counts_and_first_five_examples():
     assert "view: V4" in text and "view: V5" not in text
 
 
+def test_clean_large_file_gives_no_toast_text():
+    items = (
+        [{"kind": "element identifier", "element": "%d found" % 1000, "count": 1000}]
+        + [{"kind": "relationship identifier", "element": "%d found" % 2000, "count": 2000}]
+    )
+    assert _message(items, []) == ""
+
+
 def test_composer_message_uses_aggregate_examples():
     items = [{"kind": "property", "element": "400 found", "count": 400,
               "examples": [{"name": "E1 / k", "identifier": ""}]}]
@@ -158,17 +181,16 @@ def test_composer_scripts_surface_the_report():
 # --- database-backed ---------------------------------------------------------
 
 @db_required
-def test_access_type_survives_import_and_export(app, db_session, make_org, tenant_ctx):
+def test_access_type_is_reported_and_nothing_is_stored(app, db_session, make_org, tenant_ctx):
     from app.models.archimate_core import ArchiMateRelationship
-    from app.services.archimate_oef_service import ArchiMateOEFService
 
     org = make_org("access-type")
     with tenant_ctx(org.id):
         svc = ArchiMateImportService()
-        svc.execute_import(svc.parse_oef_xml(OEF_MODIFIERS), strategy="skip_duplicates")
+        result = svc.execute_import(svc.parse_oef_xml(OEF_MODIFIERS), strategy="skip_duplicates")
         rel = ArchiMateRelationship.query.filter_by(type="access").first()
-        assert rel is not None and rel.access_mode == "read"
-        assert 'accessType="Read"' in ArchiMateOEFService().export_model()
+        assert rel is not None and rel.access_mode is None
+        assert any(u["kind"] == "relationship access type" for u in result["unrepresentable"])
 
 
 @db_required
@@ -203,7 +225,7 @@ def test_import_endpoint_returns_unrepresentable(app, db_session, make_org, tena
         resp = client.post("/archimate/api/import/oef", json={"xml_content": OEF_MODIFIERS})
         assert resp.status_code == 200, resp.get_data(as_text=True)
         kinds = {u["kind"] for u in resp.get_json()["unrepresentable"]}
-        assert "relationship identifier" in kinds
+        assert "relationship access type" in kinds
         assert "model documentation" in kinds
 
 

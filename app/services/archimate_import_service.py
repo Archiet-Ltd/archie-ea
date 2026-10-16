@@ -477,20 +477,17 @@ class ArchiMateImportService:
                         "relationship identifier", rel_label, identifier,
                         "the file's identifier is not stored",
                     ))
-                access_mode = None
                 handled = {"identifier", "source", "target", f"{{{_XSI_NS}}}type",
                            "xsi:type", "type"}
                 access_type = rel.get("accessType")
                 if access_type is not None:
                     handled.add("accessType")
-                    mapped = self.ACCESS_TYPE_TO_MODE.get(access_type.strip().lower(), "?")
-                    if rel_type.lower() != "access" or mapped == "?":
-                        skipped.append((
-                            "relationship access type / direction", rel_label, identifier,
-                            f"accessType '{access_type}' is not stored for this relationship",
-                        ))
-                    else:
-                        access_mode = mapped
+                    skipped.append((
+                        "relationship access type", f"{rel_label} ({access_type})", identifier,
+                        "the access direction is not stored; the relationship imports as a plain Access"
+                        if rel_type.lower() == "access"
+                        else "the access type is not stored for this relationship",
+                    ))
                 if rel.get("isDirected") is not None:
                     handled.add("isDirected")
                     skipped.append((
@@ -519,6 +516,11 @@ class ArchiMateImportService:
                             "relationship properties are not imported",
                         ))
 
+                for _extra in rel.findall(_tag("documentation"))[1:]:
+                    skipped.append((
+                        "extra language documentation", rel_label, identifier,
+                        "only the first documentation text is imported",
+                    ))
                 rel_doc_el = rel.find(_tag("documentation"))
                 rel_description = (
                     rel_doc_el.text.strip()
@@ -532,7 +534,6 @@ class ArchiMateImportService:
                     "source": source,
                     "target": target,
                     "description": rel_description,
-                    "access_mode": access_mode,
                 })
 
         # --- Model-level properties and documentation ---
@@ -582,10 +583,14 @@ class ArchiMateImportService:
     # a few examples, so the returned list stays small on a large file.
     UNSUPPORTED_DETAIL_LIMIT = 5
 
-    # OEF accessType to the stored access_mode ("Access" = unspecified).
-    ACCESS_TYPE_TO_MODE = {
-        "access": None, "read": "read", "write": "write", "readwrite": "readwrite",
-    }
+    # Longest text echoed back into the report for any one field.
+    UNSUPPORTED_TEXT_LIMIT = 80
+
+    @classmethod
+    def _clip(cls, value):
+        if isinstance(value, str) and len(value) > cls.UNSUPPORTED_TEXT_LIMIT:
+            return value[: cls.UNSUPPORTED_TEXT_LIMIT - 3] + "..."
+        return value
 
     @classmethod
     def _summarise_unsupported(cls, skipped) -> List[Dict[str, Any]]:
@@ -604,6 +609,10 @@ class ArchiMateImportService:
         above that, one entry with the count and the first few examples."""
         by_kind: Dict[str, List[Dict[str, Any]]] = {}
         for entry in entries:
+            entry = {
+                k: (cls._clip(v) if k in ("element", "identifier", "key", "value", "reason") else v)
+                for k, v in entry.items()
+            }
             by_kind.setdefault(entry["kind"], []).append(entry)
         out: List[Dict[str, Any]] = []
         for kind, rows in by_kind.items():
@@ -683,7 +692,6 @@ class ArchiMateImportService:
                 "source": source_ref,
                 "target": target_ref,
                 "description": rel.get("description"),
-                "access_mode": rel.get("access_mode"),
             }
 
             if source_type is None or target_type is None:
@@ -1184,7 +1192,6 @@ class ArchiMateImportService:
                             # "ruling constrains offer" is the reason the edge
                             # exists, and it must survive the import.
                             description=rel.get("description"),
-                            access_mode=rel.get("access_mode"),
                             architecture_id=model_id,
                         )
                         db.session.add(new_rel)
