@@ -188,14 +188,30 @@ def test_the_justification_list_has_not_gone_stale():
 
 @pytest.fixture(scope="module")
 def app():
+    """This module's own app fixture (predates tests/conftest.py's shared one).
+
+    It must seed the same roles and feature flag conftest.py's ``_schema``
+    fixture seeds for every other module, not just create tables: the route
+    sweep below logs test users in through the real role guard, and a CI shard
+    that runs this file alone (no earlier test in the shard has already called
+    ``Role.insert_roles()``) otherwise 403s every one of those users before the
+    tenant-isolation check on their route ever runs, misreporting a cross-
+    tenant leak check as merely "unproven" on every affected route.
+    """
     import os
 
     os.environ.setdefault("SECRET_KEY", "x" * 32)
     from app import create_app, db
+    from app.models.user import Role
+
+    from tests.conftest import seed_implementation_planning_flag
 
     application = create_app("testing")
     with application.app_context():
         db.create_all()
+        Role.insert_roles()
+        seed_implementation_planning_flag()
+        db.session.remove()
     return application
 
 
