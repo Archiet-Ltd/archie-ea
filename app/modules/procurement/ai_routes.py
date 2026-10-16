@@ -22,6 +22,7 @@ from flask_login import current_user, login_required
 
 from app.decorators import requires_procurement
 from app.models.application_portfolio import VendorContract
+from app.middleware.tenant_context import current_org_id
 from app.models.license_entitlement import LicenseEntitlement
 from app.services.feature_flag_service import FeatureFlagService
 
@@ -167,13 +168,15 @@ def spend_ai_recommendations():
     if feature_guard:
         return feature_guard
 
+    # The organisation the user is working in, the same one the spend page shows.
+    org_id = current_org_id()
     try:
-        result = generate_spend_recommendations(current_user.organization_id)
+        result = generate_spend_recommendations(org_id)
     except ProcurementAIError as e:
-        logger.warning("Spend recommendations unparseable for org %s: %s", current_user.organization_id, e)
+        logger.warning("Spend recommendations unparseable for org %s: %s", org_id, e)
         return jsonify({"error": f"AI spend recommendations failed: {e}"}), 502
     except Exception as e:
-        logger.exception("Spend recommendations generation failed for org %s", current_user.organization_id)
+        logger.exception("Spend recommendations generation failed for org %s", org_id)
         return jsonify({"error": f"AI spend recommendations failed: {e}"}), 502
 
     return jsonify({"recommendations": result["recommendations"], "summary": result["summary"]})

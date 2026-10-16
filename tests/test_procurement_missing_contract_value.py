@@ -44,6 +44,10 @@ def _procurement_user(db_session, org):
 def _contract(db_session, org, name, contract_value=None, annual_cost=None, **extra):
     from app.models.application_portfolio import VendorContract
 
+    # These tests are about amounts nobody entered, not about currencies: the
+    # contracts are recorded in the organisation's reporting currency (GBP unless
+    # the organisation sets another), so their figures need no exchange rate.
+    extra.setdefault("currency", "GBP")
     contract = VendorContract(
         organization_id=org.id,
         contract_name=f"{name} {uuid.uuid4().hex[:6]}",

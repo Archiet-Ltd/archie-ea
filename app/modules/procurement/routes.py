@@ -13,6 +13,7 @@ from flask import render_template, request
 from flask_login import current_user, login_required
 
 from app.decorators import requires_procurement, requires_procurement_or_finance
+from app.middleware.tenant_context import current_org_id
 from app.models.application_portfolio import VendorContract
 from app.models.license_entitlement import LicenseEntitlement
 
@@ -280,7 +281,9 @@ def compliance_dashboard():
 @requires_procurement_or_finance
 def spend_analytics():
     """Spend analytics dashboard."""
-    org_id = current_user.organization_id
+    # The organisation the user is working in, not their home organisation: a
+    # user switched into another organisation sees that organisation's spend.
+    org_id = current_org_id()
 
     # Spend by category - shared with the AI recommendations endpoint
     # (procurement_ai_service.py) via get_spend_by_category() rather than a
@@ -293,5 +296,5 @@ def spend_analytics():
         # Every figure on the page comes from this one summary. Total contract
         # value and annual cost are each summed here and nowhere else, so the
         # page cannot state two different totals or add a missing amount as 0.
-        summary=get_spend_summary(),
+        summary=get_spend_summary(org_id),
     )

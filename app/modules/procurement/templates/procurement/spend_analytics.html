@@ -3,6 +3,20 @@
 {% from 'components/empty_state.html' import empty_state %}
 {% block title %}Spend Analytics{% endblock %}
 
+{# An amount always carries the currency it was recorded in; a missing figure is a dash. #}
+{% macro money(amount, code) -%}
+{%- if amount is none -%}—{%- else -%}{{ "{:,.2f}".format(amount|float) }} {{ code }}{%- endif -%}
+{%- endmacro %}
+{% macro converted(amount, show_code=False) -%}
+{{ amount|format_currency(show_code=show_code) }}
+{%- endmacro %}
+{% macro by_currency_line(by_currency) -%}
+{%- for code, amount in by_currency.items() -%}{{ money(amount, code) }}{{ '' if loop.last else ' · ' }}{%- endfor -%}
+{%- endmacro %}
+{% macro missing_rates_line(pairs, reporting) -%}
+{%- for code, day in pairs -%}No {{ code }} to {{ reporting }} rate on file for {{ day.strftime('%-d %b %Y') if day else 'this date' }}{{ '' if loop.last else '; ' }}{%- endfor -%}
+{%- endmacro %}
+
 {% block content %}
 <div class="p-6 space-y-6">
     {{ page_header(
@@ -32,7 +46,10 @@
                 </div>
                 <div class="text-sm text-muted-foreground">Total Contract Value</div>
             </div>
-            <div class="text-3xl font-bold">{{ summary.total_value|format_currency(show_code=True) if summary.total_value is not none else '—' }}</div>
+            <div class="text-3xl font-bold" data-testid="spend-total-value">{{ converted(summary.total_value, True) }}</div>
+            {% if summary.total_value is none and summary.total_value_detail.missing_rates %}
+            <p class="mt-1 text-sm text-muted-foreground">{{ missing_rates_line(summary.total_value_detail.missing_rates, summary.reporting_currency) }}</p>
+            {% endif %}
             {% if summary.contracts_without_value %}
             <p class="mt-1 text-sm text-muted-foreground">excludes {{ summary.contracts_without_value }} contract{{ '' if summary.contracts_without_value == 1 else 's' }} without a contract value</p>
             {% endif %}
@@ -44,7 +61,13 @@
                 </div>
                 <div class="text-sm text-muted-foreground">Annual Recurring Cost</div>
             </div>
-            <div class="text-3xl font-bold">{{ summary.total_annual_cost|format_currency(show_code=True) if summary.total_annual_cost is not none else '—' }}</div>
+            <div class="text-3xl font-bold" data-testid="spend-total-annual">{{ converted(summary.total_annual_cost, True) }}</div>
+            {% if summary.total.by_currency and (summary.total.by_currency|length > 1 or summary.total_annual_cost is none) %}
+            <p class="mt-1 text-sm text-muted-foreground" data-testid="spend-total-stated">Recorded as {{ by_currency_line(summary.total.by_currency) }}</p>
+            {% endif %}
+            {% if summary.total_annual_cost is none and summary.total.missing_rates %}
+            <p class="mt-1 text-sm text-muted-foreground" data-testid="spend-total-missing">{{ missing_rates_line(summary.total.missing_rates, summary.reporting_currency) }}</p>
+            {% endif %}
             {% if summary.contracts_without_annual_cost %}
             <p class="mt-1 text-sm text-muted-foreground">excludes {{ summary.contracts_without_annual_cost }} contract{{ '' if summary.contracts_without_annual_cost == 1 else 's' }} without an annual cost</p>
             {% endif %}
@@ -140,10 +163,10 @@
                         <span class="font-medium">{{ vendor_name }}</span>
                         <span class="text-sm">{% if data.annual_cost is not none %}{{ data.annual_cost|format_currency }}/yr{% else %}—{% endif %}</span>
                     </div>
-                    {% if data.annual_cost is not none %}
+                    {% if data.annual_cost is not none and summary.total_annual_cost %}
                     <div class="flex items-center gap-2">
                         <div class="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                            {% set pct = (data.annual_cost / summary.total_annual_cost * 100) if (summary.total_annual_cost or 0) > 0 else 0 %}
+                            {% set pct = (data.annual_cost / summary.total_annual_cost * 100) %}
                             <div class="h-full bg-primary rounded-full" style="width: {{ pct }}%"></div>
                         </div>
                         <span class="text-xs text-muted-foreground w-12 text-right">{{ "{:.1f}".format(pct) }}%</span>
@@ -156,6 +179,87 @@
             <p class="text-muted-foreground">No vendor spend data available</p>
             {% endif %}
         </div>
+    </div>
+
+    <!-- Spend by vendor -->
+    <div class="bg-card border border-border rounded-lg p-6" data-testid="spend-by-vendor">
+        <h2 class="text-lg font-semibold mb-1">Spend by vendor</h2>
+        <p class="text-sm text-muted-foreground mb-4">Each amount is shown in the currency it was recorded in, then converted to {{ summary.reporting_currency }}.</p>
+        {% if summary.by_vendor %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-muted-foreground border-b border-border">
+                        <th class="py-2 pr-4 font-medium">Vendor</th>
+                        <th class="py-2 pr-4 font-medium text-right">Contracts</th>
+                        <th class="py-2 pr-4 font-medium">Annual cost as recorded</th>
+                        <th class="py-2 pr-4 font-medium text-right">In {{ summary.reporting_currency }}</th>
+                        <th class="py-2 pr-4 font-medium text-right">Applications covered</th>
+                        <th class="py-2 font-medium">Nearest end date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in summary.by_vendor %}
+                    <tr class="border-b border-border last:border-0" data-testid="spend-vendor-row">
+                        <td class="py-2 pr-4 font-medium text-foreground">{{ v.vendor_name }}</td>
+                        <td class="py-2 pr-4 text-right">{{ v.count }}</td>
+                        <td class="py-2 pr-4" data-testid="vendor-stated">{{ by_currency_line(v.by_currency) if v.by_currency else '—' }}</td>
+                        <td class="py-2 pr-4 text-right" data-testid="vendor-converted">
+                            {{ converted(v.converted, True) }}
+                            {% if v.converted is none and v.missing_rates %}
+                            <div class="text-xs text-muted-foreground">{{ missing_rates_line(v.missing_rates, summary.reporting_currency) }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="py-2 pr-4 text-right">{{ v.covered_applications|length if v.covered_applications else '—' }}</td>
+                        <td class="py-2 text-muted-foreground">{{ v.nearest_end_date.strftime('%-d %b %Y') if v.nearest_end_date else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted-foreground">No vendor spend data available</p>
+        {% endif %}
+    </div>
+
+    <!-- Spend by contract -->
+    <div class="bg-card border border-border rounded-lg p-6" data-testid="spend-by-contract">
+        <h2 class="text-lg font-semibold mb-4">Spend by contract</h2>
+        {% if summary.by_contract %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-muted-foreground border-b border-border">
+                        <th class="py-2 pr-4 font-medium">Contract</th>
+                        <th class="py-2 pr-4 font-medium">Vendor</th>
+                        <th class="py-2 pr-4 font-medium text-right">Annual cost</th>
+                        <th class="py-2 pr-4 font-medium text-right">In {{ summary.reporting_currency }}</th>
+                        <th class="py-2 pr-4 font-medium">Ends</th>
+                        <th class="py-2 font-medium">Applications covered</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in summary.by_contract %}
+                    <tr class="border-b border-border last:border-0" data-testid="spend-contract-row">
+                        <td class="py-2 pr-4 font-medium text-foreground">{{ c.contract_name }}</td>
+                        <td class="py-2 pr-4">{{ c.vendor_name or '—' }}</td>
+                        <td class="py-2 pr-4 text-right" data-testid="contract-stated">{{ money(c.annual_cost, c.currency or '—') }}</td>
+                        <td class="py-2 pr-4 text-right" data-testid="contract-converted">
+                            {{ converted(c.converted, True) }}
+                            {% if c.converted is none and c.missing_rates %}
+                            <div class="text-xs text-muted-foreground">{{ missing_rates_line(c.missing_rates, summary.reporting_currency) }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="py-2 pr-4 text-muted-foreground">{{ c.end_date.strftime('%-d %b %Y') if c.end_date else '—' }}</td>
+                        <td class="py-2" data-testid="contract-applications">{{ c.covered_applications|join(', ') if c.covered_applications else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        {{ empty_state(icon='pie-chart', title='No active contracts with a stated annual cost', description='Spend appears here once vendor contracts with an annual cost are recorded.', padding='py-8') }}
+        {% endif %}
     </div>
 
     {% if summary.total_contracts == 0 %}

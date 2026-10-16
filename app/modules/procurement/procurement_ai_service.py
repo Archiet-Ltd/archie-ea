@@ -365,24 +365,50 @@ def generate_licenses_position(organization_id: int) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _money(shape_by_currency, converted, missing_rates):
+    """A spend figure as the model should read it: stated per currency, the converted
+    amount in the reporting currency, and the rates that were missing. Never a sum
+    across currencies."""
+    return {
+        "by_currency": {code: str(amount) for code, amount in shape_by_currency.items()},
+        "converted": str(converted) if converted is not None else None,
+        "missing_rates": [f"{currency} on {day}" for currency, day in missing_rates],
+    }
+
+
 def _build_spend_context(organization_id: int) -> Dict[str, Any]:
     # Reuses the exact aggregates the spend_analytics page itself computes
     # (get_spend_by_category / get_spend_summary in services.py) rather than
-    # running a third parallel query over the same VendorContract rows.
-    spend_summary = get_spend_summary()
+    # running a third parallel query over the same VendorContract rows. Amounts
+    # reach the prompt per currency plus one converted figure, so the model is
+    # never handed a sum that adds two currencies.
+    spend_summary = get_spend_summary(organization_id)
     spend_by_category = get_spend_by_category(organization_id)
+    total = spend_summary["total"]
 
     return {
+        "reporting_currency": spend_summary["reporting_currency"],
         "total_contracts": spend_summary["total_contracts"],
-        "total_value": spend_summary["total_value"],
-        "total_annual_cost": spend_summary["total_annual_cost"],
-        "spend_by_category": spend_by_category,
+        "total_annual_cost": _money(total["by_currency"], total["converted"], total["missing_rates"]),
+        "total_value": _money(
+            spend_summary["total_value_detail"]["by_currency"],
+            spend_summary["total_value"],
+            spend_summary["total_value_detail"]["missing_rates"],
+        ),
+        "spend_by_category": {
+            name: _money(row["by_currency"], row["converted"], row["missing_rates"])
+            for name, row in spend_by_category.items()
+        },
         "spend_by_type": {
-            k: v["annual_cost"] for k, v in spend_summary["by_type"].items()
+            k: _money(v["by_currency"], v["converted"], v["missing_rates"])
+            for k, v in spend_summary["by_type"].items()
         },
         "top_vendors": [
-            {"vendor_name": name, "annual_cost": data["annual_cost"]}
-            for name, data in spend_summary["top_vendors"]
+            {
+                "vendor_name": row["vendor_name"],
+                "annual_cost": _money(row["by_currency"], row["converted"], row["missing_rates"]),
+            }
+            for row in spend_summary["by_vendor"][:10]
         ],
     }
 

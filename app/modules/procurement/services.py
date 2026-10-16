@@ -11,6 +11,7 @@ from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, func, or_
+from sqlalchemy.orm import joinedload
 
 from app.models.application_portfolio import VendorContract
 
@@ -163,79 +164,259 @@ def total_of_stated(amounts) -> Tuple[Optional[float], int]:
     return (sum(stated) if stated else None), len(amounts) - len(stated)
 
 
-def get_spend_summary() -> Dict[str, any]:
-    """Get spend analytics summary.
+class _StatedAmount:
+    """A stated amount in the currency it was recorded in, in the shape
+    ``convert_total`` reads. The rate in effect on ``period_end`` is used."""
 
-    Totals add only the amounts that were stated. total_value and
-    total_annual_cost are None when no active contract states one, and
-    contracts_without_value / contracts_without_annual_cost count the active
-    contracts each total leaves out.
+    __slots__ = ("amount", "currency", "period_start", "period_end")
+
+    def __init__(self, amount, currency, as_of):
+        self.amount = amount
+        self.currency = currency
+        self.period_start = None
+        self.period_end = as_of
+
+
+def _currency_of(contract: VendorContract) -> str:
+    return (contract.currency or "").strip().upper()
+
+
+def _spend_shape(items, reporting_currency: str, as_of: date) -> Dict[str, any]:
+    """One figure for a group of contracts: the stated sums per currency and one
+    converted amount in the reporting currency.
+
+    ``items`` are ``(amount, currency)`` pairs, stated amounts only. Amounts are
+    added only within one currency; the only place two currencies meet is
+    ``convert_total``, which returns no amount when any rate is missing. An
+    amount with no currency recorded cannot be converted: it is left out of
+    both sums and counted in ``without_currency``.
     """
-    contracts = VendorContract.query.filter(VendorContract.status == "active").all()
+    from decimal import Decimal
+
+    from app.services.currency_service import convert_total
+
+    by_currency: Dict[str, Decimal] = {}
+    convertible = []
+    without_currency = 0
+    for amount, currency in items:
+        if not currency:
+            without_currency += 1
+            continue
+        by_currency[currency] = by_currency.get(currency, Decimal(0)) + Decimal(str(amount))
+        convertible.append(_StatedAmount(Decimal(str(amount)), currency, as_of))
+    if convertible:
+        converted = convert_total(convertible, reporting_currency)
+        amount, missing = converted.amount, list(converted.missing)
+    else:
+        amount, missing = None, []
+    return {
+        "by_currency": by_currency,
+        "converted": amount,
+        "missing_rates": missing,
+        "without_currency": without_currency,
+    }
+
+
+def _covered_applications(organization_id: int, contracts) -> Dict[int, List[str]]:
+    """Names of the applications each contract covers: the contract-application
+    links plus the contract's own application link, each application once.
+    One batched read for the links and one for the names."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.contract_application import ContractApplication
+    from app import db
+
+    contract_ids = [c.id for c in contracts]
+    links = {cid: [] for cid in contract_ids}
+    if not contract_ids:
+        return {}
+    for contract_id, application_id in db.session.execute(
+        db.select(ContractApplication.contract_id, ContractApplication.application_id)
+        .where(ContractApplication.organization_id == organization_id)
+        .where(ContractApplication.contract_id.in_(contract_ids))
+        .order_by(ContractApplication.id)
+    ).all():
+        links[contract_id].append(application_id)
+    for contract in contracts:
+        if contract.application_id is not None and contract.application_id not in links[contract.id]:
+            links[contract.id].append(contract.application_id)
+    wanted = sorted({a for ids in links.values() for a in ids})
+    names: Dict[int, str] = {}
+    if wanted:
+        names = dict(
+            db.session.execute(
+                db.select(ApplicationComponent.id, ApplicationComponent.name)
+                .where(ApplicationComponent.organization_id == organization_id)
+                .where(ApplicationComponent.id.in_(wanted))
+            ).all()
+        )
+    return {cid: sorted(names[a] for a in ids if a in names) for cid, ids in links.items()}
+
+
+def _empty_spend_summary(reporting_currency: Optional[str]) -> Dict[str, any]:
+    empty = {"by_currency": {}, "converted": None, "missing_rates": [], "without_currency": 0}
+    return {
+        "reporting_currency": reporting_currency,
+        "total_contracts": 0,
+        "total": {**empty, "contracts_without_annual_cost": 0},
+        "total_value": None,
+        "total_value_detail": dict(empty),
+        "total_annual_cost": None,
+        "contracts_without_value": 0,
+        "contracts_without_annual_cost": 0,
+        "by_type": {},
+        "by_vendor": [],
+        "by_contract": [],
+        "top_vendors": [],
+        "default_currency_contracts": 0,
+    }
+
+
+def get_spend_summary(organization_id: Optional[int], as_of: Optional[date] = None) -> Dict[str, any]:
+    """Spend by vendor and by contract for one organisation, never mixing currencies.
+
+    Every amount is kept in the currency it was recorded in (``by_currency``) and
+    converted to the organisation's reporting currency at the rate in effect on
+    ``as_of`` (today by default) through ``convert_total``. A converted figure is
+    None, with the missing (currency, date) pairs named, whenever a rate is not on
+    file; nothing is ever summed across currencies, and an amount nobody entered
+    stays out of the sum and is counted. With no organisation, the empty shape.
+    """
+    from app.services.application_cost_accessor import get_reporting_currency
+    from app.modules.intelligence.services.query_catalogue import truth_class_for
+
+    if organization_id is None:
+        return _empty_spend_summary(None)
+    as_of = as_of or date.today()
+    reporting = get_reporting_currency(organization_id)
+    contracts = (
+        VendorContract.query.options(joinedload(VendorContract.vendor))
+        .filter(VendorContract.organization_id == organization_id, VendorContract.status == "active")
+        .order_by(VendorContract.id)
+        .all()
+    )
     amounts = [(c, get_contract_amounts(c)) for c in contracts]
+    covered = _covered_applications(organization_id, contracts)
 
-    total_value, without_value = total_of_stated(a["contract_value"] for _, a in amounts)
-    total_annual, without_annual = total_of_stated(a["annual_cost"] for _, a in amounts)
+    def stated(group, key):
+        return [(a[key], _currency_of(c)) for c, a in group if a[key] is not None]
 
-    # Group by contract type
-    type_counts = {}
-    type_costs = {}
+    total_annual = _spend_shape(stated(amounts, "annual_cost"), reporting, as_of)
+    total_value = _spend_shape(stated(amounts, "contract_value"), reporting, as_of)
+    without_annual = sum(1 for _, a in amounts if a["annual_cost"] is None)
+    without_value = sum(1 for _, a in amounts if a["contract_value"] is None)
+
+    by_type_groups: Dict[str, list] = {}
     for c, a in amounts:
-        ct = c.contract_type or "unknown"
-        type_counts[ct] = type_counts.get(ct, 0) + 1
-        type_costs.setdefault(ct, []).append(a["annual_cost"])
-    by_type = {
-        ct: {"count": type_counts[ct], "annual_cost": total_of_stated(costs)[0]}
-        for ct, costs in type_costs.items()
-    }
+        by_type_groups.setdefault(c.contract_type or "unknown", []).append((c, a))
+    by_type = {}
+    for contract_type, group in by_type_groups.items():
+        shape = _spend_shape(stated(group, "annual_cost"), reporting, as_of)
+        by_type[contract_type] = {"count": len(group), "annual_cost": shape["converted"], **shape}
 
-    # Group by vendor
-    vendor_counts = {}
-    vendor_costs = {}
+    by_vendor_groups: Dict[int, list] = {}
     for c, a in amounts:
-        if c.vendor:
-            vname = c.vendor.name
-            vendor_counts[vname] = vendor_counts.get(vname, 0) + 1
-            vendor_costs.setdefault(vname, []).append(a["annual_cost"])
-    by_vendor = {
-        vname: {"count": vendor_counts[vname], "annual_cost": total_of_stated(costs)[0]}
-        for vname, costs in vendor_costs.items()
-    }
+        if c.vendor_id is not None and c.vendor is not None:
+            by_vendor_groups.setdefault(c.vendor_id, []).append((c, a))
+    by_vendor = []
+    for group in by_vendor_groups.values():
+        shape = _spend_shape(stated(group, "annual_cost"), reporting, as_of)
+        applications = sorted({name for c, _ in group for name in covered.get(c.id, [])})
+        ends = [c.end_date for c, _ in group if c.end_date is not None]
+        by_vendor.append({
+            "vendor_name": group[0][0].vendor.name,
+            "count": len(group),
+            "annual_cost": shape["converted"],
+            **shape,
+            "contracts_without_annual_cost": sum(1 for _, a in group if a["annual_cost"] is None),
+            "covered_applications": applications,
+            "nearest_end_date": min(ends) if ends else None,
+        })
 
-    # Sort by spend. A vendor with no stated annual cost has nothing to rank
-    # by, so it sorts after every vendor that has one; ordering only, it is
-    # never shown as a figure.
-    top_vendors = sorted(
-        by_vendor.items(),
-        key=lambda x: (x[1]["annual_cost"] is not None, x[1]["annual_cost"] or 0),
-        reverse=True
-    )[:10]
+    def vendor_rank(row):
+        largest = max(row["by_currency"].values()) if row["by_currency"] else None
+        return (
+            row["converted"] is not None,
+            row["converted"] if row["converted"] is not None else 0,
+            largest is not None,
+            largest if largest is not None else 0,
+        )
+
+    by_vendor.sort(key=vendor_rank, reverse=True)
+
+    by_contract = []
+    for c, a in amounts:
+        shape = _spend_shape(stated([(c, a)], "annual_cost"), reporting, as_of)
+        by_contract.append({
+            "contract_id": c.id,
+            "contract_name": c.contract_name,
+            "vendor_name": c.vendor.name if c.vendor is not None else None,
+            "annual_cost": a["annual_cost"],
+            "currency": _currency_of(c) or None,
+            "converted": shape["converted"],
+            "missing_rates": shape["missing_rates"],
+            "end_date": c.end_date,
+            "covered_applications": covered.get(c.id, []),
+            "source_table": VendorContract.__tablename__,
+            "truth_class": truth_class_for(VendorContract.__tablename__),
+        })
+    by_contract.sort(
+        key=lambda r: (r["converted"] is not None, r["converted"] or 0, r["annual_cost"] is not None, r["annual_cost"] or 0),
+        reverse=True,
+    )
 
     return {
+        "reporting_currency": reporting,
         "total_contracts": len(contracts),
-        "total_value": total_value,
-        "total_annual_cost": total_annual,
+        "total": {**total_annual, "contracts_without_annual_cost": without_annual},
+        # The two totals the page and the AI context read: the converted figure,
+        # or None when no amount was stated or a rate is missing.
+        "total_value": total_value["converted"],
+        "total_value_detail": total_value,
+        "total_annual_cost": total_annual["converted"],
         "contracts_without_value": without_value,
         "contracts_without_annual_cost": without_annual,
         "by_type": by_type,
-        "top_vendors": top_vendors,
+        "by_vendor": by_vendor,
+        "by_contract": by_contract,
+        "top_vendors": [(row["vendor_name"], row) for row in by_vendor[:10]],
+        # Contracts still carrying the column default currency with no other sign
+        # it was entered, reported for the product owner to rule on.
+        "default_currency_contracts": sum(1 for c in contracts if _currency_of(c) == "USD"),
     }
 
 
-def get_spend_by_category(organization_id: int) -> "Dict[str, float]":
-    """Contract value grouped by contract_category, sorted highest spend first.
+def get_spend_by_category(organization_id: Optional[int]) -> Dict[str, Dict[str, any]]:
+    """Contract value grouped by contract category, highest spend first, per currency.
 
-    Extracted from the inline loop that used to live only in
-    routes.spend_analytics() so the AI spend-recommendations endpoint
-    (procurement_ai_service.py) reuses the exact same aggregate instead of
-    running a second, parallel query over the same rows - per the Task 4
-    brief's explicit "reuse, not reimplement" instruction.
+    Each category carries the stated contract value per currency, its converted
+    amount in the reporting currency (None when a rate is missing) and the count
+    of contracts left out because they state no contract value (never added as 0).
+    Shared with the AI spend recommendations through ``_build_spend_context``.
     """
-    contracts = VendorContract.query.filter_by(organization_id=organization_id).all()
+    from app.services.application_cost_accessor import get_reporting_currency
 
-    spend_by_category: Dict[str, float] = {}
+    if organization_id is None:
+        return {}
+    reporting = get_reporting_currency(organization_id)
+    contracts = (
+        VendorContract.query.filter_by(organization_id=organization_id).order_by(VendorContract.id).all()
+    )
+    groups: Dict[str, list] = {}
     for c in contracts:
-        cat = c.contract_category or "Uncategorized"
-        spend_by_category[cat] = spend_by_category.get(cat, 0) + (c.contract_value or 0)
-
-    return dict(sorted(spend_by_category.items(), key=lambda x: -x[1]))
+        groups.setdefault(c.contract_category or "Uncategorized", []).append(c)
+    out = {}
+    for category, group in groups.items():
+        items = [(c.contract_value, _currency_of(c)) for c in group if c.contract_value is not None]
+        shape = _spend_shape(items, reporting, date.today())
+        out[category] = {
+            **shape,
+            "count": len(group),
+            "contracts_without_value": sum(1 for c in group if c.contract_value is None),
+        }
+    return dict(
+        sorted(
+            out.items(),
+            key=lambda kv: (kv[1]["converted"] is not None, kv[1]["converted"] or 0),
+            reverse=True,
+        )
+    )
