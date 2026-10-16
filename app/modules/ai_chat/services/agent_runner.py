@@ -732,6 +732,11 @@ class AgentRunner:
 
     @staticmethod
     def _build_tool_schemas(provider: str, schemas: list) -> list:
+        # The one place the chat model's tool list is built. A tool that is not
+        # offered on the chat surface (the connector's route-backed tools, which
+        # need a request context the streaming path lacks) is left out; an entry
+        # with no "surfaces" key is a chat tool, as before.
+        schemas = [s for s in schemas if "chat" in s.get("surfaces", ["chat"])]
         if provider == "anthropic":
             return [
                 {

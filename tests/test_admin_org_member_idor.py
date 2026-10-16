@@ -539,9 +539,17 @@ class TestWebhookSettingsSessionSwitchIDOR:
             assert planted is None
 
     def test_genuine_org_admin_can_still_add_webhook_within_own_org(
-        self, app, db_session, login_as, client
+        self, app, db_session, login_as, client, monkeypatch
     ):
+        import app.utils.ssrf_guard as guard
         from app.models.webhook import WebhookSubscription
+
+        # The made-up host cannot be resolved here; answer with a public address.
+        monkeypatch.setattr(
+            guard.socket, "getaddrinfo",
+            lambda host, port, *a, **k: [(2, 1, 6, "", ("93.184.216.34", port))],
+        )
+        monkeypatch.setattr(guard, "_local_interface_addresses", lambda: set())
 
         org_b = _make_org(db_session, "wh-sw-legit-b")
         admin_b = _make_user(db_session, org_b, is_org_admin=True, is_platform_admin=False)

@@ -78,13 +78,6 @@ mechanisms:
   class: queue
   disposition: move-to-pool
   tenant_context: 'none: the e-mail is fully rendered before it is queued'
-- kind: thread
-  file: app/modules/admin/connector_routes.py
-  entry: servicenow_sync
-  purpose: Runs a ServiceNow synchronisation after the request returns
-  class: queue
-  disposition: move-to-pool
-  tenant_context: organisation id passed as an argument and applied with an app context in the thread
 - kind: rq
   file: app/modules/admin/routes/admin_routes.py
   entry: <module>

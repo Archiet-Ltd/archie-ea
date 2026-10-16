@@ -976,33 +976,6 @@ def validate_application_name(mapper, connection, target):
         raise ValueError("Application name cannot be null or empty")
 
 
-@event.listens_for(VendorContract, "before_insert")
-def create_vendor_contract_archimate_element(mapper, connection, target):
-    """Mirror a new vendor contract into the model as an ArchiMate Contract.
-
-    Runs on the flush's own connection, so the element and the contract
-    commit or roll back together. organization_id is set by the tenant
-    before_flush (or by the route) before this fires; without one there is no
-    tenant to own the element, so nothing is mirrored rather than guessing.
-    """
-    if target.archimate_element_id is not None or target.organization_id is None:
-        return
-    from sqlalchemy import insert
-
-    from .archimate_core import ArchiMateElement
-
-    result = connection.execute(
-        insert(ArchiMateElement.__table__).values(
-            name=target.contract_name,
-            type="Contract",
-            layer="Business",
-            description=target.contract_description or f"Vendor contract: {target.contract_name}",
-            organization_id=target.organization_id,
-        )
-    )
-    target.archimate_element_id = result.inserted_primary_key[0]
-
-
 @event.listens_for(VendorContract, "before_update")
 def rename_vendor_contract_archimate_element(mapper, connection, target):
     """Keep the mirrored element's name in step when the contract is renamed."""
@@ -1024,36 +997,5 @@ def rename_vendor_contract_archimate_element(mapper, connection, target):
     )
 
 
-@event.listens_for(ApplicationComponent, "before_insert")
-def create_app_component_archimate_element(mapper, connection, target):
-    """Automatically create ArchiMateElement when ApplicationComponent is created."""
-    if target.archimate_element_id is None:
-        from sqlalchemy import insert, select
-
-        from .archimate_core import ArchiMateElement
-        from .organization import Organization
-
-        # archimate_elements.organization_id is NOT NULL, and this raw insert is
-        # invisible to the tenant middleware, so the org must be set explicitly.
-        # The element belongs to the same tenant as its application (set by the
-        # tenant before_flush); fall back to the default org if it is unset.
-        org_id = getattr(target, "organization_id", None)
-        if org_id is None:
-            orgs = Organization.__table__
-            row = connection.execute(
-                select(orgs.c.id).where(orgs.c.slug == "default").limit(1)
-            ).first()
-            org_id = row[0] if row is not None else connection.execute(
-                orgs.insert().values(name="Default Organization", slug="default")
-            ).inserted_primary_key[0]
-
-        result = connection.execute(
-            insert(ArchiMateElement.__table__).values(
-                name=target.name,
-                type="ApplicationComponent",
-                layer="Application",
-                description=target.description or f"Application: {target.name}",
-                organization_id=org_id,
-            )
-        )
-        target.archimate_element_id = result.inserted_primary_key[0]
+# ApplicationComponent's ArchiMate element is now created by the shared
+# flush listener in app/services/archimate_backbone.py.

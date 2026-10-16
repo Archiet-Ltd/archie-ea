@@ -1,0 +1,103 @@
+{#- smoke-coverage-ok: covered by tests/test_public_landing_layout.py (every module, use-case and comparison
+   page renders the hero, the section bands, link cards and the closing band).
+   Partial: public/_partials/_landing.html -- the landing layout of public/page.html for module,
+   use-case and comparison pages (public_pages.LANDING_FAMILIES). Expects `page`, `landing`
+   (public_pages.build_landing()), and the optional `screenshot` / `recording` / `thanks` / `error`
+   the document layout uses. Every HTML value on `landing` is sanitized Markup from
+   public_pages._sanitize_html(); nothing here marks HTML safe. Band and card classes match the
+   home page (main/index.html); band tints alternate by position (public_site.css .landing-bands). -#}
+{% from 'macros/pricing_cta.html' import plan_buy_section %}
+{% set primary_label, primary_url = landing.primary_action %}
+{% set secondary_label, secondary_url = landing.secondary_action %}
+<section data-testid="landing-hero" class="landing-hero bg-background border-b border-border">
+  <div class="public-container">
+    <div class="flex items-center gap-3 text-sm font-medium text-muted-foreground">
+      <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <i data-lucide="{{ landing.icon }}" class="h-5 w-5" aria-hidden="true"></i>
+      </span>
+      {% if landing.breadcrumb %}
+      <nav aria-label="Breadcrumb">
+        <a href="{{ landing.breadcrumb[1] }}" class="text-muted-foreground hover:text-foreground">{{ landing.breadcrumb[0] }}</a>{% if landing.segment_label %} / {{ landing.segment_label }}{% endif %}
+      </nav>
+      {% endif %}
+    </div>
+    <h1 class="mt-6 max-w-3xl text-4xl sm:text-5xl font-bold tracking-tight text-foreground">{{ landing.title }}</h1>
+    {% if landing.lead_html %}
+    <p class="mt-6 max-w-2xl text-lg sm:text-xl text-muted-foreground">{{ landing.lead_html }}</p>
+    {% endif %}
+    <div class="mt-8 flex flex-col sm:flex-row gap-3 sm:items-center">
+      <a href="{{ primary_url }}" class="public-btn bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors">{{ primary_label }}</a>
+      <a href="{{ secondary_url }}" class="public-btn border border-border bg-card text-foreground font-medium hover:bg-muted transition-colors">{{ secondary_label }}</a>
+    </div>
+  </div>
+</section>
+
+<div class="landing-bands">
+  {% if screenshot or recording %}
+  <section class="landing-band">
+    <div class="public-container">
+{% include 'public/_partials/_page_media.html' %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if landing.intro_html %}
+  <section class="landing-band">
+    <div class="public-container">
+      <div class="public-page-content prose max-w-none">{{ landing.intro_html }}</div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% for s in landing.sections %}
+  <section class="landing-band" aria-labelledby="{{ s.id }}">
+    <div class="public-container">
+      <div class="public-page-content prose max-w-none"><h2 id="{{ s.id }}">{{ s.heading_html }}</h2>{% if not s.cards %}{{ s.body_html }}{% endif %}</div>
+      {% if s.cards %}
+      <ul role="list" class="mx-auto mt-8 grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {% for c in s.cards %}
+        <li>
+          <a href="{{ c.url }}" class="group flex h-full flex-col gap-3 rounded-lg border border-border bg-card p-6 no-underline transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden="true">
+              <i data-lucide="{{ c.icon }}" class="h-5 w-5" aria-hidden="true"></i>
+            </span>
+            <span class="font-semibold text-foreground">{{ c.title_html }}</span>
+            {% if c.description %}
+            <span class="text-sm text-muted-foreground">{{ c.description }}</span>
+            {% endif %}
+            <i data-lucide="arrow-right" class="mt-auto h-4 w-4 text-primary transition-transform group-hover:translate-x-0.5" aria-hidden="true"></i>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+  </section>
+  {% endfor %}
+
+  {% if page.cta == 'plans' %}
+  <section class="landing-band">
+    <div class="public-container">
+      {{ plan_buy_section() }}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if page.cta in ('waiting_list', 'inquiry') %}
+  <section class="landing-band">
+    <div class="public-container">
+{% include 'public/_partials/_page_cta_forms.html' %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+
+<section data-testid="landing-closing" class="bg-primary text-primary-foreground">
+  <div class="public-container">
+    <p class="max-w-3xl text-xl sm:text-2xl font-semibold tracking-tight">Import your model and get a free, cited answer to what breaks if a system fails, in minutes.</p>
+    <div class="mt-8 flex flex-col sm:flex-row gap-3 sm:items-center">
+      <a href="{{ primary_url }}" class="public-btn bg-background text-foreground font-medium hover:bg-background/90 transition-colors">{{ primary_label }}</a>
+      <a href="/contact" class="public-btn border border-primary-foreground/40 text-primary-foreground font-medium hover:bg-primary-foreground/10 transition-colors">Get in touch</a>
+    </div>
+  </div>
+</section>
