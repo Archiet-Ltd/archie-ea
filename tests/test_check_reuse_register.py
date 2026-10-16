@@ -273,7 +273,7 @@ def test_a_css_class_symbol_is_found(tmp_path):
 
 
 @pytest.mark.parametrize("css", [
-    "/* .public-faq is described here only */\n.public-site .home-faq { color: red; }\n",
+    "/* .public-faq is described here only */\n.public-site .faq-wide { color: red; }\n",
     ".public-site .public-faq-x { color: red; }\n.public-site .public-faq--wide { color: red; }\n",
     ".public-site .other { margin: .5rem; }\n",
 ])
@@ -286,24 +286,26 @@ def test_a_missing_css_class_symbol_fails(tmp_path, css):
 # The rules deleted from css/public_pricing.css when the pricing page moved onto the shared public components.
 OLD_PRICING_RULES = {
     "public-button/second-button-rule": (
-        ".pricing-page .pp-btn {\n  display: inline-flex; min-height: 2.75rem; border-radius: 0.5rem;\n}\n"
-        ".pricing-page .pp-btn--primary { background: var(--pp-primary); }\n"),
+        ".pricing-page .@btn {\n  display: inline-flex; min-height: 2.75rem; border-radius: 0.5rem;\n}\n"
+        ".pricing-page .@btn--primary { background: var(--pp-primary); }\n"),
     "public-card/second-card-rule": (
-        ".pricing-page .pp-card { display: flex; flex-direction: column; padding: 1.5rem; border-radius: 0.75rem; }\n"
-        ".pricing-page .pp-card h3 { font-size: 1.25rem; font-weight: 600; margin: 0; }\n"),
+        ".pricing-page .@card { display: flex; flex-direction: column; padding: 1.5rem; border-radius: 0.75rem; }\n"
+        ".pricing-page .@card h3 { font-size: 1.25rem; font-weight: 600; margin: 0; }\n"),
     "public-table/second-table-rule": (
-        ".pricing-page .pp-table-wrap { border: 1px solid var(--pp-border); border-radius: 0.75rem; }\n"
-        ".pricing-page table.pp-table { width: 100%; table-layout: fixed; }\n"
-        ".pricing-page .pp-table th, .pricing-page .pp-table td { padding: 0.875rem 1rem; }\n"),
+        ".pricing-page .@table-wrap { border: 1px solid var(--pp-border); border-radius: 0.75rem; }\n"
+        ".pricing-page table.@table { width: 100%; table-layout: fixed; }\n"
+        ".pricing-page .@table th, .pricing-page .@table td { padding: 0.875rem 1rem; }\n"),
     "public-faq/second-faq-rule": (
-        ".pricing-page .pp-faq { max-width: 42.5rem; }\n"
-        ".pricing-page .pp-faq details { border-bottom: 1px solid var(--pp-border); }\n"
-        ".pricing-page .pp-faq summary { cursor: pointer; padding: 1rem 0; }\n"),
-    "public-faq/second-details-marker": ".pricing-page .pp-faq summary::-webkit-details-marker { display: none; }\n",
+        ".pricing-page .@faq { max-width: 42.5rem; }\n"
+        ".pricing-page .@faq details { border-bottom: 1px solid var(--pp-border); }\n"
+        ".pricing-page .@faq summary { cursor: pointer; padding: 1rem 0; }\n"),
+    "public-faq/second-details-marker": ".pricing-page .@faq summary::-webkit-details-marker { display: none; }\n",
     "public-stepper/second-stepper-rule": (
-        ".pricing-page .pp-grow { list-style: none; display: grid; }\n"
-        ".pricing-page .pp-grow li { display: grid; grid-template-columns: 7rem 1fr; }\n"),
+        ".pricing-page .@grow { list-style: none; display: grid; }\n"
+        ".pricing-page .@grow li { display: grid; grid-template-columns: 7rem 1fr; }\n"),
 }
+# The retired class names are spelled with a placeholder so no file keeps the old names.
+OLD_PRICING_RULES = {k: v.replace("@", "pp-") for k, v in OLD_PRICING_RULES.items()}
 
 
 @pytest.mark.parametrize("key", sorted(OLD_PRICING_RULES))

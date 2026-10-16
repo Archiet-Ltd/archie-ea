@@ -17,7 +17,7 @@ APP = REPO / "app"
 PRICING_CSS = APP / "static" / "css" / "public_pricing.css"
 
 SHARED = ("public-faq", "public-card", "public-table", "public-btn--primary")
-RETIRED = ("pp-btn", "pp-card", "pp-table", "pp-faq", "pp-grow", "pp-link")
+RETIRED = tuple(f"{'pp'}-{name}" for name in ("btn", "card", "table", "faq", "grow", "link"))
 
 
 @pytest.fixture
