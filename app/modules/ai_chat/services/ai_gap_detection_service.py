@@ -687,6 +687,81 @@ class AIGapDetectionService:
 
         return results
 
+    def find_maturity_gaps(self, organization_id: int) -> Dict[str, Any]:
+        """
+        Read the recorded maturity gap for the caller's own capabilities.
+
+        Every ``current``, ``target`` and ``target_gap`` value is copied from
+        ``CapabilityHeatmapService``'s batched per-capability maturity read
+        (ADR-MAT-1); this method computes no maturity level and no
+        comparison of its own.
+        A capability the tenant never assessed, or assessed with no recorded
+        target, is never a gap -- it is listed in ``unassessed`` with the
+        reason instead.
+
+        Returns:
+            ``{"gaps": [...], "unassessed": [...], "maturity_source":
+            "unified_capabilities", "reason": None}``. With
+            ``organization_id`` unresolved, nothing is read: ``{"gaps":
+            None, "unassessed": None, "maturity_source":
+            "unified_capabilities", "reason": "no_tenant_context"}``.
+        """
+        if organization_id is None:
+            return {
+                "gaps": None,
+                "unassessed": None,
+                "maturity_source": "unified_capabilities",
+                "reason": "no_tenant_context",
+            }
+
+        from app.modules.capabilities.services.capability_heatmap_service import (
+            CapabilityHeatmapService,
+        )
+
+        capability_ids = [
+            row[0]
+            for row in db.session.query(UnifiedCapability.id)
+            .filter(UnifiedCapability.organization_id == organization_id)
+            .all()
+        ]
+        blocks = CapabilityHeatmapService().maturity_for_capability_ids(
+            capability_ids, organization_id=organization_id
+        )
+
+        gaps: List[Dict[str, Any]] = []
+        unassessed: List[Dict[str, Any]] = []
+        for capability_id in sorted(blocks.keys()):
+            block = blocks[capability_id]
+            if block["under_target"] is True:
+                gaps.append(
+                    {
+                        "gap_type": "capability_maturity",
+                        "capability_id": block["capability_id"],
+                        "element_id": block["element_id"],
+                        "current": block["current"],
+                        "target": block["target"],
+                        "target_gap": block["target_gap"],
+                        "maturity_source": block["maturity_source"],
+                    }
+                )
+            elif block["under_target"] is None:
+                unassessed.append(
+                    {
+                        "capability_id": block["capability_id"],
+                        "element_id": block["element_id"],
+                        "reason": block["reason"],
+                    }
+                )
+            # under_target is False: recorded, at or above target -- not a
+            # gap and not listed as unassessed either.
+
+        return {
+            "gaps": gaps,
+            "unassessed": unassessed,
+            "maturity_source": "unified_capabilities",
+            "reason": None,
+        }
+
     def get_comprehensive_gap_summary(self) -> Dict[str, Any]:
         """
         Get a comprehensive summary of all gap types.

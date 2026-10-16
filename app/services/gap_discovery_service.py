@@ -51,6 +51,7 @@ class GapDiscoveryService:
             "integration": "Integration Gap",
             "security": "Security Gap",
             "compliance": "Compliance Gap",
+            "capability_maturity": "Capability Maturity Gap",
         }
 
         self.gap_severity_levels = {
@@ -60,12 +61,16 @@ class GapDiscoveryService:
             "low": {"score": 1, "color": "blue", "impact": "Minor business impact"},
         }
 
-    def discover_all_gaps(self, architecture_id: Optional[int] = None) -> Dict[str, Any]:
+    def discover_all_gaps(
+        self, architecture_id: Optional[int] = None, *, organization_id: Optional[int] = None
+    ) -> Dict[str, Any]:
         """
         Discover all types of gaps in the enterprise portfolio.
 
         Args:
             architecture_id: Optional architecture model ID to scope analysis
+            organization_id: Tenant for the capability-maturity gap rows
+                (``maturity_gap_rows``); resolved from context when omitted.
 
         Returns:
             Dictionary containing discovered gaps and analysis summary
@@ -74,8 +79,17 @@ class GapDiscoveryService:
 
         gaps = []
 
+        # The one maturity read for the whole run (ADR-MAT-1): computed once
+        # here and handed to discover_capability_gaps, which appends the
+        # rows as is.
+        maturity_rows = self.maturity_gap_rows(organization_id)
+
         # Discover different types of gaps
-        gaps.extend(self.discover_capability_gaps(architecture_id))
+        gaps.extend(
+            self.discover_capability_gaps(
+                architecture_id, organization_id=organization_id, maturity_rows=maturity_rows
+            )
+        )
         gaps.extend(self.discover_application_gaps(architecture_id))
         gaps.extend(self.discover_technology_gaps(architecture_id))
         gaps.extend(self.discover_process_gaps(architecture_id))
@@ -97,13 +111,29 @@ class GapDiscoveryService:
             "summary": summary,
             "discovery_timestamp": datetime.utcnow().isoformat(),
             "architecture_id": architecture_id,
+            "unassessed_capabilities": maturity_rows["unassessed"],
+            "maturity_reason": maturity_rows["reason"],
         }
 
     def discover_capability_gaps(
-        self, architecture_id: Optional[int] = None
+        self,
+        architecture_id: Optional[int] = None,
+        *,
+        organization_id: Optional[int] = None,
+        maturity_rows: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Discover business capability gaps by analyzing capability coverage.
+        Discover business capability gaps by analyzing capability coverage,
+        plus the tenant's recorded capability-maturity gap (ADR-MAT-1),
+        appended as is -- no field invented for a row nobody scored.
+
+        Args:
+            architecture_id: Optional architecture model ID to scope analysis.
+            organization_id: Tenant for the maturity rows when ``maturity_rows``
+                is not supplied; resolved from context when both are omitted.
+            maturity_rows: The result of ``maturity_gap_rows``, already computed
+                by a caller such as ``discover_all_gaps``; computed here when
+                not given, so a caller of this method alone still gets it.
         """
         gaps = []
 
@@ -143,7 +173,98 @@ class GapDiscoveryService:
         except Exception as e:
             logger.error(f"Error discovering capability gaps: {e}")
 
+        rows = (
+            maturity_rows if maturity_rows is not None else self.maturity_gap_rows(organization_id)
+        )
+        if rows["gaps"] is not None:
+            gaps.extend(rows["gaps"])
+
         return gaps
+
+    def maturity_gap_rows(self, organization_id: Optional[int]) -> Dict[str, Any]:
+        """
+        Read the recorded maturity gap for one tenant's capabilities: the
+        same row shape and the same rules as
+        ``AIGapDetectionService.find_maturity_gaps`` -- every ``current``,
+        ``target`` and ``target_gap`` value is copied from
+        ``CapabilityHeatmapService``'s batched per-capability maturity read
+        (ADR-MAT-1); this method computes no maturity level and no
+        comparison of its own.
+
+        ``organization_id`` resolves through the tenant helper when not
+        given, so a request-scoped caller that passes nothing still gets
+        its own tenant, and a job with neither carries the reason instead
+        of reading nothing meaningful.
+
+        Returns:
+            ``{"gaps": [...], "unassessed": [...], "maturity_source":
+            "unified_capabilities", "reason": None}``. With no resolvable
+            tenant, nothing is read: ``{"gaps": None, "unassessed": None,
+            "maturity_source": "unified_capabilities", "reason":
+            "no_tenant_context"}``.
+        """
+        if organization_id is None:
+            from ..utils.tenant_sql import current_org_id
+
+            organization_id = current_org_id()
+
+        if organization_id is None:
+            return {
+                "gaps": None,
+                "unassessed": None,
+                "maturity_source": "unified_capabilities",
+                "reason": "no_tenant_context",
+            }
+
+        from app.modules.capabilities.services.capability_heatmap_service import (
+            CapabilityHeatmapService,
+        )
+
+        from ..models.unified_capability import UnifiedCapability
+
+        capability_ids = [
+            row[0]
+            for row in db.session.query(UnifiedCapability.id)
+            .filter(UnifiedCapability.organization_id == organization_id)
+            .all()
+        ]
+        blocks = CapabilityHeatmapService().maturity_for_capability_ids(
+            capability_ids, organization_id=organization_id
+        )
+
+        gaps: List[Dict[str, Any]] = []
+        unassessed: List[Dict[str, Any]] = []
+        for capability_id in sorted(blocks.keys()):
+            block = blocks[capability_id]
+            if block["under_target"] is True:
+                gaps.append(
+                    {
+                        "gap_type": "capability_maturity",
+                        "capability_id": block["capability_id"],
+                        "element_id": block["element_id"],
+                        "current": block["current"],
+                        "target": block["target"],
+                        "target_gap": block["target_gap"],
+                        "maturity_source": block["maturity_source"],
+                    }
+                )
+            elif block["under_target"] is None:
+                unassessed.append(
+                    {
+                        "capability_id": block["capability_id"],
+                        "element_id": block["element_id"],
+                        "reason": block["reason"],
+                    }
+                )
+            # under_target is False: recorded, at or above target -- not a
+            # gap and not listed as unassessed either.
+
+        return {
+            "gaps": gaps,
+            "unassessed": unassessed,
+            "maturity_source": "unified_capabilities",
+            "reason": None,
+        }
 
     def discover_application_gaps(
         self, architecture_id: Optional[int] = None
