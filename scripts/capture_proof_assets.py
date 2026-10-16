@@ -204,9 +204,10 @@ def capture_home_impact(browser, base, password, wide: bool) -> tuple[int, int]:
 def capture_home_product(browser, base, password, wide: bool) -> tuple[int, int]:
     """The product window under the home hero: the real /applications/ screen.
 
-    Desktop: the whole 1280x800 viewport (sidebar, top bar, content), above the fold.
+    Desktop: the whole 1280x800 viewport (sidebar, top bar, content).
+    Desktop: scrolled so the application rows show under the top bar.
     Phone: the 358px content column from the page heading down to the last whole
-    row or card that ends within 780 CSS px of crop height.
+    block (tiles, banner, cards) that ends within 780 CSS px of crop height.
     """
     vw, vh = (1280, 800) if wide else (390, 844)
     ctx = browser.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=DPR)
@@ -236,23 +237,37 @@ def capture_home_product(browser, base, password, wide: bool) -> tuple[int, int]
         figures = re.findall(r"(?<![\d.])\d[\d,]*(?![\d.])", tile)
         if not figures or int(figures[0].replace(",", "")) == 0:
             raise SystemExit(f"home product: headline tile {label!r} reads zero or empty; run seed-demo-company first")
-    page.evaluate("window.scrollTo(0, 0)")
     if wide:
-        clip = {"x": 0, "y": 0, "width": vw, "height": vh}
-        png = page.screenshot(clip=clip)
+        # The tiles, banner and filters fill the first 800px; scroll the content the way a
+        # user would until the list card sits under the top bar, so the rows show.
+        page.evaluate(
+            """() => {
+              const card = document.querySelector("[data-testid='filter-bar']").parentElement;
+              let el = card.parentElement;
+              while (el && !/(auto|scroll)/.test(getComputedStyle(el).overflowY)) el = el.parentElement;
+              (el || document.scrollingElement).scrollTop += card.getBoundingClientRect().top - 150;
+            }"""
+        )
+        page.wait_for_timeout(500)
+        rows = page.locator("[data-testid^='app-row-']")
+        visible = sum(1 for i in range(rows.count()) if (b := rows.nth(i).bounding_box()) and b["y"] >= 0 and b["y"] + b["height"] <= vh)
+        if visible < 5:
+            raise SystemExit(f"home product: only {visible} application rows visible in the window")
+        png = page.screenshot(clip={"x": 0, "y": 0, "width": vw, "height": vh})
     else:
+        page.evaluate("window.scrollTo(0, 0)")
         main = _box(page, "main")
         top = _box(page, "h1")["y"] - 8
-        rows = page.locator("[data-testid^='app-row-']")
+        # Whole blocks only: the tiles, the data-quality banner, then the cards if they fit.
         bottom = top
-        for i in range(rows.count()):
-            box = rows.nth(i).bounding_box()
-            if box and box["height"] > 0 and box["y"] + box["height"] - top <= 780:
-                bottom = box["y"] + box["height"] + 4
-        if bottom == top:
-            raise SystemExit("home product: no application rows within the phone crop")
-        clip = {"x": main["x"] + 16, "y": top, "width": 358, "height": bottom - top}
-        png = _shoot(page, clip)
+        for sel in ("[role='region'][aria-label='Portfolio statistics']", "div.border-warning\/30", "[data-testid^='mobile-card-']"):
+            for i in range(page.locator(sel).count()):
+                box = page.locator(sel).nth(i).bounding_box()
+                if box and box["height"] > 0 and box["y"] + box["height"] + 8 - top <= 780:
+                    bottom = max(bottom, box["y"] + box["height"] + 8)
+        if bottom - top < 400:
+            raise SystemExit("home product: phone crop holds no whole tiles block")
+        png = _shoot(page, {"x": main["x"] + 16, "y": top, "width": 358, "height": bottom - top})
     name = "product-portfolio.webp" if wide else "product-portfolio-mobile.webp"
     size = _webp(png, IMG / "home" / name)
     ctx.close()
