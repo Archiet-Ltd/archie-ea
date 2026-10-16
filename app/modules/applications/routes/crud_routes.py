@@ -390,9 +390,7 @@ def retire_application(id):
     from app.services.work_package_service import create_work_package
 
     now_utc = datetime.utcnow()
-    planned_end = (request.form.get("end_date") or "").strip() or (
-        now_utc.date() + timedelta(days=365)
-    ).isoformat()
+    planned_end = (now_utc.date() + timedelta(days=365)).isoformat()
 
     # The recorded reason travels in both the visible description and the
     # structured marker (queryable and idempotent). source_type stays on the

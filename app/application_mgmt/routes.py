@@ -1966,6 +1966,7 @@ def render_application_detail(id):
             capability_mappings.append((u_mapping, u_cap))
             capabilities.append(u_cap)
     except Exception:
+        logger.exception("Could not load unified work packages for application %s", app_obj.id)
         db.session.rollback()
 
     # --- Capability form config (for "Map Capability" modal) ---

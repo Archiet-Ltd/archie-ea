@@ -105,7 +105,5 @@ def downgrade() -> None:
             batch_op.drop_constraint(
                 "fk_technical_debt_organization_id", type_="foreignkey"
             )
-        op.drop_index(
-            "ix_technical_debt_organization_id", table_name="technical_debt"
-        )
-        op.drop_column("technical_debt", "organization_id")
+            batch_op.drop_index("ix_technical_debt_organization_id")
+            batch_op.drop_column("organization_id")

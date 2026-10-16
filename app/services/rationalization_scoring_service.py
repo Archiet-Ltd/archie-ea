@@ -77,7 +77,7 @@ class RationalizationScoringService:
     """
 
     # RAT-118: Model versioning and calibration
-    # CAP-020: bumped to 2.1 — capability coverage now influences overall score
+    # bumped to 2.1 — capability coverage now influences overall score
     MODEL_VERSION = "2.1"  # Current scoring model version
     MODEL_CALIBRATION_HISTORY = []  # Populated by calibration runs
 
@@ -639,7 +639,7 @@ class RationalizationScoringService:
             vendor_score = vendor_result["score"]
             vendor_evidence = vendor_result.get("evidence", [])
 
-            # Capability coverage dimension (CAP-020: now contributes to overall score)
+            # Capability coverage dimension (now contributes to overall score)
             capability_result = RationalizationScoringService._compute_capability_score(application_id)
 
             # R1-B34 (TB-0135): one shared resolver, also used by
@@ -660,7 +660,7 @@ class RationalizationScoringService:
             )
             overall_score = RationalizationScoringService._reweighted_overall(weights, measured)
 
-            # CAP-020: Apply capability coverage adjustment (+/-10 pts max).
+            # Apply capability coverage adjustment (+/-10 pts max).
             # Apps supporting critical L1-L2 capabilities receive a bonus;
             # apps with no capability mappings receive a penalty.
             cap_adjustment = capability_result.get("capability_adjustment", 0.0)
@@ -730,7 +730,7 @@ class RationalizationScoringService:
                 "measured": vendor_score is not None,
                 "sub_factors": vendor_evidence,
             })
-            # CAP-020: Capability coverage dimension — now contributes to overall
+            # Capability coverage dimension — now contributes to overall
             # score via adjustment and influences TIME action via SPOF L1-L2 flag.
             cap_sub_factors = []
             if capability_result["score"] > 0:
@@ -747,7 +747,7 @@ class RationalizationScoringService:
                 })
             if capability_result.get("business_capability_count", 0) > 0:
                 cap_sub_factors.append({
-                    "factor": "Business Capability Coverage (CAP-020)",
+                    "factor": "Business Capability Coverage",
                     "weight": None,
                     "raw_value": capability_result.get("capability_score", 0),
                     "contribution": cap_adjustment,
@@ -830,7 +830,7 @@ class RationalizationScoringService:
                     app=app,
                 )
 
-            # CAP-020: SPOF L1-L2 override — if the app is the sole supporter of any
+            # SPOF L1-L2 override — if the app is the sole supporter of any
             # L1 or L2 capability, ELIMINATE is blocked because retiring it would leave
             # a critical capability gap.  Downgrade to TOLERATE (retain until a
             # replacement is mapped).
@@ -1050,7 +1050,7 @@ class RationalizationScoringService:
             )
             overall_score = RationalizationScoringService._reweighted_overall(weights, measured)
 
-            # CAP-020: Capability coverage (read-only, no DB writes)
+            # Capability coverage (read-only, no DB writes)
             et_cap_result = RationalizationScoringService._compute_capability_score(application_id)
             et_cap_adjustment = et_cap_result.get("capability_adjustment", 0.0)
             overall_score = max(0.0, min(100.0, overall_score + et_cap_adjustment))
@@ -1115,7 +1115,7 @@ class RationalizationScoringService:
                 },
             ]
 
-            # CAP-020: Capability coverage evidence trail
+            # Capability coverage evidence trail
             et_cap_sub_factors = []
             if et_cap_result["score"] > 0:
                 et_cap_sub_factors.append({
@@ -1131,7 +1131,7 @@ class RationalizationScoringService:
                 })
             if et_cap_result.get("business_capability_count", 0) > 0:
                 et_cap_sub_factors.append({
-                    "factor": "Business Capability Coverage (CAP-020)",
+                    "factor": "Business Capability Coverage",
                     "weight": None,
                     "raw_value": et_cap_result.get("capability_score", 0),
                     "contribution": et_cap_adjustment,
@@ -1212,7 +1212,7 @@ class RationalizationScoringService:
                     app=app,
                 )
 
-            # CAP-020: SPOF L1-L2 override in evidence trail path
+            # SPOF L1-L2 override in evidence trail path
             if et_cap_result.get("spof_l1_l2", False) and time_action == "ELIMINATE":
                 time_action = "TOLERATE"
             disposition, disp_confidence, disp_uncertainty_reasons = RationalizationScoringService._derive_disposition(
@@ -1322,7 +1322,7 @@ class RationalizationScoringService:
 
         Sources queried (merged, de-duplicated by capability name):
         1. unified_application_capability_mapping + unified_capabilities
-        2. application_capability_mapping + business_capability (CAP-020)
+        2. application_capability_mapping + business_capability
 
         Scoring weights by capability level:
         - L1: 3.0 weight (strategic)
@@ -1389,7 +1389,7 @@ class RationalizationScoringService:
                 .all()
             )
 
-            # ── Source 2: BusinessCapability mappings (CAP-020) ──
+            # ── Source 2: BusinessCapability mappings ──
             biz_cap_mappings = (
                 db.session.query(
                     ApplicationCapabilityMapping.business_capability_id,
@@ -1425,7 +1425,7 @@ class RationalizationScoringService:
                     base_weight += l1_critical_bonus
                 total_score += base_weight
 
-            # ── CAP-020: BusinessCapability level-weighted score ──
+            # ── BusinessCapability level-weighted score ──
             # L1 = 3.0, L2 = 2.0, L3+ = 1.0
             biz_cap_level_weights = {1: 3.0, 2: 2.0}
             biz_cap_weighted_total = 0.0
@@ -1503,7 +1503,7 @@ class RationalizationScoringService:
                 ]
                 has_spof = len(spof_capabilities) > 0
 
-            # ── SPOF detection (BusinessCapability — CAP-020) ──
+            # ── SPOF detection (BusinessCapability) ──
             spof_l1_l2 = False
 
             if biz_cap_ids:

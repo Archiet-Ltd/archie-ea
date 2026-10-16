@@ -3,7 +3,7 @@
 from app.services.archimate_backbone import sync_archimate_element
 from datetime import datetime
 
-from flask import flash, g, jsonify, redirect, render_template, request, url_for
+from flask import current_app, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -145,6 +145,7 @@ def application_roadmap(id):
                 .all()
             )
         except Exception:
+            current_app.logger.exception("Could not load unified work packages for application %s", id)
             db.session.rollback()
         for uwp in unified_work_packages:
             work_packages_list.append({
