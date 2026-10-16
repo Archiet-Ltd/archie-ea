@@ -116,6 +116,9 @@
 
             {# SAML fields (hidden by default) #}
             <div id="saml-fields" class="hidden space-y-4">
+                <p class="text-xs text-muted-foreground">
+                    Your identity provider must send a persistent NameID, or a subject-id or pairwise-id attribute. A temporary (transient) NameID is refused.
+                </p>
                 <div>
                     <label class="block text-sm font-medium text-foreground mb-1" for="idp_sso_url">
                         IdP SSO URL

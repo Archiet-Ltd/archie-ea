@@ -870,7 +870,17 @@ class ComplianceStandardsService:
         try:
             from app.extensions import db
             from app.models.compliance_models import ComplianceViolation
-            violations = db.session.query(ComplianceViolation).limit(20).all()
+            from app.middleware.tenant_context import current_org_id
+
+            org_id = current_org_id()
+            if org_id is None:
+                return []
+            violations = (
+                db.session.query(ComplianceViolation)
+                .filter(ComplianceViolation.organization_id == org_id)
+                .limit(20)
+                .all()
+            )
             return [
                 {
                     "id": str(v.id),
