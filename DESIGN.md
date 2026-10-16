@@ -119,11 +119,24 @@ dark-theme users. `--info` tracks blue in both.
 `.theme-marketing` and `.dark .theme-marketing` in `shadcn_tokens.css` hold a neutral palette for the
 public marketing pages, scoped as a class rather than a second token file. It is opt-in: set
 `{% block body_theme %}theme-marketing{% endblock %}` in a template that extends
-`layouts/public_base.html`. No template sets it yet; the marketing templates that will are filled in
-as that work lands. Login, registration, MFA, OAuth consent, shared artefacts and the demo page keep
+`layouts/public_base.html`. The homepage (`main/index.html`) sets it; the other marketing templates follow as that work lands. Login, registration, MFA, OAuth consent, shared artefacts and the demo page keep
 the product palette (no `body_theme` override). No other CSS, SCSS or template file may declare
 `--background`, `--primary`, `--border` or any other core token — the `reuse-register` gate enforces
 this (`docs/reuse-register.yml`, entry `design-tokens`).
+
+### Public site: the homepage classes
+
+`app/static/css/public_site.css` is the one home for the homepage classes, all under `.public-site`, each carrying
+the reference home-page value named in its comment: `.public-btn--lg` / `--primary` / `--outline` (40px, 14px/20px
+500, radius `--radius` + 4px, 3px focus ring), `.home-display` (72/72, 700, -0.025em; 60 and 48 below),
+`.home-lead` (20/32, 18/32 on phones, 48rem), `.home-section` (80px block padding, 1px border-colour divider, 1px
+rails from 640px), `.home-eyebrow` (mono 12/16, 0.2em), `.home-h2` (48/48, 30/36 on phones, 600),
+`.home-section-lead` (18/32), `.home-card` (16px radius, 1px border, 28px padding) with `.home-card-title` (24/32, 600),
+`.home-card-body` (14/24) and `.home-card-eyebrow`, `.home-link` (underline, 4px offset), `.home-emphasis-list` and
+`.home-note` (2px left rules), `.home-stepper`, `.home-table` (16px cells, 48rem minimum), `.home-faq`
+(divider-separated, rotating chevron) and `.home-closing` (96px, centred). New marketing pages use these classes
+rather than defining their own. The product window is shown at its captured CSS width (the `<img>` keeps its
+width attribute; never set `width: auto` on it).
 
 ---
 
