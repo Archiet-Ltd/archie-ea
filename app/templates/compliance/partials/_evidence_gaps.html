@@ -1,0 +1,204 @@
+{# Evidence gaps: adopted controls whose evidence is missing or out of date, or whose latest
+   tests found them not effective. Ranked by control priority, then reach, then end date.
+   Included once from frameworks_dashboard.html. Needs: evidence_gaps, evidence_gaps_error. #}
+{% from 'components/empty_state.html' import empty_state %}
+{% set _state_label = {'missing': 'No evidence', 'expired': 'Expired', 'current': 'Current', 'undated': 'No end date'} %}
+{% set _result_label = {'effective': 'Effective', 'ineffective': 'Not effective', 'exception': 'Exception'} %}
+<section id="evidence-gaps" class="bg-card text-card-foreground rounded-lg border border-border" x-data="evidenceGapsPanel()" aria-labelledby="evidence-gaps-heading">
+    <div class="px-5 py-4 border-b border-border">
+        <h2 id="evidence-gaps-heading" class="text-base font-semibold text-foreground">Evidence gaps</h2>
+        <p class="mt-1 text-sm text-muted-foreground">Controls your organisation has adopted whose evidence is missing or out of date, or whose latest tests did not pass. The most important controls on the widest-reaching applications come first.</p>
+    </div>
+
+    {% if evidence_gaps_error %}
+    <div class="px-5 py-4 text-sm text-destructive-emphasis" role="alert">Could not load the evidence gaps. Please try again.</div>
+    {% elif evidence_gaps %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-left text-muted-foreground border-b border-border">
+                    <th scope="col" class="px-5 py-3 font-medium">Control</th>
+                    <th scope="col" class="px-5 py-3 font-medium">Application</th>
+                    <th scope="col" class="px-5 py-3 font-medium">Evidence</th>
+                    <th scope="col" class="px-5 py-3 font-medium">Owner</th>
+                    <th scope="col" class="px-5 py-3 font-medium">Latest test</th>
+                    <th scope="col" class="px-5 py-3 font-medium text-right">Elements reached</th>
+                    <th scope="col" class="px-5 py-3 font-medium"><span class="sr-only">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for gap in evidence_gaps %}
+                <tr class="border-b border-border align-top" data-evidence-gap-row="{{ gap.adopted_row_id }}">
+                    <td class="px-5 py-3">
+                        <div class="font-medium text-foreground">{{ gap.control_code }} <span class="font-normal text-muted-foreground">{{ gap.framework_code or '—' }}</span></div>
+                        <div class="text-muted-foreground">{{ gap.title }}</div>
+                    </td>
+                    <td class="px-5 py-3 text-foreground">{{ gap.application_name }}</td>
+                    <td class="px-5 py-3">
+                        <span class="inline-flex items-center rounded-md border border-border px-2 py-0.5 text-xs font-medium text-foreground">{{ _state_label.get(gap.state, '—') }}</span>
+                        <div class="mt-1 text-muted-foreground">{{ ('Valid until ' ~ gap.valid_until) if gap.valid_until else 'No end date' }}</div>
+                        {% if gap.evidence != '—' %}
+                            {% if gap.evidence.startswith('http://') or gap.evidence.startswith('https://') %}
+                            <a href="{{ gap.evidence }}" rel="noopener noreferrer" target="_blank" class="text-primary hover:underline break-all">Open evidence</a>
+                            {% endif %}
+                        {% else %}
+                        <div class="text-muted-foreground">Evidence link: —</div>
+                        {% endif %}
+                        <div class="text-xs text-muted-foreground">
+                            Recorded by {{ {'person': 'a person', 'connector': 'a connector'}.get(gap.provenance.source, '—') }}{% if gap.provenance.collected_at %}, collected {{ gap.provenance.collected_at[:10] }}{% endif %}
+                        </div>
+                    </td>
+                    <td class="px-5 py-3">
+                        <div class="text-foreground" data-evidence-owner="{{ gap.adopted_row_id }}">{{ gap.evidence_owner }}</div>
+                        <div class="text-xs text-muted-foreground">Application owner: {{ gap.owner }}</div>
+                    </td>
+                    <td class="px-5 py-3 text-foreground">
+                        {{ _result_label.get(gap.latest_test_result, '—') }}
+                        {% if gap.test_notes %}<div class="text-xs text-muted-foreground">{{ gap.test_notes }}</div>{% endif %}
+                    </td>
+                    <td class="px-5 py-3 text-right text-foreground">
+                        {% if gap.exposure is not none %}{{ gap.exposure }}{% else %}<span title="{{ gap.exposure_reason or '' }}">—</span>{% endif %}
+                    </td>
+                    <td class="px-5 py-3 whitespace-nowrap">
+                        <button type="button" class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 disabled:opacity-50 disabled:pointer-events-none"
+                                @click="open({{ gap.adopted_row_id }}, 'test', '{{ url_for('application_mgmt.record_control_test', mapping_id=gap.adopted_row_id) }}')">Record test</button>
+                        <button type="button" class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 disabled:opacity-50 disabled:pointer-events-none"
+                                @click="open({{ gap.adopted_row_id }}, 'owner', '{{ url_for('application_mgmt.update_compliance_mapping', mapping_id=gap.adopted_row_id) }}')">Assign evidence owner</button>
+                    </td>
+                </tr>
+                <tr x-show="openRow === {{ gap.adopted_row_id }}" x-cloak class="border-b border-border bg-muted/30">
+                    <td colspan="7" class="px-5 py-4">
+                        <form x-show="mode === 'test'" x-cloak class="flex flex-wrap items-end gap-3" @submit.prevent="recordTest()">
+                            <label class="text-sm text-foreground">Kind
+                                <select x-model="testKind" class="mt-1 flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+                                    <option value="design">Design test</option>
+                                    <option value="operating">Operating test</option>
+                                </select>
+                            </label>
+                            <label class="text-sm text-foreground">Result
+                                <select x-model="testResult" class="mt-1 flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+                                    <option value="effective">Effective</option>
+                                    <option value="ineffective">Not effective</option>
+                                    <option value="exception">Exception</option>
+                                </select>
+                            </label>
+                            <label class="text-sm text-foreground grow">Notes
+                                <input type="text" x-model="testNotes" maxlength="2000" class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+                            </label>
+                            <button type="submit" :disabled="saving" class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">Save test</button>
+                            <button type="button" @click="close()" class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 py-2">Cancel</button>
+                        </form>
+                        <form x-show="mode === 'owner'" x-cloak class="flex flex-wrap items-end gap-3" @submit.prevent="assignOwner()">
+                            <div class="relative text-sm text-foreground" @click.outside="ownerOpen = false">
+                                <label for="evidence-owner-search-{{ gap.adopted_row_id }}">Evidence owner</label>
+                                <input id="evidence-owner-search-{{ gap.adopted_row_id }}" type="text" autocomplete="off" x-model="ownerQuery"
+                                       @input.debounce.300ms="searchOwners()" @focus="searchOwners()" placeholder="Search by name"
+                                       class="mt-1 flex h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+                                <div x-show="ownerOpen" x-cloak class="absolute z-20 mt-1 w-64 bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto" role="listbox">
+                                    <template x-for="u in ownerResults" :key="u.id">
+                                        <button type="button" role="option" @click="pickOwner(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted" x-text="u.name || '—'"></button>
+                                    </template>
+                                </div>
+                            </div>
+                            <button type="submit" :disabled="saving || !ownerId" class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">Assign</button>
+                            <button type="button" @click="close()" class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 py-2">Cancel</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    {{ empty_state(icon='shield-check', title='No evidence is missing or out of date', description='Every adopted control has current evidence, and none of its tests failed.') }}
+    {% endif %}
+</section>
+<script>
+    function evidenceGapsPanel() {
+        return {
+            openRow: null,
+            mode: null,
+            url: null,
+            saving: false,
+            testKind: 'design',
+            testResult: 'effective',
+            testNotes: '',
+            ownerQuery: '',
+            ownerId: null,
+            ownerOpen: false,
+            ownerResults: [],
+            open(rowId, mode, url) {
+                if (this.openRow === rowId && this.mode === mode) {
+                    this.close();
+                    return;
+                }
+                this.openRow = rowId;
+                this.mode = mode;
+                this.url = url;
+                this.ownerQuery = '';
+                this.ownerId = null;
+                this.ownerResults = [];
+            },
+            close() {
+                this.openRow = null;
+                this.mode = null;
+            },
+            searchOwners() {
+                const q = (this.ownerQuery || '').trim().toLowerCase();
+                this.ownerId = null;
+                if (q.length < 2) {
+                    this.ownerResults = [];
+                    this.ownerOpen = false;
+                    return Promise.resolve();
+                }
+                return Platform.fetch.get('/api/users', {}, { silent: true })
+                    .then((d) => {
+                        const users = (d && d.users) || [];
+                        this.ownerResults = users
+                            .filter((u) => (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q))
+                            .slice(0, 6);
+                        this.ownerOpen = this.ownerResults.length > 0;
+                    })
+                    .catch((err) => {
+                        this.ownerResults = [];
+                        this.ownerOpen = false;
+                        Platform.toast.error('User search failed.');
+                        throw err;
+                    });
+            },
+            pickOwner(u) {
+                this.ownerId = u.id;
+                this.ownerQuery = u.name || '';
+                this.ownerOpen = false;
+            },
+            recordTest() {
+                this.saving = true;
+                return Platform.fetch.post(this.url, {
+                    test_kind: this.testKind,
+                    result: this.testResult,
+                    notes: this.testNotes,
+                })
+                    .then(() => {
+                        Platform.toast.success('Test recorded.');
+                        window.location.reload();
+                    })
+                    .catch((err) => {
+                        this.saving = false;
+                        throw err;
+                    });
+            },
+            assignOwner() {
+                this.saving = true;
+                return Platform.fetch.put(this.url, { evidence_owner_id: this.ownerId })
+                    .then(() => {
+                        Platform.toast.success('Evidence owner assigned.');
+                        window.location.reload();
+                    })
+                    .catch((err) => {
+                        this.saving = false;
+                        throw err;
+                    });
+            },
+        };
+    }
+</script>

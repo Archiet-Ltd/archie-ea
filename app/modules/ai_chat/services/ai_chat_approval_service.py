@@ -818,6 +818,19 @@ class AIChatApprovalService:
                         organization_id=org_id,
                     )
                     result = {"success": accepted}
+                elif approval.entity_type == "control_evidence":
+                    # Accept evidence a connector found for an adopted control.
+                    # Approving writes the evidence columns with the connector
+                    # as source; the control row must be this approval's own
+                    # organisation's. Refusing writes nothing.
+                    from app.modules.compliance.services.evidence_gap_service import (
+                        accept_control_evidence,
+                    )
+                    result = accept_control_evidence(
+                        approval_id=approval.id,
+                        organization_id=approval.organization_id,
+                        accepted_by=effective_approver_id,
+                    )
                 else:
                     return {"success": False, "error": f"Unknown entity type: {approval.entity_type}"}
 

@@ -59,6 +59,8 @@
     </div>
     {% endif %}
 
+    {% include 'compliance/partials/_evidence_gaps.html' %}
+
     {# Frameworks table — each row expands in place to list its controls,
        reusing the existing GET /api/compliance/frameworks/<id>/controls
        endpoint (previously reachable only via curl). No new backend. #}
