@@ -486,3 +486,22 @@ def test_the_findings_list_runs_a_bounded_number_of_statements(app, db_session, 
         event.remove(engine, "before_cursor_execute", count)
     assert result["total"] > 50
     assert len(statements) < 40, len(statements)
+
+
+def test_the_workflow_compliance_scan_step_names_its_instances_organisation(app, db_session, monkeypatch):
+    """The scan is fenced to one organisation, so the workflow step passes its own instead of
+    relying on an ambient request that a background step does not have."""
+    from types import SimpleNamespace
+
+    from app.services.ea_workflow_engine import EAWorkflowEngine
+
+    calls = []
+
+    def fake_scan(organization_id=None):
+        calls.append(organization_id)
+        return {"success": True, "applications_scanned": 0, "total_violations_found": 0}
+
+    monkeypatch.setattr(Service, "scan_all_applications", staticmethod(fake_scan))
+    engine = EAWorkflowEngine.__new__(EAWorkflowEngine)
+    engine._handle_compliance_scan(SimpleNamespace(id=None, organization_id=4242, triggered_by_user_id=None), {}, {})
+    assert calls == [4242]

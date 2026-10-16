@@ -1119,7 +1119,7 @@ CONTROL_MAPPING_PATH = "/dashboard/api/compliance/mappings/%d"
 def _write_control_route(page, live_server, method, path, body):
     page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     csrf_token = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
-    send = page.request.post if method == "post" else page.request.put
+    send = {"post": page.request.post, "put": page.request.put, "delete": page.request.delete}[method]
     return send(live_server + path, data=body, headers={"X-CSRFToken": csrf_token}, max_redirects=0)
 
 
@@ -1154,6 +1154,43 @@ def test_control_test_and_evidence_routes_refuse_a_read_only_account(
         page, live_server, "put", CONTROL_MAPPING_PATH % 0, {"evidence_url": "https://example.test/e"}
     )
     assert saved.status == 403, "a Viewer saved control evidence: %s" % saved.status
+
+
+POLICY_ROUTES = "/dashboard/api/compliance/policies"
+# (method, path, body, status a caller past the role gate gets for the unknown id 0 or empty body)
+POLICY_WRITE_ROUTES = [
+    ("post", POLICY_ROUTES, {}, 400),
+    ("post", POLICY_ROUTES + "/0/clauses", {"clause_ref": "1", "control_id": 1}, 404),
+    ("delete", POLICY_ROUTES + "/0/clauses/0", None, 404),
+    ("post", POLICY_ROUTES + "/0/publish", {}, 404),
+    ("post", POLICY_ROUTES + "/0/versions", {}, 404),
+    ("post", POLICY_ROUTES + "/check", {}, 200),
+    ("post", "/dashboard/api/compliance/privacy-assessments/0/status", {"status": "completed"}, 404),
+    ("post", "/enterprise/api/policy-monitoring/scan", {"application_id": 0}, 200),
+]
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_policy_and_assessment_routes_authorisation(archetype, page, live_server, seeded):
+    """Writing a policy, binding and publishing, the compliance check, the assessment status and
+    the compliance scan: every archetype holds the Architect role the write gate accepts, so a
+    caller past the gate gets the answer for an unknown id (never another organisation's row);
+    a policy read is login-only."""
+    _login(page, live_server, seeded["emails"][archetype])
+    read = page.request.get(live_server + POLICY_ROUTES + "/0", max_redirects=0)
+    assert read.status == 404, "%s reading a policy: expected 404, got %s" % (archetype, read.status)
+    for method, path, body, expected in POLICY_WRITE_ROUTES:
+        response = _write_control_route(page, live_server, method, path, body)
+        assert response.status == expected, "%s %s %s: expected %s, got %s" % (
+            archetype, method, path, expected, response.status,
+        )
+
+
+def test_policy_and_assessment_routes_refuse_a_read_only_account(page, live_server, seeded, technology_links_viewer):
+    _login(page, live_server, technology_links_viewer)
+    for method, path, body, _expected in POLICY_WRITE_ROUTES:
+        response = _write_control_route(page, live_server, method, path, body)
+        assert response.status == 403, "a Viewer reached %s %s: %s" % (method, path, response.status)
 
 
 OVERSIGHT_CLASSIFICATION_PERMITTED = {

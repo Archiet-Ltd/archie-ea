@@ -2331,7 +2331,8 @@ class EAWorkflowEngine:
         """
         from app.services.policy_monitoring_service import PolicyMonitoringService
 
-        results = PolicyMonitoringService.scan_all_applications()
+        # The scan is fenced to one organisation: name the workflow instance's own.
+        results = PolicyMonitoringService.scan_all_applications(getattr(instance, "organization_id", None))
         if results is None:
             results = {"success": False, "error": "Scan returned None"}
 
