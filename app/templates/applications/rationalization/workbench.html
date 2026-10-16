@@ -343,6 +343,13 @@
                             <canvas id="breakdownRadarChart"></canvas>
                         </div>
 
+                        {# Measured-input statement: an unmeasured input renders
+                           as a dash and the overall score states how many of
+                           its four inputs were actually measured #}
+                        <p x-show="breakdownData.inputs_measured != null && breakdownData.inputs_measured < breakdownData.inputs_total"
+                           class="text-xs text-muted-foreground -mt-1"
+                           x-text="'Overall score weighted from ' + breakdownData.inputs_measured + ' of ' + breakdownData.inputs_total + ' measured inputs (dash = input not measured)'"></p>
+
                         {# Dimension bars #}
                         <div class="space-y-2">
                             <template x-for="dim in breakdownData.dimensions" :key="dim.name">

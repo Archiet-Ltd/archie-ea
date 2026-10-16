@@ -6,6 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
 url_slug: /use-cases/risk-blast-radius
+icon: flame
 ---
 
 # Which risks sit on our revenue-critical path, and who owns the mitigation?

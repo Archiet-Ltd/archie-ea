@@ -5,11 +5,6 @@ state: held
 capture_status: awaiting_capture
 cta: plans
 description: "IT portfolio manager software from Entelim: score every application with the TIME model, find duplicates and track cost. Start free, see pricing today."
-source: app/utils/role_access.py (ROLE_PORTFOLIO_MANAGER, SIDEBAR_ZONES, _MY_WORK_LINKS),
-  content/pages/modules/{applications,rationalization,vendors}.md,
-  app/modules/formula_register/routes.py, app/modules/applications/routes/coverage_routes.py,
-  app/services/servicenow_connector_service.py, app/services/billing_plans.py,
-  read 11 October 2026
 ---
 
 # IT portfolio manager software for a portfolio you can defend at budget time

@@ -7,6 +7,7 @@ source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: plans
 capture_status: live
 url_slug: /use-cases/capability-maturity-heatmap
+icon: thermometer
 ---
 
 # Show capability maturity as a heat map that never invents a value

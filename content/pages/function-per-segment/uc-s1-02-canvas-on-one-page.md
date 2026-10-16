@@ -6,6 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
 url_slug: /use-cases/business-model-canvas-on-one-page
+icon: layout-template
 ---
 
 # Put our business model on one page we can keep current
