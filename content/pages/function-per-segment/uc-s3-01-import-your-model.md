@@ -100,4 +100,3 @@ Yes, through Batch Import, which accepts .csv, .xlsx, .xls and .json. That route
 
 - [Architecture Model](/modules/architecture-model)
 - [Diagrams](/modules/diagrams)
-- [Bring our LeanIX or Ardoq fact sheets across](/use-cases/leanix-ardoq-import)
