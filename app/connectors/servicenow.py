@@ -15,7 +15,6 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
-import aiohttp
 
 from ..services.connector_framework import (
     BaseConnector,
@@ -91,7 +90,7 @@ class ServiceNowCMDBConnector(BaseConnector):
             headers = {"Authorization": f"Bearer {token}"}
             url = urljoin(self.config.config["base_url"], "/api/now/table/cmdb_ci")
 
-            async with aiohttp.ClientSession() as session:
+            async with self._outbound_session() as session:
                 async with session.get(
                     url, headers=headers, params={"sysparm_limit": "1"}
                 ) as response:
@@ -113,7 +112,7 @@ class ServiceNowCMDBConnector(BaseConnector):
                 "password": self.config.config["password"],
             }
 
-            async with aiohttp.ClientSession() as session:
+            async with self._outbound_session() as session:
                 async with session.post(token_url, data=auth_data) as response:
                     if response.status == 200:
                         token_data = await response.json()
@@ -150,7 +149,7 @@ class ServiceNowCMDBConnector(BaseConnector):
             all_records = []
             offset = 0
 
-            async with aiohttp.ClientSession() as session:
+            async with self._outbound_session() as session:
                 while True:
                     params["sysparm_offset"] = str(offset)
 

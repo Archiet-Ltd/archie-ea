@@ -70,6 +70,12 @@ else:
     # Feature models that were defined but never imported here, so create_all() skipped
     # their tables -> routes querying them returned UndefinedTable 500s on a fresh install.
     from .import_history import *  # noqa
+    # ADM board portfolios, RIDA log, cross-board dependencies: defined but never
+    # imported, so create_all() skipped all four tables and user deletion hit
+    # UndefinedTable (adm-board-portfolios bucket).
+    from .adm_portfolio import (  # noqa: F401
+        ADMBoardPortfolio, ADMBoardPortfolioLink, ADMRIDALog, ADMCrossBoardDependency,
+    )
     # BA-B1: artefact_share_links. Imported here so create_all() builds the
     # table on a fresh install and reconcile-schema sees the mapped model on an
     # existing one — every column below the primary key is nullable or has a
