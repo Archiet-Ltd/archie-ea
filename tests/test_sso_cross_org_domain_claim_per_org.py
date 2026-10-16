@@ -539,7 +539,10 @@ def _flashes(client):
         return [message for _, message in sess.get("_flashes", [])]
 
 
-def test_admin_sso_refuses_claimed_and_public_domains(app, db_session, make_org, login_as):
+def test_admin_sso_refuses_claimed_and_public_domains(app, db_session, make_org, login_as, monkeypatch):
+    # The outbound address guard has its own tests; the replacement host here does not resolve.
+    from app.services import sso_service
+    monkeypatch.setattr(sso_service, "check_idp_url", lambda url: url)
     from app.models.sso_config import SSOConfig
 
     org_a = make_org("scope-admin-own")
