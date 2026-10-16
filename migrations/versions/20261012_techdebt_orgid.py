@@ -36,10 +36,15 @@ def _has_index(bind, table: str, index: str) -> bool:
     return index in {idx["name"] for idx in inspect(bind).get_indexes(table)}
 
 
-def _has_constraint(bind, table: str, constraint: str) -> bool:
-    return constraint in {
-        c["name"] for c in inspect(bind).get_foreign_keys(table)
-    }
+def _org_fk_names(bind, table: str) -> list:
+    """Names of the foreign keys already on organization_id, whatever they are
+    called (a fresh database built from the models carries one under the
+    baseline's own name)."""
+    return [
+        c["name"]
+        for c in inspect(bind).get_foreign_keys(table)
+        if c.get("constrained_columns") == ["organization_id"] and c.get("name")
+    ]
 
 
 def upgrade() -> None:
@@ -85,13 +90,14 @@ def upgrade() -> None:
                 "technical_debt",
                 ["organization_id"],
             )
-        if not _has_constraint(bind, "technical_debt", "fk_technical_debt_organization_id"):
+        if not _org_fk_names(bind, "technical_debt"):
             op.create_foreign_key(
                 "fk_technical_debt_organization_id",
                 "technical_debt",
                 "organizations",
                 ["organization_id"],
                 ["id"],
+                ondelete="CASCADE",
             )
 
 
@@ -99,8 +105,7 @@ def downgrade() -> None:
     bind = op.get_bind()
     if _has_table(bind, "technical_debt") and _has_column(bind, "technical_debt", "organization_id"):
         with op.batch_alter_table("technical_debt") as batch_op:
-            batch_op.drop_constraint(
-                "fk_technical_debt_organization_id", type_="foreignkey"
-            )
+            for fk_name in _org_fk_names(bind, "technical_debt"):
+                batch_op.drop_constraint(fk_name, type_="foreignkey")
             batch_op.drop_index("ix_technical_debt_organization_id")
             batch_op.drop_column("organization_id")

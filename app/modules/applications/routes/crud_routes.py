@@ -374,6 +374,7 @@ def application_detail(id):
 
 @unified_applications_bp.route("/<int:id>/retire", methods=["POST"])
 @login_required
+@require_roles("admin", "architect")
 @audit_log("application_retire")
 def retire_application(id):
     """Mark an application for retirement.
@@ -382,6 +383,8 @@ def retire_application(id):
     store through the one writer, linked to this application and carrying a
     planned end date. Marking the application again returns the same single
     row -- there is never a second decommission work package for one app.
+    The application's lifecycle status becomes "retiring" in the same
+    transaction, which is the one definition of a retiring application.
     """
     org_id = g.current_org_id
     app_obj = _verify_app_in_org(id, org_id, raise_not_found=True)
@@ -410,6 +413,9 @@ def retire_application(id):
         .first()
     )
     if existing is not None:
+        if app_obj.lifecycle_status != "retiring":
+            app_obj.lifecycle_status = "retiring"
+            db.session.commit()
         flash(f"{app_obj.name} is already marked for retirement.", "info")
         return redirect(url_for("unified_applications.application_detail", id=id))
 
@@ -430,6 +436,7 @@ def retire_application(id):
         source_type="application",
         source_data=marker,
     )
+    app_obj.lifecycle_status = "retiring"
     db.session.commit()
     flash(f"{app_obj.name} marked for retirement.", "success")
     return redirect(url_for("unified_applications.application_detail", id=id))

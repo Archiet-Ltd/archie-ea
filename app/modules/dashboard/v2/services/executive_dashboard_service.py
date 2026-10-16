@@ -193,11 +193,9 @@ class ExecutiveDashboardService:
     def _get_portfolio_stats(self):
         """Counts for solutions, applications, vendors, ArchiMate elements.
 
-        ``retiring_applications`` counts the applications marked for
-        retirement from the same rows that surfaced them: distinct
-        application ids among the decommission work packages on the one
-        work package store, so one retirement action contributes exactly
-        one to the count no matter how often it is repeated."""
+        ``retiring_applications`` counts the organisation's applications whose
+        lifecycle status is "retiring", the one definition of a retiring
+        application (the retirement action sets it)."""
         stats = {
             "solutions": 0,
             "applications": 0,
@@ -234,19 +232,15 @@ class ExecutiveDashboardService:
             logger.warning("Executive dashboard: ArchiMate count unavailable: %s", exc)
 
         try:
-            from app.models.unified_work_package import UnifiedWorkPackage
+            from app.models.application_portfolio import ApplicationComponent
 
             org_id = getattr(g, "current_org_id", None)
             if org_id is not None:
                 stats["retiring_applications"] = (
-                    db.session.query(
-                        db.func.count(
-                            db.func.distinct(UnifiedWorkPackage.application_component_id)
-                        )
-                    )
+                    db.session.query(db.func.count(ApplicationComponent.id))
                     .filter(
-                        UnifiedWorkPackage.organization_id == org_id,
-                        UnifiedWorkPackage.source_data.like('%"kind": "retirement"%'),
+                        ApplicationComponent.organization_id == org_id,
+                        ApplicationComponent.lifecycle_status == "retiring",
                     )
                     .scalar()
                     or 0

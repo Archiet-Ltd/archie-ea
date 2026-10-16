@@ -596,6 +596,7 @@ class RationalizationScoringService:
         application_id: int,
         app: Optional[ApplicationComponent] = None,
         scoring_config: Optional[ScoringConfiguration] = None,
+        risk_scores_by_app: Optional[Dict[int, List[int]]] = None,
     ) -> Optional[ApplicationRationalizationScore]:
         """
         Calculate comprehensive rationalization score for an application.
@@ -607,6 +608,9 @@ class RationalizationScoringService:
             application_id: Application component ID
             app: Optional pre-loaded ApplicationComponent (avoids redundant query)
             scoring_config: Optional custom ScoringConfiguration to use
+            risk_scores_by_app: Optional risk-register scores already read for a
+                batch of applications (see ``_load_risk_scores``); without it
+                the rows for this one application are read.
 
         Returns:
             ApplicationRationalizationScore object or None on error.
@@ -635,7 +639,9 @@ class RationalizationScoringService:
             technical_score, tech_evidence = RationalizationScoringService._calculate_technical_health(app)
             business_score, biz_evidence = RationalizationScoringService._calculate_business_value(app)
             cost_score, cost_evidence = RationalizationScoringService._calculate_cost_efficiency(app)
-            vendor_result = RationalizationScoringService._calculate_vendor_risk(app)
+            vendor_result = RationalizationScoringService._calculate_vendor_risk(
+                app, risk_scores_by_app=risk_scores_by_app
+            )
             vendor_score = vendor_result["score"]
             vendor_evidence = vendor_result.get("evidence", [])
 
@@ -1035,8 +1041,7 @@ class RationalizationScoringService:
             vendor_evidence = vendor_result.get("evidence", [])
 
             # the same resolver calculate_app_score uses,
-            # so this re-derived trail never disagrees with the saved score
-            # (review finding A).
+            # so this re-derived trail never disagrees with the saved score.
             weights, _active_formula = RationalizationScoringService._resolve_overall_weights(
                 app, scoring_config, active_policy,
             )
@@ -2229,7 +2234,43 @@ class RationalizationScoringService:
         return max(0.0, min(score, 100.0)), evidence
 
     @staticmethod
-    def _calculate_vendor_risk(app: ApplicationComponent) -> dict:
+    def _load_risk_scores(app_ids) -> Dict[int, List[int]]:
+        """Read the risk-register scores for the given applications in one query.
+
+        The register rows are reached through the solutions each application
+        realises. Returns ``{application_id: [effective likelihood x impact,
+        ...]}`` with one entry per distinct register row; applications with no
+        row are absent.
+        """
+        ids = [i for i in app_ids if i is not None]
+        if not ids:
+            return {}
+        from app.models.risk import Risk  # noqa: PLC0415
+        from app.models.solution_models import solution_applications  # noqa: PLC0415
+
+        rows = (
+            db.session.query(Risk, solution_applications.c.application_component_id)
+            .join(
+                solution_applications,
+                solution_applications.c.solution_id == Risk.solution_id,
+            )
+            .filter(solution_applications.c.application_component_id.in_(ids))
+            .all()
+        )
+        seen = set()
+        result: Dict[int, List[int]] = {}
+        for risk, app_id in rows:
+            if (app_id, risk.id) in seen:
+                continue
+            seen.add((app_id, risk.id))
+            result.setdefault(app_id, []).append(risk._effective_score)
+        return result
+
+    @staticmethod
+    def _calculate_vendor_risk(
+        app: ApplicationComponent,
+        risk_scores_by_app: Optional[Dict[int, List[int]]] = None,
+    ) -> dict:
         """
         Calculate vendor risk score (0 - 100, higher = lower risk).
 
@@ -2261,36 +2302,30 @@ class RationalizationScoringService:
             # solutions this application realises. With neither, the input is
             # unmeasured and carried as None — the surface renders a dash, not
             # the old fabricated 40.
-            from app.models.risk import Risk  # noqa: PLC0415
-            from app.models.solution_models import solution_applications  # noqa: PLC0415
-
-            risk_registered = (
-                db.session.query(Risk.id)
-                .join(
-                    solution_applications,
-                    solution_applications.c.solution_id == Risk.solution_id,
-                )
-                .filter(solution_applications.c.application_component_id == app.id)
-                .first()
-            )
-            if risk_registered is not None:
-                # A risk-register row exists for this application, so the risk
-                # posture IS assessed — with no vendor link it is the in-house
-                # posture below.
+            if risk_scores_by_app is None:
+                risk_scores_by_app = RationalizationScoringService._load_risk_scores([app.id])
+            register_scores = risk_scores_by_app.get(app.id) or []
+            if register_scores:
+                # Risk-register rows exist for this application, so the risk
+                # posture IS assessed: the mean likelihood x impact (1-25)
+                # across its rows, inverted onto the 0-100 scale where higher
+                # means lower risk.
+                mean_risk = sum(register_scores) / len(register_scores)
+                register_score = round(max(0.0, min(100.0, 100.0 - (mean_risk / 25.0) * 100.0)), 1)
                 return {
-                    "score": 40.0,
+                    "score": register_score,
                     "vendor_lock_in_level": None,
                     "vendor_viability_score": None,
                     "exit_complexity": None,
                     "exit_cost_estimate": None,
                     "alternative_vendors_available": None,
                     "evidence": [{
-                        "factor": "Vendor Link",
+                        "factor": "Risk Register",
                         "weight": None,
-                        "raw_value": None,
-                        "contribution": -10,
-                        "source": "application_component_vendor_products (no link found); risks register row present",
-                        "rationale": "No vendor product linked; risk register row present, assessed as 40 (in-house / unsupported app posture)",
+                        "raw_value": round(mean_risk, 2),
+                        "contribution": None,
+                        "source": "application_component_vendor_products (no link found); risks register rows present",
+                        "rationale": f"No vendor product linked; {len(register_scores)} risk register row(s) with mean likelihood x impact {mean_risk:.1f} of 25, scored {register_score:.1f}",
                     }],
                 }
 
@@ -3112,6 +3147,11 @@ class RationalizationScoringService:
                     if s.application_component_id not in recent_scores_map:
                         recent_scores_map[s.application_component_id] = s
 
+            # One batched read of the risk register for the whole portfolio.
+            risk_scores_by_app = RationalizationScoringService._load_risk_scores(
+                [a.id for a in apps]
+            )
+
             for app in apps:
                 try:
                     # Check if recent score exists (within 30 days)
@@ -3127,7 +3167,9 @@ class RationalizationScoringService:
                             continue
 
                     # Calculate new score (pass pre-loaded app to avoid N+1 re-fetch)
-                    score = RationalizationScoringService.calculate_app_score(app.id, app=app)
+                    score = RationalizationScoringService.calculate_app_score(
+                        app.id, app=app, risk_scores_by_app=risk_scores_by_app
+                    )
 
                     if score:
                         scores_list.append(score)

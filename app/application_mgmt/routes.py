@@ -2292,6 +2292,7 @@ def render_application_detail(id):
             for wp in unified_rows
         ]
     except Exception:
+        logger.exception("Could not load unified work packages for application %s", app_obj.id)
         db.session.rollback()
 
     return render_template(

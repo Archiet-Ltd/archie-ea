@@ -81,6 +81,47 @@ class TestRetirementAction:
         assert '"kind": "retirement"' in (wp.source_data or "")
         assert wp.description and "retirement" in wp.description.lower()
 
+    def test_retiring_sets_the_one_definition_of_a_retiring_application(
+        self, app, db_session, make_org, client, login_as
+    ):
+        from app.models.application_portfolio import ApplicationComponent
+
+        org, user = _org_user(db_session, make_org, "retire-lifecycle")
+        app_obj = _app(db_session, org, "Retire-Lifecycle")
+        user_id, app_id = user.id, app_obj.id
+        db_session.commit()
+        db_session.expunge_all()
+
+        _login_read(db_session, client, login_as, user_id)
+        client.post(f"/applications/{app_id}/retire")
+
+        db_session.expire_all()
+        assert db_session.get(ApplicationComponent, app_id).lifecycle_status == "retiring"
+
+    def test_a_viewer_cannot_retire_an_application(
+        self, app, db_session, make_org, client, login_as
+    ):
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.unified_work_package import UnifiedWorkPackage
+
+        org, user = _org_user(db_session, make_org, "retire-viewer", role_name="Viewer")
+        user.enterprise_role = "viewer"
+        app_obj = _app(db_session, org, "Retire-Viewer")
+        org_id, user_id, app_id = org.id, user.id, app_obj.id
+        db_session.commit()
+        db_session.expunge_all()
+
+        _login_read(db_session, client, login_as, user_id)
+        response = client.post(f"/applications/{app_id}/retire")
+
+        assert response.status_code == 403
+        assert UnifiedWorkPackage.query.filter(
+            UnifiedWorkPackage.organization_id == org_id,
+            UnifiedWorkPackage.application_component_id == app_id,
+        ).count() == 0
+        db_session.expire_all()
+        assert db_session.get(ApplicationComponent, app_id).lifecycle_status == "operational"
+
     def test_retiring_twice_never_creates_a_second_row(
         self, app, db_session, make_org, client, login_as
     ):

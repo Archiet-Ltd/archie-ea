@@ -194,3 +194,50 @@ class TestUnmeasuredCostAndRiskInputs:
             assert dims["vendor_risk"]["measured"] is False
             assert dims["technical_health"]["measured"] is True
             assert dims["business_value"]["measured"] is True
+
+class TestRiskInputComesFromTheRiskRows:
+    def test_measured_risk_is_aggregated_from_likelihood_and_impact_not_a_constant(
+        self, app, db_session, make_org, tenant_ctx
+    ):
+        from app.services.rationalization_scoring_service import RationalizationScoringService
+
+        org = make_org("risk-aggregate")
+        with tenant_ctx(org.id):
+            app_obj = _bare_app(db_session, org)
+            high = RationalizationScoringService._calculate_vendor_risk(
+                app_obj, risk_scores_by_app={app_obj.id: [25, 25]}
+            )
+            low = RationalizationScoringService._calculate_vendor_risk(
+                app_obj, risk_scores_by_app={app_obj.id: [1, 3]}
+            )
+            none = RationalizationScoringService._calculate_vendor_risk(
+                app_obj, risk_scores_by_app={}
+            )
+
+        assert high["score"] == 0.0
+        assert low["score"] == 92.0  # mean 2 of 25
+        assert high["score"] != 40.0 and low["score"] != 40.0
+        assert none["score"] is None
+
+    def test_portfolio_scoring_reads_the_risk_register_once(
+        self, app, db_session, make_org, tenant_ctx, monkeypatch
+    ):
+        from app.services.rationalization_scoring_service import RationalizationScoringService
+
+        org = make_org("risk-batched")
+        with tenant_ctx(org.id):
+            for _ in range(3):
+                _bare_app(db_session, org)
+            db_session.flush()
+
+            calls = []
+            real = RationalizationScoringService._load_risk_scores
+
+            def spy(app_ids):
+                calls.append(list(app_ids))
+                return real(app_ids)
+
+            monkeypatch.setattr(RationalizationScoringService, "_load_risk_scores", staticmethod(spy))
+            RationalizationScoringService.calculate_portfolio_scores(force_recalculate=True)
+
+        assert len(calls) == 1

@@ -43,6 +43,7 @@ from sqlalchemy.pool import NullPool
 REPO = Path(__file__).resolve().parents[1]
 MIGRATION_PATH = REPO / "migrations" / "versions" / "20261008_row_level_security.py"
 NOTIF_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261011_notif_rls.py"
+TECHDEBT_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261016_technical_debt_rls.py"
 RUNTIME_ROLE = "archie_rls_test_runtime"
 RUNTIME_PASSWORD = uuid.uuid4().hex  # test-only role; regenerated each run
 
@@ -56,6 +57,7 @@ def _load_migration(path, name):
 
 MIGRATION = _load_migration(MIGRATION_PATH, "rls_migration_under_test")
 NOTIF_MIGRATION = _load_migration(NOTIF_MIGRATION_PATH, "notif_rls_migration_under_test")
+TECHDEBT_MIGRATION = _load_migration(TECHDEBT_MIGRATION_PATH, "techdebt_rls_migration_under_test")
 
 
 def _apply_policies(engine):
@@ -79,6 +81,14 @@ def _apply_notif_policies(engine):
         context = MigrationContext.configure(connection)
         with Operations.context(context):
             NOTIF_MIGRATION.upgrade()
+
+
+def _apply_techdebt_policies(engine):
+    """Run the technical-debt fence upgrade() on ``engine`` (idempotent)."""
+    with engine.begin() as connection:
+        context = MigrationContext.configure(connection)
+        with Operations.context(context):
+            TECHDEBT_MIGRATION.upgrade()
 
 
 class RlsEnv:
@@ -142,6 +152,7 @@ def rls(app, _schema):
         )
     _apply_policies(owner)
     _apply_notif_policies(owner)
+    _apply_techdebt_policies(owner)
     runtime = create_engine(
         url.set(username=RUNTIME_ROLE, password=RUNTIME_PASSWORD), poolclass=NullPool
     )
@@ -754,6 +765,32 @@ def test_newly_added_tenant_table_agent_registrations_is_scoped(rls, world):
     with rls.runtime_tx(a) as connection:
         seen = {r[0] for r in connection.execute(text("SELECT id FROM agent_registrations"))}
     assert ids[0] in seen and ids[1] not in seen
+
+
+def test_technical_debt_is_scoped_to_the_session_organisation(rls, world):
+    a, b = world.org("a"), world.org("b")
+    with rls.owner.begin() as connection:
+        ids = [
+            connection.execute(
+                text("INSERT INTO technical_debt (name, organization_id) VALUES (:n, :o) RETURNING id"),
+                {"n": f"Debt {o}", "o": o},
+            ).scalar_one()
+            for o in (a, b)
+        ]
+    world.extra_deletes.append(("technical_debt", "id", ids))
+    with rls.runtime_tx(a) as connection:
+        seen = {r[0] for r in connection.execute(text("SELECT id FROM technical_debt"))}
+        # An unqualified update and delete reach only the session organisation's row.
+        updated = connection.execute(text("UPDATE technical_debt SET priority = 'low'")).rowcount
+    assert ids[0] in seen and ids[1] not in seen
+    assert updated == 1
+    with rls.runtime_tx(a) as connection:
+        with pytest.raises(DBAPIError):
+            connection.execute(
+                text("INSERT INTO technical_debt (name, organization_id) VALUES ('x', :o)"), {"o": b}
+            )
+    with rls.runtime_tx(None) as connection:
+        assert _count(connection, "technical_debt") == 0
 
 
 def test_event_log_partitioned_parent_is_filtered(rls, world):
