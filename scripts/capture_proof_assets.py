@@ -218,7 +218,7 @@ def capture_home_product(browser, base, password, wide: bool) -> tuple[int, int]
     _dismiss_onboarding(page)
     if wide:
         aside = page.locator("[data-testid='sidebar']")
-        if aside.bounding_box()["width"] < 200:
+        if aside.bounding_box()["width"] > 200:
             page.locator("button.sidebar-collapse-btn").click()
             page.wait_for_timeout(600)
     _tidy(page)
@@ -238,8 +238,6 @@ def capture_home_product(browser, base, password, wide: bool) -> tuple[int, int]
         if not figures or int(figures[0].replace(",", "")) == 0:
             raise SystemExit(f"home product: headline tile {label!r} reads zero or empty; run seed-demo-company first")
     if wide:
-        page.locator("[data-testid='btn-density-toggle']").click()
-        page.wait_for_timeout(300)
         # The tiles, banner and filters fill the first 800px; scroll the content the way a
         # user would until the list card sits under the top bar, so the rows show.
         page.evaluate(
