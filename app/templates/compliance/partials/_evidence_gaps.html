@@ -1,0 +1,175 @@
+{% from 'components/empty_state.html' import empty_state %}
+{# Controls whose evidence is missing or out of date, or whose latest test failed,
+   ranked by control priority and how much of the estate the application reaches.
+   Included from frameworks_dashboard.html; reads `evidence_gaps`,
+   `evidence_gaps_error` and `can_record_control_work`. #}
+<section class="bg-card text-card-foreground rounded-lg border border-border overflow-hidden"
+         data-testid="evidence-gaps" x-data="evidenceGapPanel()">
+    <div class="px-5 py-4 border-b border-border">
+        <h2 class="text-base font-semibold text-foreground">Evidence to collect or renew</h2>
+        <p class="mt-1 text-sm text-muted-foreground">Controls with no evidence, evidence past its date, or a failed test, most important first.</p>
+    </div>
+    {% if evidence_gaps_error %}
+    <div class="px-5 py-4 text-sm text-destructive-emphasis" role="alert">Could not load the evidence list. Please try again.</div>
+    {% elif evidence_gaps and evidence_gaps.rows %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm" data-testid="evidence-gap-table">
+            <thead>
+                <tr class="text-left text-muted-foreground border-b border-border">
+                    <th class="px-5 py-3 font-medium">Control</th>
+                    <th class="px-5 py-3 font-medium">Application</th>
+                    <th class="px-5 py-3 font-medium">Evidence</th>
+                    <th class="px-5 py-3 font-medium">Valid until</th>
+                    <th class="px-5 py-3 font-medium">Latest test</th>
+                    <th class="px-5 py-3 font-medium text-right">Reaches</th>
+                    <th class="px-5 py-3 font-medium">Evidence owner</th>
+                    {% if can_record_control_work %}<th class="px-5 py-3 font-medium"><span class="sr-only">Actions</span></th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in evidence_gaps.rows %}
+                <tr class="border-b border-border last:border-0" data-testid="evidence-gap-row" data-control-row="{{ r.id }}">
+                    <td class="px-5 py-3">
+                        <div class="font-medium text-foreground">{{ r.control_code or '—' }} <span class="text-xs font-normal text-muted-foreground">{{ r.framework_code or '' }}</span></div>
+                        <div class="text-xs text-muted-foreground">{{ r.control_title or '—' }} · {{ r.priority }}</div>
+                    </td>
+                    <td class="px-5 py-3 text-foreground">{{ r.application_name }}</td>
+                    <td class="px-5 py-3">
+                        {% if r.state == 'missing' %}
+                        <span class="text-destructive-emphasis">No evidence</span>
+                        {% elif r.state == 'expired' %}
+                        <span class="text-destructive-emphasis">Expired</span>
+                        {% else %}
+                        <span class="text-muted-foreground">In date</span>
+                        {% endif %}
+                        {% if r.evidence != '—' and (r.evidence.startswith('http://') or r.evidence.startswith('https://')) %}
+                        <a href="{{ r.evidence }}" rel="noopener noreferrer" target="_blank" class="block text-xs text-primary underline">Open evidence</a>
+                        {% endif %}
+                    </td>
+                    <td class="px-5 py-3 text-muted-foreground">{{ r.valid_until or '—' }}</td>
+                    <td class="px-5 py-3 text-muted-foreground" data-testid="latest-test">
+                        {% if r.latest_test_result == 'ineffective' %}Failed{% elif r.latest_test_result == 'exception' %}Exception{% elif r.latest_test_result == 'effective' %}Passed{% else %}—{% endif %}
+                    </td>
+                    <td class="px-5 py-3 text-right text-foreground" {% if r.exposure is none and r.exposure_reason %}title="{{ r.exposure_reason }}"{% endif %}>{{ r.exposure if r.exposure is not none else '—' }}</td>
+                    <td class="px-5 py-3 text-muted-foreground" data-testid="evidence-owner">{{ r.evidence_owner }}</td>
+                    {% if can_record_control_work %}
+                    <td class="px-5 py-3 whitespace-nowrap">
+                        <button type="button" class="text-sm text-primary underline"
+                                @click="open('test', {{ r.id }}, '{{ (r.control_code or '')|e }}')">Record test</button>
+                        <button type="button" class="ml-3 text-sm text-primary underline"
+                                @click="open('owner', {{ r.id }}, '{{ (r.control_code or '')|e }}')">Assign owner</button>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if evidence_gaps.total > evidence_gaps.rows|length %}
+    <p class="px-5 py-3 text-xs text-muted-foreground">Showing {{ evidence_gaps.rows|length }} of {{ evidence_gaps.total }}.</p>
+    {% endif %}
+    {% if can_record_control_work %}
+    <div x-show="mode" x-cloak class="px-5 py-4 border-t border-border bg-muted/30" data-testid="evidence-action-panel">
+        <h3 class="text-sm font-semibold text-foreground" x-text="mode === 'test' ? 'Record a test for ' + code : 'Assign an evidence owner for ' + code"></h3>
+        <div x-show="mode === 'test'" class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+                <label for="control-test-kind" class="block text-sm font-medium text-foreground/80 mb-1">Kind of test</label>
+                <select id="control-test-kind" x-model="testKind" class="w-full px-3 py-2 border border-border rounded-md bg-background">
+                    <option value="design">Design</option>
+                    <option value="operating">Operating</option>
+                </select>
+            </div>
+            <div>
+                <label for="control-test-result" class="block text-sm font-medium text-foreground/80 mb-1">Result</label>
+                <select id="control-test-result" x-model="testResult" class="w-full px-3 py-2 border border-border rounded-md bg-background">
+                    <option value="effective">Effective</option>
+                    <option value="ineffective">Ineffective</option>
+                    <option value="exception">Exception</option>
+                </select>
+            </div>
+            <div>
+                <label for="control-test-notes" class="block text-sm font-medium text-foreground/80 mb-1">Notes</label>
+                <input id="control-test-notes" type="text" x-model="notes" class="w-full px-3 py-2 border border-border rounded-md bg-background" autocomplete="off">
+            </div>
+        </div>
+        <div x-show="mode === 'owner'" class="mt-3 relative max-w-md" @click.outside="showResults = false">
+            <label for="evidence-owner-search" class="block text-sm font-medium text-foreground/80 mb-1">Search people by name or email</label>
+            <input id="evidence-owner-search" type="text" x-model="query" @input.debounce.300ms="searchPeople()"
+                   class="w-full px-3 py-2 border border-border rounded-md bg-background" autocomplete="off" placeholder="Search by name or email...">
+            <div x-show="showResults" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                <template x-for="u in results" :key="u.id">
+                    <button type="button" @click="choose(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
+                        <span x-text="u.name" class="font-medium"></span>
+                        <span x-text="u.email" class="text-xs text-muted-foreground"></span>
+                    </button>
+                </template>
+            </div>
+            <p class="mt-2 text-sm text-muted-foreground" x-show="ownerId">Selected: <span x-text="ownerName"></span></p>
+        </div>
+        <div class="mt-4 flex gap-3">
+            <button type="button" @click="save()" :disabled="saving" class="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">Save</button>
+            <button type="button" @click="close()" class="inline-flex items-center rounded-md border border-border px-3 py-2 text-sm">Cancel</button>
+        </div>
+    </div>
+    {% endif %}
+    {% else %}
+    {{ empty_state(icon='check-circle', title='No evidence is missing or out of date', description='Every control you track has evidence in date and no failed test.', padding='py-10') }}
+    {% endif %}
+</section>
+<script>
+    function evidenceGapPanel() {
+        return {
+            mode: null, rowId: null, code: '', saving: false,
+            testKind: 'design', testResult: 'effective', notes: '',
+            query: '', results: [], showResults: false, ownerId: null, ownerName: '',
+            open(mode, rowId, code) {
+                this.mode = mode; this.rowId = rowId; this.code = code || '';
+                this.testKind = 'design'; this.testResult = 'effective'; this.notes = '';
+                this.query = ''; this.results = []; this.showResults = false; this.ownerId = null; this.ownerName = '';
+            },
+            close() { this.mode = null; this.rowId = null; },
+            searchPeople() {
+                const self = this;
+                if (this.query.length < 2) { this.results = []; this.showResults = false; return Promise.resolve(); }
+                return Platform.fetch.get('/api/users', null, { silent: true })
+                    .then(function (data) {
+                        if (!data || !data.success) { throw new Error('User search failed'); }
+                        const q = self.query.toLowerCase();
+                        self.results = data.users.filter(function (u) {
+                            return (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
+                        }).slice(0, 5);
+                        self.showResults = self.results.length > 0;
+                    })
+                    .catch(function () {
+                        self.results = []; self.showResults = false;
+                        Platform.toast.error('Could not search people.');
+                    });
+            },
+            choose(u) { this.ownerId = u.id; this.ownerName = u.name || u.email; this.query = u.name || ''; this.showResults = false; },
+            save() {
+                const self = this;
+                let request;
+                if (this.mode === 'test') {
+                    request = Platform.fetch.post('/dashboard/api/compliance/controls/' + this.rowId + '/tests',
+                        { test_kind: this.testKind, result: this.testResult, notes: this.notes });
+                } else if (this.ownerId) {
+                    request = Platform.fetch.put('/dashboard/api/compliance/mappings/' + this.rowId, { evidence_owner_id: this.ownerId });
+                } else {
+                    Platform.toast.error('Choose a person first.');
+                    return Promise.resolve();
+                }
+                this.saving = true;
+                return request
+                    .then(function () {
+                        Platform.toast.success('Saved.');
+                        window.location.reload();
+                    })
+                    .catch(function (err) {
+                        self.saving = false;
+                        Platform.toast.error('Could not save. Please try again.');
+                        throw err;
+                    });
+            }
+        };
+    }
+</script>

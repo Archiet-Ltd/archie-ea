@@ -38,6 +38,15 @@ class ApplicationComplianceControl(TenantMixin, db.Model):
     evidence_url = db.Column(db.String(500))  # Link to documentation/evidence
     notes = db.Column(db.Text)
 
+    # Evidence validity: when the evidence was gathered, until when it holds, who
+    # gathered it (a person, or a connector sync accepted through the approval
+    # queue) and who looks after renewing it. All nullable: evidence recorded
+    # before these existed reads as "undated", never as expired.
+    evidence_collected_at = db.Column(db.DateTime)
+    evidence_valid_until = db.Column(db.DateTime)
+    evidence_source = db.Column(db.String(20))  # person, connector
+    evidence_owner_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
+
     # Verification
     verified_date = db.Column(db.DateTime)
     verified_by_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
@@ -63,6 +72,7 @@ class ApplicationComplianceControl(TenantMixin, db.Model):
         "ComplianceControl", backref=db.backref("application_mappings", lazy="dynamic")
     )
     verified_by = db.relationship("User", foreign_keys=[verified_by_id])
+    evidence_owner = db.relationship("User", foreign_keys=[evidence_owner_id])
 
     adoption = db.relationship("FrameworkAdoption", back_populates="adopted_controls")
 
@@ -82,6 +92,13 @@ class ApplicationComplianceControl(TenantMixin, db.Model):
             "implementation_status": self.implementation_status,
             "evidence_url": self.evidence_url,
             "notes": self.notes,
+            "evidence_collected_at": self.evidence_collected_at.isoformat()
+            if self.evidence_collected_at
+            else None,
+            "evidence_valid_until": self.evidence_valid_until.isoformat()
+            if self.evidence_valid_until
+            else None,
+            "evidence_source": self.evidence_source,
             "verified_date": self.verified_date.isoformat() if self.verified_date else None,
             "verified_by": self.verified_by.email if self.verified_by else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,

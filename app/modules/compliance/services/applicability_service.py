@@ -16,6 +16,7 @@ from app.models.compliance_models import ComplianceControl, RegulatoryFramework
 from app.models.regulatory_change import RegulatoryChange, RegulatoryChangeImpact
 from app.models.regulatory_framework import FrameworkAdoption
 from app.models.technology_layer import Node
+from app.modules.compliance.services.control_evidence import evidence_state, has_usable_evidence_link
 
 logger = logging.getLogger(__name__)
 
@@ -242,13 +243,15 @@ class ApplicabilityService:
                 "title": control.title,
                 "implementation_status": ac.implementation_status,
                 "evidence_url": ac.evidence_url,
+                "evidence_state": evidence_state(ac),
+                "evidence_valid_until": (
+                    ac.evidence_valid_until.isoformat() if ac.evidence_valid_until else None
+                ),
                 "notes": ac.notes,
                 "evidence_source": None,
             }
 
-            has_own_evidence = (
-                ac.evidence_url is not None and ac.evidence_url.strip() != ""
-            )
+            has_own_evidence = has_usable_evidence_link(ac)
 
             if not has_own_evidence:
                 source = None
@@ -266,8 +269,7 @@ class ApplicabilityService:
                         ).first()
                         if (
                             partner_ac is not None
-                            and partner_ac.evidence_url is not None
-                            and partner_ac.evidence_url.strip() != ""
+                            and has_usable_evidence_link(partner_ac)
                         ):
                             source = {
                                 "control_id": partner.id,
@@ -294,8 +296,7 @@ class ApplicabilityService:
                         ).first()
                         if (
                             partner_ac is not None
-                            and partner_ac.evidence_url is not None
-                            and partner_ac.evidence_url.strip() != ""
+                            and has_usable_evidence_link(partner_ac)
                         ):
                             source = {
                                 "control_id": partner.id,
