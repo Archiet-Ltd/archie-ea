@@ -1,7 +1,8 @@
-"""Acceptance tests: long names, typed properties, two-org isolation, round-trip.
+"""Tests for long names, typed property import, the not-imported report and
+organisation scoping of import and export.
 
-Every test here fails on main (where MAX_NAME_LENGTH=100 and properties are
-stored raw) and passes on this branch.
+Tests marked ``db_required`` need PostgreSQL and are skipped without
+``TEST_DATABASE_URL``; the parser tests need no database.
 """
 import os
 
@@ -185,10 +186,11 @@ def test_numeric_property_imports_as_number_with_unit(app, db_session, make_org,
 
 @db_required
 def test_string_in_numeric_template_is_refused_and_reported(app, db_session, make_org, tenant_ctx):
-    """A string value for a numeric property is refused and appears in the
-    unrepresentable list, never stored."""
+    """A string value for a numeric property is refused, listed with a reason,
+    kept out of custom_properties and absent from an export."""
     from app.commands.seed_viewpoints import seed_property_templates
     from app.models.archimate_core import ArchiMateElement
+    from app.services.archimate_oef_service import ArchiMateOEFService
 
     seed_property_templates()
 
@@ -198,20 +200,181 @@ def test_string_in_numeric_template_is_refused_and_reported(app, db_session, mak
         parsed = svc.parse_oef_xml(OEF_TYPED_PROPERTIES)
         result = svc.execute_import(parsed, strategy="skip_duplicates")
 
-        # E2 should still be created (the element, not the property)
+        # The element is still created; only the property is refused.
         e2 = ArchiMateElement.query.filter_by(name="Bad Rate Limit").first()
         assert e2 is not None
+        assert "rate_limit" not in (e2.custom_properties or {})
+        assert "rate_limit" not in (e2.acm_properties or {})
 
-        # The unrepresentable list should contain the refused property
-        assert len(result.get("unrepresentable", [])) >= 1
         entry = next(
-            (u for u in result["unrepresentable"] if u["key"] == "rate_limit"),
+            (u for u in result["unrepresentable"]
+             if u.get("key") == "rate_limit" and u.get("element") == "Bad Rate Limit"),
             None,
         )
-        assert entry is not None, (
-            "Expected rate_limit in unrepresentable list, got %s" % result["unrepresentable"]
-        )
-        assert "number" in entry["reason"].lower() or "Enter a number" in entry["reason"]
+        assert entry is not None, result["unrepresentable"]
+        assert "number" in entry["reason"].lower()
+
+        exported = ArchiMateOEFService().export_model()
+        assert "not-a-number" not in exported
+
+
+@db_required
+def test_gate_owned_property_is_reported_not_stored(app, db_session, make_org, tenant_ctx):
+    """A property only the release gate may write is refused with that reason
+    and is not kept in custom_properties."""
+    from app.models.archimate_core import ArchiMateElement
+
+    xml = OEF_TYPED_PROPERTIES.replace("rate_limit", "ai_system_risk_class")
+    org = make_org("gate-owned-props")
+    with tenant_ctx(org.id):
+        svc = ArchiMateImportService()
+        result = svc.execute_import(svc.parse_oef_xml(xml), strategy="skip_duplicates")
+        e1 = ArchiMateElement.query.filter_by(name="API Gateway").first()
+        assert e1 is not None
+        assert "ai_system_risk_class" not in (e1.custom_properties or {})
+        entry = next(u for u in result["unrepresentable"]
+                     if u.get("key") == "ai_system_risk_class" and u["element"] == "API Gateway")
+        assert "set by the system" in entry["reason"]
+
+
+@db_required
+def test_non_finite_number_is_refused_and_element_still_created(app, db_session, make_org, tenant_ctx):
+    from app.commands.seed_viewpoints import seed_property_templates
+    from app.models.archimate_core import ArchiMateElement
+
+    seed_property_templates()
+    xml = OEF_TYPED_PROPERTIES.replace("not-a-number", "9" * 400)
+    org = make_org("non-finite-props")
+    with tenant_ctx(org.id):
+        svc = ArchiMateImportService()
+        result = svc.execute_import(svc.parse_oef_xml(xml), strategy="skip_duplicates")
+        assert ArchiMateElement.query.filter_by(name="Bad Rate Limit").first() is not None
+        entry = next(u for u in result["unrepresentable"]
+                     if u.get("key") == "rate_limit" and u["element"] == "Bad Rate Limit")
+        assert "finite" in entry["reason"]
+
+
+def test_coerce_number_rejects_non_finite():
+    from app.modules.architecture_assistant.property_service import (
+        PropertyValidationError,
+        _coerce_number,
+    )
+
+    for bad in (float("inf"), float("-inf"), float("nan"), "9" * 400):
+        with pytest.raises(PropertyValidationError):
+            _coerce_number(bad)
+
+
+OEF_UNSUPPORTED = """<?xml version="1.0" encoding="UTF-8"?>
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" identifier="id-unsupported">
+  <name xml:lang="en">Unsupported content</name>
+  <elements>
+    <element identifier="E1" xsi:type="BusinessService">
+      <name xml:lang="en">Orders</name>
+      <name xml:lang="de">Bestellungen</name>
+    </element>
+    <element identifier="E2" xsi:type="BusinessService"><name xml:lang="en">Billing</name></element>
+  </elements>
+  <relationships>
+    <relationship identifier="R1" source="E1" target="E2" xsi:type="Association">
+      <name xml:lang="en">Feeds</name>
+      <properties><property propertyDefinitionRef="pd1"><value>x</value></property></properties>
+    </relationship>
+  </relationships>
+  <organizations>
+    <item><label xml:lang="en">Business</label><item identifierRef="E1"/></item>
+  </organizations>
+  <propertyDefinitions>
+    <propertyDefinition identifier="pd1" type="number"><name xml:lang="en">weight</name></propertyDefinition>
+  </propertyDefinitions>
+  <views><diagrams><view identifier="v1"><name xml:lang="en">Overview</name></view></diagrams></views>
+</model>
+"""
+
+
+def test_unsupported_constructs_are_listed():
+    parsed = ArchiMateImportService().parse_oef_xml(OEF_UNSUPPORTED)
+    kinds = {}
+    for u in parsed["unrepresentable"]:
+        kinds.setdefault(u["kind"], []).append(u)
+    assert [u["identifier"] for u in kinds["view"]] == ["v1"]
+    assert kinds["view"][0]["element"] == "Overview"
+    assert kinds["relationship name"][0]["element"] == "Feeds"
+    assert kinds["relationship property"][0]["element"] == "weight"
+    assert [u["element"] for u in kinds["folder"]] == ["Business"]
+    assert kinds["extra language name"][0]["element"] == "Orders"
+    assert kinds["declared property type"][0]["element"] == "weight"
+    assert len(kinds["element identifier"]) == 2
+
+
+def test_unsupported_constructs_are_aggregated_above_five():
+    items = "".join(
+        '<element identifier="E%d" xsi:type="BusinessService"><name>N%d</name></element>' % (i, i)
+        for i in range(8)
+    )
+    xml = (
+        '<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/" '
+        'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><name>m</name>'
+        "<elements>%s</elements></model>" % items
+    )
+    parsed = ArchiMateImportService().parse_oef_xml(xml)
+    entries = [u for u in parsed["unrepresentable"] if u["kind"] == "element identifier"]
+    assert len(entries) == 1
+    assert entries[0]["count"] == 8
+    assert len(entries[0]["examples"]) == 5
+
+
+def test_preview_carries_the_not_imported_list():
+    parsed = ArchiMateImportService().parse_oef_xml(OEF_UNSUPPORTED)
+    parsed = dict(parsed, elements=[])
+    preview = ArchiMateImportService().preview_import(parsed)
+    assert any(u["kind"] == "view" for u in preview["unrepresentable"])
+
+
+@db_required
+def test_import_screen_renders_the_not_imported_list(app, db_session, make_org, tenant_ctx):
+    from flask import render_template
+    from flask_login import login_user
+
+    from app.models.user import User
+
+    org = make_org("screen-unrepresentable")
+    with tenant_ctx(org.id):
+        parsed = ArchiMateImportService().parse_oef_xml(OEF_UNSUPPORTED)
+        result = {
+            "created": 0, "updated": 0, "skipped": 0, "failed": 0, "errors": [],
+            "relationships_created": 0, "relationships_skipped": 0,
+            "relationships_failed": [], "model_name": "m", "strategy": "skip_duplicates",
+            "unrepresentable": parsed["unrepresentable"],
+        }
+        user = User(email="scr-%s@example.com" % org.id, organization_id=org.id, confirmed=True)
+        db_session.add(user)
+        db_session.commit()
+        with app.test_request_context("/architecture/import/oef"):
+            login_user(user)
+            html = render_template(
+                "archimate_crud/import_oef.html", result=result, strategy="skip_duplicates"
+            )
+    assert "import-unrepresentable" in html
+    assert "views are not imported" in html
+
+
+@db_required
+def test_canvas_materialize_keeps_names_to_255_and_says_so(app, db_session, make_org, tenant_ctx):
+    from app.models.archimate_core import ArchiMateElement
+    from app.modules.architecture.routes.archimate_routes import _materialize_canvas_items
+
+    org = make_org("canvas-names")
+    with tenant_ctx(org.id):
+        data = {"elements": [
+            {"element_id": "src-1", "name": "C" * 150, "el_type": "ApplicationComponent"},
+            {"element_id": "src-2", "name": "D" * 300, "el_type": "ApplicationComponent"},
+        ]}
+        id_map, _ = _materialize_canvas_items(data)
+        assert len(db_session.get(ArchiMateElement, id_map["src-1"]).name) == 150
+        assert len(db_session.get(ArchiMateElement, id_map["src-2"]).name) == 255
+        assert [t["element_id"] for t in data["truncated_names"]] == ["src-2"]
 
 
 # ---------------------------------------------------------------------------
@@ -220,8 +383,8 @@ def test_string_in_numeric_template_is_refused_and_reported(app, db_session, mak
 
 @db_required
 def test_round_trip_preserves_element_and_relationship_counts(app, db_session, make_org, tenant_ctx, parsed_roundtrip):
-    """Import a model, export it, re-import the export: element and relationship
-    counts match, and names over 100 characters survive."""
+    """Import a model, export it and parse the export: element and relationship
+    counts match, a 150-character name and a property survive."""
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
     from app.services.archimate_oef_service import ArchiMateOEFService
 
@@ -255,7 +418,8 @@ def test_round_trip_preserves_element_and_relationship_counts(app, db_session, m
 
 @db_required
 def test_export_never_contains_other_org_elements(app, db_session, make_org, tenant_ctx):
-    """An export from org A must not contain elements from org B."""
+    """With the same model imported into two organisations, an export in
+    organisation A holds A's two elements and not B's."""
     from app.models.archimate_core import ArchiMateElement
     from app.services.archimate_oef_service import ArchiMateOEFService
 

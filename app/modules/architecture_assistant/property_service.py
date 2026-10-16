@@ -2,6 +2,7 @@
 
 import json
 import logging
+import math
 import re
 
 from app.config.property_templates import PROPERTY_TEMPLATES
@@ -35,6 +36,8 @@ def _coerce_number(raw, unit=None):
     if isinstance(raw, bool):
         raise PropertyValidationError("Expected a number, got a boolean.")
     if isinstance(raw, (int, float)):
+        if isinstance(raw, float) and not math.isfinite(raw):
+            raise PropertyValidationError("Enter a finite number for this property.")
         return int(raw) if isinstance(raw, int) or float(raw).is_integer() else float(raw)
     text = str(raw or "").strip()
     if not text:
@@ -46,6 +49,8 @@ def _coerce_number(raw, unit=None):
     if unit and parsed_unit and parsed_unit.strip() != unit:
         raise PropertyValidationError(f"Enter a number in {unit}.")
     number = float(number_text)
+    if not math.isfinite(number):
+        raise PropertyValidationError("Enter a finite number for this property.")
     return int(number) if number.is_integer() else number
 
 
