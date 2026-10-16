@@ -99,7 +99,7 @@ ROLE_SECTION_ACCESS: Dict[str, Set[str]] = {
         "capabilities",
         "roadmaps",
         "governance",
-        "procurement", # Read-only access to procurement for cost visibility
+        "procurement",  # Read-only access to procurement for cost visibility
         # R1-B34 (TB-0135): owns the Formula Register (reviews/versions the
         # composite-score weights) -- see its _link() in this persona's zone
         # below.
@@ -115,15 +115,15 @@ ROLE_SECTION_ACCESS: Dict[str, Set[str]] = {
     },
     ROLE_PROCUREMENT: {
         "home",
-        "portfolio", # Read-only for app-vendor context
+        "portfolio",  # Read-only for app-vendor context
         "procurement",
     },
     ROLE_APPLICATION_MANAGER: {
         "home",
-        "solutions", # Read-only for impact awareness
-        "portfolio", # Read-only for integration context
+        "solutions",  # Read-only for impact awareness
+        "portfolio",  # Read-only for integration context
         "my_applications",
-        "roadmaps", # Read-only
+        "roadmaps",  # Read-only
     },
     ROLE_PLATFORM_ADMIN: {
         "home",
@@ -212,7 +212,7 @@ EXCLUSIVE_SECTIONS: Dict[str, List[str]] = {
 DEFAULT_ROLE = ROLE_SOLUTION_ARCHITECT
 
 
-# One cost-visibility rule. Every surface that redacts financial
+# One cost-visibility rule.  Every surface that redacts financial
 # figures (cost, budget, TCO, licence unit cost) checks this single set.
 # Previously each surface maintained its own copy of the same three roles;
 # a fourth surface that forgot to update its copy would leak cost data.
@@ -244,7 +244,7 @@ def get_user_role(user) -> str:
         return DEFAULT_ROLE
     try:
         return getattr(user, "enterprise_role", None) or DEFAULT_ROLE
-    except Exception: # noqa: BLE001 - a nav gate must not be able to 500 a page
+    except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
         return DEFAULT_ROLE
 
 
@@ -284,13 +284,13 @@ def is_admin(user) -> bool:
     """Check if user has admin role.
 
     The system of record for "is an administrator" is
-    Permission.ADMINISTER via user.is_admin(). This function delegates to it
+    Permission.ADMINISTER via user.is_admin().  This function delegates to it
     rather than re-deriving the answer from enterprise_role, so every caller
     that uses this accessor shares one authority.
     """
     try:
         return bool(user.is_admin())
-    except Exception: # noqa: BLE001 - a nav gate must not be able to 500 a page
+    except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
         return False
 
 
@@ -320,11 +320,11 @@ def can_edit_capabilities(user) -> bool:
     try:
         if user.is_admin():
             return True
-    except Exception: # noqa: BLE001 - a template gate must not 500 a page
+    except Exception:  # noqa: BLE001 - a template gate must not 500 a page
         pass
     try:
         return (getattr(user, "role_archetype", None) or "") == "architect"
-    except Exception: # noqa: BLE001
+    except Exception:  # noqa: BLE001
         return False
 
 
@@ -496,12 +496,12 @@ def _link(label, endpoint, icon, requires=None, query_params=None):
     """A sidebar link. ``requires`` names the guard the route enforces so the
     sidebar can drop links the user cannot reach — a link that 403s is a dead
     end, and the 2 Sep 2026 browser audit found seven of them (F-11):
-      "admin" — route is @admin_required (Permission.ADMINISTER)
+      "admin"          — route is @admin_required (Permission.ADMINISTER)
       "platform_admin" — route is @platform_admin_required (the cross-tenant
                          is_platform_admin super-admin flag)
       "data_subject_requests" — routes are @requires_role(DATA_SUBJECT_REQUEST_ROLES)
                          (security_architect, and platform_admin as always)
-      "general" — route requires Permission.GENERAL (require_roles()
+      "general"        — route requires Permission.GENERAL (require_roles()
                          only grants access when current_user.can(GENERAL)
                          holds), which a read-only Viewer role (permissions=0)
                          fails even though enterprise_role puts the link in
@@ -1073,7 +1073,7 @@ def get_sidebar_zones(user) -> List[Dict]:
     # constants are shared and must never be mutated per request.
     try:
         is_admin = bool(user.is_admin())
-    except Exception: # anonymous / unexpected user object
+    except Exception:  # anonymous / unexpected user object
         is_admin = False
 
     visible = []
@@ -1095,7 +1095,7 @@ def link_requires_satisfied(user, requires):
     if requires == "admin":
         try:
             return bool(user.is_admin())
-        except Exception: # anonymous / unexpected user object
+        except Exception:  # anonymous / unexpected user object
             return False
     if requires == "org_admin":
         return bool(getattr(user, "is_org_admin", False))
@@ -1106,14 +1106,14 @@ def link_requires_satisfied(user, requires):
             from app.decorators.requires_role import may_handle_data_subject_requests
 
             return may_handle_data_subject_requests(user)
-        except Exception: # anonymous / unexpected user object
+        except Exception:  # anonymous / unexpected user object
             return False
     if requires == "general":
         try:
             from app.models.user import Permission
 
             return bool(user.can(Permission.GENERAL))
-        except Exception: # anonymous / unexpected user object
+        except Exception:  # anonymous / unexpected user object
             return False
     if requires == "cto_or_portfolio_manager":
         # Matches the route guard on Ownership Coverage and Capabilities
@@ -1128,7 +1128,7 @@ def link_requires_satisfied(user, requires):
             if hasattr(user, "is_admin") and user.is_admin():
                 return True
             return getattr(user, "enterprise_role", None) in (ROLE_CTO, ROLE_PORTFOLIO_MANAGER)
-        except Exception: # anonymous / unexpected user object
+        except Exception:  # anonymous / unexpected user object
             return False
     return False
 

@@ -316,7 +316,7 @@ def test_f04_a_non_administrator_through_a_global_callback_lands_signed_in(
 
 
 @pytest.mark.parametrize("label", ["v1", "v2"])
-def test_d03_a_global_callback_never_replaces_a_set_external_id(
+def test_d03_a_global_callback_never_replaces_a_set_external_id_and_refuses_the_sign_in(
     app, db_session, make_org, monkeypatch, label
 ):
     module = {name: mod for name, mod, _ in _callbacks()}[label]
@@ -327,7 +327,7 @@ def test_d03_a_global_callback_never_replaces_a_set_external_id(
 
     resp, snap = _run_callback(app, monkeypatch, module, userinfo, trusted=True)
 
-    assert snap.get("_user_id") == str(member.id)
+    assert "_user_id" not in snap and "_mfa_pending_user_id" not in snap
     db_session.refresh(member)
     assert member.external_id == "scim-set-id"
     assert member.sso_provider == "entra"
@@ -358,12 +358,34 @@ def test_d03_a_global_callback_links_an_unlinked_user_and_creates_a_new_one(
     assert snap.get("_user_id") == str(created.id)
 
 
-def test_d03_neither_global_callback_constructs_a_user():
+def test_d03_neither_global_callback_constructs_a_user(app, db_session, monkeypatch):
+    """Source check plus the call path: callback -> create_sso_user -> _construct_user."""
     import inspect
 
+    import app.auth.sso as sso_module
+    from app.services import provisioning_service
+
+    assert "User(" not in inspect.getsource(sso_module.create_sso_user)
     for _name, module, view_name in _callbacks():
         source = inspect.getsource(getattr(module, view_name))
         assert "User(" not in source
+        assert "create_sso_user(" in source
+    assert "User(" not in inspect.getsource(sso_module)
+    assert "provisioning_service._construct_user(" in inspect.getsource(sso_module.create_sso_user)
+
+    for label, module, _view in _callbacks():
+        calls = []
+        real = provisioning_service._construct_user
+
+        def spy(*args, _real=real, **kwargs):
+            calls.append(args)
+            return _real(*args, **kwargs)
+
+        monkeypatch.setattr(provisioning_service, "_construct_user", spy)
+        email = f"path-{label}-{uuid.uuid4().hex[:8]}@example.com"
+        _run_callback(app, monkeypatch, module, {"email": email, "sub": f"s-{uuid.uuid4().hex[:6]}"})
+        assert len(calls) == 1, f"{label} callback did not build its user through _construct_user"
+        monkeypatch.setattr(provisioning_service, "_construct_user", real)
 
 
 # ---------------------------------------------------------------------------
@@ -736,7 +758,7 @@ def test_d09_the_capability_writer_refuses_a_deactivated_user(db_session, make_o
     with pytest.raises(service.CrossOrganisationCapabilityOwner) as refused:
         service.set_capability_owner(
             capability_id=capability.id, user_id=leaver.id, organization_id=org.id)
-    assert "does not belong to this organisation" in str(refused.value)
+    assert "That user is deactivated" in str(refused.value)
 
 
 # ---------------------------------------------------------------------------

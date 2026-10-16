@@ -499,7 +499,7 @@ def test_get_sidebar_zones_defaults_for_unknown_role():
 def test_get_sidebar_zones_never_raises_for_none_user():
     zones = get_sidebar_zones(None)
     # Must not raise and must return the default role's zone structure.
-    assert len(zones) >= 3 # home, my_work, library at minimum
+    assert len(zones) >= 3  # home, my_work, library at minimum
     zone_names = {z["zone"] for z in zones}
     assert zone_names >= {"home", "my_work", "library"}
 

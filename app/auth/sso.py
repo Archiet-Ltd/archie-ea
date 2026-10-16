@@ -352,26 +352,42 @@ def sso_email_claim_is_trusted_for(provider, userinfo, existing_user):
     return User.normalize_email(verified_email) == User.normalize_email(existing_user.email)
 
 
+def sso_pair_belongs_to_other_subject(candidate, provider, external_id):
+    """True when *candidate* already carries a stored (external_id,
+    sso_provider) pair that differs from the one the claims name.
+
+    A trusted email match may first-link an account that has no stored
+    subject; it never signs in, or links, an account whose stored subject is
+    a different one -- that is a different person (or a different provider
+    identity) claiming the same address. Shared by both global callbacks.
+    """
+    if not candidate.external_id or not external_id:
+        return False
+    return candidate.external_id != external_id or candidate.sso_provider != provider
+
+
 def create_sso_user(*, email, first_name, last_name, external_id, sso_provider):
-    """Construct a brand-new user on a first-time SSO sign-in (no existing
+    """Create a brand-new user on a first-time SSO sign-in (no existing
     subject-based or email-based match).
 
-    Lives here rather than inline in a callback view so neither global SSO
-    callback's own source contains an ORM-model constructor call -- see
-    tests/test_scim_review_fixes.py::test_d03_neither_global_callback_constructs_a_user,
-    which exists because a route that builds its own ``User`` object has
-    twice diverged from the shared identity-resolution rules above it.
-    Callers pass already-conditioned ``external_id``/``sso_provider`` values
-    (e.g. ``None`` when the provider gave no subject), so this changes no
-    caller's behaviour.
+    Delegates to the provisioning service, the one place a ``User`` is
+    constructed from an identity provider. Callers pass already-conditioned
+    ``external_id``/``sso_provider`` values (``None`` when the provider gave
+    no subject).
     """
     from app.models.user import User
+    from app.services import provisioning_service
 
-    return User(
-        email=email,
-        first_name=first_name,
-        last_name=last_name,
-        external_id=external_id,
-        sso_provider=sso_provider,
-        confirmed=True,
+    user = provisioning_service._construct_user(
+        None,
+        User.normalize_email(email),
+        {
+            "first_name": first_name,
+            "last_name": last_name,
+            "external_id": external_id,
+            "sso_provider": sso_provider,
+        },
+        False,
     )
+    user.sso_provider = sso_provider
+    return user

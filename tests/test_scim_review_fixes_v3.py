@@ -364,7 +364,7 @@ def test_v3_04_an_email_with_a_different_stored_pair_is_refused(
     rows = User.query.count()
 
     resp, snap = _run_callback(
-        app, monkeypatch, _module(label), {"email": member.email, "sub": "unknown-sub"}, provider="azure"
+        app, monkeypatch, _module(label), {"email": member.email, "sub": "unknown-sub"}, provider="azure", trusted=True
     )
     assert "_user_id" not in snap and "_mfa_pending_user_id" not in snap
     assert resp.status_code == 302
@@ -467,3 +467,90 @@ def test_v3_06_require_sole_organisation_uses_the_session_free_reader(db_session
     alone = make_user(db_session, org_b, "alone")
     _retire(db_session, alone, True)
     ps.require_sole_organisation(alone, org_b.id)
+
+
+@pytest.mark.parametrize("deactivated", _STATES)
+@pytest.mark.parametrize("label", _LABELS)
+def test_v3_04_same_email_same_tenant_different_oid_trusted_is_refused(
+    app, db_session, make_org, monkeypatch, label, deactivated
+):
+    from app.auth.sso import azure_identity_key
+    from app.models.user import User
+
+    _org_c, org_b = _orgs(db_session, make_org, f"v304p{label}")
+    stored = {"tid": "contoso", "oid": "oid-of-the-member"}
+    member = make_user(
+        db_session, org_b, "probe", external_id=azure_identity_key(stored), sso_provider="azure"
+    )
+    _retire(db_session, member, deactivated)
+    before = _state(member)
+    rows = User.query.count()
+
+    claims = {"email": member.email, "sub": "x", "tid": "contoso", "oid": "oid-of-someone-else"}
+    resp, snap = _run_callback(
+        app, monkeypatch, _module(label), claims, provider="azure", trusted=True
+    )
+    assert "_user_id" not in snap and "_mfa_pending_user_id" not in snap
+    assert resp.status_code == 302
+    assert User.query.count() == rows
+    db_session.refresh(member)
+    assert _state(member) == before
+
+
+@pytest.mark.parametrize("label", _LABELS)
+def test_v3_04_the_same_subject_signs_in_after_the_refusal_rule(
+    app, db_session, make_org, monkeypatch, label
+):
+    from app.auth.sso import azure_identity_key
+
+    _org_c, org_b = _orgs(db_session, make_org, f"v304s{label}")
+    claims = {"email": "placeholder@example.com", "sub": "x", "tid": "contoso", "oid": "same-oid"}
+    member = make_user(
+        db_session, org_b, "samesub", external_id=azure_identity_key(claims), sso_provider="azure"
+    )
+    claims["email"] = member.email
+    _resp, snap = _run_callback(app, monkeypatch, _module(label), claims, provider="azure")
+    assert snap.get("_user_id") == str(member.id)
+
+
+# ---------------------------------------------------------------------------
+# A deactivated user's record is untouched by a refused sign-in
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("label", _LABELS)
+@pytest.mark.parametrize("linked", [False, True], ids=["unlinked", "linked"])
+def test_a_refused_global_sign_in_leaves_a_deactivated_record_unchanged(
+    app, db_session, make_org, monkeypatch, label, linked
+):
+    _org_c, org_b = _orgs(db_session, make_org, f"dact{label}{int(linked)}")
+    kwargs = {"external_id": "same-sub", "sso_provider": "google"} if linked else {}
+    member = make_user(db_session, org_b, "leaver", **kwargs)
+    _retire(db_session, member, True)
+    before = _state(member)
+
+    claims = {"email": member.email, "sub": "same-sub" if linked else "new-sub",
+              "given_name": "Changed", "family_name": "Name"}
+    resp, snap = _run_callback(app, monkeypatch, _module(label), claims, trusted=True)
+
+    assert "_user_id" not in snap and "_mfa_pending_user_id" not in snap
+    assert resp.status_code == 302
+    db_session.refresh(member)
+    assert _state(member) == before
+
+
+def test_a_refused_organisation_sign_in_leaves_a_deactivated_record_unchanged(db_session, make_org):
+    from app.services.sso_service import SSOService
+
+    _org_c, org_b = _orgs(db_session, make_org, "dactorg")
+    member = make_user(db_session, org_b, "orgleaver", external_id="old-sub", sso_provider="oidc")
+    _retire(db_session, member, True)
+    before = _state(member)
+
+    returned = SSOService().provision_user(
+        org_b, {"email": member.email, "sub": "new-sub", "name": "Changed Name"}
+    )
+
+    assert returned.id == member.id and not returned.is_active
+    db_session.refresh(member)
+    assert _state(member) == before

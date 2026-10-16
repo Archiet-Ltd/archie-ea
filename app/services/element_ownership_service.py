@@ -76,8 +76,10 @@ def set_element_owner(
         raise CrossOrganisationElementOwner(missing_message)
 
     owner = User.query.filter_by(id=user_id, organization_id=organization_id).first()
-    if owner is None or not owner.is_active:
+    if owner is None:
         raise CrossOrganisationElementOwner("That user does not belong to this organisation.")
+    if not owner.is_active:
+        raise CrossOrganisationElementOwner("That user is deactivated.")
 
     existing = ApplicationOwner.find_duplicate(
         user_id,

@@ -200,7 +200,7 @@ def assert_csrf_coverage(app):
     unjustified = result["exempt_unjustified"]
     if unjustified:
         lines = "\n".join(
-            f" - {e['dest']} ({', '.join(e['methods'])} {e['rule']})" for e in unjustified
+            f"  - {e['dest']} ({', '.join(e['methods'])} {e['rule']})" for e in unjustified
         )
         raise CsrfCoverageError(
             "CSRF coverage gate failed: the following write routes are "

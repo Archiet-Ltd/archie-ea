@@ -5,12 +5,12 @@ Blueprint: ``sso``
 
 Routes
 ------
-GET /auth/sso/initiate?email=... Look up domain config; redirect to IdP.
-GET /auth/sso/callback/oidc Handle OIDC callback; provision user; login.
-POST /auth/sso/callback/saml Handle SAML Response; provision user; login.
-GET /admin/sso Show SSO config form (admin only).
-POST /admin/sso Save SSO config (admin only).
-POST /admin/sso/test Test the saved config without enforcing it (admin only).
+GET  /auth/sso/initiate?email=...    Look up domain config; redirect to IdP.
+GET  /auth/sso/callback/oidc         Handle OIDC callback; provision user; login.
+POST /auth/sso/callback/saml         Handle SAML Response; provision user; login.
+GET  /admin/sso                      Show SSO config form (admin only).
+POST /admin/sso                      Save SSO config (admin only).
+POST /admin/sso/test                 Test the saved config without enforcing it (admin only).
 """
 
 import logging

@@ -60,7 +60,7 @@ def _skip_reason(bind, table: str):
     has_column = bind.execute(
         text(
             "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
-            "WHERE table_schema = 'public' AND table_name =:t "
+            "WHERE table_schema = 'public' AND table_name = :t "
             "AND column_name = 'organization_id')"
         ),
         {"t": table},

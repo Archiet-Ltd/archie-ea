@@ -34,9 +34,9 @@ _log = logging.getLogger(__name__)
 from app.services import buy_intent
 from app.services.rate_limiter import rate_limit
 
-from. import mail_views
-from..services.account_service import AccountService
-from..forms.account_forms import (
+from . import mail_views
+from ..services.account_service import AccountService
+from ..forms.account_forms import (
     ChangeEmailForm,
     ChangePasswordForm,
     LoginForm,
@@ -49,7 +49,7 @@ _svc = AccountService
 
 
 @account_bp.route("/login", methods=["GET", "POST"])
-@rate_limit(10, "1m", methods=("POST",)) # SECURITY: Brute-force protection on credential submits only
+@rate_limit(10, "1m", methods=("POST",))  # SECURITY: Brute-force protection on credential submits only
 def login():
     """Log in an existing user."""
     # Opening /login while already signed in must not disturb the existing
@@ -211,7 +211,7 @@ def _complete_login_after_mfa(user):
 
 
 @account_bp.route("/mfa-challenge", methods=["GET", "POST"])
-@rate_limit(10, "1m", methods=("POST",)) # SECURITY: brute-force protection on code submits
+@rate_limit(10, "1m", methods=("POST",))  # SECURITY: brute-force protection on code submits
 def mfa_challenge():
     """Multi-factor step for an administrator mid-login (R1-B12 PR 2,
     TB-0144/PB-0100).
@@ -265,7 +265,7 @@ def mfa_challenge():
 
 
 @account_bp.route("/register", methods=["GET", "POST"])
-@rate_limit(5, "1m", methods=("POST",)) # SECURITY: Anti-abuse on registration submits only
+@rate_limit(5, "1m", methods=("POST",))  # SECURITY: Anti-abuse on registration submits only
 def register():
     """Register a new user, and send them a confirmation email."""
     return mail_views.register_view()
@@ -411,7 +411,7 @@ def save_preferences():
 
 
 @account_bp.route("/reset-password", methods=["GET", "POST"])
-@rate_limit(5, "1m", methods=("POST",)) # SECURITY: each POST can send mail
+@rate_limit(5, "1m", methods=("POST",))  # SECURITY: each POST can send mail
 def reset_password_request():
     """Respond to existing user's request to reset their password."""
     return mail_views.reset_request_view()
@@ -486,7 +486,7 @@ def change_email(token):
 
 @account_bp.route("/confirm-account", methods=["GET", "POST"])
 @login_required
-@rate_limit(3, "1m", methods=("POST",)) # SECURITY: each POST sends mail
+@rate_limit(3, "1m", methods=("POST",))  # SECURITY: each POST sends mail
 def confirm_request():
     """Respond to new user's request to confirm their account."""
     return mail_views.confirm_request_view()
@@ -664,6 +664,7 @@ def sso_callback(provider):
         external_id_for,
         find_linked_user,
         sso_email_claim_is_trusted_for,
+        sso_pair_belongs_to_other_subject,
     )
 
     external_id = external_id_for(provider, userinfo)
@@ -694,6 +695,7 @@ def sso_callback(provider):
             auth_audit.record_sso_email_mismatch(user.organization_id, user, provider)
         except Exception as _exc:
             _log.warning("Audit log failed on SSO email-mismatch record: %s", _exc)
+    pending_link = False
     if user is None:
         # No existing subject-based link. Falling back to matching by email
         # is only safe when the provider's claims prove the signing-in
@@ -714,12 +716,22 @@ def sso_callback(provider):
                 except Exception as _exc:
                     _log.warning("Audit log failed on SSO refusal: %s", _exc)
                 return redirect(url_for("account.login"))
-            # D-03: a trusted email match never replaces a pair this account
-            # is already linked to under a different provider -- only a
-            # still-unlinked account gets one written here.
-            if not candidate.external_id:
-                candidate.external_id = external_id
-                candidate.sso_provider = provider
+            # A trusted email match never replaces a pair this account is
+            # already linked to: a different stored subject is refused, and
+            # only a still-unlinked account gets a pair written (below,
+            # after the deactivation check).
+            if sso_pair_belongs_to_other_subject(candidate, provider, external_id):
+                flash(
+                    "SSO sign-in could not be completed. This account is "
+                    "linked to a different sign-in.",
+                    "error",
+                )
+                try:
+                    audit_logger.log_authentication(success=False, method=f"sso:{provider}")
+                except Exception as _exc:
+                    _log.warning("Audit log failed on SSO refusal: %s", _exc)
+                return redirect(url_for("account.login"))
+            pending_link = not candidate.external_id
             user = candidate
         else:
             # Create new user
@@ -732,18 +744,19 @@ def sso_callback(provider):
             )
             db.session.add(user)
 
+    # A deactivated user is refused before anything is written or committed.
+    if not user.is_active:
+        db.session.rollback()
+        flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
+        return redirect(url_for("account.login"))
+    if pending_link:
+        user.external_id = external_id
+        user.sso_provider = provider
+
     # Commit unconditionally: find_linked_user may have migrated a
     # pre-fix Azure link's external_id to the new oid+tid composite even
     # when `user` was already resolved above.
     db.session.commit()
-
-    # A leaver deactivated through the identity-provider
-    # lifecycle must not still be able to sign in via SSO. Checked after
-    # the nOAuth-protected identity resolution above (never skips that
-    # check), before anything else mints a session.
-    if not user.is_active:
-        flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
-        return redirect(url_for("account.login"))
 
     # R1-B12 PR 2 (TB-0144/PB-0100): the same MFA gate login() applies to a
     # password sign-in, applied here too -- an administrator must complete

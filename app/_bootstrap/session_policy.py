@@ -58,11 +58,11 @@ _DEFAULT_ABSOLUTE_ADMIN = timedelta(hours=4)
 #: the defect the old client-side "extend" button had, since it pinged /health.
 _EXEMPT_ENDPOINTS = {
     "static",
-    "global_health_check", # /health
-    "health.health", # /health (blueprint duplicate)
+    "global_health_check",   # /health
+    "health.health",         # /health (blueprint duplicate)
     "healthz",
-    "version_endpoint", # /version
-    "csp_report", # /api/csp-report
+    "version_endpoint",      # /version
+    "csp_report",            # /api/csp-report
 }
 
 

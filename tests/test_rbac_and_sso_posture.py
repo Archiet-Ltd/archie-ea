@@ -97,7 +97,7 @@ def test_plain_user_is_rejected_by_the_rbac_gate(app, db_session, rbac_org, logi
 def test_is_org_admin_derives_from_is_admin(app, db_session, rbac_org):
     """is_org_admin is a derived property that returns is_admin().
     Setting is_org_admin=True assigns the Administrator role, so the two can
-    never disagree. The old test that asserted they COULD disagree
+    never disagree.  The old test that asserted they COULD disagree
     (is_org_admin=True with admin_permission=False) described a state this
     change makes impossible by construction.
     """
@@ -269,7 +269,7 @@ def test_oidc_sign_in_routes_404_when_disabled(app):
     adapter = app.url_map.bind("localhost")
     client = app.test_client()
     for path in ("/account/sso/azure", "/account/sso/callback/azure"):
-        adapter.match(path) # raises NotFound when no rule is registered for the path
+        adapter.match(path)  # raises NotFound when no rule is registered for the path
         assert client.get(path).status_code == 404, (
             f"{path} must answer 404 while SSO is disabled"
         )
