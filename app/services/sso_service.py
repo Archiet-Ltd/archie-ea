@@ -19,7 +19,6 @@ import secrets
 from typing import Optional
 from urllib.parse import urlencode
 
-from app.utils.ssrf_guard import BlockedOutboundURL
 
 logger = logging.getLogger(__name__)
 
