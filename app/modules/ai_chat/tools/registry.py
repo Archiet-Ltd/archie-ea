@@ -701,14 +701,17 @@ TOOL_SCHEMAS = [
     {
         "name": "simulate_impact",
         "surfaces": ["chat"],
-        "route": "ArchiMateInferenceEngine.simulate_change_impact",
+        "route": "answer_envelope.ask_and_store",
         "fenced_fields": [],
         "risk_class": "read",
         "mutates": False,
         "record_types_written": [],
         "description": (
-            "Show the blast radius if an ArchiMate element is retired or changed. "
-            "Read-only. Returns all downstream dependents across all 6 layers."
+            "Show what depends on an ArchiMate element, by name: the canonical impact "
+            "answer (the same rows as the Ask page and the Impact page), downstream, "
+            "to depth 3, over recorded (drawn) relationships only; derived "
+            "relationships are not included. Read-only. Use the answer tool for "
+            "other depths, directions or derived relationships."
         ),
         "parameters": {
             "type": "object",
@@ -716,6 +719,64 @@ TOOL_SCHEMAS = [
                 "element_name": {"type": "string", "description": "Element name (fuzzy matched)"},
             },
             "required": ["element_name"],
+        },
+        "tier": "auto",
+    },
+    {
+        "name": "answer",
+        "surfaces": ["chat"],
+        "route": "answer_envelope.ask_and_store",
+        "fenced_fields": [],
+        "risk_class": "read",
+        "mutates": False,
+        "record_types_written": [],
+        "description": (
+            "Answer a question about the estate through the canonical answer service: "
+            "the same rows, truth class, confidence, citations and freshness the Ask "
+            "page and the Impact page show for the same question, at a permanent "
+            "address. Use this for 'what breaks if X fails' (question=impact, with "
+            "element_id), 'what breaks if these fail together' (question=set_impact, "
+            "with element_ids or a filter) and 'which risks reach X' "
+            "(question=risk_propagation, with element_id). Read-only: the answer is "
+            "stored as an immutable snapshot, nothing in the model changes. State "
+            "only what the returned rows say, and name the records they name."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "enum": ["impact", "set_impact", "risk_propagation"],
+                    "description": "Which question to answer",
+                },
+                "element_id": {
+                    "type": "integer",
+                    "description": "The ArchiMate element id (impact, risk_propagation)",
+                },
+                "element_ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Element ids that fail together (set_impact)",
+                },
+                "filter": {
+                    "type": "object",
+                    "description": "set_impact: seed every element of a type and/or layer",
+                    "properties": {
+                        "type": {"type": "string"},
+                        "layer": {"type": "string"},
+                    },
+                },
+                "max_depth": {"type": "integer", "description": "Hops to follow, 1 to 10 (default 3)"},
+                "include_derived": {
+                    "type": "boolean",
+                    "description": "Include derived (inferred) relationships (default false)",
+                },
+                "direction": {
+                    "type": "string",
+                    "enum": ["downstream", "upstream", "both"],
+                },
+            },
+            "required": ["question"],
         },
         "tier": "auto",
     },

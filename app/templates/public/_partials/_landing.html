@@ -5,7 +5,15 @@
    (public_pages.build_landing()), and the optional `screenshot` / `recording` / `thanks` / `error`
    the document layout uses. Every HTML value on `landing` is sanitized Markup from
    public_pages._sanitize_html(); nothing here marks HTML safe. Band and card classes match the
-   home page (main/index.html); band tints alternate by position (public_site.css .landing-bands). -#}
+   home page (main/index.html); band tints alternate by position (public_site.css .landing-bands).
+   B-03: a use-case section whose heading is "The question" (`s.variant == 'callout'`) renders as a
+   left-ruled attention box instead of a plain prose band; one whose heading is "What Entelim
+   answers" (`s.variant == 'figure_band'`) renders beside the page's own screenshot/recording when
+   one exists (the same figure _page_media.html already renders for module pages, moved into this
+   band instead of the page-top slot, but only for a function-per-segment page that actually has
+   this section) and as a text-only band, unchanged from the default, when neither exists yet --
+   never an empty frame. A use-case page with no "What Entelim answers" heading has no figure_band
+   section, so it keeps the page-top slot instead -- the figure always renders somewhere. -#}
 {% from 'macros/pricing_cta.html' import plan_buy_section %}
 {% set primary_label, primary_url = landing.primary_action %}
 {% set secondary_label, secondary_url = landing.secondary_action %}
@@ -33,7 +41,15 @@
 </section>
 
 <div class="landing-bands">
-  {% if screenshot or recording %}
+  {# A use-case page's figure (if any) renders inside its "What Entelim answers" band below
+     instead of here -- see the section loop's figure_band branch -- but only when that band
+     actually exists. A use-case page with no "What Entelim answers" heading (e.g. one whose
+     second heading reads "What Entelim is building" instead) has no figure_band section to
+     show the figure in, so it must keep this page-top slot or the screenshot/recording would
+     be dropped entirely instead of rendered anywhere. Every other landing family (module,
+     comparison) keeps this page-top slot exactly as before regardless. #}
+  {% set has_figure_band = landing.sections | selectattr('variant', 'equalto', 'figure_band') | list %}
+  {% if (screenshot or recording) and not (page.family == 'function-per-segment' and has_figure_band) %}
   <section class="landing-band">
     <div class="public-container">
 {% include 'public/_partials/_page_media.html' %}
@@ -52,6 +68,20 @@
   {% for s in landing.sections %}
   <section class="landing-band" aria-labelledby="{{ s.id }}">
     <div class="public-container">
+      {% if s.variant == 'callout' %}
+      <div class="public-page-content prose max-w-none">
+        <h2 id="{{ s.id }}">{{ s.heading_html }}</h2>
+        <div class="border-l-4 border-warning bg-warning/5 p-6 rounded-r-lg" data-testid="usecase-question-callout">{{ s.body_html }}</div>
+      </div>
+      {% elif s.variant == 'figure_band' and (screenshot or recording) %}
+      <div class="public-page-content prose max-w-none"><h2 id="{{ s.id }}">{{ s.heading_html }}</h2></div>
+      <div class="grid gap-8 lg:grid-cols-12 lg:items-start" data-testid="usecase-answer-figure-band">
+        <div class="lg:col-span-5 public-page-content prose max-w-none">{{ s.body_html }}</div>
+        <div class="lg:col-span-7">
+{% include 'public/_partials/_page_media.html' %}
+        </div>
+      </div>
+      {% else %}
       <div class="public-page-content prose max-w-none"><h2 id="{{ s.id }}">{{ s.heading_html }}</h2>{% if not s.cards %}{{ s.body_html }}{% endif %}</div>
       {% if s.cards %}
       <ul role="list" class="mx-auto mt-8 grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -70,6 +100,7 @@
         </li>
         {% endfor %}
       </ul>
+      {% endif %}
       {% endif %}
     </div>
   </section>

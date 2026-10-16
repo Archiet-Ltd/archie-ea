@@ -285,7 +285,7 @@ class TestFailClosedConfirmation:
         ("score_rationalization", {"surfaces": ["chat", "blueprint"], "route": "RationalizationScoringService.calculate_app_score", "fenced_fields": [], "risk_class": "write"}),
         ("search_archimate_elements", {"surfaces": ["chat", "blueprint"], "route": "ArchiMateElement.query", "fenced_fields": [], "risk_class": "read"}),
         ("search_capabilities_by_problem", {"surfaces": ["chat"], "route": "VectorEmbeddingService.embed_text", "fenced_fields": [], "risk_class": "read"}),
-        ("simulate_impact", {"surfaces": ["chat"], "route": "ArchiMateInferenceEngine.simulate_change_impact", "fenced_fields": [], "risk_class": "read"}),
+        ("simulate_impact", {"surfaces": ["chat"], "route": "answer_envelope.ask_and_store", "fenced_fields": [], "risk_class": "read"}),
         ("submit_for_arb_review", {"surfaces": ["chat", "blueprint"], "route": "TypedARBSubmissionAdapter.submit_solution_for_actor", "fenced_fields": [], "risk_class": "write"}),
         ("update_application_status", {"surfaces": ["chat", "blueprint"], "route": "ApplicationComponent.deployment_status", "fenced_fields": [], "risk_class": "write"}),
         ("update_solution_fields", {"surfaces": ["chat", "blueprint"], "route": "Solution.fields", "fenced_fields": [], "risk_class": "write"}),

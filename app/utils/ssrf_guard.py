@@ -116,6 +116,25 @@ def _is_public_ip(addr: str) -> bool:
     return True
 
 
+def _refuse_ambiguous_characters(url) -> None:
+    """Refuse a URL string whose parse differs between clients.
+
+    Python keeps a backslash inside the host; WHATWG parsers (browsers, Node,
+    so n8n) read it as a slash for http(s). ``https://169.254.169.254\\x.example/``
+    is therefore a public-looking name here and the metadata address there.
+    Control characters and whitespace are refused for the same reason, and so
+    is the encoded backslash.
+    """
+    if not isinstance(url, str):
+        return
+    if (
+        "\\" in url
+        or "%5c" in url.lower()
+        or any(ord(c) < 0x20 or ord(c) == 0x7F or c.isspace() for c in url)
+    ):
+        _refuse("backslash, control character or whitespace in URL")
+
+
 def validate_outbound_url(url: str, allowed_host_suffixes=(), require_https=True) -> str:
     """Return the URL unchanged, or raise :class:`BlockedOutboundURL`.
 
@@ -127,6 +146,7 @@ def validate_outbound_url(url: str, allowed_host_suffixes=(), require_https=True
     """
     if not url or not isinstance(url, str):
         _refuse("no URL supplied")
+    _refuse_ambiguous_characters(url)
 
     try:
         parsed = urlparse(url.strip())
@@ -219,6 +239,7 @@ def validate_user_supplied_url(url: str) -> str:
     Raises :class:`BlockedOutboundURL`.
     """
     if internal_targets_allowed():
+        _refuse_ambiguous_characters(url)
         try:
             scheme = urlparse(url.strip()).scheme if isinstance(url, str) else ""
         except ValueError:
