@@ -263,7 +263,7 @@ def capture_home_product(browser, base, password, wide: bool) -> tuple[int, int]
         for sel in ("[role='region'][aria-label='Portfolio statistics'] > *", "[data-testid^='mobile-card-']"):
             for i in range(page.locator(sel).count()):
                 box = page.locator(sel).nth(i).bounding_box()
-                if box and box["height"] > 0 and box["y"] + box["height"] + 8 - top <= 780:
+                if box and box["height"] > 0 and box["y"] + box["height"] + 8 <= vh and box["y"] + box["height"] + 8 - top <= 780:
                     bottom = max(bottom, box["y"] + box["height"] + 8)
         if bottom - top < 400:
             raise SystemExit("home product: phone crop holds no whole tiles block")
