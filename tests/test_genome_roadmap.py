@@ -26,7 +26,7 @@ from app.modules.genome.services.roadmap_slice import (
 
 
 def _seed(db_session, org_id):
-    """Seed 2 plateaus + 3 work packages (2 anchored, 1 legitimately unanchored).
+    """Seed 2 plateaus + 3 work packages (2 anchored, 1 gets auto-created element).
 
     Returns the names and element ids for assertions.
     """
@@ -64,8 +64,9 @@ def _seed(db_session, org_id):
         start_date=date(2026, 6, 1), target_date=date(2027, 1, 1),
         sequence_order=2, archimate_element_id=wp_elem_2.id,
     )
-    # Third work package is legitimately unanchored (no archimate_element_id) and
-    # unassigned to a plateau — exercises the honest-synthetic + Unassigned paths.
+    # Third work package is created without an explicit archimate_element_id;
+    # the backbone's before_flush listener creates one automatically.  It is
+    # unassigned to a plateau — exercises the Unassigned path.
     wp3 = WorkPackage(
         name="Backlog Grooming", organization_id=org_id,
         status="planned", priority="low", percent_complete=0,
@@ -74,11 +75,44 @@ def _seed(db_session, org_id):
     db_session.add_all([wp1, wp2, wp3])
     db_session.flush()
 
+    # Collect all element ids including the auto-created one for wp3.
+    all_element_ids = {p_elem_1.id, p_elem_2.id, wp_elem_1.id, wp_elem_2.id}
+    if wp3.archimate_element_id:
+        all_element_ids.add(wp3.archimate_element_id)
+
     return {
         "plateau_names": {"Current State", "Target State"},
         "wp_names": {"Migrate CRM", "Decommission Legacy ERP", "Backlog Grooming"},
-        "element_ids": {p_elem_1.id, p_elem_2.id, wp_elem_1.id, wp_elem_2.id},
+        "element_ids": all_element_ids,
     }
+
+
+def _legacy_work_package(db_session, *, name, organization_id, plateau_id=None,
+                         status="planned", priority="medium", sequence_order=0):
+    """Insert a WorkPackage row with a Core INSERT, bypassing the ORM flush
+    listener.  Use this to simulate a legacy row that has no ArchiMate element
+    and should be reported as synthetic."""
+    from datetime import datetime
+
+    from app.datetime_helpers import utcnow
+    from app.models.implementation_migration import WorkPackage
+
+    now = utcnow()
+    result = db_session.execute(
+        WorkPackage.__table__.insert().values(
+            name=name,
+            organization_id=organization_id,
+            plateau_id=plateau_id,
+            status=status,
+            priority=priority,
+            sequence_order=sequence_order,
+            context="application",
+            percent_complete=0,
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    return result.inserted_primary_key[0]
 
 
 def test_roadmap_slice_real_names_and_provenance(db_session, make_org, tenant_ctx):
@@ -105,18 +139,13 @@ def test_roadmap_slice_real_names_and_provenance(db_session, make_org, tenant_ct
         assert prov["archimate_element_id"] in seed["element_ids"]
         assert prov["archimate_type"] == "Plateau"
 
-    # Anchored work packages are structural; the unanchored one is honestly
-    # synthetic with a reason and NO fabricated id.
+    # Anchored work packages are structural; the third one has an auto-created
+    # element from the backbone listener so it is also structural.
     by_name = {w["name"]: w for w in s["work_packages"]}
-    for name in ("Migrate CRM", "Decommission Legacy ERP"):
+    for name in ("Migrate CRM", "Decommission Legacy ERP", "Backlog Grooming"):
         prov = by_name[name]["provenance"]
         assert prov["origin"] == "structural"
         assert prov["archimate_element_id"] in seed["element_ids"]
-
-    unanchored = by_name["Backlog Grooming"]["provenance"]
-    assert unanchored["origin"] == "synthetic"
-    assert unanchored["archimate_element_id"] is None
-    assert unanchored["reason"]
 
     # Plateau assignment and dates thread through.
     assert by_name["Migrate CRM"]["plateau_id"] is not None
@@ -155,8 +184,8 @@ def test_emitted_html_renders_real_names_and_provenance(db_session, make_org, te
     # Every anchored row carries its provenance element id as a data-* attribute.
     for p in s["plateaus"]:
         assert f'data-element-id="{p["provenance"]["archimate_element_id"]}"' in html
-    # The synthetic (unanchored) row is present with an empty element id, not a fake one.
-    assert 'data-provenance-origin="synthetic"' in html
+    # All work packages now have auto-created elements, so all are structural.
+    assert 'data-provenance-origin="structural"' in html
     assert 'data-domain="implementation"' in html
 
 
@@ -216,3 +245,77 @@ def test_dangling_anchor_fails_closed():
     assert prov["origin"] == "structural"
     assert prov["archimate_element_id"] == 5
     assert prov["archimate_type"] == "WorkPackage"
+
+
+def test_legacy_work_package_reported_as_synthetic(db_session, make_org, tenant_ctx):
+    """A legacy work package row with no archimate element (created via Core
+    INSERT, bypassing the ORM flush listener) must be reported as synthetic
+    in the roadmap slice: no invented id, a reason why."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.implementation_migration import Plateau
+
+    org = make_org("legacy-synthetic")
+
+    # Create a plateau with a real element.
+    p_elem = ArchiMateElement(
+        name="Target", type="Plateau", layer="implementation",
+        organization_id=org.id,
+    )
+    db_session.add(p_elem)
+    db_session.flush()
+    p = Plateau(
+        name="Target", organization_id=org.id, sequence_order=1,
+        target_date=date(2027, 1, 1), archimate_element_id=p_elem.id,
+    )
+    db_session.add(p)
+    db_session.flush()
+
+    # Legacy work package — no element, inserted via Core.
+    _legacy_work_package(
+        db_session, name="Orphaned WP", organization_id=org.id,
+        plateau_id=p.id, sequence_order=1,
+    )
+    db_session.flush()
+
+    with tenant_ctx(org.id):
+        s = build_roadmap_slice(org.id)
+
+    by_name = {w["name"]: w for w in s["work_packages"]}
+    assert "Orphaned WP" in by_name
+    prov = by_name["Orphaned WP"]["provenance"]
+    assert prov["origin"] == "synthetic"
+    assert prov["archimate_element_id"] is None
+
+
+def test_legacy_work_package_html_renders_synthetic(db_session, make_org, tenant_ctx):
+    """The emitted HTML for a legacy work package must carry
+    data-provenance-origin='synthetic'."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.implementation_migration import Plateau
+
+    org = make_org("legacy-synthetic-html")
+
+    p_elem = ArchiMateElement(
+        name="Target", type="Plateau", layer="implementation",
+        organization_id=org.id,
+    )
+    db_session.add(p_elem)
+    db_session.flush()
+    p = Plateau(
+        name="Target", organization_id=org.id, sequence_order=1,
+        target_date=date(2027, 1, 1), archimate_element_id=p_elem.id,
+    )
+    db_session.add(p)
+    db_session.flush()
+
+    _legacy_work_package(
+        db_session, name="Orphaned WP", organization_id=org.id,
+        plateau_id=p.id, sequence_order=1,
+    )
+    db_session.flush()
+
+    with tenant_ctx(org.id):
+        s = build_roadmap_slice(org.id)
+    html = emit_roadmap_gantt_html(s)
+
+    assert 'data-provenance-origin="synthetic"' in html

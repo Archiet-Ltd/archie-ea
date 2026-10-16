@@ -10,6 +10,20 @@ from tests.smoke.test_archetype_journeys import (
 )
 
 
+def _pump_until(page, condition, timeout_ms=10000):
+    """Let Playwright deliver browser events until ``condition()`` holds.
+
+    The console and pageerror callbacks run only while the sync API pumps
+    events, so a fixed sleep races a slow machine: the context can be closed
+    before the callback reads the console arguments. Waiting on the observed
+    condition is deterministic; the timeout only bounds a real failure.
+    """
+    waited = 0
+    while not condition() and waited < timeout_ms:
+        page.wait_for_timeout(25)
+        waited += 25
+
+
 class _Handle:
     def __init__(self, value):
         self._value = value
@@ -104,7 +118,11 @@ def test_timer_callback_errors_are_serialized_before_being_rethrown():
         page.evaluate("""() => setTimeout(() => {
             throw {code: 'timer-probe', expression: 'broken()', el: document.body};
         }, 0)""")
-        page.wait_for_timeout(100)
+        _pump_until(
+            page,
+            lambda: page_errors
+            and any("qualification async callback error" in d for d in diagnostics),
+        )
         context.close()
         browser.close()
 
@@ -118,7 +136,7 @@ def test_timer_callback_errors_are_serialized_before_being_rethrown():
     assert page_errors, "the diagnostic wrapper swallowed the original exception"
 
 
-def _run_unhandled_rejection(reason):
+def _run_unhandled_rejection(reason, wait_for_diagnostic=False):
     playwright = pytest.importorskip("playwright.sync_api")
     diagnostics = []
     page_errors = []
@@ -139,7 +157,12 @@ def _run_unhandled_rejection(reason):
         page.on("pageerror", lambda error: page_errors.append(str(error)))
         page.goto("data:text/html,<body>rejection target</body>")
         page.evaluate("reason => { void Promise.reject(reason); }", reason)
-        page.wait_for_timeout(100)
+        if wait_for_diagnostic:
+            _pump_until(page, lambda: diagnostics)
+        else:
+            # Absence cannot be awaited; give a suppressed rejection time to
+            # (not) surface.
+            page.wait_for_timeout(100)
         context.close()
         browser.close()
 
@@ -157,7 +180,8 @@ def test_cancelled_alpine_transition_rejection_is_suppressed():
 
 def test_non_transition_plain_object_rejection_remains_diagnostic():
     diagnostics, _ = _run_unhandled_rejection(
-        {"code": "real-failure", "expression": "loadElements()"}
+        {"code": "real-failure", "expression": "loadElements()"},
+        wait_for_diagnostic=True,
     )
 
     assert any(

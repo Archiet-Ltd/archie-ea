@@ -16,6 +16,11 @@ def init_services(app, config_name):
 
     register_template_utils(app)
 
+    # ArchiMate backbone listener — the one place domain records join the
+    # backbone.  Must be registered after db.session is available.
+    from app.services.archimate_backbone import register_archimate_listeners
+    register_archimate_listeners()
+
 
 def _check_session_configuration(app, config_name):
     """FAR-012: Check session configuration for potential stability issues."""

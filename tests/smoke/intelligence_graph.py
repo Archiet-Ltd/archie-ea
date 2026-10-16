@@ -17,7 +17,9 @@ def seed_impact_graph(org_id, noun_prefix="Ledgerpay"):
     from app import create_app, db
     from app.models.application_portfolio import ApplicationComponent
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.models.application_owner import ApplicationOwner
     from app.models.enterprise_intelligence import ApplicationOwnership, OrganizationUnit
+    from app.models.user import User
     from app.modules.intelligence.models.derived_relationship import DerivedRelationship
 
     app = create_app("testing")
@@ -61,6 +63,18 @@ def seed_impact_graph(org_id, noun_prefix="Ledgerpay"):
             organization_id=org_id, application_id=component.id, organization_unit_id=unit.id,
             ownership_type="Business Owner",
         ))
+        # The owner the answer names is the one owner record: an ApplicationOwner
+        # row pointing at a person in this organisation.
+        owner_user = User(
+            email="gateway.owner.%s@example.com" % suffix, first_name="Gwen", last_name="Owner %s" % suffix,
+            organization_id=org_id, confirmed=True,
+        )
+        db.session.add(owner_user)
+        db.session.commit()
+        db.session.add(ApplicationOwner(
+            user_id=owner_user.id, application_id=component.id,
+            organization_id=org_id, ownership_type="primary",
+        ))
         db.session.commit()
 
         # The worked-out connection goes in last: writing to an element or a
@@ -88,7 +102,7 @@ def seed_impact_graph(org_id, noun_prefix="Ledgerpay"):
                 "service": service.name, "gateway": gateway.name,
                 "ops": ops.name, "portal": portal.name,
             },
-            owner=unit.name,
+            owner="%s %s" % (owner_user.first_name, owner_user.last_name),
         )
     return out
 

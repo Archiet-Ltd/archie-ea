@@ -755,6 +755,431 @@ def legacy_id(wp: UnifiedWorkPackage, table: str) -> Optional[int]:
     return None
 
 
+# --- owner/approver panel and critical path (transformation planning) -------
+# The owner/approver panel reads the one ownership record
+# (``ApplicationOwner.get_display_rows_*``) and the one approval queue, so there
+# is no second owner reader and no second approver reader. The critical path is
+# the one computation over this store's rows and its ``work_dependencies``: the
+# retired store's stub delegates here (see RoadmapWorkPackage.get_critical_path_impact).
+
+_WP_APPROVAL_ENTITY = "work_package"
+_ELEMENT_CAPABILITY = "capability"
+_ELEMENT_APPLICATION = "application"
+
+
+def empty_critical_path() -> Dict[str, Any]:
+    """The canonical empty critical path result, shared by the model stubs."""
+    return {
+        "plateau_id": None,
+        "plateau_name": None,
+        "has_critical_path": False,
+        "path": [],
+        "duration_days": 0,
+        "blocking": None,
+        "cycles": [],
+        "ignored_dependencies": [],
+    }
+
+
+def _capability_ids_of(wp: UnifiedWorkPackage) -> List[int]:
+    """The capability ids a work package changes: its list when it has one,
+    falling back to its primary capability id. Order is kept, duplicates are
+    dropped."""
+    ids = []
+    for raw in wp.capability_ids or []:
+        try:
+            ids.append(int(raw))
+        except (TypeError, ValueError):
+            continue
+    if not ids and wp.capability_id:
+        try:
+            ids.append(int(wp.capability_id))
+        except (TypeError, ValueError):
+            pass
+    seen = set()
+    return [i for i in ids if not (i in seen or seen.add(i))]
+
+
+def _application_row(application_id: int, organization_id: int):
+    from app.models.application_portfolio import ApplicationComponent
+
+    return ApplicationComponent.query.filter_by(
+        id=application_id, organization_id=organization_id
+    ).first()
+
+
+def _approval_rows_for(organization_id: int, entity_types=None, entity_ids=None):
+    """The pending and approved rows of the one approval queue for this
+    organisation, oldest first, optionally narrowed to the given entity types
+    and ids. Rejected and expired rows never appear."""
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+
+    query = AIChatCRUDApproval.query.filter(
+        AIChatCRUDApproval.organization_id == organization_id,
+        AIChatCRUDApproval.status.in_(
+            [ApprovalStatus.PENDING, ApprovalStatus.APPROVED]
+        ),
+    )
+    if entity_types is not None:
+        query = query.filter(AIChatCRUDApproval.entity_type.in_(list(entity_types)))
+    if entity_ids is not None:
+        query = query.filter(AIChatCRUDApproval.entity_id.in_(list(entity_ids)))
+    return query.order_by(AIChatCRUDApproval.created_at, AIChatCRUDApproval.id).all()
+
+
+def _approval_dict(row) -> Dict[str, Any]:
+    return {
+        "id": row.id,
+        "summary": row.summary,
+        "status": row.status.value,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+    }
+
+
+def _element_entry(kind: str, element_id: int, element_name: Optional[str], owners: list):
+    return {
+        "kind": kind,
+        "element_id": element_id,
+        "element_name": element_name,
+        "has_owner": bool(owners),
+        "owners": owners,
+        "pending_approvals": [],
+        "approved_approvals": [],
+    }
+
+
+def owner_and_approval_panel(
+    work_package: Optional[UnifiedWorkPackage], organization_id: int
+) -> Dict[str, Any]:
+    """The owner/approver panel for a work package: for every element it
+    changes -- each capability it lists and the application component it is
+    linked to -- the recorded owners (or a no-owner flag) plus the pending and
+    approved approvals of the work package and of each element. Every read is
+    fenced to ``organization_id``; another organisation's owners, element rows
+    and approvals never appear. Approvals come from the one approval queue and
+    owners from the one ownership record reader."""
+    from app.models.application_owner import ApplicationOwner
+    from app.models.unified_capability import UnifiedCapability
+
+    if work_package is None or organization_id is None:
+        return {
+            "work_package": {"id": None, "name": None},
+            "elements": [],
+            "work_package_approvals": {"pending": [], "approved": []},
+        }
+
+    elements: List[Dict[str, Any]] = []
+    approval_filters = [(_WP_APPROVAL_ENTITY, work_package.id)]
+
+    cap_ids = _capability_ids_of(work_package)
+    cap_names = {}
+    if cap_ids:
+        for cap in UnifiedCapability.query.filter(
+            UnifiedCapability.id.in_(cap_ids),
+            UnifiedCapability.organization_id == organization_id,
+        ).all():
+            cap_names[cap.id] = cap.name
+    for cap_id in cap_ids:
+        owners = ApplicationOwner.get_display_rows_for_element(
+            _ELEMENT_CAPABILITY, cap_id, organization_id
+        )
+        elements.append(_element_entry(_ELEMENT_CAPABILITY, cap_id, cap_names.get(cap_id), owners))
+        approval_filters.append((_ELEMENT_CAPABILITY, cap_id))
+
+    if work_package.application_component_id:
+        app_id = work_package.application_component_id
+        app_row = _application_row(app_id, organization_id)
+        owners = ApplicationOwner.get_display_rows_for_application(app_id, organization_id)
+        elements.append(
+            _element_entry(_ELEMENT_APPLICATION, app_id, app_row.name if app_row else None, owners)
+        )
+        approval_filters.append((_ELEMENT_APPLICATION, app_id))
+
+    watched = set(approval_filters)
+    by_entity: Dict[tuple, List[Dict[str, Any]]] = {}
+    for row in _approval_rows_for(
+        organization_id,
+        entity_types={t for t, _ in watched},
+        entity_ids={i for _, i in watched},
+    ):
+        key = (row.entity_type, row.entity_id)
+        if key not in watched:
+            continue
+        by_entity.setdefault(key, []).append(_approval_dict(row))
+
+    wp_entry = by_entity.get((_WP_APPROVAL_ENTITY, work_package.id), [])
+    for element in elements:
+        key = (element["kind"], element["element_id"])
+        entries = by_entity.get(key, [])
+        element["pending_approvals"] = [d for d in entries if d["status"] == "pending"]
+        element["approved_approvals"] = [d for d in entries if d["status"] == "approved"]
+
+    return {
+        "work_package": {"id": work_package.id, "name": work_package.name},
+        "elements": elements,
+        "work_package_approvals": {
+            "pending": [d for d in wp_entry if d["status"] == "pending"],
+            "approved": [d for d in wp_entry if d["status"] == "approved"],
+        },
+    }
+
+
+# --- critical path to a plateau ---------------------------------------------
+
+
+def _planned_duration_days(wp: UnifiedWorkPackage) -> int:
+    if wp.start_date and wp.end_date:
+        return max((wp.end_date - wp.start_date).days, 0)
+    return wp.duration_days or 0
+
+
+def _owner_display_name(owner) -> Optional[str]:
+    """The owner's name via the one User.full_name; None for a nameless user
+    (the screen shows a dash), never the email address."""
+    if owner is None or not (owner.first_name or owner.last_name):
+        return None
+    return owner.full_name()
+
+
+def _users_by_id(owner_ids, organization_id: Optional[int]) -> Dict[int, Any]:
+    """One lookup of the owners, inside this organisation."""
+    from app.models.user import User
+
+    ids = {i for i in owner_ids if i}
+    if not ids or organization_id is None:
+        return {}
+    return {
+        user.id: user
+        for user in User.query.filter(
+            User.id.in_(ids), User.organization_id == organization_id
+        ).all()
+    }
+
+
+def _path_node(wp: UnifiedWorkPackage, users: Dict[int, Any]) -> Dict[str, Any]:
+    return {
+        "id": wp.id,
+        "name": wp.name,
+        "status": wp.status,
+        "start_date": wp.start_date.date().isoformat() if wp.start_date else None,
+        "end_date": wp.end_date.date().isoformat() if wp.end_date else None,
+        "duration_days": _planned_duration_days(wp),
+        "owner_id": wp.owner_id,
+        "owner_name": _owner_display_name(users.get(wp.owner_id)),
+    }
+
+
+def _strongly_connected_components(
+    node_ids: List[int], edges: Dict[int, List[int]]
+) -> List[List[int]]:
+    """Tarjan's algorithm with an explicit stack (no recursion limit). A
+    component is emitted after every component it depends on."""
+    index: Dict[int, int] = {}
+    low: Dict[int, int] = {}
+    on_stack = set()
+    stack: List[int] = []
+    out: List[List[int]] = []
+    counter = 0
+    for start in node_ids:
+        if start in index:
+            continue
+        work = [(start, iter(edges.get(start, ())))]
+        index[start] = low[start] = counter
+        counter += 1
+        stack.append(start)
+        on_stack.add(start)
+        while work:
+            node, deps = work[-1]
+            advanced = False
+            for dep in deps:
+                if dep not in index:
+                    index[dep] = low[dep] = counter
+                    counter += 1
+                    stack.append(dep)
+                    on_stack.add(dep)
+                    work.append((dep, iter(edges.get(dep, ()))))
+                    advanced = True
+                    break
+                if dep in on_stack:
+                    low[node] = min(low[node], index[dep])
+            if advanced:
+                continue
+            work.pop()
+            if work:
+                parent = work[-1][0]
+                low[parent] = min(low[parent], low[node])
+            if low[node] == index[node]:
+                comp = []
+                while True:
+                    member = stack.pop()
+                    on_stack.discard(member)
+                    comp.append(member)
+                    if member == node:
+                        break
+                out.append(comp)
+    return out
+
+
+def _compute_critical_path(
+    plateau, root_ids, by_id: Dict[int, UnifiedWorkPackage], organization_id: int,
+    users: Optional[Dict[int, Any]] = None,
+) -> Dict[str, Any]:
+    """The critical path of one plateau over the organisation's work packages
+    already loaded in ``by_id``. Iterative: a chain of any length terminates.
+
+    Dependencies naming no work package of this organisation are ignored and
+    reported. A dependency cycle (including a work package that depends on
+    itself) is reported once as the set of packages in the loop and its
+    internal edges are not followed. The path beside a cycle therefore does
+    not depend on row ids: ties go to the chain whose package names sort
+    first."""
+    result = empty_critical_path()
+    result["plateau_id"] = plateau.id
+    result["plateau_name"] = plateau.name
+    root_ids = {i for i in root_ids if i in by_id}
+    if not root_ids:
+        return result
+
+    # The dependency closure stays inside this organisation: an id with no row
+    # here is another organisation's work package (or a stale id) and is
+    # reported, never followed.
+    closure = set(root_ids)
+    ignored = []
+    pending = list(root_ids)
+    while pending:
+        node = by_id[pending.pop()]
+        for dep_id in _dependency_ids(node):
+            if dep_id in by_id:
+                if dep_id not in closure:
+                    closure.add(dep_id)
+                    pending.append(dep_id)
+            else:
+                ignored.append(dep_id)
+
+    edges = {
+        node_id: [d for d in _dependency_ids(by_id[node_id]) if d in closure]
+        for node_id in closure
+    }
+    components = _strongly_connected_components(sorted(closure), edges)
+    component_of = {}
+    cycles = []
+    for number, comp in enumerate(components):
+        for member in comp:
+            component_of[member] = number
+        if len(comp) > 1 or comp[0] in edges[comp[0]]:
+            cycles.append(sorted(comp))
+    cycles.sort()
+
+    def _key(length: int, chain: List[int]):
+        # longer first; on a tie the chain whose names sort first, then ids
+        return (-length, [by_id[i].name or "" for i in chain], chain)
+
+    best: Dict[int, tuple] = {}
+    for comp in components:  # dependencies are emitted before dependants
+        for node_id in comp:
+            own = _planned_duration_days(by_id[node_id])
+            choice = (own, [node_id])
+            for dep_id in edges[node_id]:
+                if component_of[dep_id] == component_of[node_id]:
+                    continue  # the cycle's own edges are never followed
+                dep_len, dep_chain = best[dep_id]
+                candidate = (own + dep_len, dep_chain + [node_id])
+                if _key(*candidate) < _key(*choice):
+                    choice = candidate
+            best[node_id] = choice
+
+    overall = None
+    for root_id in sorted(root_ids):
+        if overall is None or _key(*best[root_id]) < _key(*overall):
+            overall = best[root_id]
+
+    result["cycles"] = cycles
+    result["ignored_dependencies"] = [
+        {"dependency_id": dep_id, "reason": "no such work package in this organisation"}
+        for dep_id in sorted(set(ignored))
+    ]
+    length, chain = overall
+    nodes = [by_id[i] for i in chain]
+    if users is None:
+        users = _users_by_id([w.owner_id for w in nodes], organization_id)
+    result["path"] = [_path_node(w, users) for w in nodes]
+    result["duration_days"] = length
+    result["blocking"] = result["path"][-1]
+    result["has_critical_path"] = True
+    return result
+
+
+def critical_path_for_plateau(
+    plateau_id: int, organization_id: int
+) -> Dict[str, Any]:
+    """The critical path to a plateau: the longest dependency chain of this
+    organisation's work packages that realise it (plus their dependencies),
+    the chain's total planned duration, and the blocking item -- the chain's
+    last work package, whose end date gates the plateau -- with its owner.
+    A recompute after the blocking package's planned end date moves returns a
+    new duration, because nothing is cached. This is the one computation; the
+    retired store's stub delegates here. An unknown organisation, or a plateau
+    of another organisation, yields the empty critical path."""
+    from app.models.implementation_migration import Plateau
+
+    result = empty_critical_path()
+    result["plateau_id"] = plateau_id
+    if organization_id is None:
+        return result
+    plateau = Plateau.query.filter_by(
+        id=plateau_id, organization_id=organization_id
+    ).first()
+    if plateau is None:
+        return result
+    root_ids = plateau_work_package_ids([plateau_id], organization_id).get(
+        plateau_id, set()
+    )
+    if not root_ids:
+        result["plateau_name"] = plateau.name
+        return result
+    by_id = {row.id: row for row in query_for(organization_id).all()}
+    return _compute_critical_path(plateau, root_ids, by_id, organization_id)
+
+
+def critical_paths_for_roadmap(organization_id: Optional[int]) -> List[Dict[str, Any]]:
+    """One critical path entry per plateau of this organisation, ordered by
+    sequence then name -- what the plateau roadmap screen's critical path
+    panel renders. Another organisation's plateaus never appear. A plateau
+    with no scheduled work package reports an empty path. An unknown
+    organisation shows nothing and issues no query. The organisation's work
+    packages, plateau links and owners are each read once, however many
+    plateaus there are."""
+    from app.models.implementation_migration import Plateau
+
+    if organization_id is None:
+        return []
+    plateaus = (
+        Plateau.query.filter_by(organization_id=organization_id)
+        .order_by(
+            Plateau.sequence_order.is_(None), Plateau.sequence_order, Plateau.name
+        )
+        .all()
+    )
+    if not plateaus:
+        return []
+    roots = plateau_work_package_ids([p.id for p in plateaus], organization_id)
+    by_id = {row.id: row for row in query_for(organization_id).all()}
+    users = _users_by_id([row.owner_id for row in by_id.values()], organization_id)
+    out = []
+    for plateau in plateaus:
+        root_ids = roots.get(plateau.id, set())
+        if not root_ids:
+            entry = empty_critical_path()
+            entry["plateau_id"] = plateau.id
+            entry["plateau_name"] = plateau.name
+            out.append(entry)
+            continue
+        out.append(
+            _compute_critical_path(plateau, root_ids, by_id, organization_id, users)
+        )
+    return out
+
+
 def get_by_source(table: str, source_id: int, organization_id: int) -> Optional[UnifiedWorkPackage]:
     """The unified row copied from (table, source_id), inside this organisation."""
     return query_for(organization_id).filter(

@@ -453,8 +453,8 @@ class TestLensToolParity:
         assert mcp_result["success"] is True
         assert rest_data["data"]["initiatives"] == mcp_result["data"]["initiatives"]
 
-    def test_ask_accountability_returns_withdrawn_reason(self, client, db_session, make_org, login_as):
-        """ask_accountability returns ownership_reader_not_built on every call."""
+    def test_ask_accountability_returns_honest_empty_reason(self, client, db_session, make_org, login_as):
+        """An element with no owner record gets the honest-empty reason from REST and MCP alike."""
         org = make_org("mcp")
         user = _make_user(db_session, org, "mcp-acct@example.com")
         element = _make_element(db_session, org.id, "acct-test")
@@ -469,9 +469,10 @@ class TestLensToolParity:
 
         assert rest_data["success"] is True
         assert mcp_result["success"] is True
-        # Both carry the withdrawn reason
-        assert "ownership_reader_not_built" in str(rest_data["data"]["reasons"])
-        assert "ownership_reader_not_built" in str(mcp_result["data"]["reasons"])
+        # The reader is built: no owner records is the honest-empty case
+        assert "no_ownership_records" in str(rest_data["data"]["reasons"])
+        assert "no_ownership_records" in str(mcp_result["data"]["reasons"])
+        assert "ownership_reader_not_built" not in str(mcp_result["data"]["reasons"])
         assert rest_data["data"]["owners"] == []
         assert mcp_result["data"]["owners"] == []
 
@@ -604,45 +605,36 @@ class TestMeteringAndTenantContext:
 class TestStaticChecks:
     """Static assertions about the MCP module."""
 
-    def test_no_mcp_tool_imports_model_directly(self):
-        """No MCP tool module imports a model or service directly."""
+    def test_no_connector_tool_module_imports_model_directly(self):
+        """The module holding the connector's route-backed tools imports no model
+        or service directly: every tool goes through an existing route."""
         import ast
         import os
 
-        tools_dir = os.path.join(
-            os.path.dirname(__file__), "..", "tools"
+        filepath = os.path.join(
+            os.path.dirname(__file__), "..", "..", "ai_chat", "tools", "route_read_tools.py"
         )
         forbidden_imports = {
             "app.models", "ArchiMateElement", "ArchiMateRelationship",
             "IntelligenceQueryService", "ApplicationComponent",
         }
-        for filename in os.listdir(tools_dir):
-            if not filename.endswith(".py") or filename.startswith("_"):
-                continue
-            filepath = os.path.join(tools_dir, filename)
-            with open(filepath) as f:
-                try:
-                    tree = ast.parse(f.read())
-                except SyntaxError:
-                    continue
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Import):
-                    for alias in node.names:
-                        assert alias.name not in forbidden_imports, \
-                            f"{filename} imports {alias.name}"
-                elif isinstance(node, ast.ImportFrom):
-                    if node.module:
-                        assert node.module not in forbidden_imports, \
-                            f"{filename} imports from {node.module}"
+        with open(filepath, encoding="utf-8") as f:
+            tree = ast.parse(f.read())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    assert alias.name not in forbidden_imports,                         f"route_read_tools.py imports {alias.name}"
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                assert node.module not in forbidden_imports,                     f"route_read_tools.py imports from {node.module}"
 
     def test_search_elements_calls_only_canonical_route(self):
         """search_elements and get_element call only the canonical route."""
         import os
 
-        element_tools_path = os.path.join(
-            os.path.dirname(__file__), "..", "tools", "element_tools.py"
+        path = os.path.join(
+            os.path.dirname(__file__), "..", "..", "ai_chat", "tools", "route_read_tools.py"
         )
-        with open(element_tools_path) as f:
+        with open(path, encoding="utf-8") as f:
             source = f.read()
 
         # Must call the canonical route
@@ -656,8 +648,7 @@ class TestStaticChecks:
             "solution_design_routes",
         ]
         for forbidden_name in forbidden:
-            assert forbidden_name not in source, \
-                f"element_tools.py references forbidden duplicate: {forbidden_name}"
+            assert forbidden_name not in source,                 f"route_read_tools.py references forbidden duplicate: {forbidden_name}"
 
     def test_mcp_blueprint_does_not_import_duplicate_search_routes(self):
         """The MCP blueprint never imports the three duplicate search routes."""
