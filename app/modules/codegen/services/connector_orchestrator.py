@@ -517,7 +517,7 @@ class ConnectorOrchestrator:
         credential key that holds an address is checked whether or not a
         builder reads it today.
         """
-        from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
+        from app.utils.ssrf_guard import validate_user_supplied_url
 
         for url in ConnectorOrchestrator.workflow_urls(credentials, target_api_url):
             validate_user_supplied_url(url)
