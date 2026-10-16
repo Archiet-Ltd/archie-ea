@@ -76,7 +76,7 @@ class RationalizationScoringService:
       compatibility.  Use get_disposition_label() for human-readable rendering.
     """
 
-    # RAT-118: Model versioning and calibration
+    # Model versioning and calibration
     # bumped to 2.1 — capability coverage now influences overall score
     MODEL_VERSION = "2.1"  # Current scoring model version
     MODEL_CALIBRATION_HISTORY = []  # Populated by calibration runs
@@ -110,7 +110,7 @@ class RationalizationScoringService:
 
     @classmethod
     def compute_calibration_adjustments(cls, app_ids=None):
-        """RAT-118: Compute calibration adjustments based on realized outcomes.
+        """Compute calibration adjustments based on realized outcomes.
 
         Compares projected vs actual benefits for completed rationalization actions
         and suggests weight/threshold adjustments. Does NOT mutate historical records.
@@ -396,7 +396,7 @@ class RationalizationScoringService:
         dimensions["lifecycle"] = not lifecycle_info["data_quality_flag"]
 
         # --- cost ---
-        # R1-B08 PR 2: repointed through the one accessor (has_recorded_cost
+        # repointed through the one accessor (has_recorded_cost
         # checks the canonical column, then the legacy per-category columns
         # for a row never re-imported since -- see its own docstring).
         dimensions["cost"] = has_recorded_cost(app)
@@ -538,7 +538,7 @@ class RationalizationScoringService:
         version only when it is true.
 
         A registered formula is used only when it names every required
-        dimension; an incomplete one (R1-B34 review finding C) is treated
+        dimension; an incomplete one is treated
         exactly as if nothing were registered, rather than partially
         overriding ScoringConfiguration with some dimensions missing.
         """
@@ -642,7 +642,7 @@ class RationalizationScoringService:
             # Capability coverage dimension (now contributes to overall score)
             capability_result = RationalizationScoringService._compute_capability_score(application_id)
 
-            # R1-B34 (TB-0135): one shared resolver, also used by
+            # one shared resolver, also used by
             # get_evidence_trail below, so both surfaces answer with the
             # same weights. See _resolve_overall_weights's own docstring.
             weights, active_formula = RationalizationScoringService._resolve_overall_weights(
@@ -883,7 +883,7 @@ class RationalizationScoringService:
             score.assessment_date = datetime.utcnow().date()
             score.scoring_model_version = scoring_config.configuration_version
 
-            # R1-B34 (TB-0135): `active_formula` here is the same object
+            # `active_formula` here is the same object
             # resolved above when the overall score was computed -- it is
             # None whenever the FormulaRegister's weights were NOT the ones
             # actually used (missing or incomplete), so this column never
@@ -1034,7 +1034,7 @@ class RationalizationScoringService:
             vendor_score = vendor_result["score"]
             vendor_evidence = vendor_result.get("evidence", [])
 
-            # R1-B34 (TB-0135): the same resolver calculate_app_score uses,
+            # the same resolver calculate_app_score uses,
             # so this re-derived trail never disagrees with the saved score
             # (review finding A).
             weights, _active_formula = RationalizationScoringService._resolve_overall_weights(
@@ -2089,7 +2089,7 @@ class RationalizationScoringService:
         evidence: List[Dict] = []
 
         # --- Prefer structured cost fields on ApplicationComponent ---
-        # R1-B08 PR 2: repointed through the one accessor (same TCO-first,
+        # repointed through the one accessor (same TCO-first,
         # legacy-sum-fallback behaviour this inlined before, now the one
         # home for it rather than a copy at each call site).
         annual_cost, cost_source = get_annual_cost_with_source(app)
@@ -2841,7 +2841,7 @@ class RationalizationScoringService:
                 uncertainty_reasons.append("Score near threshold boundary")
 
             # Cost dimension gap — TCO analysis requires at least one cost field
-            # R1-B08 PR 2: repointed through the one accessor.
+            # repointed through the one accessor.
             if not has_recorded_cost(app):
                 uncertainty_reasons.append("No cost data for TCO analysis")
 
@@ -3223,7 +3223,7 @@ class RationalizationScoringService:
                         "overall_score": score.overall_health_score,
                         "time_action": score.rationalization_action,
                         # Canonical 7R disposition — may be None for scores calculated
-                        # before RAT-103 was deployed; callers should handle None gracefully.
+                        # before this was deployed; callers should handle None gracefully.
                         "disposition_action": score.disposition_action,
                         "disposition_confidence": score.disposition_confidence,
                         "confidence_reasons": score.confidence_reasons or [],

@@ -94,9 +94,6 @@ def upgrade() -> None:
                 ["id"],
             )
 
-    # Optional downgrade is intentionally omitted: tenant scoping is the
-    # target schema and reversing it would reopen the leak.
-
 
 def downgrade() -> None:
     bind = op.get_bind()
