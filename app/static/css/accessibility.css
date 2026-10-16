@@ -30,7 +30,7 @@
 
 /* Focus Visible Improvements — WCAG 2.4.7 Focus Visible (Level AA) */
 *:focus-visible {
-    outline: 2px solid hsl(var(--ring, 222.2 84% 4.9%));
+    outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
     border-radius: 0.25rem;
 }
@@ -39,16 +39,16 @@ button:focus-visible,
 a:focus-visible,
 [role="button"]:focus-visible,
 [tabindex]:focus-visible {
-    outline: 2px solid hsl(var(--ring, 222.2 84% 4.9%));
+    outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
 }
 
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-    outline: 2px solid hsl(var(--ring, 222.2 84% 4.9%));
+    outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
-    border-color: hsl(var(--ring, 222.2 84% 4.9%));
+    border-color: hsl(var(--ring));
 }
 
 /* Ensure mouse clicks don't show focus ring */
