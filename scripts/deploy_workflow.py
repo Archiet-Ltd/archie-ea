@@ -126,6 +126,15 @@ EXCLUDED_CHECKS = {
         "never gate a deploy. The page tests it runs are also covered by the "
         "required pytest shards on every non-content run."
     ),
+    "Changed-file tests (fast lane)": (
+        "runs only on pull-request pushes without the full-ci label (never on a "
+        "push to main, so it can never gate a deploy); the full suite on the "
+        "merge commit is what the required checks cover."
+    ),
+    "Quarantined tests (non-blocking)": (
+        "known timing flakes listed in scripts/ci/quarantine.txt: they run and "
+        "report on every full run but are not allowed to block it."
+    ),
     "Failing-first proof": (
         "informational: runs only on pull requests (never on a push to main) "
         "and checks that a PR's new tests fail against the base code; it may "

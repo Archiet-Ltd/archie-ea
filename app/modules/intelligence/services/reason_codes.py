@@ -181,6 +181,14 @@ REASON_CODES = frozenset(
         "drawn_by_not_recorded",
         "drawn_at_not_recorded",
         "rule_not_recorded",
+        # R1-B30 answer envelope additions: a set or filter question that
+        # names no element at all; one whose seed list was cut at the ceiling
+        # (the answer says so rather than quietly covering fewer elements);
+        # and a stored answer whose rows were cut at the storage ceiling
+        # (the summary still carries the true total).
+        "no_seed_elements",
+        "seed_limit_reached",
+        "rows_truncated",
     }
 )
 

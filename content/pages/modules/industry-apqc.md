@@ -9,6 +9,7 @@ answers_use_cases:
 capture_status: live
 cta: plans
 description: "Browse six APQC process classification framework profiles by industry, rated for regulatory intensity, digital maturity and process complexity in Entelim."
+icon: library
 ---
 
 # APQC process classification framework

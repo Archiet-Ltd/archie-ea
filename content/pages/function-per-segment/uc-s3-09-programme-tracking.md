@@ -6,6 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
 url_slug: /use-cases/programme-tracking
+icon: list-checks
 ---
 
 # Is the programme on time and on budget, and what does each project touch?

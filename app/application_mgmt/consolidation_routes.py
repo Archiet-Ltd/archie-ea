@@ -11,6 +11,7 @@ Handles application portfolio consolidation:
   * calculate_match_confidence and get_matching_reason helper functions
 """
 
+from werkzeug.exceptions import HTTPException
 import json
 import logging
 from typing import Dict
@@ -464,6 +465,9 @@ def delete_application_api(app_id):
 
         return jsonify({"success": True, "message": "Application deleted successfully"})
 
+    except HTTPException:
+        # A 404 or 403 from the lookup is the refusal itself, not an internal error.
+        raise
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error deleting application {app_id}: {str(e)}")

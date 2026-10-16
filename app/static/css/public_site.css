@@ -18,6 +18,7 @@
 @media (min-width: 640px) { .public-site .public-container { padding-inline: 1.5rem; } }
 @media (min-width: 768px) { .public-site .public-container { padding-block: 6rem; } }
 .public-site .public-page-content > * { max-width: 42.5rem; margin-inline: auto; }
+.public-site .landing-band .public-page-content > * { margin-inline: 0; }
 .public-site .public-page-content > table,
 .public-site .public-page-content > pre,
 .public-site .public-page-content > figure,
@@ -92,6 +93,14 @@
    <article> only, so vs_hub.html's unrelated 1rem value is not touched. */
 .public-site .public-page-content.public-prose.public-hub li { margin-bottom: 0.5rem; }
 .public-site .public-page-content.public-prose.public-hub-feed ul { margin-bottom: 1.5rem; }
+
+/* B-01/B-04: landing layout for module, use-case and comparison pages (public/_partials/_landing.html).
+   The hero sits tighter than a content band; the bands after it alternate tint by position, starting
+   tinted, so no two adjacent bands share a background; a band's own heading needs no top margin. */
+.public-site .landing-hero .public-container { padding-block: 3rem; }
+@media (min-width: 640px) { .public-site .landing-hero .public-container { padding-block: 4rem; } }
+.public-site .landing-bands > .landing-band:nth-child(odd) { background: hsl(var(--muted) / 0.3); }
+.public-site .landing-band .public-page-content > h2:first-child { margin-top: 0; }
 
 /* P-18: one standard sub-line under the H1 instead of a one-off italic line. */
 .public-site .public-page-content h1 + p > em:only-child {

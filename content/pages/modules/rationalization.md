@@ -9,6 +9,7 @@ answers_use_cases:
 capture_status: live
 cta: plans
 description: "Application rationalisation software: score every application with the TIME model, find duplicates, and plan consolidation with cost, savings and payback."
+icon: shrink
 ---
 
 # Application rationalisation

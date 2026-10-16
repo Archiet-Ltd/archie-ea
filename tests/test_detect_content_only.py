@@ -110,7 +110,7 @@ def test_every_job_gated_on_the_detector_wraps_both_conditions_in_parentheses():
     }
     assert gated, "no job is gated on the detector"
     for name, expr in gated.items():
-        assert re.search(r"&& \(github\.event_name != 'pull_request' \|\| github\.event\.action != 'labeled' \|\| contains\(.*?'ci-fast'\)\) && \(github\.event_name != 'pull_request' \|\| needs\.changes\.result != 'success'", expr), name
+        assert re.search(r"&& \(github\.event_name != 'pull_request' \|\| github\.event\.action != 'labeled' \|\| \(contains\(.*?'ci-fast'\) \|\| github\.event\.label\.name == 'full-ci'\)\) && \(github\.event_name != 'pull_request' \|\| needs\.changes\.result != 'success'", expr), name
 
 
 def test_content_page_tests_job_runs_only_when_is_content_only_is_true():
@@ -238,7 +238,8 @@ def _ci_workflow():
 def test_changes_job_has_the_same_labeled_event_guard_as_every_other_job():
     guard = (
         "github.event_name != 'pull_request' || github.event.action != 'labeled' "
-        "|| contains(github.event.pull_request.labels.*.name, 'ci-fast')"
+        "|| (contains(github.event.pull_request.labels.*.name, 'ci-fast') "
+        "|| github.event.label.name == 'full-ci')"
     )
     expr = str(_ci_workflow()["jobs"]["changes"]["if"]).strip()
     assert expr == "${{ " + guard + " }}"

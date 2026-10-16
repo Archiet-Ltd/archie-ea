@@ -7,6 +7,7 @@ source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
 url_slug: /use-cases/what-we-can-and-cannot-tell
+icon: eye-off
 ---
 
 # Tell me plainly what you could read from our site and what only we can tell you

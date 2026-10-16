@@ -14,6 +14,7 @@ answers_use_cases:
 capture_status: live
 cta: plans
 description: "A digital twin of an organisation is one model of what you run, who owns it and what it costs, that you can question in Ask and see on the twin map. Start free."
+icon: radar
 ---
 
 # Digital twin of an organisation
