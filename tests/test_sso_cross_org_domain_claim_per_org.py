@@ -574,7 +574,6 @@ def test_admin_sso_refuses_claimed_and_public_domains(app, db_session, make_org,
     for refused_value, problem in (
         (other_domain, other_domain),
         (f"{own_domain}, {other_domain.upper()} ", other_domain),
-        (disabled_domain, disabled_domain),
         ("gmail.com", "gmail.com"),
         (f"{own_domain},  Hotmail.COM", "hotmail.com"),
     ):
@@ -585,6 +584,10 @@ def test_admin_sso_refuses_claimed_and_public_domains(app, db_session, make_org,
         assert any(problem in m for m in messages), (refused_value, messages)
         assert not any("SSO configuration saved." in m for m in messages)
         assert saved() == before, refused_value
+
+    # A disabled configuration holds no claim, so its domain can be saved here.
+    client, resp = post(disabled_domain)
+    assert any("SSO configuration saved." in m for m in _flashes(client))
 
     # Re-saving the organisation's own, already-claimed domain is allowed.
     client, resp = post(own_domain)
