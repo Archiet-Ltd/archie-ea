@@ -1,0 +1,2250 @@
+pack_key: appian
+pack_version: '1.0'
+vendor: Appian
+product: Appian Low-Code Automation Platform
+product_edition: ''
+segment_tags: []
+industry_tags: []
+attribution_text: Facts about Appian Low-Code Automation Platform are taken from Appian's public product
+  documentation, read on 2026-09-23; product, module and service names are used as names only.
+trademark_line: Product and company names are the property of their respective owners; no affiliation
+  or endorsement is implied.
+modules:
+- key: core
+  question: Do you run Appian Low-Code Automation Platform?
+- key: platform
+  question: Do you run the Appian Low-Code Automation Platform platform components (hosting, integration,
+    data)?
+elements:
+- type: ApplicationComponent
+  layer: application
+  name: Appian Low-Code Automation Platform
+  description: Appian Low-Code Automation Platform, the core application component of the Appian pack.
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.appian-low-code-automation-platform
+  module_keys:
+  - core
+- type: Node
+  layer: technology
+  name: Appian Cloud Node 1
+  description: Appian Cloud Node 1
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.appian-cloud-node-1
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Appian Cloud Node 2
+  description: Appian Cloud Node 2
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.appian-cloud-node-2
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Appian Cloud Node 3
+  description: Appian Cloud Node 3
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.appian-cloud-node-3
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Process Mining Server
+  description: Process Mining Server
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.process-mining-server
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: RPA Orchestrator
+  description: RPA Orchestrator
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.rpa-orchestrator
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Data Fabric Node
+  description: Data Fabric Node
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.data-fabric-node
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: MariaDB Primary
+  description: MariaDB Primary
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.mariadb-primary
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: MariaDB Replica
+  description: MariaDB Replica
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.mariadb-replica
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: API Gateway
+  description: API Gateway
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.api-gateway
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Search Server (Elasticsearch)
+  description: Search Server (Elasticsearch)
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.search-server-elasticsearch
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Cloud Load Balancer
+  description: Multi-region load distribution
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.cloud-load-balancer
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: CDN
+  description: Content delivery network
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.cdn
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: WAF
+  description: Web application firewall
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.waf
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Mobile Devices
+  description: iOS/Android devices
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.mobile-devices
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: RPA Bots
+  description: Attended and unattended bots
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.rpa-bots
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Appian Platform
+  description: Appian Platform
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.appian-platform
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Appian Process Mining
+  description: Appian Process Mining
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.appian-process-mining
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Appian RPA
+  description: Appian RPA
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.appian-rpa
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Appian AI
+  description: Appian AI
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.appian-ai
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Data Fabric
+  description: Data Fabric
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.data-fabric
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: MariaDB
+  description: MariaDB
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.mariadb
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Elasticsearch
+  description: Elasticsearch
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.elasticsearch
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Apache Kafka
+  description: Apache Kafka
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.apache-kafka
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Redis
+  description: Redis
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.redis
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: Kubernetes
+  description: Kubernetes
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.kubernetes
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Appian Process Engine
+  description: BPMN 2.0 process orchestration
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.appian-process-engine
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Case Management Service
+  description: Dynamic case management
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.case-management-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: UI Rendering Service
+  description: SAIL form and interface rendering
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.ui-rendering-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Process Mining Engine
+  description: Process discovery and conformance
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.process-mining-engine
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: RPA Orchestrator Service
+  description: Robot scheduling and management
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.rpa-orchestrator-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: AI/ML Service
+  description: Document extraction, predictions
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.ai-ml-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Data Fabric Service
+  description: Unified data access layer
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.data-fabric-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Rules Engine
+  description: Decision management
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.rules-engine
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Workflow Service
+  description: Task routing and escalation
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.workflow-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Document Management
+  description: Document storage and versioning
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.document-management
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Integration Service
+  description: API and connector management
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.integration-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Mobile Service
+  description: Native mobile app backend
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.mobile-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Analytics Service
+  description: Process and operational analytics
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.analytics-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: Security Service
+  description: SSO and authorization
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.security-service
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Application Package
+  description: Application Package
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.application-package
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Process Models
+  description: Process Models
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.process-models
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: UI Interfaces
+  description: UI Interfaces
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.ui-interfaces
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Process Mining Models
+  description: Process Mining Models
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.process-mining-models
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: RPA Bot Scripts
+  description: RPA Bot Scripts
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.rpa-bot-scripts
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: AI Models
+  description: AI Models
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.ai-models
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Database Backup
+  description: Database Backup
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.database-backup
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Appian Cloud VPC
+  description: Appian Cloud VPC
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.appian-cloud-vpc
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Inter-Service Mesh
+  description: Inter-Service Mesh
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.inter-service-mesh
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: VPN/ExpressRoute
+  description: VPN/ExpressRoute
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.vpn-expressroute
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: CDN Network
+  description: CDN Network
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.cdn-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Public Internet
+  description: Public Internet
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: technology.public-internet
+  module_keys:
+  - platform
+- type: Capability
+  layer: strategy
+  name: Low-Code Development
+  description: Visual application development with minimal code
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.low-code-development
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Process Orchestration
+  description: BPMN-based process automation
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.process-orchestration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Case Management
+  description: Dynamic case and knowledge worker processes
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.case-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Process Mining
+  description: Discover and analyze actual business processes
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.process-mining
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Robotic Process Automation
+  description: Attended and unattended software robots
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.robotic-process-automation
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Intelligent Document Processing
+  description: AI-powered document extraction
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.intelligent-document-processing
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Data Fabric
+  description: Unified data access across systems
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.data-fabric
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Mobile App Development
+  description: Native iOS/Android apps
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.mobile-app-development
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Business Rules Management
+  description: Centralized decision management
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.business-rules-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: API Management
+  description: API creation and governance
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.api-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Workflow Automation
+  description: Task routing and escalation
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.workflow-automation
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Process Analytics
+  description: Real-time process performance metrics
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.process-analytics
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Document Management
+  description: Content storage and versioning
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.document-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Integration
+  description: Pre-built connectors and custom integrations
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Collaboration
+  description: Team collaboration and social features
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.collaboration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: AI/ML Integration
+  description: Embedded AI and ML capabilities
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.ai-ml-integration
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Governance
+  description: Application lifecycle governance
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.governance
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Deployment Automation
+  description: CI/CD for applications
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.deployment-automation
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Multi-Tenancy
+  description: Secure tenant isolation
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.multi-tenancy
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Localization
+  description: Multi-language and regional support
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: strategy.localization
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Process Automation Service
+  description: Automated business process execution
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.process-automation-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Case Management Service
+  description: Dynamic case handling
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.case-management-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Process Mining Service
+  description: Process discovery and analysis
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.process-mining-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: RPA Service
+  description: Software robot execution
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.rpa-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Document Processing Service
+  description: Intelligent document extraction
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.document-processing-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Mobile Application Service
+  description: Native mobile apps
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.mobile-application-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: API Service
+  description: REST API access
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.api-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Analytics Service
+  description: Process and operational analytics
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.analytics-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Integration Service
+  description: System integration
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.integration-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Collaboration Service
+  description: Team collaboration
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.collaboration-service
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Process Discovery & Mining
+  description: Discover actual processes from system logs
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.process-discovery-mining
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Automated Workflow Execution
+  description: Execute BPMN process instances
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.automated-workflow-execution
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Dynamic Case Management
+  description: Handle complex knowledge worker cases
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.dynamic-case-management
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: RPA Bot Execution
+  description: Execute attended and unattended bots
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.rpa-bot-execution
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Intelligent Document Processing
+  description: Extract data from documents using AI
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.intelligent-document-processing
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Application Development
+  description: Build applications with low-code
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.application-development
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Process Instance
+  description: Running process instance
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.process-instance
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Case
+  description: Dynamic case record
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.case
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Task
+  description: Work item assigned to user
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.task
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Document
+  description: Managed content item
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.document
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Process Model
+  description: BPMN process definition
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.process-model
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: RPA Bot
+  description: Software robot definition
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.rpa-bot
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Business Rule
+  description: Decision rule or policy
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.business-rule
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Data Record
+  description: Business data entity
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: business.data-record
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Appian Designer
+  description: Low-code development environment
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.appian-designer
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Process Engine
+  description: BPMN 2.0 execution engine
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.process-engine
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SAIL UI Framework
+  description: Component-based UI framework
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.sail-ui-framework
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Process Mining Engine
+  description: Process discovery engine
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.process-mining-engine
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: RPA Orchestrator
+  description: Bot management platform
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.rpa-orchestrator
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: AI Engine
+  description: Document AI and predictions
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.ai-engine
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Data Fabric
+  description: Unified data access layer
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.data-fabric
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Rules Engine
+  description: Business rules management
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.rules-engine
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Mobile App Framework
+  description: Native mobile app generator
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.mobile-app-framework
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Integration Framework
+  description: Connector and API framework
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.integration-framework
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: MariaDB
+  description: Application database
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.mariadb
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Elasticsearch
+  description: Full-text search
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.elasticsearch
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Appian REST API
+  description: Platform API
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.appian-rest-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Process API
+  description: Process management API
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.process-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Content API
+  description: Document management API
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.content-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Query API
+  description: Data query API
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.query-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Process Mining API
+  description: Process mining services
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.process-mining-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: RPA API
+  description: RPA orchestration API
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.rpa-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: AI API
+  description: AI services API
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.ai-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Data Fabric API
+  description: Data access API
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.data-fabric-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: Integration API
+  description: Connected systems API
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.integration-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: WebSocket API
+  description: Real-time updates
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.websocket-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: REST API
+  description: REST API
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.rest-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: SOAP Interface
+  description: SOAP Interface
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.soap-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: WebSocket Interface
+  description: WebSocket Interface
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.websocket-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Database Interface
+  description: Database Interface
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.database-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: File Interface
+  description: File Interface
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.file-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Message Queue
+  description: Message Queue
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.message-queue
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Mobile SDK
+  description: Mobile SDK
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.mobile-sdk
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Process Definition
+  description: Process Definition
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.process-definition
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Process Instance Data
+  description: Process Instance Data
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.process-instance-data
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Case Data
+  description: Case Data
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.case-data
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Document Content
+  description: Document Content
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.document-content
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Process Mining Event Log
+  description: Process Mining Event Log
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.process-mining-event-log
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: RPA Execution Log
+  description: RPA Execution Log
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.rpa-execution-log
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Business Rules
+  description: Business Rules
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.business-rules
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: User Data
+  description: User Data
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.user-data
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Analytics Data
+  description: Analytics Data
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: application.analytics-data
+  module_keys:
+  - core
+- type: Facility
+  layer: physical
+  name: Appian Cloud US-East
+  description: Primary cloud region
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: physical.appian-cloud-us-east
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: Appian Cloud US-West
+  description: Secondary cloud region
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: physical.appian-cloud-us-west
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: Appian Cloud EU
+  description: European cloud region
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: physical.appian-cloud-eu
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Cloud Application Instances
+  description: Cloud Application Instances
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: physical.cloud-application-instances
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Cloud Database Instances
+  description: Cloud Database Instances
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: physical.cloud-database-instances
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Process Mining Instances
+  description: Process Mining Instances
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: physical.process-mining-instances
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Developer Workstations
+  description: Developer Workstations
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: physical.developer-workstations
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Mobile Devices
+  description: Mobile Devices
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: physical.mobile-devices
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: AWS Cloud Network
+  description: AWS Cloud Network
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: physical.aws-cloud-network
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: AWS DirectConnect
+  description: AWS DirectConnect
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: physical.aws-directconnect
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: CloudFront CDN
+  description: CloudFront CDN
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: physical.cloudfront-cdn
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Corporate Network
+  description: Corporate Network
+  mandatory: true
+  source_urls:
+  - https://appian.com/products/platform.html
+  element_key: physical.corporate-network
+  module_keys:
+  - platform
+relationships:
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.appian-designer
+  type: composition
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.process-engine
+  type: composition
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.sail-ui-framework
+  type: composition
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.process-mining-engine
+  type: composition
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.rpa-orchestrator
+  type: composition
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.ai-engine
+  type: composition
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.data-fabric
+  type: composition
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.rules-engine
+  type: composition
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.mobile-app-framework
+  type: composition
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.integration-framework
+  type: composition
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.mariadb
+  type: composition
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.elasticsearch
+  type: composition
+  module_keys:
+  - core
+- source_key: technology.appian-platform
+  target_key: application.appian-low-code-automation-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.appian-process-mining
+  target_key: application.appian-low-code-automation-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.appian-rpa
+  target_key: application.appian-low-code-automation-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.appian-ai
+  target_key: application.appian-low-code-automation-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.data-fabric
+  target_key: application.data-fabric
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mariadb
+  target_key: application.mariadb
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.elasticsearch
+  target_key: application.elasticsearch
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.apache-kafka
+  target_key: application.appian-low-code-automation-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.redis
+  target_key: application.appian-low-code-automation-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.kubernetes
+  target_key: application.appian-low-code-automation-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.appian-cloud-node-1
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.appian-cloud-node-2
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.appian-cloud-node-3
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.process-mining-server
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.rpa-orchestrator
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.data-fabric-node
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mariadb-primary
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mariadb-replica
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.api-gateway
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.search-server-elasticsearch
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.cloud-load-balancer
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.cdn
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.waf
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mobile-devices
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.rpa-bots
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.appian-process-engine
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.case-management-service
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.ui-rendering-service
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.process-mining-engine
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.rpa-orchestrator-service
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.ai-ml-service
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.data-fabric-service
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.rules-engine
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.workflow-service
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.document-management
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.integration-service
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.mobile-service
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.analytics-service
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.security-service
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.appian-cloud-node-1
+  target_key: technology.application-package
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.appian-cloud-node-1
+  target_key: technology.process-models
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.appian-cloud-node-1
+  target_key: technology.ui-interfaces
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.appian-cloud-node-1
+  target_key: technology.process-mining-models
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.appian-cloud-node-1
+  target_key: technology.rpa-bot-scripts
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.appian-cloud-node-1
+  target_key: technology.ai-models
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.appian-cloud-node-1
+  target_key: technology.database-backup
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.appian-cloud-vpc
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.inter-service-mesh
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.vpn-expressroute
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.cdn-network
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.public-internet
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: strategy.low-code-development
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.process-orchestration
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.case-management
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.process-mining
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.robotic-process-automation
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.intelligent-document-processing
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.data-fabric
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.mobile-app-development
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.business-rules-management
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.api-management
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.workflow-automation
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.process-analytics
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.document-management
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.integration
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.collaboration
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.ai-ml-integration
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.governance
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.deployment-automation
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.multi-tenancy
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.localization
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: business.process-automation-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: business.case-management-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: business.process-mining-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: business.rpa-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: business.document-processing-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: business.mobile-application-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: business.api-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: business.analytics-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: business.integration-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: business.collaboration-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: business.process-discovery-mining
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: business.automated-workflow-execution
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: business.dynamic-case-management
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: business.rpa-bot-execution
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: business.intelligent-document-processing
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: business.application-development
+  type: association
+  module_keys:
+  - core
+- source_key: business.process-instance
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.case
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.task
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.document
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.process-model
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.rpa-bot
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.business-rule
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: business.data-record
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-rest-api
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.process-api
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.content-api
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.query-api
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.process-mining-api
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.rpa-api
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.ai-api
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.data-fabric-api
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.integration-api
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.websocket-api
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.rest-api
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.soap-interface
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.websocket-interface
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.database-interface
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.file-interface
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.message-queue
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.mobile-sdk
+  target_key: application.appian-low-code-automation-platform
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.process-definition
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.process-instance-data
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.case-data
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.document-content
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.process-mining-event-log
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.rpa-execution-log
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.business-rules
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.user-data
+  type: association
+  module_keys:
+  - core
+- source_key: application.appian-low-code-automation-platform
+  target_key: application.analytics-data
+  type: association
+  module_keys:
+  - core
+- source_key: physical.appian-cloud-us-east
+  target_key: technology.appian-cloud-node-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.appian-cloud-us-west
+  target_key: technology.appian-cloud-node-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.appian-cloud-eu
+  target_key: technology.appian-cloud-node-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.cloud-application-instances
+  target_key: technology.appian-cloud-node-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.cloud-database-instances
+  target_key: technology.appian-cloud-node-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.process-mining-instances
+  target_key: technology.appian-cloud-node-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.developer-workstations
+  target_key: technology.appian-cloud-node-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.mobile-devices
+  target_key: technology.appian-cloud-node-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.aws-cloud-network
+  target_key: physical.cloud-application-instances
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.aws-directconnect
+  target_key: physical.cloud-application-instances
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.cloudfront-cdn
+  target_key: physical.cloud-application-instances
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.corporate-network
+  target_key: physical.cloud-application-instances
+  type: association
+  module_keys:
+  - platform
+integrations: []
+capability_mappings: []
