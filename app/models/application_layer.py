@@ -615,24 +615,8 @@ class ApplicationCollaboration(db.Model):
 # ============================================================================
 
 
-@event.listens_for(ApplicationInterface, "before_insert")
-def create_interface_archimate_element(mapper, connection, target):
-    """Automatically create ArchiMateElement when ApplicationInterface is created"""
-    if target.archimate_element_id is None:
-        from sqlalchemy import insert
-
-        from .archimate_core import ArchiMateElement
-
-        result = connection.execute(
-            insert(ArchiMateElement.__table__).values(
-                organization_id=target.organization_id,
-                name=target.name,
-                type="ApplicationInterface",
-                layer="Application",
-                description=target.description or f"{target.interface_type} interface",
-            )
-        )
-        target.archimate_element_id = result.inserted_primary_key[0]
+# ApplicationInterface's ArchiMate element is now created by the shared
+# flush listener in app/services/archimate_backbone.py.
 
 
 @event.listens_for(ApplicationEvent, "before_insert")

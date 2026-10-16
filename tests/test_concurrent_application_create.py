@@ -74,6 +74,8 @@ def independent_application_race(concurrency_database_guard, app, _schema):
             # they must go before the organisation or its delete violates the FK.
             from app.models.audit_log import AuditLog
             AuditLog.query.filter_by(organization_id=org_id).delete(synchronize_session=False)
+            from tests._outbox_cleanup import purge_outbox_events
+            purge_outbox_events(db.session, [org_id])
             assert Organization.query.filter_by(id=org_id, slug=state['slug']).delete() == 1
             db.session.commit()
             assert ApplicationComponent.query.filter_by(organization_id=org_id).count() == 0

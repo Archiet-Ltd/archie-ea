@@ -391,7 +391,32 @@ def accept_classification(approval_id: int, organization_id: int) -> bool:
     ):
         _reset_release_to_draft(element)
     db.session.flush()
+
+    # Attach obligations for the accepted class. For non-high classes,
+    # obligations attach immediately. For high-risk, obligations only attach
+    # if there is an accepted assessment (the classification alone does not
+    # create regulatory obligations without the assessment evidence).
+    _attach_class_obligations(element, proposed_class, organization_id)
+
+    db.session.flush()
     return True
+
+
+def _attach_class_obligations(element, risk_class: str, organization_id: int) -> None:
+    """Attach the per-class obligation set as ComplianceRequirement rows.
+
+    A high-risk class without an accepted assessment attaches no obligations
+    — the regulatory burden only materialises when the assessment confirms the
+    class.
+    """
+    from app.modules.enterprise_genome.services.ai_system_obligations import (
+        attach_obligations,
+    )
+
+    if risk_class == "high" and not has_accepted_assessment(element, organization_id):
+        return
+
+    attach_obligations(element, risk_class, organization_id)
 
 
 def accept_assessment(approval_id: int, organization_id: int) -> bool:
@@ -437,6 +462,14 @@ def accept_assessment(approval_id: int, organization_id: int) -> bool:
         approval.approved_at = datetime.utcnow()
         db.session.add(approval)
         db.session.flush()
+
+    # Attach obligations for high-risk systems now that the assessment
+    # is accepted. If the classification was accepted first without an
+    # assessment, obligations were deferred; this is the point where
+    # they materialise.
+    _attach_class_obligations(element, get_classification(element), organization_id)
+
+    db.session.flush()
     return True
 
 

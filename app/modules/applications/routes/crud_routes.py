@@ -335,6 +335,34 @@ def application_create():
         return redirect(url_for("unified_applications.application_list"))
 
 
+@unified_applications_bp.route("/api/registration-check", methods=["GET"])
+@login_required
+@require_roles("admin", "architect")
+def api_registration_check():
+    """Existing applications a new registration may duplicate.
+
+    Read before the create call so the person can open an existing record
+    instead of adding a second one. A failure answers 500, never an empty list:
+    "no matches" must mean the check ran and found none.
+    """
+    from app.modules.applications.services.registration_check_service import (
+        find_registration_matches,
+    )
+
+    name = (request.args.get("name") or "").strip()[:255]
+    code = (request.args.get("application_code") or "").strip()[:50]
+    if not name and not code:
+        return jsonify({"success": True, "matches": []})
+    try:
+        matches = find_registration_matches(name, code)
+    except Exception:
+        current_app.logger.error("Registration duplicate check failed", exc_info=True)
+        return jsonify({"success": False, "error": "The duplicate check could not run."}), 500
+    for entry in matches:
+        entry["url"] = url_for("unified_applications.application_detail", id=entry["id"])
+    return jsonify({"success": True, "matches": matches})
+
+
 @unified_applications_bp.route("/<int:id>")
 @login_required
 def application_detail(id):
@@ -473,21 +501,11 @@ def generate_application_archimate(id):
             db.session.add(arch_model)
             db.session.flush()
 
-        if app_arch_element is None:
-            app_arch_element = ArchiMateElement(
-                name=app_obj.name,
-                type="ApplicationComponent",
-                layer="application",
-                description=app_obj.description or "",
-                architecture_id=arch_model.id,
-            )
+        from app.services.archimate_backbone import ensure_archimate_element
+        app_arch_element = app_arch_element or ensure_archimate_element(app_obj)
+        if app_arch_element is not None and not app_arch_element.architecture_id:
+            app_arch_element.architecture_id = arch_model.id
             db.session.add(app_arch_element)
-            db.session.flush()
-            app_obj.archimate_element_id = app_arch_element.id
-        else:
-            if not app_arch_element.architecture_id:
-                app_arch_element.architecture_id = arch_model.id
-                db.session.add(app_arch_element)
 
         requirement_lines = [
             f"Application: {app_obj.name}",

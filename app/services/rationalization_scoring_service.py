@@ -119,7 +119,11 @@ class RationalizationScoringService:
             RationalizationBenefitsTracker,
         )
 
-        query = RationalizationBenefitsTracker.query.filter(
+        # tenant-scoping-ok: the join to ApplicationComponent (a TenantMixin model) carries the automatic per-organization SELECT filter, scoping this read to the current tenant's own applications.
+        query = RationalizationBenefitsTracker.query.join(
+            ApplicationComponent,
+            RationalizationBenefitsTracker.application_id == ApplicationComponent.id,
+        ).filter(
             RationalizationBenefitsTracker.tracking_status.in_(["measured", "validated"])
         )
         if app_ids:

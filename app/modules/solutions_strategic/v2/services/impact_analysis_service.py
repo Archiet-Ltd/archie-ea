@@ -60,7 +60,9 @@ class ImpactAnalysisService:
                 include_derived=False,
                 max_depth=3,
                 direction="downstream",
-                with_owner=True,
+                # Scoring and storage never read owners; the page call below
+                # resolves them for the rows it returns.
+                with_owner=False,
             )
         else:
             full_result = None
@@ -115,6 +117,7 @@ class ImpactAnalysisService:
                 "tco": 0.0,
                 "owner": row.get("owner"),
                 "health": row.get("health"),
+                "owners": row.get("owners", []),
             }
 
         # Build deps from the full (unpaginated) rows for scoring.

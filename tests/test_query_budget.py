@@ -137,6 +137,9 @@ def tenant(app):
         if user is not None:
             db.session.delete(user)
         db.session.commit()
+        from tests._outbox_cleanup import purge_outbox_events
+
+        purge_outbox_events(db.session, [created["org_id"]])
         org = db.session.get(Organization, created["org_id"])
         if org is not None:
             db.session.delete(org)
