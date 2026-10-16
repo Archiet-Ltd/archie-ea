@@ -40,8 +40,8 @@
 
 /* Plan cards: four across, stack on narrow screens */
 .pricing-page .pp-plans { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
-@media (min-width: 640px) { .pricing-page .pp-plans { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 1024px) { .pricing-page .pp-plans { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 640px) { .pricing-page .pp-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .pricing-page .pp-plans { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .pricing-page .pp-plans > .public-card, .pricing-page .pp-services > .public-card { display: flex; flex-direction: column; }
 .pricing-page .public-card-title { margin: 0; }
 .pricing-page .pp-for { margin: 0.5rem 0 1.25rem; min-height: 3.5rem; color: var(--pp-muted); font-size: 0.9375rem; line-height: 1.5; }
@@ -56,16 +56,23 @@
 .pricing-page .pp-alt { margin-top: 0.75rem; text-align: center; font-size: 0.875rem; min-height: 1.25rem; }
 
 /* Comparison table: the shared .public-table--fit, with a header that stays in view and centred value cells.
-   The wrapper sets no overflow, so the header pins to the page, not to the wrapper. Cells carry the row rules
-   and the table uses separate borders, because a collapsed border does not travel with a sticky header. */
+   The wrapper (.pp-frame) clips its corners with overflow: clip, which rounds the header cells to the wrapper's
+   radius but creates no scroll container, so the header still pins to the page, not to the wrapper. Cells carry
+   the row rules and the table uses separate borders, because a collapsed border does not travel with a sticky
+   header. */
+.pricing-page .pp-frame { overflow: clip; }
 .pricing-page .public-table { border-collapse: separate; border-spacing: 0; }
+/* reuse-ok: cell row rules, because separate borders under a sticky header need the rule on the cell */
 .pricing-page .public-table th, .pricing-page .public-table td { text-align: center; border-bottom: 1px solid hsl(var(--border)); }
+/* reuse-ok: opaque sticky header fill, so rows scrolling under it do not show through */
 .pricing-page .public-table thead th {
   position: sticky; top: 0; z-index: 2; border-bottom-width: 2px;
   background: linear-gradient(hsl(var(--muted) / 0.5), hsl(var(--muted) / 0.5)), hsl(var(--background));
 }
 .pricing-page .public-table th[scope="row"], .pricing-page .public-table thead th:first-child { text-align: left; width: 32%; }
+/* reuse-ok: group-row label, a smaller muted caption inside the shared table */
 .pricing-page .public-table tbody th.pp-group { background: hsl(var(--muted)); font-weight: 600; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--pp-muted); }
+/* reuse-ok: no rule under the last row, so the table does not double the wrapper border */
 .pricing-page .public-table tr:last-child td, .pricing-page .public-table tr:last-child th { border-bottom: 0; }
 .pricing-page .pp-yes::before { content: ""; display: inline-block; width: 0.4rem; height: 0.8rem; border: solid hsl(var(--success-emphasis)); border-width: 0 2px 2px 0; transform: rotate(45deg) translateY(-2px); }
 .pricing-page .pp-no { color: var(--pp-muted); }
@@ -76,13 +83,18 @@
 .pricing-page .pp-band h2 { margin-bottom: 0.5rem; }
 .pricing-page .pp-band p { margin: 0; max-width: 42.5rem; line-height: 1.7; color: var(--pp-muted); }
 .pricing-page .pp-services { display: grid; gap: 1.5rem; grid-template-columns: 1fr; }
-@media (min-width: 768px) { .pricing-page .pp-services { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 768px) { .pricing-page .pp-services { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .pricing-page .pp-services .public-card-body { margin-bottom: 1rem; }
+.pricing-page .pp-services .pp-price { margin-bottom: 1rem; }
 .pricing-page .pp-services > .public-card > a { align-self: flex-start; margin-top: auto; }
 .pricing-page .pp-price--sm { font-size: 2rem; }
 @media (max-width: 639px) {
+/* reuse-ok: phone compaction so five columns fit at 390px */
   .pricing-page .public-table { font-size: 0.8125rem; }
+/* reuse-ok: phone compaction so five columns fit at 390px */
   .pricing-page .public-table th, .pricing-page .public-table td { padding: 0.625rem 0.25rem; }
+/* reuse-ok: phone compaction so five columns fit at 390px */
   .pricing-page .public-table thead th { font-size: 0.625rem; padding-inline: 0.125rem; }
+/* reuse-ok: phone compaction so five columns fit at 390px */
   .pricing-page .public-table th[scope="row"], .pricing-page .public-table thead th:first-child { width: 30%; padding-left: 0.5rem; }
 }

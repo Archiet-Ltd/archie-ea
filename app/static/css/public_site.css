@@ -210,9 +210,11 @@
   color: hsl(var(--card-foreground)); padding: 1.75rem;
 }
 .public-site .public-card--callout { padding: 2rem; display: flex; flex-direction: column; align-items: flex-start; }
-.public-site .public-card--callout .public-btn {
-  margin-top: auto; max-width: 100%; height: auto; padding-block: 0.625rem; white-space: normal; text-align: center;
+.public-site .public-card--callout .public-btn,
+.public-site .public-btn--wrap {
+  max-width: 100%; height: auto; padding-block: 0.625rem; white-space: normal; text-align: center;
 }
+.public-site .public-card--callout .public-btn { margin-top: auto; }
 .public-site .public-card-title { font-size: 1.5rem; line-height: 2rem; font-weight: 600; color: hsl(var(--foreground)); }
 .public-site .public-card-body { font-size: 0.875rem; line-height: 1.5rem; color: hsl(var(--muted-foreground)); }
 .public-site .public-card-title + .public-card-body { margin-top: 0.75rem; }

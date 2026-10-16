@@ -39,6 +39,12 @@ enforce nothing: the register says plainly that no one owner has been chosen.
 
 The baseline
 ------------
+The ratchet against main is ``ratchet_problems`` (a pure function, tested without git; the live test in
+tests/test_check_reuse_register.py fetches origin/main and calls it): a pattern origin/main already has (in
+its baseline or its register) may not exceed main's total for it, a pattern new in a branch must be baselined
+at exactly the tree's per-file counts, and a baseline line for a file that does not exist is allowed only
+where main already has it.
+
 ``--update-baseline`` rewrites the baseline to the current hit counts and REFUSES to
 let a pattern grow (renames excepted): lowering is routine after a cleanup, raising is done by
 fixing the code, or by a ``known_exceptions`` entry (with a reason) in the register,
@@ -48,9 +54,12 @@ another.
 
 Exemptions
 ----------
-``reuse-ok: <reason>`` on the matching line, the line above it, or any line up to the colon that
-ends a multi-line def, for a definition that only looks like a
-second copy. A bare marker with no reason does not exempt.
+``reuse-ok: <reason>`` on the matching line, on a comment line directly above it (``#`` in Python,
+``{#`` in a template, ``/*`` in a stylesheet), or any line up to the colon that ends a multi-line def, for a
+definition that only looks like a second copy. A bare marker with no reason does not exempt.
+
+A comment line is skipped as a non-hit by file type: ``#`` only in ``.py`` and ``{#`` only in ``.html``. A
+``.css`` line that begins with ``#`` is an id selector and is matched like any other line.
 
 Proven-against: a ``def normalize_name(`` added to a new file under app/ -- the gate
 names the ``name-matching`` entry and fails; a canonical symbol renamed -- the gate
@@ -82,6 +91,10 @@ STATUSES = ("active", "pending", "undetermined")
 SKIP_PARTS = {"__pycache__", "node_modules", ".git", "venv", ".venv"}
 MARKER = re.compile(r"reuse-ok:\s*\S")
 NL = chr(10)
+# A line starting with one of these is a comment, not code, in that file type. A stylesheet has none: its
+# comments are /* */ and a line starting with # is an id selector.
+_COMMENT_PREFIX = {".py": ("#",), ".html": ("{#",)}
+_ABOVE_COMMENT = ("#", "{#", "/*")
 MACRO = r"{%-?\s*macro\s+NAME\s*\("
 
 
@@ -278,7 +291,7 @@ def _exempt(lines: list[str], masked_lines: list[str], idx: int, col: int) -> bo
     """`reuse-ok: <reason>` on the match, on a comment-only line directly above it, or on a later line of
     the same statement: a multi-line def or call, followed only while the bracket opened at the match is
     still open (the check_untenanted_reads convention). One marker never covers a following block."""
-    if idx > 0 and lines[idx - 1].lstrip().startswith(("#", "{#")) and MARKER.search(lines[idx - 1]):
+    if idx > 0 and lines[idx - 1].lstrip().startswith(_ABOVE_COMMENT) and MARKER.search(lines[idx - 1]):
         return True
     depth = 0
     for i in range(idx, min(idx + 60, len(lines))):
@@ -329,7 +342,7 @@ def find_hits(root: Path, entries):
                 n = masked.count(NL, 0, m.start()) + 1
                 line = lines[n - 1]
                 col = m.start() - (masked.rfind(NL, 0, m.start()) + 1)
-                if line.lstrip().startswith(("#", "{#")) or _exempt(lines, mlines, n - 1, col):
+                if line.lstrip().startswith(_COMMENT_PREFIX.get(path.suffix, ())) or _exempt(lines, mlines, n - 1, col):
                     continue
                 bucket = hits[(e["id"], p["id"])].setdefault(rel, [])
                 if n not in bucket:
@@ -343,6 +356,43 @@ def counts_of(hits) -> dict[str, dict[str, int]]:
         if files:
             out[f"{eid}/{pid}"] = {f: len(lines) for f, lines in sorted(files.items())}
     return out
+
+
+def register_keys(entries) -> set[str]:
+    """Every "<entry id>/<pattern id>" listed under must_not_create, whatever the entry's status."""
+    return {f"{e['id']}/{p['id']}" for e in entries if isinstance(e, dict) and e.get("id")
+            for p in e.get("must_not_create") or [] if isinstance(p, dict) and p.get("id")}
+
+
+def ratchet_problems(main_keys: set, main_base: dict, mine: dict, tree: dict, root: Path) -> list[str]:
+    """Problems with a branch baseline (`mine`) judged against origin/main. No git, no I/O beyond existence checks.
+
+    `main_keys` is every key in origin/main's register, `main_base` origin/main's baseline, `tree` the hit
+    counts of this branch for the patterns new in it.
+    1. A key in main_base or main_keys is an existing pattern: its total in `mine` may not exceed main's
+       (a key missing from main_base counts as 0).
+    2. A key in neither is new in this branch: its per-file counts in `mine` must equal `tree`'s exactly.
+    3. A file in `mine` that does not exist must also be listed under the same key in main_base.
+    """
+    problems = []
+    existing = set(main_base) | set(main_keys)
+    for key in sorted(set(mine) | (set(tree) - existing)):
+        mine_files, base_files = mine.get(key, {}), main_base.get(key, {})
+        if key in existing:
+            have, allowed = sum(mine_files.values()), sum(base_files.values())
+            if have > allowed:
+                problems.append(f"{key}: baseline total {have} is above origin/main's {allowed}")
+        else:
+            want = tree.get(key, {})
+            for rel in sorted(set(mine_files) | set(want)):
+                if mine_files.get(rel, 0) != want.get(rel, 0):
+                    problems.append(f"{key} {rel}: new pattern baselined at {mine_files.get(rel, 0)}, "
+                                    f"the tree has {want.get(rel, 0)}")
+        for rel in sorted(mine_files):
+            if not (root / rel).exists() and rel not in base_files:
+                problems.append(f"{key} {rel}: baselined for a file that does not exist and origin/main "
+                                f"does not list it")
+    return problems
 
 
 def load_baseline(root: Path, baseline: Path | None = None) -> dict:
@@ -395,13 +445,16 @@ def compare(entries, hits, baseline, root: Path) -> tuple[list[str], list[str]]:
 
 
 def update_baseline(root: Path, entries, baseline_path: Path | None = None):
-    """(ok, messages). Writes the current counts only if none rises and no file is added."""
+    """(ok, messages). Writes the current counts only if no existing key rises and no file is added to one. A key
+    with no entry yet is written as the tree has it; the live test against origin/main bounds it."""
     path = baseline_path or (root / BASELINE)
     current = counts_of(find_hits(root, entries))
     old = load_baseline(root, path) if path.exists() else None
     messages = []
     if old is not None:
         for key, files in current.items():
+            if key not in old:
+                continue  # a pattern with no baseline entry yet: its hits are bounded by the tree (ratchet_problems)
             grown = excess_of(root, {r: [0] * n for r, n in files.items()}, old.get(key, {}))
             if grown:
                 messages.append(f"refused: {key} would rise in {', '.join(sorted(grown))}")

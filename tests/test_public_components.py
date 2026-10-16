@@ -86,3 +86,34 @@ def test_the_pricing_stylesheet_restyles_no_shared_component():
         if "public-card-title" in sel or "public-card-body" in sel:
             props = {d.split(":")[0].strip() for d in body.split(";") if d.strip()}
             assert props <= {"margin", "margin-bottom"}, sel
+
+
+SITE_CSS = APP / "static" / "css" / "public_site.css"
+PRICING_HTML = APP / "templates" / "public" / "pricing.html"
+
+
+def test_plan_and_service_grid_tracks_cannot_be_widened_by_their_content():
+    css = PRICING_CSS.read_text(encoding="utf-8")
+    assert "repeat(4, minmax(0, 1fr))" in css and "repeat(2, minmax(0, 1fr))" in css
+    assert not re.search(r"repeat\(\d, 1fr\)", css)
+
+
+def test_the_wrapping_button_shares_the_callout_declaration_block():
+    css = SITE_CSS.read_text(encoding="utf-8")
+    block = re.search(
+        r"\.public-site \.public-card--callout \.public-btn,\s*\.public-site \.public-btn--wrap \{([^{}]*)\}", css)
+    assert block and "white-space: normal" in block.group(1)
+    assert css.count("white-space: normal") == 1
+
+
+def test_every_plan_card_button_wraps_and_band_buttons_do_not():
+    html = PRICING_HTML.read_text(encoding="utf-8")
+    tags = re.findall(r'<a [^>]*?class="(public-btn[^"]*)"[^>]*?data-testid="(buy-[^"]*)"', html, flags=re.S)
+    assert len(tags) == 5 and all("public-btn--wrap" in cls for cls, _ in tags)
+    others = re.findall(r'class="(public-btn[^"]*)"[^>]*?data-testid="selfhost-github"', html)
+    assert others and all("public-btn--wrap" not in cls for cls in others)
+
+
+def test_the_comparison_frame_clips_its_corners_without_scrolling():
+    assert re.search(r"\.pricing-page \.pp-frame \{ overflow: clip; \}", PRICING_CSS.read_text(encoding="utf-8"))
+    assert 'class="pp-frame rounded-2xl border border-border"' in PRICING_HTML.read_text(encoding="utf-8")
