@@ -6,10 +6,13 @@ enrolment or an already-enrolled sign-in.
 
 from __future__ import annotations
 
+import logging
+import re
 import uuid
 
 import pyotp
 import pytest
+from bs4 import BeautifulSoup
 
 pytestmark = pytest.mark.usefixtures("db_session")
 
@@ -825,3 +828,284 @@ def test_v1_sso_callback_still_logs_in_a_plain_user_no_regression(monkeypatch):
 
     with client.session_transaction() as sess:
         assert sess.get("_user_id") is not None
+
+
+# ---------------------------------------------------------------------------
+# The enrolment page renders a scannable QR code (server-side SVG, inline as
+# a data: URI) alongside the existing text fallbacks -- same provisioning_uri
+# the page already shows as plain text, so the image and the raw link always
+# agree.
+# ---------------------------------------------------------------------------
+
+_NONCE_RE = re.compile(r"'nonce-[^']+'")
+
+
+def _strip_nonce(csp_header: str) -> str:
+    return _NONCE_RE.sub("", csp_header)
+
+
+def _normalize_ws(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _login_and_open_enrolment(client, admin):
+    client.post(
+        "/account/login",
+        data={"email": admin.email, "password": _PASSWORD, "remember_me": ""},
+        follow_redirects=False,
+    )
+    return client.get("/account/mfa-challenge")
+
+
+def test_enrolment_page_renders_exactly_one_qr_image_with_existing_fallbacks(
+    app, db_session, make_org
+):
+    org = make_org("mfa-qr-enrol")
+    admin = _make_admin(db_session, org, mfa_enabled=False)
+
+    client = app.test_client()
+    resp = _login_and_open_enrolment(client, admin)
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    soup = BeautifulSoup(html, "html.parser")
+
+    qr_images = soup.find_all("img", attrs={"data-testid": "mfa-qr-code"})
+    assert len(qr_images) == 1
+    assert qr_images[0]["src"].startswith("data:image/svg+xml")
+
+    assert soup.find(attrs={"data-testid": "mfa-setup-key"}) is not None
+    assert "otpauth://" in html
+
+
+def test_enrolment_qr_image_encodes_the_same_provisioning_uri_as_the_text_link(
+    app, db_session, make_org
+):
+    from app.services import mfa_service
+    from app.utils.qr import qr_svg_data_uri
+
+    org = make_org("mfa-qr-matches-uri")
+    admin = _make_admin(db_session, org, mfa_enabled=False)
+
+    client = app.test_client()
+    resp = _login_and_open_enrolment(client, admin)
+    assert resp.status_code == 200
+
+    with client.session_transaction() as sess:
+        secret = sess["_mfa_enroll_secret"]
+
+    expected_src = qr_svg_data_uri(mfa_service.provisioning_uri(admin, secret))
+
+    soup = BeautifulSoup(resp.get_data(as_text=True), "html.parser")
+    img = soup.find("img", attrs={"data-testid": "mfa-qr-code"})
+    assert img["src"] == expected_src
+
+
+def test_enrolment_response_cache_control_is_no_store(app, db_session, make_org):
+    org = make_org("mfa-qr-no-store")
+    admin = _make_admin(db_session, org, mfa_enabled=False)
+
+    client = app.test_client()
+    resp = _login_and_open_enrolment(client, admin)
+
+    assert resp.status_code == 200
+    assert "no-store" in resp.headers.get("Cache-Control", "")
+
+
+def test_enrolment_qr_uses_no_external_service_and_csp_matches_login_page(
+    app, db_session, make_org
+):
+    org = make_org("mfa-qr-no-external")
+    admin = _make_admin(db_session, org, mfa_enabled=False)
+
+    client = app.test_client()
+    resp = _login_and_open_enrolment(client, admin)
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    soup = BeautifulSoup(html, "html.parser")
+    img = soup.find("img", attrs={"data-testid": "mfa-qr-code"})
+    assert "api.qrserver.com" not in html
+    assert not img["src"].startswith("http")
+
+    enrolment_csp = _strip_nonce(resp.headers.get("Content-Security-Policy", ""))
+
+    login_resp = client.get("/account/login")
+    login_csp = _strip_nonce(login_resp.headers.get("Content-Security-Policy", ""))
+
+    assert enrolment_csp == login_csp
+    assert enrolment_csp != ""
+
+
+def test_enrolment_qr_still_present_and_unchanged_after_a_wrong_code_post(
+    app, db_session, make_org
+):
+    org = make_org("mfa-qr-wrong-code")
+    admin = _make_admin(db_session, org, mfa_enabled=False)
+
+    client = app.test_client()
+    get_resp = _login_and_open_enrolment(client, admin)
+    assert get_resp.status_code == 200
+    get_soup = BeautifulSoup(get_resp.get_data(as_text=True), "html.parser")
+    original_src = get_soup.find("img", attrs={"data-testid": "mfa-qr-code"})["src"]
+
+    post_resp = client.post(
+        "/account/mfa-challenge", data={"code": "000000"}, follow_redirects=True
+    )
+    assert post_resp.status_code == 200
+    post_soup = BeautifulSoup(post_resp.get_data(as_text=True), "html.parser")
+    re_rendered = post_soup.find_all("img", attrs={"data-testid": "mfa-qr-code"})
+
+    assert len(re_rendered) == 1
+    assert re_rendered[0]["src"] == original_src
+
+
+def test_enrolment_get_never_logs_the_secret(app, db_session, make_org, caplog):
+    org = make_org("mfa-qr-no-log-leak")
+    admin = _make_admin(db_session, org, mfa_enabled=False)
+
+    client = app.test_client()
+    client.post(
+        "/account/login",
+        data={"email": admin.email, "password": _PASSWORD, "remember_me": ""},
+        follow_redirects=False,
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        resp = client.get("/account/mfa-challenge")
+    assert resp.status_code == 200
+
+    with client.session_transaction() as sess:
+        secret = sess["_mfa_enroll_secret"]
+
+    for record in caplog.records:
+        assert secret not in record.getMessage()
+
+
+def test_v1_enrolment_page_renders_the_qr_image_too(monkeypatch):
+    """Same page, same template, served by the v1 (rollback) blueprint."""
+    v1_app = _v1_forced_app(monkeypatch)
+    _, admin_email = _v1_seed_user(v1_app, "v1-mfa-qr-enrol", mfa_enabled=False)
+
+    client = v1_app.test_client()
+    client.post(
+        "/account/login",
+        data={"email": admin_email, "password": _PASSWORD, "remember_me": ""},
+        follow_redirects=False,
+    )
+    resp = client.get("/account/mfa-challenge")
+
+    assert resp.status_code == 200
+    soup = BeautifulSoup(resp.get_data(as_text=True), "html.parser")
+    qr_images = soup.find_all("img", attrs={"data-testid": "mfa-qr-code"})
+    assert len(qr_images) == 1
+    assert qr_images[0]["src"].startswith("data:image/svg+xml")
+
+
+def test_an_already_enrolled_administrators_challenge_page_shows_no_qr_or_secret(
+    app, db_session, make_org
+):
+    secret = pyotp.random_base32()
+    org = make_org("mfa-qr-already-enrolled")
+    admin = _make_admin(db_session, org, mfa_enabled=True, mfa_secret=secret)
+
+    client = app.test_client()
+    client.post(
+        "/account/login",
+        data={"email": admin.email, "password": _PASSWORD, "remember_me": ""},
+        follow_redirects=False,
+    )
+    resp = client.get("/account/mfa-challenge")
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    soup = BeautifulSoup(html, "html.parser")
+
+    assert soup.find(attrs={"data-testid": "mfa-qr-code"}) is None
+    assert secret not in html
+
+
+def test_enrolment_page_falls_back_to_the_setup_key_when_qr_render_fails(
+    app, db_session, make_org, monkeypatch
+):
+    """When the QR helper cannot render (segno missing or any render
+    error), the page must never promise a QR code it does not show: no
+    image element, no "QR"/"scan" wording anywhere in <main>, and the
+    setup key and raw link still carry the real credential. Without the
+    failure, the normal QR case still renders."""
+    import segno
+
+    org = make_org("mfa-qr-render-fails")
+    admin = _make_admin(db_session, org, mfa_enabled=False)
+
+    def _raise(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(segno, "make_qr", _raise)
+
+    client = app.test_client()
+    resp = _login_and_open_enrolment(client, admin)
+    assert resp.status_code == 200
+
+    html = resp.get_data(as_text=True)
+    soup = BeautifulSoup(html, "html.parser")
+
+    assert soup.find(attrs={"data-testid": "mfa-qr-code"}) is None
+    setup_key = soup.find(attrs={"data-testid": "mfa-setup-key"})
+    assert setup_key is not None
+    assert "otpauth://" in html
+
+    intro_text = _normalize_ws(soup.find("main").find("p").get_text())
+    assert (
+        "Enter the setup key below in your authenticator app, or open the link below "
+        "on a device that has the app, then confirm with the code it shows."
+    ) in intro_text
+    assert "Setup key:" in html
+    assert "enter manually if you cannot scan a QR code" not in html
+
+    main_text = soup.find("main").get_text().lower()
+    assert "qr" not in main_text
+    assert "scan" not in main_text
+
+    monkeypatch.undo()
+    other_org = make_org("mfa-qr-render-succeeds")
+    other_admin = _make_admin(db_session, other_org, mfa_enabled=False)
+    other_client = app.test_client()
+    other_resp = _login_and_open_enrolment(other_client, other_admin)
+    assert other_resp.status_code == 200
+    other_html = other_resp.get_data(as_text=True)
+    other_soup = BeautifulSoup(other_html, "html.parser")
+    assert other_soup.find(attrs={"data-testid": "mfa-qr-code"}) is not None
+    other_intro_text = _normalize_ws(other_soup.find("main").find("p").get_text())
+    assert (
+        "Scan the QR code below with your authenticator app, or enter the setup key "
+        "manually, then confirm with the code it shows."
+    ) in other_intro_text
+
+
+def test_enrolment_page_loads_no_third_party_analytics(
+    app, db_session, make_org, monkeypatch
+):
+    """The enrolment page shows a sign-in secret and must never load GA4
+    or Clarity, even when both are configured and would otherwise render
+    on a public page (control: /account/login, which does not carry a
+    secret, still shows them)."""
+    monkeypatch.setitem(app.config, "GA4_MEASUREMENT_ID", "G-TEST123")
+    monkeypatch.setitem(app.config, "CLARITY_PROJECT_ID", "test-clarity-id")
+
+    org = make_org("mfa-enrol-no-analytics")
+    admin = _make_admin(db_session, org, mfa_enabled=False)
+
+    client = app.test_client()
+
+    control = client.get("/account/login")
+    control_html = control.get_data(as_text=True)
+    assert "clarity.ms" in control_html
+    assert 'id="analytics-consent-banner"' in control_html
+
+    resp = _login_and_open_enrolment(client, admin)
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert "clarity.ms" not in html
+    assert 'id="analytics-consent-banner"' not in html
+    assert "googletagmanager" not in html

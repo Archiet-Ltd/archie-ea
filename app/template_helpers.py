@@ -305,6 +305,17 @@ def register_template_filters(app):
         """
         return _plain_layer(layer, user)
 
+    @app.template_filter("qr_svg_data_uri")
+    def qr_svg_data_uri_filter(data):
+        """Render ``data`` as a QR code, returned as an SVG ``data:`` URI.
+
+        Usage in templates:
+            {{ provisioning_uri | qr_svg_data_uri }}
+        """
+        from app.utils.qr import qr_svg_data_uri
+
+        return qr_svg_data_uri(data)
+
     # Global template functions
     @app.context_processor
     def currency_context():
