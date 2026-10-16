@@ -9,6 +9,7 @@ answers_use_cases:
   - {id: UC-S3-06, segment: S3}
 capture_status: live
 cta: plans
+icon: gauge
 ---
 
 # Capability Maturity

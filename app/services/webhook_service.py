@@ -3,6 +3,8 @@ Webhook service for managing event-driven notifications
 """
 
 import json
+import logging
+import re
 import threading
 import time
 import uuid
@@ -13,7 +15,94 @@ import requests
 from flask import current_app
 
 from app.extensions import db
+from app.middleware.tenant_context import current_org_id
 from app.models.webhook import WebhookDelivery, WebhookEvent, WebhookSubscription
+from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
+
+logger = logging.getLogger(__name__)
+
+_MAX_URL_LENGTH = 500  # webhook_subscriptions.url column width
+_MAX_CUSTOM_HEADERS = 20
+_MAX_HEADER_VALUE_LENGTH = 1024
+_HEADER_NAME_RE = re.compile(r"^[A-Za-z0-9-]{1,64}$")
+
+# Headers a subscriber may never set: they steer routing (Host), framing
+# (Content-Length, Transfer-Encoding), connection handling, proxying, or
+# forge the signature the receiver trusts.
+_FORBIDDEN_HEADERS = frozenset(
+    {
+        "host",
+        "content-length",
+        "content-type",
+        "transfer-encoding",
+        "connection",
+        "keep-alive",
+        "te",
+        "trailer",
+        "upgrade",
+        "expect",
+        "cookie",
+        "user-agent",
+        "x-webhook-signature",
+    }
+)
+_FORBIDDEN_HEADER_PREFIXES = ("proxy-", "x-forwarded-", "x-real-ip", "sec-")
+
+# What a delivery record keeps about a failed attempt. Never the remote body
+# or the exception text: both can carry the content of an internal service.
+GENERIC_DELIVERY_ERRORS = {
+    "refused": "Target not permitted",
+    "connection": "Connection failed",
+    "timeout": "Request timed out",
+    "redirect": "Redirects are not followed",
+}
+
+
+class WebhookTargetRefused(ValueError):
+    """A subscription URL or header set was refused. The message is safe to show."""
+
+
+def validate_webhook_url(url) -> str:
+    """Return the stripped URL, or raise :class:`WebhookTargetRefused`.
+
+    One guard for every webhook sender (this service and the solution webhook
+    sender in drift_remediation_service): ``validate_user_supplied_url``. The
+    detail it gives (resolved addresses) is logged, not returned.
+    """
+    if not isinstance(url, str) or not url.strip():
+        raise WebhookTargetRefused("url must be a non-empty string")
+    url = url.strip()
+    if len(url) > _MAX_URL_LENGTH:
+        raise WebhookTargetRefused("url is too long")
+    try:
+        validate_user_supplied_url(url)
+    except BlockedOutboundURL as exc:
+        logger.warning("Webhook target refused: %s", exc)
+        raise WebhookTargetRefused("url is not an allowed webhook target") from exc
+    return url
+
+
+def sanitize_webhook_headers(headers) -> Dict[str, str]:
+    """Validate subscriber-supplied headers; raise :class:`WebhookTargetRefused`."""
+    if headers in (None, {}):
+        return {}
+    if not isinstance(headers, dict):
+        raise WebhookTargetRefused("headers must be an object")
+    if len(headers) > _MAX_CUSTOM_HEADERS:
+        raise WebhookTargetRefused("too many custom headers")
+    clean: Dict[str, str] = {}
+    for name, value in headers.items():
+        if not isinstance(name, str) or not _HEADER_NAME_RE.match(name):
+            raise WebhookTargetRefused("header names may contain letters, digits and hyphens only")
+        lowered = name.lower()
+        if lowered in _FORBIDDEN_HEADERS or lowered.startswith(_FORBIDDEN_HEADER_PREFIXES):
+            raise WebhookTargetRefused(f"header {name} may not be set")
+        if not isinstance(value, str) or len(value) > _MAX_HEADER_VALUE_LENGTH:
+            raise WebhookTargetRefused("header values must be short strings")
+        if any(ch in value for ch in ("\r", "\n", "\x00")):
+            raise WebhookTargetRefused("header values may not contain line breaks")
+        clean[name] = value
+    return clean
 
 
 class WebhookService:
@@ -35,9 +124,21 @@ class WebhookService:
         headers: Optional[Dict] = None,
         webhook_type: str = "generic",
     ) -> WebhookSubscription:
-        """Create a new webhook subscription"""
+        """Create a new webhook subscription.
+
+        Raises :class:`WebhookTargetRefused` for a URL or header set the server
+        must not call or send, and :class:`PermissionError` when no active
+        organisation is known (a subscription with no organisation would be
+        read by every organisation).
+        """
+        org_id = current_org_id()
+        if org_id is None:
+            raise PermissionError("No active organisation")
+        url = validate_webhook_url(url)
+        headers = sanitize_webhook_headers(headers)
         subscription = WebhookSubscription(
             id=str(uuid.uuid4()),
+            organization_id=org_id,
             user_id=user_id,
             url=url,
             events=events,
@@ -63,18 +164,32 @@ class WebhookService:
         """Get all subscriptions for a user"""
         # user_id column is varchar; current_user.id is int -> cast to avoid
         # "operator does not exist: character varying = integer".
+        org_id = current_org_id()
+        if org_id is None:
+            return []
         return WebhookSubscription.query.filter_by(
-            user_id=str(user_id), is_active=True
+            user_id=str(user_id), organization_id=org_id, is_active=True
         ).all()
 
     def get_subscription(self, subscription_id: str, user_id: str) -> Optional[WebhookSubscription]:
         """Get a specific subscription for a user"""
+        org_id = current_org_id()
+        if org_id is None:
+            return None
         return WebhookSubscription.query.filter_by(
-            id=subscription_id, user_id=user_id, is_active=True
+            id=subscription_id,
+            user_id=str(user_id),
+            organization_id=org_id,
+            is_active=True,
         ).first()
 
     def get_subscription_by_id(self, subscription_id: str) -> Optional[WebhookSubscription]:
-        """Get a subscription by ID (internal use)"""
+        """Get a subscription by ID (internal use).
+
+        Not a user-facing lookup: callers are the unauthenticated receiver
+        (inside platform_scope, where the id names the organisation) and
+        retry_event, which has already proven the organisation.
+        """
         return WebhookSubscription.query.filter_by(id=subscription_id, is_active=True).first()
 
     def update_subscription(
@@ -95,9 +210,21 @@ class WebhookService:
             "headers",
             "is_active",
         ]
+        # Validate everything before changing anything, so a refused update
+        # leaves the stored subscription exactly as it was.
+        checked = {}
         for field, value in updates.items():
-            if field in allowed_fields:
-                setattr(subscription, field, value)
+            if field not in allowed_fields:
+                continue
+            if field == "url":
+                value = validate_webhook_url(value)
+            elif field == "headers":
+                value = sanitize_webhook_headers(value)
+            elif field == "webhook_type" and value not in ("generic", "teams", "slack"):
+                raise WebhookTargetRefused("webhook_type must be generic, teams or slack")
+            checked[field] = value
+        for field, value in checked.items():
+            setattr(subscription, field, value)
 
         subscription.updated_at = datetime.utcnow()
         db.session.commit()
@@ -170,7 +297,12 @@ class WebhookService:
         self, event_type: str, payload: Dict
     ) -> List[WebhookSubscription]:
         """Find subscriptions that match the event"""
-        subscriptions = WebhookSubscription.query.filter_by(is_active=True).all()
+        org_id = current_org_id()
+        if org_id is None:
+            return []
+        subscriptions = WebhookSubscription.query.filter_by(
+            organization_id=org_id, is_active=True
+        ).all()
         matching = []
 
         for subscription in subscriptions:
@@ -345,10 +477,18 @@ class WebhookService:
 
     def _deliver_webhook(self, subscription: WebhookSubscription, event_data: Dict) -> Dict:
         """Deliver webhook to a single subscription"""
+        # Subscriber headers first, then ours, so a stored header can never
+        # replace Content-Type, User-Agent or the signature. A stored set that
+        # no longer passes validation (rows older than the check) is dropped
+        # whole rather than sent.
+        try:
+            custom_headers = sanitize_webhook_headers(subscription.headers)
+        except WebhookTargetRefused:
+            custom_headers = {}
         headers = {
+            **custom_headers,
             "Content-Type": "application/json",
             "User-Agent": "Enterprise-Architecture-Webhook/1.0",
-            **subscription.headers,
         }
 
         # Format payload according to webhook_type (teams/slack/generic)
@@ -392,26 +532,54 @@ class WebhookService:
     def _attempt_delivery(
         self, delivery: WebhookDelivery, url: str, headers: Dict, payload: Dict
     ) -> bool:
-        """Attempt to deliver webhook with retries"""
+        """Attempt to deliver webhook with retries.
+
+        The target is re-checked on every attempt (a host can start resolving to
+        an internal address after it was accepted), redirects are never followed,
+        and nothing the remote side says is kept: only the status code and a
+        fixed, generic reason. A subscriber chooses the URL, so the response
+        body of an internal service must never reach the delivery record or the
+        API that shows it.
+        """
+        try:
+            validate_webhook_url(url)
+        except WebhookTargetRefused:
+            delivery.attempt_count = (delivery.attempt_count or 0) + 1
+            delivery.last_attempt_at = datetime.utcnow()
+            delivery.status = "failed"
+            delivery.response_body = None
+            delivery.error_message = GENERIC_DELIVERY_ERRORS["refused"]
+            db.session.commit()
+            return False
         for attempt in range(self.max_retries):
             try:
                 delivery.attempt_count = attempt + 1
                 delivery.last_attempt_at = datetime.utcnow()
 
-                response = requests.post(url, json=payload, headers=headers, timeout=self.timeout)
+                response = requests.post(
+                    url,
+                    json=payload,
+                    headers=headers,
+                    timeout=self.timeout,
+                    allow_redirects=False,
+                )
 
                 delivery.response_status = response.status_code
-                delivery.response_body = response.text[:1000]  # Limit response size
+                delivery.response_body = None
 
                 if response.status_code >= 200 and response.status_code < 300:
                     delivery.status = "success"
                     delivery.delivered_at = datetime.utcnow()
                     db.session.commit()
-                    current_app.logger.info(f"Successfully delivered webhook to {url}")
+                    current_app.logger.info("Successfully delivered webhook %s", delivery.id)
                     return True
                 else:
                     delivery.status = "failed"
-                    delivery.error_message = f"HTTP {response.status_code}: {response.text[:200]}"
+                    delivery.error_message = (
+                        GENERIC_DELIVERY_ERRORS["redirect"]
+                        if 300 <= response.status_code < 400
+                        else f"HTTP {response.status_code}"
+                    )
                     db.session.commit()
 
                     if attempt < self.max_retries - 1:
@@ -419,21 +587,32 @@ class WebhookService:
 
             except requests.RequestException as e:
                 delivery.status = "failed"
-                delivery.error_message = str(e)
+                delivery.error_message = (
+                    GENERIC_DELIVERY_ERRORS["timeout"]
+                    if isinstance(e, requests.Timeout)
+                    else GENERIC_DELIVERY_ERRORS["connection"]
+                )
+                current_app.logger.warning(
+                    "Webhook delivery attempt failed: %s", type(e).__name__
+                )
                 db.session.commit()
 
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay * (attempt + 1))
 
         current_app.logger.error(
-            f"Failed to deliver webhook to {url} after {self.max_retries} attempts"
+            "Failed to deliver webhook %s after %s attempts", delivery.id, self.max_retries
         )
         return False
 
     def get_events(self, limit: int = 50, offset: int = 0) -> List[WebhookEvent]:
         """Get webhook events (admin function)"""
+        org_id = current_org_id()
+        if org_id is None:
+            return []
         return (
-            WebhookEvent.query.order_by(WebhookEvent.created_at.desc())
+            WebhookEvent.query.filter_by(organization_id=org_id)
+            .order_by(WebhookEvent.created_at.desc())
             .limit(limit)
             .offset(offset)
             .all()
@@ -441,13 +620,16 @@ class WebhookService:
 
     def retry_event(self, event_id: str) -> bool:
         """Retry delivering a failed event"""
-        event = WebhookEvent.query.get(event_id)
+        org_id = current_org_id()
+        if org_id is None:
+            return False
+        event = WebhookEvent.query.filter_by(id=event_id, organization_id=org_id).first()
         if not event:
             return False
 
         # Find failed deliveries for this event
         failed_deliveries = WebhookDelivery.query.filter_by(
-            event_type=event.event_type, status="failed"
+            event_type=event.event_type, status="failed", organization_id=org_id
         ).all()
 
         for delivery in failed_deliveries:

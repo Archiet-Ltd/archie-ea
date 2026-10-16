@@ -113,7 +113,19 @@ class Config:
         c.strip() for c in os.environ.get("SSRF_BLOCKED_CIDRS", "").split(",") if c.strip()
     ]
 
+    # Extra host suffixes accepted for Teams webhook addresses, on top of the
+    # Microsoft hosts (comma-separated; platform configuration only).
+    TEAMS_WEBHOOK_EXTRA_HOST_SUFFIXES = [
+        c.strip()
+        for c in os.environ.get("TEAMS_WEBHOOK_EXTRA_HOST_SUFFIXES", "").split(",")
+        if c.strip()
+    ]
+
     APP_NAME = os.environ.get("APP_NAME", "Entelim")
+    # The assistant's citation gate: "log" (default; answers are shown
+    # unchanged and an answer the gate would refuse is logged), "enforce"
+    # (the answer is replaced by "Not recorded") or "off".
+    ASSISTANT_CITATION_GATE_MODE = os.environ.get("ASSISTANT_CITATION_GATE_MODE", "log")
     SECRET_KEY = os.environ.get("SECRET_KEY")
     if not SECRET_KEY:
         import secrets

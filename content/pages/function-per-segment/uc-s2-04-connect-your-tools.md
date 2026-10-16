@@ -6,6 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
 url_slug: /use-cases/import-from-jira-and-github
+icon: github
 ---
 
 # How do I stop typing every system into Entelim by hand?

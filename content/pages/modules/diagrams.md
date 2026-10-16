@@ -9,6 +9,7 @@ answers_use_cases:
   - {id: UC-S2-07, segment: S2}
 capture_status: live
 cta: plans
+icon: network
 ---
 
 # Diagrams & Composer

@@ -8,6 +8,7 @@ answers_use_cases:
   - {id: UC-S1-02, segment: S1}
 capture_status: live
 cta: plans
+icon: layout-grid
 ---
 
 # Business Model Canvas

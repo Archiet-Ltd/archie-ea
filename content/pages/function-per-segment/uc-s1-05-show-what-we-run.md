@@ -6,6 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
 url_slug: /use-cases/show-investors-what-we-run
+icon: presentation
 ---
 
 # Show an investor what we run and who owns it, in an afternoon
