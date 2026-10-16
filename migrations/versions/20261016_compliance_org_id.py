@@ -14,7 +14,7 @@ number of unattributed rows is printed.
 Idempotent: every step checks before it acts, so a second run is a no-op.
 
 Revision ID: 20261016_compliance_org_id
-Revises: 20261015_adm_portfolio_rls
+Revises: 20261016_technical_debt_rls
 Create Date: 2026-10-16
 """
 import sqlalchemy as sa
@@ -22,7 +22,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "20261016_compliance_org_id"
-down_revision = "20261015_adm_portfolio_rls"
+down_revision = "20261016_technical_debt_rls"
 branch_labels = None
 depends_on = None
 
