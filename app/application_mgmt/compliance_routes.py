@@ -35,8 +35,12 @@ def _can_record_control_work() -> bool:
     """Whether to offer the record-a-test and assign-an-owner actions: the persona side of
     what the write routes below accept. The routes decide; this only keeps the page from
     offering actions that will be refused."""
+    from app.models.user import Permission
     from app.utils.role_access import get_user_role, is_admin
 
+    # A read-only account (no general permission) holds no write role however it is labelled.
+    if not current_user.can(Permission.GENERAL):
+        return False
     role = get_user_role(current_user)
     return is_admin(current_user) or role in CONTROL_WORK_ROLES or role.endswith("_architect")
 

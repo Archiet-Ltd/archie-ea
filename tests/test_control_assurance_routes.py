@@ -181,3 +181,20 @@ def test_the_dashboard_says_so_when_nothing_is_missing(app, db_session, make_org
     html = client.get("/dashboard/compliance").get_data(as_text=True)
     assert "No evidence is missing or out of date" in html
     assert "Record test" not in html
+
+
+def test_a_reader_with_a_compliance_label_is_not_offered_the_write_actions(app, db_session, make_org, client, login_as):
+    """The Viewer role holds no write permission however the persona is labelled, so the page
+    must not offer record-a-test or assign-an-owner (the routes would refuse them)."""
+    org_a, _b, row_a, _rb = _world(db_session, make_org)
+    row_a.evidence_url = "https://e.example/old"
+    row_a.evidence_valid_until = datetime.utcnow() - timedelta(days=2)
+    db_session.commit()
+    reader = _person(db_session, org_a.id, "Reader", role="Viewer", enterprise_role="compliance")
+    login_as(client, reader)
+    html = client.get("/dashboard/compliance").get_data(as_text=True)
+    assert f'data-control-row="{row_a.id}"' in html and "Expired" in html
+    assert "Record test" not in html and "Assign owner" not in html
+    officer = _person(db_session, org_a.id, "Officer", enterprise_role="compliance")
+    login_as(client, officer)
+    assert "Record test" in client.get("/dashboard/compliance").get_data(as_text=True)
