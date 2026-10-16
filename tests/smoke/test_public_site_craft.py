@@ -13,7 +13,10 @@ _MEASURE = """() => {
   const link = [...document.querySelectorAll('nav a')].find(a => /Features/.test(a.innerText));
   const signin = [...document.querySelectorAll('a')].find(a => a.innerText.trim() === 'Sign In');
   const signup = [...document.querySelectorAll('a')].find(a => a.innerText.trim() === 'Sign Up');
-  const h1 = document.querySelector('h1'), p = document.querySelector('main p');
+  // Body text is a paragraph of page content: on a landing page the first <p> in <main> is
+  // the hero lead (a larger sub-line), so prefer the first content paragraph when there is one.
+  const h1 = document.querySelector('h1'),
+        p = document.querySelector('main .public-page-content p') || document.querySelector('main p');
   const main = document.querySelector('main#main-content');
   return {
     linkMid: mid(link), signinMid: mid(signin), signupH: R(signup).height, signupRadius: cs(signup).borderRadius,
