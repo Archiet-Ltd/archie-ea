@@ -113,6 +113,14 @@ class Config:
         c.strip() for c in os.environ.get("SSRF_BLOCKED_CIDRS", "").split(",") if c.strip()
     ]
 
+    # Extra host suffixes accepted for Teams webhook addresses, on top of the
+    # Microsoft hosts (comma-separated; platform configuration only).
+    TEAMS_WEBHOOK_EXTRA_HOST_SUFFIXES = [
+        c.strip()
+        for c in os.environ.get("TEAMS_WEBHOOK_EXTRA_HOST_SUFFIXES", "").split(",")
+        if c.strip()
+    ]
+
     APP_NAME = os.environ.get("APP_NAME", "Entelim")
     SECRET_KEY = os.environ.get("SECRET_KEY")
     if not SECRET_KEY:
