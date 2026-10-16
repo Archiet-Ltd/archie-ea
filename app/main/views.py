@@ -703,14 +703,6 @@ def public_module(slug):
     )
 
 
-_USE_CASE_SEGMENT_LABELS = {
-    "S1": "Startups",
-    "S2": "Scale-ups",
-    "S3": "Enterprise architecture teams",
-    "S4": "Services and operations",
-}
-
-
 @main.route("/use-cases")
 def public_use_cases_index():
     """The /use-cases index: every live use-case page, grouped by segment.
@@ -721,12 +713,12 @@ def public_use_cases_index():
     listing, same as every other nav/index listing -- see
     app/services/public_pages.py::load_feed_pages.
     """
-    from app.services.public_pages import family_hub_groups
+    from app.services.public_pages import USE_CASE_SEGMENT_LABELS, family_hub_groups
 
     groups = family_hub_groups(
         "function-per-segment",
         group_key="segment_id",
-        labels=_USE_CASE_SEGMENT_LABELS,
+        labels=USE_CASE_SEGMENT_LABELS,
     )
     return render_template(
         "public/hub_index.html",
