@@ -10,7 +10,7 @@ Every statement is guarded so the revision runs twice (and runs on a schema
 built fresh from the models, where the column already exists) without error.
 
 Revision ID: 20261012_techdebt_orgid
-Revises: 20261011_notif_rls
+Revises: 20261015_adm_portfolio_rls
 Create Date: 2026-10-12
 """
 
@@ -19,7 +19,7 @@ from alembic import op
 from sqlalchemy import inspect
 
 revision = "20261012_techdebt_orgid"
-down_revision = "20261011_notif_rls"
+down_revision = "20261015_adm_portfolio_rls"
 branch_labels = None
 depends_on = None
 
