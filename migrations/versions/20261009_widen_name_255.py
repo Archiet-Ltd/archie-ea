@@ -6,7 +6,7 @@ this rewrites neither the table nor its indexes. The down step narrows back to
 100 and refuses, changing nothing, while any name is longer.
 
 Revision ID: 20261009_widen_name_255
-Revises: 20261010_arb_change_requests_rls
+Revises: 20261015_adm_portfolio_rls
 Create Date: 2026-10-09
 """
 from alembic import op
@@ -14,7 +14,7 @@ from alembic import op
 from app.commands.schema_migrations import narrow_varchar, widen_varchar
 
 revision = "20261009_widen_name_255"
-down_revision = "20261010_arb_change_requests_rls"
+down_revision = "20261015_adm_portfolio_rls"
 branch_labels = None
 depends_on = None
 
