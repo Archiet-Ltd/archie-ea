@@ -1,4 +1,4 @@
-{% extends 'layouts/public_base.html' %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
+{% extends 'layouts/public_base.html' %}{% from 'components/badge.html' import badge %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
 {% block full_title %}Entelim — The Company Brain for every enterprise{% endblock %}
 {% block meta_description %}
 <link rel="canonical" href="https://entelim.org/">
@@ -42,11 +42,10 @@
 
   <div class="home-hero__grid relative z-10 mx-auto px-4 sm:px-6">
     <div class="home-hero__text space-y-6">
-      <div class="home-hero__chip inline-flex items-center rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-muted-foreground">
-        <span class="mr-2 h-2 w-2 shrink-0 rounded-full bg-primary"></span>
+      {% call badge(size='pill') %}
         <span class="sm:hidden">Open source &middot; Self-host free</span>
         <span class="hidden sm:inline">Open source under AGPL-3.0 &middot; Self-host free, forever</span>
-      </div>
+      {% endcall %}
 
       <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground">
         The company brain for every enterprise.
