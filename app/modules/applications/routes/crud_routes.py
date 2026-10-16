@@ -372,6 +372,9 @@ def application_detail(id):
     return render_application_detail(id)
 
 
+_TERMINAL_LIFECYCLE_STATUSES = frozenset({"retired", "decommissioned", "end_of_life", "end of life"})
+
+
 @unified_applications_bp.route("/<int:id>/retire", methods=["POST"])
 @login_required
 @require_roles("admin", "architect")
@@ -403,6 +406,16 @@ def retire_application(id):
         "kind": "retirement",
         "requested_at": now_utc.isoformat(),
     })
+    # An application already at a terminal lifecycle value is not moved back
+    # to "retiring" and gets no new decommission work package.
+    current_status = (app_obj.lifecycle_status or "").strip().lower()
+    if current_status in _TERMINAL_LIFECYCLE_STATUSES or current_status.startswith("5."):
+        flash(
+            f"{app_obj.name} is already {app_obj.lifecycle_status}; it cannot be marked for retirement.",
+            "warning",
+        )
+        return redirect(url_for("unified_applications.application_detail", id=id))
+
     existing = (
         UnifiedWorkPackage.query.filter(
             UnifiedWorkPackage.organization_id == org_id,

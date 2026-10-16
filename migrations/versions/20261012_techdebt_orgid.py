@@ -72,10 +72,18 @@ def upgrade() -> None:
         )
 
         # 3. Tighten to NOT NULL when every row now carries an organisation.
-        has_null_org = bind.execute(
-            sa.text("SELECT 1 FROM technical_debt WHERE organization_id IS NULL LIMIT 1")
-        ).first()
-        if has_null_org is None:
+        unmatched = bind.execute(
+            sa.text("SELECT count(*) FROM technical_debt WHERE organization_id IS NULL")
+        ).scalar() or 0
+        if unmatched:
+            # Rows with no application link have no derivable organisation. They
+            # are neither deleted nor given an invented one; they stay NULL (and
+            # so are visible to no organisation) until someone attributes them.
+            print(
+                f"technical_debt: {unmatched} row(s) have no application link and no "
+                "organisation; organization_id stays nullable until they are attributed"
+            )
+        else:
             op.alter_column(
                 "technical_debt",
                 "organization_id",

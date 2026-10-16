@@ -7,9 +7,11 @@ unions every revision carrying a ``TENANT_TABLES``/``HYBRID_TABLES`` constant,
 so this file alone brings the table under the guard; the base revision's
 helper functions and policy text are copied here rather than imported.
 
-``organization_id`` is NOT NULL once the preceding revision has run, so every
-row belongs to exactly one organisation and is invisible under every other
-organisation's session; the platform scope sees all rows.
+A row with an organisation is visible only under that organisation's session;
+the platform scope sees all rows. ``organization_id`` is NOT NULL only when the
+preceding revision found no row without an application link; rows left with no
+organisation match no organisation's policy and are visible to the platform
+scope alone until they are attributed.
 
 Revision ID: 20261016_technical_debt_rls
 Revises: 20261012_techdebt_orgid

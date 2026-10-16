@@ -84,7 +84,7 @@
      class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
     <i data-lucide="pencil" class="w-4 h-4 mr-2" aria-hidden="true"></i>Edit
   </a>
-  {% if current_user.is_admin() or current_user.role_archetype == 'architect' %}
+  {% if can_retire_applications(current_user) %}
   <div x-data="{ retiring: false }">
     <form method="POST" action="{{ url_for('unified_applications.retire_application', id=app.id) }}"
           class="inline-flex"

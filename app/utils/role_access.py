@@ -328,6 +328,24 @@ def can_edit_capabilities(user) -> bool:
         return False
 
 
+def can_retire_applications(user) -> bool:
+    """True when the user may mark an application for retirement.
+
+    Mirrors the retirement route's own rule, require_roles("admin",
+    "architect"): an administrator, or a user whose role is Architect.
+    """
+    if not user:
+        return False
+    if is_admin(user):
+        return True
+    try:
+        role = getattr(user, "role", None)
+        name = str(getattr(role, "name", "") or "").strip().lower()
+        return name == "architect"
+    except Exception:  # noqa: BLE001 - a template gate must not 500 a page
+        return False
+
+
 def is_procurement(user) -> bool:
     """Check if user has procurement role."""
     return get_user_role(user) == ROLE_PROCUREMENT
@@ -1118,6 +1136,7 @@ def role_access_context_processor():
     return {
         "can_access_section": can_access_section,
         "can_edit_capabilities": can_edit_capabilities,
+        "can_retire_applications": can_retire_applications,
         "get_visible_sections": get_visible_sections,
         "is_admin": is_admin,
         "is_procurement": is_procurement,

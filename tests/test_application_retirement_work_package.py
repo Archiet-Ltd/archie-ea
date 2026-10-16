@@ -122,6 +122,53 @@ class TestRetirementAction:
         db_session.expire_all()
         assert db_session.get(ApplicationComponent, app_id).lifecycle_status == "operational"
 
+    def test_an_architect_sees_the_retire_button_and_a_viewer_does_not(
+        self, app, db_session, make_org, client, login_as
+    ):
+        org, architect = _org_user(db_session, make_org, "retire-btn-a")
+        _org2, viewer = _org_user(db_session, make_org, "retire-btn-v", role_name="Viewer")
+        viewer.organization_id = org.id
+        viewer.enterprise_role = "viewer"
+        app_obj = _app(db_session, org, "Retire-Button")
+        architect_id, viewer_id, app_id = architect.id, viewer.id, app_obj.id
+        db_session.commit()
+        db_session.expunge_all()
+
+        _login_read(db_session, client, login_as, architect_id)
+        assert "Mark for retirement" in client.get(f"/applications/{app_id}").get_data(as_text=True)
+
+        _login_read(db_session, client, login_as, viewer_id)
+        page = client.get(f"/applications/{app_id}")
+        assert page.status_code == 200
+        assert "Mark for retirement" not in page.get_data(as_text=True)
+
+    def test_a_terminal_application_is_not_moved_back_or_given_a_package(
+        self, app, db_session, make_org, client, login_as
+    ):
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.unified_work_package import UnifiedWorkPackage
+
+        org, user = _org_user(db_session, make_org, "retire-terminal")
+        ids = {}
+        for status in ("retired", "5. DECOMMISSIONED"):
+            a = _app(db_session, org, "Retire-Terminal")
+            a.lifecycle_status = status
+            ids[status] = a.id
+        org_id, user_id = org.id, user.id
+        db_session.commit()
+        db_session.expunge_all()
+
+        _login_read(db_session, client, login_as, user_id)
+        for status, app_id in ids.items():
+            response = client.post(f"/applications/{app_id}/retire")
+            assert response.status_code in (302, 303)
+            db_session.expire_all()
+            assert db_session.get(ApplicationComponent, app_id).lifecycle_status == status
+            assert UnifiedWorkPackage.query.filter(
+                UnifiedWorkPackage.organization_id == org_id,
+                UnifiedWorkPackage.application_component_id == app_id,
+            ).count() == 0
+
     def test_retiring_twice_never_creates_a_second_row(
         self, app, db_session, make_org, client, login_as
     ):
