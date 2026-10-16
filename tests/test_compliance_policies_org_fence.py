@@ -12,6 +12,7 @@ import uuid
 from pathlib import Path
 
 import pytest
+from sqlalchemy import text
 
 REPO = Path(__file__).resolve().parents[1]
 VERSIONS = REPO / "migrations" / "versions"
@@ -117,6 +118,12 @@ def world(db_session, make_org):
     return w
 
 
+def _count(where):
+    from app import db
+
+    return db.session.execute(text(f"select count(*) from compliance_violations where {where}")).scalar()  # nosec B608 - literal in this module
+
+
 def _ids(response, key):
     assert response.status_code == 200, response.get_data(as_text=True)
     return {row["id"] for row in response.get_json()["data"][key]}
@@ -173,9 +180,7 @@ def test_a_violation_cannot_be_logged_against_another_organisations_policy(clien
         json={"policy_id": world.policy_a.id, "description": "planted", "severity": "High"},
     )
     assert response.status_code == 404
-    from app.models.compliance_models import ComplianceViolation
-
-    assert ComplianceViolation.query.filter_by(description="planted").count() == 0
+    assert _count("description = 'planted'") == 0
 
 
 def test_a_violation_logged_in_one_organisation_carries_that_organisation(client, login_as, world):
@@ -199,17 +204,23 @@ def test_another_organisations_violation_cannot_be_changed(client, login_as, wor
     assert response.status_code == 404
     from app import db
 
-    db.session.expire_all()
-    assert world.violation_a.status == "Open"
+    status = db.session.execute(
+        text("select status from compliance_violations where id = :i"), {"i": world.violation_a.id}
+    ).scalar()
+    assert status == "Open"
 
 
 def test_another_organisations_violation_cannot_be_deleted(client, login_as, world):
     login_as(client, world.admin_b)
     response = client.delete(f"/enterprise/compliance/violations/{world.violation_a.id}")
     assert response.status_code == 404
-    from app.models.compliance_models import ComplianceViolation
+    # Raw SQL: the ORM would apply organisation B's filter, which is still the test context.
+    from app import db
 
-    assert ComplianceViolation.query.filter_by(id=world.violation_a.id).count() == 1
+    still_there = db.session.execute(
+        text("select count(*) from compliance_violations where id = :i"), {"i": world.violation_a.id}
+    ).scalar()
+    assert still_there == 1
 
 
 def test_own_violation_can_still_be_changed_and_deleted(client, login_as, world):
@@ -220,6 +231,31 @@ def test_own_violation_can_still_be_changed_and_deleted(client, login_as, world)
     assert changed.status_code == 200, changed.get_data(as_text=True)
     deleted = client.delete(f"/enterprise/compliance/violations/{world.violation_a.id}")
     assert deleted.status_code == 200, deleted.get_data(as_text=True)
+
+
+def test_policy_id_sent_as_a_string_is_handled_and_still_fenced(client, login_as, world):
+    login_as(client, world.admin_b)
+    own = client.post(
+        "/enterprise/compliance/violations",
+        json={"policy_id": str(world.policy_b.id), "description": "string id", "severity": "Low"},
+    )
+    assert own.status_code == 201, own.get_data(as_text=True)
+    other = client.post(
+        "/enterprise/compliance/violations",
+        json={"policy_id": str(world.policy_a.id), "description": "string id planted", "severity": "Low"},
+    )
+    assert other.status_code == 404
+
+
+def test_dashboard_with_no_active_organisation_counts_nothing(app, db_session, world, monkeypatch):
+    import app.modules.capabilities.routes.enterprise_crud_routes as routes
+
+    monkeypatch.setattr(routes, "current_org_id", lambda: None)
+    with app.test_request_context("/enterprise/compliance"):
+        view = routes.compliance_dashboard
+        view = getattr(view, "__wrapped__", view)
+        data = view().get_json()["data"]
+    assert data["total_policies"] == 0 and data["total_violations"] == 0
 
 
 def test_write_roles_are_unchanged(client, login_as, db_session, world):

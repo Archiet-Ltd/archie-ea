@@ -10,6 +10,7 @@ import pytest
 from alembic.operations import Operations
 from alembic.runtime.migration import MigrationContext
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 
 from tests.test_row_level_security import RlsEnv, rls, world  # noqa: F401  (shared fixtures)
 
@@ -72,7 +73,7 @@ def test_one_organisation_cannot_read_change_or_delete_anothers_policies_and_vio
         assert connection.execute(
             text("DELETE FROM compliance_policies WHERE id = :i"), {"i": policy_b}
         ).rowcount == 0
-        with pytest.raises(Exception):
+        with pytest.raises(DBAPIError, match="row-level security"):
             connection.execute(text(_POLICY), {"o": org_b, "n": "planted"})
 
     with fenced.owner.connect() as connection:

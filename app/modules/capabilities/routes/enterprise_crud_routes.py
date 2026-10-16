@@ -474,6 +474,19 @@ def compliance_dashboard():
     """Get compliance dashboard with statistics."""
     try:
         org_id = current_org_id()
+        if org_id is None:
+            return jsonify(
+                {
+                    "success": True,
+                    "data": {
+                        "total_policies": 0,
+                        "total_violations": 0,
+                        "critical_violations": 0,
+                        "open_violations": 0,
+                        "compliance_score": 100,
+                    },
+                }
+            )
         violations = ComplianceViolation.query.filter(ComplianceViolation.organization_id == org_id)
         total_policies = CompliancePolicy.query.filter(
             CompliancePolicy.organization_id == org_id
@@ -653,7 +666,8 @@ def create_compliance_violation():
 
         # Verify policy exists
         policy = CompliancePolicy.query.filter(
-            CompliancePolicy.id == data["policy_id"], CompliancePolicy.organization_id == org_id
+            CompliancePolicy.id == int(data["policy_id"]),
+            CompliancePolicy.organization_id == org_id,
         ).first()
         if not policy:
             return jsonify({"success": False, "error": "Policy not found"}), 404
@@ -661,7 +675,7 @@ def create_compliance_violation():
         # Create violation
         violation = ComplianceViolation(
             organization_id=org_id,
-            policy_id=data["policy_id"],
+            policy_id=policy.id,
             severity=data.get("severity", "Medium"),
             description=data.get("description", ""),
             status="Open",
