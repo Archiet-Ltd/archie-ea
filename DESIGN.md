@@ -119,7 +119,7 @@ dark-theme users. `--info` tracks blue in both.
 `.theme-marketing` and `.dark .theme-marketing` in `shadcn_tokens.css` hold a neutral palette for the
 public marketing pages, scoped as a class rather than a second token file. It is opt-in: set
 `{% block body_theme %}theme-marketing{% endblock %}` in a template that extends
-`layouts/public_base.html`. The homepage (`main/index.html`) sets it; the other marketing templates follow as that work lands. Login, registration, MFA, OAuth consent, shared artefacts and the demo page keep
+`layouts/public_base.html`. The homepage (`main/index.html`) and the pricing page (`public/pricing.html`) set it; the other marketing templates follow as that work lands. Login, registration, MFA, OAuth consent, shared artefacts and the demo page keep
 the product palette (no `body_theme` override). No other CSS, SCSS or template file may declare
 `--background`, `--primary`, `--border` or any other core token — the `reuse-register` gate enforces
 this (`docs/reuse-register.yml`, entry `design-tokens`).
