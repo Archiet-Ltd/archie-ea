@@ -326,10 +326,12 @@ class TestAskQuestions:
         # The seed records two owners against Event Relay itself (a primary
         # and a technical owner). The answer names the element's own owners
         # first, so both appear and no absence reason is given.
-        assert [(o["name"], o["role"]) for o in result["owners"][:2]] == [
+        # The two own owners come before any owner of an affected element;
+        # their order between themselves is not part of the contract.
+        assert {(o["name"], o["role"]) for o in result["owners"][:2]} == {
             ("Ivo Reed", "Primary"),
             ("Cameron SysAdmin", "Technical"),
-        ]
+        }
         assert "no_ownership_records" not in result.get("reasons", [])
 
     def test_programme_on_quay_compute_pool(self, app, db_session, make_org):

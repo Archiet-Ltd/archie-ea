@@ -116,11 +116,24 @@ EXCLUDED_CHECKS = {
         "a dedicated job for census, ai-protocol and guide-history journeys; "
         "the aggregate \"Browser journeys (one per archetype)\" is the required check."
     ),
+    "Fast static checks (compile + lint)": (
+        "an early, cheap subset of \"Static gates (compile + ratchets)\" that only "
+        "orders the heavy CI jobs; the full static job is the required check."
+    ),
     "Content page tests": (
         "runs only on pull requests whose changes are all content "
         "(is_content_only=true); it never runs on a push to main, so it can "
         "never gate a deploy. The page tests it runs are also covered by the "
         "required pytest shards on every non-content run."
+    ),
+    "Changed-file tests (fast lane)": (
+        "runs only on pull-request pushes without the full-ci label (never on a "
+        "push to main, so it can never gate a deploy); the full suite on the "
+        "merge commit is what the required checks cover."
+    ),
+    "Quarantined tests (non-blocking)": (
+        "known timing flakes listed in scripts/ci/quarantine.txt: they run and "
+        "report on every full run but are not allowed to block it."
     ),
     "Failing-first proof": (
         "informational: runs only on pull requests (never on a push to main) "

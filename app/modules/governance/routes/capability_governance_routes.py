@@ -8,6 +8,7 @@ Capability Governance Routes
 Routes for capability governance and business process management.
 """
 
+from werkzeug.exceptions import HTTPException
 import logging
 
 from flask import Blueprint, jsonify, render_template, request
@@ -177,6 +178,9 @@ def api_update_governance(capability_id):
 
         db.session.commit()
         return jsonify({"success": True})
+    except HTTPException:
+        # A 404 or 403 from the lookup is the refusal itself, not an internal error.
+        raise
     except Exception as e:
         db.session.rollback()
         logger.error("Error updating governance for capability %s: %s", capability_id, e)
