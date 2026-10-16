@@ -220,6 +220,10 @@ def boot_live_server(request, ai_protocol_stub, app, extra_env=None):
     # The assistant connector is off by default; the consent journey needs it on in
     # the server it drives, and no other journey is affected by its extra routes.
     env.setdefault("MCP_ENABLED", "true")
+    # Journeys save connector addresses on made-up hosts; the outbound-URL guard
+    # resolves a name before accepting it, which a made-up host cannot do. The
+    # development switch skips resolution for this harness only.
+    env.setdefault("ALLOW_INTERNAL_WEBHOOK_TARGETS", "1")
     _require_explicit_test_database(env)
     if ai_protocol_stub is not None:
         env = ai_protocol_stub.child_environment(env)
