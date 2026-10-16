@@ -129,7 +129,7 @@ class AbacusConnector(BaseConnector):
             headers = {"Authorization": f"Bearer {token}"}
             url = urljoin(self.config.config["base_url"], "/api/Architectures")
 
-            async with aiohttp.ClientSession() as session:
+            async with self._outbound_session() as session:
                 async with session.get(
                     url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
@@ -175,7 +175,7 @@ class AbacusConnector(BaseConnector):
             logger.info(f"Requesting OAuth token from: {token_url}")
             logger.debug(f"Using client_id: {self.config.config['client_id']}")
 
-            async with aiohttp.ClientSession() as session:
+            async with self._outbound_session() as session:
                 async with session.post(
                     token_url,
                     data=auth_data,
@@ -304,7 +304,7 @@ class AbacusConnector(BaseConnector):
             page_size = 100  # Per docs: use $top with reasonable value
             max_iterations = 100  # Safety limit: 100 pages * 100 = 10,000 max records
 
-            async with aiohttp.ClientSession() as session:
+            async with self._outbound_session() as session:
                 for iteration in range(max_iterations):
                     params = {
                         "$filter": base_filter,
@@ -353,8 +353,9 @@ class AbacusConnector(BaseConnector):
                             # Check for @odata.nextLink (preferred pagination method)
                             next_link = data.get("@odata.nextLink")
                             if next_link:
-                                # nextLink is a full URL, use it directly
-                                url = next_link
+                                # nextLink is a full URL supplied by the remote side:
+                                # it may only continue on the configured host.
+                                url = self._same_origin_link(next_link)
                                 params = {}  # nextLink includes all params
                                 skip = 0  # Reset skip since nextLink handles it
                             elif len(raw_apps) < page_size:
@@ -397,7 +398,7 @@ class AbacusConnector(BaseConnector):
             skip = 0
             page_size = 500
 
-            async with aiohttp.ClientSession() as session:
+            async with self._outbound_session() as session:
                 for _ in range(20):  # Max 20 pages = 10,000 apps
                     params = {
                         "$filter": "startsWith(ComponentTypeName,'Apps') and Name ne null",
@@ -463,7 +464,7 @@ class AbacusConnector(BaseConnector):
                 "$orderby": "Count desc",
             }
 
-            async with aiohttp.ClientSession() as session:
+            async with self._outbound_session() as session:
                 async with session.get(
                     url, headers=headers, params=params,
                     timeout=aiohttp.ClientTimeout(total=30)
@@ -496,7 +497,7 @@ class AbacusConnector(BaseConnector):
         skip = 0
         page_size = 1000
 
-        async with aiohttp.ClientSession() as session:
+        async with self._outbound_session() as session:
             for _ in range(10):
                 params = {
                     "$select": "ComponentTypeName",
@@ -795,7 +796,7 @@ class AbacusConnector(BaseConnector):
             page_size = 100
             max_iterations = 100  # Safety limit
 
-            async with aiohttp.ClientSession() as session:
+            async with self._outbound_session() as session:
                 for iteration in range(max_iterations):
                     params = {
                         "$filter": base_filter,
@@ -832,7 +833,8 @@ class AbacusConnector(BaseConnector):
                             # Check for pagination
                             next_link = data.get("@odata.nextLink")
                             if next_link:
-                                url = next_link
+                                # remote-supplied: may only continue on the configured host
+                                url = self._same_origin_link(next_link)
                                 params = {}
                                 skip = 0
                             elif len(raw_caps) < page_size:

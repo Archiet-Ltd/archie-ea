@@ -17,7 +17,6 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
-import aiohttp
 
 from app.services.connector_framework import (
     BaseConnector,
@@ -87,7 +86,7 @@ class JiraALMConnector(BaseConnector):
             headers = self._get_auth_headers()
             url = urljoin(self.config.config["base_url"], "/rest/api/3/myself")
 
-            async with aiohttp.ClientSession() as session:
+            async with self._outbound_session() as session:
                 async with session.get(url, headers=headers) as response:
                     return response.status == 200
 
@@ -150,7 +149,7 @@ class JiraALMConnector(BaseConnector):
         all_issues = []
         start_at = 0
 
-        async with aiohttp.ClientSession() as session:
+        async with self._outbound_session() as session:
             while True:
                 params["startAt"] = start_at
 
@@ -257,7 +256,7 @@ class JiraALMConnector(BaseConnector):
             }
         }
 
-        async with aiohttp.ClientSession() as session:
+        async with self._outbound_session() as session:
             async with session.post(url, headers=headers, json=payload) as response:
                 body = await response.json()
                 if response.status != 201:
@@ -285,7 +284,7 @@ class JiraALMConnector(BaseConnector):
         )
         payload = {"fields": fields_dict}
 
-        async with aiohttp.ClientSession() as session:
+        async with self._outbound_session() as session:
             async with session.put(url, headers=headers, json=payload) as response:
                 if response.status not in (200, 204):
                     body = await response.json()
@@ -308,7 +307,7 @@ class JiraALMConnector(BaseConnector):
             self.config.config["base_url"], f"/rest/api/3/issue/{issue_key}"
         )
 
-        async with aiohttp.ClientSession() as session:
+        async with self._outbound_session() as session:
             async with session.get(url, headers=headers) as response:
                 if response.status != 200:
                     raise JiraAPIError(
@@ -347,7 +346,7 @@ class JiraALMConnector(BaseConnector):
             f"/rest/api/3/issue/createmeta/{project_key}/issuetypes/{issue_type_id}",
         )
 
-        async with aiohttp.ClientSession() as session:
+        async with self._outbound_session() as session:
             async with session.get(url, headers=headers) as response:
                 if response.status != 200:
                     raise JiraAPIError(
@@ -379,7 +378,7 @@ class JiraALMConnector(BaseConnector):
             f"/rest/api/3/project/{project_key}/components",
         )
 
-        async with aiohttp.ClientSession() as session:
+        async with self._outbound_session() as session:
             async with session.get(url, headers=headers) as response:
                 if response.status != 200:
                     raise JiraAPIError(
@@ -414,7 +413,7 @@ class JiraALMConnector(BaseConnector):
             "description": description,
         }
 
-        async with aiohttp.ClientSession() as session:
+        async with self._outbound_session() as session:
             async with session.post(url, headers=headers, json=payload) as response:
                 if response.status != 201:
                     body = await response.json()
@@ -442,7 +441,7 @@ class JiraALMConnector(BaseConnector):
             "outwardIssue": {"key": outward_key},
         }
 
-        async with aiohttp.ClientSession() as session:
+        async with self._outbound_session() as session:
             async with session.post(url, headers=headers, json=payload) as response:
                 if response.status not in (200, 201, 204):
                     body = await response.text()

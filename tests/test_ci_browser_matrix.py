@@ -527,7 +527,7 @@ def test_runner_choice_and_parallelism_contract():
                 "_labels": [],
             },
             ["self-hosted", "ibm-vsi"],
-            "4",
+            4,
         ),
     ]
 
@@ -541,6 +541,57 @@ def test_runner_choice_and_parallelism_contract():
         assert actual_parallel == expected_parallel, (
             f"{name}: expected max-parallel {expected_parallel!r}, "
             f"got {actual_parallel!r}"
+        )
+        assert isinstance(actual_parallel, int) and not isinstance(
+            actual_parallel, bool
+        ), f"{name}: max-parallel must evaluate to a number, got {actual_parallel!r}"
+
+
+def test_max_parallel_is_a_number_for_every_variable_state():
+    """The Actions schema types strategy.max-parallel as a number and does not
+    coerce strings: a raw repository variable yields zero shard jobs."""
+    max_parallel = _strip_expr(_ci_jobs()["tests-shard"]["strategy"]["max-parallel"])
+    repo = "anioko/archie-ea"
+
+    def ctx(value, labels=()):
+        return {
+            "github": {
+                "event_name": "pull_request",
+                "event": {
+                    "pull_request": {"head": {"repo": {"full_name": repo}}}
+                },
+                "repository": repo,
+            },
+            "vars": {
+                "CI_FAST_RUNNER": "runner" if labels else "",
+                "CI_SHARD_RUNNER": "",
+                "CI_SHARD_MAX_PARALLEL": value,
+            },
+            "_labels": list(labels),
+        }
+
+    for name, context, expected in (
+        ("variable unset", ctx(""), 6),
+        ("variable 4", ctx("4"), 4),
+        ("variable 8", ctx("8"), 8),
+        ("ci-fast label wins over the variable", ctx("4", ["ci-fast"]), 8),
+    ):
+        actual = _eval_github_expr(max_parallel, context)
+        assert actual == expected and isinstance(actual, int), (
+            f"{name}: expected number {expected!r}, got {actual!r}"
+        )
+
+
+def test_max_parallel_variable_is_wrapped_in_fromjson():
+    """Using the variable without fromJSON hands the schema a string."""
+    import re
+
+    raw = _ci_jobs()["tests-shard"]["strategy"]["max-parallel"]
+    assert "vars.CI_SHARD_MAX_PARALLEL" in raw
+    for match in re.finditer(r"vars\.CI_SHARD_MAX_PARALLEL", raw):
+        before = raw[: match.start()].rstrip()
+        assert before.endswith("fromJSON("), (
+            "vars.CI_SHARD_MAX_PARALLEL must be wrapped in fromJSON(...)"
         )
 
 
@@ -561,7 +612,7 @@ def test_jobs_skip_on_non_ci_fast_labeled_events():
         "secret-scan", "static-gates", "boot-health", "tests-shard",
         "tests", "db-gates", "security-sast", "smoke",
         "browser-compatibility", "walkthrough", "dependency-audit",
-        "content-page-tests",
+        "content-page-tests", "fast-tests", "quarantine-tests",
     }
     for job_id in gating_jobs:
         job = jobs[job_id]
@@ -746,7 +797,7 @@ def test_detector_gated_jobs_use_cancelled_not_always():
     """A cancelled run must really cancel: no detector-gated job may start its
     condition with always(), which would keep running after a cancellation."""
     gated = _detector_gated_jobs()
-    assert len(gated) == 9
+    assert len(gated) == 11
     for name, job in gated.items():
         expr = _strip_expr(str(job["if"]))
         assert expr.startswith("!cancelled() &&"), name
@@ -765,7 +816,7 @@ def test_heavy_jobs_run_when_the_detector_job_did_not_succeed(changes_result):
     for name, job in gated.items():
         expr = _strip_expr(str(job["if"])).replace("!cancelled()", "1 == 1")
         ran = bool(_eval_github_expr(expr, c))
-        if name == "content-page-tests":
+        if name in ("content-page-tests", "fast-tests"):
             continue
         assert ran, f"{name} must run when the changes job result is {changes_result}"
 
@@ -779,7 +830,7 @@ def test_heavy_jobs_run_when_the_detector_output_is_missing():
         "_labels": [],
     }
     for name, job in gated.items():
-        if name == "content-page-tests":
+        if name in ("content-page-tests", "fast-tests"):
             continue
         expr = _strip_expr(str(job["if"])).replace("!cancelled()", "1 == 1")
         assert bool(_eval_github_expr(expr, c)), f"{name} must run when is_content_only is missing"

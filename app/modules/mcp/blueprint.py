@@ -45,7 +45,13 @@ from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user
 
 from app.extensions import csrf
-from app.modules.mcp.tools import TOOL_REGISTRY
+from app.modules.ai_chat.tools.executor import ToolCall, ToolExecutor
+from app.modules.ai_chat.tools.route_read_tools import (
+    connector_tools,
+    resolve_connector_tool,
+    scrub_credentials,
+)
+from app.modules.oauth_provider.scopes import MCP_READ_SCOPE
 
 logger = logging.getLogger(__name__)
 
@@ -209,22 +215,15 @@ def mcp_endpoint():
         if not current_user.is_authenticated:
             return jsonify(_jsonrpc_error(req_id, JSONRPC_INTERNAL_ERROR,
                                           "Authentication required")), 401
-        tools = []
-        for name, handler in sorted(TOOL_REGISTRY.items()):
-            tools.append({
-                "name": name,
-                "description": handler.description,
-                "inputSchema": handler.input_schema,
-                "annotations": handler.annotations,
-            })
-        return jsonify(_jsonrpc_result(req_id, {"tools": tools}))
+        return jsonify(_jsonrpc_result(req_id, {"tools": connector_tools()}))
 
     if method == "tools/call":
         params = body.get("params", {})
         tool_name = params.get("name", "")
         arguments = params.get("arguments", {})
 
-        if tool_name not in TOOL_REGISTRY:
+        catalogue_name = resolve_connector_tool(tool_name)
+        if catalogue_name is None:
             return jsonify(_jsonrpc_error(req_id, JSONRPC_METHOD_NOT_FOUND,
                                           f"Tool not found: {tool_name}")), 404
 
@@ -235,8 +234,6 @@ def mcp_endpoint():
             return jsonify(_jsonrpc_error(req_id, JSONRPC_INTERNAL_ERROR,
                                           "Authentication required")), 401
 
-        handler = TOOL_REGISTRY[tool_name]
-
         # Scope check -- only meaningful for a bearer-authenticated call: the
         # token's granted scope (set at issue time by
         # oauth_provider.routes._filter_granted_scopes) is the only place a
@@ -246,10 +243,10 @@ def mcp_endpoint():
         if getattr(g, "auth_mode", None) == "bearer":
             bearer_token = getattr(g, "bearer_token", None)
             granted_scopes = set((bearer_token.scope or "").split()) if bearer_token else set()
-            if handler.required_scope not in granted_scopes:
+            if MCP_READ_SCOPE not in granted_scopes:
                 return jsonify(_jsonrpc_error(
                     req_id, JSONRPC_INTERNAL_ERROR,
-                    f"insufficient_scope: this token does not have {handler.required_scope}",
+                    f"insufficient_scope: this token does not have {MCP_READ_SCOPE}",
                 )), 403
 
         # Meter the call
@@ -277,7 +274,10 @@ def mcp_endpoint():
                 return jsonify(_jsonrpc_error(
                     req_id, JSONRPC_INTERNAL_ERROR, "Organisation scope unavailable.",
                 )), 403
-            result = handler.execute(arguments)
+            result = scrub_credentials(ToolExecutor(user_id=user_id).execute(
+                ToolCall(id=f"mcp-{req_id}", name=catalogue_name, arguments=arguments),
+                propagate_errors=True,
+            ))
             elapsed_ms = int((time.monotonic() - start) * 1000)
 
             logger.info(

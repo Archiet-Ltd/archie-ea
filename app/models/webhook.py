@@ -132,7 +132,7 @@ class WebhookDelivery(TenantMixin, db.Model):
             "status": self.status,
             "attempt_count": self.attempt_count,
             "response_status": self.response_status,
-            "response_body": self.response_body,
+            "response_body": None,  # never returned: the remote answer to a subscriber-chosen URL
             "error_message": self.error_message,
             "delivered_at": self.delivered_at.isoformat() if self.delivered_at else None,
             "last_attempt_at": self.last_attempt_at.isoformat() if self.last_attempt_at else None,

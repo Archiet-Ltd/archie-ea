@@ -390,8 +390,13 @@ class ToolExecutor:
             return False
         return bool(user.can(Permission.GENERAL))
 
-    def execute(self, tool_call: ToolCall) -> dict:
+    def execute(self, tool_call: ToolCall, *, propagate_errors: bool = False) -> dict:
         """Dispatch one tool call. THE choke point for every agent write.
+
+        ``propagate_errors`` re-raises a handler's exception (after the rollback)
+        instead of returning its text. The assistant connector sets it so a
+        failing tool answers with its own generic error and never returns
+        exception text, which can carry SQL or another tenant's identifiers.
 
         Every write reaches the database through a handler on this class —
         called here directly for auto-tier tools (AgentRunner._run below) and
@@ -513,6 +518,8 @@ class ToolExecutor:
         except Exception as e:
             db.session.rollback()
             logger.exception("Tool %s failed", tool_call.name)
+            if propagate_errors:
+                raise
             return {"success": False, "error": str(e)}
 
     # ------------------------------------------------------------------ #
@@ -3412,3 +3419,9 @@ def _install_archimate_element_tools() -> int:
 
 
 _ARCHIMATE_TOOLS_INSTALLED = _install_archimate_element_tools()
+
+
+# The connector's route-backed read tools are installed the same way.
+from .route_read_tools import install_route_read_tools  # noqa: E402
+
+_ROUTE_READ_TOOLS_INSTALLED = install_route_read_tools(ToolExecutor)
