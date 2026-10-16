@@ -1262,6 +1262,7 @@ def api_executive_summary():
             "Health Score": None if health_score is None else format_health_score(health_score),
             "Solutions": portfolio.get("solutions"),
             "Applications": portfolio.get("applications"),
+            "Retiring Applications": portfolio.get("retiring_applications"),
             "ArchiMate Elements": portfolio.get("archimate_elements"),
             "Capability Coverage %": cap.get("percentage"),
             "Open Risks": risk.get("total"),
