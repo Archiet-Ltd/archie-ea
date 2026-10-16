@@ -240,3 +240,82 @@ class AdminUserService:
         return True, "Successfully deleted user {}.".format(
             user_name
         )
+
+    @staticmethod
+    def list_org_business_units():
+        """BusinessActors that are organisational units in the current
+        organisation, for the admin "change business unit" picker.
+
+        Scoped to the caller's organisation (admin_required) and to the
+        unit-shaped actor types (Department, Team, Business Unit) — a person
+        is never offered as somewhere a person is assigned.
+        """
+        from app.models.business_layer import BusinessActor
+
+        from app.modules.organization.service import ORGANISATIONAL_UNIT_ACTOR_TYPES
+
+        return (
+            BusinessActor.query.filter(
+                BusinessActor.actor_type.in_(ORGANISATIONAL_UNIT_ACTOR_TYPES)
+            )
+            .order_by(BusinessActor.name)
+            .all()
+        )
+
+    @staticmethod
+    def business_unit_choices():
+        """Choices for the "change business unit" picker: an empty "No unit"
+        entry followed by this organisation's units."""
+        return [("", "No unit")] + [
+            (str(unit.id), unit.name)
+            for unit in AdminUserService.list_org_business_units()
+        ]
+
+    @staticmethod
+    def assign_business_unit_and_describe(user: User, raw_unit_id):
+        """Apply the picker's raw value (a unit id string, or empty for no
+        unit) and return ``(ok, message)`` for the flash line. A refusal
+        carries the reason."""
+        try:
+            AdminUserService.set_user_business_unit(
+                user, int(raw_unit_id) if raw_unit_id else None
+            )
+        except ValueError as exc:
+            return False, str(exc)
+        unit_name = "no unit"
+        if user.business_unit_id is not None:
+            unit_name = next(
+                (
+                    label
+                    for value, label in AdminUserService.business_unit_choices()
+                    if value == str(user.business_unit_id)
+                ),
+                unit_name,
+            )
+        return True, "Business unit for {} successfully changed to {}.".format(
+            user.full_name(), unit_name
+        )
+
+    @staticmethod
+    def set_user_business_unit(user: User, business_unit_id: Optional[int]) -> None:
+        """Assign a user to a unit (or clear it, when ``business_unit_id`` is
+        None — empty means "no unit").
+
+        Refuses a unit that does not belong to the user's organisation: a
+        unit from another organisation can never be assigned here.
+        """
+        from app.models.business_layer import BusinessActor
+
+        if business_unit_id is None:
+            user.business_unit_id = None
+        else:
+            unit = BusinessActor.query.filter_by(
+                id=business_unit_id, organization_id=user.organization_id
+            ).first()
+            if unit is None:
+                raise ValueError(
+                    "That business unit does not belong to this organisation"
+                )
+            user.business_unit_id = unit.id
+        db.session.add(user)
+        db.session.commit()

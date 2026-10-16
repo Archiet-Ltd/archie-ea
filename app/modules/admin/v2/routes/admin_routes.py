@@ -66,6 +66,7 @@ from app.core.decorators import timed_route
 from ...forms.admin_forms import (
     APISettingsForm,
     ChangeAccountTypeForm,
+    ChangeBusinessUnitForm,
     ChangeUserEmailForm,
     FeatureFlagForm,
     InviteUserForm,
@@ -604,6 +605,36 @@ def change_account_type(user_id):
             ),
             "form-success",
         )
+    return render_template("admin/manage_user.html", user=user, form=form)
+
+
+@admin_bp_v2.route("/user/<int:user_id>/change-business-unit", methods=["GET", "POST"])
+@timed_route
+@login_required
+@admin_required
+@audit_log("change_user_business_unit")
+def change_user_business_unit(user_id):
+    """Assign a person to a unit (or clear the assignment).
+
+    The picker offers only the organisational units of the caller's
+    organisation — a unit from another organisation can never be chosen —
+    and the empty choice means "no unit". Same role gate as its neighbouring
+    field-editing routes, including the active-org tenant guard they all
+    carry: an Administrator of their home organisation who holds only a
+    Viewer OrgRole in another organisation cannot reassign that
+    organisation's people."""
+    require_org_or_platform_admin(g.current_org_id)
+    user = _svc.get_user_or_404(user_id)
+    form = ChangeBusinessUnitForm(
+        business_unit_id=str(user.business_unit_id) if user.business_unit_id else ""
+    )
+    form.business_unit_id.choices = _svc.business_unit_choices()
+    if form.validate_on_submit():
+        ok, message = _svc.assign_business_unit_and_describe(
+            user, form.business_unit_id.data
+        )
+        flash(message, "form-success" if ok else "error")
+        return redirect(url_for("admin.user_info", user_id=user_id))
     return render_template("admin/manage_user.html", user=user, form=form)
 
 

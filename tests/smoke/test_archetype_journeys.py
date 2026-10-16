@@ -1063,3 +1063,157 @@ def test_operations_subscribes_to_service_status_and_it_persists(page, live_serv
     assert page.locator("[data-testid=service-status-subscribed]").count() == 1, (
         "the subscription did not persist after reload"
     )
+
+
+def _seed_org_units(org_id, suffix):
+    """Two top-level units, the second with a child, linked as the chart reads them."""
+    from app import create_app, db as _db
+    from app.models.archimate_core import ArchiMateRelationship
+    from app.models.business_layer import BusinessActor
+
+    names = {
+        "head": "HQ %s" % suffix, "ops": "Ops %s" % suffix, "sales": "Sales %s" % suffix,
+    }
+    app = create_app("testing")
+    with app.app_context():
+        head = BusinessActor(name=names["head"], actor_type="Business Unit", organization_id=org_id)
+        ops = BusinessActor(name=names["ops"], actor_type="Department", organization_id=org_id)
+        sales = BusinessActor(name=names["sales"], actor_type="Department", organization_id=org_id)
+        _db.session.add_all([head, ops, sales])
+        _db.session.flush()
+        _db.session.add(ArchiMateRelationship(
+            type="Composition", source_id=head.archimate_element_id,
+            target_id=ops.archimate_element_id, organization_id=org_id))
+        _db.session.commit()
+        names["ids"] = {"head": head.id, "ops": ops.id, "sales": sales.id}
+    return names
+
+
+def _chart_tree(page):
+    """The chart's persisted hierarchy, read from the server: {name: parent name or None}."""
+    payload = page.evaluate(
+        "fetch('/organization/chart/api/data', {credentials: 'include'}).then(r => r.json())")
+    data = payload.get("data", payload)
+    parents = {}
+
+    def walk(node, parent):
+        parents[node["name"]] = parent
+        for child in node.get("children") or []:
+            walk(child, node["name"])
+
+    for root in data.get("roots") or []:
+        walk(root, None)
+    return parents
+
+
+def _open_chart_unit(page, live_server, name):
+    _visit(page, live_server, "/organization/chart")
+    page.locator("g.org-node", has_text=name).first.click()
+    page.get_by_test_id("org-unit-panel").wait_for(state="visible")
+
+
+def test_business_architect_edits_the_org_hierarchy_and_it_persists(page, live_server, seeded):
+    """Business architect: add a child, rename it, move it, then remove it by
+    clicking the real controls; the hierarchy is re-read after every reload."""
+    import uuid
+
+    ref = uuid.uuid4().hex[:5]
+    units = _seed_org_units(seeded["ids"]["org"], ref)
+    _login(page, live_server, seeded["emails"]["business_architect"])
+
+    # Add a child under HQ.
+    _open_chart_unit(page, live_server, units["head"])
+    child = "Team %s" % ref
+    page.get_by_test_id("org-chart-add-child-form").locator("input").fill(child)
+    page.get_by_test_id("org-chart-add-child-form").get_by_role("button", name="Add child").click()
+    page.locator("g.org-node", has_text=child).first.wait_for()
+    _visit(page, live_server, "/organization/chart")
+    assert _chart_tree(page).get(child) == units["head"]
+
+    # Rename it.
+    renamed = "Crew %s" % ref
+    _open_chart_unit(page, live_server, child)
+    page.get_by_test_id("org-chart-rename-form").locator("input").fill(renamed)
+    page.get_by_test_id("org-chart-rename-form").get_by_role("button", name="Rename").click()
+    page.locator("g.org-node", has_text=renamed).first.wait_for()
+    _visit(page, live_server, "/organization/chart")
+    tree = _chart_tree(page)
+    assert renamed in tree and child not in tree
+
+    # The move picker offers neither the unit nor its descendants: HQ's child
+    # "Ops" is offered to the new child, HQ's own descendants are not offered to HQ.
+    _open_chart_unit(page, live_server, units["head"])
+    offered = page.get_by_test_id("org-chart-move-select").locator("option").all_inner_texts()
+    assert units["head"] not in offered
+    assert units["ops"] not in offered and renamed not in offered
+    assert units["sales"] in offered
+
+    # Move the renamed unit under Sales.
+    _open_chart_unit(page, live_server, renamed)
+    page.get_by_test_id("org-chart-move-select").select_option(label=units["sales"])
+    page.get_by_test_id("org-chart-move-form").get_by_role("button", name="Move").click()
+    page.wait_for_timeout(1000)
+    _visit(page, live_server, "/organization/chart")
+    assert _chart_tree(page).get(renamed) == units["sales"]
+
+    # A refusal shows the server's reason: HQ still has a child.
+    _open_chart_unit(page, live_server, units["head"])
+    page.get_by_test_id("org-chart-remove-unit").click()
+    page.get_by_role("button", name="Confirm", exact=True).click()
+    page.get_by_text("still has child units").first.wait_for()
+
+    # Remove the renamed leaf.
+    _open_chart_unit(page, live_server, renamed)
+    page.get_by_test_id("org-chart-remove-unit").click()
+    page.get_by_role("button", name="Confirm", exact=True).click()
+    page.wait_for_timeout(1000)
+    _visit(page, live_server, "/organization/chart")
+    assert renamed not in _chart_tree(page)
+
+
+def test_read_only_account_sees_the_org_chart_without_edit_controls(page, live_server, seeded):
+    """An account without edit rights still reads the chart and is not offered controls."""
+    import uuid
+
+    from app import create_app, db as _db
+    from app.models.user import Role, User
+
+    ref = uuid.uuid4().hex[:5]
+    units = _seed_org_units(seeded["ids"]["org"], ref)
+    email = "smoke.readonly-chart.%s@example.com" % ref
+    app = create_app("testing")
+    with app.app_context():
+        viewer_role = Role.query.filter_by(name="Viewer").first() or Role.query.filter_by(name="User").first()
+        user = User(email=email, first_name="Smoke", last_name="Reader",
+                    organization_id=seeded["ids"]["org"], confirmed=True)
+        user.role = viewer_role
+        user.password = PASSWORD
+        _db.session.add(user)
+        _db.session.commit()
+    _login(page, live_server, email)
+    _open_chart_unit(page, live_server, units["head"])
+    assert page.get_by_test_id("org-chart-add-child-form").count() == 0
+    assert page.get_by_test_id("org-chart-remove-unit").count() == 0
+
+
+def test_platform_admin_assigns_a_person_to_a_unit_and_it_persists(page, live_server, seeded):
+    """Platform admin: pick a unit on a person's edit page, save, reload, see it selected."""
+    import uuid
+
+    ref = uuid.uuid4().hex[:5]
+    units = _seed_org_units(seeded["ids"]["org"], ref)
+    target = seeded["ids"]["solution_architect_user"]
+    _login(page, live_server, seeded["emails"]["platform_admin"])
+
+    path = "/admin/user/%d/change-business-unit" % target
+    _visit(page, live_server, path)
+    page.select_option("select[name='business_unit_id']", label=units["ops"])
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
+        page.get_by_role("button", name="Update business unit").click()
+    page.wait_for_timeout(500)
+    assert units["ops"] in page.inner_text("body")
+
+    _visit(page, live_server, path)
+    selected = page.eval_on_selector(
+        "select[name='business_unit_id']", "el => el.options[el.selectedIndex].text")
+    assert selected == units["ops"]
