@@ -38,7 +38,7 @@ with the picker, and the answer appears as one card per owner:
 
 The list starts with the system's own owners and then adds the owners of the elements it affects,
 walking up to three steps downstream. Each distinct owner appears once. When neither the system nor
-anything it affects has an owner, the page says no ownership is recorded rather than inventing one.
+anything it affects has an owner, the page reads "Ownership data is not yet connected" rather than inventing one.
 
 Two other screens cover the gap side directly. **Capabilities with no owner** lists every capability in
 your organisation with nobody recorded as its owner, with a user search beside each row so you can
@@ -60,7 +60,7 @@ operations who has just lost a long-serving engineer and wants to know what that
 
 1. Open **Ask** and choose the accountability question.
 2. Pick a system. Read the cards: each is an owner with a recorded type, unit and contact.
-3. If the page says no ownership is recorded for that system or anything it affects, you have found a
+3. If the page reads "Ownership data is not yet connected" for that system and anything it affects, you have found a
    gap. Open the application, go to its Ownership section, search for a user, choose Primary, Backup,
    Technical or Business, and click Add owner. Then ask again.
 4. Run the same question for the systems you most depend on, and note any name that keeps appearing
@@ -88,7 +88,7 @@ owner column to the dependencies that make an owner matter.
 
 ### Does Entelim assign an owner when none is recorded?
 
-No. A system with no recorded owner shows no owner card, and the page says no ownership is recorded.
+No. A system with no recorded owner shows no owner card, and the page reads "Ownership data is not yet connected".
 Naming someone by guesswork would hide exactly the gap an auditor asks about.
 
 ### Can it tell me which person is a single point of failure?
