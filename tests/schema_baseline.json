@@ -17564,6 +17564,10 @@
     "has_default": false,
     "nullable": false
    },
+   "organization_id": {
+    "has_default": true,
+    "nullable": false
+   },
    "policy_type": {
     "has_default": true,
     "nullable": false
@@ -17935,6 +17939,10 @@
    "mitigation_status": {
     "has_default": false,
     "nullable": true
+   },
+   "organization_id": {
+    "has_default": true,
+    "nullable": false
    },
    "policy_id": {
     "has_default": false,

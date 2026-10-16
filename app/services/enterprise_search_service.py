@@ -5,6 +5,7 @@ Provides search functionality across capabilities and compliance entities.
 """
 
 from app.models.unified_capability import UnifiedCapability
+from app.middleware.tenant_context import current_org_id
 from app.models.compliance_models import CompliancePolicy, ComplianceViolation
 
 
@@ -53,11 +54,17 @@ class EnterpriseSearchService:
             ]
             results["total"] += cap_total
 
+        # Policies and violations belong to an organisation; with no active
+        # organisation nothing is searched.
+        org_id = current_org_id()
+        compliance = entity_type in ("all", "compliance") and org_id is not None
+
         # Search policies
-        if entity_type in ("all", "compliance"):
+        if compliance:
             policy_query = CompliancePolicy.query.filter(
+                CompliancePolicy.organization_id == org_id,
                 (CompliancePolicy.name.ilike(f"%{query}%"))
-                | (CompliancePolicy.description.ilike(f"%{query}%"))
+                | (CompliancePolicy.description.ilike(f"%{query}%")),
             )
             policy_total = policy_query.count()
             policies = policy_query.limit(per_page).offset((page - 1) * per_page).all()
@@ -72,9 +79,10 @@ class EnterpriseSearchService:
             results["total"] += policy_total
 
         # Search violations
-        if entity_type in ("all", "compliance"):
+        if compliance:
             violation_query = ComplianceViolation.query.filter(
-                ComplianceViolation.description.ilike(f"%{query}%")
+                ComplianceViolation.organization_id == org_id,
+                ComplianceViolation.description.ilike(f"%{query}%"),
             )
             violation_total = violation_query.count()
             violations = violation_query.limit(per_page).offset((page - 1) * per_page).all()

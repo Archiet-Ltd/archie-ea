@@ -166,7 +166,7 @@ def test_init_db_then_schema_upgrade_builds_and_fences_the_tables(deployed):
     engine = create_engine(url)
     try:
         assert _present(engine) == [True] * len(ADM_TABLES)
-        assert SCHEMA._recorded(url) == [RLS_REVISION], output
+        assert SCHEMA._recorded(url) == _script().get_heads(), output
         for table in FENCED_TABLES:
             names, enabled = _policies(engine, table)
             assert enabled and names == POLICIES, table
@@ -229,15 +229,22 @@ def test_revision_builds_the_shape_create_all_builds_and_refences(deployed):
         engine.dispose()
 
 
-def test_revision_chain_is_linear_and_ends_at_the_fencing_revision():
+def _script():
     from alembic.config import Config
     from alembic.script import ScriptDirectory
 
     directory = REPO / "migrations"
     config = Config(str(directory / "alembic.ini"))
     config.set_main_option("script_location", str(directory))
-    script = ScriptDirectory.from_config(config)
-    assert script.get_heads() == [RLS_REVISION]
+    return ScriptDirectory.from_config(config)
+
+
+def test_revision_chain_is_linear_and_contains_the_fencing_revision():
+    script = _script()
+    heads = script.get_heads()
+    assert len(heads) == 1
+    # Later revisions may sit on top; the fencing revision stays in the chain.
+    assert RLS_REVISION in {r.revision for r in script.walk_revisions(base="base", head=heads[0])}
     assert script.get_revision(RLS_REVISION).down_revision == TABLES_REVISION
     assert script.get_revision(TABLES_REVISION).down_revision == PARENT_REVISION
 

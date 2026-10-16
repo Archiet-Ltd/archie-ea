@@ -16,6 +16,7 @@ from datetime import datetime
 
 from app import db
 
+from .mixins import TenantMixin
 from .relationship_tables import capability_compliance_requirements
 
 # ============================================================================
@@ -531,7 +532,7 @@ class ComplianceGap(db.Model):
 # ============================================================================
 
 
-class CompliancePolicy(db.Model):
+class CompliancePolicy(TenantMixin, db.Model):
     """
     Compliance policy definition for organizational compliance tracking.
 
@@ -544,7 +545,7 @@ class CompliancePolicy(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     # Policy identification
-    name = db.Column(db.String(200), nullable=False, unique=True)
+    name = db.Column(db.String(200), nullable=False)
     policy_type = db.Column(
         db.String(50), nullable=False, default="NIST"
     )  # NIST, CIS, ISO, SOX, HIPAA, GDPR, PCI-DSS, COBIT
@@ -564,6 +565,11 @@ class CompliancePolicy(db.Model):
 
     # Relationships
     violations = db.relationship("ComplianceViolation", backref="policy", cascade="all, delete-orphan")
+
+    # A policy name is unique within an organisation, not across the platform.
+    __table_args__ = (
+        db.UniqueConstraint("organization_id", "name", name="uq_compliance_policies_org_name"),
+    )
 
     def __repr__(self):
         return f"<CompliancePolicy {self.name} ({self.policy_type})>"
@@ -585,7 +591,7 @@ class CompliancePolicy(db.Model):
         }
 
 
-class ComplianceViolation(db.Model):
+class ComplianceViolation(TenantMixin, db.Model):
     """
     Compliance violation tracking and remediation management.
 

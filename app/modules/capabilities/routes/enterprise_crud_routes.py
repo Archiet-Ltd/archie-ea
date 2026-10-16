@@ -10,6 +10,7 @@ Provides full CRUD operations with RBAC enforcement and audit logging.
 
 import logging
 from flask import Blueprint, abort, jsonify, render_template, request
+from werkzeug.exceptions import NotFound
 from flask_login import current_user, login_required
 
 from app import db
@@ -20,11 +21,24 @@ from app.models.compliance_models import CompliancePolicy, ComplianceViolation
 from app.services.enterprise_validation_service import EnterpriseValidationService
 from app.services.enterprise_audit_log import EnterpriseAuditLog
 from app.services.enterprise_search_service import EnterpriseSearchService
+from app.middleware.tenant_context import current_org_id
 from app.utils.pagination import safe_int_arg
+from app.utils.route_guards import require_entity_in_active_org
 
 logger = logging.getLogger(__name__)
 
 enterprise_crud_bp = Blueprint("enterprise_crud", __name__, url_prefix="/enterprise")
+
+
+def _no_active_organisation():
+    """Answer for a write when the caller's active organisation is unknown."""
+    return jsonify({"success": False, "error": "No active organisation"}), 403
+
+
+def _empty_page(key, page):
+    return jsonify(
+        {"success": True, "data": {key: [], "total": 0, "pages": 0, "current_page": page}}
+    )
 
 
 # ============================================================================
@@ -459,10 +473,14 @@ def delete_capability(capability_id):
 def compliance_dashboard():
     """Get compliance dashboard with statistics."""
     try:
-        total_policies = CompliancePolicy.query.count()
-        total_violations = ComplianceViolation.query.count()
-        critical_violations = ComplianceViolation.query.filter_by(severity="Critical").count()
-        open_violations = ComplianceViolation.query.filter_by(status="Open").count()
+        org_id = current_org_id()
+        violations = ComplianceViolation.query.filter(ComplianceViolation.organization_id == org_id)
+        total_policies = CompliancePolicy.query.filter(
+            CompliancePolicy.organization_id == org_id
+        ).count()
+        total_violations = violations.count()
+        critical_violations = violations.filter(ComplianceViolation.severity == "Critical").count()
+        open_violations = violations.filter(ComplianceViolation.status == "Open").count()
 
         return jsonify(
             {
@@ -490,7 +508,10 @@ def list_compliance_policies():
         per_page = safe_int_arg('per_page', 20, minimum=1, maximum=500)
         filter_type = request.args.get("type", "", type=str)
 
-        query = CompliancePolicy.query
+        org_id = current_org_id()
+        if org_id is None:
+            return _empty_page("policies", page)
+        query = CompliancePolicy.query.filter(CompliancePolicy.organization_id == org_id)
 
         if filter_type:
             query = query.filter(CompliancePolicy.policy_type == filter_type)
@@ -520,6 +541,9 @@ def list_compliance_policies():
 def create_compliance_policy():
     """Create a new compliance policy."""
     try:
+        org_id = current_org_id()
+        if org_id is None:
+            return _no_active_organisation()
         data = request.get_json() or {}
 
         # Validate input
@@ -531,7 +555,9 @@ def create_compliance_policy():
             )
 
         # Check for duplicate
-        existing = CompliancePolicy.query.filter_by(name=data["name"]).first()
+        existing = CompliancePolicy.query.filter_by(
+            name=data["name"], organization_id=org_id
+        ).first()
         if existing:
             return (
                 jsonify({"success": False, "error": "Policy with this name already exists"}),
@@ -540,6 +566,7 @@ def create_compliance_policy():
 
         # Create policy
         policy = CompliancePolicy(
+            organization_id=org_id,
             name=data["name"],
             policy_type=data.get("type", "NIST"),
             description=data.get("description", ""),
@@ -574,7 +601,10 @@ def list_compliance_violations():
         filter_severity = request.args.get("severity", "", type=str)
         filter_status = request.args.get("status", "", type=str)
 
-        query = ComplianceViolation.query
+        org_id = current_org_id()
+        if org_id is None:
+            return _empty_page("violations", page)
+        query = ComplianceViolation.query.filter(ComplianceViolation.organization_id == org_id)
 
         if filter_severity:
             query = query.filter(ComplianceViolation.severity == filter_severity)
@@ -608,6 +638,9 @@ def list_compliance_violations():
 def create_compliance_violation():
     """Log a new compliance violation."""
     try:
+        org_id = current_org_id()
+        if org_id is None:
+            return _no_active_organisation()
         data = request.get_json() or {}
 
         # Validate input
@@ -619,12 +652,15 @@ def create_compliance_violation():
             )
 
         # Verify policy exists
-        policy = CompliancePolicy.query.get(data["policy_id"])
+        policy = CompliancePolicy.query.filter(
+            CompliancePolicy.id == data["policy_id"], CompliancePolicy.organization_id == org_id
+        ).first()
         if not policy:
             return jsonify({"success": False, "error": "Policy not found"}), 404
 
         # Create violation
         violation = ComplianceViolation(
+            organization_id=org_id,
             policy_id=data["policy_id"],
             severity=data.get("severity", "Medium"),
             description=data.get("description", ""),
@@ -656,8 +692,9 @@ def create_compliance_violation():
 def update_compliance_violation(violation_id):
     """Update compliance violation status."""
     try:
-        violation = ComplianceViolation.query.get(violation_id)
-        if not violation:
+        try:
+            violation = require_entity_in_active_org(ComplianceViolation, violation_id)
+        except NotFound:
             return jsonify({"success": False, "error": "Violation not found"}), 404
 
         data = request.get_json() or {}
@@ -707,8 +744,9 @@ def update_compliance_violation(violation_id):
 def delete_compliance_violation(violation_id):
     """Delete a compliance violation."""
     try:
-        violation = ComplianceViolation.query.get(violation_id)
-        if not violation:
+        try:
+            violation = require_entity_in_active_org(ComplianceViolation, violation_id)
+        except NotFound:
             return jsonify({"success": False, "error": "Violation not found"}), 404
 
         db.session.delete(violation)
