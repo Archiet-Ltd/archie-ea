@@ -29,6 +29,7 @@ from app.modules.compliance.services.control_evidence import (
     INEFFECTIVE,
     control_effectiveness,
     evidence_state,
+    evidence_url_recorded,
     latest_tests_by_kind,
     naive_utc,
 )
@@ -217,7 +218,7 @@ def evidence_gaps(organization_id: Optional[int], as_of: Optional[datetime] = No
                 None if exposure.get(key) is not None and not partial
                 else exposure_reason.get(key) or (REASON_PARTIAL if exposure.get(key) is not None else None)
             ),
-            "evidence": mapping.evidence_url.strip() if (mapping.evidence_url or "").strip() else DASH,
+            "evidence": mapping.evidence_url.strip() if evidence_url_recorded(mapping) else DASH,
             "provenance": {
                 "source": mapping.evidence_source,
                 "who": _full_name(users.get(mapping.evidence_owner_id)),

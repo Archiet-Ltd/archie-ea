@@ -222,11 +222,17 @@ def _own_mapping(mapping_id):
     ).scalar_one_or_none()
 
 
-def _parse_moment(raw):
-    """A date (YYYY-MM-DD) or an ISO date-time as naive UTC; ValueError when it is neither."""
+def _parse_moment(raw, *, end_of_day=False):
+    """A date (YYYY-MM-DD) or an ISO date-time as naive UTC; ValueError when it is neither.
+    With ``end_of_day`` a bare date means the end of that day, so "valid until 30 June"
+    holds through 30 June."""
     if not isinstance(raw, str) or not raw.strip():
         raise ValueError("a date is required")
-    return naive_utc(datetime.fromisoformat(raw.strip()))
+    text = raw.strip()
+    moment = naive_utc(datetime.fromisoformat(text))
+    if end_of_day and len(text) == 10:
+        moment = moment.replace(hour=23, minute=59, second=59)
+    return moment
 
 
 def _full_name(user):
@@ -267,7 +273,9 @@ def update_compliance_mapping(mapping_id):
         if "evidence_valid_until" in data:
             raw = data["evidence_valid_until"]
             changes["evidence_valid_until"] = (
-                None if raw is None or (isinstance(raw, str) and not raw.strip()) else _parse_moment(raw)
+                None
+                if raw is None or (isinstance(raw, str) and not raw.strip())
+                else _parse_moment(raw, end_of_day=True)
             )
         if "evidence_owner_id" in data:
             raw = data["evidence_owner_id"]

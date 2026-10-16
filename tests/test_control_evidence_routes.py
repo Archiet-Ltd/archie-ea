@@ -201,7 +201,7 @@ def test_evidence_validity_and_owner_are_saved_through_the_existing_writer(
     assert saved.status_code == 200, saved.get_data(as_text=True)
     db_session.expire_all()
     assert world.row_a.evidence_url == "https://e.example/policy"
-    assert world.row_a.evidence_valid_until == datetime(2027, 6, 30)
+    assert world.row_a.evidence_valid_until == datetime(2027, 6, 30, 23, 59, 59), "a bare date holds through that day"
     assert world.row_a.evidence_source == "person"
     assert world.row_a.evidence_collected_at is not None
     assert world.row_a.evidence_owner_id == world.user_a2.id
