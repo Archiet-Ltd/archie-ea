@@ -23,7 +23,7 @@ def _seed_expired_control(org_id):
     app = create_app("testing")
     code = "EG-%s" % uuid.uuid4().hex[:5].upper()
     with app.app_context():
-        framework = RegulatoryFramework(code="EG%s" % uuid.uuid4().hex[:5], name="Evidence framework", category="security")
+        framework = RegulatoryFramework(code="EG%s" % uuid.uuid4().hex[:5], name="Evidence framework %s" % code, category="security")
         component = ApplicationComponent(name="Evidence ledger %s" % code, organization_id=org_id)
         db.session.add_all([framework, component])
         db.session.flush()
@@ -79,6 +79,10 @@ def test_the_officer_sees_the_gap_records_a_test_assigns_an_owner_and_both_persi
     expect(row).to_be_visible()
     expect(row).to_contain_text(expired_control["code"])
     expect(row).to_contain_text("Expired")
+
+    # The framework rows on the same page expand to their controls.
+    page.get_by_role("button", name="Show controls for Evidence framework %s" % expired_control["code"]).click()
+    expect(page.locator("td[colspan='7'] table").get_by_text(expired_control["code"])).to_be_visible()
 
     row.get_by_role("button", name="Record test").click()
     panel = page.locator('[data-testid="evidence-action-panel"]')
