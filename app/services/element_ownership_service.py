@@ -78,14 +78,16 @@ def set_element_owner(
     owner = User.query.filter_by(id=user_id, organization_id=organization_id).first()
     if owner is None:
         raise CrossOrganisationElementOwner("That user does not belong to this organisation.")
+    if not owner.is_active:
+        raise CrossOrganisationElementOwner("That user is deactivated.")
 
-    existing = ApplicationOwner.query.filter_by(
+    existing = ApplicationOwner.find_duplicate(
+        user_id,
+        ownership_type,
+        organization_id,
         element_type=element_type,
         element_id=element_id,
-        user_id=user_id,
-        ownership_type=ownership_type,
-        organization_id=organization_id,
-    ).first()
+    )
     if existing is not None:
         return existing
 

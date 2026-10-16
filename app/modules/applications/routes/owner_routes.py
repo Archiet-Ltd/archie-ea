@@ -27,16 +27,14 @@ from ._helpers import _verify_app_in_org
 
 logger = logging.getLogger(__name__)
 def _duplicate_owner(app_id: int, user_id: int, ownership_type: str, org_id: int, exclude_owner_id: int | None = None):
-    """Return an existing owner row with the same user and type, if any."""
-    query = ApplicationOwner.query.filter(
-        ApplicationOwner.application_id == app_id,
-        ApplicationOwner.user_id == user_id,
-        ApplicationOwner.ownership_type == ownership_type,
-        ApplicationOwner.organization_id == org_id,
+    """Return an existing owner row with the same user and type, if any.
+
+    The rule itself lives on the model (``ApplicationOwner.find_duplicate``),
+    shared with the leaver transfer."""
+    return ApplicationOwner.find_duplicate(
+        user_id, ownership_type, org_id,
+        application_id=app_id, exclude_owner_id=exclude_owner_id,
     )
-    if exclude_owner_id is not None:
-        query = query.filter(ApplicationOwner.id != exclude_owner_id)
-    return query.first()
 
 
 @unified_applications_bp.route("/<int:app_id>/owners", methods=["POST"])
@@ -70,7 +68,7 @@ def add_owner(app_id: int):
         }), 400
 
     user = user_in_org(user_id, org_id)
-    if user is None:
+    if user is None or not user.is_active:
         return jsonify({
             "success": False,
             "error": "User not found in your organisation",

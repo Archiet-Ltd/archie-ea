@@ -129,6 +129,10 @@ POLICY = {
     # no ordinary persona role carries; only the administrator can buy, change
     # or cancel the organisation's plan.
     "/admin/billing/":         set(),
+    # Leaver transfer list. Gated by admin_required, which no ordinary
+    # persona role carries; only an administrator hands a departed user's
+    # ownerships to someone else.
+    "/admin/leavers":          set(),
     # Interface Register (SAP S/4HANA Interface Register, Task 02): gated by
     # can_access_section(current_user, "data_integration") -- the same
     # section-based predicate the sidebar uses, not a requires_role()-style

@@ -113,7 +113,11 @@ def login():
             _landing = buy_intent.next_candidate(consume=True)
             session.clear()
             session.modified = True
-            _svc.login(user, form.remember_me.data)
+            if not _svc.login(user, form.remember_me.data):
+                from app.services.session_registry import INACTIVE_ACCOUNT_MESSAGE
+
+                flash(INACTIVE_ACCOUNT_MESSAGE, "form-error")
+                return redirect(url_for("account.login"))
             session.permanent = True
             try:
                 audit_logger.log_authentication(success=True)
@@ -177,7 +181,11 @@ def _complete_login_after_mfa(user):
 
     session.clear()
     session.modified = True
-    _svc.login(user, remember)
+    if not _svc.login(user, remember):
+        from app.services.session_registry import INACTIVE_ACCOUNT_MESSAGE
+
+        flash(INACTIVE_ACCOUNT_MESSAGE, "form-error")
+        return redirect(url_for("account.login"))
     session.permanent = True
     try:
         audit_logger.log_authentication(success=True)
@@ -617,15 +625,17 @@ def sso_callback(provider):
 
     from app import db
     from app.models import User
-    from app.services import session_registry
+    from app.services import mfa_service, session_registry
 
     # external_id is derived per-provider: Azure uses a tenant-qualified
     # oid+tid composite rather than the raw `sub` claim (see
     # app/auth/sso.py); Okta keeps using `sub`.
     from app.auth.sso import (
+        create_sso_user,
         external_id_for,
         find_linked_user,
         sso_email_claim_is_trusted_for,
+        sso_pair_belongs_to_other_subject,
     )
 
     email = userinfo.get("email")
@@ -643,7 +653,26 @@ def sso_callback(provider):
     # unaffected by the email-claim trust checks below, exactly like
     # account_routes.py v1's sso_callback. Previously this route had no
     # subject-based lookup at all and re-resolved by email on every login.
-    user = find_linked_user(provider, userinfo, User) if external_id else None
+    user = find_linked_user(provider, userinfo, User, migrate=False) if external_id else None
+    if user is not None and not user.is_active:
+        # Refused before anything is written: no legacy-link migration and
+        # no audit row that touches the user.
+        flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
+        return redirect(url_for("account.login"))
+    if user is not None:
+        user = find_linked_user(provider, userinfo, User)
+    if user is not None and User.normalize_email(email) != User.normalize_email(user.email):
+        # Subject match, but the IdP's current email claim no longer
+        # matches the stored address -- informational (the subject anchor
+        # already proved identity above, so this never blocks sign-in),
+        # but worth a record: never the addresses themselves.
+        from app.services import auth_audit
+
+        try:
+            auth_audit.record_sso_email_mismatch(user.organization_id, user, provider)
+        except Exception as _exc:
+            _log.warning("Audit log failed on SSO email-mismatch record: %s", _exc)
+    pending_link = False
     if user is None:
         candidate = User.find_by_email(email)
         if candidate is not None:
@@ -664,20 +693,41 @@ def sso_callback(provider):
                 except Exception:
                     _log.warning("Audit log failed on SSO refusal for %s", provider)
                 return redirect(url_for("account.login"))
-            if external_id:
-                candidate.external_id = external_id
-                candidate.sso_provider = provider
+            # A trusted email match never replaces a pair this account is
+            # already linked to: a different stored subject is refused, and
+            # only a still-unlinked account gets a pair written (below,
+            # after the deactivation check).
+            if sso_pair_belongs_to_other_subject(candidate, provider, external_id):
+                flash(
+                    "SSO sign-in could not be completed. This account is "
+                    "linked to a different sign-in.",
+                    "error",
+                )
+                try:
+                    audit_logger.log_authentication(success=False, method=f"sso:{provider}")
+                except Exception as _exc:
+                    _log.warning("Audit log failed on SSO refusal: %s", _exc)
+                return redirect(url_for("account.login"))
+            pending_link = external_id and not candidate.external_id
             user = candidate
         else:
-            user = User(
+            user = create_sso_user(
                 email=email,
                 first_name=userinfo.get("given_name", ""),
                 last_name=userinfo.get("family_name", ""),
                 external_id=external_id or None,
                 sso_provider=provider if external_id else None,
-                confirmed=True,
             )
             db.session.add(user)
+
+    # A deactivated user is refused before anything is written or committed.
+    if not user.is_active:
+        db.session.rollback()
+        flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
+        return redirect(url_for("account.login"))
+    if pending_link:
+        user.external_id = external_id
+        user.sso_provider = provider
 
     # Commit unconditionally: find_linked_user may have migrated a
     # pre-fix Azure link's external_id to the new oid+tid composite even
@@ -703,15 +753,15 @@ def sso_callback(provider):
     # explicitly -- USE_ACCOUNT_GUARDRAILS chooses which of the two is
     # registered, so whichever is live stays internally consistent between
     # its own MFA and non-MFA paths.
-    from app.services import mfa_service
-
     if mfa_service.required_for(user):
         session["_mfa_pending_user_id"] = user.id
         session["_mfa_pending_remember"] = False
         session["_mfa_pending_next"] = ""
         return redirect(url_for("account.mfa_challenge"))
 
-    session_registry.login_and_register(user)
+    if not session_registry.login_and_register(user):
+        flash(session_registry.INACTIVE_ACCOUNT_MESSAGE, "error")
+        return redirect(url_for("account.login"))
     # Pre-existing bug, fixed here because it blocked verifying this file's
     # own SSO success path: AuditLogger has no `log()` method (only
     # log_event/log_authentication/...), so this line raised AttributeError

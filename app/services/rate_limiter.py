@@ -169,11 +169,41 @@ class RateLimiter:
 _rate_limiter = RateLimiter()
 
 
+_UNIT_NAMES = {1: "second", 60: "minute", 3600: "hour", 86400: "day"}
+
+
+def _check_shared(key: str, limit: int, window_seconds: int) -> tuple[Optional[bool], Optional[int]]:
+    """Count one hit in the Flask-Limiter storage.
+
+    Returns ``(allowed, retry_after)``, or ``(None, None)`` when the limiter is
+    not installed so the caller falls back to the per-process bucket.
+    """
+    from app._bootstrap import rate_limiting
+
+    installed = rate_limiting.limiter
+    strategy = getattr(installed, "limiter", None) if installed is not None else None
+    if strategy is None:
+        return None, None
+    from limits import RateLimitItemPerSecond, parse
+
+    unit = _UNIT_NAMES.get(window_seconds)
+    item = parse(f"{limit} per {unit}") if unit else RateLimitItemPerSecond(limit, window_seconds)
+    try:
+        if strategy.hit(item, "app-rate-limit", key):
+            return True, None
+        stats = strategy.get_window_stats(item, "app-rate-limit", key)
+    except Exception as exc:  # storage down: degrade to the per-process bucket
+        logger.warning("Shared rate-limit storage failed (%s); using the process bucket", exc)
+        return None, None
+    return False, max(1, int(stats.reset_time - time.time()) + 1)
+
+
 def rate_limit(
     limit: int,
     window: str,
     key_func: Callable = None,
     methods: Optional[tuple[str, ...] | list[str]] = None,
+    shared: bool = False,
 ):
     """
     Decorator to rate limit endpoints.
@@ -183,6 +213,10 @@ def rate_limit(
         window: Time window ('1h', '1m', '1d')
         key_func: Optional function to generate rate limit key
                  (defaults to user_id or IP address)
+        shared: count in the Flask-Limiter storage (Redis when configured, so
+                the count is shared by every worker) instead of the
+                per-process bucket. Falls back to the bucket when the
+                limiter is not installed.
 
     Example:
         @rate_limit(10, '1h')  # 10 requests per hour
@@ -220,7 +254,11 @@ def rate_limit(
                 key = f"ip:{request.remote_addr}:{endpoint}"
 
             # Check rate limit
-            allowed, retry_after = _rate_limiter.check_rate_limit(key, limit, window_seconds)
+            allowed, retry_after = None, None
+            if shared:
+                allowed, retry_after = _check_shared(key, limit, window_seconds)
+            if allowed is None:
+                allowed, retry_after = _rate_limiter.check_rate_limit(key, limit, window_seconds)
 
             if not allowed:
                 logger.warning(f"Rate limit exceeded for {key}: {limit}/{window}")

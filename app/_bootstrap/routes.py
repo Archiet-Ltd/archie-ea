@@ -483,6 +483,14 @@ def _register_api_auth(app, csrf):
                 {"success": False, "error": "Invalid email or password"}
             ), 401
 
+        # Decide before anything touches the session: a deactivated account is
+        # answered exactly like a wrong password, with no cookie difference.
+        if not user.is_active:
+            app.logger.info("api login refused for deactivated user %s", user.id)
+            return jsonify(
+                {"success": False, "error": "Invalid email or password"}
+            ), 401
+
         # CRITICAL fix: an administrator with MFA required must never get a
         # real session from a password alone. This endpoint is a pure JSON
         # API with no API-based TOTP-code submission step (out of scope to
@@ -500,7 +508,13 @@ def _register_api_auth(app, csrf):
             ), 401
 
         # Fix Session Fixation: Regenerate session ID after successful authentication
-        session_registry.login_and_register(user, remember=remember_me)
+        if not session_registry.login_and_register(user, remember=remember_me):
+            # Deactivated: answered exactly like a wrong password, so the
+            # right password cannot be confirmed for a leaver's account.
+            app.logger.info("api login refused for deactivated user %s", user.id)
+            return jsonify(
+                {"success": False, "error": "Invalid email or password"}
+            ), 401
 
         return (
             jsonify(
