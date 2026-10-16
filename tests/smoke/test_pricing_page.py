@@ -33,12 +33,12 @@ def test_each_plan_card_holds_its_price_and_its_buy_button(browser, live_server)
             expect(card).to_be_visible(timeout=PAGE_TIMEOUT)
             expect(card.locator(".pp-price")).to_contain_text(price)
             expect(card.get_by_test_id(button)).to_be_visible()
-            # Large numeral (40-48px) and a 44px / 8px button, per the review's spec.
+            # Large numeral (40-48px) and the shared public button (40px, radius + 4px).
             size = card.locator(".pp-price").evaluate("e => parseFloat(getComputedStyle(e).fontSize)")
             assert 40 <= size <= 48, f"{key} price numeral is {size}px"
             box = card.get_by_test_id(button).evaluate(
                 "e => { const s = getComputedStyle(e); return [e.getBoundingClientRect().height, s.borderRadius]; }")
-            assert box == [44, "8px"], f"{key} button is {box}"
+            assert box == [40, "14px"], f"{key} button is {box}"
         # Four across at desktop width.
         tops = {page.get_by_test_id(f"plan-card-{k}").bounding_box()["y"]
                 for k in ("community", "startup", "team", "enterprise")}

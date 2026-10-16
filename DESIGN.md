@@ -131,10 +131,15 @@ the reference home-page value named in its comment: `.public-btn--lg` / `--prima
 500, radius `--radius` + 4px, 3px focus ring), `.home-display` (72/72, 700, -0.025em; 60 and 48 below),
 `.home-lead` (20/32, 18/32 on phones, 48rem), `.home-section` (80px block padding, 1px border-colour divider, 1px
 rails from 640px), `.home-eyebrow` (mono 12/16, 0.2em), `.home-h2` (48/48, 30/36 on phones, 600),
-`.home-section-lead` (18/32), `.home-card` (16px radius, 1px border, 28px padding) with `.home-card-title` (24/32, 600),
-`.home-card-body` (14/24) and `.home-card-eyebrow`, `.home-link` (underline, 4px offset), `.home-emphasis-list` and
-`.home-note` (2px left rules), `.home-stepper`, `.home-table` (16px cells, 48rem minimum), `.home-faq`
-(divider-separated, rotating chevron) and `.home-closing` (96px, centred). New marketing pages use these classes
+`.home-section-lead` (18/32), `.public-card` (16px radius, 1px border, 28px padding) with `.public-card-title` (24/32, 600),
+`.public-card-body` (14/24) and `.public-card-eyebrow`, `.public-link` (underline, 4px offset), `.home-emphasis-list` and
+`.home-note` (2px left rules), `.public-stepper`, `.public-table` (16px cells, 48rem minimum), `.public-faq`
+(divider-separated, rotating chevron) and `.home-closing` (96px, centred). `.public-btn`, `.public-card`,
+`.public-table`, `.public-faq` and `.public-stepper` are the public site's one button, card, table, FAQ and stepper,
+used by `/` and `/pricing` and registered in `docs/reuse-register.yml`; the authenticated app's equivalents are the
+`components/button.html`, `card.html`, `table.html` and `stepper.html` macros, and neither side defines a copy of the
+other. The FAQ chevron is the `faq_chevron` macro in `components/public_faq.html`. A page adds only layout to these
+classes (the pricing page's plan-card columns and sticky comparison header). New marketing pages use these classes
 rather than defining their own. The product window is shown at its captured CSS width (the `<img>` keeps its
 width attribute; never set `width: auto` on it).
 

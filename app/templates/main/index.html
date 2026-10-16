@@ -1,4 +1,4 @@
-{% extends 'layouts/public_base.html' %}{% from 'components/badge.html' import badge %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
+{% extends 'layouts/public_base.html' %}{% from 'components/badge.html' import badge %}{% from 'components/public_faq.html' import faq_chevron %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
 {% block full_title %}Entelim — The Company Brain for every enterprise{% endblock %}
 {% block meta_description %}
 <link rel="canonical" href="https://entelim.org/">
@@ -77,7 +77,7 @@
                width="1280" height="800" decoding="async" fetchpriority="high" class="home-frame__img">
         </picture>
       </div>
-      <figcaption class="home-card-body mt-3 text-center">
+      <figcaption class="public-card-body mt-3 text-center">
         The application portfolio of the demonstration company, as Entelim shows it.
       </figcaption>
     </figure>
@@ -147,21 +147,21 @@
       </p>
     </div>
     <div class="mt-12 grid gap-6 sm:grid-cols-2">
-      <div class="home-card" data-testid="home-proof-what-breaks">
-        <h3 class="home-card-title">What breaks if this fails?</h3>
-        <p class="home-card-body">Everything that depends on it, across every layer, cited back to the record it came from.</p>
+      <div class="public-card" data-testid="home-proof-what-breaks">
+        <h3 class="public-card-title">What breaks if this fails?</h3>
+        <p class="public-card-body">Everything that depends on it, across every layer, cited back to the record it came from.</p>
       </div>
-      <div class="home-card" data-testid="home-proof-strategy">
-        <h3 class="home-card-title">Which strategy does it serve?</h3>
-        <p class="home-card-body">The goals and value streams this element carries, traced back to the motivation model.</p>
+      <div class="public-card" data-testid="home-proof-strategy">
+        <h3 class="public-card-title">Which strategy does it serve?</h3>
+        <p class="public-card-body">The goals and value streams this element carries, traced back to the motivation model.</p>
       </div>
-      <div class="home-card" data-testid="home-proof-programmes">
-        <h3 class="home-card-title">Which programmes touch it?</h3>
-        <p class="home-card-body">Every gap, roadmap and work package that changes it, in the same model as the estate it changes.</p>
+      <div class="public-card" data-testid="home-proof-programmes">
+        <h3 class="public-card-title">Which programmes touch it?</h3>
+        <p class="public-card-body">Every gap, roadmap and work package that changes it, in the same model as the estate it changes.</p>
       </div>
-      <div class="home-card" data-testid="home-proof-risk">
-        <h3 class="home-card-title">Which risks reach it?</h3>
-        <p class="home-card-body">Every recorded risk on the path to this element, not only the risk written directly on it.</p>
+      <div class="public-card" data-testid="home-proof-risk">
+        <h3 class="public-card-title">Which risks reach it?</h3>
+        <p class="public-card-body">Every recorded risk on the path to this element, not only the risk written directly on it.</p>
       </div>
     </div>
     <div class="mt-8">
@@ -184,59 +184,59 @@
     </div>
 
     <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      <div class="home-card">
-        <h3 class="home-card-title">Set direction</h3>
-        <p class="home-card-body">Where are we going, and is the money following the plan?</p>
-        <ul class="home-card-body mt-6 space-y-2">
-          <li><a href="/features#strategy-management" class="home-link text-foreground">Strategy Management</a></li>
-          <li><a href="/features#portfolio-management" class="home-link text-foreground">Portfolio Management</a></li>
-          <li><a href="/features#transformation-management" class="home-link text-foreground">Transformation Management</a></li>
-          <li><a href="/features#investment-and-financial-management" class="home-link text-foreground">Investment and Financial Management</a></li>
+      <div class="public-card">
+        <h3 class="public-card-title">Set direction</h3>
+        <p class="public-card-body">Where are we going, and is the money following the plan?</p>
+        <ul class="public-card-body mt-6 space-y-2">
+          <li><a href="/features#strategy-management" class="public-link text-foreground">Strategy Management</a></li>
+          <li><a href="/features#portfolio-management" class="public-link text-foreground">Portfolio Management</a></li>
+          <li><a href="/features#transformation-management" class="public-link text-foreground">Transformation Management</a></li>
+          <li><a href="/features#investment-and-financial-management" class="public-link text-foreground">Investment and Financial Management</a></li>
         </ul>
       </div>
-      <div class="home-card">
-        <h3 class="home-card-title">Know what you run</h3>
-        <p class="home-card-body">What does the business actually run on, and who owns it?</p>
-        <ul class="home-card-body mt-6 space-y-2">
-          <li><a href="/features#architecture-management" class="home-link text-foreground">Architecture Management</a></li>
-          <li><a href="/features#data-management" class="home-link text-foreground">Data Management</a></li>
-          <li><a href="/features#people-and-organisation-management" class="home-link text-foreground">People and Organisation Management</a></li>
-          <li><a href="/features#operations-and-service-management" class="home-link text-foreground">Operations and Service Management</a></li>
+      <div class="public-card">
+        <h3 class="public-card-title">Know what you run</h3>
+        <p class="public-card-body">What does the business actually run on, and who owns it?</p>
+        <ul class="public-card-body mt-6 space-y-2">
+          <li><a href="/features#architecture-management" class="public-link text-foreground">Architecture Management</a></li>
+          <li><a href="/features#data-management" class="public-link text-foreground">Data Management</a></li>
+          <li><a href="/features#people-and-organisation-management" class="public-link text-foreground">People and Organisation Management</a></li>
+          <li><a href="/features#operations-and-service-management" class="public-link text-foreground">Operations and Service Management</a></li>
         </ul>
       </div>
-      <div class="home-card">
-        <h3 class="home-card-title">Stay in control</h3>
-        <p class="home-card-body">What could hurt us, what must we prove, and what are we committed to?</p>
-        <ul class="home-card-body mt-6 space-y-2">
-          <li><a href="/features#risk-management" class="home-link text-foreground">Risk Management</a></li>
-          <li><a href="/features#compliance-and-governance" class="home-link text-foreground">Compliance and Governance</a></li>
-          <li><a href="/features#vendor-and-procurement-management" class="home-link text-foreground">Vendor and Procurement Management</a></li>
-          <li><a href="/features#ai-management" class="home-link text-foreground">AI Management</a></li>
+      <div class="public-card">
+        <h3 class="public-card-title">Stay in control</h3>
+        <p class="public-card-body">What could hurt us, what must we prove, and what are we committed to?</p>
+        <ul class="public-card-body mt-6 space-y-2">
+          <li><a href="/features#risk-management" class="public-link text-foreground">Risk Management</a></li>
+          <li><a href="/features#compliance-and-governance" class="public-link text-foreground">Compliance and Governance</a></li>
+          <li><a href="/features#vendor-and-procurement-management" class="public-link text-foreground">Vendor and Procurement Management</a></li>
+          <li><a href="/features#ai-management" class="public-link text-foreground">AI Management</a></li>
         </ul>
       </div>
-      <div class="home-card">
-        <h3 class="home-card-title">Get answers before you need them</h3>
-        <p class="home-card-body">What does it mean, what happens next, and what should we do?</p>
-        <ul class="home-card-body mt-6 space-y-2">
-          <li><a href="/features#enterprise-intelligence" class="home-link text-foreground">Enterprise Intelligence</a></li>
-          <li><a href="/features#simulation-and-scenario-planning" class="home-link text-foreground">Simulation and Scenario Planning</a></li>
-          <li><a href="/features#agentic-automation" class="home-link text-foreground">Agentic Automation</a></li>
+      <div class="public-card">
+        <h3 class="public-card-title">Get answers before you need them</h3>
+        <p class="public-card-body">What does it mean, what happens next, and what should we do?</p>
+        <ul class="public-card-body mt-6 space-y-2">
+          <li><a href="/features#enterprise-intelligence" class="public-link text-foreground">Enterprise Intelligence</a></li>
+          <li><a href="/features#simulation-and-scenario-planning" class="public-link text-foreground">Simulation and Scenario Planning</a></li>
+          <li><a href="/features#agentic-automation" class="public-link text-foreground">Agentic Automation</a></li>
         </ul>
       </div>
-      <div class="home-card">
-        <h3 class="home-card-title">Connect and trust</h3>
-        <p class="home-card-body">Does it fit how we work, and can we trust it with our data?</p>
-        <ul class="home-card-body mt-6 space-y-2">
-          <li><a href="/features#collaboration-and-communication" class="home-link text-foreground">Collaboration and Communication</a></li>
-          <li><a href="/features#integration-and-interoperability" class="home-link text-foreground">Integration and Interoperability</a></li>
-          <li><a href="/features#administration-and-trust" class="home-link text-foreground">Administration and Trust</a></li>
+      <div class="public-card">
+        <h3 class="public-card-title">Connect and trust</h3>
+        <p class="public-card-body">Does it fit how we work, and can we trust it with our data?</p>
+        <ul class="public-card-body mt-6 space-y-2">
+          <li><a href="/features#collaboration-and-communication" class="public-link text-foreground">Collaboration and Communication</a></li>
+          <li><a href="/features#integration-and-interoperability" class="public-link text-foreground">Integration and Interoperability</a></li>
+          <li><a href="/features#administration-and-trust" class="public-link text-foreground">Administration and Trust</a></li>
         </ul>
       </div>
     </div>
 
-    <p class="home-card-body mt-10">
+    <p class="public-card-body mt-10">
       Every capability is in the product today or has a quarter on the published roadmap.
-      <a href="/features" class="home-link">See all eighteen in full</a>.
+      <a href="/features" class="public-link">See all eighteen in full</a>.
     </p>
   </div>
 </section>
@@ -278,26 +278,26 @@
         How the company brain grows.
       </h2>
     </div>
-    <ol class="home-stepper mt-12">
+    <ol class="public-stepper mt-12">
       <li>
         <p class="home-eyebrow">Today</p>
-        <p class="home-stepper__name">Modelled</p>
+        <p class="public-stepper__name">Modelled</p>
       </li>
       <li>
         <p class="home-eyebrow">Q1 2027</p>
-        <p class="home-stepper__name">Synchronised</p>
+        <p class="public-stepper__name">Synchronised</p>
       </li>
       <li>
         <p class="home-eyebrow">Q2 2027</p>
-        <p class="home-stepper__name">Operational</p>
+        <p class="public-stepper__name">Operational</p>
       </li>
       <li>
         <p class="home-eyebrow">Q3 2027</p>
-        <p class="home-stepper__name">Predictive</p>
+        <p class="public-stepper__name">Predictive</p>
       </li>
       <li>
         <p class="home-eyebrow">Q1 2028</p>
-        <p class="home-stepper__name">Self-maintaining</p>
+        <p class="public-stepper__name">Self-maintaining</p>
       </li>
     </ol>
   </div>
@@ -315,11 +315,11 @@
 
     <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
       {% for group in use_case_highlights %}
-      <div class="home-card">
-        <h3 class="home-card-title">{{ group.label }}</h3>
-        <ul class="home-card-body mt-4 space-y-2">
+      <div class="public-card">
+        <h3 class="public-card-title">{{ group.label }}</h3>
+        <ul class="public-card-body mt-4 space-y-2">
           {% for page in group.pages %}
-          <li><a href="{{ page.url }}" class="home-link">{{ page.title }}</a></li>
+          <li><a href="{{ page.url }}" class="public-link">{{ page.title }}</a></li>
           {% endfor %}
         </ul>
       </div>
@@ -343,7 +343,7 @@
     </div>
 
     <div class="mt-6 overflow-x-auto rounded-2xl border border-border">
-      <table class="home-table">
+      <table class="public-table">
         <thead>
           <tr>
             <th scope="col">Plan</th>
@@ -387,17 +387,17 @@
     </div>
 
     <div class="mt-6 grid gap-6 sm:grid-cols-2">
-      <div class="home-card">
-        <h3 class="home-card-title">Architecture health check</h3>
-        <p class="mt-3 text-2xl font-bold text-foreground">$4,500<span class="home-card-body font-normal"> one-time</span></p>
-        <p class="home-card-body mt-3">A fixed-price assessment of your application landscape on your own data in Entelim, with a written report and read-out.</p>
-        <p class="home-card-body mt-3"><a href="/architecture-health-check" class="home-link">See what is included</a></p>
+      <div class="public-card">
+        <h3 class="public-card-title">Architecture health check</h3>
+        <p class="mt-3 text-2xl font-bold text-foreground">$4,500<span class="public-card-body font-normal"> one-time</span></p>
+        <p class="public-card-body mt-3">A fixed-price assessment of your application landscape on your own data in Entelim, with a written report and read-out.</p>
+        <p class="public-card-body mt-3"><a href="/architecture-health-check" class="public-link">See what is included</a></p>
       </div>
-      <div class="home-card">
-        <h3 class="home-card-title">Team annual with onboarding</h3>
-        <p class="mt-3 text-2xl font-bold text-foreground">$290<span class="home-card-body font-normal">/editor/year + $1,500 one-time</span></p>
-        <p class="home-card-body mt-3">At the end, your landscape is modelled, your existing data imported and your team able to keep it current.</p>
-        <p class="home-card-body mt-3"><a href="/team-annual-onboarding" class="home-link">See what is included</a></p>
+      <div class="public-card">
+        <h3 class="public-card-title">Team annual with onboarding</h3>
+        <p class="mt-3 text-2xl font-bold text-foreground">$290<span class="public-card-body font-normal">/editor/year + $1,500 one-time</span></p>
+        <p class="public-card-body mt-3">At the end, your landscape is modelled, your existing data imported and your team able to keep it current.</p>
+        <p class="public-card-body mt-3"><a href="/team-annual-onboarding" class="public-link">See what is included</a></p>
       </div>
     </div>
 
@@ -411,24 +411,24 @@
 <section class="home-section">
   <div class="container px-4">
     <div class="grid gap-6 lg:grid-cols-2">
-      <div class="home-card home-card--callout">
-        <p class="home-card-eyebrow">Start small</p>
-        <h2 class="home-card-title">
+      <div class="public-card public-card--callout">
+        <p class="public-card-eyebrow">Start small</p>
+        <h2 class="public-card-title">
           A startup is an enterprise too.
         </h2>
-        <p class="home-card-body mb-6">
+        <p class="public-card-body mb-6">
           A startup has a strategy, a handful of systems it cannot live without, suppliers it pays every month and
           risks nobody has written down. Entelim puts all of it in one place on a free plan for up to three people, or
           on the Startup plan for a team of ten at $49 a month.
         </p>
         <a href="/use-cases" class="public-btn public-btn--outline">See it for startups and growing businesses</a>
       </div>
-      <div class="home-card home-card--callout">
-        <p class="home-card-eyebrow">Open source</p>
-        <h2 class="home-card-title">
+      <div class="public-card public-card--callout">
+        <p class="public-card-eyebrow">Open source</p>
+        <h2 class="public-card-title">
           Licensed under AGPL-3.0.
         </h2>
-        <p class="home-card-body mb-6">
+        <p class="public-card-body mb-6">
           Every question, the Business Model Canvas and the twin map run on software licensed under AGPL-3.0. Run it
           on your own servers at any size, free, for as long as you like. Pay us when you want us to run it for you,
           support it under contract, or connect it to your systems.
@@ -465,30 +465,29 @@
       <h2 class="home-h2">
         Questions.
       </h2>
-      <div class="home-faq mt-12">
-        {%- set chevron %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>{% endset %}
+      <div class="public-faq mt-12">
         <details>
-          <summary>What is Enterprise Intelligence Management?{{ chevron }}</summary>
+          <summary>What is Enterprise Intelligence Management?{{ faq_chevron() }}</summary>
           <p>The capability that builds your company brain: one living, explainable model of your enterprise, kept current from the systems that master each fact, and turned into cited answers for every person who runs the business.</p>
         </details>
         <details>
-          <summary>How is this different from a company-wide search or a chatbot over your documents?{{ chevron }}</summary>
+          <summary>How is this different from a company-wide search or a chatbot over your documents?{{ faq_chevron() }}</summary>
           <p>Search finds documents faster; it doesn't fix knowledge that was never written down in a structured, checkable form. A chatbot trained on whatever it can find repeats the same gaps with more confidence. Entelim builds a living, explainable model of how your enterprise actually works, and every answer cites the record it came from.</p>
         </details>
         <details>
-          <summary>How is it different from enterprise architecture management?{{ chevron }}</summary>
+          <summary>How is it different from enterprise architecture management?{{ faq_chevron() }}</summary>
           <p>Enterprise architecture management models your systems. Enterprise Intelligence Management models the whole enterprise, keeps that model current, and answers plain-language questions across it, for every person who runs the business, not only architects.</p>
         </details>
         <details>
-          <summary>Is it only for large companies?{{ chevron }}</summary>
+          <summary>Is it only for large companies?{{ faq_chevron() }}</summary>
           <p>No. A startup is an enterprise too. What changes with size is the depth of the model, not the need for it: a free plan covers up to three people, and the paid plans grow with you.</p>
         </details>
         <details>
-          <summary>What works today?{{ chevron }}</summary>
-          <p>Import an existing architecture model and get a cited answer to what breaks if a system fails, in minutes. <a href="/features" class="home-link">See all eighteen capabilities</a> for what each one delivers today.</p>
+          <summary>What works today?{{ faq_chevron() }}</summary>
+          <p>Import an existing architecture model and get a cited answer to what breaks if a system fails, in minutes. <a href="/features" class="public-link">See all eighteen capabilities</a> for what each one delivers today.</p>
         </details>
         <details>
-          <summary>Can my AI assistant use it?{{ chevron }}</summary>
+          <summary>Can my AI assistant use it?{{ faq_chevron() }}</summary>
           <p>Read access for your own AI assistants, through the open Model Context Protocol, opens in Q1 2027. Today, Entelim's own assistant already works through the same permission and approval model.</p>
         </details>
       </div>

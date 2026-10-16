@@ -93,18 +93,29 @@ def _box(page, selector, nth=0):
     return box
 
 
-def capture_applications(browser, base, password, wide: bool) -> tuple[int, int]:
-    vw, vh = (1408, 1600) if wide else (390, 1400)
-    ctx = browser.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=DPR)
+def _open_applications(browser, base, password, viewport):
+    """A logged-in page on /applications/ with the onboarding prompt dismissed: (context, page)."""
+    ctx = browser.new_context(viewport=viewport, device_scale_factor=DPR)
     page = ctx.new_page()
     _login(page, base, DEMO_EMAIL, password)
     page.goto(base + "/applications/", wait_until="networkidle")
     page.wait_for_timeout(1500)
     _dismiss_onboarding(page)
-    _tidy(page)
+    return ctx, page
+
+
+def _require_seeded_portfolio(page, label) -> None:
+    """Stop when the demo portfolio is not seeded: empty vendor or capability columns make a poor capture."""
     text = page.inner_text("body")
     if re.search(r"(?<!\d)0 of \d+ applications in the portfolio have a vendor", text) or "Not mapped" in text:
-        raise SystemExit("applications: vendor or capability columns are empty; run seed-demo-company first")
+        raise SystemExit(f"{label}: vendor or capability columns are empty; run seed-demo-company first")
+
+
+def capture_applications(browser, base, password, wide: bool) -> tuple[int, int]:
+    vw, vh = (1408, 1600) if wide else (390, 1400)
+    ctx, page = _open_applications(browser, base, password, {"width": vw, "height": vh})
+    _tidy(page)
+    _require_seeded_portfolio(page, "applications")
     main = _box(page, "main")
     # A 1408px viewport leaves a 1104px content column: exactly the public page figure width
     # (72rem less padding), so the crop is shown 1:1 and never shrunk.
@@ -210,12 +221,7 @@ def capture_home_product(browser, base, password, wide: bool) -> tuple[int, int]
     block (tiles, banner, cards) that ends within 780 CSS px of crop height.
     """
     vw, vh = (1280, 800) if wide else (390, 844)
-    ctx = browser.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=DPR)
-    page = ctx.new_page()
-    _login(page, base, DEMO_EMAIL, password)
-    page.goto(base + "/applications/", wait_until="networkidle")
-    page.wait_for_timeout(1500)
-    _dismiss_onboarding(page)
+    ctx, page = _open_applications(browser, base, password, {"width": vw, "height": vh})
     if wide:
         aside = page.locator("[data-testid='sidebar']")
         if aside.bounding_box()["width"] > 200:
@@ -227,9 +233,7 @@ def capture_home_product(browser, base, password, wide: bool) -> tuple[int, int]
         """() => document.querySelectorAll("[data-testid='sidebar'] p[title^='Build identifier']")
                  .forEach((e) => { e.style.display = 'none'; })"""
     )
-    text = page.inner_text("body")
-    if re.search(r"(?<!\d)0 of \d+ applications in the portfolio have a vendor", text) or "Not mapped" in text:
-        raise SystemExit("home product: vendor or capability columns are empty; run seed-demo-company first")
+    _require_seeded_portfolio(page, "home product")
     for label in ("Active Portfolio", "Strategic", "Tactical", "Sunset/Decom Pipeline", "Decommissioned"):
         tile = page.get_by_text(label, exact=True).first.locator(
             "xpath=ancestor::*[contains(@class,'rounded')][1]"

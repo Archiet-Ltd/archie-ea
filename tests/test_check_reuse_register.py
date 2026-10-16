@@ -253,6 +253,80 @@ def test_a_missing_css_custom_property_symbol_fails(tmp_path):
     assert len(fails) == 1 and "--primary" in fails[0]
 
 
+def _css_class_register(symbol):
+    return REGISTER.replace("app/utils/duplicate_guard.py", "app/static/css/site.css").replace(
+        "symbols: [normalize_name, Guard.check]", f"symbols: ['{symbol}']")
+
+
+def _css_class_tree(tmp_path, css, symbol=".public-faq"):
+    root = _tree(tmp_path, register=_css_class_register(symbol))
+    (root / "app" / "utils" / "duplicate_guard.py").unlink()
+    (root / "app" / "static" / "css").mkdir(parents=True)
+    (root / "app" / "static" / "css" / "site.css").write_text(css, encoding="utf-8")
+    return root
+
+
+def test_a_css_class_symbol_is_found(tmp_path):
+    root = _css_class_tree(tmp_path, ".public-site .public-faq { border-top: 1px solid red; }\n"
+                                     ".public-site .public-faq summary { cursor: pointer; }\n")
+    assert _run(root)[0] == []
+
+
+@pytest.mark.parametrize("css", [
+    "/* .public-faq is described here only */\n.public-site .home-faq { color: red; }\n",
+    ".public-site .public-faq-x { color: red; }\n.public-site .public-faq--wide { color: red; }\n",
+    ".public-site .other { margin: .5rem; }\n",
+])
+def test_a_missing_css_class_symbol_fails(tmp_path, css):
+    root = _css_class_tree(tmp_path, css)
+    fails, _ = _run(root)
+    assert len(fails) == 1 and ".public-faq" in fails[0]
+
+
+# The rules deleted from css/public_pricing.css when the pricing page moved onto the shared public components.
+OLD_PRICING_RULES = {
+    "public-button/second-button-rule": (
+        ".pricing-page .pp-btn {\n  display: inline-flex; min-height: 2.75rem; border-radius: 0.5rem;\n}\n"
+        ".pricing-page .pp-btn--primary { background: var(--pp-primary); }\n"),
+    "public-card/second-card-rule": (
+        ".pricing-page .pp-card { display: flex; flex-direction: column; padding: 1.5rem; border-radius: 0.75rem; }\n"
+        ".pricing-page .pp-card h3 { font-size: 1.25rem; font-weight: 600; margin: 0; }\n"),
+    "public-table/second-table-rule": (
+        ".pricing-page .pp-table-wrap { border: 1px solid var(--pp-border); border-radius: 0.75rem; }\n"
+        ".pricing-page table.pp-table { width: 100%; table-layout: fixed; }\n"
+        ".pricing-page .pp-table th, .pricing-page .pp-table td { padding: 0.875rem 1rem; }\n"),
+    "public-faq/second-faq-rule": (
+        ".pricing-page .pp-faq { max-width: 42.5rem; }\n"
+        ".pricing-page .pp-faq details { border-bottom: 1px solid var(--pp-border); }\n"
+        ".pricing-page .pp-faq summary { cursor: pointer; padding: 1rem 0; }\n"),
+    "public-faq/second-details-marker": ".pricing-page .pp-faq summary::-webkit-details-marker { display: none; }\n",
+    "public-stepper/second-stepper-rule": (
+        ".pricing-page .pp-grow { list-style: none; display: grid; }\n"
+        ".pricing-page .pp-grow li { display: grid; grid-template-columns: 7rem 1fr; }\n"),
+}
+
+
+@pytest.mark.parametrize("key", sorted(OLD_PRICING_RULES))
+def test_a_deleted_pricing_rule_copied_back_fails_with_its_register_entry(tmp_path, key):
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "reuse-register.yml").write_text(
+        (REPO / "docs" / "reuse-register.yml").read_text(encoding="utf-8"), encoding="utf-8")
+    css = tmp_path / "app" / "static" / "css"
+    css.mkdir(parents=True)
+    (css / "public_site.css").write_text((REPO / "app/static/css/public_site.css").read_text(encoding="utf-8"), encoding="utf-8")
+    (css / "public_pricing.css").write_text(OLD_PRICING_RULES[key], encoding="utf-8")
+    fails, _ = _run(tmp_path)
+    assert any(f.startswith(f"[{key}]") and "app/static/css/public_pricing.css" in f for f in fails), fails
+
+
+def test_no_public_page_stylesheet_or_template_holds_a_second_public_component_rule():
+    entries, _ = gate.load_register(REPO)
+    hits = gate.find_hits(REPO, [e for e in entries if e["id"].startswith("public-")])
+    public = ("app/static/css/public_", "app/templates/public/", "app/templates/main/")
+    stray = {k: [f for f in files if f.startswith(public)] for k, files in hits.items()}
+    assert {k: v for k, v in stray.items() if v} == {}
+
+
 def test_update_baseline_refuses_to_raise_a_pattern_total(tmp_path):
     baseline = {"name-matching/normaliser": {"app/a.py": 1}}
     root = _tree(tmp_path, extra={"app/a.py": COPY, "app/b.py": COPY}, baseline=baseline)
@@ -497,7 +571,9 @@ def test_the_baseline_is_not_above_the_one_on_origin_main():
     if not main_totals:
         return
     mine = {k: sum(v.values()) for k, v in gate.load_baseline(REPO).items()}
-    raised = {k: (main_totals.get(k, 0), n) for k, n in mine.items() if n > main_totals.get(k, 0)}
+    # A pattern main does not have yet is new in this branch: its baseline records the hits that already
+    # existed when the pattern was introduced (the gate bounds it by the tree), so it has nothing to rise from.
+    raised = {k: (main_totals[k], n) for k, n in mine.items() if k in main_totals and n > main_totals[k]}
     assert raised == {}, f"baseline raised against origin/main: {raised}"
 
 

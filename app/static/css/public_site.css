@@ -131,6 +131,7 @@
 /* Home page layer. Every value is from the reference home page (reference-design-values-v1.yml); the
    entry each class carries is named beside it. Palette comes from .theme-marketing (shadcn_tokens.css). */
 
+/* Shared public component; used by the homepage and the pricing page; registered in docs/reuse-register.yml. */
 /* buttons: common (14px/20px, 500, radius + 4px, shadow, 150ms, 3px focus ring), sizes.lg, primary, outline */
 .public-site .public-btn--primary,
 .public-site .public-btn--outline {
@@ -202,31 +203,33 @@
 .public-site .home-section-lead { margin-top: 1.25rem; font-size: 1.125rem; line-height: 2rem; color: hsl(var(--muted-foreground)); }
 .public-site .home-section-lead strong { color: hsl(var(--foreground)); }
 
+/* Shared public component; used by the homepage and the pricing page; registered in docs/reuse-register.yml. */
 /* cards.home (16px radius, 1px border, 28px padding), card_h3_home, card_body, card_eyebrow, cta_eyebrow */
-.public-site .home-card {
+.public-site .public-card {
   border: 1px solid hsl(var(--border)); border-radius: 1rem; background: hsl(var(--card));
   color: hsl(var(--card-foreground)); padding: 1.75rem;
 }
-.public-site .home-card--callout { padding: 2rem; display: flex; flex-direction: column; align-items: flex-start; }
-.public-site .home-card--callout .public-btn {
+.public-site .public-card--callout { padding: 2rem; display: flex; flex-direction: column; align-items: flex-start; }
+.public-site .public-card--callout .public-btn {
   margin-top: auto; max-width: 100%; height: auto; padding-block: 0.625rem; white-space: normal; text-align: center;
 }
-.public-site .home-card-title { font-size: 1.5rem; line-height: 2rem; font-weight: 600; color: hsl(var(--foreground)); }
-.public-site .home-card-body { font-size: 0.875rem; line-height: 1.5rem; color: hsl(var(--muted-foreground)); }
-.public-site .home-card-title + .home-card-body { margin-top: 0.75rem; }
-.public-site .home-card-eyebrow,
+.public-site .public-card-title { font-size: 1.5rem; line-height: 2rem; font-weight: 600; color: hsl(var(--foreground)); }
+.public-site .public-card-body { font-size: 0.875rem; line-height: 1.5rem; color: hsl(var(--muted-foreground)); }
+.public-site .public-card-title + .public-card-body { margin-top: 0.75rem; }
+.public-site .public-card-eyebrow,
 .public-site .home-cta-eyebrow {
   font-size: 0.75rem; line-height: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
   color: hsl(var(--foreground));
 }
-.public-site .home-card-eyebrow + .home-card-title { margin-top: 0.75rem; }
+.public-site .public-card-eyebrow + .public-card-title { margin-top: 0.75rem; }
 .public-site .home-cta-eyebrow { font-size: 0.875rem; line-height: 1.25rem; }
 
+/* Shared public component; used by the homepage and the pricing page; registered in docs/reuse-register.yml. */
 /* inline_link: underline, offset 4px, hover foreground; 3px focus ring */
-.public-site .home-link { text-decoration: underline; text-underline-offset: 4px; transition: color 150ms; }
-.public-site .home-link:hover { color: hsl(var(--foreground)); }
-.public-site .home-link:focus-visible,
-.public-site .home-faq summary:focus-visible {
+.public-site .public-link { text-decoration: underline; text-underline-offset: 4px; transition: color 150ms; }
+.public-site .public-link:hover { color: hsl(var(--foreground)); }
+.public-site .public-link:focus-visible,
+.public-site .public-faq summary:focus-visible {
   outline: none; border-radius: 0.25rem; box-shadow: 0 0 0 3px hsl(var(--ring) / 0.5);
 }
 
@@ -243,51 +246,57 @@
   font-size: 0.875rem; line-height: 1.5rem; color: hsl(var(--muted-foreground));
 }
 
+/* Shared public component; used by the homepage and the pricing page; registered in docs/reuse-register.yml. */
 /* Roadmap stepper: a 1px line with an 8px dot per stage; one row of five from 768px, a vertical line below */
-.public-site .home-stepper { list-style: none; padding: 0; display: grid; gap: 2rem; }
-.public-site .home-stepper > li { position: relative; padding-left: 1.5rem; }
-.public-site .home-stepper > li::before {
+.public-site .public-stepper { list-style: none; padding: 0; display: grid; gap: 2rem; }
+.public-site .public-stepper > li { position: relative; padding-left: 1.5rem; }
+.public-site .public-stepper > li::before {
   content: ""; position: absolute; left: 3.5px; top: 0.5rem; bottom: -2rem; border-left: 1px solid hsl(var(--border));
 }
-.public-site .home-stepper > li:last-child::before { display: none; }
-.public-site .home-stepper > li::after {
+.public-site .public-stepper > li:last-child::before { display: none; }
+.public-site .public-stepper > li::after {
   content: ""; position: absolute; left: 0; top: 0.25rem; width: 0.5rem; height: 0.5rem; border-radius: 9999px;
   background: hsl(var(--border));
 }
-.public-site .home-stepper > li:first-child::after { background: hsl(var(--foreground)); }
-.public-site .home-stepper__name {
+.public-site .public-stepper > li:first-child::after { background: hsl(var(--foreground)); }
+.public-site .public-stepper__name {
   margin-top: 0.5rem; font-size: 1.25rem; line-height: 1.75rem; font-weight: 600; color: hsl(var(--muted-foreground));
 }
-.public-site .home-stepper > li:first-child .home-stepper__name { color: hsl(var(--foreground)); }
+.public-site .public-stepper > li:first-child .public-stepper__name { color: hsl(var(--foreground)); }
+.public-site .public-stepper__body { margin-top: 0.5rem; font-size: 0.875rem; line-height: 1.5rem; color: hsl(var(--muted-foreground)); }
 @media (min-width: 768px) {
-  .public-site .home-stepper { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0 1.5rem; }
-  .public-site .home-stepper > li { padding-left: 0; padding-top: 1.5rem; }
-  .public-site .home-stepper > li::before { left: 0; right: -1.5rem; top: 3.5px; bottom: auto; border-left: 0; border-top: 1px solid hsl(var(--border)); }
-  .public-site .home-stepper > li:last-child::before { display: block; right: 0; }
-  .public-site .home-stepper > li::after { top: 0; }
+  .public-site .public-stepper { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0 1.5rem; }
+  .public-site .public-stepper > li { padding-left: 0; padding-top: 1.5rem; }
+  .public-site .public-stepper > li::before { left: 0; right: -1.5rem; top: 3.5px; bottom: auto; border-left: 0; border-top: 1px solid hsl(var(--border)); }
+  .public-site .public-stepper > li:last-child::before { display: block; right: 0; }
+  .public-site .public-stepper > li::after { top: 0; }
 }
 
+/* Shared public component; used by the homepage and the pricing page; registered in docs/reuse-register.yml. */
 /* layout_rhythm.table: wrapper overflow-x auto; 48rem minimum; 16px cell padding; header at muted 50% */
-.public-site .home-table { width: 100%; min-width: 48rem; border-collapse: collapse; text-align: left; font-size: 0.875rem; line-height: 1.25rem; }
-.public-site .home-table thead tr { border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--muted) / 0.5); }
-.public-site .home-table th { padding: 1rem; font-weight: 600; color: hsl(var(--foreground)); }
-.public-site .home-table tbody tr { border-bottom: 1px solid hsl(var(--border)); vertical-align: top; }
-.public-site .home-table tbody tr:last-child { border-bottom: 0; }
-.public-site .home-table td { padding: 1rem; font-size: 0.875rem; line-height: 1.5rem; color: hsl(var(--muted-foreground)); }
-.public-site .home-table td:first-child { font-weight: 600; color: hsl(var(--foreground)); }
-.public-site .home-table td strong { font-weight: 600; color: hsl(var(--foreground)); }
+.public-site .public-table { width: 100%; min-width: 48rem; border-collapse: collapse; text-align: left; font-size: 0.875rem; line-height: 1.25rem; }
+/* A table that fits its container: no minimum width, equal fixed columns; its wrapper must not set overflow. */
+.public-site .public-table--fit { min-width: 0; table-layout: fixed; }
+.public-site .public-table thead tr { border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--muted) / 0.5); }
+.public-site .public-table th { padding: 1rem; font-weight: 600; color: hsl(var(--foreground)); }
+.public-site .public-table tbody tr { border-bottom: 1px solid hsl(var(--border)); vertical-align: top; }
+.public-site .public-table tbody tr:last-child { border-bottom: 0; }
+.public-site .public-table td { padding: 1rem; font-size: 0.875rem; line-height: 1.5rem; color: hsl(var(--muted-foreground)); }
+.public-site .public-table td:first-child { font-weight: 600; color: hsl(var(--foreground)); }
+.public-site .public-table td strong { font-weight: 600; color: hsl(var(--foreground)); }
 
+/* Shared public component; used by the homepage and the pricing page; registered in docs/reuse-register.yml. */
 /* inner_h3_faq (16/24, 600), body 16/28 muted, divider-separated items, rotating chevron */
-.public-site .home-faq { border-top: 1px solid hsl(var(--border)); }
-.public-site .home-faq details { border-bottom: 1px solid hsl(var(--border)); }
-.public-site .home-faq summary {
+.public-site .public-faq { border-top: 1px solid hsl(var(--border)); }
+.public-site .public-faq details { border-bottom: 1px solid hsl(var(--border)); }
+.public-site .public-faq summary {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem; cursor: pointer; list-style: none;
   padding-block: 1.25rem; font-size: 1rem; line-height: 1.5rem; font-weight: 600; color: hsl(var(--foreground));
 }
-.public-site .home-faq summary::-webkit-details-marker { display: none; }
-.public-site .home-faq summary svg { flex: none; width: 1rem; height: 1rem; color: hsl(var(--muted-foreground)); transition: transform 150ms; }
-.public-site .home-faq details[open] summary svg { transform: rotate(180deg); }
-.public-site .home-faq details > p { padding-bottom: 1.25rem; font-size: 1rem; line-height: 1.75rem; color: hsl(var(--muted-foreground)); }
+.public-site .public-faq summary::-webkit-details-marker { display: none; }
+.public-site .public-faq summary svg { flex: none; width: 1rem; height: 1rem; color: hsl(var(--muted-foreground)); transition: transform 150ms; }
+.public-site .public-faq details[open] summary svg { transform: rotate(180deg); }
+.public-site .public-faq details > p { padding-bottom: 1.25rem; font-size: 1rem; line-height: 1.75rem; color: hsl(var(--muted-foreground)); }
 
 /* Closing call to action: centred, 96px block padding, the section divider above */
 .public-site .home-closing { border-top: 1px solid hsl(var(--border)); padding-block: 6rem; text-align: center; background: hsl(var(--background)); }

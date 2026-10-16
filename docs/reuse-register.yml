@@ -396,3 +396,97 @@ entries:
       - ApplicationOwnership (organisation-unit ownership; a separate model)
       - an owner text column on the element
     note: the store-agreement gate already reports these disagreeing; the consolidation branch decides.
+
+  - id: public-button
+    concept: The public site button (primary and outline, 40px, 3px focus ring)
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-btn", ".public-btn--primary", ".public-btn--outline", ".public-btn--lg"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use these classes from
+      public_site.css; the authenticated app uses components/button.html. Neither side defines a copy of the
+      other. Do not write a second rule for this component in another stylesheet or an inline
+      <style>; a page-specific layout (grid, width, alignment, stickiness) is a rule on the page's own
+      wrapper that does not restyle the shared component.
+    must_not_create:
+      - id: second-button-rule
+        regex: '^[^\n{}]*?(?<![\w-])\.(?!public-)[\w-]*-(?:btn|button)(?![\w])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+
+  - id: public-card
+    concept: The public site card, with its title and body
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-card", ".public-card-title", ".public-card-body"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use these classes from
+      public_site.css; the authenticated app uses components/card.html. Neither side defines a copy of the
+      other. Do not write a second rule for this component in another stylesheet or an inline
+      <style>; a page-specific layout (grid, width, alignment, stickiness) is a rule on the page's own
+      wrapper that does not restyle the shared component.
+    must_not_create:
+      - id: second-card-rule
+        regex: '^[^\n{}]*?(?<![\w-])\.(?!public-)[\w-]*-(?:card)(?![\w])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+
+  - id: public-table
+    concept: The public site data table (fits its container or scrolls in a wrapper)
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-table"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use these classes from
+      public_site.css; the authenticated app uses components/table.html. Neither side defines a copy of the
+      other. Do not write a second rule for this component in another stylesheet or an inline
+      <style>; a page-specific layout (grid, width, alignment, stickiness) is a rule on the page's own
+      wrapper that does not restyle the shared component.
+    must_not_create:
+      - id: second-table-rule
+        regex: '^[^\n{}]*?(?<![\w-])\.(?!public-)[\w-]*-(?:table|table-wrap)(?![\w])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+
+  - id: public-faq
+    concept: The public site FAQ (details and summary with a rotating chevron)
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-faq"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use these classes from
+      public_site.css; the authenticated app has no FAQ component and does not use this class. Neither side defines a
+      copy of the other. The chevron icon is the faq_chevron macro in components/public_faq.html. Do not write a second rule for this component in another stylesheet or an inline
+      <style>; a page-specific layout (grid, width, alignment, stickiness) is a rule on the page's own
+      wrapper that does not restyle the shared component.
+    must_not_create:
+      - id: second-faq-rule
+        regex: '^[^\n{}]*?(?<![\w-])\.(?!public-)[\w-]*-(?:faq)(?![\w])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+      - id: second-details-marker
+        regex: 'summary::-webkit-details-marker'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+
+  - id: public-stepper
+    concept: The public site roadmap stepper (a row of stages with a line and a dot)
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-stepper"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use these classes from
+      public_site.css; the authenticated app uses components/stepper.html. Neither side defines a copy of the
+      other. Do not write a second rule for this component in another stylesheet or an inline
+      <style>; a page-specific layout (grid, width, alignment, stickiness) is a rule on the page's own
+      wrapper that does not restyle the shared component.
+    must_not_create:
+      - id: second-stepper-rule
+        regex: '^[^\n{}]*?(?<![\w-])\.(?!public-)[\w-]*-(?:stepper|steps|roadmap|grow)(?![\w])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]

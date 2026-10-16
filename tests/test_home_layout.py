@@ -60,14 +60,14 @@ def test_eyebrows_label_the_sections(home_html):
 
 
 def test_every_details_sits_inside_the_faq_column(home_html):
-    faq = re.search(r'<div class="home-faq[^"]*">(.*?)</div>\s*</div>\s*</div>\s*</section>', home_html, flags=re.S)
+    faq = re.search(r'<div class="public-faq[^"]*">(.*?)</div>\s*</div>\s*</div>\s*</section>', home_html, flags=re.S)
     assert faq, "FAQ column not found"
     assert home_html.count("<details") == 6
     assert faq.group(1).count("<details") == 6
 
 
 def test_pricing_table_has_five_headers_and_four_rows(home_html):
-    table = re.search(r'<table class="home-table">(.*?)</table>', home_html, flags=re.S)
+    table = re.search(r'<table class="public-table">(.*?)</table>', home_html, flags=re.S)
     assert table, "pricing table not found"
     head, body = table.group(1).split("</thead>")
     assert [_text(h) for h in re.findall(r"<th[^>]*>(.*?)</th>", head, flags=re.S)] == [

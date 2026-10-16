@@ -20,8 +20,8 @@ What it checks
 --------------
 (a) Every ``active`` entry's canonical file exists and defines every listed symbol
     (``name`` for a module-level function or class, ``Class.method`` for a method, a
-    ``{% macro name(`` for a template, or a ``--name:`` custom-property declaration for
-    a ``.css`` canonical). A canonical that moved or was renamed fails, so the register
+    ``{% macro name(`` for a template, a ``--name:`` custom-property declaration for
+    a ``.css`` canonical, or a ``.name`` class in a selector of a ``.css`` canonical, comments excluded). A canonical that moved or was renamed fails, so the register
     cannot rot into a list of dead links.
 (b) Every ``must_not_create`` regex is run over its scope (default: ``app/**/*.py``).
     A match in any file other than the canonical file or a ``known_exceptions`` path is
@@ -171,6 +171,15 @@ def _py_symbols(text: str) -> set[str]:
     return out
 
 
+def _css_symbol_defined(text: str, symbol: str) -> bool:
+    """A custom property is declared (`--name:`); a class symbol (`.name`) appears in a selector, followed by a
+    character that cannot continue a class name, so `.public-faq` is not found in `.public-faq-x`. `text` has
+    its comments removed."""
+    if symbol.startswith("."):
+        return re.search(r"(?<![\w-])" + re.escape(symbol) + r"(?![\w-])", text) is not None
+    return re.search(r"(?m)(^|[\s;{])" + re.escape(symbol) + r"\s*:", text) is not None
+
+
 def missing_symbols(root: Path, canonical_path: str, symbols) -> tuple[bool, list[str]]:
     """(file_exists, symbols not defined there)."""
     path = root / canonical_path
@@ -181,10 +190,8 @@ def missing_symbols(root: Path, canonical_path: str, symbols) -> tuple[bool, lis
         have = _py_symbols(text)
         return True, [s for s in symbols if s not in have]
     if path.suffix == ".css":
-        return True, [
-            s for s in symbols
-            if not re.search(r"(?m)(^|[\s;{])" + re.escape(s) + r"\s*:", text)
-        ]
+        uncommented = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        return True, [s for s in symbols if not _css_symbol_defined(uncommented, s)]
     return True, [s for s in symbols if not re.search(MACRO.replace("NAME", re.escape(s)), text)]
 
 
