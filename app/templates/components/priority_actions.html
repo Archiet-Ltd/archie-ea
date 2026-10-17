@@ -17,7 +17,7 @@
         {% if row.kind == 'gap' %}
             {% set href = url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=row.record_id) %}
         {% elif row.kind == 'work_package' %}
-            {% set href = url_for('enterprise.work_package_detail', work_package_id=row.record_id) if 'enterprise.work_package_detail' in vf else url_for('enterprise.work_packages') %}
+            {% set href = url_for('enterprise.work_package_detail', work_package_id=row.record_id) if 'enterprise.work_package_detail' in flask.current_app.view_functions else url_for('enterprise.work_packages') %}
         {% else %}
             {% set href = url_for('risk.risk_page', risk_id=row.record_id) if 'risk.risk_page' in flask.current_app.view_functions else url_for('risk.risk_register', risk=row.record_id) %}
         {% endif %}
