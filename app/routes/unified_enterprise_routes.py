@@ -865,13 +865,48 @@ def plateaus():
         )
 
 
+# Severity is the recorded rating of a gap (Gap.priority is a default no one
+# sets), ordered by seriousness; the kind is what sort of gap it is.
+_SEVERITY_ORDER = db.case(
+    {"critical": 0, "high": 1, "medium": 2, "low": 3}, value=Gap.severity, else_=4
+)
 _GAP_SORT_COLUMNS = {
     "name": Gap.name,
-    "gap_type": Gap.gap_type,
-    "priority": Gap.priority,
+    "gap_kind": Gap.gap_kind,
+    "gap_type": Gap.gap_kind,
+    "severity": _SEVERITY_ORDER,
+    "priority": _SEVERITY_ORDER,
     "resolution_status": Gap.resolution_status,
     "impact": Gap.impact,
 }
+
+
+@enterprise_bp.route("/api/gaps/<int:gap_id>/work-packages", methods=["POST", "DELETE"])
+@login_required
+def api_gap_work_package_link(gap_id):
+    """Link one work package to a gap (POST) or remove that link (DELETE),
+    leaving the work package's other gap links alone. Another organisation's
+    gap or work package answers 404 and nothing is written."""
+    # CSRF: Protected via X-CSRFToken header sent by Platform.fetch
+    data = request.get_json(silent=True) or {}
+    try:
+        wp_id = int(data.get("work_package_id") or request.args.get("work_package_id"))
+    except (TypeError, ValueError):
+        return api_error("work_package_id is required", "MISSING_FIELD")
+    org_id = current_organization_id()
+    try:
+        if request.method == "POST":
+            wp = work_package_service.link_gap(wp_id, gap_id, org_id)
+            changed = 1
+        else:
+            wp = work_package_service.require_work_package(wp_id, org_id)
+            changed = work_package_service.unlink_gap(wp_id, gap_id, org_id)
+    except work_package_service.WorkPackageError as exc:
+        db.session.rollback()
+        return _wp_error(exc)
+    db.session.commit()
+    _audit_wp("link_gap" if request.method == "POST" else "unlink_gap", wp.id, wp.name)
+    return jsonify({"status": "ok", "work_package_id": wp.id, "gap_id": gap_id, "changed": bool(changed)})
 
 
 @enterprise_bp.route("/implementation/gap-analysis")
@@ -895,18 +930,30 @@ def gap_analysis():
     try:
         from app.services.gap_register_service import count_gaps, get_gaps_not_addressed
 
+        org_id = current_org_id()
         gaps = (
             Gap.query.filter(Gap.gap_kind != "plateau_transition")
             .order_by(order, Gap.id)
             .limit(500)
             .all()
         )
-        total_gap_count = count_gaps(current_org_id())
-        not_addressed_gaps = get_gaps_not_addressed(current_org_id())
+        total_gap_count = count_gaps(org_id)
+        summary = {
+            "critical": count_gaps(org_id, severity="critical"),
+            "in_progress": count_gaps(org_id, resolution_status="in_progress"),
+            "resolved": count_gaps(org_id, resolution_status="resolved"),
+        }
+        not_addressed_gaps = get_gaps_not_addressed(org_id)
+        gap_work_packages = work_package_service.work_packages_for_gaps(
+            [g.id for g in gaps], org_id
+        )
 
         return render_template(
             "enterprise/gap_analysis.html", gaps=gaps,
             total_gap_count=total_gap_count,
+            summary=summary,
+            gap_work_packages=gap_work_packages,
+            gap_names={str(g.id): g.name for g in gaps},
             not_addressed_gaps=not_addressed_gaps,
             current_sort=sort_key if sort_key in _GAP_SORT_COLUMNS else "name",
             current_dir=direction if direction in ("asc", "desc") else "asc",

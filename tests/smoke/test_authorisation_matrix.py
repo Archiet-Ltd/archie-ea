@@ -59,6 +59,10 @@ POLICY = {
     "/dashboard/compliance":   set(ARCHETYPES),
     # risk.risk_register is @login_required only.
     "/risks/":                 set(ARCHETYPES),
+    # enterprise.gap_analysis and the work package search the gap row's picker
+    # reads: both @login_required only, so every archetype reaches them.
+    "/enterprise/implementation/gap-analysis": set(ARCHETYPES),
+    "/enterprise/api/work-packages?per_page=8&q=": set(ARCHETYPES),
     "/my-applications/":       {"application_manager"},
     "/my-applications/list":   {"application_manager"},
     "/my-applications/health": {"application_manager"},
@@ -741,6 +745,25 @@ def test_interface_register_attach_work_package_authorisation(
             "%s was refused attach_work_package by the data_integration guard "
             "despite being permitted by the GET rows" % archetype
         )
+
+
+@pytest.mark.parametrize("method", ["post", "delete"])
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_gap_work_package_link_route_authorisation(archetype, method, page, live_server, seeded):
+    """POST/DELETE /enterprise/api/gaps/<id>/work-packages is @login_required
+    only, like the other enterprise writes: every archetype reaches it. A gap
+    that is not the caller's organisation's answers 404 and writes nothing."""
+    _login(page, live_server, seeded["emails"][archetype])
+    csrf_token = _csrf_token(page)
+    response = getattr(page.request, method)(
+        live_server + "/enterprise/api/gaps/999999999/work-packages?work_package_id=999999999",
+        data={"work_package_id": 999999999},
+        headers={"X-CSRFToken": csrf_token},
+    )
+    assert response.status == 404, (
+        "%s %s: expected 404 for a gap outside the organisation, got %s"
+        % (archetype, method.upper(), response.status)
+    )
 
 
 @pytest.mark.parametrize("path,allowed", ACCOUNT_POST_POLICY.items())

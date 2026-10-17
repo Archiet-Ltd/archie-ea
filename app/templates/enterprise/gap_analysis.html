@@ -15,6 +15,15 @@
 {% endblock %}
 
 {% block content %}
+{% macro kind_label(gap) -%}
+{{ ((gap.gap_type or gap.gap_kind or '')|replace('_', ' ')|capitalize) or '—' }}
+{%- endmacro %}
+{% macro severity_badge(gap) -%}
+{% if gap.severity == 'critical' %}{{ status_badge('Critical', 'error') }}
+{% elif gap.severity == 'high' %}{{ status_badge('High', 'warning') }}
+{% elif gap.severity %}{{ status_badge(gap.severity|capitalize, 'neutral') }}
+{% else %}—{% endif %}
+{%- endmacro %}
 <div class="flex flex-col space-y-8 animate-in fade-in duration-500">
     <!-- Header -->
     {{ page_header(
@@ -28,9 +37,9 @@
     <!-- Gap Summary -->
     <div class="grid gap-4 md:grid-cols-4">
         {{ metrics_card(title='Recorded Gaps', value=total_gap_count|default(0), icon='target', description='ArchiMate Gap elements in the register') }}
-        {{ metrics_card(title='Critical', value=gaps|selectattr('priority', 'equalto', 'Critical')|list|length|default(0), icon='alert-triangle', icon_class='!text-destructive', value_class='text-destructive') }}
-        {{ metrics_card(title='In Progress', value=gaps|selectattr('status', 'equalto', 'In Progress')|list|length|default(0), icon='loader', icon_class='!text-primary', value_class='text-primary') }}
-        {{ metrics_card(title='Resolved', value=gaps|selectattr('status', 'equalto', 'Resolved')|list|length|default(0), icon='check-circle', icon_class='!text-success', value_class='text-success') }}
+        {{ metrics_card(title='Critical', value=summary.critical, icon='alert-triangle', icon_class='!text-destructive', value_class='text-destructive') }}
+        {{ metrics_card(title='In Progress', value=summary.in_progress, icon='loader', icon_class='!text-primary', value_class='text-primary') }}
+        {{ metrics_card(title='Resolved', value=summary.resolved, icon='check-circle', icon_class='!text-success', value_class='text-success') }}
     </div>
 
     <!-- Gaps Table -->
@@ -59,10 +68,11 @@
                             </th>
                             {% endmacro %}
                             {{ sort_th('name', 'Gap') }}
-                            {{ sort_th('gap_type', 'Type') }}
-                            {{ sort_th('priority', 'Priority') }}
+                            {{ sort_th('gap_kind', 'Type') }}
+                            {{ sort_th('severity', 'Priority') }}
                             {{ sort_th('resolution_status', 'Status') }}
                             {{ sort_th('impact', 'Impact') }}
+                            <th class="text-left p-3 font-medium">Work packages</th>
                             <th class="text-left p-3 font-medium">Actions</th>
                         </tr>
                     </thead>
@@ -76,16 +86,8 @@
                                 </div>
                                 <div class="text-sm text-muted-foreground">{{ gap.description|default('', true)|truncate(50) }}</div>
                             </td>
-                            <td class="p-3">{{ gap.gap_type|default('Unknown') }}</td>
-                            <td class="p-3">
-                                {% if gap.priority == 'Critical' %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'error') }}
-                                {% elif gap.priority == 'High' %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'warning') }}
-                                {% else %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'neutral') }}
-                                {% endif %}
-                            </td>
+                            <td class="p-3">{{ kind_label(gap) }}</td>
+                            <td class="p-3">{{ severity_badge(gap) }}</td>
                             <td class="p-3">
                                 {% if gap.resolution_status == 'resolved' %}
                                     {{ status_badge(gap.resolution_status|default('identified'), 'success') }}
@@ -95,10 +97,45 @@
                                     {{ status_badge(gap.resolution_status|default('identified'), 'neutral') }}
                                 {% endif %}
                             </td>
-                            <td class="p-3 text-sm text-muted-foreground">{{ gap.impact|default('Unknown') }}</td>
+                            <td class="p-3 text-sm text-muted-foreground">{{ (gap.impact|capitalize) if gap.impact else '—' }}</td>
+                            <td class="p-3 text-sm" data-testid="gap-work-packages-{{ gap.id }}">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    {% for wp_id, wp_name in gap_work_packages.get(gap.id, []) %}
+                                    <span class="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs">
+                                        {% if 'enterprise.work_package_detail' in flask.current_app.view_functions %}
+                                        <a href="{{ url_for('enterprise.work_package_detail', work_package_id=wp_id) }}" class="hover:underline">{{ wp_name or '—' }}</a>
+                                        {% else %}{{ wp_name or '—' }}{% endif %}
+                                        <button type="button" class="hover:bg-muted rounded-md px-1"
+                                                @click="unlink({{ gap.id }}, {{ wp_id }})"
+                                                aria-label="Remove link to {{ wp_name or 'work package' }}">&times;</button>
+                                    </span>
+                                    {% else %}
+                                    <span class="text-muted-foreground">—</span>
+                                    {% endfor %}
+                                </div>
+                                <div class="relative mt-2">
+                                    <button type="button" class="px-2 py-1 text-xs rounded-md border hover:bg-muted"
+                                            @click="openPicker({{ gap.id }})"
+                                            aria-label="Link a work package to {{ gap.name|e }}">Link to work package</button>
+                                    <div x-show="pickerGap === {{ gap.id }}" x-cloak @keydown.escape="pickerGap = null"
+                                         class="absolute z-20 left-0 mt-1 w-72 rounded-md border bg-popover p-2 shadow-md">
+                                        <input type="search" x-model="query" @input.debounce.300ms="search()"
+                                               x-ref="pickerInput{{ gap.id }}"
+                                               class="w-full h-8 rounded-md border bg-background px-2 text-sm"
+                                               placeholder="Search work packages" aria-label="Search work packages">
+                                        <ul class="mt-1 max-h-48 overflow-auto" role="listbox" aria-label="Matching work packages">
+                                            <template x-for="wp in results" :key="wp.id">
+                                                <li><button type="button" class="w-full text-left px-2 py-1 text-sm rounded-md hover:bg-muted"
+                                                            role="option" @click="link({{ gap.id }}, wp)" x-text="wp.name"></button></li>
+                                            </template>
+                                        </ul>
+                                        <p class="mt-1 px-2 text-xs text-muted-foreground" x-show="searched && !results.length">No matching work packages</p>
+                                    </div>
+                                </div>
+                            </td>
                             <td class="p-3">
                                 <button type="button" class="px-3 py-1.5 text-sm rounded-md border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
-                                        @click="convertToWorkPackage({{ gap.id }}, {{ (gap.name|default('this gap'))|tojson }}, $event.target)"
+                                        @click="convertToWorkPackage({{ gap.id }})"
                                         :disabled="busyId === {{ gap.id }}"
                                         aria-label="Convert this gap to a work package">
                                     <span x-show="busyId !== {{ gap.id }}">Convert to Work Package</span>
@@ -108,7 +145,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="6" class="p-6 text-center text-muted-foreground">No gaps identified</td>
+                            <td colspan="7" class="p-6 text-center text-muted-foreground">No gaps identified</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -146,16 +183,8 @@
                                 </div>
                                 <div class="text-sm text-muted-foreground">{{ gap.description|default('', true)|truncate(50) }}</div>
                             </td>
-                            <td class="p-3">{{ gap.gap_type|default('Unknown') }}</td>
-                            <td class="p-3">
-                                {% if gap.priority == 'Critical' %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'error') }}
-                                {% elif gap.priority == 'High' %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'warning') }}
-                                {% else %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'neutral') }}
-                                {% endif %}
-                            </td>
+                            <td class="p-3">{{ kind_label(gap) }}</td>
+                            <td class="p-3">{{ severity_badge(gap) }}</td>
                             <td class="p-3">
                                 {% if gap.resolution_status == 'resolved' %}
                                     {{ status_badge(gap.resolution_status|default('identified'), 'success') }}
@@ -189,16 +218,61 @@
     function gapAnalysisTable() {
         return {
             busyId: null,
-            convertToWorkPackage(gapId, gapName) {
+            gapNames: {{ gap_names|tojson }},
+            pickerGap: null,
+            query: '',
+            results: [],
+            searched: false,
+            openPicker(gapId) {
+                this.pickerGap = this.pickerGap === gapId ? null : gapId;
+                this.query = '';
+                this.results = [];
+                this.searched = false;
+                if (this.pickerGap !== null) {
+                    this.$nextTick(() => { const el = this.$refs['pickerInput' + gapId]; if (el) el.focus(); });
+                    this.search();
+                }
+            },
+            search() {
+                const gapId = this.pickerGap;
+                Platform.fetch.get('/enterprise/api/work-packages?per_page=8&q=' + encodeURIComponent(this.query))
+                    .then((data) => {
+                        if (this.pickerGap !== gapId) return;
+                        this.results = (data && data.work_packages) || [];
+                        this.searched = true;
+                    })
+                    .catch((err) => {
+                        Platform.toast.error('Could not search work packages.');
+                        throw err;
+                    });
+            },
+            link(gapId, wp) {
+                Platform.fetch.post('/enterprise/api/gaps/' + gapId + '/work-packages', { work_package_id: wp.id })
+                    .then(() => window.location.reload())
+                    .catch((err) => {
+                        Platform.toast.error('Could not link "' + wp.name + '".');
+                        throw err;
+                    });
+            },
+            unlink(gapId, wpId) {
+                Platform.fetch.delete('/enterprise/api/gaps/' + gapId + '/work-packages?work_package_id=' + wpId)
+                    .then(() => window.location.reload())
+                    .catch((err) => {
+                        Platform.toast.error('Could not remove the link.');
+                        throw err;
+                    });
+            },
+            convertToWorkPackage(gapId) {
+                const gapName = this.gapNames[gapId] || 'this gap';
                 if (this.busyId !== null) return;
                 this.busyId = gapId;
-                Platform.fetch.post('/api/roadmap/gaps/' + gapId + '/work-packages', { template: 'auto' })
+                Platform.fetch.post('/capability-map/api/roadmap/gaps/' + gapId + '/work-packages', { template: 'auto' })
                     .then((data) => {
                         if (data && data.success === false) {
                             Platform.toast.error(data.error || 'Could not convert "' + gapName + '" to a work package.');
                             return;
                         }
-                        Platform.toast.success('"' + gapName + '" converted to a work package.');
+                        window.location.reload();
                     })
                     .catch((err) => {
                         Platform.toast.error('Could not convert "' + gapName + '" to a work package.');

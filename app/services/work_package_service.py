@@ -500,6 +500,53 @@ def work_package_ids_for_gap(gap_id: int, organization_id: int) -> List[int]:
     return sorted({row[0] for row in rows if row[2] == _GAP_REL})
 
 
+def work_packages_for_gaps(gap_ids, organization_id: int) -> Dict[int, List[tuple]]:
+    """{gap id: [(work package id, name), ...]} for these gaps: one link read and
+    one name read for the whole set. Another organisation's rows never appear."""
+    out: Dict[int, List[tuple]] = {gid: [] for gid in gap_ids}
+    if not out:
+        return out
+    rows = [r for r in _link_rows(organization_id, gap_ids=list(out)) if r[2] == _GAP_REL]
+    names = dict(db.session.execute(
+        db.select(UnifiedWorkPackage.id, UnifiedWorkPackage.name).where(
+            UnifiedWorkPackage.organization_id == organization_id,
+            UnifiedWorkPackage.id.in_({r[0] for r in rows}),
+        )).all()) if rows else {}
+    for wp_id, _rel, _kind, _plateau, gap_id in rows:
+        entry = (wp_id, names.get(wp_id))
+        if entry not in out[gap_id]:
+            out[gap_id].append(entry)
+    return out
+
+
+def addressed_gap_ids(organization_id: int) -> set:
+    """Ids of this organisation's gaps that at least one of its work packages is linked to."""
+    return {r[4] for r in _link_rows(organization_id) if r[2] == _GAP_REL}
+
+
+def link_gap(work_package_id: int, gap_id: int, organization_id: int) -> UnifiedWorkPackage:
+    """Link a work package to a gap, keeping its other gap links. Linking a pair
+    that is already linked changes nothing. Another organisation's work package
+    or gap is reported as missing. Flushes; the caller commits."""
+    wp = require_work_package(work_package_id, organization_id)
+    links = _resolve_links({"gap_id": gap_id}, organization_id)
+    if links["gap_id"] is None:
+        raise WorkPackageNotFound("Linked record not found.")
+    _apply_links(wp, links, organization_id, replace=False)
+    return wp
+
+
+def unlink_gap(work_package_id: int, gap_id: int, organization_id: int) -> int:
+    """Remove one work package's link to one gap, leaving its other links.
+    Returns how many links were removed (0 when there was none)."""
+    wp = require_work_package(work_package_id, organization_id)
+    links = _resolve_links({"gap_id": gap_id}, organization_id)
+    if links["gap_id"] is None:
+        raise WorkPackageNotFound("Linked record not found.")
+    lock_work_package(wp.id)
+    return remove_link_targets(wp, "gap_id", organization_id, [links["gap_id"].id])
+
+
 def plateau_work_package_ids(plateau_ids, organization_id: int) -> Dict[int, set]:
     """{plateau id: {ids of this organisation's work packages that realise it}}."""
     out: Dict[int, set] = {pid: set() for pid in plateau_ids}
