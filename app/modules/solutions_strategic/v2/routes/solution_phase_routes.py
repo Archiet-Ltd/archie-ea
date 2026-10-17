@@ -6,7 +6,7 @@ from flask import abort, jsonify, request, url_for
 from flask_login import current_user, login_required
 from app import db
 from app.models.solution_models import Solution
-from app.decorators import audit_log
+from app.decorators import WORK_PACKAGE_WRITE_ROLES, audit_log, require_roles
 from .solution_design_routes import solution_design_bp
 
 logger = logging.getLogger(__name__)
@@ -540,6 +540,7 @@ def get_solution_plateaus(solution_id):
 
 @solution_design_bp.route("/<int:solution_id>/plateaus", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def create_solution_plateau(solution_id):
     """Add a transition architecture plateau."""
     solution = Solution.query.get_or_404(solution_id)

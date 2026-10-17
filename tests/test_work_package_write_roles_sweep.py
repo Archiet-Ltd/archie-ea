@@ -37,6 +37,8 @@ STORES = (
     "archimate_elements",
     "archimate_relationships",
     "solutions",
+    "solution_plateaus",
+    "consolidation_list_entries",
 )
 
 # (label, method, url with {keys}, json body, [key sets whose organisation-B version is tried])
@@ -134,6 +136,9 @@ ROUTES = [
     ("solution wp delete", "delete", "/solutions/{sol}/api/work-packages/{rwp}", None, [("sol",), ("rwp",)]),
     ("solution roadmap item update", "post", "/solutions/{sol}/update-roadmap-item", {"index": 0, "item": {}}, [("sol",)]),
     ("solution roadmap items delete", "post", "/solutions/{sol}/delete-roadmap-items", {"indices": [0]}, [("sol",)]),
+    ("solution plateau create", "post", "/solutions/{sol}/plateaus", {"name": "x"}, [("sol",)]),
+    ("capability map element work package", "post", "/capability-map/api/archimate/elements", {"name": "x", "type": "WorkPackage", "application_id": "{app}"}, [("app",)]),
+    ("consolidation roadmap task", "post", "/consolidation-list/api/create-roadmap-task", {"entry_id": "{centry}", "start_date": "2030-01-01", "end_date": "2030-06-01", "owner": "x"}, [("centry",)]),
 ]
 LABELS = [r[0] for r in ROUTES]
 
@@ -187,12 +192,16 @@ def _records(db_session, org, owner):
     db_session.add(element)
     db_session.flush()
     deliv = work_package_service.create_deliverable(uwp.id, organization_id=org.id, name=f"Deliv {tag}")
+    from app.models.consolidation_list import ConsolidationListEntry
+
+    centry = ConsolidationListEntry(application_id=app_c.id, recommended_action="pending_review")
+    db_session.add(centry)
     gap, _ = create_gap(org.id, f"Gap {tag}", gap_type="coverage")
     db_session.flush()
     return {
         "app": app_c.id, "sol": sol.id, "lwp": lwp.id, "plat": plat.id, "rwp": rwp.id,
         "uwp": uwp.id, "uwp2": uwp2.id, "deliv": deliv.id, "gap": gap.id, "zero": 0,
-        "el": element.id,
+        "el": element.id, "centry": centry.id,
     }
 
 
@@ -202,10 +211,13 @@ def world(db_session, make_org):
     editor_a = _user(db_session, a, "edita")
     viewer_a = _user(db_session, a, "viewa", role_name="Viewer")
     editor_b = _user(db_session, b, "editb")
+    # Records the Viewer owns, so the solution routes' ownership check cannot be
+    # what refuses the Viewer: the role is the only thing standing in the way.
     return {
         "a": a, "b": b, "editor_a": editor_a, "viewer_a": viewer_a,
         "ids_a": _records(db_session, a, editor_a),
         "ids_b": _records(db_session, b, editor_b),
+        "ids_viewer": _records(db_session, a, viewer_a),
     }
 
 
@@ -288,7 +300,7 @@ def test_every_registered_work_package_write_route_is_in_the_table(app):
 @pytest.mark.parametrize("label", LABELS)
 def test_viewer_is_refused_and_nothing_changes(db_session, world, client, login_as, label):
     before = _fingerprint(db_session)
-    resp = _send(client, login_as, world["viewer_a"], _row(label), world["ids_a"])
+    resp = _send(client, login_as, world["viewer_a"], _row(label), world["ids_viewer"])
     assert resp.status_code == 403, (label, resp.status_code, resp.get_data(as_text=True)[:200])
     assert _fingerprint(db_session) == before
 

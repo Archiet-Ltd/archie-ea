@@ -185,6 +185,9 @@ def attach_work_package(gap_id):
         )
         flash("Work package attached.", "success")
     except service.InterfaceRegisterError as exc:
+        if str(exc) == "Gap not found":
+            # Another organisation's gap is indistinguishable from a missing one.
+            return render_template("errors/404.html"), 404
         flash(str(exc), "error")
 
     return redirect(url_for("interface_register.comparison", initiative_id=initiative_id))

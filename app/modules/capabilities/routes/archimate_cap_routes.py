@@ -20,7 +20,10 @@ from flask_login import login_required
 from sqlalchemy.exc import SQLAlchemyError
 
 from app import db
-from app.decorators import audit_log
+from app.decorators import WORK_PACKAGE_WRITE_ROLES, audit_log, require_roles
+from app.models.application_portfolio import ApplicationComponent
+from app.services import work_package_service
+from werkzeug.exceptions import HTTPException
 
 from . import capability_map
 from app.utils.pagination import safe_int_arg
@@ -108,6 +111,13 @@ def api_create_archimate_element():
         element_type = data.get("type")
         layer = data.get("layer")
         application_id = data.get("application_id")
+
+        if element_type == "WorkPackage":
+            # A work package needs the write role; the other element types keep
+            # their existing rules. The application must be this organisation's.
+            require_roles(*WORK_PACKAGE_WRITE_ROLES)(lambda: None)()
+            if application_id is not None:
+                work_package_service.own_or_404(ApplicationComponent, application_id)
         properties = data.get("properties", {})
 
         # Import appropriate model based on type
@@ -212,6 +222,9 @@ def api_create_archimate_element():
             }
         )
 
+    except HTTPException:
+        db.session.rollback()
+        raise
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error creating ArchiMate element: {e}", exc_info=True)

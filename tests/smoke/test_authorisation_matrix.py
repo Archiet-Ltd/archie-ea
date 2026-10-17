@@ -1607,6 +1607,9 @@ WORK_PACKAGE_SWEEP_POLICY = [
     ("DELETE", "/solutions/0/api/work-packages/0"),
     ("POST", "/solutions/0/update-roadmap-item"),
     ("POST", "/solutions/0/delete-roadmap-items"),
+    ("POST", "/solutions/0/plateaus"),
+    ("POST", "/capability-map/api/archimate/elements"),
+    ("POST", "/consolidation-list/api/create-roadmap-task"),
 ]
 
 
