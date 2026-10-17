@@ -17,9 +17,12 @@ Open **Duplicate Detection** and click **Run Detection**. Entelim compares every
 
 ## The question
 
-A spend review finds three tools doing the same job, bought by three teams who never compared notes. Nobody had one list to check against, and the invoices sit apart from the list of what the company runs.
+A SaaS spend review finds three tools doing the same job, bought by three different teams who never
+talked to each other. Nobody set out to waste money — nobody had a single list to check against.
 
 ## What Entelim answers
+
+Find what you're paying for twice. Run duplicate detection across your whole application list, review the overlapping groups it finds, and add them to a consolidation plan.
 
 **Duplicate Detection** shows four cards: **Duplicate Groups**, **Estimated Savings**, **High Priority** (groups with a similarity of 0.85 or more) and **Last Detection**, which reads "Never" until the first run. **Run Detection** opens a form with a strategy (Hybrid Detection, recommended, Fast Detection or Enhanced Detection), a **Similarity Threshold** slider from 0.4 ("More matches") to 0.9 ("Higher precision"), and an optional run name.
 

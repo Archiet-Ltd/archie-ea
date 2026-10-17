@@ -17,7 +17,9 @@ On the Ask page, choose "What breaks if ___ fails or is under-resourced?", pick 
 
 ## The question
 
-An outage starts. The first ten minutes go on working out what else is affected and who owns it, before anyone starts fixing. The dependencies are in someone's head, the owners are in a spreadsheet, and the two have never been read together.
+An outage happens. The first ten minutes are spent figuring out who owns the failing component
+before anyone can even start fixing it. That gap — not the outage itself — is usually the part
+that hurts.
 
 ## What Entelim answers
 

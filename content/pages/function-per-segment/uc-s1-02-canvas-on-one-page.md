@@ -21,7 +21,7 @@ You drew the canvas once, on a whiteboard, in Miro or in an investor deck. Then 
 
 ## What Entelim answers
 
-The **Canvases** page lists every canvas in your organisation as a card: the name, the first part of the description, the operating-model badge (or "No operating model set") and the date it was last updated. With none yet, it says "No Business Model Canvases yet".
+The **Canvases** page lists each canvas in your organisation as a card: the name, the first part of the description, the operating-model badge (or "No operating model set") and the date it was last updated. With none yet, it says "No Business Model Canvases yet".
 
 **New Canvas** opens a short form with three fields: a name (required), an optional description, and an **Operating Model Archetype** chosen from Coordination, Unification, Replication and Diversification, or left as "Not set". Click **Create Canvas** and the canvas opens.
 
