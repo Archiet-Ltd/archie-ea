@@ -290,13 +290,16 @@ def ranked_risks():
             apps_by_risk.setdefault(risk_id, []).append(component_id)
 
     seeds_by_risk = {}
+    unlinked_apps = set()   # risks with an application whose element pointer is empty
     for risk in risks:
         seeds = []
         if risk.archimate_element_id is not None:
             seeds.append(risk.archimate_element_id)
         for component_id in sorted(apps_by_risk.get(risk.id, [])):
             element_id = components[component_id][1]
-            if element_id is not None and element_id not in seeds:
+            if element_id is None:
+                unlinked_apps.add(risk.id)
+            elif element_id not in seeds:
                 seeds.append(element_id)
         seeds_by_risk[risk.id] = seeds
 
@@ -312,8 +315,12 @@ def ranked_risks():
         if answer["truncated"]:
             truncated.update(chunk)
         for row in answer["rows"]:
-            for seed in row["seed_ids"]:
-                reach.setdefault(seed, {})[row["element_id"]] = row["depth"]
+            # Distance from each seed separately: row["depth"] is the nearest
+            # over every seed, which would understate a far seed's distance.
+            for relation in row["relations"]:
+                seed_reach = reach.setdefault(relation["from_seed"], {})
+                seed_reach[row["element_id"]] = min(
+                    relation["depth"], seed_reach.get(row["element_id"], relation["depth"]))
 
     entries = []
     for risk in risks:
@@ -321,10 +328,14 @@ def ranked_risks():
         reached = {}
         for seed in seeds:
             for element_id, depth in reach.get(seed, {}).items():
-                if element_id not in seeds:
+                # Only the risk's own element is left out: another application
+                # mapped to the risk still counts when the risk already reached it.
+                if element_id != risk.archimate_element_id:
                     reached[element_id] = min(depth, reached.get(element_id, depth))
         exposure, why = None, None
-        if not seeds:
+        if risk.id in unlinked_apps:
+            why = "not_computed"
+        elif not seeds:
             why = "no_links"
         elif any(s in unresolved for s in seeds) or any(s in truncated for s in seeds):
             why = "not_computed"
@@ -375,5 +386,6 @@ def ranked_risks():
             "status": risk.status.value, "risk_level": risk.risk_level,
             "likelihood": risk.likelihood, "impact": risk.impact, "risk_score": entry["score"],
             "exposure": entry["exposure"], "reason": reason, "touches": entry["touches"],
+            "worked_out": entry["why"] != "not_computed",
         })
     return {"rows": rows, "total": total, "rule": RANKING_RULE}

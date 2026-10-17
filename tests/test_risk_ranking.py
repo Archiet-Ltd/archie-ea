@@ -156,3 +156,134 @@ def test_risk_page_shows_reason_and_is_404_for_another_organisation(
     assert listing.status_code == 200
     assert b"Foreign risk" not in listing.data
     assert b"Top risks (5)" in listing.data
+
+
+from app import db  # noqa: E402
+
+
+def _app(db_session, org_id, name, element=None):
+    from app.models.application_portfolio import ApplicationComponent
+
+    row = ApplicationComponent(name=name, organization_id=org_id,
+                               archimate_element_id=element.id if element is not None else None)
+    db_session.add(row)
+    db_session.flush()
+    if element is None:
+        # The shared backbone gives every application an element on flush; a cleared pointer
+        # (an element deleted or detached later) is written straight to the table.
+        db_session.execute(db.text("UPDATE application_components SET archimate_element_id = NULL WHERE id = :i"),
+                           {"i": row.id})
+        db_session.expire(row)
+    return row
+
+
+def _map(db_session, org_id, risk, component):
+    from app.models.risk_entity_link import RiskEntityLink
+
+    db_session.add(RiskEntityLink(risk_id=risk.id, entity_type="application", entity_id=component.id,
+                                  organization_id=org_id))
+    db_session.flush()
+
+
+def _only_row(org_id, tenant_ctx):
+    from app.services.risk_service import ranked_risks
+
+    with tenant_ctx(org_id):
+        (row,) = ranked_risks()["rows"]
+    return row
+
+
+def test_mapping_an_already_reached_application_does_not_lower_exposure(db_session, make_org, tenant_ctx):
+    org = make_org("a")
+    root, shared = _element(db_session, org.id, "Root"), _element(db_session, org.id, "Shared app")
+    _serves(db_session, org.id, root, shared)
+    _serves(db_session, org.id, shared, _element(db_session, org.id, "Leaf"))
+    risk = _risk(db_session, org.id, "Reaches shared", 3, 3, root)
+    before = _only_row(org.id, tenant_ctx)["exposure"]
+    assert before == 2
+    _map(db_session, org.id, risk, _app(db_session, org.id, "Shared app", shared))
+    assert _only_row(org.id, tenant_ctx)["exposure"] >= before
+
+
+def test_distance_is_measured_from_each_seed(db_session, make_org, tenant_ctx):
+    from app.services.risk_service import ranked_risks
+
+    org = make_org("a")
+    a, b = _element(db_session, org.id, "A"), _element(db_session, org.id, "B")
+    hop1, hop2, target = (_element(db_session, org.id, n) for n in ("h1", "h2", "Target"))
+    _serves(db_session, org.id, a, hop1)
+    _serves(db_session, org.id, hop1, hop2)
+    _serves(db_session, org.id, hop2, target)   # 3 hops from A
+    _serves(db_session, org.id, b, target)      # 1 hop from B
+    alone = _risk(db_session, org.id, "Only A", 3, 3, a)
+    both = _risk(db_session, org.id, "A and B", 3, 3, a)
+    _map(db_session, org.id, both, _app(db_session, org.id, "B app", b))
+    with tenant_ctx(org.id):
+        rows = {r["title"]: r for r in ranked_risks()["rows"]}
+    # A and B are asked about in one call; Target is one hop from B but three from A,
+    # so for the risk that only has A it must sort after h1 and h2.
+    touches = [t["name"] for t in rows["Only A"]["touches"]]
+    assert touches.index("h1") < touches.index("h2") < touches.index("Target")
+    assert alone.id == rows["Only A"]["risk_id"]
+
+
+def test_application_with_no_element_is_not_skipped(db_session, make_org, tenant_ctx):
+    org = make_org("a")
+    root = _element(db_session, org.id, "Root")
+    _serves(db_session, org.id, root, _element(db_session, org.id, "Leaf"))
+    risk = _risk(db_session, org.id, "Half known", 3, 3, root)
+    _map(db_session, org.id, risk, _app(db_session, org.id, "Resolvable", _element(db_session, org.id, "Mirror")))
+    _map(db_session, org.id, risk, _app(db_session, org.id, "Unmirrored"))
+    row = _only_row(org.id, tenant_ctx)
+    assert row["exposure"] is None
+    assert row["worked_out"] is False
+    assert "could not be worked out" in row["reason"]
+    # An application with no element and no other link is not "no linked elements" either.
+    risk2 = _risk(db_session, org.id, "Only unmirrored", 1, 1)
+    _map(db_session, org.id, risk2, _app(db_session, org.id, "Unmirrored two"))
+    from app.services.risk_service import ranked_risks
+    with tenant_ctx(org.id):
+        by_title = {r["title"]: r for r in ranked_risks()["rows"]}
+    assert "could not be worked out" in by_title["Only unmirrored"]["reason"]
+
+
+def test_statement_count_with_distinct_mirrors_grows_per_risk(db_session, make_org, tenant_ctx):
+    """Measured, not hidden: each distinct seed costs one walk in the impact engine."""
+    from app.services.risk_service import ranked_risks
+
+    org = make_org("a")
+
+    def add(n):
+        for i in range(n):
+            el = _element(db_session, org.id, "Mirror %d-%d" % (n, i))
+            _serves(db_session, org.id, el, _element(db_session, org.id, "Leaf %d-%d" % (n, i)))
+            _risk(db_session, org.id, "Risk %d-%d" % (n, i), 2, 2, el)
+
+    add(1)
+    with tenant_ctx(org.id):
+        one = _count_statements(db_session, ranked_risks)
+    add(9)
+    with tenant_ctx(org.id):
+        ten = _count_statements(db_session, ranked_risks)
+    per_risk = (ten - one) / 9
+    print("statements: 1 risk=%d, 10 risks=%d, per extra risk=%.1f" % (one, ten, per_risk))
+    assert per_risk <= 14, per_risk
+
+
+def test_risk_page_does_not_claim_no_links_when_it_could_not_read_them(
+    db_session, make_org, login_as, client
+):
+    from app.models.user import User
+
+    org = make_org("a")
+    risk = _risk(db_session, org.id, "Unreadable links", 3, 3)
+    _map(db_session, org.id, risk, _app(db_session, org.id, "Unmirrored"))
+    user = User(email="u-%s@example.com" % uuid.uuid4().hex[:8], first_name="R", last_name="T",
+                organization_id=org.id, confirmed=True, enterprise_role="enterprise_architect")
+    db.session.add(user)
+    db.session.flush()
+    login_as(client, user)
+    page = client.get("/risks/%d" % risk.id)
+    assert page.status_code == 200
+    assert b"could not be worked out" in page.data
+    assert b"No linked elements recorded" not in page.data

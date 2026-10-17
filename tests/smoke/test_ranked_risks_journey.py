@@ -37,6 +37,17 @@ def _seed(org_id, noun):
         db.session.add(ArchiMateRelationship(type="Serving", source_id=narrow.id, target_id=other.id,
                                              organization_id=org_id))
         db.session.commit()
+        # An application whose element reaches two more elements, for the mapping step.
+        from app.models.application_portfolio import ApplicationComponent
+
+        ledger = ApplicationComponent(name="%s Ledger" % noun, organization_id=org_id)
+        db.session.add(ledger)
+        db.session.commit()
+        for leaf in ("ledger one", "ledger two"):
+            db.session.add(ArchiMateRelationship(type="Serving", source_id=ledger.archimate_element_id,
+                                                 target_id=element("%s %s" % (noun, leaf)).id,
+                                                 organization_id=org_id))
+        db.session.commit()
         for title, likelihood, impact, seed in (
             ("%s low risk" % noun, 1, 2, narrow), ("%s big risk" % noun, 3, 3, wide),
             ("%s loose risk" % noun, 5, 5, None),
@@ -80,6 +91,27 @@ def test_ranked_risk_list_journey(live_server, browser):
     page.wait_for_url(lambda url: "/archimate/elements/" in url, timeout=PAGE_TIMEOUT)
 
     page.goto(base + "/risks/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.reload(wait_until="domcontentloaded")
+    assert _order(page, noun) == expected
+
+    # Map the loose risk to an application: the ranked card changes without a reload.
+    loose_title = "%s loose risk" % noun
+    table_row = page.locator("#risk-register-table tbody tr", has_text=loose_title)
+    table_row.get_by_role("button", name="Map to…").click()
+    page.get_by_label("Search entities to link").fill("%s Ledger" % noun)
+    page.get_by_role("button", name="%s Ledger" % noun).click()
+    loose = page.locator("[data-risk-row]", has_text=loose_title)
+    expect(loose.locator("[data-risk-reason]")).to_contain_text("reaches 2 elements", timeout=PAGE_TIMEOUT)
+    expect(loose.locator("[data-risk-reason]")).not_to_contain_text("no linked elements recorded")
+    page.reload(wait_until="domcontentloaded")
+    loose = page.locator("[data-risk-row]", has_text=loose_title)
+    expect(loose.locator("[data-risk-reason]")).to_contain_text("reaches 2 elements")
+
+    # Unmap it again: the card goes back, and stays back after a reload.
+    page.locator("#risk-register-table tbody tr", has_text=loose_title).get_by_role("button", name="Map to…").click()
+    page.get_by_role("button", name="Unmap").click()
+    loose = page.locator("[data-risk-row]", has_text=loose_title)
+    expect(loose.locator("[data-risk-reason]")).to_contain_text("no linked elements recorded", timeout=PAGE_TIMEOUT)
     page.reload(wait_until="domcontentloaded")
     assert _order(page, noun) == expected
     context.close()
