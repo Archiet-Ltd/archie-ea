@@ -265,11 +265,23 @@ def capture_role(browser, base, password, slug: str, archetype: str) -> tuple[bo
             return False, "no answer rows appeared for %s (empty state)" % archetype
         button = page.get_by_role("button", name="Work them out now")
         if button.count():
-            button.click()
-            page.wait_for_timeout(10000)
+            # A 409 (busy) or 500 leaves the earlier rows on screen, so the row selector alone
+            # cannot tell a refreshed answer from a failed recalculation: require the request to succeed.
+            try:
+                with page.expect_response(lambda r: "/derivation/recompute" in r.url, timeout=60000) as sent:
+                    button.click()
+            except Exception:
+                return False, "recalculation did not complete for %s" % archetype
+            if not sent.value.ok:
+                return False, "recalculation answered HTTP %s for %s" % (sent.value.status, archetype)
+            page.wait_for_load_state("networkidle")
+            if page.locator("[data-recompute-button]").count() and page.locator("[data-recompute-button]").first.is_visible():
+                return False, "recalculation notice still shown for %s" % archetype
         page.wait_for_selector("[data-ask-row]", timeout=30000)
         page.wait_for_timeout(1000)
         _tidy(page)
+        # Ask scrolls to its results; measure from the top, the same position _shoot() clips from.
+        page.evaluate("window.scrollTo(0, 0)")
         h1 = _box(page, "h1")
         main = _box(page, "main")
         row = _box(page, "[data-ask-row]", 0)
