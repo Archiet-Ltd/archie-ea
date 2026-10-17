@@ -74,11 +74,11 @@ capabilities.
   and the whole platform is open source, so you are never locked into a proprietary format or a
   single vendor.
 
-## Where Entelim is today, and where it goes
+## Where Entelim is today
 
 Today Entelim is a modelled company brain: import an existing architecture model and ask cited
 questions about it. Every action Entelim's own assistant takes passes one permission check, and every
-change it suggests waits in an approval queue until a person approves it. See
+change the assistant proposes waits in an approval queue until a person approves it. See
 [all eighteen capabilities](/features) for what each one delivers today.
 
 ## Open source, so nobody's locked in
@@ -91,7 +91,7 @@ locked into a proprietary format.
 
 ## How we run our own company on it
 
-Archiet Ltd, the company behind Entelim, runs its own operating model in Entelim: roadmap and
+Archiet Ltd, the company behind Entelim, runs its own operating model in Entelim: roadmaps and
 stop/go decisions trace back to the same twin the product sells, not a spreadsheet kept alongside
 it. See [how Archiet runs on Entelim](/how-archiet-runs-on-entelim).
 

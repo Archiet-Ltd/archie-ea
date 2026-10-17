@@ -123,7 +123,7 @@ Delivered today by: [Org Chart and RACI](/modules/org-chart).
 <h3 id="operations-and-service-management">Operations and Service Management</h3>
 
 Bring the live state of the business into the model (services, incidents, changes, service levels
-and telemetry) so the company brain reflects what is happening now, not what was drawn last quarter.
+and telemetry) so the company brain reflects what is happening now, not what was drawn at the last review.
 
 ## Stay in control
 
@@ -187,7 +187,7 @@ Delivered today by: [Vendors](/modules/vendors), [Procurement](/modules/procurem
 Inventory, classify, evaluate and govern every AI system in the enterprise, including Entelim's own,
 and manage what AI costs you.
 
-**Today:** Entelim governs its own AI the way you will govern yours: every action its assistant takes
+**Today:** Entelim governs its own AI the way you govern yours: every action its assistant takes
 passes one permission check, writes wait for approval, and its agents are listed in a register you
 can read.
 
@@ -227,7 +227,7 @@ Let governed agents and your own AI assistants read the model, propose changes a
 delegate, act on it, with one permission check, one approval queue and a full audit trail.
 
 **Today:** the in-product assistant works through the same permission check and approval inbox every
-agent will use.
+agent uses.
 
 Delivered today by: [AI Chat](/modules/ai-chat).
 
@@ -264,5 +264,5 @@ For certifications and what we do and do not claim today, see [Security](/securi
 
 ---
 
-Every capability above is in the product today or has a quarter on the published roadmap. See [how
+Every capability above is in the product today. See [how
 it's priced](/pricing) or [try it](/account/register).

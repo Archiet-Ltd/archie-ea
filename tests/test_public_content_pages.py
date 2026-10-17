@@ -2774,7 +2774,7 @@ def test_new_role_page_appears_everywhere_with_no_other_edit(app):
         assert _robots_allows(rules, "/roles/zzz-e2e-role")
 
 
-_ROADMAP_VOICE = re.compile(r"Q[1-4] ?20\d\d|\bopens in\b|\barrives?\b|\bNext:")
+_ROADMAP_VOICE = re.compile(r"Q[1-4] ?20\d\d|\bopens in\b|\barrives?\b|\bNext:|\bquarter\b|\broadmap\b")
 _SELL_PAGE_SOURCES = [
     "app/templates/main/index.html",
     "app/templates/public/pricing.html",
