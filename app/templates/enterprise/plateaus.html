@@ -54,7 +54,7 @@
             </div>
             <div class="mt-4 text-sm" data-testid="plateau-gaps-{{ plateau.id }}">
                 <div class="font-medium mb-1">Gaps</div>
-                {% for gap in plateau_gaps.get(plateau.id, []) %}
+                {% for gap in (plateau_gaps or {}).get(plateau.id, []) %}
                 <div><a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
                         class="hover:underline" data-testid="plateau-gap-link">{{ gap.name|default('—', true) }}</a></div>
                 {% else %}

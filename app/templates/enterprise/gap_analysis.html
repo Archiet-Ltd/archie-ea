@@ -98,7 +98,7 @@
                             </td>
                             <td class="p-3 text-sm text-muted-foreground">{{ gap.impact|default('Unknown') }}</td>
                             <td class="p-3 text-sm" data-testid="gap-work-packages-{{ gap.id }}">
-                                {% for wp in work_packages_by_gap.get(gap.id, []) %}
+                                {% for wp in (work_packages_by_gap or {}).get(gap.id, []) %}
                                 <div><a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wp.id) if 'implementation_planning.work_package_detail' in flask.current_app.view_functions else '#' }}"
                                         class="text-primary hover:underline" data-testid="gap-work-package-link">{{ wp.name|default('—', true) }}</a></div>
                                 {% else %}
