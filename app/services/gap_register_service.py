@@ -341,6 +341,37 @@ def get_gaps_not_addressed(organization_id: int) -> List[Gap]:
     )
 
 
+_RESOLVED_GAP_STATUSES = ("resolved", "closed", "complete", "completed")
+
+
+def open_gaps_with_coverage(organization_id: int) -> List[Tuple[Gap, bool]]:
+    """Every open capability gap of the organisation, each with whether a work
+    package addresses it. One statement, same notion of "addressed" as
+    get_gaps_not_addressed."""
+    from sqlalchemy import exists
+
+    from app.models.implementation_migration import WorkPackage
+
+    addressed = (
+        exists()
+        .where(gap_work_packages.c.gap_id == Gap.id)
+        .where(gap_work_packages.c.work_package_id == WorkPackage.id)
+        .where(WorkPackage.organization_id == organization_id)
+    )
+    return (
+        db.session.query(Gap, addressed.label("addressed"))
+        .filter(
+            Gap.organization_id == organization_id,
+            Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
+            db.or_(
+                Gap.resolution_status.is_(None),
+                Gap.resolution_status.notin_(_RESOLVED_GAP_STATUSES),
+            ),
+        )
+        .all()
+    )
+
+
 def count_gaps(
     organization_id: int,
     gap_type: Optional[str] = None,
