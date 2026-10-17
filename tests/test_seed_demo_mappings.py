@@ -166,3 +166,93 @@ def test_dry_run_writes_nothing_but_still_reports_what_it_would_do(
     assert applied["app_capability_created"] == stats["app_capability_created"], (
         "the dry run's preview did not match what the real run actually did"
     )
+
+
+# ── the table the Investment Map and capability screens read ─────────────────
+
+
+def _unified_count(db_session, org_id):
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.unified_application_capability_mapping import (
+        UnifiedApplicationCapabilityMapping as U,
+    )
+
+    return (
+        db_session.query(U)
+        .join(ApplicationComponent, ApplicationComponent.id == U.application_component_id)
+        .filter(ApplicationComponent.organization_id == org_id)
+        .count()
+    )
+
+
+def test_seeding_writes_the_rows_the_investment_map_reads(db_session, tenant_with_entities):
+    """Fails on the base: the seed wrote only the legacy table, so the screens read 0."""
+    org = tenant_with_entities("seed-unified")
+
+    stats = seed_demo_mappings(org.id)
+
+    assert stats["unified_created"] > 0
+    assert _unified_count(db_session, org.id) == stats["unified_created"]
+    assert stats["unified_created"] == stats["app_capability_created"]
+
+
+def test_unified_rows_point_at_the_projection_of_the_same_organisation(
+    db_session, tenant_with_entities
+):
+    from app.models.unified_application_capability_mapping import (
+        UnifiedApplicationCapabilityMapping as U,
+    )
+
+    org = tenant_with_entities("seed-unified-org")
+    seed_demo_mappings(org.id)
+
+    from app.models.application_portfolio import ApplicationComponent
+
+    mine = (
+        db_session.query(U)
+        .join(ApplicationComponent, ApplicationComponent.id == U.application_component_id)
+        .filter(ApplicationComponent.organization_id == org.id)
+        .all()
+    )
+    assert mine
+    assert all(r.unified_capability.organization_id == org.id for r in mine)
+    assert all(r.unified_capability.source_table == "business_capability" for r in mine)
+
+
+def test_unified_seeding_is_idempotent(db_session, tenant_with_entities):
+    org = tenant_with_entities("seed-unified-idem")
+
+    seed_demo_mappings(org.id)
+    first = _unified_count(db_session, org.id)
+    second = seed_demo_mappings(org.id)
+
+    assert second["unified_created"] == 0
+    assert second["unified_already_present"] == first
+    assert _unified_count(db_session, org.id) == first
+
+
+def test_unified_dry_run_writes_nothing_and_matches_the_real_run(
+    db_session, tenant_with_entities
+):
+    org = tenant_with_entities("seed-unified-dry")
+
+    preview = seed_demo_mappings(org.id, dry_run=True)
+    assert _unified_count(db_session, org.id) == 0
+    assert preview["unified_created"] > 0
+
+    applied = seed_demo_mappings(org.id)
+    assert applied["unified_created"] == preview["unified_created"]
+
+
+def test_unified_seeding_one_organisation_adds_nothing_for_the_other(
+    db_session, tenant_with_entities, tenant_ctx
+):
+    a = tenant_with_entities("seed-unified-a")
+    b = tenant_with_entities("seed-unified-b")
+
+    # The command runs inside the organisation it is given (tenant_scope).
+    with tenant_ctx(a.id):
+        seed_demo_mappings(a.id)
+
+    assert _unified_count(db_session, a.id) > 0
+    assert _unified_count(db_session, b.id) == 0

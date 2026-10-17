@@ -127,6 +127,94 @@ def _stages(org_id):
     return {(vs_name, stage.name): stage for stage, vs_name in rows}
 
 
+def _unified_capability_ids(org_id, capabilities, dry_run):
+    """business_capability id -> unified_capabilities id, inside one organisation.
+
+    The unified rows are the projection of the source capabilities (ADR 0008),
+    found by their provenance. A capability not yet projected is projected
+    through the existing single-row projection, never written by hand; a dry run
+    projects nothing and reports the capability as resolvable.
+    """
+    from app.commands.project_capabilities import SOURCE_TABLE
+    from app.models.unified_capability import UnifiedCapability
+
+    def _lookup():
+        rows = (
+            db.session.query(UnifiedCapability.source_id, UnifiedCapability.id)
+            .filter(
+                UnifiedCapability.organization_id == org_id,
+                UnifiedCapability.source_table == SOURCE_TABLE,
+                UnifiedCapability.source_id.in_([str(c.id) for c in capabilities]),
+            )
+            .all()
+        )
+        return {int(source_id): uid for source_id, uid in rows}
+
+    found = _lookup()
+    missing = [c for c in capabilities if c.id not in found]
+    if missing and not dry_run:
+        from app.models.business_capabilities import _project_capability_row
+
+        for capability in missing:
+            _project_capability_row(db.session.connection(), capability)
+        db.session.flush()
+        found = _lookup()
+    return found
+
+
+def write_unified_mappings(org_id, pairs, dry_run=False):
+    """Write the rows the Investment Map and capability screens read.
+
+    `pairs` is an iterable of (ApplicationComponent, BusinessCapability,
+    support_level, coverage_percentage), already resolved inside `org_id`.
+    Fields and defaults follow the application edit screen's own writer.
+    Idempotent. Returns counts: unified_created, unified_already_present,
+    unified_skipped (capability with no unified row to point at).
+    """
+    from app.models.unified_application_capability_mapping import (
+        UnifiedApplicationCapabilityMapping,
+    )
+
+    stats = {"unified_created": 0, "unified_already_present": 0, "unified_skipped": 0}
+    pairs = list(pairs)
+    if not pairs:
+        return stats
+
+    capabilities = list({bc.id: bc for _, bc, _, _ in pairs}.values())
+    unified_ids = _unified_capability_ids(org_id, capabilities, dry_run)
+
+    app_ids = {a.id for a, _, _, _ in pairs}
+    existing = {
+        (m.application_component_id, m.unified_capability_id)
+        for m in db.session.query(UnifiedApplicationCapabilityMapping)
+        .filter(UnifiedApplicationCapabilityMapping.application_component_id.in_(app_ids))
+        .all()
+    }
+
+    for app, bc, support_level, coverage in pairs:
+        unified_id = unified_ids.get(bc.id)
+        if unified_id is None and not dry_run:
+            stats["unified_skipped"] += 1
+            continue
+        if unified_id is not None and (app.id, unified_id) in existing:
+            stats["unified_already_present"] += 1
+            continue
+        if not dry_run:
+            db.session.add(
+                UnifiedApplicationCapabilityMapping(
+                    application_component_id=app.id,
+                    unified_capability_id=unified_id,
+                    support_level=support_level,
+                    coverage_percentage=coverage,
+                    relationship_type="enables",
+                    notes="Demonstration data",
+                )
+            )
+            existing.add((app.id, unified_id))
+        stats["unified_created"] += 1
+    return stats
+
+
 def seed_demo_mappings(org_id, dry_run=False):
     """Link a tenant's applications, capabilities and value-stream stages.
 
@@ -147,6 +235,7 @@ def seed_demo_mappings(org_id, dry_run=False):
         "already_present": 0,
         "skipped": 0,
     }
+    unified_pairs = []
 
     # tenant-scoping-ok: scoped via the FK parent BusinessCapability (caps,
     # already filtered to org_id above), not ACM.organization_id -- that
@@ -168,6 +257,7 @@ def seed_demo_mappings(org_id, dry_run=False):
             if app is None or capability is None:
                 stats["skipped"] += 1
                 continue
+            unified_pairs.append((app, capability, "full", 100))
             if (app.id, capability.id) in existing_app_caps:
                 stats["already_present"] += 1
                 continue
@@ -183,6 +273,10 @@ def seed_demo_mappings(org_id, dry_run=False):
                 )
             stats["app_capability_created"] += 1
             existing_app_caps.add((app.id, capability.id))
+
+    if not dry_run:
+        db.session.flush()
+    stats.update(write_unified_mappings(org_id, unified_pairs, dry_run=dry_run))
 
     stage_ids = [stage.id for stage in stages.values()] or [-1]
     existing_stage_caps = {
@@ -261,6 +355,7 @@ def seed_demo_mappings_command(org_id, dry_run):
     click.echo(
         f"  {verb} {stats['app_capability_created']} application-capability and "
         f"{stats['stage_capability_created']} stage-capability mapping(s); "
+        f"{stats['unified_created']} screen-reader mapping(s); "
         f"{stats['already_present']} already present; {stats['skipped']} skipped "
         "(name not present in this organisation)."
     )

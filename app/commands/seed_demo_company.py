@@ -1420,6 +1420,19 @@ def seed_demo_company() -> dict:
             db.session.flush()
         stats["capability_mappings_created"] = mappings_created
 
+        # The Investment Map and capability screens read the unified table.
+        from app.commands.seed_demo_mappings import write_unified_mappings
+
+        unified_pairs = []
+        for app_name, app in _resolve_apps(org_id).items():
+            profile = _APP_PROFILE.get(app_name)
+            bc = existing_bcs.get(profile[3]) if profile else None
+            if bc is not None:
+                unified_pairs.append((app, bc, "full", 80))
+        unified = write_unified_mappings(org_id, unified_pairs)
+        db.session.flush()
+        stats["unified_capability_mappings_created"] = unified["unified_created"]
+
         # ── 7c. architecture review board queue ─────────────────────────
         from app.models.architecture_review_board import ARBReviewItem
 
