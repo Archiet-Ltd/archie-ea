@@ -964,8 +964,11 @@ def ai_architecture_analysis():
         total_recommendations = AIRecommendation.query.count()
         total_gaps = count_gaps(current_org_id())
 
+        from app.services.priority_action_service import prioritised_actions
+
         return render_template(
             "enterprise/ai_architecture_analysis.html",
+            priority_actions=prioritised_actions(current_org_id(), limit=10),
             ai_recommendations=ai_recommendations,
             gaps_by_severity=gaps_by_severity,
             apps_needing_review=apps_needing_review,

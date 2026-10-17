@@ -525,6 +525,13 @@ function riskRegister() {
 
         updatingId: null,
 
+        // A link from the prioritised action list (?risk=<id>) opens that risk's panel.
+        init() {
+            const wanted = new URLSearchParams(window.location.search).get('risk');
+            const match = (window.RISK_ROWS || []).find(function (r) { return String(r.id) === wanted; });
+            if (match) this.openView(match, false);
+        },
+
         // PATCH /api/risks/<id> takes {status} and returns the updated risk.
         setStatus(id, status) {
             if (this.updatingId) return;

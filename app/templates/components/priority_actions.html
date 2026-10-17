@@ -1,0 +1,43 @@
+{# The one prioritised action list, shared by every screen that answers "what should be done first".
+   Expects `priority_actions` from app.services.priority_action_service.prioritised_actions(). #}
+{% from 'components/badge.html' import badge %}
+{% set pa = priority_actions %}
+{% set vf = flask.current_app.view_functions %}
+<section class="rounded-lg border bg-card shadow-sm" data-testid="priority-actions" aria-labelledby="priority-actions-title">
+    <div class="border-b p-4">
+        <h2 id="priority-actions-title" class="text-lg font-semibold flex items-center gap-2">
+            <i data-lucide="list-ordered" class="h-5 w-5 text-primary" aria-hidden="true"></i>
+            Prioritised actions
+        </h2>
+        <p class="text-sm text-muted-foreground mt-1" data-testid="priority-actions-rule">{{ pa.rule }}</p>
+    </div>
+    {% if pa.rows %}
+    <ol class="divide-y divide-border/50" data-testid="priority-actions-list">
+        {% for row in pa.rows %}
+        {% if row.kind == 'gap' %}
+            {% set href = url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=row.record_id) %}
+        {% elif row.kind == 'work_package' %}
+            {% set href = url_for('enterprise.work_package_detail', work_package_id=row.record_id) if 'enterprise.work_package_detail' in flask.current_app.view_functions else url_for('enterprise.work_packages') %}
+        {% else %}
+            {% set href = url_for('risk.risk_page', risk_id=row.record_id) if 'risk.risk_page' in flask.current_app.view_functions else url_for('risk.risk_register', risk=row.record_id) %}
+        {% endif %}
+        <li class="flex items-start gap-3 p-4" data-testid="priority-action-row">
+            <span class="text-sm font-semibold text-muted-foreground w-6 shrink-0">{{ row.position }}</span>
+            <div class="min-w-0 flex-1">
+                <a href="{{ href }}" class="font-medium text-foreground hover:underline" data-testid="priority-action-link">{{ row.action }}</a>
+                <p class="text-sm text-muted-foreground mt-0.5">{{ row.why }}</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                {% call badge('neutral') %}{{ row.kind_label }}{% endcall %}
+                {% call badge('warning' if row.severity in ('Critical', 'High') else 'secondary') %}{{ row.severity or '—' }}{% endcall %}
+            </div>
+        </li>
+        {% endfor %}
+    </ol>
+    {% if pa.total > pa.rows|length %}
+    <p class="border-t p-3 text-sm text-muted-foreground">Showing the first {{ pa.rows|length }} of {{ pa.total }} actions.</p>
+    {% endif %}
+    {% else %}
+    <p class="p-4 text-sm text-muted-foreground" data-testid="priority-actions-empty">Nothing needs doing right now: no open gaps, late or blocked work packages, or open risks.</p>
+    {% endif %}
+</section>
