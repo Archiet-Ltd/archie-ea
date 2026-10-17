@@ -75,7 +75,7 @@ def _offered_urls(app, user):
         from flask_login import login_user
 
         login_user(user)
-        links = [l for z in get_sidebar_zones(user) for l in z["links"]] + visible_module_links()
+        links = [item for z in get_sidebar_zones(user) for item in z["links"]] + visible_module_links()
         out = {}
         for link in links:
             ep = link["endpoint"]
