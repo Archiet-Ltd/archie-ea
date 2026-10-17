@@ -30,6 +30,13 @@ Tracing capability ownership and goals to what realises them lands in Q4 2026, a
 Delivered today by: [Business Model Canvas](/modules/business-model-canvas),
 [Value Streams at Risk](/use-cases/value-streams-at-risk).
 
+<figure class="public-figure mt-10">
+<picture>
+<img src="/static/img/modules/business-model-canvas.webp" alt="Screenshot of the Business Model Canvas module's canvas library." width="1200" height="750" loading="lazy" decoding="async" class="rounded-lg border border-border shadow-sm">
+</picture>
+<figcaption class="mt-2 text-sm text-muted-foreground">The business model canvas library, with each canvas's operating-model archetype.</figcaption>
+</figure>
+
 <h3 id="portfolio-management">Portfolio Management</h3>
 
 Keep one current portfolio of applications, technology, products and initiatives, each with an
@@ -42,6 +49,13 @@ Every application will carry a named owner, and every impact answer will show ow
 
 Delivered today by: [Applications](/modules/applications), [Portfolio](/modules/portfolio),
 [Rationalization](/modules/rationalization), [What I Own](/use-cases/what-i-own).
+
+<figure class="public-figure mt-10">
+<picture>
+<img src="/static/img/modules/portfolio.webp" alt="Screenshot of the Portfolio module's dashboard." width="1200" height="750" loading="lazy" decoding="async" class="rounded-lg border border-border shadow-sm">
+</picture>
+<figcaption class="mt-2 text-sm text-muted-foreground">The portfolio dashboard, summarising active initiatives and programmes.</figcaption>
+</figure>
 
 <h3 id="transformation-management">Transformation Management</h3>
 
@@ -67,6 +81,13 @@ Next comes one home for every cost, totalled in your reporting currency, in Q2 2
 
 Delivered today by: [Business Case](/modules/business-case).
 
+<figure class="public-figure mt-10">
+<picture>
+<img src="/static/img/modules/business-case.webp" alt="Screenshot of the Business Case module's list of business cases." width="1200" height="750" loading="lazy" decoding="async" class="rounded-lg border border-border shadow-sm">
+</picture>
+<figcaption class="mt-2 text-sm text-muted-foreground">Business cases with their status, three-year TCO and return on investment.</figcaption>
+</figure>
+
 ## Know what you run
 
 *What does the business actually run on, and who owns it?*
@@ -84,6 +105,13 @@ Re-importing a model will keep identities through renames from Q4 2026, with mod
 
 Delivered today by: [Architecture Model](/modules/architecture-model),
 [Diagrams and Composer](/modules/diagrams), [Industry Reference Frameworks](/modules/industry-apqc).
+
+<figure class="public-figure mt-10">
+<picture>
+<img src="/static/img/modules/architecture-model.webp" alt="Screenshot of the Architecture Model module's ArchiMate element browser." width="1200" height="750" loading="lazy" decoding="async" class="rounded-lg border border-border shadow-sm">
+</picture>
+<figcaption class="mt-2 text-sm text-muted-foreground">The ArchiMate element browser, spanning the business, application, technology and motivation layers.</figcaption>
+</figure>
 
 <h3 id="data-management">Data Management</h3>
 
@@ -130,6 +158,13 @@ Risk will propagate through every dependency from Q1 2027, with appetite, key ri
 
 Delivered today by: [Risk Register](/modules/risk-register).
 
+<figure class="public-figure mt-10">
+<picture>
+<img src="/static/img/modules/risk-register.webp" alt="Screenshot of the Risk Register module." width="1200" height="750" loading="lazy" decoding="async" class="rounded-lg border border-border shadow-sm">
+</picture>
+<figcaption class="mt-2 text-sm text-muted-foreground">The risk register, with likelihood, impact and a mitigation plan recorded for each risk.</figcaption>
+</figure>
+
 <h3 id="compliance-and-governance">Compliance and Governance</h3>
 
 Map obligations to controls and evidence, run architecture review and gates, and give auditors
@@ -144,6 +179,14 @@ A control library with evidence that proves each control operates arrives in Q1 
 Delivered today by: [Architecture Review Board](/modules/arb),
 [Compliance Frameworks](/modules/compliance-frameworks).
 
+<figure class="public-figure mt-10">
+<picture>
+<source media="(max-width: 1099px)" srcset="/static/img/modules/arb-mobile.webp" width="302" height="624">
+<img src="/static/img/modules/arb.webp" alt="Screenshot of the Architecture Review Board hub showing total and pending reviews, approval rate, cycle time and the review status chart." width="952" height="808" loading="lazy" decoding="async" class="rounded-lg border border-border shadow-sm">
+</picture>
+<figcaption class="mt-2 text-sm text-muted-foreground">The Architecture Review Board hub: review volume, pending decisions, approval rate and cycle time.</figcaption>
+</figure>
+
 <h3 id="vendor-and-procurement-management">Vendor and Procurement Management</h3>
 
 Know every supplier, contract and licence, what each one serves and what it costs, and never miss
@@ -155,6 +198,13 @@ the applications they serve.
 Renewal alerts that show the last day to cancel arrive in Q1 2027, followed by licence usage that is measured rather than typed in Q2 2027.
 
 Delivered today by: [Vendors](/modules/vendors), [Procurement](/modules/procurement).
+
+<figure class="public-figure mt-10">
+<picture>
+<img src="/static/img/modules/vendors.webp" alt="Screenshot of the Vendors module's vendor catalogue." width="1200" height="750" loading="lazy" decoding="async" class="rounded-lg border border-border shadow-sm">
+</picture>
+<figcaption class="mt-2 text-sm text-muted-foreground">The vendor catalogue, with each vendor's type, products and contract status.</figcaption>
+</figure>
 
 <h3 id="ai-management">AI Management</h3>
 
@@ -184,6 +234,13 @@ Organisation-wide questions with cited, shareable answers arrive in Q4 2026, and
 
 Delivered today by: [Digital Twin](/modules/digital-twin),
 [What breaks if this fails, and who gets called](/use-cases/what-breaks-and-who-gets-called).
+
+<figure class="public-figure mt-10">
+<picture>
+<img src="/static/img/modules/ai-chat.webp" alt="Screenshot of the AI Chat module answering a question about Lantern Quay Systems' architecture." width="1200" height="750" loading="lazy" decoding="async" class="rounded-lg border border-border shadow-sm">
+</picture>
+<figcaption class="mt-2 text-sm text-muted-foreground">The AI assistant answering a question from the organisation's own architecture model.</figcaption>
+</figure>
 
 <h3 id="simulation-and-scenario-planning">Simulation and Scenario Planning</h3>
 
