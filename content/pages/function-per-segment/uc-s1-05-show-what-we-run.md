@@ -66,7 +66,7 @@ Entelim has no public link for these screens. A person needs a sign-in to your o
 
 ### What if an application has no owner?
 
-It counts against the owner figure in the Data Quality panel. Ask shows no owner card for it, and says no ownership is recorded.
+It counts against the owner figure in the Data Quality panel. Ask also draws on owners of the systems downstream of it, so cards can appear even when the application has no owner of its own; open the application's Ownership section to check its own assignments. Only when nothing in that chain has an owner does Ask say so.
 
 ## Related questions and modules
 

@@ -70,7 +70,7 @@ were new and which already existed, and there is no preview and no way back.
 ## Limits
 
 - The import reads Open Exchange XML. The page accepts .xml files only.
-- It brings in elements, relationships and their properties. Diagrams and their layouts are not imported.
+- It brings in elements, relationships and the properties on elements. Properties on relationships are not imported. Diagrams and their layouts are not imported.
 - Elements whose name or type is too long for the model, and relationships the ArchiMate rules do not allow, are
   refused and reported, not silently stored.
 - Duplicates are matched on name and type, not on the identifiers in the file.

@@ -67,7 +67,7 @@ A dependency diagram and a service catalogue spreadsheet. In an incident the dia
 
 ### What if nobody owns the system that failed?
 
-The accountability question says no ownership is recorded for it. It does not name anyone.
+The accountability question does not name anyone for an owner that is not recorded, but it also lists owners of the systems downstream, so cards can still appear. Open the system's own Ownership section to see whether it has an owner itself.
 
 ### Does it read live monitoring?
 

@@ -53,7 +53,7 @@ benefit. It shows a dash until at least capex or the benefit is entered. Payback
 Only blank fields are filled. A figure you have already typed is left alone. A message lists the fields that were
 filled, or says no new figures were found on the linked records.
 
-The case can be exported as an image, or downloaded as a Mermaid, Lucidchart or Archi file.
+The case can be exported as an image. The Mermaid, Lucidchart and Archi downloads are diagram files: they carry the saved diagram and the reasons for each box, not the text and financial figures you typed in, so use the image or the printed page for the completed document.
 
 For the portfolio view, the **Investment Prioritization Matrix** (Investment Analysis in the module list) shows each capability's
 strategic, coverage and risk scores, total score, priority, an investment figure and a recommendation. An investment

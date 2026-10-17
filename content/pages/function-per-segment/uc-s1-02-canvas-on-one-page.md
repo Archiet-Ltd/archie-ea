@@ -29,7 +29,7 @@ The canvas page shows nine boxes in the classic layout: Customer Segments, Value
 
 Each box also has a sparkle button, named for example "Draft Revenue Streams with AI". It puts a draft into that box. The draft is built from the other boxes you have already filled in, the canvas name, the archetype, and the number of applications recorded in your workspace. It is a starting point to edit, not a record of anything.
 
-An **Export & share** panel offers **Export as image**, and **Download file** in Mermaid, Lucidchart or Archi format. Once the canvas has a saved diagram, a **Share** link appears that opens it for people inside your organisation.
+An **Export & share** panel offers **Export as image**, and **Download file** in Mermaid, Lucidchart or Archi format; those files are diagram files that carry the saved diagram and the reasons for each box, not the text you typed into the boxes. Once the canvas has a saved diagram, a **Share** link appears that opens it for people inside your organisation.
 
 ## Who asks it
 
@@ -41,7 +41,7 @@ A founder or head of operations who has to show the business model at a board me
 2. Click **New Canvas**, enter a name, pick an archetype if you know yours, and click **Create Canvas**.
 3. Start with Customer Segments and Value Propositions. Type one idea per line and click out of the box. Wait for "Saved".
 4. For a box you are stuck on, click its sparkle button, edit the draft and click out of the box to save it.
-5. When the board or an investor asks, use **Export as image**, or download a file in the format your other tools read.
+5. When the board or an investor asks, use **Export as image**, which shows the completed canvas. The downloadable files are diagram files and do not carry the text you typed into the boxes.
 6. Return when something changes. Edit only the box that moved.
 
 ## Doing this without Entelim
