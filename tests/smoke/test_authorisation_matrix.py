@@ -57,7 +57,8 @@ POLICY = {
     # (RegulatoryFramework/ComplianceControl, a different store from the
     # procurement compliance page above) -- every persona can reach it.
     "/dashboard/compliance":   set(ARCHETYPES),
-    # risk.risk_register is @login_required only.
+    # risk.risk_register and risk.risk_page (/risks/<id>, 404 for another
+    # organisation's risk, pinned in tests/test_risk_ranking.py) are @login_required only.
     "/risks/":                 set(ARCHETYPES),
     "/my-applications/":       {"application_manager"},
     "/my-applications/list":   {"application_manager"},

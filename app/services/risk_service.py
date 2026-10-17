@@ -225,3 +225,155 @@ def risk_score_history(risk_id, score_kind=None):
     if score_kind is not None:
         query = query.filter_by(score_kind=score_kind)
     return query.order_by(RiskScoreHistory.recorded_at, RiskScoreHistory.id).all()
+
+
+# --- Ranked risk list: exposure comes from the one impact engine ------------
+
+RANKING_RULE = (
+    "Ranked by the elements each risk reaches, then by recorded risk score; "
+    "risks with no linked elements follow, ordered by recorded score."
+)
+_TOUCHES_SHOWN = 5
+
+
+def _plural(count, word):
+    return "%d %s%s" % (count, word, "" if count == 1 else "s")
+
+
+def ranked_risks():
+    """Every risk of the caller's organisation, ranked by exposure.
+
+    Exposure is how many elements the risk reaches, read from
+    ``IntelligenceQueryService.set_impact`` (the one blast-radius answer) in
+    one call per 25 distinct seed elements, never one per risk: a risk's seeds
+    are its own ArchiMate element plus the element of every application it is
+    linked to. Ties are broken by recorded score, then title, then id. A risk
+    with no seed, or whose seeds connect to nothing, is ranked by its recorded
+    score and says so; a risk whose
+    exposure cannot be worked out carries ``exposure`` None and a reason.
+    """
+    from app.middleware.tenant_context import current_org_id
+    from app.models.application_portfolio import ApplicationComponent
+    from app.modules.intelligence.services.query_service import (
+        SET_IMPACT_MAX_SEEDS,
+        IntelligenceQueryService,
+    )
+
+    org_id = current_org_id()
+    if org_id is None:
+        return {"rows": [], "total": 0, "rule": RANKING_RULE}
+    risks = db.session.execute(
+        db.select(Risk).where(Risk.organization_id == org_id).order_by(Risk.id)
+    ).scalars().all()
+    links = db.session.execute(
+        db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_id).where(
+            RiskEntityLink.organization_id == org_id, RiskEntityLink.entity_type == "application"
+        )
+    ).all()
+    components = {}
+    if links:
+        components = {
+            cid: (name, element_id)
+            for cid, name, element_id in db.session.execute(
+                db.select(
+                    ApplicationComponent.id, ApplicationComponent.name,
+                    ApplicationComponent.archimate_element_id,
+                ).where(
+                    ApplicationComponent.organization_id == org_id,
+                    ApplicationComponent.id.in_(sorted({entity_id for _, entity_id in links})),
+                )
+            ).all()
+        }
+    apps_by_risk = {}
+    for risk_id, component_id in links:
+        if component_id in components:
+            apps_by_risk.setdefault(risk_id, []).append(component_id)
+
+    seeds_by_risk = {}
+    for risk in risks:
+        seeds = []
+        if risk.archimate_element_id is not None:
+            seeds.append(risk.archimate_element_id)
+        for component_id in sorted(apps_by_risk.get(risk.id, [])):
+            element_id = components[component_id][1]
+            if element_id is not None and element_id not in seeds:
+                seeds.append(element_id)
+        seeds_by_risk[risk.id] = seeds
+
+    distinct = sorted({s for seeds in seeds_by_risk.values() for s in seeds})
+    reach = {}          # seed -> {element id: depth} of elements that seed reaches
+    names = {}
+    unresolved, truncated = set(), set()
+    for start in range(0, len(distinct), SET_IMPACT_MAX_SEEDS):
+        chunk = distinct[start:start + SET_IMPACT_MAX_SEEDS]
+        answer = IntelligenceQueryService.set_impact(chunk, with_owner=False)
+        unresolved.update(answer["unresolved_seed_ids"])
+        names.update({int(k): v["name"] for k, v in answer["elements"].items()})
+        if answer["truncated"]:
+            truncated.update(chunk)
+        for row in answer["rows"]:
+            for seed in row["seed_ids"]:
+                reach.setdefault(seed, {})[row["element_id"]] = row["depth"]
+
+    entries = []
+    for risk in risks:
+        seeds = seeds_by_risk[risk.id]
+        reached = {}
+        for seed in seeds:
+            for element_id, depth in reach.get(seed, {}).items():
+                if element_id not in seeds:
+                    reached[element_id] = min(depth, reached.get(element_id, depth))
+        exposure, why = None, None
+        if not seeds:
+            why = "no_links"
+        elif any(s in unresolved for s in seeds) or any(s in truncated for s in seeds):
+            why = "not_computed"
+        elif reached:
+            exposure = len(reached)
+        else:
+            # Its own element (every risk is mirrored as one) connects to nothing.
+            why = "no_links"
+        touches = [
+            {"name": components[c][0], "kind": "application", "id": c, "element_id": components[c][1]}
+            for c in sorted(apps_by_risk.get(risk.id, []))
+        ]
+        app_elements = {t["element_id"] for t in touches}
+        if risk.archimate_element_id is not None and risk.archimate_element_id in names:
+            touches.insert(0, {"name": names[risk.archimate_element_id], "kind": "element",
+                               "id": risk.archimate_element_id, "element_id": risk.archimate_element_id})
+        nearest = sorted(reached, key=lambda e: (reached[e], names.get(e, ""), e))
+        touches += [{"name": names[e], "kind": "element", "id": e, "element_id": e}
+                    for e in nearest if e in names and e not in app_elements][:_TOUCHES_SHOWN]
+        entries.append({
+            "risk": risk, "exposure": exposure, "why": why, "touches": touches,
+            "score": risk.risk_score,
+        })
+
+    entries.sort(key=lambda e: (
+        e["exposure"] is None,
+        -(e["exposure"] or 0),
+        -e["score"],
+        (e["risk"].title or "").lower(),
+        e["risk"].id,
+    ))
+    total = len(entries)
+    rows = []
+    for position, entry in enumerate(entries, start=1):
+        risk = entry["risk"]
+        scores = "likelihood %d of 5, impact %d of 5" % (risk.likelihood, risk.impact)
+        if entry["exposure"] is not None:
+            reason = "Ranked %d of %d: reaches %s, %s" % (
+                position, total, _plural(entry["exposure"], "element"), scores)
+        elif entry["why"] == "no_links":
+            reason = "Ranked %d of %d: no linked elements recorded, ranked by its recorded score of %d (%s)" % (
+                position, total, entry["score"], scores)
+        else:
+            reason = ("Ranked %d of %d: how far it reaches could not be worked out, "
+                      "ranked by its recorded score of %d (%s)") % (position, total, entry["score"], scores)
+        rows.append({
+            "rank": position, "risk_id": risk.id, "title": risk.title,
+            "status": risk.status.value, "risk_level": risk.risk_level,
+            "likelihood": risk.likelihood, "impact": risk.impact, "risk_score": entry["score"],
+            "exposure": entry["exposure"], "reason": reason, "touches": entry["touches"],
+        })
+    return {"rows": rows, "total": total, "rule": RANKING_RULE}
