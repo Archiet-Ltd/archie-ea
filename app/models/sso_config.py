@@ -74,6 +74,10 @@ class SSOConfig(db.Model):  # migration-exempt
     # inside the response itself (that is what an attacker would forge) --
     # this column is the operator-entered, out-of-band trust anchor.
     idp_x509_cert = db.Column(db.Text)
+    # The IdP's own entity id: the Issuer every response and assertion from it must name.
+    # Entered by the administrator, never read from a response. A SAML configuration
+    # without one cannot be enabled and refuses every response.
+    idp_entity_id = db.Column(db.String(500))
     # This organisation's SAML entity id as the Service Provider. Nullable:
     # defaults to the platform's base URL + "/auth/sso/metadata/<org_id>"
     # when unset (see SSOConfig.sp_entity_id_or_default).

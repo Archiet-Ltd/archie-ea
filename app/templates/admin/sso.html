@@ -143,6 +143,18 @@
                     </p>
                 </div>
                 <div>
+                    <label class="block text-sm font-medium text-foreground mb-1" for="idp_entity_id">
+                        Identity Provider Entity ID
+                    </label>
+                    <input type="text" id="idp_entity_id" name="idp_entity_id"
+                           value="{{ config.idp_entity_id if config and config.idp_entity_id else '' }}"
+                           placeholder="The issuer your IdP puts in its assertions"
+                           class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-primary/50">
+                    <p class="mt-1 text-xs text-muted-foreground">
+                        Every sign-in response must name this issuer. SAML cannot be enabled without it.
+                    </p>
+                </div>
+                <div>
                     <label class="block text-sm font-medium text-foreground mb-1" for="sp_entity_id">
                         Service Provider Entity ID
                         <span class="text-muted-foreground font-normal">(optional; defaults to this platform's own URL)</span>
@@ -183,6 +195,44 @@
             </div>
         </form>
     </div>
+
+
+    {# Domain ownership: a listed domain routes sign-ins only once its proof is published #}
+    {% if config and domain_claims %}
+    <div class="mt-6 bg-card border border-border rounded-lg p-5" data-testid="sso-domain-proof">
+        <h3 class="text-sm font-semibold text-foreground mb-1">Domain verification</h3>
+        <p class="text-xs text-muted-foreground mb-3">
+            A domain only signs people in through your identity provider once you have shown you control it.
+            Publish the TXT record below in the domain's DNS, then choose Verify.
+        </p>
+        <div class="space-y-4">
+            {% for claim in domain_claims %}
+            <div class="border border-border rounded-md p-3" data-testid="sso-domain-row" data-domain="{{ claim.domain }}">
+                <div class="flex items-center justify-between gap-3">
+                    <span class="font-medium text-foreground">{{ claim.domain }}</span>
+                    {% if claim.verified_at %}
+                    <span class="text-sm text-success-emphasis" data-testid="sso-domain-status">Verified</span>
+                    {% else %}
+                    <span class="text-sm text-muted-foreground" data-testid="sso-domain-status">Not verified</span>
+                    {% endif %}
+                </div>
+                {% if not claim.verified_at %}
+                <dl class="mt-2 text-xs text-muted-foreground space-y-1">
+                    <div><dt class="inline font-medium">Record name:</dt> <dd class="inline font-mono">{{ challenge_names[claim.domain] }}</dd></div>
+                    <div><dt class="inline font-medium">Type:</dt> <dd class="inline font-mono">TXT</dd></div>
+                    <div><dt class="inline font-medium">Value:</dt> <dd class="inline font-mono">{{ claim.token }}</dd></div>
+                </dl>
+                <form method="POST" action="{{ url_for('sso.admin_sso_verify_domain') }}" class="mt-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="domain" value="{{ claim.domain }}">
+                    <button type="submit" class="rounded-md border border-border px-3 py-1.5 text-sm">Verify</button>
+                </form>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 
     {# Info card: callback URLs for IdP registration #}
     {% if config %}

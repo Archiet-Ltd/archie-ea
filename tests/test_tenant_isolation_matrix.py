@@ -45,6 +45,14 @@ INTENTIONALLY_GLOBAL = {
         "organization_id in their own predicates"
     ),
     "SSOConfig": "read during authentication, before a tenant is known",
+    "SSODomainClaim": (
+        "the sign-in form looks an email domain up before any organisation is known; "
+        "every administrator read and write names the organisation in its own predicate"
+    ),
+    "SSOAssertionId": (
+        "written by the SAML callback before anyone is signed in, keyed by the organisation "
+        "the callback names; never read by a page"
+    ),
     "Subscription": "billing is administered platform-side",
     "UsageEvent": "metering is aggregated platform-side",
     "OrgRole": "role definitions are resolved during authorisation setup",

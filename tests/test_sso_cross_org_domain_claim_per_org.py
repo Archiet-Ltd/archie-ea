@@ -39,8 +39,13 @@ def _domain(label: str) -> str:
     return f"{label}-{uuid.uuid4().hex[:8]}.example"
 
 
-def _configure_sso(db_session, org, email_domain, *, enabled=True, protocol="oidc", **fields):
-    from app.models.sso_config import SSOConfig
+def _configure_sso(db_session, org, email_domain, *, enabled=True, protocol="oidc", verified=True, **fields):
+    """An organisation's SSO configuration. Its domains are proved by default, since a domain
+    only routes sign-ins once it is; pass ``verified=False`` for a listed but unproven one."""
+    from datetime import datetime
+
+    from app.models.sso_config import SSOConfig, split_email_domains
+    from app.models.sso_domain_claim import SSODomainClaim
 
     config = SSOConfig(
         organization_id=org.id,
@@ -52,6 +57,12 @@ def _configure_sso(db_session, org, email_domain, *, enabled=True, protocol="oid
         **fields,
     )
     db_session.add(config)
+    db_session.flush()
+    for domain in split_email_domains(email_domain):
+        db_session.add(SSODomainClaim(
+            organization_id=org.id, domain=domain, token=uuid.uuid4().hex,
+            verified_at=datetime.utcnow() if verified else None,
+        ))
     db_session.flush()
     return config
 
@@ -78,6 +89,15 @@ def _make_user(db_session, org, email, *, password=None, external_id=None,
     db_session.add(user)
     db_session.flush()
     return user
+
+
+def _allow_two_verified_claims(db_session):
+    """Lift the database's one-verified-claim-per-domain guarantee inside this test's own
+    rolled-back transaction, to reach the sign-in path that must still fail closed if two
+    organisations ever did hold one domain."""
+    from sqlalchemy import text
+
+    db_session.execute(text("DROP INDEX IF EXISTS uq_sso_domain_claim_verified_domain"))
 
 
 def _issue_reset_token(db_session, user):
@@ -444,6 +464,11 @@ def test_v1_login_does_not_redirect_another_orgs_user_to_the_claiming_idp(monkey
                            email_domain=claimed, client_id="client-id",
                            idp_metadata_url="https://idp.example/.well-known/openid-configuration")
         db.session.add(config)
+        from datetime import datetime as _dt
+
+        from app.models.sso_domain_claim import SSODomainClaim
+
+        db.session.add(SSODomainClaim(organization_id=org_x.id, domain=claimed, token="t", verified_at=_dt.utcnow()))
         holder = User(email=f"pat@{claimed}", organization_id=org_y.id, confirmed=True)
         holder.password = _PASSWORD
         member = User(email=f"quinn@{claimed}", organization_id=org_x.id, confirmed=True)
@@ -469,8 +494,11 @@ def test_v1_login_does_not_redirect_another_orgs_user_to_the_claiming_idp(monkey
         assert _session_user_id(own_client) is None
     finally:
         with v1_app.app_context():
+            from app.models.sso_domain_claim import SSODomainClaim
+
             leftover = db.session.get(SSOConfig, config_id)
             if leftover is not None:
+                SSODomainClaim.query.filter_by(organization_id=leftover.organization_id).delete()
                 db.session.delete(leftover)
                 db.session.commit()
             db.session.remove()
@@ -484,6 +512,7 @@ def test_v1_login_does_not_redirect_another_orgs_user_to_the_claiming_idp(monkey
 def test_contested_domain_fails_closed(db_session, make_org, caplog):
     from app.services.sso_service import SSOService
 
+    _allow_two_verified_claims(db_session)
     contested = _domain("contested")
     first = _configure_sso(db_session, make_org("scope-contest-a"), contested)
     second = _configure_sso(db_session, make_org("scope-contest-b"), f"spare.example, {contested.upper()}")
@@ -509,7 +538,7 @@ def test_contested_domain_fails_closed(db_session, make_org, caplog):
     # A disabled configuration does not contest an enabled one.
     shared = _domain("shared")
     enabled = _configure_sso(db_session, make_org("scope-shared-on"), shared)
-    _configure_sso(db_session, make_org("scope-shared-off"), shared, enabled=False)
+    _configure_sso(db_session, make_org("scope-shared-off"), shared, enabled=False, verified=False)
     assert SSOService().get_config_for_email(f"someone@{shared}").id == enabled.id
 
 
@@ -1517,6 +1546,7 @@ def test_domain_claim_collides_across_spellings(db_session, make_org):
 def test_contested_domain_refuses_password_sign_in_and_records_it(app, db_session, make_org, monkeypatch):
     from app.services import auth_audit
 
+    _allow_two_verified_claims(db_session)
     contested = _domain("contested-login")
     _configure_sso(db_session, make_org("scope-cl-a"), contested)
     _configure_sso(db_session, make_org("scope-cl-b"), contested)

@@ -67,6 +67,10 @@ def _configuration_app(monkeypatch, *, existing=True, csrf=False):
         sso_routes._svc, "domains_claimed_by_other_orgs", lambda org_id, domains: {}
     )
 
+    # Domain proof rows live in the database; this app has none.
+    monkeypatch.setattr(sso_routes._svc, "sync_domain_claims", lambda org_id, domains: None)
+    monkeypatch.setattr(sso_routes._svc, "domain_claims_for", lambda org_id: [])
+
     class User(UserMixin):
         id = "sso-validation"
         organization_id = 7
@@ -171,12 +175,30 @@ def test_saml_with_idp_fields_can_be_enabled_and_saved(monkeypatch):
         "protocol": "saml", "enabled": "on", "email_domain": "updated.example",
         "idp_sso_url": "https://idp.example.com/saml/sso",
         "idp_x509_cert": "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----",
+        "idp_entity_id": "https://idp.example.com/entity",
     }, follow_redirects=True)
     assert response.status_code == 200
     assert b"SSO configuration saved." in response.data
     assert state.persisted["protocol"] == "saml"
+    assert state.persisted["idp_entity_id"] == "https://idp.example.com/entity"
     assert state.persisted["enabled"] is True
     assert state.persisted["idp_sso_url"] == "https://idp.example.com/saml/sso"
+
+
+def test_enabled_saml_without_an_identity_provider_entity_id_is_refused_and_nothing_changes(monkeypatch):
+    """Every SAML response must name the issuer the administrator entered, so SAML cannot be
+    enabled without one."""
+    application, state = _configuration_app(monkeypatch)
+    before = dict(state.persisted)
+    client = application.test_client()
+    client.get("/test-entry")
+    response = client.post("/admin/sso", data={
+        "protocol": "saml", "enabled": "on", "email_domain": "updated.example",
+        "idp_sso_url": "https://idp.example.com/saml/sso",
+        "idp_x509_cert": "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----",
+    }, follow_redirects=True)
+    assert b"entity id before it can be enabled" in response.data
+    assert state.persisted == before
 
 
 def test_browser_rejects_enabled_saml_without_idp_fields_and_reloads_prior_oidc_settings(monkeypatch):
@@ -222,3 +244,26 @@ def test_browser_rejects_enabled_saml_without_idp_fields_and_reloads_prior_oidc_
         server.shutdown()
         server.server_close()
         thread.join()
+
+
+def test_a_failing_domain_claim_write_is_reported_as_a_failed_save_and_nothing_persists(monkeypatch):
+    """The claim write runs inside the save's error handler, so it is a rolled-back, reported
+    failure rather than an unhandled error."""
+    from app.modules.auth import sso_routes
+
+    application, state = _configuration_app(monkeypatch)
+    before = deepcopy(state.persisted)
+
+    def broken(org_id, domains):
+        raise RuntimeError("could not write the claim")
+
+    monkeypatch.setattr(sso_routes._svc, "sync_domain_claims", broken)
+    client = application.test_client()
+    client.get("/test-entry")
+    response = client.post("/admin/sso", data={
+        "protocol": "oidc", "enabled": "on", "email_domain": "updated.example",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"Failed to save SSO configuration." in response.data
+    assert b"SSO configuration saved." not in response.data
+    assert state.persisted == before
