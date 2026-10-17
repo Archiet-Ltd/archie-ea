@@ -253,6 +253,82 @@ def test_a_missing_css_custom_property_symbol_fails(tmp_path):
     assert len(fails) == 1 and "--primary" in fails[0]
 
 
+def _css_class_register(symbol):
+    return REGISTER.replace("app/utils/duplicate_guard.py", "app/static/css/site.css").replace(
+        "symbols: [normalize_name, Guard.check]", f"symbols: ['{symbol}']")
+
+
+def _css_class_tree(tmp_path, css, symbol=".public-faq"):
+    root = _tree(tmp_path, register=_css_class_register(symbol))
+    (root / "app" / "utils" / "duplicate_guard.py").unlink()
+    (root / "app" / "static" / "css").mkdir(parents=True)
+    (root / "app" / "static" / "css" / "site.css").write_text(css, encoding="utf-8")
+    return root
+
+
+def test_a_css_class_symbol_is_found(tmp_path):
+    root = _css_class_tree(tmp_path, ".public-site .public-faq { border-top: 1px solid red; }\n"
+                                     ".public-site .public-faq summary { cursor: pointer; }\n")
+    assert _run(root)[0] == []
+
+
+@pytest.mark.parametrize("css", [
+    "/* .public-faq is described here only */\n.public-site .faq-wide { color: red; }\n",
+    ".public-site .public-faq-x { color: red; }\n.public-site .public-faq--wide { color: red; }\n",
+    ".public-site .other { margin: .5rem; }\n",
+])
+def test_a_missing_css_class_symbol_fails(tmp_path, css):
+    root = _css_class_tree(tmp_path, css)
+    fails, _ = _run(root)
+    assert len(fails) == 1 and ".public-faq" in fails[0]
+
+
+# The rules deleted from css/public_pricing.css when the pricing page moved onto the shared public components.
+OLD_PRICING_RULES = {
+    "public-button/second-button-rule": (
+        ".pricing-page .@btn {\n  display: inline-flex; min-height: 2.75rem; border-radius: 0.5rem;\n}\n"
+        ".pricing-page .@btn--primary { background: var(--pp-primary); }\n"),
+    "public-card/second-card-rule": (
+        ".pricing-page .@card { display: flex; flex-direction: column; padding: 1.5rem; border-radius: 0.75rem; }\n"
+        ".pricing-page .@card h3 { font-size: 1.25rem; font-weight: 600; margin: 0; }\n"),
+    "public-table/second-table-rule": (
+        ".pricing-page .@table-wrap { border: 1px solid var(--pp-border); border-radius: 0.75rem; }\n"
+        ".pricing-page table.@table { width: 100%; table-layout: fixed; }\n"
+        ".pricing-page .@table th, .pricing-page .@table td { padding: 0.875rem 1rem; }\n"),
+    "public-faq/second-faq-rule": (
+        ".pricing-page .@faq { max-width: 42.5rem; }\n"
+        ".pricing-page .@faq details { border-bottom: 1px solid var(--pp-border); }\n"
+        ".pricing-page .@faq summary { cursor: pointer; padding: 1rem 0; }\n"),
+    "public-faq/second-details-marker": ".pricing-page .@faq summary::-webkit-details-marker { display: none; }\n",
+    "public-stepper/second-stepper-rule": (
+        ".pricing-page .@grow { list-style: none; display: grid; }\n"
+        ".pricing-page .@grow li { display: grid; grid-template-columns: 7rem 1fr; }\n"),
+}
+# The retired class names are spelled with a placeholder so no file keeps the old names.
+OLD_PRICING_RULES = {k: v.replace("@", "pp-") for k, v in OLD_PRICING_RULES.items()}
+
+
+@pytest.mark.parametrize("key", sorted(OLD_PRICING_RULES))
+def test_a_deleted_pricing_rule_copied_back_fails_with_its_register_entry(tmp_path, key):
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "reuse-register.yml").write_text(
+        (REPO / "docs" / "reuse-register.yml").read_text(encoding="utf-8"), encoding="utf-8")
+    css = tmp_path / "app" / "static" / "css"
+    css.mkdir(parents=True)
+    (css / "public_site.css").write_text((REPO / "app/static/css/public_site.css").read_text(encoding="utf-8"), encoding="utf-8")
+    (css / "public_pricing.css").write_text(OLD_PRICING_RULES[key], encoding="utf-8")
+    fails, _ = _run(tmp_path)
+    assert any(f.startswith(f"[{key}]") and "app/static/css/public_pricing.css" in f for f in fails), fails
+
+
+def test_no_public_page_stylesheet_or_template_holds_a_second_public_component_rule():
+    entries, _ = gate.load_register(REPO)
+    hits = gate.find_hits(REPO, [e for e in entries if e["id"].startswith("public-")])
+    public = ("app/static/css/public_", "app/templates/public/", "app/templates/main/")
+    stray = {k: [f for f in files if f.startswith(public)] for k, files in hits.items()}
+    assert {k: v for k, v in stray.items() if v} == {}
+
+
 def test_update_baseline_refuses_to_raise_a_pattern_total(tmp_path):
     baseline = {"name-matching/normaliser": {"app/a.py": 1}}
     root = _tree(tmp_path, extra={"app/a.py": COPY, "app/b.py": COPY}, baseline=baseline)
@@ -459,16 +535,13 @@ def test_a_rename_is_forgiven_only_up_to_the_vanished_files_hits(tmp_path):
     assert len(_run(two)[0]) == 1
 
 
-def _main_baseline_totals():
-    """Pattern totals of the baseline on origin/main: None when there is no remote to ask,
-    {} when main carries no baseline file yet (the first merge)."""
+def _origin_main_file(path):
+    """Text of `path` on origin/main: None when there is no remote to ask, "" when main has no such file."""
     import subprocess
 
     def show():
         return subprocess.run(
-            ["git", "show", "origin/main:scripts/reuse_register_baseline.json"],
-            cwd=REPO, capture_output=True, text=True, encoding="utf-8",
-        )
+            ["git", "show", f"origin/main:{path}"], cwd=REPO, capture_output=True, text=True, encoding="utf-8")
 
     proc = show()
     if proc.returncode != 0:
@@ -481,24 +554,218 @@ def _main_baseline_totals():
             return None
         proc = show()
         if proc.returncode != 0:
-            return {}
-    return {k: sum(v.values()) for k, v in json.loads(proc.stdout)["patterns"].items()}
+            return ""
+    return proc.stdout
+
+
+def _main_baseline_patterns():
+    """The `patterns` dict of the baseline on origin/main: None with no remote, {} when main has no baseline file."""
+    text = _origin_main_file("scripts/reuse_register_baseline.json")
+    if not text:
+        return text
+    return json.loads(text)["patterns"]
+
+
+def _main_register_keys():
+    """Every "<entry>/<pattern>" key in origin/main's register: empty when main has none."""
+    text = _origin_main_file("docs/reuse-register.yml")
+    if not text:
+        return set()
+    return gate.register_keys((yaml.safe_load(text) or {}).get("entries") or [])
 
 
 def test_the_baseline_is_not_above_the_one_on_origin_main():
-    """Ratchet integrity: a branch cannot raise a pattern's baseline total relative to main.
+    """Ratchet integrity against origin/main, by `gate.ratchet_problems`:
 
-    Skipped only when there is no remote to fetch from. When main has no baseline file yet (the first
-    merge) every total is compared with zero and the test passes: the file is being introduced, and
-    the gate itself bounds it by the tree."""
-    main_totals = _main_baseline_totals()
-    if main_totals is None:
+    1. a pattern main already has (in its baseline or in its register) may not exceed main's total for it, so a
+       zero-hit pattern cannot gain hits and a raised key fails;
+    2. a pattern new in this branch must be baselined at exactly the tree's per-file counts;
+    3. a baseline line for a file that does not exist is allowed only where main already lists it.
+
+    Skipped only when there is no remote to fetch from. When main has no baseline file yet (the first merge) the
+    test passes: the file is being introduced, and the gate itself bounds it by the tree."""
+    main_base = _main_baseline_patterns()
+    if main_base is None:
         pytest.skip("no remote to fetch origin/main from")
-    if not main_totals:
+    if not main_base:
         return
-    mine = {k: sum(v.values()) for k, v in gate.load_baseline(REPO).items()}
-    raised = {k: (main_totals.get(k, 0), n) for k, n in mine.items() if n > main_totals.get(k, 0)}
-    assert raised == {}, f"baseline raised against origin/main: {raised}"
+    main_keys = _main_register_keys()
+    entries, problems = gate.load_register(REPO)
+    assert problems == []
+    new_only = []
+    for e in entries:
+        fresh = [p for p in e.get("must_not_create") or []
+                 if f"{e['id']}/{p['id']}" not in main_base and f"{e['id']}/{p['id']}" not in main_keys]
+        if fresh:
+            new_only.append({**e, "must_not_create": fresh})
+    tree = gate.counts_of(gate.find_hits(REPO, new_only))
+    mine = gate.load_baseline(REPO)
+    assert gate.ratchet_problems(main_keys, main_base, mine, tree, REPO) == []
+
+
+# ratchet_problems, without git: the rule of the live test above, one scenario each.
+
+def _ratchet(tmp_path, *, main_keys=(), main_base=None, mine=None, tree=None, files=()):
+    for rel in files:
+        path = tmp_path / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("x\n", encoding="utf-8")
+    return gate.ratchet_problems(set(main_keys), main_base or {}, mine or {}, tree or {}, tmp_path)
+
+
+def test_ratchet_a_pattern_main_registers_cannot_gain_hits_without_a_baseline_key(tmp_path):
+    """The zero-hit pattern: main has `public-faq/second-faq-rule` in its register and no baseline key."""
+    key = "public-faq/second-faq-rule"
+    problems = _ratchet(tmp_path, main_keys={key}, mine={key: {"a.css": 7}}, files=["a.css"])
+    assert len(problems) == 1 and key in problems[0] and "7" in problems[0] and "0" in problems[0]
+
+
+def test_ratchet_a_raised_key_of_main_fails(tmp_path):
+    key = "design-tokens/hex-fallback"
+    problems = _ratchet(tmp_path, main_keys={key}, main_base={key: {"a.css": 2}},
+                        mine={key: {"a.css": 3}}, files=["a.css"])
+    assert len(problems) == 1 and key in problems[0]
+
+
+def test_ratchet_a_lowered_key_passes(tmp_path):
+    key = "design-tokens/hex-fallback"
+    assert _ratchet(tmp_path, main_keys={key}, main_base={key: {"a.css": 2}}, mine={key: {"a.css": 1}},
+                    files=["a.css"]) == []
+
+
+def test_ratchet_a_new_pattern_equal_to_the_tree_passes(tmp_path):
+    key = "public-card/restyled-card"
+    counts = {"a.css": 3, "b.html": 1}
+    assert _ratchet(tmp_path, mine={key: dict(counts)}, tree={key: dict(counts)}, files=["a.css", "b.html"]) == []
+
+
+def test_ratchet_a_new_pattern_one_above_the_tree_fails(tmp_path):
+    key = "public-card/restyled-card"
+    problems = _ratchet(tmp_path, mine={key: {"a.css": 4, "b.html": 1}}, tree={key: {"a.css": 3, "b.html": 1}},
+                        files=["a.css", "b.html"])
+    assert len(problems) == 1 and key in problems[0] and "a.css" in problems[0]
+
+
+def test_ratchet_a_new_pattern_with_an_extra_file_that_does_not_exist_fails(tmp_path):
+    key = "public-card/restyled-card"
+    problems = _ratchet(tmp_path, mine={key: {"a.css": 3, "retired.css": 5}}, tree={key: {"a.css": 3}},
+                        files=["a.css"])
+    assert problems and all(key in p for p in problems) and any("retired.css" in p for p in problems)
+
+
+def test_ratchet_an_existing_pattern_cannot_add_a_vanished_file_allowance(tmp_path):
+    key = "design-tokens/hex-fallback"
+    problems = _ratchet(tmp_path, main_keys={key}, main_base={key: {"a.css": 2}},
+                        mine={key: {"a.css": 1, "retired.css": 1}}, files=["a.css"])
+    assert len(problems) == 1 and "retired.css" in problems[0]
+
+
+def test_ratchet_an_existing_pattern_keeping_a_vanished_file_main_lists_passes(tmp_path):
+    key = "design-tokens/hex-fallback"
+    base = {key: {"a.css": 1, "retired.css": 1}}
+    assert _ratchet(tmp_path, main_keys={key}, main_base=base, mine={key: dict(base[key])}, files=["a.css"]) == []
+
+
+def test_ratchet_rejects_the_inflated_faq_key_against_the_shipped_baseline():
+    """The refuter's scenario: the shipped baseline plus an inflated key for a pattern main registers."""
+    shipped = gate.load_baseline(REPO)
+    key = "public-faq/second-faq-rule"
+    mine = {**shipped, key: {"app/static/css/public_pricing.css": 7}}
+    problems = gate.ratchet_problems({key}, {}, mine, {}, REPO)
+    assert any(key in p for p in problems)
+
+
+def test_register_keys_lists_every_pattern_of_every_entry():
+    entries, _ = gate.load_register(REPO)
+    keys = gate.register_keys(entries)
+    assert {"public-faq/second-faq-rule", "public-faq/second-summary-rule", "public-button/restyled-button"} <= keys
+
+
+# ------------------------------------------------------------------ the public-* patterns catch what the text says
+
+def _public_entries():
+    entries, problems = gate.load_register(REPO)
+    assert problems == []
+    return [e for e in entries if e["id"].startswith("public-")]
+
+
+def _public_tree(tmp_path, rel, text):
+    (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "docs" / "reuse-register.yml").write_text(
+        yaml.safe_dump({"version": 1, "entries": _public_entries()}, sort_keys=False), encoding="utf-8")
+    css = tmp_path / "app" / "static" / "css"
+    css.mkdir(parents=True, exist_ok=True)
+    (css / "public_site.css").write_text(
+        (REPO / "app/static/css/public_site.css").read_text(encoding="utf-8"), encoding="utf-8")
+    path = tmp_path / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return tmp_path
+
+
+EXTRA = "app/static/css/public_extra.css"
+FAQ_RESTYLE = ".pricing-page .public-faq summary { font-size: 1.0625rem; padding: 1rem 0; }\n"
+REGISTER_BYPASSES = [
+    ("faq restyle with summary", EXTRA, FAQ_RESTYLE, "public-faq"),
+    ("button restyle", EXTRA,
+     ".pricing-page .public-btn--primary { height: 2.75rem; border-radius: 0.5rem; }\n", "public-button"),
+    ("card restyle, multi-line", EXTRA,
+     ".pricing-page .public-card {\n  display: flex;\n  padding: 1.5rem;\n}\n", "public-card"),
+    ("prefixed button", EXTRA, ".public-pricing-btn { height: 3rem; }\n", "public-button"),
+    ("prefixed faq summary", EXTRA, ".public-pricing-faq summary { font-weight: 600; }\n", "public-faq"),
+    ("bare faq summary", EXTRA, ".faq summary { font-weight: 600; }\n", "public-faq"),
+    ("faq item summary", EXTRA, ".faq-item summary { font-weight: 600; }\n", "public-faq"),
+    ("bare btn", EXTRA, ".btn { height: 3rem; }\n", "public-button"),
+    ("button-primary", EXTRA, ".button-primary { color: red; }\n", "public-button"),
+    ("timeline", EXTRA, ".timeline li { padding: 0; }\n", "public-stepper"),
+    ("bare summary selector", EXTRA, ".pricing-page summary { font-size: 1rem; }\n", "public-faq"),
+    ("id selector line", EXTRA, "#pricing .public-faq summary { font-size: 1rem; }\n", "public-faq"),
+    ("inline style in a template", "app/templates/public/extra.html",
+     "<style>\n" + FAQ_RESTYLE + "</style>\n", "public-faq"),
+]
+
+
+@pytest.mark.parametrize("name,rel,text,entry", REGISTER_BYPASSES, ids=[b[0] for b in REGISTER_BYPASSES])
+def test_a_bypass_of_a_public_component_is_a_hit_naming_its_entry(tmp_path, name, rel, text, entry):
+    fails, _ = gate.run(_public_tree(tmp_path, rel, text))
+    assert any(f.startswith(f"[{entry}/") and rel in f for f in fails), fails
+
+
+REGISTER_LAYOUT_ONLY = [
+    ".pricing-page .pp-plans > .public-card { display: flex; flex-direction: column; }\n",
+    ".pricing-page .pp-plans { grid-template-columns: repeat(4, minmax(0, 1fr)); }\n",
+    ".pricing-page .pp-services .pp-price { margin-bottom: 1rem; }\n",
+    ".pricing-page .public-card-title { margin: 0; }\n",
+    ".pricing-page .pp-frame { overflow: clip; }\n",
+    ".table { display: table; }\n",
+    ".table-cell { display: table-cell; }\n",
+    ".grow { flex-grow: 1; }\n",
+    ".flex-grow-0 { flex-grow: 0; }\n",
+]
+JS_SUMMARY_LINES = (
+    "<script>\nconst x = {\n  summary: {\n    a: 1 },\n};\nconst summary = {};\n"
+    "class A { get summary() { return 1; } }\n</script>\n")
+
+
+@pytest.mark.parametrize("text", REGISTER_LAYOUT_ONLY)
+def test_a_layout_rule_or_a_utility_class_is_not_a_hit(tmp_path, text):
+    assert gate.run(_public_tree(tmp_path, EXTRA, text))[0] == []
+
+
+def test_javascript_that_mentions_summary_is_not_a_hit(tmp_path):
+    assert gate.run(_public_tree(tmp_path, "app/templates/public/extra.html", JS_SUMMARY_LINES))[0] == []
+
+
+def test_a_css_line_starting_with_a_hash_is_not_skipped_as_a_comment(tmp_path):
+    fails, _ = gate.run(_public_tree(tmp_path, EXTRA, "#pricing .public-btn { height: 3rem; }\n"))
+    assert any(f.startswith("[public-button/restyled-button]") for f in fails)
+
+
+def test_a_reuse_ok_comment_on_the_line_above_a_css_hit_exempts_it(tmp_path):
+    text = "/* reuse-ok: a one-off compaction at 390px */\n.pricing-page .public-table { font-size: 0.8rem; }\n"
+    assert gate.run(_public_tree(tmp_path, EXTRA, text))[0] == []
+    far = "/* reuse-ok: a one-off compaction at 390px */\n\n.pricing-page .public-table { font-size: 0.8rem; }\n"
+    assert gate.run(_public_tree(tmp_path / "far", EXTRA, far))[0] != []
 
 
 # ------------------------------------------------------------------ design-tokens: evading the regex
@@ -717,3 +984,80 @@ def test_layer_and_font_sans_tokens_are_now_protected(tmp_path):
     fails = _design_tokens_fails(tmp_path, files)
     hit = next(f for f in fails if "design-tokens/token-declaration" in f)
     assert "x.css:1" in hit and "x.css:2" in hit
+
+
+# Shapes that once slipped past the public-component patterns: element-qualified selectors, a rule written on one
+# line inside an at-rule or a nesting block, and minified output. Each is written alone into a new stylesheet.
+BYPASS_SHAPES = [
+    ".pricing-page a.public-btn { height: 3rem; }",
+    "button.public-btn { background: red; }",
+    ".pricing-page article.public-card { padding: 0; }",
+    "div.pricing-card { padding: 2rem; }",
+    "a.cta-btn { height: 3rem; }",
+    "details.faq { border: 0; }",
+    ".pricing-page table.pp-table { width: 100%; }",
+    "@media (min-width: 0px) { .pricing-page .public-btn { height: 2.75rem; border-radius: 0.5rem; } }",
+    "@media all { .pricing-btn { height: 3rem; background: red; } }",
+    "@media all { .faq summary { padding: 1rem 0; font-weight: 600; } }",
+    "@supports (display: grid) { .pricing-page .public-faq summary { font-size: 2rem; } }",
+    ".pricing-page { .public-btn { height: 3rem; } }",
+    ".x{margin:0}.pricing-btn{height:3rem}",
+    ".pricing-page .public-faq summary { font-size: 1.0625rem; padding: 1rem 0; }",
+    ".pricing-page .public-btn--primary { height: 2.75rem; border-radius: 0.5rem; }",
+    ".pricing-page .public-card { padding: 1.5rem; border-radius: 0.75rem; }",
+    ".public-pricing-btn { display: inline-flex; }",
+    ".faq-item summary { cursor: pointer; }",
+    ".button-primary { color: red; }",
+    ".timeline li { display: grid; }",
+    "@media (min-width: 1024px) { .pricing-page .pp-plans > .public-card > a { min-height: 3.875rem; } }",
+]
+
+# Layout-only rules the register must keep allowing.
+LAYOUT_ONLY = [
+    ".pricing-page .public-btn { display: inline-flex; margin-top: 1rem; width: 100%; }",
+    "@media (min-width: 640px) { .pricing-page .pp-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); } }",
+    "@media (min-width: 768px) { .pricing-page h2 { font-size: 1.875rem; } }",
+    ".pricing-page .pp-section { margin-top: 4rem; }",
+    ".pricing-page .public-card { position: relative; overflow: hidden; }",
+    "a.cta { color: red; } p.lead { margin: 0 0 1rem; }",
+]
+
+
+def _extra_css_tree(tmp_path, css_text):
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "reuse-register.yml").write_text(
+        (REPO / "docs" / "reuse-register.yml").read_text(encoding="utf-8"), encoding="utf-8")
+    css = tmp_path / "app" / "static" / "css"
+    css.mkdir(parents=True)
+    (css / "public_site.css").write_text(
+        (REPO / "app/static/css/public_site.css").read_text(encoding="utf-8"), encoding="utf-8")
+    (css / "public_extra.css").write_text(css_text + "\n", encoding="utf-8")
+    return tmp_path
+
+
+@pytest.mark.parametrize("shape", BYPASS_SHAPES)
+def test_a_bypass_shape_in_a_new_stylesheet_fails(tmp_path, shape):
+    fails, _ = _run(_extra_css_tree(tmp_path, shape))
+    assert any("app/static/css/public_extra.css" in f for f in fails), (shape, fails)
+
+
+@pytest.mark.parametrize("rule", LAYOUT_ONLY)
+def test_a_layout_only_rule_in_a_new_stylesheet_passes(tmp_path, rule):
+    fails, _ = _run(_extra_css_tree(tmp_path, rule))
+    assert [f for f in fails if f.startswith("[public-")] == [], (rule, fails)
+
+
+def test_update_baseline_refuses_a_new_key_unless_allowed_and_names_each_one(tmp_path):
+    root = _tree(tmp_path, extra={"app/a.py": COPY}, baseline={"other/key": {"app/z.py": 1}})
+    entries, _ = gate.load_register(root)
+    path = root / "scripts" / "reuse_register_baseline.json"
+    before = path.read_text()
+
+    ok, messages = gate.update_baseline(root, entries)
+    assert ok is False
+    assert any("name-matching/normaliser" in m and "--allow-new-keys" in m for m in messages)
+    assert path.read_text() == before
+
+    ok, messages = gate.update_baseline(root, entries, allow_new_keys=True)
+    assert ok is True
+    assert any(m.startswith("new key written: name-matching/normaliser") for m in messages)
