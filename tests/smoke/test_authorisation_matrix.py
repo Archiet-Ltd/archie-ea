@@ -247,6 +247,27 @@ GOAL_LINK_POST_POLICY = {
     "/portfolio/initiatives/0/goals": set(ARCHETYPES),
 }
 
+# Creating, changing and deleting a work package is role-gated by require_roles
+# on every route: a persona holding the Architect role (every seeded archetype)
+# or Administrator (platform_admin) reaches the handler (answered 400 or 404 for
+# the empty body and the id 0 used here); a read-only Viewer is answered 403
+# before the handler runs (pinned with a real Viewer account in
+# tests/test_work_package_write_roles.py).
+WORK_PACKAGE_WRITE_POLICY = {
+    ("POST", "/capability-map/api/roadmap/work-packages"):          set(ARCHETYPES),
+    ("POST", "/capability-map/api/roadmap/gaps/0/work-packages"):   set(ARCHETYPES),
+    ("PUT", "/capability-map/api/roadmap/work-packages/0"):         set(ARCHETYPES),
+    ("POST", "/capability-map/api/roadmap/work-packages/0/children"): set(ARCHETYPES),
+    ("DELETE", "/capability-map/api/roadmap/work-packages/0"):      set(ARCHETYPES),
+    ("POST", "/enterprise/api/work-packages"):                      set(ARCHETYPES),
+    ("PATCH", "/enterprise/api/work-packages/0"):                   set(ARCHETYPES),
+    ("DELETE", "/enterprise/api/work-packages/bulk"):               set(ARCHETYPES),
+    ("DELETE", "/enterprise/api/work-packages/0"):                  set(ARCHETYPES),
+}
+
+for _allowed in WORK_PACKAGE_WRITE_POLICY.values():
+    _allowed.add("platform_admin")
+
 OVERSIGHT_POST_POLICY = {
     "/ai-chat/oversight/pause":  set(),
     "/ai-chat/oversight/resume": set(),
@@ -783,6 +804,28 @@ def test_initiative_goal_link_post_authorisation(
     actual = ALLOWED if response.status < 400 else DENIED
     assert actual == expected, (
         "%s reached %s: expected %s, got %s" % (archetype, path, expected, actual)
+    )
+
+
+@pytest.mark.parametrize("route,allowed", WORK_PACKAGE_WRITE_POLICY.items())
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_work_package_write_authorisation(
+    archetype, route, allowed, page, live_server, seeded
+):
+    """Work package writes are role-gated: a write role reaches the handler (400
+    or 404 for the empty body and id 0), anyone else is refused before it."""
+    method, path = route
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.fetch(
+        live_server + path, method=method, data={},
+        headers={"X-CSRFToken": csrf}, max_redirects=0,
+    )
+    expected = ALLOWED if archetype in allowed else DENIED
+    actual = DENIED if response.status in (401, 403) else ALLOWED
+    assert actual == expected, (
+        "%s reached %s %s: expected %s, got %s" % (archetype, method, path, expected, response.status)
     )
 
 
