@@ -151,6 +151,8 @@ def test_four_across_prices_fit_their_cards_and_the_buttons_share_a_row(browser,
             box = card.get_by_test_id(f"buy-{key}").bounding_box()
             tops.append(round(box["y"]))
             assert 40 <= box["height"] <= 80
+            rights.append(round(card.bounding_box()["x"] + card.bounding_box()["width"]))
+        assert max(rights) <= width, f"a plan card runs past the viewport at {width}px: {rights}"
         assert max(tops) - min(tops) <= 1, f"plan buttons sit at different heights at {width}px: {tops}"
     finally:
         context.close()
