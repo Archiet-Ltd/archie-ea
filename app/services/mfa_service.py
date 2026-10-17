@@ -114,6 +114,24 @@ def provisioning_uri(user, secret: str) -> str:
     return pyotp.TOTP(secret).provisioning_uri(name=user.email, issuer_name=issuer)
 
 
+def provisioning_qr_svg(provisioning_uri: str, *, scale: int = 4) -> str:
+    """Inline SVG markup for a QR code that encodes ``provisioning_uri``.
+
+    Generated server-side with segno so the provisioning URI -- which embeds
+    the TOTP secret -- never leaves the server: the page ships an inline SVG,
+    not a JavaScript widget and not a request to an external image service.
+    """
+    import segno
+
+    qrcode = segno.make(provisioning_uri)
+    svg = qrcode.svg_inline(scale=scale)
+    return svg.replace(
+        '<svg ',
+        '<svg role="img" aria-label="QR code: scan to add this account to your authenticator app" ',
+        1,
+    )
+
+
 def verify_code(secret: str, code: str) -> bool:
     """True if ``code`` is a currently-valid TOTP for ``secret``.
 
