@@ -126,6 +126,13 @@ def compute_nav_counts(org_id, ttl=_NAV_COUNTS_TTL):
     return counts
 
 
+def _four_properties(screen):
+    """Jinja global behind components/four_properties_footer.html."""
+    from app.services.four_properties_service import four_properties
+
+    return four_properties(screen)
+
+
 def init_context_processors(app):
     """Register all context processors for Jinja templates."""
 
@@ -303,6 +310,8 @@ def init_context_processors(app):
             db.session.rollback()
             app.logger.debug(f"Error loading applications/vendors: {e}")
             return {"applications": [], "vendors": []}
+
+    app.add_template_global(_four_properties, "four_properties")
 
     @app.context_processor
     def inject_flask():
