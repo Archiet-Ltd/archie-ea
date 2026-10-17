@@ -365,24 +365,42 @@ def generate_licenses_position(organization_id: int) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _spend_figure(figure: Dict[str, Any]) -> Dict[str, Any]:
+    """A spend figure as the model sees it: each currency stated on its own,
+    and one converted figure (None when a rate is missing) - never a sum
+    across currencies."""
+    converted = figure["converted"]
+    return {
+        "by_currency": figure["by_currency"],
+        "converted": float(converted) if converted is not None else None,
+        "missing_rates": [
+            {"currency": currency, "date": on.isoformat() if on else None}
+            for currency, on in figure["missing_rates"]
+        ],
+    }
+
+
 def _build_spend_context(organization_id: int) -> Dict[str, Any]:
     # Reuses the exact aggregates the spend_analytics page itself computes
     # (get_spend_by_category / get_spend_summary in services.py) rather than
     # running a third parallel query over the same VendorContract rows.
-    spend_summary = get_spend_summary()
+    spend_summary = get_spend_summary(organization_id)
     spend_by_category = get_spend_by_category(organization_id)
 
     return {
+        "reporting_currency": spend_summary["reporting_currency"],
         "total_contracts": spend_summary["total_contracts"],
-        "total_value": spend_summary["total_value"],
-        "total_annual_cost": spend_summary["total_annual_cost"],
-        "spend_by_category": spend_by_category,
+        "total_contract_value": _spend_figure(spend_summary["total_contract_value"]),
+        "total_annual_cost": _spend_figure(spend_summary["total"]),
+        "spend_by_category": {
+            name: _spend_figure(figure) for name, figure in spend_by_category.items()
+        },
         "spend_by_type": {
-            k: v["annual_cost"] for k, v in spend_summary["by_type"].items()
+            name: _spend_figure(figure) for name, figure in spend_summary["by_type"].items()
         },
         "top_vendors": [
-            {"vendor_name": name, "annual_cost": data["annual_cost"]}
-            for name, data in spend_summary["top_vendors"]
+            dict(vendor_name=row["vendor_name"], **_spend_figure(row))
+            for row in spend_summary["by_vendor"][:10]
         ],
     }
 

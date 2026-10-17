@@ -25,6 +25,14 @@ pytestmark = pytest.mark.usefixtures("db_session")
 DASH = "—"
 
 
+def _usd_org(make_org, db_session, label):
+    """An organisation reporting in USD, the currency these contracts are recorded in."""
+    org = make_org(label)
+    org.reporting_currency = "USD"
+    db_session.flush()
+    return org
+
+
 def _procurement_user(db_session, org):
     from app.models.user import User
 
@@ -103,7 +111,7 @@ def _by_type_amounts(soup):
 def test_a_contract_without_an_annual_cost_is_a_dash_on_both_screens(
     client, login_as, db_session, make_org
 ):
-    org = make_org("spend-missing")
+    org = _usd_org(make_org, db_session, "spend-missing")
     user = _procurement_user(db_session, org)
     with_cost = _contract(db_session, org, "Priced", contract_value=50000, annual_cost=12000)
     without_cost = _contract(db_session, org, "Unpriced", contract_value=100000)
@@ -119,8 +127,8 @@ def test_a_contract_without_an_annual_cost_is_a_dash_on_both_screens(
     figure = _register_annual_cost(register, with_cost)
     assert figure != DASH and "12,000.00" in figure
     annual_tile, annual_note = _tile(spend, "Annual Recurring Cost")
-    assert annual_tile.endswith(figure), (annual_tile, figure)
-    assert _by_type_amounts(spend) == [f"{figure}/yr"]
+    assert "12,000.00" in annual_tile and annual_tile.endswith("USD"), annual_tile
+    assert _by_type_amounts(spend) == ["12,000.00 USD/yr"]
 
     assert annual_note == "excludes 1 contract without an annual cost"
     contract_value_tile, contract_value_note = _tile(spend, "Total Contract Value")
@@ -133,7 +141,7 @@ def test_a_contract_without_an_annual_cost_is_a_dash_on_both_screens(
 
 
 def test_totals_name_how_many_contracts_they_leave_out(client, login_as, db_session, make_org):
-    org = make_org("spend-excluded")
+    org = _usd_org(make_org, db_session, "spend-excluded")
     user = _procurement_user(db_session, org)
     _contract(db_session, org, "Priced", contract_value=50000, annual_cost=12000)
     _contract(db_session, org, "No cost one", contract_value=1000)
@@ -146,7 +154,7 @@ def test_totals_name_how_many_contracts_they_leave_out(client, login_as, db_sess
 
 
 def test_a_total_nothing_states_is_a_dash_not_a_zero(client, login_as, db_session, make_org):
-    org = make_org("spend-none-stated")
+    org = _usd_org(make_org, db_session, "spend-none-stated")
     user = _procurement_user(db_session, org)
     unpriced = _contract(db_session, org, "Unpriced")
 
@@ -166,7 +174,7 @@ def test_a_total_nothing_states_is_a_dash_not_a_zero(client, login_as, db_sessio
 
 
 def test_a_stated_zero_is_an_amount_on_both_screens(client, login_as, db_session, make_org):
-    org = make_org("spend-stated-zero")
+    org = _usd_org(make_org, db_session, "spend-stated-zero")
     user = _procurement_user(db_session, org)
     free = _contract(db_session, org, "Free tier", contract_value=0, annual_cost=0)
 
@@ -176,7 +184,7 @@ def test_a_stated_zero_is_an_amount_on_both_screens(client, login_as, db_session
     figure = _register_annual_cost(register, free)
     assert figure != DASH and figure.endswith("0.00")
     annual_tile, annual_note = _tile(spend, "Annual Recurring Cost")
-    assert annual_tile.endswith(figure)
+    assert annual_tile == "0.00 USD"
     assert annual_note is None
     assert _tile(spend, "Total Contract Value")[1] is None
 
@@ -186,7 +194,7 @@ def test_vendor_rows_do_not_rank_or_total_a_missing_cost_as_zero(
 ):
     from app.models.vendor.vendor_organization import VendorOrganization
 
-    org = make_org("spend-vendors")
+    org = _usd_org(make_org, db_session, "spend-vendors")
     user = _procurement_user(db_session, org)
     priced_vendor = VendorOrganization(name=f"Priced Vendor {uuid.uuid4().hex[:6]}")
     unpriced_vendor = VendorOrganization(name=f"Unpriced Vendor {uuid.uuid4().hex[:6]}")
@@ -197,15 +205,15 @@ def test_vendor_rows_do_not_rank_or_total_a_missing_cost_as_zero(
 
     spend = _soup(client, login_as, user, "/procurement/spend")
 
-    heading = spend.find("h2", string=lambda s: s and s.strip() == "Top Vendors by Annual Spend")
-    panel = heading.find_parent("div", class_="rounded-lg")
+    table = spend.select_one("table[data-testid='spend-by-vendor']")
     rows = [
-        [" ".join(span.get_text().split()) for span in block.find_all("span")][:2]
-        for block in panel.select("div.flex.items-center.justify-between.mb-1")
+        [" ".join(td.get_text().split()) for td in tr.find_all("td")]
+        for tr in table.select("tbody tr")
     ]
-    assert [name for name, _ in rows] == [priced_vendor.name, unpriced_vendor.name]
-    assert rows[0][1].endswith("12,000.00/yr")
-    assert rows[1][1] == DASH
+    assert [row[0] for row in rows] == [priced_vendor.name, unpriced_vendor.name]
+    # as recorded, then in the reporting currency
+    assert rows[0][2] == "12,000.00 USD" and rows[0][3] == "12,000.00 USD"
+    assert rows[1][2] == DASH and rows[1][3] == DASH
 
 
 def test_both_screens_read_a_contracts_amounts_from_one_function(db_session, make_org):
