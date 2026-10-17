@@ -149,7 +149,7 @@
 .dark .public-site .public-btn--outline:hover { background: hsl(var(--input) / 0.5); }
 .public-site .public-btn--primary:focus-visible,
 .public-site .public-btn--outline:focus-visible {
-  outline: none; border-color: hsl(var(--ring)); box-shadow: 0 0 0 3px hsl(var(--ring) / 0.5);
+  outline: 2px solid hsl(var(--foreground)); outline-offset: 2px; border-color: hsl(var(--ring));
 }
 
 /* type_scale.home_h1 (72/72 at lg, 60/60 at sm, 48/48; 700; -0.025em) and home_lead (20/32 from sm, 18/32; max 768px) */
@@ -227,12 +227,13 @@
 .public-site .home-cta-eyebrow { font-size: 0.875rem; line-height: 1.25rem; }
 
 /* Shared public component; used by the homepage and the pricing page; registered in docs/reuse-register.yml. */
-/* inline_link: underline, offset 4px, hover foreground; 3px focus ring */
+/* inline_link: underline, offset 4px, hover foreground; 2px solid focus outline (survives forced-colors mode) */
 .public-site .public-link { text-decoration: underline; text-underline-offset: 4px; transition: color 150ms; }
 .public-site .public-link:hover { color: hsl(var(--foreground)); }
 .public-site .public-link:focus-visible,
-.public-site .public-faq summary:focus-visible {
-  outline: none; border-radius: 0.25rem; box-shadow: 0 0 0 3px hsl(var(--ring) / 0.5);
+.public-site .public-faq summary:focus-visible,
+.public-site .public-table-scroll:focus-visible {
+  outline: 2px solid hsl(var(--foreground)); outline-offset: 2px; border-radius: 0.25rem;
 }
 
 /* layout_rhythm.list_emphasis and note_block */
