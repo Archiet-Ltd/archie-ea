@@ -21,6 +21,7 @@ from app.utils.validators import validate_string
 from app.decorators import audit_log, require_roles
 from app.services.rate_limiter import rate_limit
 from app.extensions import db
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.vendor_organization import VendorOrganization, VendorProduct
 import logging
 from app.utils.pagination import safe_int_arg
@@ -145,7 +146,7 @@ def list_vendors():
 
 
 @unified_vendors_api_bp.route("/bulk", methods=["DELETE"])
-@login_required
+@platform_admin_required
 def bulk_delete_vendors():
     """Bulk delete vendors by IDs."""
     data = request.get_json() or {}
@@ -241,8 +242,7 @@ def search_vendors():
 
 
 @unified_vendors_api_bp.route("/", methods=["POST"])
-@login_required
-@require_roles("admin", "architect")
+@platform_admin_required
 @audit_log("vendor_create")
 @rate_limit(20, "1h")
 def create_vendor():
@@ -410,8 +410,7 @@ def update_vendor(vendor_id):
 
 
 @unified_vendors_api_bp.route("/<int:vendor_id>", methods=["DELETE"])
-@login_required
-@require_roles("admin")
+@platform_admin_required
 @audit_log("vendor_delete")
 @rate_limit(10, "1h")
 def delete_vendor(vendor_id):

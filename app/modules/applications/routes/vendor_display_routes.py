@@ -17,6 +17,7 @@ from flask_login import login_required
 
 from app import db
 from app.decorators import audit_log
+from app.middleware.tenant_decorators import platform_admin_required
 
 from ._helpers import _vendors_impl
 from . import unified_applications_bp
@@ -93,7 +94,7 @@ def vendors():
 
 
 @unified_applications_bp.route("/vendors/create", methods=["GET", "POST"])
-@login_required
+@platform_admin_required
 @audit_log("create_vendor")
 def vendors_create():
     """Render and process the standalone vendor create form."""

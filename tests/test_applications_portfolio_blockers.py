@@ -180,6 +180,7 @@ def test_vendor_create_modal_wiring_is_consistent():
 
 def test_vendor_management_create_persists(app, db_session, make_org, client, login_as):
     org, user = _admin_user(db_session, make_org)
+    user.is_platform_admin = True  # catalogue writes are platform-admin only
     db_session.commit()
     login_as(client, user)
 

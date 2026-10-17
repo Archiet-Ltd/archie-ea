@@ -16,6 +16,7 @@ from flask import (
     current_app,
 )
 from flask_login import login_required, current_user
+from app.middleware.tenant_decorators import platform_admin_required
 from sqlalchemy import func
 
 from app.decorators import audit_log, require_roles  # dead-code-ok
@@ -55,8 +56,7 @@ def vendor_dashboard():
 
 
 @vendor_management_bp.route("/create", methods=["GET", "POST"])
-@login_required
-@require_roles("admin", "architect")
+@platform_admin_required
 @audit_log("vendor_create")
 def create_vendor():
     """Create new vendor (admin/architect only) with validation."""
@@ -140,8 +140,7 @@ def vendor_analytics():
 
 
 @vendor_management_bp.route("/import", methods=["GET", "POST"])
-@login_required
-@require_roles("admin")
+@platform_admin_required
 @audit_log("vendor_import")
 def import_vendors():
     """
@@ -365,8 +364,7 @@ def api_list_vendors():
 
 
 @vendor_management_bp.route("/api/vendors", methods=["POST"])
-@login_required
-@require_roles("admin", "architect")
+@platform_admin_required
 @audit_log("vendor_api_create")
 def api_create_vendor():
     """API: Create vendor with validation and duplicate prevention."""
@@ -466,8 +464,7 @@ def api_update_vendor(vendor_id):
 
 
 @vendor_management_bp.route("/api/vendors/<int:vendor_id>", methods=["DELETE"])
-@login_required
-@require_roles("admin")
+@platform_admin_required
 @audit_log("vendor_api_delete")
 def api_delete_vendor(vendor_id):
     """

@@ -54,6 +54,7 @@ def logged_in_client(app, db_session, org, login_as):
         role=role,
         confirmed=True,
     )
+    user.is_platform_admin = True  # the vendor create form is platform-admin only
     db_session.add(user)
     db_session.flush()
 

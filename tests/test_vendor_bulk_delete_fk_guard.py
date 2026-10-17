@@ -12,6 +12,7 @@ import pytest
 @pytest.mark.usefixtures("db_session")
 def test_vendor_with_product_is_refused_not_500(app, db_session, make_org, tenant_ctx):
     from app.models.vendor.vendor_organization import VendorOrganization, VendorProduct
+    from app.models import Role
     from app.models.user import User
 
     org = make_org("vendor-bulk-delete-guard")
@@ -25,6 +26,8 @@ def test_vendor_with_product_is_refused_not_500(app, db_session, make_org, tenan
 
         user = User(email=f"vbd-{org.id}@example.com", organization_id=org.id,
                     enterprise_role="enterprise_architect", confirmed=True)
+        user.is_platform_admin = True
+        user.role = Role.query.filter_by(name="Administrator").first()
         db_session.add(user)
         db_session.commit()
 
@@ -42,6 +45,7 @@ def test_vendor_with_product_is_refused_not_500(app, db_session, make_org, tenan
 @pytest.mark.usefixtures("db_session")
 def test_vendor_without_products_deletes_cleanly(app, db_session, make_org, tenant_ctx):
     from app.models.vendor.vendor_organization import VendorOrganization
+    from app.models import Role
     from app.models.user import User
 
     org = make_org("vendor-bulk-delete-clean")
@@ -50,6 +54,8 @@ def test_vendor_without_products_deletes_cleanly(app, db_session, make_org, tena
         db_session.add(vendor)
         user = User(email=f"vbdc-{org.id}@example.com", organization_id=org.id,
                     enterprise_role="enterprise_architect", confirmed=True)
+        user.is_platform_admin = True
+        user.role = Role.query.filter_by(name="Administrator").first()
         db_session.add(user)
         db_session.commit()
         vendor_id = vendor.id
