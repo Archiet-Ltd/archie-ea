@@ -691,15 +691,6 @@
         return WP_DETAIL_URL ? WP_DETAIL_URL.replace('__ID__', String(id)) : null;
       },
 
-      wpGapNames(wp) {
-        const names = (wp.gaps || []).map(g => g.name);
-        if (!names.length && wp.gap_id) {
-          const n = this.gapNameForWp(wp.gap_id);
-          if (n) names.push(n);
-        }
-        return names.length ? names.join(', ') : '—';
-      },
-
       async init() {
         this.loading = true;
         try {
