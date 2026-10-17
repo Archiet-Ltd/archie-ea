@@ -240,13 +240,15 @@ def seed_role_users(password: str) -> None:
         db.session.commit()
 
 
-def capture_role(browser, base, password, slug: str, archetype: str) -> tuple[bool, str]:
+def capture_role(browser, base, password, slug: str, archetype: str, wide: bool = True) -> tuple[bool, str]:
     """The role's workspace: Ask open on the impact question with one answer shown.
 
     Returns (captured, reason). An empty state or a 403 is reported and nothing is written, so the
     page stays held rather than shipping a bad image.
     """
-    ctx = browser.new_context(viewport={"width": 1280, "height": 1400}, device_scale_factor=DPR)
+    # 1408px leaves a 1104px crop, the public figure column, so the desktop crop is shown 1:1 (as capture_applications).
+    vw, vh = (1408, 1600) if wide else (390, 1400)
+    ctx = browser.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=DPR)
     page = ctx.new_page()
     try:
         _login(page, base, role_email(archetype), password)
@@ -285,11 +287,13 @@ def capture_role(browser, base, password, slug: str, archetype: str) -> tuple[bo
         h1 = _box(page, "h1")
         main = _box(page, "main")
         row = _box(page, "[data-ask-row]", 0)
+        pad = 24 if wide else 16
         clip = {
-            "x": main["x"] + 24, "y": h1["y"] - 16, "width": main["width"] - 48,
+            "x": main["x"] + pad, "y": h1["y"] - 16, "width": main["width"] - 2 * pad,
             "height": row["y"] + row["height"] + 12 - (h1["y"] - 16),
         }
-        _webp(_shoot(page, clip), IMG / "roles" / ("%s.webp" % slug))
+        name = "%s.webp" % slug if wide else "%s-mobile.webp" % slug
+        _webp(_shoot(page, clip), IMG / "roles" / name)
         return True, "captured"
     finally:
         ctx.close()
@@ -317,8 +321,9 @@ def main() -> int:
         try:
             if args.roles:
                 for slug, archetype in ROLE_PAGES:
-                    ok, reason = capture_role(browser, args.base, password, slug, archetype)
-                    print(f"{slug:24s} {'CAPTURED' if ok else 'REFUSED '} {reason}")
+                    for wide in (True, False):
+                        ok, reason = capture_role(browser, args.base, password, slug, archetype, wide)
+                        print(f"{slug:24s} {'desktop' if wide else 'mobile '} {'CAPTURED' if ok else 'REFUSED '} {reason}")
                 return 0
             for label, fn in (
                 ("home impact answer", capture_home_impact),

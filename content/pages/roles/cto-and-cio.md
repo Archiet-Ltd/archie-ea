@@ -70,8 +70,9 @@ work on [enterprise architect tools](/roles/enterprise-architects).
 2. Check rationalisation's consolidation list for what you're paying for twice, and ownership
    coverage for which business unit has an application nobody has claimed.
 3. Open the roadmap's gap register for the stage a proposed change sits in, and the business case
-   behind it, with capex, annual opex, three-year TCO, ROI, payback and NPV drawn from the capability,
-   initiative or solution it's linked to.
+   behind it, with the capex, annual opex, three-year TCO, ROI, payback and NPV recorded on it. The
+   costs of the capability, initiative or solution it's linked to can fill blank cost fields and are
+   shown beside what was entered as a cross-check.
 4. Send the change to the review board, and decide it once its sessions and evidence are recorded.
 5. Set direction on the tech radar for anything newly adopted, trialled, assessed or put on hold.
 
