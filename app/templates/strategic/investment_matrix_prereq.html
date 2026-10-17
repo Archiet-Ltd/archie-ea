@@ -23,63 +23,13 @@
     <div class="flex items-center justify-center min-h-[480px]">
         <div class="rounded-lg border bg-card text-card-foreground shadow-sm w-full max-w-lg p-8 text-center space-y-6">
 
-            <div class="flex justify-center">
-                <div class="rounded-full bg-muted p-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"
-                         viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
-                         class="text-muted-foreground">
-                        <path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
-                        <path d="M17 18h1"/>
-                        <path d="M12 18h1"/>
-                        <path d="M7 18h1"/>
-                    </svg>
-                </div>
-            </div>
-
-            <div class="space-y-2">
-                <h2 class="text-xl font-semibold tracking-tight">Setup Required</h2>
-                <p class="text-sm text-muted-foreground leading-relaxed">
-                    Click below to map your first application to a business capability.
-                    The Investment Matrix will unlock automatically once the first mapping is saved.
-                </p>
-            </div>
-
-            <div class="flex flex-col items-center gap-3 pt-2">
-                <button type="button" id="btn-map-capabilities"
-                        class="inline-flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground px-6 py-2.5 text-sm font-medium shadow hover:bg-primary/90 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
-                         viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                    </svg>
-                    Map Applications to Capabilities
-                </button>
-                <button type="button" id="btn-map-applications"
-                        class="text-sm text-muted-foreground hover:underline hover:text-foreground transition-colors">
-                    or map from an application →
-                </button>
-            </div>
-<script>
-(function() {
-    function reloadOnSave(data) {
-        if (data && (data.success || data.created > 0)) { window.location.reload(); }
-    }
-    let capBtn = document.getElementById('btn-map-capabilities');
-    let appBtn = document.getElementById('btn-map-applications');
-    if (capBtn) capBtn.addEventListener('click', function() {
-        if (typeof openUnifiedMappingModalDiscovery === 'function') {
-            openUnifiedMappingModalDiscovery({ context: 'capability', onSaveCallback: reloadOnSave });
-        }
-    });
-    if (appBtn) appBtn.addEventListener('click', function() {
-        if (typeof openUnifiedMappingModalDiscovery === 'function') {
-            openUnifiedMappingModalDiscovery({ context: 'application', onSaveCallback: reloadOnSave });
-        }
-    });
-})();
-</script>
+            {% from 'components/not_available.html' import not_available %}
+            {{ not_available(
+                component='Investment Priorities',
+                why='No data yet',
+                next_step='Map applications to capabilities first — the dashboard unlocks once the first mapping is saved.',
+                who_can='Architects or system administrators'
+            ) }}
 
         </div>
     </div>
