@@ -14,14 +14,19 @@ icon: network
 
 # Diagrams & Composer
 
-*Saved diagram views, and a composer that jumps straight from any element to its exact place in the
-picture.*
+*A library of the diagrams you have saved, and a composer for building ArchiMate views from your
+model's elements and exporting them.*
 
 ## What this module does
 
-A library for the twin maps and diagrams you've generated, and a composer for building your own from
-the same elements. A deep link from any element takes you straight to where it sits in the diagram,
-no hunting through layers to find it.
+The library lists every diagram saved across your solutions, searchable by name and filterable by
+solution, and opens each one in the composer. The composer builds views from the elements already
+in your model, either on a blank canvas or from a viewpoint, and saves them back to the library. A
+link can open the composer on a specific saved diagram, a viewpoint or a solution.
+
+Views export as ArchiMate Exchange XML, and the composer can also export its live canvas as
+Mermaid, Lucidchart or Archi files. The Twin map is its own page; it is not saved to this library
+and has no link into the composer.
 
 ## Where you'll meet it
 

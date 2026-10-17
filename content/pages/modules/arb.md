@@ -14,8 +14,8 @@ icon: gavel
 
 # Architecture Review Board
 
-*Reviews, sessions and decisions, with the impact evidence already attached before the meeting
-starts.*
+*Reviews, sessions and decisions, with each decision recorded against the exact version of the
+proposal it reviewed.*
 
 ## What is an architecture review board?
 
@@ -44,14 +44,20 @@ the bigger picture before it ships, not after.
 
 Entelim's Architecture Review Board module runs that process in software, not in someone's inbox.
 It holds every change proposal your board reviews, alongside the sessions where it was discussed
-and the decisions that came out of them. A decision here is locked to the exact proposal it reviewed — a
-decision brief, a solution, an architecture model, or an architecture decision record — along with
-its rationale and any conditions attached, so governance doesn't live in a separate record nobody
-trusts.
+and the decisions that came out of them. A review covers a decision brief, a solution, an architecture
+model or an architecture decision record. For a decision brief, architecture model or architecture
+decision record, the evidence is captured and pinned for the review cycle, and the decision
+is recorded against that pinned snapshot with its rationale and any conditions attached, so
+governance doesn't live in a separate record nobody trusts.
+
+Decisions are approved, approved with conditions, rejected, or returned for more evidence or
+options. A person who submitted a review cannot also decide it. The board's sessions, standards,
+change requests and decision log sit alongside the reviews. The pinned evidence is the proposal's
+readiness record; a separate impact analysis is not attached to the review.
 
 ## Where you'll meet it
 
-- [Take a change through the review board with the impact evidence attached](/use-cases/architecture-review-board)
+- [Take a change through the review board](/use-cases/architecture-review-board)
 
 ## Related modules
 
