@@ -91,14 +91,14 @@ def test_screen_carries_footer_and_it_is_per_organisation(app, client, login_as,
     assert "in this organisation" in footer_a
     assert "Counted from recorded data" in footer_a
     expected = {"roadmap": "3 recorded gaps", "gaps": "3 recorded gaps", "risks": "4 recorded risks",
-                "health_scorecard": "4 recorded risks"}.get(key)
+                "health_scorecard": "4 open risks"}.get(key)
     if expected:
         assert expected in footer_a
 
     login_as(client, user_b)
     html_b = client.get(path).get_data(as_text=True)
     footer_b = html_b.split('data-four-properties="%s"' % key)[1].split("</section>")[0]
-    assert "3 recorded gaps" not in footer_b and "4 recorded risks" not in footer_b
+    assert "3 recorded gaps" not in footer_b and "4 recorded risks" not in footer_b and "4 open risks" not in footer_b
     assert org_a.name not in html_b
 
 
@@ -116,3 +116,75 @@ def test_footer_renders_nothing_when_the_fields_cannot_be_worked_out(app, monkey
             "{{ four_properties_footer('gaps') }}"
         )
     assert "data-four-properties" not in html
+
+
+def _footer(html, key):
+    return html.split('data-four-properties="%s"' % key)[1].split("</section>")[0]
+
+
+def test_risks_footer_follows_to_the_risk_records_not_a_maturity_screen(app, client, login_as, db_session):
+    org_a, org_b = _make_org(db_session, "fp-r-a"), _make_org(db_session, "fp-r-b")
+    user_a, user_b = _make_user(db_session, org_a, org_admin=True), _make_user(db_session, org_b, org_admin=True)
+    _seed(db_session, org_a, gaps=0, risks=2)
+    db_session.commit()
+    for user, count in ((user_a, "2 recorded risks"), (user_b, "no recorded risks")):
+        login_as(client, user)
+        footer = _footer(client.get("/risks/").get_data(as_text=True), "risks")
+        assert count in footer
+        assert "value-streams-at-risk" not in footer
+        assert 'href="/risks/' in footer
+
+
+def test_health_scorecard_footer_counts_open_risks_only(app, client, login_as, db_session):
+    from app.models.risk import Risk, RiskStatus
+
+    org_a, org_b = _make_org(db_session, "fp-o-a"), _make_org(db_session, "fp-o-b")
+    user_a, user_b = _make_user(db_session, org_a, org_admin=True), _make_user(db_session, org_b, org_admin=True)
+    _seed(db_session, org_a, gaps=0, risks=2)
+    for status in (RiskStatus.CLOSED, RiskStatus.ACCEPTED, RiskStatus.MITIGATED):
+        db_session.add(Risk(organization_id=org_a.id, title="Done %s" % status.value, likelihood=2, impact=2,
+                            status=status))
+    db_session.add(Risk(organization_id=org_b.id, title="Only other org", likelihood=2, impact=2,
+                        status=RiskStatus.CLOSED))
+    db_session.commit()
+    login_as(client, user_a)
+    footer = _footer(client.get("/dashboard/health").get_data(as_text=True), "health_scorecard")
+    assert "2 open risks" in footer and "5 recorded" not in footer
+    login_as(client, user_b)
+    footer = _footer(client.get("/dashboard/health").get_data(as_text=True), "health_scorecard")
+    assert "no open risks" in footer
+
+
+def test_capability_health_footer_uses_the_dashboards_cached_result_and_time(app, client, login_as, db_session):
+    import time
+
+    from app.models.business_capabilities import BusinessCapability
+    from app.modules.capabilities.services import capability_health_service as chs
+
+    org_a, org_b = _make_org(db_session, "fp-c-a"), _make_org(db_session, "fp-c-b")
+    user_a, user_b = _make_user(db_session, org_a, org_admin=True), _make_user(db_session, org_b, org_admin=True)
+    for i in range(2):
+        db_session.add(BusinessCapability(name="Cap %s" % i, organization_id=org_a.id))
+    db_session.commit()
+    chs._health_metrics_cache.clear()
+
+    login_as(client, user_a)
+    assert client.get("/strategic/capability-health").status_code == 200
+    # A third capability appears after the dashboard worked its figures out,
+    # and the cached result is 30 seconds old: the footer must say what the
+    # dashboard shows, with the time the dashboard worked it out.
+    db_session.add(BusinessCapability(name="Cap late", organization_id=org_a.id))
+    db_session.commit()
+    stamp = time.time() - 30
+    _, result = chs._health_metrics_cache[org_a.id]
+    chs._health_metrics_cache[org_a.id] = (stamp, result)
+    footer = _footer(client.get("/strategic/capability-health").get_data(as_text=True), "capability_health")
+    assert "2 recorded capabilities" in footer and "3 recorded" not in footer
+    import datetime as dt
+    label = dt.datetime.utcfromtimestamp(stamp).strftime("%d %b %Y, %H:%M UTC")
+    assert label in footer
+
+    login_as(client, user_b)
+    footer_b = _footer(client.get("/strategic/capability-health").get_data(as_text=True), "capability_health")
+    assert "no recorded capabilities" in footer_b
+    chs._health_metrics_cache.clear()

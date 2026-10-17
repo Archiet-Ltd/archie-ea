@@ -33,23 +33,33 @@ def _plural(count: int, one: str, many: str) -> str:
     return f"{count} {one if count == 1 else many}"
 
 
-def _count(model) -> int:
+def _count(model, *predicates) -> int:
     org_id = current_org_id()
     if org_id is None:
         return 0
-    return db.session.query(db.func.count(model.id)).filter(model.organization_id == org_id).scalar() or 0
+    query = db.session.query(db.func.count(model.id)).filter(model.organization_id == org_id)
+    return query.filter(*predicates).scalar() or 0
 
 
-def _endpoint_url(endpoint: str) -> Optional[str]:
+def _endpoint_url(endpoint: str, **url_args: Any) -> Optional[str]:
     from flask import current_app
 
     if endpoint not in current_app.view_functions:
         return None
-    return url_for(endpoint)
+    return url_for(endpoint, **url_args)
 
 
-def _fields(source: Optional[str], endpoint: str, trail_label: str) -> Dict[str, Any]:
-    now = _dt.datetime.utcnow().replace(microsecond=0)
+def _fields(
+    source: Optional[str],
+    endpoint: str,
+    trail_label: str,
+    computed_epoch: Optional[float] = None,
+    **url_args: Any,
+) -> Dict[str, Any]:
+    if computed_epoch is not None:
+        now = _dt.datetime.utcfromtimestamp(computed_epoch).replace(microsecond=0)
+    else:
+        now = _dt.datetime.utcnow().replace(microsecond=0)
     return {
         "source": source,
         "computed_at": now.isoformat() + "Z",
@@ -57,7 +67,7 @@ def _fields(source: Optional[str], endpoint: str, trail_label: str) -> Dict[str,
         "confidence": None,
         "confidence_basis": CONFIDENCE_DRAWN_ONLY if source else None,
         "confidence_percent": None,
-        "trail_url": _endpoint_url(endpoint),
+        "trail_url": _endpoint_url(endpoint, **url_args),
         "trail_label": trail_label,
     }
 
@@ -95,21 +105,33 @@ def _risks() -> Dict[str, Any]:
 
     source = f"{_plural(_count(Risk), 'recorded risk', 'recorded risks')} in this organisation"
     return _fields(source if current_org_id() is not None else None,
-                   "intelligence_ui.value_streams_at_risk", "See which value streams the risks reach")
+                   "risk.risk_register", "See the risks, highest impact first",
+                   sort="impact", dir="desc")
 
 
 def _capability_health() -> Dict[str, Any]:
-    from app.models.business_capabilities import BusinessCapability
+    """Counted from the same cached result the dashboard shows, and stamped with
+    the time that result was worked out (not the time the page was asked for)."""
+    from app.modules.capabilities.services.capability_health_service import CapabilityHealthService
 
-    source = f"{_plural(_count(BusinessCapability), 'recorded capability', 'recorded capabilities')} in this organisation"
-    return _fields(source if current_org_id() is not None else None,
-                   "intelligence_ui.traceability", "Check how a capability traces to technology")
+    trail = ("intelligence_ui.traceability", "Check how a capability traces to technology")
+    if current_org_id() is None:
+        return _fields(None, *trail)
+    computed_epoch, metrics = CapabilityHealthService().get_capability_health_metrics_with_time()
+    total = metrics.get("total_capabilities")
+    source = (
+        f"{_plural(total, 'recorded capability', 'recorded capabilities')} in this organisation"
+        if isinstance(total, int)
+        else None
+    )
+    return _fields(source, *trail, computed_epoch=computed_epoch)
 
 
 def _health_scorecard() -> Dict[str, Any]:
-    from app.models.risk import Risk
+    from app.models.risk import Risk, RiskStatus
 
-    source = f"{_plural(_count(Risk), 'recorded risk', 'recorded risks')} in this organisation"
+    open_risks = _count(Risk, Risk.status == RiskStatus.OPEN)
+    source = f"{_plural(open_risks, 'open risk', 'open risks')} in this organisation"
     return _fields(source if current_org_id() is not None else None,
                    "risk.risk_register", "Open the risk register")
 

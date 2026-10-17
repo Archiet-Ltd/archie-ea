@@ -62,3 +62,36 @@ def test_architect_sees_the_four_properties_under_the_gap_list(browser, live_ser
             "no recorded gaps")
     finally:
         context.close()
+
+
+ROADMAP = "/capability-roadmap"
+
+
+def test_roadmap_footer_follows_a_deleted_work_package_without_a_reload(browser, live_server):
+    org = create_fresh_org("enterprise_architect")
+    context, page = _new_page(browser)
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        page.goto(live_server + ROADMAP, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        status, gap = api(page, "POST", "/capability-map/api/roadmap/gaps",
+                          {"name": "Billing has no owner %s" % org["suffix"], "gap_type": "coverage",
+                           "priority": "high"})
+        assert status in (200, 201), gap
+        status, wp = api(page, "POST", "/capability-map/api/roadmap/work-packages",
+                         {"name": "Assign billing owner %s" % org["suffix"], "status": "planned",
+                          "priority": "high", "business_capability": "Enterprise"})
+        assert status in (200, 201), wp
+
+        page.goto(live_server + ROADMAP, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        source = page.locator('[data-four-properties="roadmap"] [data-fp="source"]')
+        expect(source).to_contain_text("1 recorded gap and 1 work package")
+
+        page.get_by_role("button", name="Delete", exact=True).first.click()
+        page.get_by_role("alertdialog").get_by_role("button", name="Delete").click()
+        expect(source).to_contain_text("1 recorded gap and no work packages", timeout=PAGE_TIMEOUT)
+
+        page.reload(wait_until="domcontentloaded")
+        expect(page.locator('[data-four-properties="roadmap"] [data-fp="source"]')).to_contain_text(
+            "1 recorded gap and no work packages")
+    finally:
+        context.close()
