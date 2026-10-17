@@ -486,7 +486,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 72 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 73 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -511,6 +511,7 @@ to reconfirm the count before trusting it:**
 | `untenanted-reads` | a read (`db.select`, `.query`, `session.get`) of ANY model with no `TenantMixin`, with no org predicate in the statement | ratchet @ 2361; a bare `tenant-scoping-ok` (no reason) or an org word inside another name does not clear a read |
 | `unfenced-tables` | a database table with no `TenantMixin` that is not listed in `scripts/unfenced_tables.txt` (a new one is a decision) | ratchet @ 0 |
 | `reuse-register` | a second copy of a concept registered in `docs/reuse-register.yml` (a definition matching a `must_not_create` pattern outside the canonical file and the known exceptions), or a canonical file or symbol that no longer exists; the failure prints what to reuse (`python scripts/check_reuse_register.py --entries`) | zero over per-file counts in `scripts/reuse_register_baseline.json` that only fall; `--update-baseline` refuses to raise one |
+| `marketing-copy` | roadmap language (`Q1 2027`, `opens in`, `quarter`, `roadmap`) or generic filler on a public content page or the public templates; absolute-claim words (`every`, `all`, `never`) are listed by `--claims` for review and never fail | ratchet over per-file counts in `scripts/marketing_copy_baseline.json` that only fall; `--update-baseline` refuses to raise one |
 | `llm-boundary` | a codegen emitter calling an LLM directly | ratchet @ 0 |
 | `evidence-contract` | behavioural changes/checkers missing evidence or provenance | ratchet @ 29 |
 | `untyped-property-writes` | direct ArchiMate element property writes bypassing the typed writer | ratchet @ 1 |
