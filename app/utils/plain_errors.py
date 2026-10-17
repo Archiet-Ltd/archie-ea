@@ -26,7 +26,7 @@ PLAIN = {
     500: (
         "triangle-alert",
         "Something went wrong on our side",
-        "Nothing you entered has been lost. Try again in a moment, and if it keeps happening "
+        "Check whether your changes were saved before trying again. If it keeps happening, "
         "tell your administrator.",
     ),
 }

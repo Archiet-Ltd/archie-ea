@@ -112,11 +112,20 @@ def test_history_pages_open_from_the_sidebar_without_parameters(app, org_user, l
     _, user = org_user("a")
     client = app.test_client()
     for path in ("/intelligence/history/changes", "/intelligence/history/as-of",
-                 "/intelligence/history/changes?from=nonsense&to=nonsense"):
+                 "/intelligence/history/changes?from=nonsense&to=nonsense",
+                 "/intelligence/history/changes?from=2026-10-01T00:00:00%2B00:00",
+                 "/intelligence/history/changes?from=2026-10-01T00:00:00%2B02:00&to=2026-10-10"):
         login_as(client, user)
         resp = client.get(path)
         assert resp.status_code == 200, path
         assert "MISSING_PARAMETER" not in _body(resp)
+
+
+def test_server_error_does_not_promise_unsaved_work_is_safe(app):
+    from app.utils.plain_errors import PLAIN
+
+    assert "lost" not in PLAIN[500][2]
+    assert "Check whether your changes were saved" in PLAIN[500][2]
 
 
 def test_history_submit_buttons_carry_a_label(app, org_user, login_as):

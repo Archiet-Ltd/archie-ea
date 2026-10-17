@@ -11,7 +11,7 @@ the same prefix — ADR 0008 rule 3). Provides:
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from flask import render_template, request
 from flask_login import login_required
@@ -34,9 +34,11 @@ def _parse_datetime_param(raw: str | None, param_name: str) -> tuple[datetime | 
         )
     try:
         # Accept both date-only and full datetime
-        if "T" in raw:
-            return datetime.fromisoformat(raw), None
-        return datetime.fromisoformat(raw + "T00:00:00"), None
+        parsed = datetime.fromisoformat(raw if "T" in raw else raw + "T00:00:00")
+        if parsed.tzinfo is not None:
+            # Compare and query in one representation: naive UTC, like the defaults.
+            parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+        return parsed, None
     except ValueError:
         return None, error_response(
             f"{param_name} must be a valid ISO date or datetime (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)",
