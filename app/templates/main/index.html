@@ -270,11 +270,11 @@
     </h2>
     <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
       Your teams ask questions about your systems, suppliers, risks and plans. Entelim's built-in assistant
-      works on the records in your organisation's model, and it never acts with more access than the person
-      asking.
+      works on the records in your organisation's model, and what it is allowed to change is decided by the
+      role of the person asking.
     </p>
     <ul class="mx-auto max-w-xl text-left space-y-2 text-muted-foreground">
-      <li class="rounded-lg border border-border bg-card p-4"><strong class="text-foreground">Your permissions decide.</strong> Every action the assistant takes passes one permission check; a role without write access is refused, and the refusal is recorded in the audit log.</li>
+      <li class="rounded-lg border border-border bg-card p-4"><strong class="text-foreground">Your permissions decide.</strong> Every change the assistant attempts passes one permission check; a role without write access is refused, and the refusal is recorded in the audit log.</li>
       <li class="rounded-lg border border-border bg-card p-4"><strong class="text-foreground">Changes wait for a person.</strong> A change the assistant proposes goes to your approval queue, and nothing is written until a person approves it.</li>
     </ul>
   </div>
@@ -299,7 +299,7 @@
       </div>
       <div class="rounded-lg border border-border bg-card p-4">
         <p class="font-semibold text-foreground mb-1">Governed</p>
-        <p class="text-muted-foreground">Every assistant action passes one permission check.</p>
+        <p class="text-muted-foreground">Every change the assistant attempts passes one permission check.</p>
       </div>
       <div class="rounded-lg border border-border bg-card p-4">
         <p class="font-semibold text-foreground mb-1">Approved</p>
@@ -459,7 +459,7 @@
       </details>
       <details class="rounded-lg border border-border bg-card p-6">
         <summary class="font-semibold text-foreground cursor-pointer">Can my AI assistant use it?</summary>
-        <p class="text-muted-foreground text-sm mt-3">Entelim has its own built-in assistant. Every action it takes passes one permission check, and every change it proposes waits in an approval queue until a person approves it.</p>
+        <p class="text-muted-foreground text-sm mt-3">Entelim has its own built-in assistant. Every change it attempts passes one permission check, and every change it proposes waits in an approval queue until a person approves it.</p>
       </details>
     </div>
   </div>

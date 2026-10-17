@@ -54,7 +54,7 @@ back to the record it came from. Enterprise Intelligence Management gives people
 Entelim's own assistant one governed, time-aware, cited model of the enterprise to stand on, the same
 way a CRM is the source a sales assistant should read about customers. That positions Entelim as the
 company brain, rather than another AI feature bolted onto an architecture tool. Entelim's
-own assistant already works this way: every action passes one permission check and every change
+own assistant already works this way: every change it attempts passes one permission check and every change
 the assistant proposes waits for approval. See [Agentic Automation](/features#agentic-automation) among the eighteen
 capabilities.
 
@@ -77,7 +77,7 @@ capabilities.
 ## Where Entelim is today
 
 Today Entelim is a modelled company brain: import an existing architecture model and ask cited
-questions about it. Every action Entelim's own assistant takes passes one permission check, and every
+questions about it. Every change Entelim's own assistant attempts passes one permission check, and every
 change the assistant proposes waits in an approval queue until a person approves it. See
 [all eighteen capabilities](/features) for what each one covers.
 
