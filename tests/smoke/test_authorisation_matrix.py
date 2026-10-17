@@ -1515,3 +1515,130 @@ def test_approval_impact_route_authorisation(archetype, page, live_server, seede
         assert response.json()["impact"]["state"] == "not_in_model"
     else:
         assert response.status == 403, "%s reached the impact route (%s)" % (archetype, response.status)
+
+
+# The other routes that create, change or delete a work package, roadmap gap or
+# plateau (every one is role-gated by require_roles(*WORK_PACKAGE_WRITE_ROLES)).
+# A persona holding the Architect role (every seeded archetype) or Administrator
+# (platform_admin) reaches the handler, which answers 400 or 404 for the empty
+# body and the id 0 used here; a read-only Viewer is answered 403 before the
+# handler runs (pinned with real Viewer and two-organisation data in
+# tests/test_work_package_write_roles_sweep.py).
+WORK_PACKAGE_SWEEP_POLICY = [
+    ("POST", "/api/applications/0/work-packages"),
+    ("PUT", "/api/applications/0/work-packages/0"),
+    ("DELETE", "/api/applications/0/work-packages/0"),
+    ("POST", "/api/archimate-work-packages"),
+    ("PUT", "/api/archimate-work-packages/0"),
+    ("DELETE", "/api/archimate-work-packages/0"),
+    ("POST", "/api/strategic-work-packages"),
+    ("PUT", "/api/strategic-work-packages/0"),
+    ("DELETE", "/api/strategic-work-packages/0"),
+    ("POST", "/api/capability-work-packages"),
+    ("PUT", "/api/capability-work-packages/0"),
+    ("DELETE", "/api/capability-work-packages/0"),
+    ("POST", "/api/capability-work-packages/0/tasks"),
+    ("PUT", "/api/capability-work-packages/0/tasks/0"),
+    ("DELETE", "/api/capability-work-packages/0/tasks/0"),
+    ("POST", "/api/capability-work-packages/0/deliverables"),
+    ("PUT", "/api/capability-work-packages/0/deliverables/0"),
+    ("DELETE", "/api/capability-work-packages/0/deliverables/0"),
+    ("POST", "/capability-map/api/roadmap/gaps"),
+    ("PUT", "/capability-map/api/roadmap/gaps/0"),
+    ("DELETE", "/capability-map/api/roadmap/gaps/0"),
+    ("POST", "/capability-map/api/roadmap/gaps/0/link-plateau/0"),
+    ("POST", "/capability-map/api/roadmap/gaps/0/unlink-plateau/0"),
+    ("POST", "/capability-map/api/roadmap/gaps/add-from-capability"),
+    ("POST", "/capability-map/api/roadmap/gaps/convert"),
+    ("POST", "/capability-map/api/roadmap/gaps/detect"),
+    ("POST", "/capability-map/api/roadmap/plateaus"),
+    ("POST", "/api/roadmap/work-packages"),
+    ("PUT", "/api/roadmap/work-packages/0"),
+    ("DELETE", "/api/roadmap/work-packages/0"),
+    ("POST", "/api/roadmap/deliverables"),
+    ("PUT", "/api/roadmap/deliverables/0"),
+    ("DELETE", "/api/roadmap/deliverables/0"),
+    ("POST", "/api/roadmap/gaps"),
+    ("POST", "/api/roadmap/plateaus"),
+    ("POST", "/api/roadmap/automation/generate-work-packages"),
+    ("POST", "/api/roadmap/sync/capabilities"),
+    ("POST", "/api/roadmap/sync/applications"),
+    ("POST", "/api/roadmap/archimate/generate-roadmap"),
+    ("POST", "/api/roadmap/archimate/generate-single-gap/0"),
+    ("POST", "/api/roadmap-builder/work-packages"),
+    ("PUT", "/api/roadmap-builder/work-packages/0"),
+    ("DELETE", "/api/roadmap-builder/work-packages/0"),
+    ("POST", "/api/roadmap-builder/work-packages/0/dependencies"),
+    ("DELETE", "/api/roadmap-builder/work-packages/0/dependencies/0"),
+    ("POST", "/api/roadmap-builder/plateaus"),
+    ("POST", "/implementation/work-packages/create"),
+    ("POST", "/implementation/work-packages/0/edit"),
+    ("POST", "/implementation/work-packages/0/delete"),
+    ("POST", "/implementation/work-packages/0/dependencies"),
+    ("POST", "/implementation/work-packages/0/dependencies/0/remove"),
+    ("POST", "/implementation/api/work-packages"),
+    ("PUT", "/implementation/api/work-packages/0"),
+    ("DELETE", "/implementation/api/work-packages/0"),
+    ("POST", "/implementation/api/deliverables"),
+    ("POST", "/implementation/gaps/discover"),
+    ("POST", "/implementation/api/gaps/discover"),
+    ("POST", "/dashboard/applications/0/work-packages"),
+    ("DELETE", "/dashboard/applications/0/work-packages/0"),
+    ("POST", "/dashboard/applications/0/deliverables"),
+    ("DELETE", "/dashboard/applications/0/deliverables/0"),
+    ("POST", "/dashboard/applications/0/plateaus"),
+    ("DELETE", "/dashboard/applications/0/plateaus/0"),
+    ("POST", "/dashboard/applications/0/work-packages/0/delete"),
+    ("POST", "/dashboard/applications/0/work-packages/0/edit"),
+    ("POST", "/dashboard/applications/0/work-packages/add"),
+    ("POST", "/dashboard/applications/0/deliverables/0/delete"),
+    ("POST", "/dashboard/applications/0/deliverables/0/edit"),
+    ("POST", "/dashboard/applications/0/deliverables/add"),
+    ("POST", "/dashboard/applications/0/plateaus/0/delete"),
+    ("POST", "/dashboard/applications/0/plateaus/add"),
+    ("POST", "/applications/0/work-packages/add"),
+    ("POST", "/applications/0/deliverables/add"),
+    ("POST", "/applications/0/plateaus/add"),
+    ("POST", "/interface-register/gaps/0/work-packages"),
+    ("POST", "/api/architecture-assistant/roadmap-elements"),
+    ("POST", "/api/adm-kanban/v2/cards/task:0/push-to-gantt"),
+    ("POST", "/solutions/0/api/work-packages"),
+    ("PUT", "/solutions/0/api/work-packages/0"),
+    ("DELETE", "/solutions/0/api/work-packages/0"),
+    ("POST", "/solutions/0/update-roadmap-item"),
+    ("POST", "/solutions/0/delete-roadmap-items"),
+]
+
+
+# One route is also behind the interface register's own section gate (the same
+# predicate its sidebar uses), which refuses these archetypes before and after
+# the role check; the role check adds nothing for them.
+WORK_PACKAGE_SWEEP_SECTION_GATED = {
+    ("POST", "/interface-register/gaps/0/work-packages"): {
+        "arb_member", "portfolio_manager", "cto", "procurement", "application_manager",
+        "finance", "compliance", "risk", "operations", "non_technical_owner",
+    },
+}
+
+
+@pytest.mark.parametrize("route", WORK_PACKAGE_SWEEP_POLICY, ids=["%s %s" % r for r in WORK_PACKAGE_SWEEP_POLICY])
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_work_package_sweep_write_authorisation(archetype, route, page, live_server, seeded):
+    """A write role reaches the handler (anything but 401/403); the Viewer case
+    is the two-organisation test named above."""
+    method, path = route
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.fetch(
+        live_server + path, method=method, data={},
+        headers={"X-CSRFToken": csrf}, max_redirects=0,
+    )
+    if archetype in WORK_PACKAGE_SWEEP_SECTION_GATED.get(route, ()):
+        assert response.status == 403, (
+            "%s reached %s %s (%s)" % (archetype, method, path, response.status)
+        )
+        return
+    assert response.status not in (401, 403), (
+        "%s was refused %s %s (%s)" % (archetype, method, path, response.status)
+    )
