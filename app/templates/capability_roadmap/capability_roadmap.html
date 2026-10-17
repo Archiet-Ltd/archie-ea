@@ -26,26 +26,28 @@
 .rdm-gantt-legend{display:flex;align-items:center;gap:1rem;font-size:.75rem;color:var(--muted-foreground)}
 .rdm-gantt-legend span{display:flex;align-items:center;gap:.375rem}
 .rdm-gantt-legend-dot{display:inline-block;width:10px;height:10px;border-radius:3px}
-.rdm-gantt-col-hdr{display:grid;grid-template-columns:300px 80px 1fr;border-bottom:1px solid var(--border);background:var(--muted);position:sticky;top:0;z-index:10}
+.rdm-gantt-col-hdr{display:grid;grid-template-columns:300px 180px 80px 1fr;border-bottom:1px solid var(--border);background:var(--muted);position:sticky;top:0;z-index:10}
 .rdm-gantt-col-hdr div{padding:.625rem 1rem;font-size:.8125rem;font-weight:600;color:var(--muted-foreground)}
 .rdm-gantt-col-hdr .rdm-gantt-dur-hdr{padding:.625rem .5rem}
+.rdm-gantt-col-hdr .rdm-gantt-gap-hdr{padding:.625rem .5rem}
 .rdm-gantt-months-hdr{padding:.625rem 1rem;overflow-x:auto}
 .rdm-gantt-months-row{display:flex}
 .rdm-gantt-month{flex:0 0 120px;text-align:center;font-size:.75rem;font-weight:600;color:var(--muted-foreground)}
 .rdm-gantt-section{border-bottom:1px solid var(--border)}
 .rdm-gantt-section:last-child{border-bottom:none}
 .rdm-gantt-section-hdr{padding:.625rem 1rem;background:var(--muted);font-size:.8125rem;font-weight:600;color:var(--foreground)}
-.rdm-gantt-row{display:grid;grid-template-columns:300px 80px 1fr;border-bottom:1px solid var(--border);min-height:48px}
+.rdm-gantt-row{display:grid;grid-template-columns:300px 180px 80px 1fr;border-bottom:1px solid var(--border);min-height:48px}
 .rdm-gantt-row:last-child{border-bottom:none}
 .rdm-gantt-name-cell{padding:.625rem 1rem;display:flex;align-items:center;gap:.5rem;font-size:.8125rem}
 .rdm-gantt-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .rdm-gantt-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--foreground)}
+.rdm-gantt-gap-cell{padding:.625rem .5rem;font-size:.75rem;color:var(--muted-foreground);display:flex;align-items:center;overflow:hidden}
 .rdm-gantt-dur-cell{padding:.625rem .5rem;font-size:.75rem;color:var(--muted-foreground);display:flex;align-items:center}
 .rdm-gantt-timeline-cell{padding:.625rem 1rem;overflow-x:auto;display:flex;align-items:center;min-width:0}
 .rdm-gantt-track{position:relative;height:28px;display:flex}
 .rdm-gantt-cell{flex:0 0 120px;height:100%;border-right:1px solid var(--border)}
 .rdm-gantt-legend-ip{background:#5B91F5}.rdm-gantt-legend-done{background:#22C55E}.rdm-gantt-legend-hold{background:#F59E0B}.rdm-gantt-legend-plan{background:#94A3B8}
-.rdm-gantt-bar{position:absolute;height:24px;top:2px;border-radius:.375rem;display:flex;align-items:center;padding:0 .5rem;font-size:.7rem;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;cursor:default;transition:filter .15s}
+.rdm-gantt-bar{position:absolute;height:24px;top:2px;border-radius:.375rem;display:flex;align-items:center;padding:0 .5rem;font-size:.7rem;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;cursor:default;text-decoration:none;transition:filter .15s}
 .rdm-gantt-bar:hover{filter:brightness(1.12)}
 </style>
 {% endblock %}
@@ -91,9 +93,9 @@
   {# ── Metrics Row ── #}
   <div class="grid grid-cols-2 gap-4 md:grid-cols-6">
     <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
-      <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Capability Gaps Detected</p>
+      <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Capability Signals Detected</p>
       <p class="mt-2 text-2xl font-semibold text-foreground" x-text="metrics.total_gaps"></p>
-      <p class="mt-1 text-xs text-muted-foreground">Coverage, quality &amp; modernization signals across capabilities</p>
+      <p class="mt-1 text-xs text-muted-foreground">Computed from application coverage, one per capability shortfall. Recorded gaps are counted on Gap Analysis.</p>
     </div>
     <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Plateaus</p>
@@ -160,9 +162,35 @@
                   x-text="plateau.target_date ? formatDate(plateau.target_date) : 'No target date'"></span>
               </div>
               <div class="mt-3 border-t border-border pt-3">
-                <p class="text-xs text-muted-foreground">
-                  <span x-text="gapsForPlateau(plateau.id).length"></span> gap(s) assigned
+                <p class="text-xs font-medium text-foreground">
+                  <span x-text="plateauGaps(plateau).length"></span> gap(s) assigned
                 </p>
+                <ul class="mt-1 space-y-0.5 text-xs text-muted-foreground" data-testid="plateau-gaps">
+                  <template x-for="g in plateauGaps(plateau)" :key="g.id">
+                    <li x-text="g.name"></li>
+                  </template>
+                  <template x-if="plateauGaps(plateau).length === 0">
+                    <li>No gaps assigned</li>
+                  </template>
+                </ul>
+                <p class="mt-2 text-xs font-medium text-foreground">
+                  Realised by <span x-text="plateauWorkPackages(plateau).length"></span> work package(s)
+                </p>
+                <ul class="mt-1 space-y-0.5 text-xs text-muted-foreground" data-testid="plateau-work-packages">
+                  <template x-for="w in plateauWorkPackages(plateau)" :key="w.id">
+                    <li>
+                      <template x-if="wpUrl(w.id)">
+                        <a :href="wpUrl(w.id)" class="text-primary hover:underline" x-text="w.name"></a>
+                      </template>
+                      <template x-if="!wpUrl(w.id)">
+                        <span x-text="w.name"></span>
+                      </template>
+                    </li>
+                  </template>
+                  <template x-if="plateauWorkPackages(plateau).length === 0">
+                    <li>No work packages realise this plateau</li>
+                  </template>
+                </ul>
               </div>
             </div>
           </template>
@@ -604,6 +632,8 @@
   'use strict';
 
   const CSRF = () => document.getElementById('rdm-csrf-token')?.value || '';
+  // The work package page, when this build has one (else rows are not links).
+  const WP_DETAIL_URL = window.rdmWpDetailUrl = {{ (url_for('implementation_planning.work_package_detail', work_package_id=0) if 'implementation_planning.work_package_detail' in flask.current_app.view_functions else none) | tojson }};
 
   // ── Alpine Store: shared state between page and modal sub-components ──
   document.addEventListener('alpine:init', () => {
@@ -647,8 +677,27 @@
         };
       },
 
-      gapsForPlateau(plateauId) {
-        return this.workPackages.filter(wp => wp.plateau_id === plateauId);
+      // Gaps and realising work packages come from the one server-side reader
+      // (a plateau created in this session has none yet).
+      plateauGaps(plateau) {
+        return plateau.gaps || [];
+      },
+
+      plateauWorkPackages(plateau) {
+        return plateau.work_packages || [];
+      },
+
+      wpUrl(id) {
+        return WP_DETAIL_URL ? WP_DETAIL_URL.replace(/0$/, String(id)) : null;
+      },
+
+      wpGapNames(wp) {
+        const names = (wp.gaps || []).map(g => g.name);
+        if (!names.length && wp.gap_id) {
+          const n = this.gapNameForWp(wp.gap_id);
+          if (n) names.push(n);
+        }
+        return names.length ? names.join(', ') : '—';
       },
 
       async init() {
@@ -1135,6 +1184,12 @@
     return `${months} mo`;
   }
 
+  function esc(value) {
+    const d = document.createElement('div');
+    d.textContent = value == null ? '' : String(value);
+    return d.innerHTML.replace(/"/g, '&quot;');
+  }
+
   function formatMonth(date) {
     return date.toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
   }
@@ -1166,20 +1221,26 @@
           `<div class="rdm-gantt-cell"></div>`
         ).join('');
 
+        const detail = window.rdmWpDetailUrl ? window.rdmWpDetailUrl.replace(/0$/, String(task.id)) : null;
+        const nameHtml = detail
+          ? `<a class="rdm-gantt-name text-primary hover:underline" href="${esc(detail)}" title="${esc(task.name)}">${esc(task.name)}</a>`
+          : `<span class="rdm-gantt-name" title="${esc(task.name)}">${esc(task.name)}</span>`;
+
         return `
           <div class="rdm-gantt-row">
             <div class="rdm-gantt-name-cell">
               <span class="rdm-gantt-dot" style="background:${colour}"></span> <!-- inline-style-ok ratchet-ok -->
-              <span class="rdm-gantt-name" title="${task.name}">${task.name}</span>
+              ${nameHtml}
             </div>
+            <div class="rdm-gantt-gap-cell" data-testid="gantt-gap">${esc(task.gaps) || '—'}</div>
             <div class="rdm-gantt-dur-cell">${getDuration(task.startDate, task.endDate)}</div>
             <div class="rdm-gantt-timeline-cell">
               <div class="rdm-gantt-track" style="min-width:${totalWidth}px"> <!-- inline-style-ok ratchet-ok -->
                 ${timelineCells}
-                <div class="rdm-gantt-bar"
+                <${detail ? 'a href="' + esc(detail) + '"' : 'div'} class="rdm-gantt-bar"
                      style="background:${colour};left:${left}px;width:${width}px"
-                     title="${task.name} · ${task.startDate} → ${task.endDate}"
-                >${showText ? task.name : ''}</div>
+                     title="${esc(task.name)} · ${esc(task.startDate)} → ${esc(task.endDate)}"
+                >${showText ? esc(task.name) : ''}</${detail ? 'a' : 'div'}>
               </div>
             </div>
           </div>`;
@@ -1205,6 +1266,7 @@
         </div>
         <div class="rdm-gantt-col-hdr">
           <div>Work Package</div>
+          <div class="rdm-gantt-dur-hdr rdm-gantt-gap-hdr">Gap</div>
           <div class="rdm-gantt-dur-hdr">Duration</div>
           <div class="rdm-gantt-months-hdr">
             <div class="rdm-gantt-months-row" style="min-width:${totalWidth}px">${monthHeaderCells}</div> <!-- inline-style-ok ratchet-ok -->
@@ -1260,6 +1322,8 @@
           endDate:   wp.end_date || wp.target_date,
           group:     wp.plateau_id || '__none__',
           status:    wp.status,
+          id:        wp.id,
+          gaps:      (wp.gaps || []).map(g => g.name).join(', '),
         }));
       } else {
         /* group by gap_type */
@@ -1275,6 +1339,8 @@
           endDate:   wp.end_date || wp.target_date,
           group:     gapMap[wp.gap_id] || 'coverage',
           status:    wp.status,
+          id:        wp.id,
+          gaps:      (wp.gaps || []).map(g => g.name).join(', '),
         }));
       }
 

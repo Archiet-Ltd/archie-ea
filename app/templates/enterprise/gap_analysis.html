@@ -15,6 +15,15 @@
 {% endblock %}
 
 {% block content %}
+{% macro kind_label(gap) -%}
+{{ ((gap.gap_type or gap.gap_kind or '')|replace('_', ' ')|capitalize) or '—' }}
+{%- endmacro %}
+{% macro severity_badge(gap) -%}
+{% if gap.severity == 'critical' %}{{ status_badge('Critical', 'error') }}
+{% elif gap.severity == 'high' %}{{ status_badge('High', 'warning') }}
+{% elif gap.severity %}{{ status_badge(gap.severity|capitalize, 'neutral') }}
+{% else %}—{% endif %}
+{%- endmacro %}
 <div class="flex flex-col space-y-8 animate-in fade-in duration-500">
     <!-- Header -->
     {{ page_header(
@@ -28,9 +37,9 @@
     <!-- Gap Summary -->
     <div class="grid gap-4 md:grid-cols-4">
         {{ metrics_card(title='Recorded Gaps', value=total_gap_count|default(0), icon='target', description='ArchiMate Gap elements in the register') }}
-        {{ metrics_card(title='Critical', value=gaps|selectattr('priority', 'equalto', 'Critical')|list|length|default(0), icon='alert-triangle', icon_class='!text-destructive', value_class='text-destructive') }}
-        {{ metrics_card(title='In Progress', value=gaps|selectattr('status', 'equalto', 'In Progress')|list|length|default(0), icon='loader', icon_class='!text-primary', value_class='text-primary') }}
-        {{ metrics_card(title='Resolved', value=gaps|selectattr('status', 'equalto', 'Resolved')|list|length|default(0), icon='check-circle', icon_class='!text-success', value_class='text-success') }}
+        {{ metrics_card(title='Critical', value=summary.critical, icon='alert-triangle', icon_class='!text-destructive', value_class='text-destructive') }}
+        {{ metrics_card(title='In Progress', value=summary.in_progress, icon='loader', icon_class='!text-primary', value_class='text-primary') }}
+        {{ metrics_card(title='Resolved', value=summary.resolved, icon='check-circle', icon_class='!text-success', value_class='text-success') }}
     </div>
 
     <!-- Gaps Table -->
@@ -59,8 +68,8 @@
                             </th>
                             {% endmacro %}
                             {{ sort_th('name', 'Gap') }}
-                            {{ sort_th('gap_type', 'Type') }}
-                            {{ sort_th('priority', 'Priority') }}
+                            {{ sort_th('gap_kind', 'Type') }}
+                            {{ sort_th('severity', 'Priority') }}
                             {{ sort_th('resolution_status', 'Status') }}
                             {{ sort_th('impact', 'Impact') }}
                             <th class="text-left p-3 font-medium">Work packages</th>
@@ -77,16 +86,8 @@
                                 </div>
                                 <div class="text-sm text-muted-foreground">{{ gap.description|default('', true)|truncate(50) }}</div>
                             </td>
-                            <td class="p-3">{{ gap.gap_type|default('Unknown') }}</td>
-                            <td class="p-3">
-                                {% if gap.priority == 'Critical' %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'error') }}
-                                {% elif gap.priority == 'High' %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'warning') }}
-                                {% else %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'neutral') }}
-                                {% endif %}
-                            </td>
+                            <td class="p-3">{{ kind_label(gap) }}</td>
+                            <td class="p-3">{{ severity_badge(gap) }}</td>
                             <td class="p-3">
                                 {% if gap.resolution_status == 'resolved' %}
                                     {{ status_badge(gap.resolution_status|default('identified'), 'success') }}
@@ -96,7 +97,7 @@
                                     {{ status_badge(gap.resolution_status|default('identified'), 'neutral') }}
                                 {% endif %}
                             </td>
-                            <td class="p-3 text-sm text-muted-foreground">{{ gap.impact|default('Unknown') }}</td>
+                            <td class="p-3 text-sm text-muted-foreground">{{ (gap.impact|capitalize) if gap.impact else '—' }}</td>
                             <td class="p-3 text-sm" data-testid="gap-work-packages-{{ gap.id }}">
                                 {% for wp in work_packages_by_gap.get(gap.id, []) %}
                                 <div><a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wp.id) if 'implementation_planning.work_package_detail' in flask.current_app.view_functions else '#' }}"
@@ -155,16 +156,8 @@
                                 </div>
                                 <div class="text-sm text-muted-foreground">{{ gap.description|default('', true)|truncate(50) }}</div>
                             </td>
-                            <td class="p-3">{{ gap.gap_type|default('Unknown') }}</td>
-                            <td class="p-3">
-                                {% if gap.priority == 'Critical' %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'error') }}
-                                {% elif gap.priority == 'High' %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'warning') }}
-                                {% else %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'neutral') }}
-                                {% endif %}
-                            </td>
+                            <td class="p-3">{{ kind_label(gap) }}</td>
+                            <td class="p-3">{{ severity_badge(gap) }}</td>
                             <td class="p-3">
                                 {% if gap.resolution_status == 'resolved' %}
                                     {{ status_badge(gap.resolution_status|default('identified'), 'success') }}
