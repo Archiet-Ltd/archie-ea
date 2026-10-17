@@ -32,6 +32,7 @@ from datetime import datetime
 
 from flask import current_app, jsonify, request
 from flask_login import current_user, login_required
+from app.decorators import WORK_PACKAGE_WRITE_ROLES, require_roles
 from app.middleware.tenant_context import current_org_id
 
 from app.decorators import audit_log
@@ -701,6 +702,7 @@ def api_roadmap_gaps():
 
 @capability_map.route("/api/roadmap/gaps", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @rate_limit(30, "1m")
 @audit_log("roadmap_gap_create_direct")
 def api_roadmap_create_gap():
@@ -908,6 +910,7 @@ def api_roadmap_archimate_gaps():
 @capability_map.route("/api/roadmap/gaps/convert", methods=["POST"])
 @rate_limit(30, "1m")
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("roadmap_gaps_convert")
 def api_roadmap_convert_gaps():
     """
@@ -970,6 +973,7 @@ def api_roadmap_convert_gaps():
 @capability_map.route("/api/roadmap/gaps/add-from-capability", methods=["POST"])
 @rate_limit(30, "1m")
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("roadmap_gap_create")
 def api_roadmap_add_from_capability():
     """
@@ -1102,6 +1106,7 @@ def api_roadmap_get_gap(gap_id):
 
 @capability_map.route("/api/roadmap/gaps/<int:gap_id>", methods=["PUT"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @rate_limit(30, "1m")
 @audit_log("roadmap_gap_update")
 def api_roadmap_update_gap(gap_id):
@@ -1133,6 +1138,7 @@ def api_roadmap_update_gap(gap_id):
 
 @capability_map.route("/api/roadmap/gaps/<int:gap_id>", methods=["DELETE"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @rate_limit(30, "1m")
 @audit_log("roadmap_gap_delete")
 def api_roadmap_delete_gap(gap_id):
@@ -1796,6 +1802,7 @@ def api_roadmap_get_plateaus():
 
 @capability_map.route("/api/roadmap/plateaus", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @rate_limit(30, "1m")
 @audit_log("roadmap_plateau_create")
 def api_roadmap_create_plateau():
@@ -1851,6 +1858,7 @@ def api_roadmap_create_plateau():
 
 @capability_map.route("/api/roadmap/gaps/detect", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @rate_limit(30, "1m")
 @audit_log("roadmap_gap_detect")
 def api_roadmap_detect_gaps():
@@ -2194,6 +2202,7 @@ def api_capability_traceability(capability_id):
 
 @capability_map.route("/api/roadmap/gaps/<int:gap_id>/link-plateau/<int:plateau_id>", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @rate_limit(30, "1m")
 @audit_log("roadmap_gap_link_plateau")
 def api_roadmap_gap_link_plateau(gap_id: int, plateau_id: int):
@@ -2224,6 +2233,7 @@ def api_roadmap_gap_link_plateau(gap_id: int, plateau_id: int):
 
 @capability_map.route("/api/roadmap/gaps/<int:gap_id>/unlink-plateau/<int:plateau_id>", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @rate_limit(30, "1m")
 @audit_log("roadmap_gap_unlink_plateau")
 def api_roadmap_gap_unlink_plateau(gap_id: int, plateau_id: int):

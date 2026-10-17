@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from flask import Blueprint, abort, jsonify, request
 from flask_login import current_user, login_required
+from app.decorators import WORK_PACKAGE_WRITE_ROLES, require_roles
 from sqlalchemy import func, text
 
 from app import db
@@ -230,6 +231,7 @@ def get_work_packages():
 
 @roadmap_bp.route("/work-packages", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("create_work_package")
 def create_work_package():
     """
@@ -467,6 +469,7 @@ def get_work_package(work_package_id: int):
 
 @roadmap_bp.route("/work-packages/<int:work_package_id>", methods=["PUT"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("update_work_package")
 def update_work_package(work_package_id: int):
     """
@@ -577,6 +580,7 @@ def update_work_package(work_package_id: int):
 
 @roadmap_bp.route("/work-packages/<int:work_package_id>", methods=["DELETE"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("delete_work_package")
 def delete_work_package(work_package_id: int):
     """
@@ -735,6 +739,7 @@ def get_deliverables():
 
 @roadmap_bp.route("/deliverables", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("create_deliverable")
 def create_deliverable():
     """
@@ -826,6 +831,7 @@ def create_deliverable():
 
 @roadmap_bp.route("/deliverables/<int:deliverable_id>", methods=["PUT"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("update_deliverable")
 def update_deliverable(deliverable_id: int):
     """
@@ -915,6 +921,7 @@ def update_deliverable(deliverable_id: int):
 
 @roadmap_bp.route("/deliverables/<int:deliverable_id>", methods=["DELETE"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("delete_deliverable")
 def delete_deliverable(deliverable_id: int):
     """
@@ -1030,6 +1037,7 @@ def get_gaps():
 
 @roadmap_bp.route("/gaps", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("create_gap")
 def create_gap():
     """
@@ -1173,6 +1181,7 @@ def get_plateaus():
 
 @roadmap_bp.route("/plateaus", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("create_plateau")
 def create_plateau():
     """
@@ -1262,6 +1271,7 @@ def create_plateau():
 
 @roadmap_bp.route("/automation/generate-work-packages", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("generate_work_packages")
 def generate_work_packages():
     """
@@ -1445,6 +1455,7 @@ def detect_conflicts():
 
 @roadmap_bp.route("/sync/capabilities", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("sync_capabilities")
 def sync_capabilities():
     """
@@ -1478,6 +1489,7 @@ def sync_capabilities():
 
 @roadmap_bp.route("/sync/applications", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("sync_applications")
 def sync_applications():
     """
@@ -1625,6 +1637,7 @@ def get_statistics():
 
 @roadmap_bp.route("/archimate/generate-roadmap", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("generate_archimate_roadmap")
 def generate_archimate_roadmap():
     """
@@ -1760,6 +1773,7 @@ def preview_archimate_roadmap():
 
 @roadmap_bp.route("/archimate/generate-single-gap/<int:gap_id>", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("generate_single_gap_roadmap")
 def generate_single_gap_roadmap(gap_id: int):
     """
@@ -1796,8 +1810,10 @@ def generate_single_gap_roadmap(gap_id: int):
 
         if result["success"]:
             return jsonify(result), 200
-        else:
-            return jsonify(result), 400
+        # Another organisation's gap id is indistinguishable from a missing one.
+        if "No gaps found" in (result.get("error") or ""):
+            return jsonify(result), 404
+        return jsonify(result), 400
 
     except HTTPException:
 

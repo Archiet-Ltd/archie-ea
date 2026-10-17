@@ -14,6 +14,7 @@ from flask import (
     url_for,
 )
 from flask_login import login_required
+from app.decorators import WORK_PACKAGE_WRITE_ROLES, require_roles
 
 from app.models.implementation_migration import Gap, GAP_KIND_PLATEAU_TRANSITION
 from app.modules.interface_register.routes.register_routes import (
@@ -161,6 +162,7 @@ def raise_gap(element_id):
 
 @interface_register_bp.route("/gaps/<int:gap_id>/work-packages", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def attach_work_package(gap_id):
     """Attach a costed WorkPackage to an interface gap (US-6 AC6)."""
     guard = _guard()

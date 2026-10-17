@@ -1217,6 +1217,71 @@ def get_deliverable(deliverable_id: int, organization_id: int):
     return deliverables_query(organization_id).filter(Deliverable.id == deliverable_id).first()
 
 
+def get_owned_deliverable(deliverable_id: int, organization_id: int):
+    """A deliverable attached to one of this organisation's records, else None.
+
+    ``deliverables`` has no organisation column of its own: a row belongs to the
+    unified work package, application or older work package it hangs off, so
+    ownership is read from whichever of those parents it carries.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.implementation_migration import Deliverable
+    from app.models.implementation_migration import WorkPackage as LegacyWorkPackage
+
+    deliverable = Deliverable.query.filter(Deliverable.id == deliverable_id).first()
+    if deliverable is None:
+        return None
+    parents = (
+        (UnifiedWorkPackage, deliverable.unified_work_package_id),
+        (ApplicationComponent, deliverable.application_component_id),
+        (LegacyWorkPackage, deliverable.work_package_id),
+    )
+    for model, parent_id in parents:
+        if parent_id is None:
+            continue
+        owned = db.session.execute(
+            db.select(model.id).where(model.id == parent_id, model.organization_id == organization_id)
+        ).first()
+        if owned is not None:
+            return deliverable
+    return None
+
+
+def own_or_404(model, record_id):
+    """This organisation's row of ``model``, else a 404.
+
+    ``Query.get`` can answer from the session's identity map without the tenant
+    filter, so this is a filtered SELECT; another organisation's id is
+    indistinguishable from a missing one.
+    """
+    from flask import abort
+
+    try:
+        key = int(record_id)
+    except (TypeError, ValueError):
+        abort(404)
+    row = model.query.filter_by(id=key).first()
+    if row is None:
+        abort(404)
+    return row
+
+
+def own_deliverable_or_404(deliverable_id):
+    """A deliverable attached to one of this organisation's records, else a 404."""
+    from flask import abort
+
+    from app.utils.tenant import current_organization_id
+
+    try:
+        key = int(deliverable_id)
+    except (TypeError, ValueError):
+        abort(404)
+    deliverable = get_owned_deliverable(key, current_organization_id())
+    if deliverable is None:
+        abort(404)
+    return deliverable
+
+
 def _deliverable_value(key: str, value: Any):
     if key in _DELIVERABLE_DATES:
         parsed = _parse_date(value)

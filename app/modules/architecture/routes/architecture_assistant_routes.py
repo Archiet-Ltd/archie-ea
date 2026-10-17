@@ -28,7 +28,7 @@ from xml.sax.saxutils import escape
 from flask import Blueprint, Response, current_app, jsonify, render_template, request, session
 from flask_login import current_user, login_required
 
-from app.decorators import require_roles
+from app.decorators import WORK_PACKAGE_WRITE_ROLES, require_roles
 from app.models.archimate_motivation import (
     MotivationAssessment,
     MotivationConstraint,
@@ -3526,6 +3526,7 @@ def get_archimate_model():
 
 @architecture_assistant_bp.route("/roadmap-elements", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def create_roadmap_elements():
     """Create persisted WorkPackage/Deliverable ArchiMate elements from gap + option data."""
     data = request.get_json() or {}

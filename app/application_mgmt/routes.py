@@ -30,6 +30,7 @@ from flask import (
     url_for,
 )
 from sqlalchemy import or_, select, text  # dead-code-ok: func
+from werkzeug.exceptions import HTTPException
 from sqlalchemy.orm import joinedload
 
 from config import CurrencyConfig
@@ -1492,6 +1493,9 @@ def _add_archimate_element(
             },
         })
 
+    except HTTPException:
+        db.session.rollback()
+        raise
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error adding ArchiMate element: {str(e)}")
@@ -1777,6 +1781,9 @@ def _delete_archimate_element(element_id, rel_type="realization"):
 
         return jsonify({"success": True})
 
+    except HTTPException:
+        db.session.rollback()
+        raise
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error deleting ArchiMate element: {str(e)}")
