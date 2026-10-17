@@ -233,8 +233,12 @@
 .public-site .public-link:focus-visible,
 .public-site .public-faq summary:focus-visible,
 .public-site .public-table-scroll:focus-visible {
-  outline: 2px solid hsl(var(--foreground)); outline-offset: 2px; border-radius: 0.25rem;
+  outline: 2px solid hsl(var(--foreground)); outline-offset: 2px;
 }
+.public-site .public-link:focus-visible,
+.public-site .public-faq summary:focus-visible { border-radius: 0.25rem; }
+/* the global :focus-visible rule rounds to 0.25rem; the wrapper keeps its own rounded-2xl radius */
+.public-site .public-table-scroll:focus-visible { border-radius: 1rem; }
 
 /* layout_rhythm.list_emphasis and note_block */
 .public-site .home-emphasis-list { list-style: none; padding: 0; }

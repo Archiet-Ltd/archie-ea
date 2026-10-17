@@ -398,7 +398,7 @@ entries:
     note: the store-agreement gate already reports these disagreeing; the consolidation branch decides.
 
   - id: public-button
-    concept: The public site button (primary and outline, 40px, 3px focus ring)
+    concept: The public site button (primary and outline, 40px, 2px solid focus outline)
     status: active
     canonical:
       path: app/static/css/public_site.css
@@ -428,6 +428,19 @@ entries:
         reason: third-party stylesheets, not ours to change
       - path: app/static/css/tailwind-output*
         reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
+
+  - id: public-link
+    concept: The public site inline link (underlined, 4px offset, solid focus outline)
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-link"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use this class from
+      public_site.css for inline links; the authenticated app has its own link styles. Do not write a second
+      inline-link rule in another stylesheet or an inline <style>. The focus indicator is a 2px solid
+      outline in the foreground colour, which survives forced-colours mode; do not replace it with a
+      shadow-only ring.
 
   - id: public-card
     concept: The public site card, with its title and body
