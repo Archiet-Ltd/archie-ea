@@ -589,7 +589,13 @@ def overview():
             "owner": portfolio_figures.percent(
                 _owners["applications_with_owner"], _owners["application_count"]
             ),
-            "vendor": round((cov_row[1] or 0) / cov_total * 100),
+            # Same vendor population as the Vendors tile: with an empty catalogue
+            # there is nothing to measure against, so a dash rather than a percentage.
+            "vendor": (
+                round((cov_row[1] or 0) / cov_total * 100)
+                if portfolio_figures.vendor_count()
+                else None
+            ),
             "cost": portfolio_figures.percent(
                 _cost["applications_with_cost"], _cost["application_count"]
             ),

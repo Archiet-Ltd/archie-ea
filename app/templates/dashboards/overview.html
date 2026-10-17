@@ -289,7 +289,7 @@
                 ) }}
                 {{ metrics_card(
                     title='Vendors',
-                    value=(metrics.vendors or 0)|string,
+                    value=(metrics.vendors|string if metrics.vendors else '—'),
                     icon='building',
                     description='Registered vendor organizations',
                     href='/applications/vendors'
@@ -562,7 +562,7 @@
         <div class="space-y-6">
             <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {{ metrics_card(title='Applications', value=(metrics.applications or 0)|string, icon='package', description='In portfolio', href='/applications/') }}
-                {{ metrics_card(title='Vendors', value=(metrics.vendors or 0)|string, icon='building', description='Vendor organizations', href='/applications/vendors') }}
+                {{ metrics_card(title='Vendors', value=(metrics.vendors|string if metrics.vendors else '—'), icon='building', description='Vendor organizations', href='/applications/vendors') }}
                 {{ metrics_card(title='Health Score', value=health_score_text|default('—'), value_testid='cfo-health-score-value', icon='heart-pulse', description='Architecture health', href='/dashboard/health') }}
                 {{ metrics_card(title='Solutions', value=(nav_stats.solutions or 0)|string, icon='puzzle', description='Active designs', href='/solutions/') }}
             </div>

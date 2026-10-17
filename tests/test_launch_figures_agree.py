@@ -79,6 +79,20 @@ def _seed_org(db_session, org, spec, label):
                 organization_id=org.id,
             )
         )
+    if label == "A":
+        # A duplicate record with an owner and a cost: not an application, so it must change no figure.
+        dup = ApplicationComponent(
+            name=f"(Duplicate) {label}-dup-{uuid.uuid4().hex[:6]}",
+            organization_id=org.id,
+            total_cost_of_ownership=None,
+        )
+        db_session.add(dup)
+        db_session.flush()
+        db_session.add(
+            ApplicationOwner(
+                application_id=dup.id, user_id=user.id, organization_id=org.id, ownership_type="backup"
+            )
+        )
     db_session.flush()
     return user
 
@@ -239,3 +253,31 @@ def test_the_cfo_tab_is_hidden_with_the_other_unfinished_pages(app, two_orgs):
         assert 'data-testid="layer-tab-cfo"' in dash
     finally:
         app.config["HIDE_NOT_READY_MODULES"] = old
+
+
+def test_owners_never_exceed_applications_with_a_duplicate_row(app, two_orgs):
+    from app.services import portfolio_figures
+
+    org, user = two_orgs["A"]
+    fig = portfolio_figures.owner_figure(org.id)
+    assert fig == {"applications_with_owner": ORG_A["owners"], "application_count": ORG_A["apps"]}
+    assert fig["applications_with_owner"] <= fig["application_count"]
+    page = _get(app, user, org, "/applications/").get_data(as_text=True)
+    m = re.search(r"(\d+) of (\d+) applications in the portfolio have a named owner", page)
+    assert m and int(m.group(1)) <= int(m.group(2))
+
+
+def test_empty_vendor_catalogue_is_a_dash_on_the_tile_the_strip_and_the_page(app, db_session, two_orgs):
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    db_session.query(VendorOrganization).delete(synchronize_session=False)
+    db_session.flush()
+    org, user = two_orgs["A"]
+    dash = _get(app, user, org, "/dashboard/overview").get_data(as_text=True)
+    tile = re.search(r'card-description[^>]*>Vendors</p>\s*<div[^>]*>\s*(\S+)\s*</div>', dash)
+    strip = re.search(r"text-xs text-muted-foreground\">Vendor</p>\s*<p[^>]*>\s*(\S+?)\s*</p>", dash)
+    assert tile and tile.group(1) == "—", tile and tile.group(1)
+    assert strip and strip.group(1) == "—", strip and strip.group(1)
+    page = _get(app, user, org, "/applications/vendors").get_data(as_text=True)
+    m = re.search(r"Total Vendors</p>\s*<div[^>]*>\s*<p[^>]*>\s*(\S+)\s*</p>", page)
+    assert m and m.group(1) == "—", m and m.group(1)

@@ -36,7 +36,7 @@
 
   {# Metrics Cards #}
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 sm:gap-6 mb-8">
-    {{ data_card(icon='building', icon_color='blue', value=stats.total|default(0)|dash, label='Total Vendors', subtitle='In vendor catalogue') }}
+    {{ data_card(icon='building', icon_color='blue', value=(stats.total or none)|dash, label='Total Vendors', subtitle='In vendor catalogue') }}
     {{ data_card(icon='check-circle', icon_color='green', value=stats.active|default(0)|dash, label='Active Vendors', subtitle=(((stats.active|default(0) / stats.total|default(1)) * 100)|round(0)|string ~ '% of total') if (stats.total or 0) > 0 else '—') }}
     {{ data_card(icon='star', icon_color='purple', value=stats.strategic|default(0)|dash, label='Strategic Vendors', subtitle='High-value partnerships') }}
     {{ data_card(icon='package', icon_color='amber', value=stats.total_products|default(0)|dash, label='Product Portfolio', subtitle='Across all vendors') }}

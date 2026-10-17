@@ -30,8 +30,10 @@ def owner_figure(org_id: Optional[int]) -> Dict[str, Optional[int]]:
     from app.models.application_portfolio import ApplicationComponent
     from app.modules.my_applications.services import has_assigned_owner
 
+    # Same population as the application list's total: duplicates are not applications.
     base = db.session.query(db.func.count(ApplicationComponent.id)).filter(
-        ApplicationComponent.organization_id == org_id
+        ApplicationComponent.organization_id == org_id,
+        ~ApplicationComponent.name.ilike("(Duplicate)%", escape="\\"),
     )
     return {
         "applications_with_owner": base.filter(has_assigned_owner(org_id)).scalar() or 0,
