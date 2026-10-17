@@ -641,3 +641,143 @@ def test_a_proposal_naming_another_organisations_control_is_refused(app, db_sess
     db_session.expire_all()
     assert row_b.evidence_url is None and row_b.evidence_source is None
     assert AIChatCRUDApproval.query.filter_by(id=forged.id).first() is not None
+
+
+# --------------------------------------------------------------------------- #
+# Review round: edges of the rule, the fallback, exposure and the rendered controls
+# --------------------------------------------------------------------------- #
+
+
+def test_a_waived_controls_expired_link_is_not_usable_evidence():
+    expired = _Row(implementation_status="waived", evidence_url="https://e.test", evidence_valid_until=NOW - timedelta(days=1))
+    current = _Row(implementation_status="waived", evidence_url="https://e.test", evidence_valid_until=NOW + timedelta(days=1))
+    assert rule.evidence_state(expired, NOW) == "not_required"  # the control needs none ...
+    assert rule.link_state(expired, NOW) == "expired"  # ... but the link it holds has lapsed
+    assert rule.has_usable_evidence_link(expired, NOW) is False
+    assert rule.has_usable_evidence_link(current, NOW) is True
+
+
+def test_a_recorded_exception_shows_before_the_other_test_kind_exists():
+    class T:
+        id, test_kind, result, tested_at = 1, "design", "exception", NOW
+
+    assert rule.effectiveness([T()]) == "exception"
+
+
+def test_an_exception_with_current_evidence_stays_on_the_gap_list(app, db_session, make_org):
+    org = make_org("exc")
+    tester = _user(db_session, org.id, "Tester")
+    component, _ = _application(db_session, org.id, "Exception app")
+    row = _adopt(
+        db_session, org.id, _control(db_session, _framework(db_session), "X-1"), component,
+        evidence_url="https://e.test/x", evidence_valid_until=NOW + timedelta(days=60),
+    )
+    db_session.commit()
+
+    def run():
+        record_control_test(org.id, row.id, test_kind="design", result="exception", tested_by_id=tester.id)
+        db_session.commit()
+        return evidence_gaps(org.id, NOW)["rows"]
+
+    [gap] = _in_org(app, org.id, run)
+    assert gap["id"] == row.id and gap["effectiveness"] == "exception"
+
+
+def test_controls_with_no_tests_are_listed_so_their_first_test_can_be_recorded(app, db_session, make_org):
+    org_a, org_b = make_org("untested-a"), make_org("untested-b")
+    framework = _framework(db_session)
+    comp_a, _ = _application(db_session, org_a.id, "Untested app")
+    comp_b, _ = _application(db_session, org_b.id, "Foreign app")
+    fresh = _adopt(
+        db_session, org_a.id, _control(db_session, framework, "U-1"), comp_a,
+        evidence_url="https://e.test/u", evidence_valid_until=NOW + timedelta(days=60),
+    )
+    waived = _adopt(db_session, org_a.id, _control(db_session, framework, "U-2"), comp_a, implementation_status="waived")
+    foreign = _adopt(
+        db_session, org_b.id, _control(db_session, framework, "U-3"), comp_b,
+        evidence_url="https://e.test/f", evidence_valid_until=NOW + timedelta(days=60),
+    )
+    db_session.commit()
+
+    result = _in_org(app, org_a.id, lambda: evidence_gaps(org_a.id, NOW))
+    assert result["rows"] == []
+    ids = [u["id"] for u in result["untested"]]
+    assert fresh.id in ids and waived.id not in ids and foreign.id not in ids
+    assert result["untested_total"] == len(ids)
+
+
+def test_the_exposure_count_uses_drawn_relationships_only(app, db_session, make_org, monkeypatch):
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("drawn")
+    component, _ = _application(db_session, org.id, "Drawn app")
+    _adopt(db_session, org.id, _control(db_session, _framework(db_session), "D-1"), component)
+    db_session.commit()
+
+    seen = {}
+    real = IntelligenceQueryService.set_impact
+
+    def spy(*args, **kwargs):
+        seen.update(kwargs)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(IntelligenceQueryService, "set_impact", staticmethod(spy))
+    _in_org(app, org.id, lambda: evidence_gaps(org.id, NOW))
+    assert seen["include_derived"] is False
+
+
+def test_a_truncated_exposure_answer_reports_unknown_not_a_count(app, db_session, make_org, monkeypatch):
+    from app.modules.compliance.services.evidence_gap_service import EXPOSURE_TRUNCATED_REASON
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    org = make_org("cut")
+    component, element = _application(db_session, org.id, "Cut app")
+    _adopt(db_session, org.id, _control(db_session, _framework(db_session), "T-9"), component)
+    db_session.commit()
+
+    def truncated(*args, **kwargs):
+        return {"seed_element_ids": [element.id], "rows": [], "truncated": True}
+
+    monkeypatch.setattr(IntelligenceQueryService, "set_impact", staticmethod(truncated))
+    [row] = _in_org(app, org.id, lambda: evidence_gaps(org.id, NOW))["rows"]
+    assert row["exposure"] is None and row["exposure_reason"] == EXPOSURE_TRUNCATED_REASON
+
+
+def test_a_harmonised_fallback_carries_the_partners_state_and_validity(app, db_session, make_org):
+    from app.modules.compliance.services.applicability_service import ApplicabilityService
+    from app.models.regulatory_framework import FrameworkAdoption
+
+    org = make_org("harm")
+    framework = _framework(db_session)
+    partner = _control(db_session, framework, "H-2")
+    own = _control(db_session, framework, "H-1")
+    own.harmonized_control_id, own.harmonization_status = partner.id, "confirmed"
+    until = datetime.utcnow() + timedelta(days=90)
+    _adopt(db_session, org.id, partner, evidence_url="https://e.test/partner", evidence_valid_until=until)
+    adoption = FrameworkAdoption(organization_id=org.id, scope="tenant", framework_id=framework.id, status="active")
+    db_session.add(adoption)
+    db_session.flush()
+    mine = _adopt(db_session, org.id, own, adoption_id=adoption.id)
+    db_session.commit()
+
+    entries = _in_org(app, org.id, lambda: ApplicabilityService.evidence_status(org.id, adoption.id))
+    [entry] = [e for e in entries if e["id"] == mine.id]
+    assert entry["evidence_url"] == "https://e.test/partner"
+    assert entry["evidence_state"] == "current"
+    assert entry["evidence_valid_until"] == until.isoformat()
+
+
+def test_a_control_code_cannot_break_out_of_the_row_action_handlers(app):
+    code = "A'); alert(1); ('\"<b>"
+    with app.test_request_context("/"):
+        html = app.jinja_env.from_string(
+            """<button @click="open('test', 1, {{ (c or '')|tojson|forceescape }})">x</button>"""
+        ).render(c=code)
+    attribute = html.split('@click="', 1)[1].split('">x<', 1)[0]
+    assert '"' not in attribute and "<" not in attribute
+    from html import unescape
+
+    # decoded the way the browser does before Alpine reads it, the argument is one JSON string
+    decoded = unescape(attribute)
+    argument = decoded[len("open('test', 1, "):-1]
+    assert json.loads(argument) == code

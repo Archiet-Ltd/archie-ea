@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from app import db
 from app.middleware.tenant_context import current_org_id
@@ -20,6 +20,8 @@ from app.modules.compliance.services.control_evidence import (
     EXCEPTION,
     GAP_STATES,
     INEFFECTIVE,
+    NOT_REQUIRED,
+    NOT_TESTED,
     effectiveness,
     evidence_state,
 )
@@ -29,6 +31,7 @@ logger = logging.getLogger(__name__)
 ENTITY_CONTROL_EVIDENCE = "control_evidence"
 EXPOSURE_NOT_COMPUTED_REASON = "not computed for this many applications"
 EXPOSURE_NO_ELEMENT_REASON = "no model element for this application"
+EXPOSURE_TRUNCATED_REASON = "the combined answer was cut at its row limit, so the count would be understated"
 _PRIORITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 _ROW_LIMIT = 200
 
@@ -44,19 +47,28 @@ def _day(value: Optional[datetime]) -> Optional[str]:
     return value.date().isoformat() if value else None
 
 
-def _exposure(organization_id: int, element_ids: List[int]) -> Dict[int, int]:
-    """Elements each application element reaches downstream, from ONE ``set_impact`` call."""
+def _exposure(organization_id: int, element_ids: List[int]) -> Tuple[Dict[int, int], bool]:
+    """Elements each application element reaches downstream, from ONE ``set_impact`` call.
+
+    Only drawn relationships count (``include_derived=False``), which is what each row's
+    ``confidence_basis`` says. When the combined answer was cut at its row limit the
+    per-seed counts would be understated, so none is returned and ``truncated`` is True.
+    """
     from app.modules.intelligence.services.query_service import IntelligenceQueryService
 
     if not element_ids or current_org_id() != organization_id:
-        return {}
-    answer = IntelligenceQueryService.set_impact(element_ids, direction="downstream", with_owner=False)
+        return {}, False
+    answer = IntelligenceQueryService.set_impact(
+        element_ids, direction="downstream", with_owner=False, include_derived=False
+    )
+    if answer.get("truncated"):
+        return {}, True
     counts = {eid: 0 for eid in answer.get("seed_element_ids", [])}
     for row in answer.get("rows", []):
         for seed in row.get("seed_ids", []):
             if seed in counts and seed != row["element_id"]:
                 counts[seed] += 1
-    return counts
+    return counts, False
 
 
 def evidence_gaps(organization_id: Optional[int], as_of: Optional[datetime] = None) -> Dict[str, Any]:
@@ -75,7 +87,8 @@ def evidence_gaps(organization_id: Optional[int], as_of: Optional[datetime] = No
     from app.modules.intelligence.services.query_service import SET_IMPACT_MAX_SEEDS
 
     moment = as_of or datetime.utcnow()
-    empty = {"rows": [], "total": 0, "as_of": moment.isoformat(), "exposure_limit": SET_IMPACT_MAX_SEEDS}
+    empty = {"rows": [], "total": 0, "as_of": moment.isoformat(), "exposure_limit": SET_IMPACT_MAX_SEEDS,
+             "untested": [], "untested_total": 0}
     if organization_id is None:
         return empty
 
@@ -97,6 +110,7 @@ def evidence_gaps(organization_id: Optional[int], as_of: Optional[datetime] = No
         tests_by_control.setdefault(test.application_control_id, []).append(test)
 
     candidates = []
+    untested = []
     for mapping, control, framework, component in mapped:
         # An application mapping whose application is gone from this organisation is skipped.
         if mapping.application_id is not None and (
@@ -108,6 +122,15 @@ def evidence_gaps(organization_id: Optional[int], as_of: Optional[datetime] = No
         effect = effectiveness(tests)
         if state in GAP_STATES or effect in (INEFFECTIVE, EXCEPTION):
             candidates.append((mapping, control, framework, component, state, effect, tests))
+        elif effect == NOT_TESTED and state != NOT_REQUIRED:
+            # Not a gap, but the officer still has to be able to record its first tests.
+            untested.append({
+                "id": mapping.id,
+                "control_code": control.control_code if control else None,
+                "control_title": control.title if control else None,
+                "framework_code": framework.code if framework else None,
+                "application_name": component.name if component is not None else "Organisation-wide",
+            })
 
     # Exposure for the highest-priority applications only (one set_impact call).
     def _priority(item) -> int:
@@ -123,7 +146,7 @@ def evidence_gaps(organization_id: Optional[int], as_of: Optional[datetime] = No
         if len(element_for_app) >= SET_IMPACT_MAX_SEEDS:
             break
         element_for_app[component.id] = element_id
-    exposure_by_element = _exposure(organization_id, list(element_for_app.values()))
+    exposure_by_element, exposure_truncated = _exposure(organization_id, list(element_for_app.values()))
 
     owner_rows = (
         ApplicationOwner.get_display_rows_for_applications(
@@ -153,6 +176,8 @@ def evidence_gaps(organization_id: Optional[int], as_of: Optional[datetime] = No
             exposure_reason = EXPOSURE_NO_ELEMENT_REASON
         elif component.id in element_for_app and element_for_app[component.id] in exposure_by_element:
             exposure = exposure_by_element[element_for_app[component.id]]
+        elif exposure_truncated and component.id in element_for_app:
+            exposure_reason = EXPOSURE_TRUNCATED_REASON
         else:
             exposure_reason = EXPOSURE_NOT_COMPUTED_REASON
         latest_test = max(tests, key=lambda t: (t.tested_at or datetime.min, t.id)) if tests else None
@@ -202,7 +227,13 @@ def evidence_gaps(organization_id: Optional[int], as_of: Optional[datetime] = No
         )
     )
     total = len(rows)
-    return {**empty, "rows": rows[:_ROW_LIMIT], "total": total}
+    return {
+        **empty,
+        "rows": rows[:_ROW_LIMIT],
+        "total": total,
+        "untested": untested[:_ROW_LIMIT],
+        "untested_total": len(untested),
+    }
 
 
 def propose_control_evidence(

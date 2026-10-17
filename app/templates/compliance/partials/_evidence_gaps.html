@@ -11,7 +11,8 @@
     </div>
     {% if evidence_gaps_error %}
     <div class="px-5 py-4 text-sm text-destructive-emphasis" role="alert">Could not load the evidence list. Please try again.</div>
-    {% elif evidence_gaps and evidence_gaps.rows %}
+    {% else %}
+    {% if evidence_gaps and evidence_gaps.rows %}
     <div class="overflow-x-auto">
         <table class="w-full text-sm" data-testid="evidence-gap-table">
             <thead>
@@ -39,8 +40,12 @@
                         <span class="text-destructive-emphasis">No evidence</span>
                         {% elif r.state == 'expired' %}
                         <span class="text-destructive-emphasis">Expired</span>
-                        {% else %}
+                        {% elif r.state == 'current' %}
                         <span class="text-muted-foreground">In date</span>
+                        {% elif r.state == 'undated' %}
+                        <span class="text-muted-foreground">No end date recorded</span>
+                        {% else %}
+                        <span class="text-muted-foreground">Not required</span>
                         {% endif %}
                         {% if r.evidence != '—' and (r.evidence.startswith('http://') or r.evidence.startswith('https://')) %}
                         <a href="{{ r.evidence }}" rel="noopener noreferrer" target="_blank" class="block text-xs text-primary underline">Open evidence</a>
@@ -55,9 +60,9 @@
                     {% if can_record_control_work %}
                     <td class="px-5 py-3 whitespace-nowrap">
                         <button type="button" class="text-sm text-primary underline"
-                                @click="open('test', {{ r.id }}, '{{ (r.control_code or '')|e }}')">Record test</button>
+                                @click="open('test', {{ r.id }}, {{ (r.control_code or '')|tojson|forceescape }})">Record test</button>
                         <button type="button" class="ml-3 text-sm text-primary underline"
-                                @click="open('owner', {{ r.id }}, '{{ (r.control_code or '')|e }}')">Assign owner</button>
+                                @click="open('owner', {{ r.id }}, {{ (r.control_code or '')|tojson|forceescape }})">Assign owner</button>
                     </td>
                     {% endif %}
                 </tr>
@@ -67,6 +72,32 @@
     </div>
     {% if evidence_gaps.total > evidence_gaps.rows|length %}
     <p class="px-5 py-3 text-xs text-muted-foreground">Showing {{ evidence_gaps.rows|length }} of {{ evidence_gaps.total }}.</p>
+    {% endif %}
+    {% endif %}
+    {% if evidence_gaps and evidence_gaps.untested %}
+    <div class="border-t border-border" data-testid="untested-controls">
+        <h3 class="px-5 pt-4 text-sm font-semibold text-foreground">Controls with no tests recorded</h3>
+        <p class="px-5 mt-1 text-sm text-muted-foreground">Evidence is in order, but neither a design nor an operating test has been recorded.</p>
+        <table class="w-full text-sm mt-2">
+            <tbody>
+                {% for u in evidence_gaps.untested %}
+                <tr class="border-t border-border" data-testid="untested-control-row" data-control-row="{{ u.id }}">
+                    <td class="px-5 py-3"><span class="font-medium text-foreground">{{ u.control_code or '—' }}</span> <span class="text-xs text-muted-foreground">{{ u.framework_code or '' }}</span><div class="text-xs text-muted-foreground">{{ u.control_title or '—' }}</div></td>
+                    <td class="px-5 py-3 text-foreground">{{ u.application_name }}</td>
+                    {% if can_record_control_work %}
+                    <td class="px-5 py-3 whitespace-nowrap text-right">
+                        <button type="button" class="text-sm text-primary underline"
+                                @click="open('test', {{ u.id }}, {{ (u.control_code or '')|tojson|forceescape }})">Record test</button>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if evidence_gaps.untested_total > evidence_gaps.untested|length %}
+        <p class="px-5 py-3 text-xs text-muted-foreground">Showing {{ evidence_gaps.untested|length }} of {{ evidence_gaps.untested_total }}.</p>
+        {% endif %}
+    </div>
     {% endif %}
     {% if can_record_control_work %}
     <div x-show="mode" x-cloak class="px-5 py-4 border-t border-border bg-muted/30" data-testid="evidence-action-panel">
@@ -112,8 +143,9 @@
         </div>
     </div>
     {% endif %}
-    {% else %}
+    {% if not (evidence_gaps and (evidence_gaps.rows or evidence_gaps.untested)) %}
     {{ empty_state(icon='check-circle', title='No evidence is missing or out of date', description='Every control you track has evidence in date and no failed test.', padding='py-10') }}
+    {% endif %}
     {% endif %}
 </section>
 <script>

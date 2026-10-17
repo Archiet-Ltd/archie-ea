@@ -16,7 +16,11 @@ from app.models.compliance_models import ComplianceControl, RegulatoryFramework
 from app.models.regulatory_change import RegulatoryChange, RegulatoryChangeImpact
 from app.models.regulatory_framework import FrameworkAdoption
 from app.models.technology_layer import Node
-from app.modules.compliance.services.control_evidence import evidence_state, has_usable_evidence_link
+from app.modules.compliance.services.control_evidence import (
+    evidence_state,
+    has_usable_evidence_link,
+    link_state,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -280,6 +284,8 @@ class ApplicabilityService:
                                     else None
                                 ),
                                 "evidence_url": partner_ac.evidence_url,
+                                "evidence_state": link_state(partner_ac),
+                                "evidence_valid_until": partner_ac.evidence_valid_until,
                                 "notes": partner_ac.notes,
                             }
 
@@ -307,12 +313,20 @@ class ApplicabilityService:
                                     else None
                                 ),
                                 "evidence_url": partner_ac.evidence_url,
+                                "evidence_state": link_state(partner_ac),
+                                "evidence_valid_until": partner_ac.evidence_valid_until,
                                 "notes": partner_ac.notes,
                             }
                             break
 
                 if source is not None:
                     entry["evidence_url"] = source["evidence_url"]
+                    entry["evidence_state"] = source["evidence_state"]
+                    entry["evidence_valid_until"] = (
+                        source["evidence_valid_until"].isoformat()
+                        if source["evidence_valid_until"]
+                        else None
+                    )
                     entry["notes"] = source["notes"]
                     entry["evidence_source"] = {
                         "control_id": source["control_id"],

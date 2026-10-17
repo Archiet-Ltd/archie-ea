@@ -109,3 +109,63 @@ def test_the_officer_sees_the_gap_records_a_test_assigns_an_owner_and_both_persi
     # The seeded person has no recorded name, so the column shows a dash (never an
     # email address); what persisted is the owner id on the control row.
     assert _owner_id(expired_control["row_id"]) is not None
+
+
+def _seed_untested_control(org_id):
+    """Current evidence and no tests, under a control code that would break a naive handler."""
+    from app import create_app, db
+    from app.models.application_compliance import ApplicationComplianceControl
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+
+    with create_app("testing").app_context():
+        tag = uuid.uuid4().hex[:5].upper()
+        framework = RegulatoryFramework(code="UT%s" % tag, name="Untested framework %s" % tag, category="security")
+        component = ApplicationComponent(name="Untested ledger %s" % tag, organization_id=org_id)
+        db.session.add_all([framework, component])
+        db.session.flush()
+        code = "UT'%s" % tag
+        control = ComplianceControl(framework_id=framework.id, control_code=code, title="Quarterly review", priority="low")
+        db.session.add(control)
+        db.session.flush()
+        row = ApplicationComplianceControl(
+            organization_id=org_id, application_id=component.id, control_id=control.id,
+            implementation_status="implemented", evidence_url="https://evidence.example.test/fresh",
+            evidence_valid_until=datetime.utcnow() + timedelta(days=90),
+        )
+        db.session.add(row)
+        db.session.commit()
+        return {"code": code, "row_id": row.id}
+
+
+def _test_results(row_id):
+    from app import create_app, db
+    from app.models.control_test import ControlTest
+
+    with create_app("testing").app_context():
+        return [
+            (t.test_kind, t.result)
+            for t in db.session.execute(db.select(ControlTest).where(ControlTest.application_control_id == row_id)).scalars()
+        ]
+
+
+def test_the_officer_records_the_first_test_for_a_control_that_is_not_on_the_gap_list(
+    page, live_server, seeded
+):
+    control = _seed_untested_control(seeded["ids"]["org"])
+    _login(page, live_server, seeded["emails"]["compliance"])
+    page.goto(live_server + "/dashboard/compliance", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+    row = page.locator('[data-testid="untested-control-row"][data-control-row="%d"]' % control["row_id"])
+    expect(row).to_be_visible()
+    row.get_by_role("button", name="Record test").click()
+    panel = page.locator('[data-testid="evidence-action-panel"]')
+    expect(panel).to_contain_text(control["code"])  # the code reached the handler intact
+    page.select_option("#control-test-result", "exception")
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
+        panel.get_by_role("button", name="Save").click()
+
+    # The recorded exception persisted and the control now ranks on the gap list.
+    assert _test_results(control["row_id"]) == [("design", "exception")]
+    listed = page.locator('[data-testid="evidence-gap-row"][data-control-row="%d"]' % control["row_id"])
+    expect(listed.locator('[data-testid="latest-test"]')).to_have_text("Exception")

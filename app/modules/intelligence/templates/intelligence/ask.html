@@ -375,7 +375,8 @@
                             </div>
                             <p class="mt-1 text-sm text-foreground"><span class="text-muted-foreground">Status: </span><span x-text="control.status"></span></p>
                             <p class="mt-1 text-sm text-destructive" x-show="control.noEvidence">No evidence recorded and not verified</p>
-                            <p class="mt-1 text-sm text-muted-foreground" x-show="!control.noEvidence &amp;&amp; control.evidenceRecorded">Evidence recorded</p>
+                            <p class="mt-1 text-sm text-destructive" x-show="control.evidenceExpired">Evidence has expired</p>
+                            <p class="mt-1 text-sm text-muted-foreground" x-show="!control.noEvidence &amp;&amp; !control.evidenceExpired &amp;&amp; control.evidenceRecorded" x-text="control.evidenceUndated ? 'Evidence recorded, no end date' : 'Evidence recorded'"></p>
                             <p class="mt-1 text-sm text-muted-foreground" x-show="control.verifiedDate" x-text="'Verified ' + control.verifiedDate"></p>
                         </li>
                     </template>

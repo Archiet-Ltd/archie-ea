@@ -49,6 +49,16 @@ def evidence_state(mapping, as_of: Optional[datetime] = None) -> str:
     """
     if (getattr(mapping, "implementation_status", None) or "") in NOT_REQUIRED_STATUSES:
         return NOT_REQUIRED
+    return link_state(mapping, as_of)
+
+
+def link_state(mapping, as_of: Optional[datetime] = None) -> str:
+    """The state of the evidence the row carries, whatever the control's applicability.
+
+    One of ``missing``, ``expired``, ``current``, ``undated``. A waived or not-applicable
+    control is still holding a link with its own validity date; callers that reuse that
+    link for another control (harmonisation) need this, not :func:`evidence_state`.
+    """
     has_url = bool((getattr(mapping, "evidence_url", None) or "").strip())
     verified = getattr(mapping, "verified_date", None) is not None
     if not has_url and not verified:
@@ -67,7 +77,7 @@ def has_usable_evidence_link(mapping, as_of: Optional[datetime] = None) -> bool:
     rule's verdict on it: a link past its validity date is not usable evidence.
     """
     has_url = bool((getattr(mapping, "evidence_url", None) or "").strip())
-    return has_url and evidence_state(mapping, as_of) != EXPIRED
+    return has_url and link_state(mapping, as_of) != EXPIRED
 
 
 def effectiveness(tests: Iterable) -> str:
@@ -75,8 +85,9 @@ def effectiveness(tests: Iterable) -> str:
 
     ``effective`` only when the latest design test and the latest operating test
     are both ``effective``; ``ineffective`` if either latest is ``ineffective``;
-    ``exception`` when neither is ineffective but one is an exception;
-    ``not_tested`` when either kind has no test yet.
+    ``exception`` when neither is ineffective but one is an exception (a recorded
+    exception shows even before the other kind has been tested); ``not_tested``
+    when either kind has no test yet and nothing recorded is a failure or exception.
     """
     latest = {}
     for test in tests:
@@ -87,8 +98,8 @@ def effectiveness(tests: Iterable) -> str:
     results = {kind: pair[1] for kind, pair in latest.items()}
     if results.get("design") == INEFFECTIVE or results.get("operating") == INEFFECTIVE:
         return INEFFECTIVE
-    if "design" not in results or "operating" not in results:
-        return NOT_TESTED
     if EXCEPTION in results.values():
         return EXCEPTION
+    if "design" not in results or "operating" not in results:
+        return NOT_TESTED
     return EFFECTIVE
