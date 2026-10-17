@@ -45,10 +45,11 @@ the bigger picture before it ships, not after.
 Entelim's Architecture Review Board module runs that process in software, not in someone's inbox.
 It holds every change proposal your board reviews, alongside the sessions where it was discussed
 and the decisions that came out of them. A review covers a decision brief, a solution, an architecture
-model or an architecture decision record. For a decision brief, architecture model or architecture
-decision record, the evidence is captured and pinned for the review cycle, and the decision
-is recorded against that pinned snapshot with its rationale and any conditions attached, so
-governance doesn't live in a separate record nobody trusts.
+model or an architecture decision record. For every one of these, the evidence is captured and pinned
+for the review cycle: a decision brief is pinned as a version, and a solution, an architecture model
+or an architecture decision record as an evidence snapshot. The decision is recorded against that
+pinned evidence with its rationale and any conditions attached, so governance doesn't live in a
+separate record nobody trusts.
 
 Decisions are approved, approved with conditions, rejected, or returned for more evidence or
 options. A person who submitted a review cannot also decide it. The board's sessions, standards,

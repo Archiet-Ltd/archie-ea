@@ -14,14 +14,15 @@ icon: trending-up
 # Investment Analysis
 
 *A ranked view of where to invest across your business capabilities — scored on strategic
-importance, coverage and risk, with real initiative budgets used wherever one is linked.*
+importance, coverage, maturity gap and risk, with real initiative budgets used wherever one is linked.*
 
 ## What this module does
 
 A single business case answers whether one initiative is worth doing. Investment Analysis answers a
 different question: across all your business capabilities, which deserve investment first. Each
-capability is scored on strategic importance, how well applications cover it and how risky it is,
-then placed in a critical, high, medium or low priority band, with a recommendation and a timeframe.
+capability is scored on strategic importance, how well applications cover it, its maturity gap and
+how risky it is; where maturity has not been assessed, that part of the score takes a neutral
+midpoint rather than an invented gap. It is then placed in a critical, high, medium or low priority band, with a recommendation and a timeframe.
 
 Where a capability is linked to a strategic initiative, the budget shown is that initiative's real
 allocation and is marked Live. Where it is not, the figure is a scoring-based estimate and is
