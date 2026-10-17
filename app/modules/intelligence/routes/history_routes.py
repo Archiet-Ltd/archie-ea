@@ -11,7 +11,7 @@ the same prefix — ADR 0008 rule 3). Provides:
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from flask import render_template, request
 from flask_login import login_required
