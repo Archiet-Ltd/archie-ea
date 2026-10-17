@@ -633,7 +633,7 @@
 
   const CSRF = () => document.getElementById('rdm-csrf-token')?.value || '';
   // The work package page, when this build has one (else rows are not links).
-  const WP_DETAIL_URL = window.rdmWpDetailUrl = {{ (url_for('implementation_planning.work_package_detail', work_package_id=0) if 'implementation_planning.work_package_detail' in flask.current_app.view_functions else none) | tojson }};
+  const WP_DETAIL_URL = window.rdmWpDetailUrl = {{ (url_for('implementation_planning.work_package_detail', work_package_id=987654321) | replace('987654321', '__ID__') if 'implementation_planning.work_package_detail' in flask.current_app.view_functions else none) | tojson }};
 
   // ── Alpine Store: shared state between page and modal sub-components ──
   document.addEventListener('alpine:init', () => {
@@ -688,7 +688,7 @@
       },
 
       wpUrl(id) {
-        return WP_DETAIL_URL ? WP_DETAIL_URL.replace(/0$/, String(id)) : null;
+        return WP_DETAIL_URL ? WP_DETAIL_URL.replace('__ID__', String(id)) : null;
       },
 
       wpGapNames(wp) {
@@ -1221,7 +1221,7 @@
           `<div class="rdm-gantt-cell"></div>`
         ).join('');
 
-        const detail = window.rdmWpDetailUrl ? window.rdmWpDetailUrl.replace(/0$/, String(task.id)) : null;
+        const detail = window.rdmWpDetailUrl ? window.rdmWpDetailUrl.replace('__ID__', String(task.id)) : null;
         const nameHtml = detail
           ? `<a class="rdm-gantt-name text-primary hover:underline" href="${esc(detail)}" title="${esc(task.name)}">${esc(task.name)}</a>`
           : `<span class="rdm-gantt-name" title="${esc(task.name)}">${esc(task.name)}</span>`;

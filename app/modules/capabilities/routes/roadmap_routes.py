@@ -1796,7 +1796,12 @@ def api_roadmap_get_plateaus():
         from app.services import gap_register_service
         from app.utils.tenant import current_organization_id
 
-        plateaus = Plateau.query.order_by(Plateau.sequence_order.asc()).all()
+        # Explicit organisation predicate on top of the tenant mixin's filter.
+        plateaus = (
+            Plateau.query.filter(Plateau.organization_id == current_organization_id())
+            .order_by(Plateau.sequence_order.asc())
+            .all()
+        )
         # The one reader of a plateau's gaps and realising work packages.
         linked = gap_register_service.plateau_gaps_and_work_packages(
             [p.id for p in plateaus], current_organization_id())

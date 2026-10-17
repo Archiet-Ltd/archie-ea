@@ -911,7 +911,7 @@ def gap_analysis():
     column = _GAP_SORT_COLUMNS.get(sort_key, Gap.name)
     order = column.desc() if direction == "desc" else column.asc()
     try:
-        from app.services.gap_register_service import count_gaps, get_gaps_not_addressed
+        from app.services.gap_register_service import gap_summary_counts, get_gaps_not_addressed
 
         gaps = (
             Gap.query.filter(Gap.gap_kind != "plateau_transition")
@@ -920,12 +920,9 @@ def gap_analysis():
             .all()
         )
         org_id = current_org_id()
-        total_gap_count = count_gaps(org_id)
-        summary = {
-            "critical": count_gaps(org_id, severity="critical"),
-            "in_progress": count_gaps(org_id, resolution_status="in_progress"),
-            "resolved": count_gaps(org_id, resolution_status="resolved"),
-        }
+        counts = gap_summary_counts(org_id)
+        total_gap_count = counts["total"]
+        summary = {k: counts[k] for k in ("critical", "in_progress", "resolved")}
         not_addressed_gaps = get_gaps_not_addressed(org_id)
         work_packages_by_gap = work_package_service.work_packages_for_gaps(
             [g.id for g in gaps], current_org_id())

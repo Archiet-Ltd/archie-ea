@@ -475,3 +475,26 @@ def count_gaps(
         elif addressed:
             query = query.filter(~Gap.id.in_(addressed))
     return query.count()
+
+
+def gap_summary_counts(organization_id: int) -> Dict[str, int]:
+    """Total, critical, in-progress and resolved counts in one query.
+
+    Same population as count_gaps (plateau transitions excluded); the figures
+    equal count_gaps(org), count_gaps(org, severity="critical") and so on.
+    """
+    def _n(*conds):
+        return db.func.count(Gap.id).filter(*conds) if conds else db.func.count(Gap.id)
+
+    row = db.session.execute(
+        db.select(
+            _n().label("total"),
+            _n(Gap.severity == "critical").label("critical"),
+            _n(Gap.resolution_status == "in_progress").label("in_progress"),
+            _n(Gap.resolution_status == "resolved").label("resolved"),
+        ).where(
+            Gap.organization_id == organization_id,
+            Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
+        )
+    ).one()
+    return {k: int(row._mapping[k] or 0) for k in ("total", "critical", "in_progress", "resolved")}

@@ -61,3 +61,23 @@ def test_the_counts_come_from_the_one_register(app, db_session, make_org):
     assert count_gaps(org.id, resolution_status="in_progress") == 1
     assert count_gaps(org.id, resolution_status="resolved") == 0
     assert count_gaps(other.id, severity="critical") == 1
+
+
+def test_summary_counts_equal_the_individual_counts_in_one_query(app, db_session, make_org):
+    from app.services.gap_register_service import count_gaps, gap_summary_counts
+
+    org, other = make_org("gac-e"), make_org("gac-f")
+    _gap(db_session, org, "A", severity="critical", resolution_status="resolved")
+    _gap(db_session, org, "B", severity="high", resolution_status="in_progress")
+    _gap(db_session, org, "C", severity="critical")
+    _gap(db_session, other, "D", severity="critical", resolution_status="resolved")
+    db_session.flush()
+
+    assert gap_summary_counts(org.id) == {"total": 3, "critical": 2, "in_progress": 1, "resolved": 1}
+    assert gap_summary_counts(org.id) == {
+        "total": count_gaps(org.id),
+        "critical": count_gaps(org.id, severity="critical"),
+        "in_progress": count_gaps(org.id, resolution_status="in_progress"),
+        "resolved": count_gaps(org.id, resolution_status="resolved"),
+    }
+    assert gap_summary_counts(make_org("gac-g").id) == {"total": 0, "critical": 0, "in_progress": 0, "resolved": 0}
