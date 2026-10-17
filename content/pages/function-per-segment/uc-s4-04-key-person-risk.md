@@ -13,7 +13,7 @@ icon: user-cog
 
 **For owner-operators and managing directors.**
 
-Entelim shows you who is recorded as accountable for each system, one system at a time. On Ask, choose "Who's accountable for ___, and can they take on more?" and pick a system. You get a card for every recorded owner, with the ownership type, the organisation unit and the contact. The Org Chart and the Enterprise RACI matrix show the wider picture of who answers for what. Entelim does not total up how much each person holds, so a name that keeps turning up is something you spot, not something it ranks for you.
+Entelim shows you who is recorded as accountable for each system, one system at a time. On Ask, choose "Who's accountable for ___, and can they take on more?" and pick a system. You get a card for every distinct recorded owner. The Org Chart and the Enterprise RACI matrix show the wider picture of who answers for what. Entelim does not total up how much each person holds, so a name that keeps turning up is something you spot, not something it ranks for you.
 
 ## The question
 
@@ -21,12 +21,7 @@ A key person resigns, and suddenly nobody can list what they actually held. That
 
 ## What Entelim answers
 
-On the **Ask** page, open the accountability question and pick a system. Each recorded owner appears as a card with:
-
-- the **ownership type** as the heading: Primary, Backup, Technical, Business or Steward
-- the **organisation unit** the owner belongs to, where one is recorded
-- the **primary contact**, or "No contact recorded"
-- a **Since** date, where a start date is recorded
+On the **Ask** page, open the accountability question and pick a system. Each distinct recorded owner appears as a card.
 
 The cards cover the system itself and the things it affects downstream. Each distinct owner appears once. Under the cards, every answer carries the line "Capacity and availability data is not yet connected." When no ownership is recorded for the system or anything it affects, the page says "Ownership data is not yet connected." It does not name anyone on your behalf.
 

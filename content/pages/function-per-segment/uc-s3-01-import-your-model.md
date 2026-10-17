@@ -74,7 +74,7 @@ were new and which already existed, and there is no preview and no way back.
 - Elements whose name or type is too long for the model, and relationships the ArchiMate rules do not allow, are
   refused and reported, not silently stored.
 - Duplicates are matched on name and type, not on the identifiers in the file.
-- The separate Batch Import area loads spreadsheet-style files (.csv, .xlsx, .xls, .json) and is not the route for an
+- The separate Batch Import area loads spreadsheet-style files (.csv and Excel) and is not the route for an
   ArchiMate model.
 
 ## Frequently asked questions
@@ -94,7 +94,7 @@ They are not stored. The preview lists them with the reason, and the result list
 
 ### Can I import a spreadsheet instead?
 
-Yes, through Batch Import, which accepts .csv, .xlsx, .xls and .json. That route is separate from the model import.
+Yes, through Batch Import, which accepts .csv and Excel (.xlsx, .xls) files. That route is separate from the model import.
 
 ## Related questions and modules
 

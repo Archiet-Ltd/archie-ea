@@ -27,7 +27,7 @@ A **Data Quality** panel states how many applications in the portfolio have a na
 
 **Organization** holds the **Org Chart**, drawn from the actors and the composition and aggregation links in your model, and the **Enterprise RACI** matrix. In the matrix, stakeholders run down the side and capabilities across the top. Click a cell to cycle it through Responsible, Accountable, Consulted and Informed. A cell nobody has set stays blank.
 
-On **Ask**, the accountability question, "Who's accountable for ___, and can they take on more?", lists the recorded owners of one system, with ownership type, organisation unit, contact and start date. The **Twin map** button on Ask opens the map: pick a team, service or system and it draws what it connects to in bands (Goals, Strategy, Business, Systems, Technology, Delivery), with a hop-depth slider from 1 to 5 and a table of the same connections underneath.
+On **Ask**, the accountability question, "Who's accountable for ___, and can they take on more?", lists the recorded owners of one system and of what it affects downstream. The **Twin map** button on Ask opens the map: pick a team, service or system and it draws what it connects to in bands (Goals, Strategy, Business, Systems, Technology, Delivery), with a hop-depth slider from 1 to 5 and a table of the same connections underneath.
 
 ## Who asks it
 
