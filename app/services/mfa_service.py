@@ -117,9 +117,10 @@ def provisioning_uri(user, secret: str) -> str:
 def provisioning_qr_svg(provisioning_uri: str, *, scale: int = 4) -> str:
     """Inline SVG markup for a QR code that encodes ``provisioning_uri``.
 
-    Generated server-side with segno so the provisioning URI -- which embeds
-    the TOTP secret -- never leaves the server: the page ships an inline SVG,
-    not a JavaScript widget and not a request to an external image service.
+    Generated on the server with segno and shipped as inline SVG: no
+    JavaScript widget and no request to an outside image service, so the
+    provisioning URI is not sent to any third party. The setup key itself is
+    also shown on the page for manual entry, as before.
     """
     import segno
 
