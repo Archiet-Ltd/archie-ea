@@ -378,22 +378,19 @@ def test_homepage_prose_matches_billing_plans_catalogue(app):
     with app.test_client() as client:
         html = client.get("/").data.decode()
 
-    assert (
-        f'>${startup.display_price_monthly}<span class="text-sm font-normal '
-        'text-muted-foreground">/month</span>' in html
-    ), "home page: Startup monthly price does not match billing_plans"
+    assert f"<strong>${startup.display_price_monthly}</strong>/month" in html, (
+        "home page: Startup monthly price does not match billing_plans"
+    )
     assert f"${startup.display_price_annual}/year" in html, (
         "home page: Startup annual price does not match billing_plans"
     )
-    assert (
-        f'>${team.display_price_monthly}<span class="text-sm font-normal '
-        f'text-muted-foreground">/{team.display_price_unit}/month</span>' in html
-    ), "home page: Team per-editor monthly price does not match billing_plans"
+    assert f"<strong>${team.display_price_monthly}</strong>/{team.display_price_unit}/month" in html, (
+        "home page: Team per-editor monthly price does not match billing_plans"
+    )
     assert f"${team.display_price_annual}/{team.display_price_unit}/year" in html, (
         "home page: Team per-editor annual price does not match billing_plans"
     )
     assert (
-        f'>From ${enterprise.display_price_floor_annual:,}<span class="text-sm '
-        'font-normal text-muted-foreground">/year</span>' in html
+        f"<strong>From ${enterprise.display_price_floor_annual:,}</strong>/year" in html
     ), "home page: Enterprise floor price does not match billing_plans"
 
