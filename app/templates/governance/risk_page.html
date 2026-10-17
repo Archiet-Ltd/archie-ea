@@ -38,6 +38,8 @@
             </li>
             {% endfor %}
         </ul>
+        {% elif row and not row.worked_out %}
+        <p class="text-sm text-muted-foreground">What this risk touches could not be worked out.</p>
         {% else %}
         <p class="text-sm text-muted-foreground">No linked elements recorded.</p>
         {% endif %}

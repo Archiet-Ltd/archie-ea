@@ -457,9 +457,7 @@
                                         <span class="inline-flex items-center px-1.5 py-0 rounded text-2xs font-medium bg-muted text-muted-foreground capitalize mr-1.5" x-text="link.entity_type"></span>
                                         <span :class="link.entity_label ? 'text-foreground' : 'text-destructive-emphasis'" x-text="link.entity_label || ('Deleted ' + link.entity_type + ' (#' + link.entity_id + ')')"></span>
                                     </span>
-                                    <button type="button" @click="removeLink(link.id)" aria-label="Unmap" class="text-muted-foreground hover:text-destructive-emphasis shrink-0">
-                                        <i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                                    </button>
+                                    <button type="button" @click="removeLink(link.id)" aria-label="Unmap" class="text-xs text-muted-foreground hover:text-destructive-emphasis shrink-0">Unmap</button>
                                 </li>
                             </template>
                         </ul>
@@ -648,10 +646,25 @@ function riskRegister() {
                     self.linkSearch = '';
                     self.linkResults = [];
                     Platform.toast.success('Risk mapped to ' + (link.entity_label || entity.name) + '.');
+                    self.refreshRanked();
                 })
                 .catch(function (err) {
                     Platform.toast.error('Could not map this risk.');
                     throw err;
+                });
+        },
+
+        // The ranked card is drawn on the server: after a link is added or
+        // removed, fetch the page again and swap in the new card.
+        refreshRanked() {
+            Platform.fetch(window.location.pathname + window.location.search, { silent: true })
+                .then(function (html) {
+                    const fresh = new DOMParser().parseFromString(html, 'text/html').getElementById('ranked-risks');
+                    const current = document.getElementById('ranked-risks');
+                    if (fresh && current) { current.innerHTML = fresh.innerHTML; }
+                })
+                .catch(function () {
+                    Platform.toast.error('The ranked list could not be refreshed. Reload the page to see it.');
                 });
         },
 
@@ -666,6 +679,7 @@ function riskRegister() {
                     self.selectedRisk.entity_links = (self.selectedRisk.entity_links || [])
                         .filter(function (l) { return l.id !== linkId; });
                     Platform.toast.success('Link removed.');
+                    self.refreshRanked();
                 })
                 .catch(function (err) {
                     Platform.toast.error('Could not remove that link.');
