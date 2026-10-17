@@ -1,0 +1,59 @@
+{# Shared Not Available Block
+   
+   Used for empty/unavailable states across the application.
+   Shows what the component is, why it's empty/unavailable, 
+   the next step, and who can perform it.
+   
+   Usage:
+   {% from 'components/not_available.html' import not_available %}
+   
+   {{ not_available(
+        component='Investment Map',
+        why='No capability data has been loaded yet.',
+        next_step='Load capability data via the import tool or API.',
+        who_can='Platform administrators or data stewards'
+   ) }}
+#}
+
+{% macro not_available(
+    component='Component',
+    why='No data available.',
+    next_step='Configure the required data.',
+    who_can='System administrators',
+    icon='alert-circle',
+    class='',
+    padding='py-12'
+) %}
+<div class="text-center {{ padding }} px-4 {{ class }}" role="status">
+    <!-- Icon -->
+    <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
+        <i data-lucide="{{ icon }}" class="h-8 w-8 text-muted-foreground" aria-hidden="true"></i>
+    </div>
+
+    <!-- What it is -->
+    <h3 class="mt-4 text-lg font-medium text-foreground">
+        {{ component }}
+    </h3>
+
+    <!-- Why empty/unavailable -->
+    {% if why %}
+    <p class="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+        {{ why }}
+    </p>
+    {% endif %}
+
+    <!-- Next step -->
+    {% if next_step %}
+    <p class="mt-2 text-sm text-muted-foreground max-w-md mx-auto font-medium">
+        Next step: {{ next_step }}
+    </p>
+    {% endif %}
+
+    <!-- Who can do it -->
+    {% if who_can %}
+    <p class="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+        Who can do it: {{ who_can }}
+    </p>
+    {% endif %}
+</div>
+{% endmacro %}
