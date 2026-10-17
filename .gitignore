@@ -218,6 +218,7 @@ scripts/check_*.py
 !scripts/check_raw_sql_tenancy.py
 !scripts/check_untenanted_reads.py
 !scripts/check_reuse_register.py
+!scripts/check_design_register.py
 !scripts/check_fabricated_data.py
 !scripts/check_macro_import_context.py
 !scripts/check_dead_interactions.py

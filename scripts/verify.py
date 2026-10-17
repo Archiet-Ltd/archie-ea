@@ -1302,6 +1302,24 @@ def gate_reuse_register() -> Result:
                   detail, count, 0)
 
 
+def gate_design_register() -> Result:
+    """Public-page design register (design/register.yml): duplication, drift, staleness. Gated at ZERO.
+
+    Static. Fails when a registered selector is defined twice, a literal colour/px/font stack falls
+    outside the register's scales, a registered entry points at nothing, beyond the per-file counts in
+    scripts/design_register_baseline.json (which only fall). See scripts/check_design_register.py.
+    """
+    proc = _run([sys.executable, "scripts/check_design_register.py"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("design-register", FAIL,
+                      f"could not parse: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = proc.stdout[-1800:] if count or proc.returncode else ""
+    return Result("design-register", PASS if count == 0 and proc.returncode == 0 else FAIL,
+                  detail, count, 0)
+
+
 def gate_sidebar_links(baseline: int) -> Result:
     """Persona sidebar link-count budget (shell-overhaul Wave 1, Task 3).
 
@@ -1892,6 +1910,11 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="reuse the implementation named in docs/reuse-register.yml "
                          "(python scripts/check_reuse_register.py --entries), or add a "
                          "known_exceptions entry with a reason",
+             tags=["static", "process"]),
+        Gate("design-register", "public-page tokens and components: no duplicate selector, drift or stale entry",
+             "zero", gate_design_register,
+             remediation="reuse the component named in design/register.yml "
+                         "(python scripts/check_design_register.py --entries), or register the value",
              tags=["static", "process"]),
         Gate("llm-boundary", "codegen emitters make no direct LLM calls (deterministic boundary)",
              "ratchet", lambda: gate_llm_boundary(baseline.get("llm_boundary", 0)),
