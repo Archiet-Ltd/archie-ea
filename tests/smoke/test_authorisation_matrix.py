@@ -229,6 +229,12 @@ POLICY = {
     # implementation_planning blueprint, so every signed-in persona reaches
     # it; the gaps it shows are fenced per organisation by Gap's TenantMixin.
     "/implementation/gaps":    set(ARCHETYPES),
+    # Gap and work package pickers (link a gap to a work package): both carry
+    # @login_required and no role gate, are fenced to the caller's organisation
+    # by the query, and every persona may search; writing the link is the
+    # role-gated POST pinned in GAP_WORK_PACKAGE_LINK_POST_POLICY below.
+    "/capability-map/api/roadmap/gaps/search":          set(ARCHETYPES),
+    "/capability-map/api/roadmap/work-packages/search": set(ARCHETYPES),
 }
 for _allowed in POLICY.values():
     _allowed.add("platform_admin")
@@ -247,6 +253,19 @@ ACCOUNT_POST_POLICY = {
 GOAL_LINK_POST_POLICY = {
     "/portfolio/initiatives/0/goals": set(ARCHETYPES),
 }
+
+# Linking a gap to a work package (and removing the link) is role-gated by
+# require_roles on the route: a persona holding the Architect role (every seeded
+# archetype) or Administrator (platform_admin) reaches the handler, which answers
+# 404 for the id 0 used here; a read-only Viewer is answered 403 before the
+# handler runs (pinned with a real Viewer account in tests/test_gap_work_package_link.py).
+GAP_WORK_PACKAGE_LINK_POST_POLICY = {
+    "/capability-map/api/roadmap/gaps/0/link-work-package/0":   set(ARCHETYPES),
+    "/capability-map/api/roadmap/gaps/0/unlink-work-package/0": set(ARCHETYPES),
+}
+
+for _allowed in GAP_WORK_PACKAGE_LINK_POST_POLICY.values():
+    _allowed.add("platform_admin")
 
 OVERSIGHT_POST_POLICY = {
     "/ai-chat/oversight/pause":  set(),
@@ -820,6 +839,28 @@ def test_initiative_goal_link_post_authorisation(
     assert actual == expected, (
         "%s reached %s: expected %s, got %s" % (archetype, path, expected, actual)
     )
+
+
+@pytest.mark.parametrize("path,allowed", GAP_WORK_PACKAGE_LINK_POST_POLICY.items())
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_gap_work_package_link_post_authorisation(
+    archetype, path, allowed, page, live_server, seeded
+):
+    """The link routes are role-gated: a role that may write reaches the handler
+    (404 for a record that does not exist), anyone else is refused before it."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.post(
+        live_server + path, form={"csrf_token": csrf}, max_redirects=0
+    )
+    expected = ALLOWED if archetype in allowed else DENIED
+    actual = DENIED if response.status in (401, 403) else ALLOWED
+    assert actual == expected, (
+        "%s reached %s: expected %s, got %s" % (archetype, path, expected, response.status)
+    )
+    if actual == ALLOWED:
+        assert response.status == 404, (archetype, path, response.status)
 
 
 @pytest.mark.parametrize("path,allowed", OVERSIGHT_POST_POLICY.items())
