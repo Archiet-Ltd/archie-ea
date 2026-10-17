@@ -107,6 +107,7 @@
             </th>
             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" scope="col">Status</th>
             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" scope="col">Priority</th>
+            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" scope="col">Gap</th>
             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" scope="col">Progress</th>
             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" scope="col">Due Date</th>
             <th class="h-12 px-4 text-right align-middle font-medium text-muted-foreground" scope="col">Actions</th>
@@ -115,7 +116,7 @@
         <tbody class="[&_tr:last-child]:border-0">
           {# Loading state #}
           <tr x-show="loading" x-cloak>
-            <td colspan="8" class="px-4 py-12 text-center">
+            <td colspan="9" class="px-4 py-12 text-center">
               <div class="flex flex-col items-center gap-2">
                 <i data-lucide="loader-2" class="h-6 w-6 text-muted-foreground animate-spin"></i>
                 <p class="text-sm text-muted-foreground">Loading...</p>
@@ -124,11 +125,11 @@
           </tr>
           {# Error state #}
           <tr x-show="!loading && errorMsg" x-cloak>
-            <td colspan="8" class="px-4 py-12 text-center text-destructive-emphasis text-sm" x-text="errorMsg"></td>
+            <td colspan="9" class="px-4 py-12 text-center text-destructive-emphasis text-sm" x-text="errorMsg"></td>
           </tr>
           {# Empty state #}
           <tr x-show="!loading && !errorMsg && items.length === 0" x-cloak>
-            <td colspan="8" class="px-4 py-12 text-center">
+            <td colspan="9" class="px-4 py-12 text-center">
               <div class="flex flex-col items-center gap-2">
                 <i data-lucide="inbox" class="h-8 w-8 text-muted-foreground/40"></i>
                 <p class="text-sm text-muted-foreground">No work packages found</p>
@@ -148,7 +149,12 @@
               </td>
               <td class="px-3 align-middle tabular-nums text-muted-foreground text-sm" x-text="row.row_number"></td>
               <td class="px-4 py-3 align-middle">
-                <div class="font-medium" x-text="row.name"></div>
+                <template x-if="row.detail_url">
+                  <a :href="row.detail_url" class="font-medium text-primary hover:underline" data-testid="work-package-link" x-text="row.name"></a>
+                </template>
+                <template x-if="!row.detail_url">
+                  <div class="font-medium" x-text="row.name"></div>
+                </template>
                 <div class="text-sm text-muted-foreground" x-text="row.summary || ''"></div>
               </td>
               <td class="px-4 py-3 align-middle">
@@ -157,12 +163,18 @@
               <td class="px-4 py-3 align-middle">
                 <span class="px-2 py-1 text-xs rounded-full" :class="priorityClass(row.priority)" x-text="row.priority || 'Normal'"></span>
               </td>
+              <td class="px-4 py-3 align-middle text-sm" data-testid="work-package-gaps">
+                <template x-if="!row.gaps || row.gaps.length === 0"><span class="text-muted-foreground">—</span></template>
+                <template x-for="g in (row.gaps || [])" :key="g.id">
+                  <div x-text="g.name"></div>
+                </template>
+              </td>
               <td class="px-4 py-3 align-middle">
                 <div class="w-24">
                   <div class="h-2 bg-secondary rounded-full overflow-hidden">
                     <div class="h-full bg-primary" :style="'width: ' + progressWidth(row.percent_complete)"></div>
                   </div>
-                  <span class="text-xs text-muted-foreground" x-text="(row.percent_complete || 0) + '%'"></span>
+                  <span class="text-xs text-muted-foreground" x-text="row.percent_complete == null ? '—' : row.percent_complete + '%'"></span>
                 </div>
               </td>
               <td class="px-4 py-3 align-middle text-sm text-muted-foreground" x-text="row.target_date || 'TBD'"></td>
