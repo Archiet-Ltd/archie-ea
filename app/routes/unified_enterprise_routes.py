@@ -60,11 +60,17 @@ from ..models.implementation_migration import Gap
 from ..models.implementation_migration import Plateau
 from ..models.unified_work_package import UnifiedWorkPackage
 from ..models.implementation_migration import WorkPackage  # dead-code-ok
+from app.decorators import require_roles
 from app.services import work_package_service
 from app.utils.pagination import safe_int_arg
 from app.utils.tenant import current_organization_id
 
 logger = logging.getLogger(__name__)
+
+# Roles that may create, change or delete a work package.
+_WP_WRITE_ROLES = (
+    "admin", "architect", "business_architect", "cto", "portfolio_manager", "application_manager",
+)
 
 # Create unified enterprise architecture blueprint
 enterprise_bp = Blueprint("enterprise", __name__, url_prefix="/enterprise")
@@ -759,6 +765,7 @@ def _audit_wp(action, wp_id, name, status=None, severity=AuditEventSeverity.MEDI
 
 @enterprise_bp.route("/api/work-packages", methods=["POST"])
 @login_required
+@require_roles(*_WP_WRITE_ROLES)
 def api_create_work_package():
     """Create a new work package in the one store. PROD-008"""
     data = request.get_json(force=True) or {}
@@ -785,6 +792,7 @@ def api_create_work_package():
 # CSRF: Protected via X-CSRFToken header sent by Platform.fetch
 @enterprise_bp.route("/api/work-packages/<int:wp_id>", methods=["PATCH"])
 @login_required
+@require_roles(*_WP_WRITE_ROLES)
 def api_update_work_package(wp_id):
     """Update a work package. PROD-008"""
     data = request.get_json(force=True) or {}
@@ -808,6 +816,7 @@ def api_update_work_package(wp_id):
 
 @enterprise_bp.route("/api/work-packages/bulk", methods=["DELETE"])
 @login_required
+@require_roles(*_WP_WRITE_ROLES)
 def api_bulk_delete_work_packages():
     """Bulk delete work packages (this organisation's own only)."""
     data = request.get_json() or {}
@@ -833,6 +842,7 @@ def api_bulk_delete_work_packages():
 
 @enterprise_bp.route("/api/work-packages/<int:wp_id>", methods=["DELETE"])
 @login_required
+@require_roles(*_WP_WRITE_ROLES)
 def api_delete_work_package(wp_id):
     """Delete one work package. The 2 Sep 2026 audit (F-06) found rows had no
     delete at all -- only the bulk path existed. Mirrors the bulk handler:

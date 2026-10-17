@@ -34,7 +34,7 @@ from flask import current_app, jsonify, request
 from flask_login import current_user, login_required
 from app.middleware.tenant_context import current_org_id
 
-from app.decorators import audit_log
+from app.decorators import audit_log, require_roles
 from app.services.rate_limiter import rate_limit
 
 from app import db
@@ -42,6 +42,11 @@ from app import db
 from . import capability_map
 import logging
 logger = logging.getLogger(__name__)
+
+# Roles that may create, change or delete a work package from the roadmap.
+_WP_WRITE_ROLES = (
+    "admin", "architect", "business_architect", "cto", "portfolio_manager", "application_manager",
+)
 
 
 @capability_map.route("/api/roadmap/capabilities")
@@ -1155,6 +1160,7 @@ def api_roadmap_delete_gap(gap_id):
 @capability_map.route("/api/roadmap/gaps/<int:gap_id>/work-packages", methods=["POST"])
 @login_required
 @rate_limit(30, "1m")
+@require_roles(*_WP_WRITE_ROLES)
 @audit_log("roadmap_work_package_create")
 def api_roadmap_create_work_package(gap_id):
     """
@@ -1435,6 +1441,7 @@ def _derived_capability_name(capability_type, capability_id):
 @capability_map.route("/api/roadmap/work-packages", methods=["POST"])
 @login_required
 @rate_limit(30, "1m")
+@require_roles(*_WP_WRITE_ROLES)
 @audit_log("roadmap_work_package_create_standalone")
 def api_roadmap_create_standalone_work_package():
     """
@@ -1580,6 +1587,7 @@ def api_roadmap_get_work_package(wp_id):
 @capability_map.route("/api/roadmap/work-packages/<int:wp_id>", methods=["PUT"])
 @login_required
 @rate_limit(30, "1m")
+@require_roles(*_WP_WRITE_ROLES)
 @audit_log("roadmap_work_package_update")
 def api_roadmap_update_work_package(wp_id):
     """
@@ -1655,6 +1663,7 @@ def api_roadmap_update_work_package(wp_id):
 @capability_map.route("/api/roadmap/work-packages/<int:wp_id>", methods=["DELETE"])
 @login_required
 @rate_limit(30, "1m")
+@require_roles(*_WP_WRITE_ROLES)
 @audit_log("roadmap_work_package_delete")
 def api_roadmap_delete_work_package(wp_id):
     """Delete a WorkPackage (and optionally its children)."""
@@ -1683,6 +1692,7 @@ def api_roadmap_delete_work_package(wp_id):
 @capability_map.route("/api/roadmap/work-packages/<int:wp_id>/children", methods=["POST"])
 @login_required
 @rate_limit(30, "1m")
+@require_roles(*_WP_WRITE_ROLES)
 @audit_log("roadmap_child_work_package_create")
 def api_roadmap_create_child_work_package(wp_id):
     """
