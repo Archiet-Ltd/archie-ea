@@ -370,11 +370,12 @@ def admin_sso():
         config.sp_entity_id = sp_entity_id or None
         config.idp_entity_id = idp_entity_id or None
         config.enabled = enabled
-        # One claim row per listed domain, each with its own proof token; a domain taken out of
-        # the list loses its claim.
-        _svc.sync_domain_claims(org_id, config.email_domains)
 
         try:
+            # One claim row per listed domain, each with its own proof token; a domain taken
+            # out of the list loses its claim. Inside the same handler as the commit, so a
+            # failing flush or a concurrent save is rolled back and reported, not a 500.
+            _svc.sync_domain_claims(org_id, config.email_domains)
             db.session.commit()
             flash("SSO configuration saved.", "success")
         except Exception as exc:

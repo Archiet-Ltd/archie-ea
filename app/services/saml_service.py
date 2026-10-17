@@ -268,6 +268,9 @@ class SAMLService:
             raise SAMLVerificationError("SAMLResponse assertion has no bearer subject confirmation")
         satisfied = False
         answered = []
+        wrong_request = False
+        # Confirmations are alternatives: one that is addressed to us, current and answers
+        # THIS login is enough, whatever order the others come in.
         for confirmation in confirmations:
             data = confirmation.find("saml:SubjectConfirmationData", namespaces=_SAML_NS)
             if data is None:
@@ -277,11 +280,20 @@ class SAMLService:
             not_on_or_after = SAMLService._parse_instant(data.get("NotOnOrAfter") or "")
             if not_on_or_after is None or now >= not_on_or_after + _skew():
                 continue
-            if data.get("InResponseTo"):
-                answered.append(data.get("InResponseTo"))
+            answers = data.get("InResponseTo")
+            if answers and answers != expected_request_id:
+                wrong_request = True
+                continue
+            if answers:
+                answered.append(answers)
             satisfied = True
             break
         if not satisfied:
+            if wrong_request:
+                raise SAMLVerificationError(
+                    "SAMLResponse InResponseTo does not match this login attempt "
+                    "(possible replay of a response from a different request)"
+                )
             raise SAMLVerificationError(
                 "SAMLResponse subject confirmation is not addressed to this service or has expired"
             )
@@ -311,7 +323,9 @@ class SAMLService:
             raise SAMLVerificationError("SAMLResponse assertion has no ID")
         conditions = assertion.find("saml:Conditions", namespaces=_SAML_NS)
         expires = SAMLService._parse_instant(conditions.get("NotOnOrAfter") or "") if conditions is not None else None
-        remember_until = (expires or datetime.now(timezone.utc)) + _skew() + _skew()
+        if expires is None:
+            raise SAMLVerificationError("SAMLResponse assertion has no readable expiry (NotOnOrAfter)")
+        remember_until = expires + _skew() + _skew()
         try:
             # Expired ids can never be replayed (the assertion itself is expired), so drop them.
             SSOAssertionId.query.filter(SSOAssertionId.expires_at < datetime.utcnow()).delete(
@@ -382,13 +396,17 @@ class SAMLService:
                 raise SAMLVerificationError("SAMLResponse assertion has no expiry (NotOnOrAfter)")
             if not_before:
                 nb = self._parse_instant(not_before)
-                if nb is not None and now < nb - _skew():
+                if nb is None:
+                    raise SAMLVerificationError("SAMLResponse assertion NotBefore is not a readable time")
+                if now < nb - _skew():
                     raise SAMLVerificationError(
                         "SAMLResponse assertion is not yet valid (NotBefore)"
                     )
             if not_on_or_after:
                 noa = self._parse_instant(not_on_or_after)
-                if noa is not None and now >= noa + _skew():
+                if noa is None:
+                    raise SAMLVerificationError("SAMLResponse assertion NotOnOrAfter is not a readable time")
+                if now >= noa + _skew():
                     raise SAMLVerificationError(
                         "SAMLResponse assertion has expired (NotOnOrAfter)"
                     )

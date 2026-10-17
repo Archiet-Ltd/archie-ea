@@ -175,3 +175,94 @@ def test_the_admin_page_gives_the_record_to_publish_and_verifies_it(app, db_sess
     assert _claim(org.id, domain).verified_at is not None
     login_as(client, admin)
     assert "Verified" in client.get("/admin/sso").get_data(as_text=True)
+
+
+def test_two_organisations_proving_one_domain_at_once_cannot_both_win(app, monkeypatch):
+    """Both pass the DNS check and both would pass the holder check if they ran side by side;
+    the second must wait for the first and then be refused. Real commits, so this cleans up."""
+    import threading
+    import uuid
+
+    from app import db
+    from app.models.organization import Organization
+    from app.models.sso_config import SSOConfig
+    from app.models.sso_domain_claim import SSODomainClaim
+
+    suffix = uuid.uuid4().hex[:8]
+    domain = f"race-{suffix}.example"
+    org_ids = []
+    with app.app_context():
+        for label in ("a", "b"):
+            org = Organization(name=f"Race {label} {suffix}", slug=f"race-{label}-{suffix}")
+            db.session.add(org)
+            db.session.flush()
+            db.session.add(SSOConfig(organization_id=org.id, protocol="oidc", enabled=True, email_domain=domain))
+            db.session.add(SSODomainClaim(organization_id=org.id, domain=domain, token=f"token-{label}-{suffix}"))
+            org_ids.append(org.id)
+        db.session.commit()
+
+    monkeypatch.setattr(
+        SSOService, "_lookup_txt", staticmethod(lambda name: [f"token-a-{suffix}", f"token-b-{suffix}"])
+    )
+    both_checked = threading.Barrier(2)
+    real = SSOService.domains_claimed_by_other_orgs
+
+    def meeting(self, org_id, domains):
+        answer = real(self, org_id, domains)
+        try:
+            both_checked.wait(timeout=2)  # without the lock both get here with the same answer
+        except threading.BrokenBarrierError:
+            pass
+        if org_id == org_ids[1]:
+            # The second one carries on only after the first has had time to commit, so
+            # without the lock it would find the winner's claim and clear it.
+            threading.Event().wait(1.5)
+        return answer
+
+    monkeypatch.setattr(SSOService, "domains_claimed_by_other_orgs", meeting)
+    outcomes = {}
+
+    def verify(org_id):
+        with app.app_context():
+            try:
+                outcomes[org_id] = SSOService().verify_domain(org_id, domain)[0]
+            finally:
+                db.session.remove()
+
+    threads = [threading.Thread(target=verify, args=(org_id,)) for org_id in org_ids]
+    try:
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(30)
+        with app.app_context():
+            holders = [
+                c.organization_id
+                for c in SSODomainClaim.query.filter(
+                    SSODomainClaim.domain == domain, SSODomainClaim.verified_at.isnot(None)
+                ).all()
+            ]
+        assert sorted(outcomes.values()) == [False, True], outcomes
+        assert holders == [org_id for org_id, won in outcomes.items() if won]
+    finally:
+        with app.app_context():
+            SSODomainClaim.query.filter(SSODomainClaim.domain == domain).delete()
+            SSOConfig.query.filter(SSOConfig.organization_id.in_(org_ids)).delete(synchronize_session=False)
+            Organization.query.filter(Organization.id.in_(org_ids)).delete(synchronize_session=False)
+            db.session.commit()
+
+
+def test_a_sign_in_reads_the_verified_domains_once_however_many_are_listed(app, db_session, make_org, monkeypatch):
+    org = make_org("proof-once")
+    domains = [_domain(f"once{i}") for i in range(3)]
+    _configure_sso(db_session, org, ", ".join(domains))
+    calls = []
+    real = SSOService.verified_domains_for
+
+    def counted(self, org_id):
+        calls.append(org_id)
+        return real(self, org_id)
+
+    monkeypatch.setattr(SSOService, "verified_domains_for", counted)
+    SSOService().provision_user(org, {"email": f"someone@{domains[1]}", "sub": "s1"})
+    assert calls.count(org.id) == 1

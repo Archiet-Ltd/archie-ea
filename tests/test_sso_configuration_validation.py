@@ -244,3 +244,26 @@ def test_browser_rejects_enabled_saml_without_idp_fields_and_reloads_prior_oidc_
         server.shutdown()
         server.server_close()
         thread.join()
+
+
+def test_a_failing_domain_claim_write_is_reported_as_a_failed_save_and_nothing_persists(monkeypatch):
+    """The claim write runs inside the save's error handler, so it is a rolled-back, reported
+    failure rather than an unhandled error."""
+    from app.modules.auth import sso_routes
+
+    application, state = _configuration_app(monkeypatch)
+    before = deepcopy(state.persisted)
+
+    def broken(org_id, domains):
+        raise RuntimeError("could not write the claim")
+
+    monkeypatch.setattr(sso_routes._svc, "sync_domain_claims", broken)
+    client = application.test_client()
+    client.get("/test-entry")
+    response = client.post("/admin/sso", data={
+        "protocol": "oidc", "enabled": "on", "email_domain": "updated.example",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"Failed to save SSO configuration." in response.data
+    assert b"SSO configuration saved." not in response.data
+    assert state.persisted == before

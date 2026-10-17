@@ -392,10 +392,17 @@ class SSOService:
         name = self.challenge_record_name(domain)
         if claim.token not in {value.strip() for value in self._lookup_txt(name)}:
             return False, f"No TXT record with the expected value was found at {name}. DNS changes can take a while to appear."
+        # Two organisations proving the same domain at once must not both pass the holder
+        # check: ownership changes of one domain are serialised on a transaction-scoped lock,
+        # and the holder is read again once the lock is ours.
+        db.session.execute(
+            db.text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key": f"sso-domain:{domain}"}
+        )
         holders = self.domains_claimed_by_other_orgs(org_id, [domain])
         if domain in holders:
             return False, f"{domain} is already used by another organisation's single sign-on."
-        # Release any stale verified claim on the domain, then record this one.
+        # Whatever other verified claim remains is stale (its configuration is disabled or no
+        # longer lists the domain, or the holder check above would have refused): release it.
         for other in SSODomainClaim.query.filter(
             SSODomainClaim.domain == domain,
             SSODomainClaim.organization_id != org_id,
@@ -877,8 +884,9 @@ class SSOService:
                 user.last_name = family_name
 
         config = getattr(org, "sso_config", None) if org is not None else None
+        verified_domains = set(self.verified_domains_for(org.id)) if config is not None and org is not None else set()
         configured_domains = (
-            [d for d in config.email_domains if d in set(self.verified_domains_for(org.id))]
+            [d for d in config.email_domains if d in verified_domains]
             if config is not None and org is not None
             else []
         )

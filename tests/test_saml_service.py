@@ -87,13 +87,15 @@ def _signed_assertion_b64(
     with_audience=True,
     with_confirmation=True,
     with_issuer=True,
+    conditions_not_on_or_after=None,
+    first_confirmation_in_response_to=None,
 ):
     import signxml
 
     now = datetime.datetime.now(datetime.timezone.utc)
     fmt = "%Y-%m-%dT%H:%M:%SZ"
     not_before = (now + not_before_delta).strftime(fmt)
-    not_on_or_after = (now + not_on_or_after_delta).strftime(fmt)
+    not_on_or_after = conditions_not_on_or_after or (now + not_on_or_after_delta).strftime(fmt)
     confirm_until = (now + confirmation_delta).strftime(fmt)
     issue_instant = now.strftime(fmt)
     assertion_id = assertion_id or "_a" + uuid.uuid4().hex
@@ -105,6 +107,13 @@ def _signed_assertion_b64(
         if with_confirmation
         else ""
     )
+    if first_confirmation_in_response_to:
+        # A second bearer confirmation, listed before the real one, answering another request.
+        confirmation = (
+            f'<saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">'
+            f'<saml:SubjectConfirmationData Recipient="{recipient}" NotOnOrAfter="{confirm_until}" '
+            f'InResponseTo="{first_confirmation_in_response_to}"/></saml:SubjectConfirmation>'
+        ) + confirmation
     audience_xml = (
         f"<saml:AudienceRestriction><saml:Audience>{audience}</saml:Audience></saml:AudienceRestriction>"
         if with_audience
@@ -280,3 +289,22 @@ def test_build_authn_request_produces_a_redirect_with_a_request_id():
     assert redirect_url.startswith("https://idp.example.com/saml/sso?SAMLRequest=")
     assert request_id.startswith("_")
     assert len(request_id) > 10
+
+
+def test_confirmations_are_alternatives_whatever_their_order(_idp_keypair, org_id):
+    key_pem, cert_pem = _idp_keypair
+    config = _FakeConfig(cert_pem, organization_id=org_id)
+    # A confirmation for another request listed first does not hide the one that answers this login.
+    claims = _verify(config, _signed_assertion_b64(key_pem, cert_pem, first_confirmation_in_response_to="_other"))
+    assert claims["email"] == "alice@acme.com"
+    # With only confirmations for other requests the response is still refused.
+    with pytest.raises(SAMLVerificationError, match="does not match"):
+        _verify(config, _signed_assertion_b64(key_pem, cert_pem, in_response_to="_other", first_confirmation_in_response_to="_another"))
+
+
+@pytest.mark.parametrize("stamp", ["2000-01-01T00:00:00+00:00", "next tuesday", "2099-01-01 00:00:00"])
+def test_an_unreadable_expiry_is_refused_not_replaced_by_the_current_time(_idp_keypair, org_id, stamp):
+    key_pem, cert_pem = _idp_keypair
+    config = _FakeConfig(cert_pem, organization_id=org_id)
+    with pytest.raises(SAMLVerificationError, match="not a readable time"):
+        _verify(config, _signed_assertion_b64(key_pem, cert_pem, conditions_not_on_or_after=stamp))
