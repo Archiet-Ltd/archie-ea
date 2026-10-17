@@ -26,7 +26,6 @@ from app import db
 from app.models.application_capability import ApplicationCapabilityMapping
 from app.models.application_portfolio import ApplicationComponent
 from app.models.unified_capability import UnifiedCapability
-from app.modules.my_applications.services import has_assigned_owner
 from app.security.import_decorators import with_import_security
 from app.utils.pagination import safe_int_arg
 from app.utils.tenant_users import escape_like_literal
@@ -453,9 +452,11 @@ def application_list():
         # An application counts as having an assigned owner when a business owner is
         # recorded on it or an application manager is assigned to it; the second half
         # is the same ownership the My Applications screens count for a user.
-        owner_assigned_count = _stats_base.filter(
-            has_assigned_owner(current_user.organization_id)
-        ).count()
+        from app.services import portfolio_figures
+
+        owner_assigned_count = portfolio_figures.owner_figure(current_user.organization_id)[
+            "applications_with_owner"
+        ]
         vendor_assigned_count = _stats_base.filter(
             db.or_(
                 db.and_(

@@ -170,7 +170,7 @@
 
     {# ── Persona Tabs ────────────────────────────────────── #}
     <div class="flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 w-fit">
-        {% for role_key, role_label in [('overview', 'Overview'), ('cto', 'CTO'), ('cfo', 'CFO'), ('motivation', 'Motivation'), ('strategy', 'Strategy'), ('business', 'Business'), ('application', 'Application'), ('technology', 'Technology'), ('implementation', 'Implementation & Migration')] %}
+        {% for role_key, role_label in [('overview', 'Overview'), ('cto', 'CTO')] + ([] if hide_cfo_tab|default(false) else [('cfo', 'CFO')]) + [('motivation', 'Motivation'), ('strategy', 'Strategy'), ('business', 'Business'), ('application', 'Application'), ('technology', 'Technology'), ('implementation', 'Implementation & Migration')] %}
         <button type="button" @click="activeRole = '{{ role_key }}'"
                 data-testid="layer-tab-{{ role_key }}"
                 :class="activeRole === '{{ role_key }}' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
@@ -243,7 +243,12 @@
                         {% set pct = data_coverage[field] if data_coverage is defined and data_coverage[field] is defined else 0 %}
                         <div class="rounded-lg border border-border bg-background p-3">
                             <p class="text-xs text-muted-foreground">{{ label }}</p>
-                            <p class="text-lg font-bold text-foreground">{{ pct }}%</p>
+                            <p class="text-lg font-bold text-foreground">{{ (pct ~ '%') if pct is not none else '—' }}</p>
+                            {% if field == 'owner' and data_coverage.owner_count is defined and data_coverage.owner_count is not none %}
+                            <p class="text-xs text-muted-foreground" data-testid="owner-count">{{ data_coverage.owner_count }} of {{ data_coverage.application_count }} applications have an owner</p>
+                            {% elif field == 'cost' and data_coverage.cost_count is defined and data_coverage.cost_count is not none %}
+                            <p class="text-xs text-muted-foreground" data-testid="cost-count">{{ data_coverage.cost_count }} of {{ data_coverage.application_count }} applications have a cost{% if data_coverage.total_annual_cost is not none %}, {{ '{:,.0f}'.format(data_coverage.total_annual_cost) }} a year{% endif %}</p>
+                            {% endif %}
                         </div>
                         {% endfor %}
                     </div>
@@ -452,7 +457,7 @@
                         <div class="flex items-center gap-3 text-xs" data-testid="capability-health-widget">
                             <span class="text-success-emphasis font-medium">{{ covered_count }} covered</span>
                             <span class="text-warning-emphasis font-medium">{{ partial_count }} partial</span>
-                            <span class="text-destructive-emphasis font-medium">{{ gap_count }} gaps</span>
+                            <span class="text-destructive-emphasis font-medium">{{ gap_count }} uncovered</span>
                         </div>
                     </div>
                 {% endcall %}
@@ -552,6 +557,7 @@
     {# ══════════════════════════════════════════════════════════════════════
        CFO TAB — Cost focus
        ══════════════════════════════════════════════════════════════════════ #}
+    {% if not hide_cfo_tab|default(false) %}
     <div x-show="activeRole === 'cfo'" x-cloak>
         <div class="space-y-6">
             <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -600,6 +606,7 @@
             {% endcall %}
         </div>
     </div>
+    {% endif %}
 
     {# ══════════════════════════════════════════════════════════════════════
        ARCHITECT TAB — Coverage focus
