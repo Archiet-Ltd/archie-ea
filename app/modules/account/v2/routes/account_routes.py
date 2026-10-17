@@ -235,6 +235,9 @@ def mfa_challenge():
                     "account/mfa_enroll.html",
                     secret=secret,
                     provisioning_uri=mfa_service.provisioning_uri(user, secret),
+                    qr_svg=mfa_service.provisioning_qr_svg(
+                        mfa_service.provisioning_uri(user, secret)
+                    ),
                 )
             session.pop("_mfa_enroll_secret", None)
             return _complete_login_after_mfa(user)
@@ -242,6 +245,9 @@ def mfa_challenge():
             "account/mfa_enroll.html",
             secret=secret,
             provisioning_uri=mfa_service.provisioning_uri(user, secret),
+            qr_svg=mfa_service.provisioning_qr_svg(
+                mfa_service.provisioning_uri(user, secret)
+            ),
         )
 
     if request.method == "POST":
