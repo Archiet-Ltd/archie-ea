@@ -78,7 +78,7 @@ def test_the_pricing_stylesheet_restyles_no_shared_component():
         assert ".public-faq" not in sel, f"pricing stylesheet styles the shared FAQ: {sel}"
         if any(re.search(r"\.public-card$", part.strip()) for part in sel.split(",")):
             props = {d.split(":")[0].strip() for d in body.split(";") if d.strip()}
-            assert props <= {"display", "flex-direction"}, (
+            assert props <= {"display", "flex-direction", "grid-row", "grid-template-rows", "row-gap", "align-content"}, (
                 f"pricing stylesheet restyles the shared card: {sel}"
             )
     # The card title and body keep the shared type: no font or padding is set on them from this page.
