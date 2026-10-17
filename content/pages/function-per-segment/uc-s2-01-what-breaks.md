@@ -35,7 +35,7 @@ Pick a system with the search box ("Type a team, service or system name") and th
 
 If nothing is recorded as depending on the system, the page says "Nothing is recorded as depending on this yet". If your indirect connections have never been calculated, it says "We haven't worked out the indirect connections for your model yet" and offers **Work them out now**. If some may be out of date, a notice says so and offers the same button. The **Indirect connections** panel at the foot of Ask shows when they were last worked out and how many may be out of date.
 
-The owner on each line belongs to that connected element, not to the system you picked. To find who to call for the failing system itself, open the question "Who's accountable for ___, and can they take on more?" and pick the same system. It lists each recorded owner with ownership type, organisation unit and contact.
+The owner on each line belongs to that connected element, not to the system you picked. To find who to call for the failing system itself, open the question "Who's accountable for ___, and can they take on more?" and pick the same system. It lists the recorded owners of that system and of what it affects, one card per distinct owner.
 
 The **Impact Analysis** page, under the Strategy Layer, is a separate tool for planned change. Pick an element, choose a change type (Full Replacement, Upgrade / Version Change, Decommission / Retirement or Minor Modification) and click **Analyze Impact**. The report gives a severity, counts of Capabilities, Processes and TCO at Risk, and a table of affected elements with Name, Type, Application, Owner, Health and Relationship.
 
