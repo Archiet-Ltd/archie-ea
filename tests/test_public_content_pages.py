@@ -2775,7 +2775,9 @@ def test_new_role_page_appears_everywhere_with_no_other_edit(app):
 
 
 _ROADMAP_VOICE = re.compile(
-    r"Q[1-4] ?20\d\d|\bopens in\b|\barrives?\b|\bNext:|\bquarters?\b|\broadmaps?\b",
+    r"Q[1-4] ?20\d\d|\bopens in\b|\barrives?\b|\bNext:|\bquarters?\b|\broadmaps?\b"
+    r"|\b(?:later|coming|arriv\w*|launch\w*|ships?|shipping|available|opens?)\b[^.<>\n]{0,30}\b20\d\d\b"
+    r"|\bwill\s+(?:ship|launch|arrive|be\s+available)\b|\b(?:ships?|coming|available)\s+soon\b",
     re.I,
 )
 # The module is legitimately called "Roadmaps" and lives at /modules/roadmaps;
@@ -2808,3 +2810,16 @@ def test_changelog_page_holds_the_dated_plan():
     assert page is not None
     for quarter in ("Q4 2026", "Q1 2027", "Q2 2027", "Q3 2027"):
         assert quarter in page.body_html
+
+
+@pytest.mark.parametrize("path", _SELL_PAGE_SOURCES)
+def test_sell_pages_do_not_claim_outside_assistants_connect_via_mcp(path):
+    """MCP access for outside assistants is not live; only the changelog may mention it."""
+    root = Path(__file__).resolve().parents[1]
+    text = (root / path).read_text(encoding="utf-8")
+    assert not re.search(r"\bMCP\b|Model Context Protocol", text, re.I), path
+
+
+def test_roadmap_voice_catches_bare_future_years():
+    for phrase in ("later in 2027", "Coming in 2027", "will ship soon", "arrives in 2027"):
+        assert _ROADMAP_VOICE.search(phrase), phrase

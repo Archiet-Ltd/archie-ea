@@ -247,8 +247,8 @@ work.
 Open the model to the rest of your stack through a secure API, events and connectors, with every
 incoming change matched by identifier and approved before it lands.
 
-**Today:** import ArchiMate Open Exchange, Archi and spreadsheet files, and send signed event
-notifications to Slack, Microsoft Teams or any webhook.
+**Today:** import ArchiMate Open Exchange, Archi and spreadsheet files, and deliver signed
+webhook calls to Slack, Microsoft Teams or any endpoint for events you publish yourself.
 
 Delivered today by: [Architecture Model](/modules/architecture-model) (file import).
 

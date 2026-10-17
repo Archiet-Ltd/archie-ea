@@ -50,10 +50,10 @@ AI assistants are becoming the way people ask questions about their company, and
 rarely the model anymore. It's that the company's own knowledge was never written down in a
 structured, checkable form. This isn't a problem a better search box or a chattier assistant fixes:
 it needs a living, explainable model of how the enterprise actually works, with every answer traced
-back to the record it came from. Enterprise Intelligence Management gives every assistant one
-governed, time-aware, cited model of the enterprise to stand on, the same way a CRM is the source a
-sales assistant should read about customers. That positions Entelim as the company brain other AI
-tools plug into, rather than another AI feature bolted onto an architecture tool. Entelim's
+back to the record it came from. Enterprise Intelligence Management gives people and
+Entelim's own assistant one governed, time-aware, cited model of the enterprise to stand on, the same
+way a CRM is the source a sales assistant should read about customers. That positions Entelim as the
+company brain, rather than another AI feature bolted onto an architecture tool. Entelim's
 own assistant already works this way: every action passes one permission check and every change
 the assistant proposes waits for approval. See [Agentic Automation](/features#agentic-automation) among the eighteen
 capabilities.
@@ -68,8 +68,8 @@ capabilities.
   a change, nothing happens until a person approves it.
 - **One engine per question.** The same question gets the same answer everywhere it is asked: in a
   screen, in the API or through an AI assistant.
-- **Open by contract.** Every connector and every assistant acts through the same governed interface,
-  logged and revocable, not a side door.
+- **Open by contract.** Every connector and Entelim's own assistant act through the same governed
+  permissions, not a side door.
 - **Portable and sovereign.** Your model is yours. It is built on the open ArchiMate 3.2 standard,
   and the whole platform is open source, so you are never locked into a proprietary format or a
   single vendor.
@@ -79,7 +79,7 @@ capabilities.
 Today Entelim is a modelled company brain: import an existing architecture model and ask cited
 questions about it. Every action Entelim's own assistant takes passes one permission check, and every
 change the assistant proposes waits in an approval queue until a person approves it. See
-[all eighteen capabilities](/features) for what each one delivers today.
+[all eighteen capabilities](/features) for what each one covers.
 
 ## Open source, so nobody's locked in
 
