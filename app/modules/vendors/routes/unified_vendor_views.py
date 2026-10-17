@@ -416,10 +416,6 @@ def edit_vendor(vendor_id):
             )
             vendor.stock_symbol = form.stock_symbol.data
             vendor.strategic_tier = form.strategic_tier.data
-            vendor.contract_status = form.contract_status.data
-            vendor.contract_start_date = form.contract_start_date.data
-            vendor.contract_end_date = form.contract_end_date.data
-            vendor.contract_value_annual = form.contract_value_annual.data
             vendor.updated_at = datetime.utcnow()
 
             db.session.commit()
@@ -449,24 +445,23 @@ def activate_vendor(vendor_id):
         end_date = datetime.strptime(contract_end, "%Y-%m-%d") if contract_end else None
         value = float(contract_value) if contract_value else None
 
-        vendor = VendorOnboardingService.activate_vendor(
+        contract = VendorOnboardingService.activate_vendor(
             vendor_id,
+            current_user.organization_id,
             contract_start_date=start_date,
             contract_end_date=end_date,
             contract_value=value,
         )
 
-        flash(
-            f"{vendor.name} activated successfully! Status: {vendor.contract_status}",
-            "success",
-        )
+        flash(f"{contract.vendor.name} activated successfully! Status: contracted", "success")
 
         if request.headers.get("Accept") == "application/json":
             return jsonify(
                 {
                     "success": True,
-                    "vendor_id": vendor.id,
-                    "contract_status": vendor.contract_status,
+                    "vendor_id": vendor_id,
+                    "contract_id": contract.id,
+                    "contract_status": "contracted",
                 }
             )
 

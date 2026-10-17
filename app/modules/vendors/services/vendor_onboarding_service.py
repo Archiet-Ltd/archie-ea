@@ -30,38 +30,63 @@ class VendorOnboardingService:
 
     @staticmethod
     def activate_vendor(
-        vendor_id, contract_start_date=None, contract_end_date=None, contract_value=None
+        vendor_id,
+        organization_id,
+        contract_start_date=None,
+        contract_end_date=None,
+        contract_value=None,
     ):
         """
-        Activate a vendor from catalog to contracted status.
+        Record the calling organisation's contract with a catalogue vendor.
+
+        The vendor row is shared by every organisation, so the commercial terms
+        go on that organisation's own VendorContract, never on the vendor.
 
         Args:
             vendor_id: ID of the vendor to activate
-            contract_start_date: Start date of the contract
+            organization_id: the organisation whose contract this is
+            contract_start_date: Start date of the contract (defaults to today)
             contract_end_date: End date of the contract
             contract_value: Annual contract value
 
         Returns:
-            The activated vendor object
+            The organisation's VendorContract for this vendor
         """
+        from datetime import date
+
+        from app.models.application_portfolio import VendorContract
+
         VendorOrganization = get_vendor_organization_model()
         vendor = VendorOrganization.query.get(vendor_id)
         if not vendor:
             raise ValueError(f"Vendor with ID {vendor_id} not found")
+        if not organization_id:
+            raise ValueError("An organisation is required to activate a vendor")
 
-        # Update vendor contract information
-        vendor.contract_status = "contracted"
-        vendor.contract_start_date = contract_start_date
-        vendor.contract_end_date = contract_end_date
-        vendor.contract_value_annual = contract_value
-        vendor.status = "active"
+        def _as_date(value):
+            return value.date() if isinstance(value, datetime) else value
 
-        # Set activation timestamp
-        vendor.updated_at = datetime.utcnow()
+        contract_number = f"ACT-{vendor.id}"
+        contract = VendorContract.query.filter_by(
+            organization_id=organization_id, contract_number=contract_number
+        ).first()
+        if contract is None:
+            contract = VendorContract(
+                organization_id=organization_id,
+                vendor_id=vendor.id,
+                contract_number=contract_number,
+                contract_name=f"{vendor.name} agreement",
+            )
+            db.session.add(contract)
+
+        contract.status = "active"
+        contract.start_date = _as_date(contract_start_date) or date.today()
+        contract.end_date = _as_date(contract_end_date)
+        contract.annual_cost = contract_value
 
         try:
             db.session.commit()
-            return vendor
+            return contract
         except Exception as e:
             db.session.rollback()
             raise e
@@ -246,10 +271,6 @@ class VendorOnboardingService:
                 "impl_date": datetime.utcnow(),
             },
         )
-
-        # 4. Update vendor contract_status if contracted
-        if vendor.contract_status == "contracted":
-            vendor.contract_status = "deployed"
 
         db.session.commit()
 
