@@ -119,11 +119,34 @@ dark-theme users. `--info` tracks blue in both.
 `.theme-marketing` and `.dark .theme-marketing` in `shadcn_tokens.css` hold a neutral palette for the
 public marketing pages, scoped as a class rather than a second token file. It is opt-in: set
 `{% block body_theme %}theme-marketing{% endblock %}` in a template that extends
-`layouts/public_base.html`. No template sets it yet; the marketing templates that will are filled in
-as that work lands. Login, registration, MFA, OAuth consent, shared artefacts and the demo page keep
+`layouts/public_base.html`. It is set by `main/index.html`, `public/page.html`, `public/hub_index.html`,
+`public/vs_hub.html` and `public/pricing.html`. Login, registration, MFA, OAuth consent, shared artefacts and the demo page keep
 the product palette (no `body_theme` override). No other CSS, SCSS or template file may declare
 `--background`, `--primary`, `--border` or any other core token — the `reuse-register` gate enforces
 this (`docs/reuse-register.yml`, entry `design-tokens`).
+
+### Public site
+
+Public pages (everything extending `layouts/public_base.html` and opted in to the marketing theme) use these
+classes and macro calls, defined in `app/static/css/public_site.css` and `components/badge.html`, rather than
+ad hoc utilities. The stylesheet is plain CSS, so a change to it needs no Tailwind rebuild; a utility class added
+to a template does.
+
+- **Pill:** `{% call badge(size='pill', href=url) %}…{% endcall %}` renders a link, `{% call badge(size='pill') %}…{% endcall %}`
+  a span. 30px tall, 12px/16px medium text, `px-4 py-1.5`, 1px border-colour border, transparent background; a
+  pill ignores `variant`. The default `badge(...)` call is unchanged.
+- **Buttons:** `public-btn` plus a fill (`public-btn--primary`, `public-btn--outline`) and optionally a size.
+  Default 40px tall, 24px inline padding, 14px radius, 14px/20px medium; `public-btn--sm` 36px, `public-btn--xs` 32px
+  with the 10px radius. Focus shows a 3px ring at half opacity; in dark the outline fill is the input token at 30%.
+- **Eyebrow:** `public-eyebrow`, 12px uppercase monospace with 0.2em tracking in the muted colour.
+- **Callout:** `public-callout`, a neutral card (16px radius, 1px border, 24px padding, 18px/32px text).
+- **Section rhythm:** `public-container` has 80px block padding at every width; landing bands are separated by a
+  1px border-colour line, never alternating tints; the hero has 80px above and 64px below.
+- **Type scale (marketing theme):** `public-h1` and page `h1`: 30px/36px, 48px/48px from 640px, weight 600, -0.025em;
+  `h2` 24px/32px, 30px/36px from 640px, 4rem above and 1rem below; `h3` 16px/24px; body and list text 16px/28px in the
+  muted colour; `public-lead` 18px/32px, 20px/32px from 640px; links inherit colour, underlined, foreground on hover.
+- **Tables** in page content are a bordered 16px-radius box with a muted header row; below 640px they scroll inside
+  themselves.
 
 ---
 
