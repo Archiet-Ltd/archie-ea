@@ -1,7 +1,7 @@
 """Public marketing theme opt-in: layouts/public_base.html's `body_theme` block.
 
 T-001 defines `.theme-marketing` / `.dark .theme-marketing` in shadcn_tokens.css and the opt-in block
-that would set it on <body>, but no template sets the block in this task (T-002 does). This proves the
+that sets it on <body>; the public marketing templates opt in. This proves the
 scope mechanism itself works before anything depends on it: a template that sets the block renders the
 class, and the pages that do not set it -- the home page and the login page -- do not carry it.
 """
@@ -38,9 +38,22 @@ def test_a_template_that_sets_body_theme_renders_the_marketing_class(app, _schem
     assert "public-site" in classes  # the block is additive to the existing body classes, not a replacement
 
 
-def test_the_homepage_does_not_set_the_marketing_class(app, _schema):
+import pytest
+
+
+@pytest.mark.parametrize("path", ["/", "/pricing", "/modules/arb", "/vs/leanix", "/vs", "/use-cases", "/features"])
+def test_marketing_pages_set_the_marketing_class(app, _schema, path):
     with app.test_client() as client:
-        resp = client.get("/")
+        resp = client.get(path, follow_redirects=True)
+    assert resp.status_code == 200
+    assert "theme-marketing" in _body_classes(resp.get_data(as_text=True))
+
+
+def test_the_registration_page_does_not_set_the_marketing_class(app, _schema):
+    with app.test_request_context():
+        register_url = url_for("account.register")
+    with app.test_client() as client:
+        resp = client.get(register_url)
     assert resp.status_code == 200
     assert "theme-marketing" not in _body_classes(resp.get_data(as_text=True))
 

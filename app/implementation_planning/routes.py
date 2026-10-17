@@ -264,14 +264,28 @@ def work_package_detail(work_package_id):
             else []
         )
 
+        org_id = _org_id()
+        shown = work_package_service.to_roadmap_dict(work_package, org_id)
+        plateau_ids = shown["plateau_ids"]
+        plateaus = (
+            ImplementationPlateau.query.filter(
+                ImplementationPlateau.id.in_(plateau_ids),
+                ImplementationPlateau.organization_id == org_id,
+            ).all()
+            if plateau_ids else []
+        )
+        from app.models.user import Permission
+
         return render_template(
-            "implementation_planning/dashboard.html",
+            "implementation_planning/work_package_detail.html",
             work_package=work_package,
             deliverables=deliverables,
             events=events,
-            owner_panel=work_package_service.owner_and_approval_panel(
-                work_package, _org_id()
-            ),
+            gaps=shown["gaps"],
+            plateaus=plateaus,
+            owner_name=shown["owner_name"],
+            can_link=bool(current_user.can(Permission.GENERAL)),
+            owner_panel=work_package_service.owner_and_approval_panel(work_package, org_id),
         )
 
     except HTTPException:

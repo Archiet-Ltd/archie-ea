@@ -19,7 +19,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from app import db
 from app.models.capability_gap_analysis import CapabilityGapAnalysis
 from app.models.implementation_migration import Gap, GAP_KIND_PLATEAU_TRANSITION, Plateau
-from app.models.relationship_tables import gap_work_packages
 
 log = logging.getLogger(__name__)
 
@@ -317,28 +316,58 @@ def get_plateau_gaps(plateau_id: int, organization_id: int) -> List[Gap]:
 def get_gaps_not_addressed(organization_id: int) -> List[Gap]:
     """Return gaps that have no work package addressing them.
 
-    A gap is "addressed" when it has at least one entry in the
-    gap_work_packages junction table.  This queries the unified work
-    package store (WorkPackage model) through the existing many-to-many
-    relationship.
+    A gap is "addressed" when at least one work package of the organisation in
+    the one work package store is linked to it; the link is read through
+    work_package_service (the one reader), not from the retired
+    gap_work_packages table.
     """
-    from app.models.implementation_migration import WorkPackage
+    from app.services import work_package_service
 
-    subq = (
-        db.session.query(gap_work_packages.c.gap_id)
-        .join(WorkPackage, gap_work_packages.c.work_package_id == WorkPackage.id)
-        .filter(WorkPackage.organization_id == organization_id)
-        .subquery()
+    addressed = work_package_service.addressed_gap_ids(organization_id)
+    query = Gap.query.filter(
+        Gap.organization_id == organization_id,
+        Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
     )
-    return (
-        Gap.query
-        .filter(
-            Gap.organization_id == organization_id,
-            Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
-            ~Gap.id.in_(db.session.query(subq.c.gap_id)),
-        )
-        .all()
-    )
+    if addressed:
+        query = query.filter(~Gap.id.in_(addressed))
+    return query.all()
+
+
+def get_plateau_gap_rows(plateau_ids, organization_id: int) -> Dict[int, List[Dict[str, Any]]]:
+    """{plateau id: [{"id", "name", "via"}]} for the gaps each plateau lists.
+
+    A plateau lists the gaps linked to it directly (via "linked") and the gaps
+    that the work packages realising it are linked to (via "work package").
+    Another organisation's plateaus, gaps and work packages never appear.
+    """
+    from app.services import work_package_service
+
+    out: Dict[int, List[Dict[str, Any]]] = {pid: [] for pid in plateau_ids}
+    if not out:
+        return out
+    seen = {pid: set() for pid in out}
+    plateaus = Plateau.query.filter(
+        Plateau.id.in_(list(out)), Plateau.organization_id == organization_id).all()
+    for plateau in plateaus:
+        for gap in plateau.gaps:
+            if gap.organization_id == organization_id and gap.id not in seen[plateau.id]:
+                seen[plateau.id].add(gap.id)
+                out[plateau.id].append({"id": gap.id, "name": gap.name, "via": "linked"})
+    wp_ids_by_plateau = work_package_service.plateau_work_package_ids(
+        [p.id for p in plateaus], organization_id)
+    all_wp_ids = {wp_id for ids in wp_ids_by_plateau.values() for wp_id in ids}
+    if all_wp_ids:
+        wps = work_package_service.query_for(organization_id).filter(
+            work_package_service.UnifiedWorkPackage.id.in_(all_wp_ids)).all()
+        gaps_by_wp = work_package_service.gaps_for_work_packages(wps, organization_id)
+        for pid, ids in wp_ids_by_plateau.items():
+            for wp_id in sorted(ids):
+                for gap in gaps_by_wp.get(wp_id, []):
+                    if gap["id"] not in seen[pid]:
+                        seen[pid].add(gap["id"])
+                        out[pid].append(
+                            {"id": gap["id"], "name": gap["name"], "via": "work package"})
+    return out
 
 
 _RESOLVED_GAP_STATUSES = ("resolved", "closed", "complete", "completed")
@@ -393,16 +422,11 @@ def count_gaps(
     if gap_type:
         query = query.filter(Gap.gap_type == gap_type)
     if has_work_package is not None:
-        from app.models.implementation_migration import WorkPackage
+        from app.services import work_package_service
 
-        subq = (
-            db.session.query(gap_work_packages.c.gap_id)
-            .join(WorkPackage, gap_work_packages.c.work_package_id == WorkPackage.id)
-            .filter(WorkPackage.organization_id == organization_id)
-            .subquery()
-        )
+        addressed = work_package_service.addressed_gap_ids(organization_id)
         if has_work_package:
-            query = query.filter(Gap.id.in_(db.session.query(subq.c.gap_id)))
-        else:
-            query = query.filter(~Gap.id.in_(db.session.query(subq.c.gap_id)))
+            query = query.filter(Gap.id.in_(addressed)) if addressed else query.filter(db.false())
+        elif addressed:
+            query = query.filter(~Gap.id.in_(addressed))
     return query.count()
