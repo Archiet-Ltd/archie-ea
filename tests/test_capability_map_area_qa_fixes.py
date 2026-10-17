@@ -89,7 +89,7 @@ def test_gap_surfaces_use_distinct_labels():
     health = (root / "strategic" / "capability_health.html").read_text(encoding="utf-8")
     register = (root / "enterprise" / "gap_analysis.html").read_text(encoding="utf-8")
 
-    assert "Capability Gaps Detected" in roadmap
+    assert "Capability Signals Detected" in roadmap
     assert "Capability Gap Signals" in health
     assert "Recorded Gaps" in register
     # None of the three should reuse the bare ambiguous "Total Gaps" label.

@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from app import db
 from app.models.capability_gap_analysis import CapabilityGapAnalysis
 from app.models.implementation_migration import Gap, GAP_KIND_PLATEAU_TRANSITION, Plateau
-from app.models.relationship_tables import gap_work_packages
+from app.models.relationship_tables import gap_work_packages, plateau_gaps
 
 log = logging.getLogger(__name__)
 
@@ -326,6 +326,68 @@ def _addressed_gap_ids(organization_id: int) -> set:
         .filter(WorkPackage.organization_id == organization_id)
     }
     return legacy | work_package_service.addressed_gap_ids(organization_id)
+
+
+def plateau_gaps_and_work_packages(
+    plateau_ids, organization_id: int
+) -> Dict[int, Dict[str, List[Dict[str, Any]]]]:
+    """{plateau id: {"gaps": [{id, name}], "work_packages": [{id, name}]}} for these plateaus.
+
+    The one reader behind every plateau's gap list and its "N gaps" figure. A
+    plateau's gaps are the gaps linked to it through the gap register UNION the gaps
+    of the work packages that realise it, de-duplicated. One query per kind for the
+    whole set; another organisation's rows never appear.
+    """
+    from app.services import work_package_service
+
+    plateau_ids = list(plateau_ids)
+    out: Dict[int, Dict[str, List[Dict[str, Any]]]] = {
+        pid: {"gaps": [], "work_packages": []} for pid in plateau_ids
+    }
+    if not out or organization_id is None:
+        return out
+
+    registered = db.session.execute(
+        db.select(plateau_gaps.c.plateau_id, plateau_gaps.c.gap_id)
+        .join(Gap, Gap.id == plateau_gaps.c.gap_id)
+        .where(plateau_gaps.c.plateau_id.in_(plateau_ids), Gap.organization_id == organization_id)
+    ).all()
+    wp_ids_by_plateau = work_package_service.plateau_work_package_ids(plateau_ids, organization_id)
+    all_wp_ids = set().union(*wp_ids_by_plateau.values())
+    wps = {
+        wp.id: wp
+        for wp in work_package_service.query_for(organization_id).filter(
+            work_package_service.UnifiedWorkPackage.id.in_(all_wp_ids or {-1}))
+    }
+    wp_gap_ids = work_package_service.plateau_and_gap_links(wps.values(), organization_id)
+
+    gap_ids_by_plateau: Dict[int, List[int]] = {pid: [] for pid in plateau_ids}
+    for plateau_id, gap_id in registered:
+        gap_ids_by_plateau[plateau_id].append(gap_id)
+    for plateau_id, wp_ids in wp_ids_by_plateau.items():
+        for wp_id in sorted(wp_ids):
+            if wp_id not in wps:
+                continue
+            gap_ids_by_plateau[plateau_id].extend(wp_gap_ids[wp_id]["gap_ids"])
+            out[plateau_id]["work_packages"].append({"id": wp_id, "name": wps[wp_id].name})
+
+    every_gap = {gid for ids in gap_ids_by_plateau.values() for gid in ids}
+    names = {
+        gid: name
+        for gid, name in db.session.execute(
+            db.select(Gap.id, Gap.name).where(
+                Gap.id.in_(every_gap or {-1}), Gap.organization_id == organization_id)
+        ).all()
+    }
+    for plateau_id, ids in gap_ids_by_plateau.items():
+        seen = set()
+        for gid in ids:
+            if gid in seen or gid not in names:
+                continue
+            seen.add(gid)
+            out[plateau_id]["gaps"].append({"id": gid, "name": names[gid]})
+        out[plateau_id]["gaps"].sort(key=lambda g: (g["name"] or "", g["id"]))
+    return out
 
 
 def get_gaps_not_addressed(organization_id: int) -> List[Gap]:

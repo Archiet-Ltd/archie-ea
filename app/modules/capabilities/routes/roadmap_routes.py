@@ -1315,6 +1315,19 @@ def api_roadmap_work_packages():
                 current_app.logger.warning(f"WorkPackage {wp.id} serialization failed: {se}")
                 serialized.append({"id": wp.id, "name": wp.name, "status": wp.status})
 
+        # Names of the gaps these work packages address: one read for the whole page.
+        from app.models.implementation_migration import Gap
+
+        gap_ids = {gid for d in serialized for gid in d.get("gap_ids") or []}
+        gap_names = {}
+        if gap_ids:
+            gap_names = dict(db.session.execute(
+                db.select(Gap.id, Gap.name).where(
+                    Gap.id.in_(gap_ids), Gap.organization_id == org_id)).all())
+        for d in serialized:
+            d["gaps"] = [{"id": gid, "name": gap_names[gid]}
+                         for gid in d.get("gap_ids") or [] if gid in gap_names]
+
         return jsonify(
             {
                 "success": True,
@@ -1775,7 +1788,13 @@ def api_roadmap_get_plateaus():
     try:
         from app.models.implementation_migration import Plateau
 
+        from app.services import gap_register_service
+        from app.utils.tenant import current_organization_id
+
         plateaus = Plateau.query.order_by(Plateau.sequence_order.asc()).all()
+        # The one reader of a plateau's gaps and realising work packages.
+        linked = gap_register_service.plateau_gaps_and_work_packages(
+            [p.id for p in plateaus], current_organization_id())
         return jsonify({
             "success": True,
             "plateaus": [
@@ -1785,6 +1804,9 @@ def api_roadmap_get_plateaus():
                     "description": p.description,
                     "sequence_order": p.sequence_order,
                     "target_date": p.target_date.isoformat() if p.target_date else None,
+                    "gaps": linked[p.id]["gaps"],
+                    "gap_count": len(linked[p.id]["gaps"]),
+                    "work_packages": linked[p.id]["work_packages"],
                 }
                 for p in plateaus
             ],
