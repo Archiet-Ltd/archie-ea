@@ -252,18 +252,37 @@ def test_fetch_refuses_a_cheap_but_huge_yaml_document_quickly(world, production_
     assert IntegrationContract.query.get(c.id).spec_content is None
 
 
-def test_fetch_node_budget_refuses_a_yaml_document_under_the_byte_cap(world, production_like, http_calls):
-    import time
+def test_fetch_node_budget_refuses_a_yaml_document_under_the_byte_cap(world, production_like, http_calls, monkeypatch):
+    """The budget trips by count: the parser stops after MAX_YAML_NODES nodes.
 
-    body = "a: [" + ",".join(["[]"] * 70000) + "]\n"
+    Asserted on the number of nodes the YAML composer was actually asked to build,
+    not on elapsed seconds (a wall-clock bound flaked on loaded CI runners: the
+    refusal path legitimately does ~MAX_YAML_NODES nodes of pure-Python work).
+    """
+    import yaml.composer
+
+    from app.modules.solutions_strategic.v2.routes import integration_contract_routes as r
+
+    n_leaves = 70000
+    body = "a: [" + ",".join(["[]"] * n_leaves) + "]\n"
     assert len(body) < 256 * 1024
+    assert n_leaves > 3 * r.MAX_YAML_NODES  # a parser with no budget would build every one
+
+    composed = []
+    real = yaml.composer.Composer.compose_node
+
+    def counting(self, parent, index):
+        composed.append(1)
+        return real(self, parent, index)
+
+    monkeypatch.setattr(yaml.composer.Composer, "compose_node", counting)
     http_calls.reply = lambda: _Resp(body=body, ctype="application/yaml")
     c = _insert_contract(world, "https://api.example.com/openapi.yaml")
-    started = time.monotonic()
     resp = world.as_a().post(f"/api/enterprise/contracts/{c.id}/fetch-spec")
-    assert time.monotonic() - started < 2
     assert resp.status_code == 502
     assert resp.get_json() == {"error": "Spec could not be parsed"}
+    # Refused early: exactly the budget was built, never the whole document.
+    assert len(composed) == r.MAX_YAML_NODES
 
 
 def test_yaml_node_budget_boundary():
