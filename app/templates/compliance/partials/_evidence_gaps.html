@@ -54,6 +54,7 @@
                     <td class="px-5 py-3 text-muted-foreground">{{ r.valid_until or '—' }}</td>
                     <td class="px-5 py-3 text-muted-foreground" data-testid="latest-test">
                         {% if r.latest_test_result == 'ineffective' %}Failed{% elif r.latest_test_result == 'exception' %}Exception{% elif r.latest_test_result == 'effective' %}Passed{% else %}—{% endif %}
+                        {% if r.latest_test_notes and r.latest_test_result in ('ineffective', 'exception') %}<div class="mt-1 text-xs" data-testid="latest-test-notes">{{ r.latest_test_notes }}</div>{% endif %}
                     </td>
                     <td class="px-5 py-3 text-right text-foreground" {% if r.exposure is none and r.exposure_reason %}title="{{ r.exposure_reason }}"{% endif %}>{{ r.exposure if r.exposure is not none else '—' }}</td>
                     <td class="px-5 py-3 text-muted-foreground" data-testid="evidence-owner">{{ r.evidence_owner }}</td>

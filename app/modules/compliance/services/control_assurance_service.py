@@ -21,6 +21,32 @@ IMPLEMENTATION_STATUSES = (
 )
 
 
+# The roles that may record control tests, evidence and owners (the write routes require them).
+CONTROL_WORK_ROLES = (
+    "admin",
+    "architect",
+    "business_architect",
+    "security_architect",
+    "compliance",
+    "compliance_officer",
+)
+
+EVIDENCE_URL_MAX = 500
+
+
+def may_record_control_work(user) -> bool:
+    """Whether ``user`` holds a control-work role: the one rule behind the page's actions, the
+    write routes and the approval of connector-found evidence. A read-only account (no general
+    permission) holds no write role however it is labelled."""
+    from app.models.user import Permission
+    from app.utils.role_access import get_user_role, is_admin
+
+    if user is None or not user.can(Permission.GENERAL):
+        return False
+    role = get_user_role(user)
+    return bool(is_admin(user) or role in CONTROL_WORK_ROLES or (role or "").endswith("_architect"))
+
+
 class ControlNotFound(LookupError):
     """The adopted control row is not in the caller's organisation."""
 
@@ -45,6 +71,11 @@ def _own_user_id(organization_id: int, user_id: Optional[int]) -> Optional[int]:
 
     if user_id is None:
         return None
+    if isinstance(user_id, bool) or not isinstance(user_id, int):
+        try:
+            user_id = int(user_id)
+        except (TypeError, ValueError):
+            raise ValueError("The evidence owner must be a person's id") from None
     found = db.session.execute(
         db.select(User.id).where(User.id == user_id).where(User.organization_id == organization_id)
     ).scalar_one_or_none()
@@ -125,11 +156,20 @@ def update_control_evidence(
     if notes is not _UNSET:
         control.notes = notes
     if evidence_url is not _UNSET:
-        control.evidence_url = ((evidence_url or "").strip() or None)
-        if control.evidence_url:
+        new_url = (evidence_url or "").strip() or None
+        if new_url and len(new_url) > EVIDENCE_URL_MAX:
+            raise ValueError(f"The evidence link can be at most {EVIDENCE_URL_MAX} characters")
+        changed = new_url != control.evidence_url
+        control.evidence_url = new_url
+        if new_url:
             control.evidence_source = "person"
-            if evidence_collected_at is _UNSET and control.evidence_collected_at is None:
-                control.evidence_collected_at = datetime.utcnow()
+        if changed:
+            # A different link is different evidence: the dates of the old one do not carry
+            # over. Collected now unless the caller says when; valid until nothing, unless told.
+            if evidence_collected_at is _UNSET:
+                control.evidence_collected_at = datetime.utcnow() if new_url else None
+            if evidence_valid_until is _UNSET:
+                control.evidence_valid_until = None
     if evidence_collected_at is not _UNSET:
         control.evidence_collected_at = evidence_collected_at
     if evidence_valid_until is not _UNSET:

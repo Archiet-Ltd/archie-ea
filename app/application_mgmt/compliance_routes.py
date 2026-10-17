@@ -12,8 +12,10 @@ from app.middleware.tenant_context import current_org_id
 from app.models.application_compliance import ApplicationComplianceControl
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
 from app.modules.compliance.services.control_assurance_service import (
+    CONTROL_WORK_ROLES,
     ControlNotFound,
     list_control_tests,
+    may_record_control_work,
     record_control_test,
     update_control_evidence,
 )
@@ -21,28 +23,11 @@ from app.modules.compliance.services.evidence_gap_service import evidence_gaps
 from app.utils.route_guards import require_entity
 
 
-CONTROL_WORK_ROLES = (
-    "admin",
-    "architect",
-    "business_architect",
-    "security_architect",
-    "compliance",
-    "compliance_officer",
-)
-
-
 def _can_record_control_work() -> bool:
     """Whether to offer the record-a-test and assign-an-owner actions: the persona side of
     what the write routes below accept. The routes decide; this only keeps the page from
     offering actions that will be refused."""
-    from app.models.user import Permission
-    from app.utils.role_access import get_user_role, is_admin
-
-    # A read-only account (no general permission) holds no write role however it is labelled.
-    if not current_user.can(Permission.GENERAL):
-        return False
-    role = get_user_role(current_user)
-    return is_admin(current_user) or role in CONTROL_WORK_ROLES or role.endswith("_architect")
+    return may_record_control_work(current_user)
 
 
 @application_mgmt.route("/compliance", methods=["GET"])

@@ -98,11 +98,12 @@ def _adopt(db_session, org_id, control, component=None, **fields):
     return row
 
 
-def _user(db_session, org_id, label):
+def _user(db_session, org_id, label, enterprise_role=None):
     from app.models.user import Role, User
 
     role = Role.query.filter_by(name="Architect").first()
     user = User(
+        enterprise_role=enterprise_role,
         email=f"{label}-{uuid.uuid4().hex[:8]}@example.test",
         first_name=label,
         last_name="Tester",
@@ -549,7 +550,8 @@ def test_approving_a_proposal_writes_the_evidence_with_source_connector(app, db_
     from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
 
     org = make_org("conn-ok")
-    proposer, reviewer = _user(db_session, org.id, "Proposer"), _user(db_session, org.id, "Reviewer")
+    proposer = _user(db_session, org.id, "Proposer")
+    reviewer = _user(db_session, org.id, "Reviewer", enterprise_role="compliance")
     rows = _stage_three(db_session, org)
     approvals = _propose_all(org, rows, proposer.id)
     db_session.commit()
@@ -781,3 +783,155 @@ def test_a_control_code_cannot_break_out_of_the_row_action_handlers(app):
     decoded = unescape(attribute)
     argument = decoded[len("open('test', 1, "):-1]
     assert json.loads(argument) == code
+
+
+# --------------------------------------------------------------------------- #
+# Independent review round: approval roles, new link dates, input errors, mutations
+# --------------------------------------------------------------------------- #
+
+
+def test_an_approver_without_a_control_work_role_cannot_accept_connector_evidence(app, db_session, make_org):
+    """The direct writer is limited to the control-work roles; so is approving the same write."""
+    from app.models.user import Role, User
+    from app.modules.ai_chat.services.ai_chat_approval_service import AIChatApprovalService
+
+    org = make_org("conn-role")
+    proposer = _user(db_session, org.id, "Proposer")
+    procurement = User(
+        email=f"proc-{uuid.uuid4().hex[:8]}@example.test", first_name="Pro", last_name="Curement",
+        organization_id=org.id, confirmed=True, role=Role.query.filter_by(name="User").first(),
+        enterprise_role="procurement",
+    )
+    procurement.password = uuid.uuid4().hex
+    db_session.add(procurement)
+    rows = _stage_three(db_session, org)
+    [first, *_] = _propose_all(org, rows, proposer.id)
+    db_session.commit()
+
+    result = _in_org(
+        app, org.id, lambda: AIChatApprovalService(procurement.id).approve_and_execute(first.id, procurement.id)
+    )
+    assert result["success"] is False
+    db_session.expire_all()
+    assert rows["access-reviews"].evidence_url is None and rows["access-reviews"].evidence_source is None
+
+
+def test_replacing_the_evidence_link_drops_the_old_dates(app, db_session, make_org):
+    org = make_org("relink")
+    component, _ = _application(db_session, org.id, "Relink app")
+    row = _adopt(
+        db_session, org.id, _control(db_session, _framework(db_session), "RL-1"), component,
+        evidence_url="https://e.test/old", evidence_valid_until=NOW + timedelta(days=300),
+        evidence_collected_at=NOW - timedelta(days=30),
+    )
+    db_session.commit()
+
+    def run():
+        update_control_evidence(org.id, row.id, evidence_url="https://e.test/new")
+        db_session.commit()
+        return rule.evidence_state(row, NOW)
+
+    state = _in_org(app, org.id, run)
+    db_session.refresh(row)
+    assert row.evidence_url == "https://e.test/new"
+    assert row.evidence_valid_until is None and row.evidence_collected_at is not None
+    assert row.evidence_collected_at > NOW - timedelta(days=1)  # collected now, not 30 days ago
+    assert state == "undated"  # not "current" on the old link's date
+
+    # The same link again changes nothing; a link with its own dates keeps them.
+    def keep():
+        update_control_evidence(org.id, row.id, evidence_url="https://e.test/new")
+        update_control_evidence(
+            org.id, row.id, evidence_url="https://e.test/third", evidence_valid_until=NOW + timedelta(days=5)
+        )
+        db_session.commit()
+
+    _in_org(app, org.id, keep)
+    db_session.refresh(row)
+    assert row.evidence_valid_until == NOW + timedelta(days=5)
+
+
+def test_a_mapping_update_with_a_bad_owner_or_a_long_link_is_a_400_not_a_500(app, db_session, make_org):
+    org = make_org("badinput")
+    component, _ = _application(db_session, org.id, "Bad input app")
+    row = _adopt(db_session, org.id, _control(db_session, _framework(db_session), "BI-1"), component)
+    db_session.commit()
+
+    def run():
+        refused = []
+        for fields in ({"evidence_owner_id": "abc"}, {"evidence_url": "https://e.test/" + "x" * 600}):
+            try:
+                update_control_evidence(org.id, row.id, **fields)
+            except ValueError as exc:
+                refused.append(str(exc))
+        return refused
+
+    refused = _in_org(app, org.id, run)
+    assert len(refused) == 2
+
+
+def test_the_gap_list_ignores_an_organisation_wide_control_of_another_organisation(app, db_session, make_org):
+    """A decoy: organisation B has an organisation-wide control (no application) with no
+    evidence. It must never appear in A's list, and A's list must carry only A's rows."""
+    org_a, org_b = make_org("decoy-a"), make_org("decoy-b")
+    framework = _framework(db_session)
+    comp_a, _ = _application(db_session, org_a.id, "Decoy A app")
+    mine = _adopt(db_session, org_a.id, _control(db_session, framework, "DC-1"), comp_a)
+    wide_b = _adopt(db_session, org_b.id, _control(db_session, framework, "DC-2"))
+    db_session.commit()
+
+    ids = [r["id"] for r in _in_org(app, org_a.id, lambda: evidence_gaps(org_a.id, NOW))["rows"]]
+    assert ids == [mine.id] and wide_b.id not in ids
+    ids_b = [r["id"] for r in _in_org(app, org_b.id, lambda: evidence_gaps(org_b.id, NOW))["rows"]]
+    assert ids_b == [wide_b.id]
+
+
+def test_accepting_a_proposal_re_checks_the_organisation_of_the_control(app, db_session, make_org):
+    """An approved proposal of organisation B naming a control row of organisation A writes nothing."""
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+
+    from app.models.ai_chat_crud_approval import ApprovalStatus
+    from app.modules.ai_chat.services.ai_chat_approval_service import create_approval_record
+
+    org_a, org_b = make_org("recheck-a"), make_org("recheck-b")
+    rows_a = _stage_three(db_session, org_a)
+    target = rows_a["access-reviews"]
+    # Raised the way the real proposer raises it, but naming a control row of ANOTHER organisation
+    # (the proposer itself refuses that, so the row is made directly).
+    approval = create_approval_record(
+        organization_id=org_b.id, operation_type="update", entity_type="control_evidence",
+        entity_id=target.id, summary="recheck",
+        operation_payload={
+            "application_control_id": target.id, "evidence_url": "https://evil.example/e",
+            "collected_at": NOW.isoformat(), "valid_until": None, "source_system": "x",
+        },
+        user_id=None,
+    )
+    approval.status = ApprovalStatus.APPROVED
+    db_session.commit()
+
+    assert accept_control_evidence(approval.id, org_b.id, None) is False
+    db_session.expire_all()
+    assert target.evidence_url is None
+
+
+def test_the_latest_exception_notes_are_shown_in_the_gap_row(app, db_session, make_org):
+    org = make_org("notes")
+    tester = _user(db_session, org.id, "Tester")
+    component, _ = _application(db_session, org.id, "Notes app")
+    row = _adopt(
+        db_session, org.id, _control(db_session, _framework(db_session), "NT-1"), component,
+        evidence_url="https://e.test/n", evidence_valid_until=NOW + timedelta(days=60),
+    )
+    db_session.commit()
+
+    def run():
+        record_control_test(
+            org.id, row.id, test_kind="design", result="exception", tested_by_id=tester.id,
+            notes="Signed off by the CISO until Q3",
+        )
+        db_session.commit()
+        return evidence_gaps(org.id, NOW)["rows"]
+
+    [gap] = _in_org(app, org.id, run)
+    assert gap["latest_test_notes"] == "Signed off by the CISO until Q3"

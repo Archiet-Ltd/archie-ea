@@ -194,6 +194,7 @@ def evidence_gaps(organization_id: Optional[int], as_of: Optional[datetime] = No
             "state": state,
             "effectiveness": effect,
             "latest_test_result": latest_test.result if latest_test else None,
+            "latest_test_notes": latest_test.notes if latest_test else None,
             "valid_until": _day(mapping.evidence_valid_until),
             "exposure": exposure,
             "exposure_reason": exposure_reason,
