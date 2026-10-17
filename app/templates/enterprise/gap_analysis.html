@@ -37,9 +37,9 @@
     <!-- Gap Summary -->
     <div class="grid gap-4 md:grid-cols-4">
         {{ metrics_card(title='Recorded Gaps', value=total_gap_count|default(0), icon='target', description='ArchiMate Gap elements in the register') }}
-        {{ metrics_card(title='Critical', value=summary.critical, icon='alert-triangle', icon_class='!text-destructive', value_class='text-destructive') }}
-        {{ metrics_card(title='In Progress', value=summary.in_progress, icon='loader', icon_class='!text-primary', value_class='text-primary') }}
-        {{ metrics_card(title='Resolved', value=summary.resolved, icon='check-circle', icon_class='!text-success', value_class='text-success') }}
+        {{ metrics_card(title='Critical', value=(summary.critical if summary is defined and summary else '—'), icon='alert-triangle', icon_class='!text-destructive', value_class='text-destructive') }}
+        {{ metrics_card(title='In Progress', value=(summary.in_progress if summary is defined and summary else '—'), icon='loader', icon_class='!text-primary', value_class='text-primary') }}
+        {{ metrics_card(title='Resolved', value=(summary.resolved if summary is defined and summary else '—'), icon='check-circle', icon_class='!text-success', value_class='text-success') }}
     </div>
 
     <!-- Gaps Table -->
@@ -99,7 +99,7 @@
                             </td>
                             <td class="p-3 text-sm text-muted-foreground">{{ (gap.impact|capitalize) if gap.impact else '—' }}</td>
                             <td class="p-3 text-sm" data-testid="gap-work-packages-{{ gap.id }}">
-                                {% for wp in work_packages_by_gap.get(gap.id, []) %}
+                                {% for wp in (work_packages_by_gap|default({})).get(gap.id, []) %}
                                 <div><a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wp.id) if 'implementation_planning.work_package_detail' in flask.current_app.view_functions else '#' }}"
                                         class="text-primary hover:underline" data-testid="gap-work-package-link">{{ wp.name|default('—', true) }}</a></div>
                                 {% else %}
