@@ -33,7 +33,7 @@
                     <template x-if="loading">
                         {{ loading_inline(size='sm', text='Loading...') }}
                     </template>
-                    <template x-if="!loading">Show model</template>
+                    <span x-show="!loading">Show model</span>
                 </button>
                 <template x-if="lastLoaded">
                     <span class="text-sm text-muted-foreground" x-text="'Last loaded: ' + formatDateTime(lastLoaded)"></span>
@@ -235,7 +235,7 @@ function asOfPage() {
                 this.relationships = data.relationships || [];
                 this.lastLoaded = new Date().toISOString();
             } catch (e) {
-                this.error = 'Could not load model snapshot: ' + e.message;
+                this.error = 'We could not load the model for that date. Check the date and try again in a moment.';
             } finally {
                 this.loading = false;
                 this.$nextTick(() => lucide.createIcons());

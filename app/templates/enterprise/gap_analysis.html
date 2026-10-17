@@ -76,7 +76,7 @@
                                 </div>
                                 <div class="text-sm text-muted-foreground">{{ gap.description|default('', true)|truncate(50) }}</div>
                             </td>
-                            <td class="p-3">{{ gap.gap_type|default('Unknown') }}</td>
+                            <td class="p-3">{{ gap.gap_type|default('—', true) }}</td>
                             <td class="p-3">
                                 {% if gap.priority == 'Critical' %}
                                     {{ status_badge(gap.priority|default('Normal'), 'error') }}
@@ -146,7 +146,7 @@
                                 </div>
                                 <div class="text-sm text-muted-foreground">{{ gap.description|default('', true)|truncate(50) }}</div>
                             </td>
-                            <td class="p-3">{{ gap.gap_type|default('Unknown') }}</td>
+                            <td class="p-3">{{ gap.gap_type|default('—', true) }}</td>
                             <td class="p-3">
                                 {% if gap.priority == 'Critical' %}
                                     {{ status_badge(gap.priority|default('Normal'), 'error') }}
