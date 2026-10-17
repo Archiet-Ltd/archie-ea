@@ -14,8 +14,8 @@ icon: users
 
 # Org Chart & RACI
 
-*Who owns what, honestly — including the systems that don't have an owner recorded, shown as
-missing, not silently assigned to someone.*
+*The structure of your organisation as modelled Business Actors, and a RACI matrix that maps people
+and roles to your capabilities.*
 
 ## What is org chart software?
 
@@ -39,10 +39,21 @@ most needs to see: the system, process or team with no one accountable for it at
 
 ## What this module does
 
-Entelim's Org Chart & RACI module builds that structure from the organisation's own actor and
-relationship data, not a hand-maintained slide deck. Every ownership record in one place: who's
-accountable for what, by organisation unit, with gaps shown as genuinely missing rather than
-silently assigned to someone.
+Entelim's Org Chart & RACI module builds the structure from the organisation's own modelled
+data, not a hand-maintained slide deck. The org chart is a tree of Business Actors — departments,
+teams, business units and partners — joined by composition and aggregation relationships. Where no
+such relationships exist yet, actors are listed grouped by type instead, and that grouped list
+shows each actor's headcount where one is recorded; the tree shows names and types. Neither shows
+individual reporting lines.
+
+The Enterprise RACI is a matrix with actors, roles and users down the side and your top-level
+capabilities across the top. Each cell holds Responsible, Accountable, Consulted or Informed, and
+you can add a stakeholder, or create a new Business Actor, from the matrix itself. A cell nobody has
+filled stays empty; the matrix does not flag it as a gap or count the capabilities without an
+accountable owner. A third page, Workforce Transition, tracks role changes behind a transformation.
+
+Owners of individual systems are recorded in each application's Ownership section, and capabilities
+with no recorded owner are listed on their own page for CTOs and portfolio managers.
 
 ## Where you'll meet it
 

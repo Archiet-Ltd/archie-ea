@@ -13,13 +13,21 @@ icon: layout-grid
 
 # Business Model Canvas
 
-*Nine standard blocks, saved per block, with AI fill suggestions drawn from your own model data.*
+*Nine standard blocks, saved one block at a time, with optional AI drafts built from the rest of
+your canvas.*
 
 ## What this module does
 
 The canvas your business model actually lives on — updated one block at a time instead of a whole
-document you have to reopen and redo. AI suggestions, grounded in your real capability data, help
-you go from blank page to something real fast.
+document you have to reopen and redo. Each canvas also carries an operating model archetype
+(coordination, unification, replication or diversification) and can be exported as an image of the
+canvas. Mermaid, Lucidchart and Archi downloads export a saved diagram of the canvas, not its nine
+text blocks, and come out empty until one has been saved.
+
+Where AI is enabled, a draft button proposes text for a single block from the blocks you have
+already filled in and the number of applications in your estate. The draft is advice only: it
+appears for you to edit and save, and nothing is written until you do. It does not read your
+capability data.
 
 ## Where you'll meet it
 
