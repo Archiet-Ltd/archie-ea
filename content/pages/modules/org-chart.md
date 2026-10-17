@@ -42,8 +42,9 @@ most needs to see: the system, process or team with no one accountable for it at
 Entelim's Org Chart & RACI module builds the structure from the organisation's own modelled
 data, not a hand-maintained slide deck. The org chart is a tree of Business Actors — departments,
 teams, business units and partners — joined by composition and aggregation relationships. Where no
-such relationships exist yet, actors are listed grouped by type instead. It shows each actor's
-headcount where one is recorded, but not individual reporting lines.
+such relationships exist yet, actors are listed grouped by type instead, and that grouped list
+shows each actor's headcount where one is recorded; the tree shows names and types. Neither shows
+individual reporting lines.
 
 The Enterprise RACI is a matrix with actors, roles and users down the side and your top-level
 capabilities across the top. Each cell holds Responsible, Accountable, Consulted or Informed, and

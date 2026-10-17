@@ -24,9 +24,10 @@ capability is scored on strategic importance, how well applications cover it, it
 how risky it is; where maturity has not been assessed, that part of the score takes a neutral
 midpoint rather than an invented gap. It is then placed in a critical, high, medium or low priority band, with a recommendation and a timeframe.
 
-Where a capability is linked to a strategic initiative, the budget shown is that initiative's real
-allocation and is marked Live. Where it is not, the figure is a scoring-based estimate and is
-marked Est. The matrix opens once at least one application has been mapped to a capability. An
+Where a capability is linked to a strategic initiative that has a budget allocated, the figure shown
+is that initiative's remaining budget (its allocation is shown alongside) and is marked Live. Where
+there is no link, or the linked initiative has no allocation, the figure is a scoring-based estimate
+and is marked Est. The matrix opens once at least one application has been mapped to a capability. An
 optional AI panel suggests a sequence from the matrix's own figures; it is advice only and changes
 nothing. It does not roll up business cases.
 

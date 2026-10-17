@@ -19,8 +19,7 @@ it only when you are happy.*
 
 ## What this module does
 
-Upload a CSV or Excel file, paste rows straight from a spreadsheet, or start from applications you
-already hold. Pick how much detail to generate — quick, standard or comprehensive — and the import
+Upload a CSV or Excel file, or paste rows straight from a spreadsheet. Pick how much detail to generate — quick, standard or comprehensive — and the import
 drafts architecture elements from your rows in batches. Nothing lands in the repository until you
 have reviewed a batch and chosen to commit it. SAP landscape exports are recognised and tidied up
 automatically. The import dashboard lists the jobs you have run, with their status.
