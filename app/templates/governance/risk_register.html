@@ -64,6 +64,7 @@
     </div>
 
     {# Ranked list: exposure comes from the one impact answer, see risk_service.ranked_risks. #}
+    {% if ranked is defined and ranked %}
     <div class="rounded-lg border border-border bg-card p-4" id="ranked-risks">
         <h2 class="text-sm font-semibold text-foreground">Top risks ({{ ranked.total }})</h2>
         <p class="text-xs text-muted-foreground mt-0.5 mb-3" id="ranked-risks-rule">{{ ranked.rule }}</p>
@@ -98,6 +99,7 @@
         <p class="text-sm text-muted-foreground">No risks recorded yet.</p>
         {% endif %}
     </div>
+    {% endif %}
 
     <div class="rounded-lg border border-border bg-card p-4">
         <h2 class="text-sm font-semibold text-foreground mb-3">All risks</h2>
