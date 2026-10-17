@@ -406,3 +406,95 @@ def test_the_recommendations_context_never_adds_two_currencies(db_session, make_
 
     _rate(db_session, "USD", "GBP", "0.5")
     assert _build_spend_context(org.id)["total_annual_cost"]["converted"] == pytest.approx(2234)
+
+
+# 5 ---------------------------------------------------------------------------
+
+
+def test_recommendations_use_the_active_organisation_after_a_switch(
+    db_session, make_org, client, login_as, monkeypatch
+):
+    from app.models.org_role import OrgRole
+    from app.modules.procurement import ai_routes
+
+    org_a, org_b, *_ = _two_orgs(db_session, make_org)
+    visitor = _user(db_session, org_b)  # home organisation is B
+    db_session.add(OrgRole(organization_id=org_a.id, user_id=visitor.id, role="viewer"))
+    db_session.flush()
+
+    asked = []
+
+    def fake(organization_id):
+        asked.append(organization_id)
+        return {"recommendations": [], "summary": ""}
+
+    monkeypatch.setattr(ai_routes, "generate_spend_recommendations", fake)
+    monkeypatch.setattr(ai_routes.FeatureFlagService, "require_ai_for_route",
+                        staticmethod(lambda *a, **k: None))
+
+    login_as(client, visitor)
+    switched = client.post("/account/switch-organization", data={"organization_id": str(org_a.id)},
+                           follow_redirects=True)
+    assert switched.status_code == 200
+    login_as(client, visitor)
+    response = client.post("/procurement/api/spend/ai-recommendations")
+    assert response.status_code == 200, response.get_data(as_text=True)[:500]
+    assert asked == [org_a.id], "recommendations were built for the home organisation"
+
+
+# 6 ---------------------------------------------------------------------------
+
+
+def test_rate_lookups_do_not_grow_with_the_number_of_contracts(db_session, make_org):
+    from sqlalchemy import event
+
+    org = _org(make_org, db_session)
+    vendor = _vendor(db_session)
+    _no_rates(db_session, ("USD", "GBP"), ("EUR", "GBP"))
+    _rate(db_session, "USD", "GBP", "0.8")
+    _rate(db_session, "EUR", "GBP", "0.9")
+
+    def statements_for(contract_count):
+        for i in range(contract_count):
+            _contract(db_session, org, "Many%d" % i, annual_cost=10 + i,
+                      currency="USD" if i % 2 else "EUR", vendor=vendor,
+                      contract_value=20 + i, contract_type="license")
+        seen = []
+
+        def count(conn, cursor, statement, *a):
+            if "exchange_rates" in statement:
+                seen.append(statement)
+
+        engine = db_session.get_bind()
+        event.listen(engine, "before_cursor_execute", count)
+        try:
+            summary = _summary(org)
+        finally:
+            event.remove(engine, "before_cursor_execute", count)
+        assert summary["total"]["converted"] is not None
+        return len(seen)
+
+    few = statements_for(4)
+    many = statements_for(40)
+    assert many == few, "rate queries grew from %d to %d with the contract count" % (few, many)
+    assert many <= 8
+
+
+# 7 ---------------------------------------------------------------------------
+
+
+def test_two_distinct_applications_with_one_name_count_as_two(db_session, make_org):
+    org = _org(make_org, db_session)
+    vendor = _vendor(db_session)
+    first, second = _app(db_session, org, "Same"), _app(db_session, org, "Same")
+    second.name = first.name
+    db_session.flush()
+    one = _contract(db_session, org, "One", annual_cost=10, currency="GBP", vendor=vendor)
+    two = _contract(db_session, org, "Two", annual_cost=10, currency="GBP", vendor=vendor)
+    _link(db_session, org, one, first)
+    _link(db_session, org, two, second)
+
+    summary = _summary(org)
+    assert _vendor_row(summary, vendor)["covered_application_count"] == 2
+    rows = {r["contract_name"]: r for r in summary["by_contract"]}
+    assert rows[one.contract_name]["applications"] == [first.name]

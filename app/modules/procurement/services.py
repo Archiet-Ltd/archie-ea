@@ -185,14 +185,16 @@ def _currency_of(contract: VendorContract) -> str:
     return (contract.currency or "USD").strip().upper()
 
 
-def _currency_shape(stated, reporting_currency: str, as_of: date) -> Dict[str, any]:
+def _currency_shape(stated, reporting_currency: str, as_of: date,
+                    rate_cache: Optional[dict] = None) -> Dict[str, any]:
     """One figure in each currency it was stated in, plus one converted figure.
 
     ``stated`` is a list of (amount, currency); an amount that is None was not
     stated and is left out and counted. The stated sums are kept per currency
     and are never added to each other; the only conversion is
     ``convert_total``, which answers None (and names each currency and date
-    with no rate) rather than a partial sum.
+    with no rate) rather than a partial sum. ``rate_cache`` is shared across
+    the figures of one request so a rate is looked up once.
     """
     from app.services.currency_service import convert_total
 
@@ -203,6 +205,7 @@ def _currency_shape(stated, reporting_currency: str, as_of: date) -> Dict[str, a
     converted = convert_total(
         [_StatedAmount(amount, currency, as_of) for amount, currency in present],
         reporting_currency,
+        rate_cache,
     )
     return {
         "by_currency": dict(sorted(by_currency.items())),
@@ -225,8 +228,10 @@ def _empty_spend_summary(reporting_currency: Optional[str] = None) -> Dict[str, 
     }
 
 
-def _covered_applications(organization_id: int, contracts) -> Dict[int, List[str]]:
-    """Names of the applications each contract covers, de-duplicated.
+def _covered_applications(organization_id: int, contracts) -> Dict[int, List[Tuple[int, str]]]:
+    """(id, name) of the applications each contract covers, de-duplicated by id.
+
+    Names are not unique, so identity is the id; the name is for display only.
 
     Reads the contract-to-application links and the contract's legacy single
     application, in two organisation-scoped queries for all contracts at once.
@@ -260,14 +265,14 @@ def _covered_applications(organization_id: int, contracts) -> Dict[int, List[str
         ).all()
         names = {row.id: row.name for row in rows}
 
-    covered: Dict[int, List[str]] = {}
+    covered: Dict[int, List[Tuple[int, str]]] = {}
     for contract_id, ids in ids_by_contract.items():
         seen, ordered = set(), []
         for app_id in ids:
             if app_id in names and app_id not in seen:
                 seen.add(app_id)
                 ordered.append(app_id)
-        covered[contract_id] = [names[i] for i in ordered]
+        covered[contract_id] = [(i, names[i]) for i in ordered]
     return covered
 
 
@@ -328,13 +333,15 @@ def get_spend_summary(organization_id: Optional[int], as_of: Optional[date] = No
     apps = _covered_applications(organization_id, contracts)
     vendor_names = _vendor_names({c.vendor_id for c in contracts if c.vendor_id})
 
+    rate_cache: dict = {}
+
     def shape_of(group, key="annual_cost"):
         return _currency_shape(
-            [(amounts[c.id][key], _currency_of(c)) for c in group], reporting, as_of
+            [(amounts[c.id][key], _currency_of(c)) for c in group], reporting, as_of, rate_cache
         )
 
-    total_annual = _currency_shape(annual, reporting, as_of)
-    total_value = _currency_shape(stated_value, reporting, as_of)
+    total_annual = _currency_shape(annual, reporting, as_of, rate_cache)
+    total_value = _currency_shape(stated_value, reporting, as_of, rate_cache)
 
     by_type: Dict[str, any] = {}
     groups: Dict[str, list] = {}
@@ -360,7 +367,7 @@ def get_spend_summary(organization_id: Optional[int], as_of: Optional[date] = No
     by_vendor = []
     for vendor_id, group in vendor_groups.items():
         shape = shape_of(group)
-        covered = {name for c in group for name in apps.get(c.id, [])}
+        covered = {app_id for c in group for app_id, _name in apps.get(c.id, [])}
         end_dates = [c.end_date for c in group if c.end_date is not None]
         by_vendor.append({
             "vendor_id": vendor_id,
@@ -388,7 +395,7 @@ def get_spend_summary(organization_id: Optional[int], as_of: Optional[date] = No
             "converted": shape["converted"],
             "missing_rates": shape["missing_rates"],
             "end_date": c.end_date,
-            "applications": apps.get(c.id, []),
+            "applications": [name for _id, name in apps.get(c.id, [])],
             "source_table": VendorContract.__tablename__,
             "truth_class": truth_class_for(VendorContract.__tablename__),
         })
@@ -434,6 +441,7 @@ def get_spend_by_category(organization_id: Optional[int]) -> Dict[str, Dict[str,
         VendorContract.organization_id == organization_id
     ).all()
 
+    rate_cache: dict = {}
     groups: Dict[str, list] = {}
     for c in contracts:
         groups.setdefault(c.contract_category or "Uncategorized", []).append(c)
@@ -444,6 +452,7 @@ def get_spend_by_category(organization_id: Optional[int]) -> Dict[str, Dict[str,
             [(get_contract_amounts(c)["contract_value"], _currency_of(c)) for c in group],
             reporting,
             as_of,
+            rate_cache,
         )
         categories[category] = {
             "by_currency": shape["by_currency"],
