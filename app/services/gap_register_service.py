@@ -374,6 +374,8 @@ def count_gaps(
     organization_id: int,
     gap_type: Optional[str] = None,
     has_work_package: Optional[bool] = None,
+    severity: Optional[str] = None,
+    resolution_status: Optional[str] = None,
 ) -> int:
     """Return the number of gaps in the one gap register for an organisation.
 
@@ -388,6 +390,8 @@ def count_gaps(
       has_work_package:  True counts gaps with at least one work package
                          link in this organisation; False counts gaps with
                          none (get_gaps_not_addressed). None counts all.
+      severity:          only count gaps recorded with this severity.
+      resolution_status: only count gaps in this resolution status.
     """
     query = Gap.query.filter(
         Gap.organization_id == organization_id,
@@ -395,6 +399,10 @@ def count_gaps(
     )
     if gap_type:
         query = query.filter(Gap.gap_type == gap_type)
+    if severity:
+        query = query.filter(Gap.severity == severity)
+    if resolution_status:
+        query = query.filter(Gap.resolution_status == resolution_status)
     if has_work_package is not None:
         from app.services import work_package_service
 
