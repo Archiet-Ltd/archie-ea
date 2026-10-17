@@ -22,7 +22,7 @@ from flask import (
 )
 from flask_login import login_required
 
-from app.decorators import audit_log
+from app.decorators import audit_log, require_roles
 from sqlalchemy import or_, text
 
 from .. import db
@@ -726,18 +726,25 @@ def api_consolidation_statistics():
 
 @unified_low_priority_bp.route("/api/policy-monitoring/scan", methods=["POST"])
 @login_required
+@require_roles("admin", "architect", "business_architect")
 @audit_log("compliance_scan")
 def api_scan_compliance():
     """API endpoint to trigger compliance scan"""
     try:
         application_id = request.json.get("application_id") if request.json else None
         if application_id:
-            result = policy_monitoring_service.scan_application_compliance(
-                application_id
-            )
+            result = policy_monitoring_service.scan_application_compliance(application_id)
+            if not result.get("success"):
+                if result.get("error") == "Application not found":
+                    return jsonify(result), 404
+                else:
+                    return jsonify(result), 500
+            return jsonify(result)
         else:
             result = policy_monitoring_service.scan_all_applications()
-        return jsonify(result)
+            if not result.get("success"):
+                return jsonify(result), 500
+            return jsonify(result)
     except Exception as e:
         current_app.logger.error(f"API scan compliance error: {str(e)}")
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
