@@ -25,7 +25,7 @@ def test_detail_shows_gap_plateau_progress_and_owner_panel(db_session, make_org,
     org, user = _org_with_user(db_session, make_org, "wpd-a")
     gap, plateau = _gap(db_session, org, "Billing gap"), _plateau(db_session, org, "Target state")
     wp = _package(org, "Billing rework", gap_id=gap.id, plateau_id=plateau.id,
-                  progress_percentage=40.0)
+                  progress_percentage=40.0, assigned_to="Ivo Reed")
 
     login_as(client, user)
     resp = client.get("/enterprise/implementation/work-packages/%d" % wp.id)
@@ -37,6 +37,7 @@ def test_detail_shows_gap_plateau_progress_and_owner_panel(db_session, make_org,
     assert plateau.name in html
     assert "40%" in html
     assert 'data-testid="owner-panel"' in html
+    assert 'data-testid="work-package-assignee">Ivo Reed<' in html
 
 
 def test_detail_shows_dash_when_progress_not_recorded(db_session, make_org, client, login_as):

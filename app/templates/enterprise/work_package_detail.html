@@ -28,6 +28,7 @@
       <div><dt class="text-muted-foreground">Priority</dt><dd class="font-medium">{{ (wp.priority or '—')|capitalize }}</dd></div>
       <div><dt class="text-muted-foreground">Start date</dt><dd class="font-medium">{{ wp.start_date.strftime('%d %b %Y') if wp.start_date else '—' }}</dd></div>
       <div><dt class="text-muted-foreground">Due date</dt><dd class="font-medium">{{ wp.end_date.strftime('%d %b %Y') if wp.end_date else '—' }}</dd></div>
+      <div><dt class="text-muted-foreground">Assigned to</dt><dd class="font-medium" data-testid="work-package-assignee">{{ wp.assigned_to or '—' }}</dd></div>
     </dl>
     <div>
       <div class="text-sm text-muted-foreground">Progress</div>
