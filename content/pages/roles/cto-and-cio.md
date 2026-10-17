@@ -1,8 +1,8 @@
 ---
 page_family: role
 role_group: technology-leadership
-state: held
-capture_status: awaiting_capture
+state: on_main
+capture_status: live
 cta: plans
 description: "Entelim's CIO dashboard for CTOs: a scorecard, rationalisation, roadmaps and investment analysis built on one shared model. Start free, see pricing today."
 source: app/utils/role_access.py (ROLE_CTO, SIDEBAR_ZONES, _MY_WORK_LINKS, _BOARD_ROLES),

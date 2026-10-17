@@ -1,8 +1,8 @@
 ---
 page_family: role
 role_group: portfolio-procurement-finance
-state: held
-capture_status: awaiting_capture
+state: on_main
+capture_status: live
 cta: plans
 description: "IT portfolio manager software from Entelim: score every application with the TIME model, find duplicates and track cost. Start free, see pricing today."
 ---
