@@ -43,6 +43,7 @@ DEMO_EMAIL = "demo@lantern-quay.example.com"
 IMG = REPO / "app" / "static" / "img"
 DPR = 2
 SUBJECT = "Calibration Ledger"
+ROWS_SHOWN = 3
 
 
 def _webp(png: bytes, dest: pathlib.Path) -> tuple[int, int]:
@@ -155,42 +156,72 @@ def capture_arb(browser, base, password, wide: bool) -> tuple[int, int]:
 
 
 def capture_home_impact(browser, base, password, wide: bool) -> tuple[int, int]:
-    """The 'what breaks if this fails' answer: the twin map centred on one system.
+    """The 'what breaks if this fails' answer: Ask open on the impact question, one answer shown.
 
     Taken at 740px viewport (desktop) so the crop is 644 CSS px wide -- the width
-    of the hero's figure column -- and shown there at 1:1.
+    of the hero's figure column -- and shown there at 1:1. The crop runs from the
+    page heading through the first answer row. An empty state, a failed recalculation
+    or a non-200 page is refused, not shipped.
     """
     vw, vh = (740, 1400) if wide else (390, 1800)
     ctx = browser.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=DPR)
     page = ctx.new_page()
     _login(page, base, DEMO_EMAIL, password)
-    page.goto(base + "/intelligence/twin-map", wait_until="networkidle")
+    response = page.goto(base + "/intelligence/ask", wait_until="networkidle")
     page.wait_for_timeout(1500)
     _dismiss_onboarding(page)
-    page.fill("#twin-picker-input", SUBJECT)
-    page.wait_for_selector("#twin-picker-listbox [role=option]", timeout=20000)
-    page.locator("#twin-picker-listbox [role=option]").first.click()
-    page.wait_for_timeout(2500)
+    if response is None or response.status != 200:
+        raise SystemExit("home impact: Ask answered HTTP %s" % (response.status if response else "none"))
+    page.click("#ask-question-impact")
+    page.fill("#ask-picker-input", SUBJECT)
+    page.wait_for_selector("#ask-picker-listbox [role=option]", timeout=20000)
+    page.locator("#ask-picker-listbox [role=option]").first.click()
+    try:
+        page.wait_for_selector("[data-ask-row]", timeout=30000)
+    except Exception:
+        raise SystemExit("home impact: no answer rows appeared (empty state)")
     button = page.get_by_role("button", name="Work them out now")
     if button.count():
-        button.click()
-        page.wait_for_timeout(10000)
-    page.locator("body").click(position={"x": 2, "y": 2})
+        # A 409 (busy) or 500 leaves the earlier rows on screen, so require the request to succeed.
+        try:
+            with page.expect_response(lambda r: "/derivation/recompute" in r.url, timeout=60000) as sent:
+                button.click()
+        except Exception:
+            raise SystemExit("home impact: recalculation did not complete")
+        if not sent.value.ok:
+            raise SystemExit("home impact: recalculation answered HTTP %s" % sent.value.status)
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(2000)
+        if page.locator("[data-recompute-button]:visible").count():
+            raise SystemExit("home impact: recalculation notice still shown")
+    page.wait_for_selector("[data-ask-row]", timeout=30000)
+    page.wait_for_timeout(1000)
     _tidy(page)
-    top = page.locator("#twin-picker-input").locator("xpath=ancestor::*[contains(@class,'rounded')][1]").bounding_box()
-    tech = page.get_by_text("Technology", exact=True).last.bounding_box()
+    # The other seven starter questions stay collapsed and would fill the crop with
+    # unrelated headings: fold them away so the one question asked and its answer are the picture.
+    page.evaluate(
+        """() => {
+          const open = document.querySelector('#ask-question-impact').closest('section');
+          for (const s of open.parentElement.querySelectorAll(':scope > section')) {
+            if (s !== open) s.style.display = 'none';
+          }
+          for (const a of document.querySelectorAll('main a[href*="twin-map"]')) {
+            if (!a.closest('[data-ask-row]')) a.style.display = 'none';
+          }
+        }"""
+    )
+    page.evaluate("window.scrollTo(0, 0)")
+    h1 = _box(page, "h1")
     main = _box(page, "main")
+    rows = page.locator("[data-ask-row]:visible")
+    last = _box(page, "[data-ask-row]:visible", min(rows.count(), ROWS_SHOWN) - 1)
     pad = 48 if wide else 16
-    bottom = tech["y"] - 6
-    if not wide:
-        # Phone: the map alone (the picker and controls would make the crop two screens tall).
-        goals = page.get_by_text("Goals", exact=True).last.bounding_box()
-        top = {"y": goals["y"] - 10}
+    top = h1["y"] - 16
     clip = {
         "x": main["x"] + pad,
-        "y": top["y"],
+        "y": top,
         "width": main["width"] - 2 * pad,
-        "height": bottom - top["y"],
+        "height": last["y"] + last["height"] + 12 - top,
     }
     name = "impact-answer.webp" if wide else "impact-answer-mobile.webp"
     size = _webp(_shoot(page, clip), IMG / "home" / name)
