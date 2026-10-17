@@ -98,26 +98,32 @@ def history_changes_page():
     from_raw = request.args.get("from")
     to_raw = request.args.get("to")
 
-    from_date, err = _parse_datetime_param(from_raw, "from")
-    if err:
-        return err
-    to_date, err = _parse_datetime_param(to_raw, "to")
-    if err:
-        return err
+    from_date, from_err = _parse_datetime_param(from_raw, "from")
+    to_date, to_err = _parse_datetime_param(to_raw, "to")
 
-    if from_date >= to_date:
-        return error_response(
-            "from must be before to",
-            code="INVALID_RANGE",
-            status_code=400,
-        )
+    error_message = None
+    if from_err:
+        # Extract the message from the error_response tuple
+        resp, _ = from_err
+        error_message = resp.get_json()["error"]["message"]
+    elif to_err:
+        resp, _ = to_err
+        error_message = resp.get_json()["error"]["message"]
+    elif from_date and to_date and from_date >= to_date:
+        error_message = "from must be before to"
 
     organization_id = current_organization_id()
     if organization_id is None:
-        return error_response(
-            "no tenant context for this request",
-            code="NO_TENANT_CONTEXT",
-            status_code=400,
+        error_message = "no tenant context for this request"
+
+    if error_message is not None:
+        # Render the template with the error message to show the not_available block
+        return render_template(
+            "intelligence/history_changes.html",
+            error=error_message,
+            from_date=from_date,
+            to_date=to_date,
+            changes=[],
         )
 
     from app.extensions import db
