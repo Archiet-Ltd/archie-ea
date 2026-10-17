@@ -88,9 +88,9 @@ opex, three-year TCO, ROI, payback and NPV; and a review board decision with its
 
 Sign your whole technology leadership team in the way they already sign in everywhere else: connect
 [single sign-on](/connectors/single-sign-on) over OpenID Connect or SAML, included from the Team
-plan. Carry the same questions into a conversation you're already having by connecting an
-[AI assistant](/connectors/ai-assistants) such as Claude, read-only and scoped to your own
-organisation's data, on every plan including the free one.
+plan. Carry the same questions into a conversation with
+[Entelim's own AI assistant](/connectors/ai-assistants), which answers from your own organisation's
+model and sends any change it proposes to an approval queue.
 
 ## Limits
 

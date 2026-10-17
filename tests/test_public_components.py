@@ -43,9 +43,8 @@ def test_the_pricing_page_opts_into_the_marketing_palette(pages):
     assert body and "theme-marketing" in body.group(1).split()
 
 
-def test_the_pricing_roadmap_is_the_shared_stepper(pages):
-    assert re.search(r'<ol class="public-stepper">', pages["/pricing"])
-    assert pages["/pricing"].count("public-stepper__body") == 4
+def test_the_pricing_page_carries_no_roadmap_stepper(pages):
+    assert "public-stepper" not in pages["/pricing"]
 
 
 @pytest.mark.parametrize("path", ["/", "/pricing"])

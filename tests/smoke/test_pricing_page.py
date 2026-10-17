@@ -104,11 +104,11 @@ def test_self_hosting_band_faq_and_roadmap(browser, live_server):
         assert 6 <= questions.count() <= 8
         questions.first.click()
         expect(faq.locator("details").first.locator("p")).to_be_visible()
-        # Roadmap dates are quarter-year only.
-        text = page.get_by_test_id("pricing-grow").inner_text()
+        # Pricing is a sell page: no dated roadmap language lives on it.
         import re
-        assert re.findall(r"Q[1-4] 20\d\d", text) == ["Q4 2026", "Q1 2027", "Q2 2027", "Q3 2027"]
-        assert not re.search(r"(January|February|March|April|May|June|July|August|September|October|November|December)", text)
+        text = page.locator("body").inner_text()
+        assert not re.search(r"Q[1-4] 20\d\d|opens in|arrives", text)
+        assert page.get_by_test_id("pricing-grow").count() == 0
     finally:
         context.close()
 

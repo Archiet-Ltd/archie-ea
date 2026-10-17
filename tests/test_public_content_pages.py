@@ -2772,3 +2772,115 @@ def test_new_role_page_appears_everywhere_with_no_other_edit(app):
         assert "https://entelim.org/roles/zzz-e2e-role</loc>" in client.get("/sitemap.xml").data.decode()
         rules = _parse_robots_rules(_ROBOTS_TXT_PATH.read_text(encoding="utf-8"))
         assert _robots_allows(rules, "/roles/zzz-e2e-role")
+
+
+_ROADMAP_VOICE = re.compile(
+    "|".join([
+        r"\bQ[1-4][\s-]?20\d\d\b",
+        r"\bH[12][\s-]?20\d\d\b",
+        r"\b(?:early|mid|late)[\s-]20\d\d\b",
+        r"\b(?:planned\s+for|expected\s+in|lands?\s+in|starts?\s+in)\s+(?:\w+\s+){0,2}20\d\d\b",
+        r"\bfollowing\s+through\s+20\d\d\b",
+        r"\bin\s+the\s+coming\s+months\b",
+        r"\bnot\s+yet\s+available\b",
+        r"\bupcoming\b",
+        r"\bopens\s+in\b",
+        r"\barrives?\b",
+        r"\bNext:",
+        r"\bquarters?\b",
+        r"\broadmaps?\b",
+        r"\b(?:later|coming|arriv\w*)\b[^.<>\n]{0,30}\b20\d\d\b",
+        r"\bwill\s+(?:ship|launch|arrive|be\s+available)\b",
+        r"\b(?:ships?|coming|available)\s+soon\b",
+    ]),
+    re.I,
+)
+# The module is legitimately called "Roadmaps" and lives at /modules/roadmaps;
+# only that exact name and link are exempt, so a lower-case or singular use
+# in prose still fails.
+_ROADMAP_MODULE_NAMES = ("Roadmaps", "/modules/roadmaps")
+_SELL_PAGE_SOURCES = [
+    "app/templates/main/index.html",
+    "app/templates/public/pricing.html",
+    "content/pages/site/about.md",
+    "content/pages/site/features.md",
+    "content/pages/connectors/ai-assistants.md",
+]
+# Pages that link into the assistant page: their roadmaps and quarters are
+# product vocabulary, so they are checked only for the MCP claim.
+_ASSISTANT_LINKING_PAGES = [
+    "content/pages/modules/digital-twin.md",
+    "content/pages/roles/cto-and-cio.md",
+    "content/pages/roles/enterprise-architects.md",
+]
+
+
+@pytest.mark.parametrize("path", _SELL_PAGE_SOURCES)
+def test_sell_pages_carry_no_roadmap_language(path):
+    """Roadmap voice lives only on the roadmap page, never on a page that
+    sells or explains the product as it is today."""
+    root = Path(__file__).resolve().parents[1]
+    text = (root / path).read_text(encoding="utf-8")
+    for name in _ROADMAP_MODULE_NAMES:
+        text = text.replace(name, "")
+    assert _ROADMAP_VOICE.findall(text) == [], path
+
+
+def test_roadmap_page_holds_the_dated_plan():
+    from app.services.public_pages import load_page
+
+    page = load_page("site", slug="changelog")
+    assert page is not None
+    for quarter in ("Q4 2026", "Q1 2027", "Q2 2027", "Q3 2027"):
+        assert quarter in page.body_html
+
+
+@pytest.mark.parametrize("path", _SELL_PAGE_SOURCES + _ASSISTANT_LINKING_PAGES)
+def test_sell_pages_do_not_claim_outside_assistants_connect_via_mcp(path):
+    """MCP access for outside assistants is not live; only the roadmap page may mention it."""
+    root = Path(__file__).resolve().parents[1]
+    text = (root / path).read_text(encoding="utf-8")
+    assert not re.search(r"\bMCP\b|Model Context Protocol", text, re.I), path
+
+
+def test_footer_link_to_the_roadmap_page_is_labelled_roadmap():
+    root = Path(__file__).resolve().parents[1]
+    footer = (root / "app/templates/components/public_footer.html").read_text(encoding="utf-8")
+    assert re.search(r'href="/changelog"[^>]*>\s*Roadmap\s*<', footer)
+
+
+@pytest.mark.parametrize("phrase", [
+    "Planned for 2027",
+    "Expected in 2027",
+    "Expected in late 2027",
+    "Lands in 2027",
+    "Starts in 2027",
+    "H1 2027",
+    "H2 2027",
+    "Q1 2027",
+    "Q3-2027",
+    "Q42027",
+    "Early 2027",
+    "mid-2027",
+    "Late 2027",
+    "An upcoming release",
+    "This is not yet available",
+    "Shipping in the coming months",
+    "Model health findings following through 2027",
+    "Coming in 2027",
+    "later in 2027",
+    "arrives in 2027",
+    "will ship soon",
+])
+def test_roadmap_voice_catches_forward_looking_phrasing(phrase):
+    assert _ROADMAP_VOICE.search(phrase), phrase
+
+
+@pytest.mark.parametrize("phrase", [
+    "Entelim launched in 2024 as an open-source project.",
+    "Available to every plan since 2025.",
+    "The first release shipped in 2023.",
+    "Licensed under AGPL-3.0 since 2024.",
+])
+def test_roadmap_voice_does_not_flag_past_tense_copy(phrase):
+    assert _ROADMAP_VOICE.search(phrase) is None, phrase

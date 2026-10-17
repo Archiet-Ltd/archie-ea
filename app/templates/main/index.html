@@ -2,9 +2,9 @@
 {% block full_title %}Entelim — The Company Brain for every enterprise{% endblock %}
 {% block meta_description %}
 <link rel="canonical" href="https://entelim.org/">
-<meta name="description" content="Entelim is the company brain: one living, explainable model of your enterprise that your people and your AI agents can both query and trust. Enterprise Intelligence Management, open source, self-host free under AGPL-3.0.">
+<meta name="description" content="Entelim is the company brain: one living, explainable model of your enterprise that your people can query and trust, with a built-in assistant that works within your permissions and approvals. Enterprise Intelligence Management, open source, self-host free under AGPL-3.0.">
 <meta property="og:title" content="Entelim — The Company Brain for every enterprise">
-<meta property="og:description" content="One living, explainable model of your enterprise, queryable by your people and your AI agents. Open source, self-host free, forever.">
+<meta property="og:description" content="One living, explainable model of your enterprise, with cited answers and a built-in assistant that works within your permissions. Open source, self-host free, forever.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://entelim.org/">
 <meta property="og:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
@@ -12,7 +12,7 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Entelim — The Company Brain for every enterprise">
-<meta name="twitter:description" content="One living, explainable model of your enterprise, queryable by your people and your AI agents. Open source, self-host free, forever.">
+<meta name="twitter:description" content="One living, explainable model of your enterprise, with cited answers and a built-in assistant that works within your permissions. Open source, self-host free, forever.">
 <meta name="twitter:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "Entelim is the company brain: Enterprise Intelligence Management, the open-source enterprise architecture and intelligence platform."}</script>
 {% if config.GOOGLE_SITE_VERIFICATION %}
@@ -48,8 +48,7 @@
 
     <p class="home-lead">
       One living, explainable model of your enterprise: its strategy, systems, data, people, money, risk,
-      suppliers and AI, kept current and turned into cited answers &mdash; built so that when your AI agents
-      need to know how your company actually works, there is a governed source to ask, not a guess. Entelim is
+      suppliers and AI, turned into cited answers &mdash; a governed source to ask, not a guess. Entelim is
       an open-source enterprise architecture and intelligence platform built on ArchiMate 3.2. Import your
       model and get a free, cited answer to what breaks if a system fails, in minutes.
     </p>
@@ -108,18 +107,16 @@
         Searching your documents faster doesn't fix knowledge that was never written down in a structured,
         checkable form in the first place, and a chatbot trained on whatever it can find repeats the same gaps
         with more confidence. What's missing is a living, explainable model of how the enterprise actually works
-        &mdash; its strategy, systems, data, people, money, risk and suppliers &mdash; kept current, and built so
-        both the people who run the business and the AI assistants working alongside them have one governed
-        source to ask instead of guessing.
+        &mdash; its strategy, systems, data, people, money, risk and suppliers &mdash; one that both the people who run the business and Entelim's own assistant can ask as a governed
+        source instead of guessing.
       </p>
       <p class="home-section-lead !mt-0">
         <strong>Enterprise Intelligence Management is the capability that builds that
         model.</strong> Customer relationship management gave every company one record of its customers.
         Enterprise resource planning gave it one record of its operations and finances. Enterprise Intelligence
         Management gives it one record of the enterprise itself: a company brain holding strategy, business,
-        applications, data, technology, people, money, risk, suppliers, operations and AI, kept current from the
-        systems that master each fact, and turned into answers, insights, recommendations and simulations for
-        every person who runs the business, and for the machines that work for them.
+        applications, data, technology, people, money, risk, suppliers, operations and AI, held in one model your team keeps up to date, and turned into cited answers for
+        every person who runs the business.
       </p>
       <p class="home-section-lead !mt-0">
         <strong>It is a capability, not a department.</strong> A startup is an
@@ -157,7 +154,7 @@
       </div>
       <div class="public-card" data-testid="home-proof-programmes">
         <h3 class="public-card-title">Which programmes touch it?</h3>
-        <p class="public-card-body">Every gap, roadmap and work package that changes it, in the same model as the estate it changes.</p>
+        <p class="public-card-body">Every gap, transition plan and work package that changes it, in the same model as the estate it changes.</p>
       </div>
       <div class="public-card" data-testid="home-proof-risk">
         <h3 class="public-card-title">Which risks reach it?</h3>
@@ -235,71 +232,33 @@
     </div>
 
     <p class="public-card-body mt-10">
-      Every capability is in the product today or has a quarter on the published roadmap.
+      Each capability lists what it delivers today.
       <a href="/features" class="public-link">See all eighteen in full</a>.
     </p>
   </div>
 </section>
 
-<!-- 4. Give your AI assistants one true source -->
+<!-- 4. The built-in assistant -->
 <section class="home-section">
   <div class="container px-4">
     <div class="max-w-3xl">
       <p class="home-eyebrow">AI assistants</p>
       <h2 class="home-h2">
-        Give your AI assistants one true source about your company.
+        An assistant that works within your permissions and your approvals.
       </h2>
       <p class="home-section-lead">
-        Your teams already ask AI assistants about your systems, suppliers, risks and plans. Without a source of
-        truth, those assistants guess. A company brain closes that loop: Entelim connects to AI assistants through
-        the Model Context Protocol, the open standard for linking assistants to tools and data, so an assistant
-        asks the same governed questions the platform's own screens ask and gets back answers that cite the
-        records they came from.
+        Your teams ask questions about your systems, suppliers, risks and plans. Entelim's built-in assistant
+        answers them from the same governed model the platform's own screens read, and cites the records
+        each answer came from.
       </p>
     </div>
     <ul class="home-emphasis-list mt-12 max-w-3xl">
-      <li><strong>Your administrator decides.</strong> Each assistant is approved for your organisation and access can be revoked at any time.</li>
-      <li><strong>Read first, change only with approval.</strong> Assistants start with read access; a suggested change arrives in your approval queue, and nothing changes until a person approves it.</li>
-      <li><strong>Every call on the record.</strong> Each request is logged with the assistant, the grant and the person it acted for.</li>
+      <li><strong>Changes are checked.</strong> Every change the assistant attempts passes a permission check against the person it acts for; a role without write access is refused.</li>
+      <li><strong>Changes wait for a person.</strong> A change the assistant proposes goes to your approval queue, and by default nothing is written until a person approves it.</li>
     </ul>
     <p class="home-note mt-8 max-w-3xl">
-      Read access for your AI assistants opens in Q1 2027. Today, Entelim's own assistant already works this way:
-      every action passes one permission check and every change waits for approval.
+      Entelim does not connect to an AI assistant you run elsewhere; the assistant described here is Entelim's own.
     </p>
-  </div>
-</section>
-
-<!-- 5. How the company brain grows -->
-<section class="home-section">
-  <div class="container px-4">
-    <div class="max-w-3xl">
-      <p class="home-eyebrow">Roadmap</p>
-      <h2 class="home-h2">
-        How the company brain grows.
-      </h2>
-    </div>
-    <ol class="public-stepper mt-12">
-      <li>
-        <p class="home-eyebrow">Today</p>
-        <p class="public-stepper__name">Modelled</p>
-      </li>
-      <li>
-        <p class="home-eyebrow">Q1 2027</p>
-        <p class="public-stepper__name">Synchronised</p>
-      </li>
-      <li>
-        <p class="home-eyebrow">Q2 2027</p>
-        <p class="public-stepper__name">Operational</p>
-      </li>
-      <li>
-        <p class="home-eyebrow">Q3 2027</p>
-        <p class="public-stepper__name">Predictive</p>
-      </li>
-      <li>
-        <p class="home-eyebrow">Q1 2028</p>
-        <p class="public-stepper__name">Self-maintaining</p>
-      </li>
-    </ol>
   </div>
 </section>
 
@@ -468,7 +427,7 @@
       <div class="public-faq mt-12">
         <details>
           <summary>What is Enterprise Intelligence Management?{{ faq_chevron() }}</summary>
-          <p>The capability that builds your company brain: one living, explainable model of your enterprise, kept current from the systems that master each fact, and turned into cited answers for every person who runs the business.</p>
+          <p>The capability that builds your company brain: one living, explainable model of your enterprise, held in one place your team keeps up to date, and turned into cited answers for every person who runs the business.</p>
         </details>
         <details>
           <summary>How is this different from a company-wide search or a chatbot over your documents?{{ faq_chevron() }}</summary>
@@ -488,7 +447,7 @@
         </details>
         <details>
           <summary>Can my AI assistant use it?{{ faq_chevron() }}</summary>
-          <p>Read access for your own AI assistants, through the open Model Context Protocol, opens in Q1 2027. Today, Entelim's own assistant already works through the same permission and approval model.</p>
+          <p>Not an assistant you run elsewhere: Entelim does not connect to one. It has its own built-in assistant, which answers from your model. Every change that assistant attempts passes a permission check, and by default a change it proposes waits in an approval queue until a person approves it.</p>
         </details>
       </div>
     </div>

@@ -83,7 +83,7 @@ Yes. Open Model as of and pick any past date to see every element and relationsh
 
 ### Can an AI assistant query it?
 
-Yes. Once you connect an assistant under your own account, it reads your model through a read-only connection and can answer what stops if something fails, which risks threaten it, and which programmes and initiatives it serves. See [connecting an AI assistant](/connectors/ai-assistants) for how it is set up and what it can and cannot do.
+Entelim's own assistant, AI Chat, can: it answers what stops if something fails, which risks threaten it, and which programmes and initiatives it serves, from the same model. Entelim does not connect to an AI assistant you run elsewhere. See [Entelim's AI assistant](/connectors/ai-assistants) for what it can do and what stands between it and a change to your model.
 
 ### Is Ask included in the free plan?
 
