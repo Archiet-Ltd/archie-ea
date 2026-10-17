@@ -36,7 +36,9 @@ def test_public_pages_share_one_craft_system(browser, live_server, path):
         assert page.goto(live_server + path, timeout=PAGE_TIMEOUT).status == 200
         m = page.evaluate(_MEASURE)
         assert abs(m["linkMid"] - m["signinMid"]) <= 2, m  # P-01
-        assert m["signupH"] == 44 and m["signupRadius"] == "8px", m  # P-13 button
+        # The public button system is 40px tall with a 14px radius. The navbar moves to the 36px
+        # size in the next change, which updates this line.
+        assert m["signupH"] == 40 and m["signupRadius"] == "14px", m
         assert m["h1"] >= 2.75 * m["body"], m  # P-13 type scale
         assert m["docH"] > m["viewH"] and not m["mainScrolls"], m  # P-16 document scroll
         if path != "/":
