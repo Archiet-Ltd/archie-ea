@@ -31,6 +31,7 @@ CONTENT_PAGES = [
     "contact",
     "features",
     "docs",
+    "changelog",
 ]
 
 

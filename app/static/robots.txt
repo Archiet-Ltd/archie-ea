@@ -18,6 +18,7 @@ Allow: /docs
 Allow: /features
 Allow: /pricing
 Allow: /privacy
+Allow: /changelog
 Allow: /security
 Allow: /team-annual-onboarding
 Allow: /terms
