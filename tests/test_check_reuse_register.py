@@ -1019,7 +1019,7 @@ LAYOUT_ONLY = [
     "@media (min-width: 768px) { .pricing-page h2 { font-size: 1.875rem; } }",
     ".pricing-page .pp-section { margin-top: 4rem; }",
     ".pricing-page .public-card { position: relative; overflow: hidden; }",
-    "a.link { color: red; } p.lead { margin: 0 0 1rem; }",
+    "a.cta { color: red; } p.lead { margin: 0 0 1rem; }",
 ]
 
 
