@@ -12,6 +12,8 @@ set -eu
 flask --app manage init-db
 flask --app manage schema-upgrade
 flask --app manage reconcile-schema
+# Default global compliance catalogue (six frameworks and their controls). Idempotent: adds only what is missing and never edits an existing row, so it is safe on every deploy. Non-fatal: adoption screens show an honest empty state until it runs.
+flask --app manage seed-compliance-catalogue || echo 'WARN compliance catalogue seed skipped - the default frameworks and controls are not loaded until it runs'
 flask --app manage migrate-connector-credentials || echo 'WARN connector credential migration skipped - ServiceNow/Lucidchart secrets saved before this fix remain only in the retired encrypted columns; ServiceNowConnectorService and LucidchartConnectorService read the new OrgCredentialVault store and will treat those organisations as unconfigured until it runs'
 flask --app manage backfill-servicenow-connector-config || echo 'WARN ServiceNow connector config backfill skipped - organisations configured before the connector-framework change remain invisible to the new /admin/connectors page until it runs'
 flask --app manage migrate-connector-row-secrets || echo 'WARN Jira/M365 connector row-secret migration skipped - a legacy connector row still carries its secret only in ConnectorConfig.config instead of the vault until it runs'

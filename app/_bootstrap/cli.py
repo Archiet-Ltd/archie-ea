@@ -70,6 +70,14 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"\u26a0\ufe0f  Failed to register ADM deliverables seed CLI command: {e}")
 
+    # Default compliance catalogue seed CLI command
+    try:
+        from app.commands import seed_compliance_catalogue
+        seed_compliance_catalogue.init_app(app)
+        app.logger.info("\u2705 Compliance catalogue seed CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"\u26a0\ufe0f  Failed to register compliance catalogue seed CLI command: {e}")
+
     # ArchiMate backfill CLI command
     try:
         from app.commands import backfill_archimate_elements
