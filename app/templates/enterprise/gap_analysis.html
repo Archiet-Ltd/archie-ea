@@ -63,6 +63,7 @@
                             {{ sort_th('priority', 'Priority') }}
                             {{ sort_th('resolution_status', 'Status') }}
                             {{ sort_th('impact', 'Impact') }}
+                            <th class="text-left p-3 font-medium">Work packages</th>
                             <th class="text-left p-3 font-medium">Actions</th>
                         </tr>
                     </thead>
@@ -96,6 +97,14 @@
                                 {% endif %}
                             </td>
                             <td class="p-3 text-sm text-muted-foreground">{{ gap.impact|default('Unknown') }}</td>
+                            <td class="p-3 text-sm" data-testid="gap-work-packages-{{ gap.id }}">
+                                {% for wp in (work_packages_by_gap or {}).get(gap.id, []) %}
+                                <div><a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wp.id) if 'implementation_planning.work_package_detail' in flask.current_app.view_functions else '#' }}"
+                                        class="text-primary hover:underline" data-testid="gap-work-package-link">{{ wp.name|default('—', true) }}</a></div>
+                                {% else %}
+                                <span class="text-muted-foreground">—</span>
+                                {% endfor %}
+                            </td>
                             <td class="p-3">
                                 <button type="button" class="px-3 py-1.5 text-sm rounded-md border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
                                         @click="convertToWorkPackage({{ gap.id }}, {{ (gap.name|default('this gap'))|tojson }}, $event.target)"
@@ -108,7 +117,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="6" class="p-6 text-center text-muted-foreground">No gaps identified</td>
+                            <td colspan="7" class="p-6 text-center text-muted-foreground">No gaps identified</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -192,7 +201,7 @@
             convertToWorkPackage(gapId, gapName) {
                 if (this.busyId !== null) return;
                 this.busyId = gapId;
-                Platform.fetch.post('/api/roadmap/gaps/' + gapId + '/work-packages', { template: 'auto' })
+                Platform.fetch.post('/capability-map/api/roadmap/gaps/' + gapId + '/work-packages', { template: 'auto' })
                     .then((data) => {
                         if (data && data.success === false) {
                             Platform.toast.error(data.error || 'Could not convert "' + gapName + '" to a work package.');
