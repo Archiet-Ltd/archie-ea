@@ -1089,6 +1089,16 @@ _WORK_PACKAGE_LINKS = {
 }
 
 
+# plateau -> gaps recorded against it in the gap register, on top of the gaps of the
+# work packages that realise it. "Future State" is left with none on purpose.
+_PLATEAU_GAP_LINKS = {
+    "Baseline Architecture": ["Data quality gap", "Documentation currency gap"],
+    "Current State": ["Monitoring coverage gap", "Skills shortage gap"],
+    "Transition State 1": ["Inventory visibility gap", "Integration coverage gap"],
+    "Target Architecture": ["Event backbone resilience gap"],
+}
+
+
 def _recorded_progress(status, estimated, actual):
     """The percent complete a project office would have recorded for this demonstration row."""
     if status == "completed":
@@ -1122,6 +1132,28 @@ def _link_work_packages(org_id):
             work_package_service.update_work_package(wp.id, organization_id=org_id, **fields)
             linked += 1
     return linked
+
+
+def _link_plateau_gaps(org_id):
+    """Record which gaps each demonstration plateau carries, through the gap register's
+    one writer. Idempotent. Returns how many links were created."""
+    from app.models.implementation_migration import Gap, Plateau
+    from app.services import gap_register_service
+
+    gaps = {g.name: g for g in db.session.query(Gap).filter(Gap.organization_id == org_id)}
+    plateaus = {p.name: p for p in db.session.query(Plateau).filter(Plateau.organization_id == org_id)}
+    created = 0
+    for plateau_name, gap_names in _PLATEAU_GAP_LINKS.items():
+        plateau = plateaus.get(plateau_name)
+        if plateau is None:
+            continue
+        for gap_name in gap_names:
+            gap = gaps.get(gap_name)
+            if gap is None or plateau in gap.plateaus:
+                continue
+            gap_register_service.link_gap_to_plateau(gap.id, plateau.id, org_id)
+            created += 1
+    return created
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1676,6 +1708,9 @@ def seed_demo_company() -> dict:
 
         # ── 13. which work package addresses which gap, and which plateau it realises ──
         stats["work_package_links_created"] = _link_work_packages(org_id)
+
+        # ── 14. which gaps each plateau carries in the gap register ──────
+        stats["plateau_gap_links_created"] = _link_plateau_gaps(org_id)
 
         db.session.commit()
 
