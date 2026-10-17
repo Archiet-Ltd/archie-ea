@@ -1,7 +1,8 @@
 {# Simple public navbar without sidebar toggle
    smoke-coverage-ok: brand_name variable with default fallback; backward-compatible, no visual change for existing pages.
 #}
-<header class="flex items-center justify-between h-16 px-6 bg-background border-b border-border">
+<header class="public-navbar">
+  <div class="container public-navbar__inner">
     <div class="flex items-center gap-8">
         <!-- Logo/Brand -->
         <a href="{{ url_for('main.index') }}" class="flex items-center hover:opacity-90 transition-opacity" aria-label="{{ brand_name|default(config.APP_NAME) }} home">
@@ -9,18 +10,18 @@
         </a>
 
         <!-- Primary public nav: hidden on narrow screens, the footer carries these links there -->
-        <nav aria-label="Primary" class="hidden md:flex items-center gap-6">
-            <a href="/features" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
-            <a href="/use-cases" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Use cases</a>
-            <a href="/roles" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Roles</a>
-            <a href="/vs" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Compare</a>
-            <a href="/pricing" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
-            <a href="/about" class="text-sm text-muted-foreground hover:text-foreground transition-colors">About</a>
-            <a href="/docs" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Docs</a>
+        <nav aria-label="Primary" class="hidden md:flex items-center gap-1">
+            <a href="/features" class="public-nav-link">Features</a>
+            <a href="/use-cases" class="public-nav-link">Use cases</a>
+            <a href="/roles" class="public-nav-link">Roles</a>
+            <a href="/vs" class="public-nav-link">Compare</a>
+            <a href="/pricing" class="public-nav-link">Pricing</a>
+            <a href="/about" class="public-nav-link">About</a>
+            <a href="/docs" class="public-nav-link">Docs</a>
         </nav>
     </div>
 
-    <div class="flex items-center gap-6">
+    <div class="flex items-center gap-2">
         {% if current_user.is_authenticated %}
             <!-- Authenticated User Menu -->
             <div class="relative" id="userMenuContainer">
@@ -60,14 +61,15 @@
             </div>
         {% else %}
             <!-- Unauthenticated User Links -->
-            <a href="{{ url_for('account.login') }}" class="text-sm font-medium text-foreground hover:text-primary transition-colors">
+            <a href="{{ url_for('account.login') }}" class="public-btn public-btn--outline public-btn--sm">
                 Sign In
             </a>
-            <a href="{{ url_for('account.register') }}" class="public-btn bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+            <a href="{{ url_for('account.register') }}" class="public-btn public-btn--primary public-btn--sm">
                 Sign Up
             </a>
         {% endif %}
     </div>
+  </div>
 </header>
 
 <script>

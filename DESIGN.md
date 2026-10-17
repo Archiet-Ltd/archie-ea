@@ -119,11 +119,36 @@ dark-theme users. `--info` tracks blue in both.
 `.theme-marketing` and `.dark .theme-marketing` in `shadcn_tokens.css` hold a neutral palette for the
 public marketing pages, scoped as a class rather than a second token file. It is opt-in: set
 `{% block body_theme %}theme-marketing{% endblock %}` in a template that extends
-`layouts/public_base.html`. No template sets it yet; the marketing templates that will are filled in
-as that work lands. Login, registration, MFA, OAuth consent, shared artefacts and the demo page keep
+`layouts/public_base.html`. The homepage (`main/index.html`) and the pricing page (`public/pricing.html`) set it; the other marketing templates follow as that work lands. Login, registration, MFA, OAuth consent, shared artefacts and the demo page keep
 the product palette (no `body_theme` override). No other CSS, SCSS or template file may declare
 `--background`, `--primary`, `--border` or any other core token — the `reuse-register` gate enforces
 this (`docs/reuse-register.yml`, entry `design-tokens`).
+
+### Public site: the homepage classes
+
+`app/static/css/public_site.css` is the one home for the homepage classes, all under `.public-site`, each carrying
+the reference home-page value named in its comment: `.public-btn--lg` / `--primary` / `--outline` (40px, 14px/20px
+500, radius `--radius` + 4px, 3px focus ring), `.home-display` (72/72, 700, -0.025em; 60 and 48 below),
+`.home-lead` (20/32, 18/32 on phones, 48rem), `.home-section` (80px block padding, 1px border-colour divider, 1px
+rails from 640px), `.home-eyebrow` (mono 12/16, 0.2em), `.home-h2` (48/48, 30/36 on phones, 600),
+`.home-section-lead` (18/32), `.public-card` (16px radius, 1px border, 28px padding) with `.public-card-title` (24/32, 600),
+`.public-card-body` (14/24) and `.public-card-eyebrow`, `.public-link` (underline, 4px offset), `.home-emphasis-list` and
+`.home-note` (2px left rules), `.public-stepper`, `.public-table` (16px cells, 48rem minimum), `.public-faq`
+(divider-separated, rotating chevron) and `.home-closing` (96px, centred). `.public-btn`, `.public-card`,
+`.public-table`, `.public-faq` and `.public-stepper` are the public site's one button, card, table, FAQ and stepper,
+used by `/` and `/pricing` and registered in `docs/reuse-register.yml`; the authenticated app's equivalents are the
+`components/button.html`, `card.html`, `table.html` and `stepper.html` macros, and neither side defines a copy of the
+other. The FAQ chevron is the `faq_chevron` macro in `components/public_faq.html`. A page adds only layout to these
+classes (the pricing page's plan-card columns and sticky comparison header). New marketing pages use these classes
+rather than defining their own. The product window is shown at its captured CSS width (the `<img>` keeps its
+width attribute; never set `width: auto` on it).
+
+The shared chrome and hub pages use the same file: `.public-navbar` (sticky, z-index 40, 16px block padding, 1px bottom
+border, Tailwind `container` inside; 69px tall) with `.public-nav-link` (36px hit area, 15px/22.5px, 400, radius + 4px,
+accent hover, 3px focus outline) and `.public-btn--sm` (36px) for the sign-in outline and sign-up primary buttons;
+`.public-footer` (80px top, 40px bottom, `container` inside); `.public-inner-page` (80px block padding, centred 56rem
+column) on the hub pages `/vs`, `/use-cases`, `/roles` and `/connectors`. No public template hand-rolls a pill; the
+`badge(size='pill')` macro is the only one.
 
 ---
 
