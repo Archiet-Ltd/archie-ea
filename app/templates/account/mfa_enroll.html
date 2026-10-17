@@ -1,4 +1,4 @@
-{% extends 'layouts/public_base.html' %}
+{% extends 'layouts/public_base.html' %} {# smoke-coverage-ok: covered by tests/test_mfa_enroll_qr.py, which renders this template through the real /account/mfa-challenge route and asserts the inline QR SVG; the page is reachable only mid-login and SmokeTestingConfig bypasses MFA (ADMIN_MFA_BYPASS), so no browser journey can load it #}
 {% block title %}Set up two-factor authentication{% endblock %}
 {% from 'components/accessibility_helpers.html' import skip_to_main, live_region with context %}
 
@@ -13,6 +13,7 @@
   </p>
 
   <div class="mt-6 rounded-md border border-border bg-muted/30 p-4">
+    <div class="mb-3">{{ qr_svg|safe }}</div>
     <p class="text-xs text-muted-foreground">Setup key (enter manually if you cannot scan a QR code):</p>
     <code class="mt-1 block break-all text-sm font-mono" data-testid="mfa-setup-key">{{ secret }}</code>
     <p class="mt-3 text-xs text-muted-foreground">Or open this link on a device with your authenticator app:</p>
