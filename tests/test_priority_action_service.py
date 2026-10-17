@@ -140,21 +140,87 @@ def test_blocked_by_another_programme_is_listed(db_session, make_org, tenant_ctx
 
 
 def test_covered_gaps_follow_uncovered_ones_and_closed_gaps_drop_out(db_session, make_org, tenant_ctx):
-    from app.models.implementation_migration import WorkPackage
-    from app.models.relationship_tables import gap_work_packages
+    from app.services import work_package_service
 
     org = make_org("a")
     with tenant_ctx(org.id):
         uncovered = _gap(db_session, org, "Uncovered gap", "high")
         covered = _gap(db_session, org, "Covered gap", "high")
         _gap(db_session, org, "Closed gap", "critical", status="resolved")
-        legacy_wp = WorkPackage(name="Legacy wp", organization_id=org.id)
-        db_session.add(legacy_wp)
-        db_session.flush()
-        db_session.execute(gap_work_packages.insert().values(gap_id=covered.id, work_package_id=legacy_wp.id))
+        work_package_service.create_work_package(
+            organization_id=org.id, name="Linked wp", gap_id=covered.id)
         result = svc.prioritised_actions(org.id, today=TODAY)
     assert _names(result) == [uncovered.name, covered.name]
     assert result["rows"][1]["action"].startswith("Close the Covered gap")
+
+
+def test_unlinking_through_the_writer_uncovers_the_gap(db_session, make_org, tenant_ctx):
+    from app.services import work_package_service
+
+    org = make_org("a")
+    with tenant_ctx(org.id):
+        gap = _gap(db_session, org, "Gap to unlink", "high")
+        wp = work_package_service.create_work_package(
+            organization_id=org.id, name="Linked wp", gap_id=gap.id)
+        linked = svc.prioritised_actions(org.id, today=TODAY)
+        work_package_service.update_work_package(wp.id, organization_id=org.id, gap_id=None)
+        unlinked = svc.prioritised_actions(org.id, today=TODAY)
+    assert linked["rows"][0]["action"].startswith("Close the Gap to unlink")
+    assert unlinked["rows"][0]["action"].startswith("Link a work package to the Gap to unlink")
+
+
+def test_another_organisations_link_does_not_cover_a_gap(db_session, make_org, tenant_ctx):
+    from app.services import work_package_service
+
+    org, other = make_org("a"), make_org("b")
+    with tenant_ctx(other.id):
+        foreign_gap = _gap(db_session, other, "Foreign gap", "high")
+        work_package_service.create_work_package(
+            organization_id=other.id, name="Foreign wp", gap_id=foreign_gap.id)
+    with tenant_ctx(org.id):
+        own = _gap(db_session, org, "Own gap", "high")
+        result = svc.prioritised_actions(org.id, today=TODAY)
+    assert _names(result) == [own.name]
+    assert result["rows"][0]["action"].startswith("Link a work package to the Own gap")
+
+
+@pytest.mark.parametrize("done", ["Completed", "completed", "Cancelled", "Canceled"])
+def test_form_spellings_of_finished_work_are_not_listed(db_session, make_org, tenant_ctx, done):
+    org = make_org("a")
+    with tenant_ctx(org.id):
+        _wp(db_session, org, "Finished late", end=datetime(2026, 1, 1), progress=10, status=done)
+        result = svc.prioritised_actions(org.id, today=TODAY)
+    assert result["rows"] == []
+
+
+@pytest.mark.parametrize("spelling", ["On Hold", "on-hold", "ON HOLD", "on_hold"])
+def test_form_spellings_of_on_hold_are_listed(db_session, make_org, tenant_ctx, spelling):
+    org = make_org("a")
+    with tenant_ctx(org.id):
+        _wp(db_session, org, "Parked", status=spelling, progress=20)
+        result = svc.prioritised_actions(org.id, today=TODAY)
+    assert _names(result) == ["Parked"]
+    assert result["rows"][0]["action"] == "Restart Parked: on hold at 20 percent done"
+    assert "on hold" in result["rows"][0]["why"]
+
+
+def test_a_completed_dependency_does_not_block(db_session, make_org, tenant_ctx):
+    from app.models.vendor.vendor_organization import EnterpriseInitiative
+    from app.services import work_package_service
+
+    org = make_org("a")
+    with tenant_ctx(org.id):
+        first = EnterpriseInitiative(name="P1 %s" % uuid.uuid4().hex[:6], organization_id=org.id)
+        second = EnterpriseInitiative(name="P2 %s" % uuid.uuid4().hex[:6], organization_id=org.id)
+        db_session.add_all([first, second])
+        db_session.flush()
+        waiting = _wp(db_session, org, "Waiting work", end=datetime(2027, 1, 1))
+        done = _wp(db_session, org, "Done work", end=datetime(2027, 1, 1), status="Completed")
+        waiting.enterprise_initiative_id, done.enterprise_initiative_id = first.id, second.id
+        work_package_service.add_dependency(waiting.id, done.id, organization_id=org.id)
+        db_session.flush()
+        result = svc.prioritised_actions(org.id, today=TODAY)
+    assert result["rows"] == []
 
 
 def test_only_open_risks_and_at_most_five(db_session, make_org, tenant_ctx):
@@ -207,7 +273,7 @@ def test_statement_count_is_bounded_whatever_the_row_count(db_session, make_org,
         finally:
             event.remove(db.engine, "before_cursor_execute", _count)
     assert result["total"] == 30 + 30 + svc.RISK_LIMIT
-    assert len(statements) <= 4, statements
+    assert len(statements) <= 5, statements  # gaps, their links, work packages, dependencies, risks
 
 
 def test_rule_sentence_is_one_sentence():

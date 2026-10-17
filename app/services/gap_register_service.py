@@ -346,20 +346,13 @@ _RESOLVED_GAP_STATUSES = ("resolved", "closed", "complete", "completed")
 
 def open_gaps_with_coverage(organization_id: int) -> List[Tuple[Gap, bool]]:
     """Every open capability gap of the organisation, each with whether a work
-    package addresses it. One statement, same notion of "addressed" as
-    get_gaps_not_addressed."""
-    from sqlalchemy import exists
+    package addresses it. Two statements: the gaps, then their links read in bulk
+    through the one link reader of the work package store (the relationships the
+    work package writer records)."""
+    from app.services import work_package_service
 
-    from app.models.implementation_migration import WorkPackage
-
-    addressed = (
-        exists()
-        .where(gap_work_packages.c.gap_id == Gap.id)
-        .where(gap_work_packages.c.work_package_id == WorkPackage.id)
-        .where(WorkPackage.organization_id == organization_id)
-    )
-    return (
-        db.session.query(Gap, addressed.label("addressed"))
+    gaps = (
+        Gap.query
         .filter(
             Gap.organization_id == organization_id,
             Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
@@ -370,6 +363,8 @@ def open_gaps_with_coverage(organization_id: int) -> List[Tuple[Gap, bool]]:
         )
         .all()
     )
+    covered = work_package_service.gap_ids_with_work_packages([g.id for g in gaps], organization_id)
+    return [(gap, gap.id in covered) for gap in gaps]
 
 
 def count_gaps(

@@ -29,7 +29,11 @@
             </div>
             <div class="flex items-center gap-2 shrink-0">
                 {% call badge('neutral') %}{{ row.kind_label }}{% endcall %}
-                {% call badge('warning' if row.severity in ('Critical', 'High') else 'secondary') %}{{ row.severity or '—' }}{% endcall %}
+                {% if row.severity in ('Critical', 'High') %}
+                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-warning/10 text-warning-emphasis border-warning/30">{{ row.severity }}</span>
+                {% else %}
+                {% call badge('secondary') %}{{ row.severity or '—' }}{% endcall %}
+                {% endif %}
             </div>
         </li>
         {% endfor %}

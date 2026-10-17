@@ -94,15 +94,14 @@ def _gap_rows(organization_id: int) -> List[Dict[str, Any]]:
 
 
 def _work_package_rows(organization_id: int, today: date) -> List[Dict[str, Any]]:
-    resolved = ("completed", "cancelled")
     candidates = {}
     for wp in work_package_service.query_for(organization_id).all():
-        if wp.status in resolved:
+        if work_package_service.is_resolved(wp.status):
             continue
         overdue = 0
         if wp.end_date is not None and wp.end_date.date() < today and (wp.progress_percentage or 0) < 100:
             overdue = (today - wp.end_date.date()).days
-        if overdue or wp.status == "on_hold":
+        if overdue or work_package_service.status_key(wp.status) == "on_hold":
             candidates[wp.id] = [wp, overdue, []]
     for entry in work_package_service.blocked_by_another_programme(organization_id):
         wp = entry["work_package"]
@@ -122,7 +121,7 @@ def _work_package_rows(organization_id: int, today: date) -> List[Dict[str, Any]
             action = "Restart %s: on hold at %s percent done" % (wp.name, pct)
         if blockers:
             reasons.append("waiting on work in another programme")
-        if wp.status == "on_hold":
+        if work_package_service.status_key(wp.status) == "on_hold":
             reasons.append("on hold")
         sev = _severity_label(wp.priority)
         lead = ("%s priority" % sev) if sev else "Priority not recorded"

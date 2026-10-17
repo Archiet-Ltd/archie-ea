@@ -18,6 +18,7 @@ belongs to). A dependency is an id in ``work_dependencies``.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -29,6 +30,18 @@ from app.models.unified_work_package import UnifiedWorkPackage
 # so the writer checks shape, not a closed list, and leaves the vocabulary alone.
 # A dependency that is finished or abandoned no longer blocks anything.
 _RESOLVED = ("completed", "cancelled")
+
+
+def status_key(status: Any) -> str:
+    """A stored status as one lowercase, underscore-separated spelling, so the
+    forms' "On Hold" and "Completed" and the API's "on_hold" compare equal."""
+    return re.sub(r"[\s\-]+", "_", str(status or "").strip().lower())
+
+
+def is_resolved(status: Any) -> bool:
+    """Completed or cancelled (either spelling of cancelled), in any supported
+    spelling of the status."""
+    return status_key(status) in _RESOLVED or status_key(status) == "canceled"
 
 _EDITABLE = (
     "name", "description", "status", "priority", "assigned_to", "business_capability",
@@ -500,6 +513,16 @@ def work_package_ids_for_gap(gap_id: int, organization_id: int) -> List[int]:
     return sorted({row[0] for row in rows if row[2] == _GAP_REL})
 
 
+def gap_ids_with_work_packages(gap_ids, organization_id: int) -> set:
+    """Which of these gaps have at least one of this organisation's work packages
+    linked, from the relationships in one query."""
+    gap_ids = list(gap_ids)
+    if not gap_ids:
+        return set()
+    rows = _link_rows(organization_id, gap_ids=gap_ids)
+    return {row[4] for row in rows if row[2] == _GAP_REL}
+
+
 def plateau_work_package_ids(plateau_ids, organization_id: int) -> Dict[int, set]:
     """{plateau id: {ids of this organisation's work packages that realise it}}."""
     out: Dict[int, set] = {pid: set() for pid in plateau_ids}
@@ -728,7 +751,7 @@ def blocked_by_another_programme(organization_id: int) -> List[Dict[str, Any]]:
     by_id = {r.id: r for r in rows}
     result = []
     for wp in rows:
-        if wp.enterprise_initiative_id is None or wp.status in _RESOLVED:
+        if wp.enterprise_initiative_id is None or is_resolved(wp.status):
             continue
         blockers = []
         for dep_id in _dependency_ids(wp):
@@ -737,7 +760,7 @@ def blocked_by_another_programme(organization_id: int) -> List[Dict[str, Any]]:
                 dep is not None
                 and dep.enterprise_initiative_id is not None
                 and dep.enterprise_initiative_id != wp.enterprise_initiative_id
-                and dep.status not in _RESOLVED
+                and not is_resolved(dep.status)
             ):
                 blockers.append(dep)
         if blockers:
