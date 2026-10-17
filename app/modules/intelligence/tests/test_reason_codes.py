@@ -120,11 +120,12 @@ _EXPECTED = {
     "no_seed_elements",
     "seed_limit_reached",
     "rows_truncated",
+    "control_evidence_expired",
 }
 
 
-def test_reason_codes_has_exactly_fifty_two_members():
-    assert len(REASON_CODES) == 52
+def test_reason_codes_has_exactly_fifty_three_members():
+    assert len(REASON_CODES) == 53
     assert REASON_CODES == frozenset(_EXPECTED)
 
 

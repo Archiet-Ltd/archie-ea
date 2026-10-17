@@ -132,7 +132,7 @@
                     <p class="font-medium text-foreground">Controls on this path</p>
                     <ul class="mt-1 space-y-1">
                         {% for control in row.controls %}
-                        <li class="text-foreground" data-control-id="{{ control.control_id }}">{{ control.code or '—' }} {{ control.name or '' }}: {{ control.implementation_status | replace('_', ' ') }}{% if control.evidence_url_recorded or control.verified %}, evidence recorded{% else %}, no evidence recorded{% endif %}</li>
+                        <li class="text-foreground" data-control-id="{{ control.control_id }}">{{ control.code or '—' }} {{ control.name or '' }}: {{ control.implementation_status | replace('_', ' ') }}{% if control.evidence_state == 'expired' %}, evidence expired{% elif control.evidence_state == 'missing' %}, no evidence recorded{% elif control.evidence_state == 'not_required' %}, evidence not required{% elif control.evidence_state == 'undated' %}, evidence recorded with no end date{% else %}, evidence recorded{% endif %}</li>
                         {% endfor %}
                     </ul>
                     {% else %}

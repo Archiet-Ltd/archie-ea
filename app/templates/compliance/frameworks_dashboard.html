@@ -53,6 +53,8 @@
         </div>
     </div>
 
+    {% include 'compliance/partials/_evidence_gaps.html' %}
+
     {% if load_error %}
     <div class="rounded-lg border border-destructive/30 bg-destructive/10 px-5 py-4 text-sm text-destructive-emphasis" role="alert">
         Could not load compliance data. Please try again.
@@ -60,7 +62,7 @@
     {% endif %}
 
     {# Frameworks table — each row expands in place to list its controls,
-       reusing the existing GET /api/compliance/frameworks/<id>/controls
+       reusing the existing GET /dashboard/api/compliance/frameworks/<id>/controls
        endpoint (previously reachable only via curl). No new backend. #}
     <div class="bg-card text-card-foreground rounded-lg border border-border overflow-hidden" x-data="frameworksTable()">
         <div class="px-5 py-4 border-b border-border">
@@ -163,7 +165,7 @@
                     return;
                 }
                 this.loadingId = frameworkId;
-                Platform.fetch.get('/api/compliance/frameworks/' + frameworkId + '/controls')
+                Platform.fetch.get('/dashboard/api/compliance/frameworks/' + frameworkId + '/controls')
                     .then((data) => {
                         this.controlsByFramework[frameworkId] = Array.isArray(data) ? data : [];
                     })
