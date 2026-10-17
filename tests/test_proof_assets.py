@@ -67,6 +67,20 @@ def test_home_hero_declares_the_captured_pixels(app, client):
         assert int(tag.group(1) or tag.group(2)) == h, f"{name}: declared height differs from the file's {h}px"
 
 
+def test_home_hero_shows_the_ask_answer_not_the_twin_map(app, client):
+    """The hero image is the Ask question and answer; its caption must say so."""
+    html = client.get("/").get_data(as_text=True)
+    hero = html[html.index('data-testid="home-hero-figure"'):]
+    hero = hero[: hero.index("</figure>")]
+    assert "What breaks if Calibration Ledger fails?" in hero
+    assert "Twin map" not in hero
+    source = (public_pages.STATIC_ROOT.parent.parent / "scripts" / "capture_proof_assets.py").read_text(encoding="utf-8")
+    block = source[source.index("def capture_home_impact"): source.index("def main(")]
+    assert "/intelligence/ask" in block
+    assert "/intelligence/twin-map" not in block
+    assert "/derivation/recompute" in block, "the capture must wait for the recalculation to succeed"
+
+
 def test_home_hero_chip_is_short_on_phones_and_has_one_primary_action(app, client):
     html = client.get("/").get_data(as_text=True)
     assert "Open source &middot; Self-host free" in html
