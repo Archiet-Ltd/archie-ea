@@ -143,6 +143,13 @@ classes (the pricing page's plan-card columns and sticky comparison header). New
 rather than defining their own. The product window is shown at its captured CSS width (the `<img>` keeps its
 width attribute; never set `width: auto` on it).
 
+The shared chrome and hub pages use the same file: `.public-navbar` (sticky, z-index 40, 16px block padding, 1px bottom
+border, Tailwind `container` inside; 69px tall) with `.public-nav-link` (36px hit area, 15px/22.5px, 400, radius + 4px,
+accent hover, 3px focus outline) and `.public-btn--sm` (36px) for the sign-in outline and sign-up primary buttons;
+`.public-footer` (80px top, 40px bottom, `container` inside); `.public-inner-page` (80px block padding, centred 56rem
+column) on the hub pages `/vs`, `/use-cases`, `/roles` and `/connectors`. No public template hand-rolls a pill; the
+`badge(size='pill')` macro is the only one.
+
 ---
 
 ## Typography

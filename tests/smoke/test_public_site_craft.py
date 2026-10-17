@@ -19,7 +19,8 @@ _MEASURE = """() => {
         p = document.querySelector('main .public-page-content p') || document.querySelector('main p');
   const main = document.querySelector('main#main-content');
   return {
-    linkMid: mid(link), signinMid: mid(signin), signupH: R(signup).height, signupRadius: cs(signup).borderRadius,
+    linkMid: mid(link), signinMid: mid(signin), signupH: R(signup).height, signinH: R(signin).height,
+    navSticky: cs(document.querySelector('header.public-navbar')).position, signupRadius: cs(signup).borderRadius,
     h1: parseFloat(cs(h1).fontSize), body: parseFloat(cs(p).fontSize),
     docH: document.documentElement.scrollHeight, viewH: innerHeight,
     mainScrolls: main.scrollHeight > main.clientHeight + 1 && ['auto', 'scroll'].includes(cs(main).overflowY),
@@ -36,8 +37,9 @@ def test_public_pages_share_one_craft_system(browser, live_server, path):
         assert page.goto(live_server + path, timeout=PAGE_TIMEOUT).status == 200
         m = page.evaluate(_MEASURE)
         assert abs(m["linkMid"] - m["signinMid"]) <= 2, m  # P-01
-        assert m["signupH"] == 44 and m["signupRadius"] == "8px", m  # P-13 button
-        assert m["h1"] >= 2.75 * m["body"], m  # P-13 type scale
+        assert m["signupH"] == 36 and m["signupRadius"] == "14px", m  # navbar sign-up: default-size primary button
+        assert m["signinH"] == 36 and m["navSticky"] == "sticky", m  # sign-in is an outline button of the same size
+        assert m["h1"] >= 3 * m["body"], m  # P-13 type scale
         assert m["docH"] > m["viewH"] and not m["mainScrolls"], m  # P-16 document scroll
         if path != "/":
             assert m["wide"] > 720 and m["prose"] <= 690, m  # P-15
