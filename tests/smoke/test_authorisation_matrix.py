@@ -562,6 +562,37 @@ def test_data_entity_page_rejects_anonymous(page, live_server, seeded_data_entit
 
 
 @pytest.fixture(scope="module")
+def seeded_work_package(seeded):
+    """A real work package in the seeded org, for the detail page's <id> path."""
+    from app import create_app, db
+    from app.services import work_package_service
+
+    app = create_app("testing")
+    with app.app_context():
+        wp = work_package_service.create_work_package(
+            organization_id=seeded["ids"]["org"], name="Auth-matrix probe package")
+        db.session.commit()
+        return wp.id
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_work_package_detail_page_authorisation(archetype, page, live_server, seeded, seeded_work_package):
+    """GET /enterprise/implementation/work-packages/<id> carries @login_required and no
+    role gate, like the list it is opened from; the row is fenced by organisation."""
+    _login(page, live_server, seeded["emails"][archetype])
+    path = "/enterprise/implementation/work-packages/%d" % seeded_work_package
+    actual = _observe(page, live_server, path)
+    assert actual == ALLOWED, "%s could not reach %s: expected ALLOWED" % (archetype, path)
+
+
+def test_work_package_detail_page_rejects_anonymous(page, live_server, seeded_work_package):
+    path = "/enterprise/implementation/work-packages/%d" % seeded_work_package
+    response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert "/account/login" in page.url or (response is not None and response.status >= 400), (
+        "%s was served without signing in" % path)
+
+
+@pytest.fixture(scope="module")
 def seeded_interface_initiative(seeded):
     """A real TechnologyRoadmapInitiative wired to an ArchitectureModel in the
     seeded org, for the comparison POST routes (D5) -- provision_comparison

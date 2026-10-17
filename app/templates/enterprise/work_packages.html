@@ -19,7 +19,8 @@
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6" x-data="workPackagesTable()" x-cloak>
+<div class="space-y-6" x-data="workPackagesTable()" x-cloak
+     data-detail-url-template="{{ url_for('enterprise.work_package_detail', work_package_id=0) }}">
 
   {# Header #}
   <div class="flex items-center justify-between">
@@ -105,6 +106,7 @@
                 <i data-lucide="arrow-up-down" class="h-3.5 w-3.5"></i>
               </button>
             </th>
+            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" scope="col">Gap</th>
             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" scope="col">Status</th>
             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" scope="col">Priority</th>
             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" scope="col">Progress</th>
@@ -115,7 +117,7 @@
         <tbody class="[&_tr:last-child]:border-0">
           {# Loading state #}
           <tr x-show="loading" x-cloak>
-            <td colspan="8" class="px-4 py-12 text-center">
+            <td colspan="9" class="px-4 py-12 text-center">
               <div class="flex flex-col items-center gap-2">
                 <i data-lucide="loader-2" class="h-6 w-6 text-muted-foreground animate-spin"></i>
                 <p class="text-sm text-muted-foreground">Loading...</p>
@@ -124,11 +126,11 @@
           </tr>
           {# Error state #}
           <tr x-show="!loading && errorMsg" x-cloak>
-            <td colspan="8" class="px-4 py-12 text-center text-destructive-emphasis text-sm" x-text="errorMsg"></td>
+            <td colspan="9" class="px-4 py-12 text-center text-destructive-emphasis text-sm" x-text="errorMsg"></td>
           </tr>
           {# Empty state #}
           <tr x-show="!loading && !errorMsg && items.length === 0" x-cloak>
-            <td colspan="8" class="px-4 py-12 text-center">
+            <td colspan="9" class="px-4 py-12 text-center">
               <div class="flex flex-col items-center gap-2">
                 <i data-lucide="inbox" class="h-8 w-8 text-muted-foreground/40"></i>
                 <p class="text-sm text-muted-foreground">No work packages found</p>
@@ -148,9 +150,12 @@
               </td>
               <td class="px-3 align-middle tabular-nums text-muted-foreground text-sm" x-text="row.row_number"></td>
               <td class="px-4 py-3 align-middle">
-                <div class="font-medium" x-text="row.name"></div>
+                <a class="font-medium text-primary hover:underline" data-testid="work-package-link"
+                   :href="$root.dataset.detailUrlTemplate.replace(/0$/, row.id)" x-text="row.name"></a>
                 <div class="text-sm text-muted-foreground" x-text="row.summary || ''"></div>
               </td>
+              <td class="px-4 py-3 align-middle text-sm" data-testid="work-package-gap"
+                  x-text="(row.gaps && row.gaps.length) ? row.gaps.join(', ') : '—'"></td>
               <td class="px-4 py-3 align-middle">
                 <span class="px-2 py-1 text-xs rounded-full" :class="statusClass(row.status)" x-text="row.status || 'Planned'"></span>
               </td>
@@ -158,12 +163,13 @@
                 <span class="px-2 py-1 text-xs rounded-full" :class="priorityClass(row.priority)" x-text="row.priority || 'Normal'"></span>
               </td>
               <td class="px-4 py-3 align-middle">
-                <div class="w-24">
+                <div class="w-24" x-show="row.percent_complete != null">
                   <div class="h-2 bg-secondary rounded-full overflow-hidden">
                     <div class="h-full bg-primary" :style="'width: ' + progressWidth(row.percent_complete)"></div>
                   </div>
-                  <span class="text-xs text-muted-foreground" x-text="(row.percent_complete || 0) + '%'"></span>
+                  <span class="text-xs text-muted-foreground" x-text="Math.round(row.percent_complete) + '%'"></span>
                 </div>
+                <span class="text-sm text-muted-foreground" x-show="row.percent_complete == null">—</span>
               </td>
               <td class="px-4 py-3 align-middle text-sm text-muted-foreground" x-text="row.target_date || 'TBD'"></td>
               <td class="px-4 py-3 align-middle text-right" @click.stop>

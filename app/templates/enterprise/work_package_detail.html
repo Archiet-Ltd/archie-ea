@@ -1,0 +1,78 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'components/page_header.html' import page_header %}
+
+{% block title %}{{ wp.name }}{% endblock %}
+
+{% block breadcrumb %}
+{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
+{{ breadcrumb_nav(items=[
+    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
+    {'text': 'Enterprise Architecture', 'href': url_for('enterprise.enterprise_dashboard')},
+    {'text': 'Work Packages', 'href': url_for('enterprise.work_packages')},
+    {'text': wp.name, 'current': true}
+]) }}
+{% endblock %}
+
+{% block content %}
+{% set progress = wp.progress_percentage %}
+<div class="space-y-6">
+  {{ page_header(
+      title=wp.name,
+      description=wp.summary or '',
+      actions=[{'text': 'Back to work packages', 'href': url_for('enterprise.work_packages'), 'variant': 'outline'}]
+  ) }}
+
+  <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-6 space-y-4">
+    <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+      <div><dt class="text-muted-foreground">Status</dt><dd class="font-medium" data-testid="work-package-status">{{ (wp.status or '—')|replace('_', ' ')|capitalize }}</dd></div>
+      <div><dt class="text-muted-foreground">Priority</dt><dd class="font-medium">{{ (wp.priority or '—')|capitalize }}</dd></div>
+      <div><dt class="text-muted-foreground">Start date</dt><dd class="font-medium">{{ wp.start_date.strftime('%d %b %Y') if wp.start_date else '—' }}</dd></div>
+      <div><dt class="text-muted-foreground">Due date</dt><dd class="font-medium">{{ wp.end_date.strftime('%d %b %Y') if wp.end_date else '—' }}</dd></div>
+    </dl>
+    <div>
+      <div class="text-sm text-muted-foreground">Progress</div>
+      {% if progress is not none %}
+      <div class="flex items-center gap-3" data-testid="work-package-progress">
+        <div class="h-2 w-48 bg-secondary rounded-full overflow-hidden">
+          <div class="h-full bg-primary" style="width: {{ [[progress, 0]|max, 100]|min }}%"></div>
+        </div>
+        <span class="text-sm font-medium">{{ progress|round|int }}%</span>
+      </div>
+      {% else %}
+      <div class="text-sm font-medium" data-testid="work-package-progress">—</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-6" data-testid="work-package-gaps">
+      <h2 class="font-semibold mb-3">Gaps addressed</h2>
+      {% if gaps %}
+      <ul class="space-y-1 text-sm">
+        {% for gap_id, gap_name in gaps %}
+        <li>
+          {% if 'archimate_crud.detail_element' in flask.current_app.view_functions %}
+          <a class="text-primary hover:underline" href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap_id) }}">{{ gap_name }}</a>
+          {% else %}{{ gap_name }}{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-sm text-muted-foreground">No gap is linked to this work package.</p>
+      {% endif %}
+    </div>
+    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-6" data-testid="work-package-plateaus">
+      <h2 class="font-semibold mb-3">Plateaus realised</h2>
+      {% if plateaus %}
+      <ul class="space-y-1 text-sm">
+        {% for plateau_id, plateau_name in plateaus %}<li>{{ plateau_name }}</li>{% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-sm text-muted-foreground">No plateau is linked to this work package.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {% include 'implementation_planning/_owner_panel.html' %}
+</div>
+{% endblock %}

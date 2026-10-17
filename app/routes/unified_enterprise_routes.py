@@ -27,6 +27,7 @@ from flask import (
     jsonify,
     redirect,
     render_template,
+    abort,
     request,
     url_for,
 )
@@ -545,6 +546,35 @@ def work_packages():
     return render_template("enterprise/work_packages.html")
 
 
+@enterprise_bp.route("/implementation/work-packages/<int:work_package_id>")
+@login_required
+def work_package_detail(work_package_id):
+    """One work package: its progress, the gaps it addresses, the plateaus it
+    realises, and its owners and approvals. Another organisation's id is a 404."""
+    org_id = current_organization_id()
+    wp = work_package_service.get_work_package(work_package_id, org_id)
+    if wp is None:
+        abort(404)
+    links = work_package_service.plateau_and_gap_links([wp], org_id)[wp.id]
+    gaps = _names_for(Gap, links["gap_ids"])
+    plateaus = _names_for(Plateau, links["plateau_ids"])
+    return render_template(
+        "enterprise/work_package_detail.html",
+        wp=wp,
+        gaps=gaps,
+        plateaus=plateaus,
+        owner_panel=work_package_service.owner_and_approval_panel(wp, org_id),
+    )
+
+
+def _names_for(model, ids):
+    """[(id, name)] for these ids; the tenant filter on the model fences the org."""
+    if not ids:
+        return []
+    rows = model.query.filter(model.id.in_(ids)).order_by(model.name, model.id).all()
+    return [(row.id, row.name) for row in rows]
+
+
 @enterprise_bp.route("/api/work-packages", methods=["GET"])
 @login_required
 def api_list_work_packages():
@@ -576,16 +606,21 @@ def api_list_work_packages():
     paginated = q.paginate(page=page, per_page=per_page, error_out=False)
     offset = (page - 1) * per_page
 
+    links = work_package_service.plateau_and_gap_links(
+        paginated.items, current_organization_id())
+    gap_names = dict(_names_for(
+        Gap, sorted({g for entry in links.values() for g in entry["gap_ids"]})))
     items = []
     for idx, wp in enumerate(paginated.items):
         items.append({
             "id": wp.id,
+            "gaps": [gap_names[g] for g in links[wp.id]["gap_ids"] if g in gap_names],
             "row_number": offset + idx + 1,
             "name": wp.name or "",
             "summary": wp.summary,
             "status": wp.status or "Planned",
             "priority": wp.priority or "Normal",
-            "percent_complete": wp.progress_percentage or 0,
+            "percent_complete": wp.progress_percentage,
             "target_date": str(wp.end_date.date()) if wp.end_date else None,
             "togaf_phase": wp.togaf_phase or "",
             "created_at": str(wp.created_at) if wp.created_at else None,
