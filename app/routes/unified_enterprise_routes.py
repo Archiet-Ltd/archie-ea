@@ -876,10 +876,17 @@ def plateaus():
         )
 
 
+# Severity is the recorded rating of a gap (Gap.priority is a default no one sets),
+# ordered by seriousness; the kind is what sort of gap it is.
+_SEVERITY_ORDER = db.case(
+    {"critical": 0, "high": 1, "medium": 2, "low": 3}, value=Gap.severity, else_=4
+)
 _GAP_SORT_COLUMNS = {
     "name": Gap.name,
-    "gap_type": Gap.gap_type,
-    "priority": Gap.priority,
+    "gap_kind": Gap.gap_kind,
+    "gap_type": Gap.gap_kind,
+    "severity": _SEVERITY_ORDER,
+    "priority": _SEVERITY_ORDER,
     "resolution_status": Gap.resolution_status,
     "impact": Gap.impact,
 }
@@ -904,7 +911,7 @@ def gap_analysis():
     column = _GAP_SORT_COLUMNS.get(sort_key, Gap.name)
     order = column.desc() if direction == "desc" else column.asc()
     try:
-        from app.services.gap_register_service import count_gaps, get_gaps_not_addressed
+        from app.services.gap_register_service import gap_summary_counts, get_gaps_not_addressed
 
         gaps = (
             Gap.query.filter(Gap.gap_kind != "plateau_transition")
@@ -912,14 +919,18 @@ def gap_analysis():
             .limit(500)
             .all()
         )
-        total_gap_count = count_gaps(current_org_id())
-        not_addressed_gaps = get_gaps_not_addressed(current_org_id())
+        org_id = current_org_id()
+        counts = gap_summary_counts(org_id)
+        total_gap_count = counts["total"]
+        summary = {k: counts[k] for k in ("critical", "in_progress", "resolved")}
+        not_addressed_gaps = get_gaps_not_addressed(org_id)
         work_packages_by_gap = work_package_service.work_packages_for_gaps(
             [g.id for g in gaps], current_org_id())
 
         return render_template(
             "enterprise/gap_analysis.html", gaps=gaps,
             work_packages_by_gap=work_packages_by_gap,
+            summary=summary,
             total_gap_count=total_gap_count,
             not_addressed_gaps=not_addressed_gaps,
             current_sort=sort_key if sort_key in _GAP_SORT_COLUMNS else "name",
