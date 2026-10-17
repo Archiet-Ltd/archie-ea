@@ -1046,6 +1046,9 @@ NOT_READY_ENDPOINTS = {
     "architecture.investment_priorities": "asks for setup before it shows anything",
     "strategic.investment_matrix": "asks for setup before it shows anything",
     "intelligence_ui.history_changes_page": "answers with a raw error without a date range",
+    # A part of a page, not a route: the dashboard's CFO tab totals solution cost estimates, a
+    # different store from the application cost every other screen shows. Same list, same switch.
+    "dashboard_v2.overview#cfo_tab": "cost totals come from a different store than the application cost shown elsewhere",
 }
 
 

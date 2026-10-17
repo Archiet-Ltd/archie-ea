@@ -396,3 +396,18 @@ entries:
       - ApplicationOwnership (organisation-unit ownership; a separate model)
       - an owner text column on the element
     note: the store-agreement gate already reports these disagreeing; the consolidation branch decides.
+
+  - id: portfolio-figures
+    concept: The headline figures on the launch screens (applications with an owner, annual application cost, vendor count, gap count)
+    status: active
+    canonical:
+      path: app/services/portfolio_figures.py
+      symbols: [owner_figure, cost_figure, vendor_count, gap_count]
+    reuse: >
+      A screen or API that shows one of these four numbers calls portfolio_figures. Owners come from
+      has_assigned_owner, cost from application_cost_accessor, gaps from gap_register_service.count_gaps and
+      vendors from the one shared vendor catalogue. Do not count them again in a route or template. A figure
+      that cannot be measured is None and renders as a dash.
+    must_not_create:
+      - id: portfolio-figure-reader
+        regex: 'def\s+_?(owner|cost|vendor|gap)_figure\s*\('

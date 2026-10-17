@@ -958,24 +958,15 @@ def get_tco_cost_tiers():
         # Use total_cost_of_ownership for annual TCO
         cost_col = ApplicationComponent.total_cost_of_ownership
 
-        # Portfolio-level counts for data completeness
-        total_portfolio = db.session.query(func.count(ApplicationComponent.id)).filter(
-            ApplicationComponent.lifecycle_status.in_(
-                ["operational", "testing", "development", "deprecated"]
-            )
-        ).scalar() or 0
-        apps_with_tco = db.session.query(func.count(ApplicationComponent.id)).filter(
-            ApplicationComponent.lifecycle_status.in_(
-                ["operational", "testing", "development", "deprecated"]
-            ),
-            cost_col.isnot(None),
-        ).scalar() or 0
-        portfolio_tco = db.session.query(func.sum(cost_col)).filter(
-            ApplicationComponent.lifecycle_status.in_(
-                ["operational", "testing", "development", "deprecated"]
-            ),
-            cost_col.isnot(None),
-        ).scalar() or 0
+        # Portfolio-level counts for data completeness: the one cost figure
+        # (portfolio_figures), the same total the dashboard shows.
+        from app.services import portfolio_figures
+        from flask_login import current_user as _cu
+
+        _cost = portfolio_figures.cost_figure(getattr(_cu, "organization_id", None))
+        total_portfolio = _cost["application_count"] or 0
+        apps_with_tco = _cost["applications_with_cost"] or 0
+        portfolio_tco = _cost["total_annual_cost"] or 0
 
         # Get counts per tier
         results = []
