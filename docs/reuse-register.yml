@@ -396,3 +396,203 @@ entries:
       - ApplicationOwnership (organisation-unit ownership; a separate model)
       - an owner text column on the element
     note: the store-agreement gate already reports these disagreeing; the consolidation branch decides.
+
+  - id: public-button
+    concept: The public site button (primary and outline, 40px, 2px solid focus outline)
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-btn", ".public-btn--primary", ".public-btn--outline", ".public-btn--lg"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use these classes from
+      public_site.css; the authenticated app uses components/button.html. Neither side defines a copy of the
+      other. Do not write a second rule for this component in another stylesheet or an inline <style>; a
+      page-specific layout is a rule on the page's own wrapper that does not restyle the shared component.
+      The gate flags a class rule whose name contains the component word, bare or prefixed, other than the
+      canonical class; and any rule outside public_site.css whose selector names the canonical class and
+      sets padding, border, radius, font, line height, letter spacing, text transform or decoration, colour,
+      background, shadow, outline, height or opacity (layout properties such as display, grid, flex, width,
+      margin, position and overflow are allowed). Not seen by the gate: attribute selectors; review catches
+      those.
+    must_not_create:
+      - id: second-button-rule
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-btn(?:--[\w]+)?)(?![\w-]))(?:[\w-]*[-_])?(?:btn|button)(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+      - id: restyled-button
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-(?:btn)(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline|height|min-height|opacity)[\w-]*\s*:'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+    known_exceptions:
+      - path: app/static/css/vendor/
+        reason: third-party stylesheets, not ours to change
+      - path: app/static/css/tailwind-output*
+        reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
+
+  - id: public-link
+    concept: The public site inline link (underlined, 4px offset, solid focus outline)
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-link"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use this class from
+      public_site.css for inline links; the authenticated app has its own link styles. Do not write a second
+      inline-link rule in another stylesheet or an inline <style>. The focus indicator is a 2px solid
+      outline in the foreground colour, which survives forced-colours mode; do not replace it with a
+      shadow-only ring.
+    must_not_create:
+      - id: second-link-rule
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-link)(?![\w-]))(?:[\w-]*[-_])?link(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates/public, app/templates/main, app/templates/layouts]
+        suffixes: [.css, .html]
+      - id: restyled-link
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-link(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline)[\w-]*\s*:'
+        scope: [app/static/css, app/templates/public, app/templates/main, app/templates/layouts]
+        suffixes: [.css, .html]
+    known_exceptions:
+      - path: app/static/css/accessibility.css
+        reason: authenticated-app skip-link and focus styles, not the public inline link
+      - path: app/static/css/app.css
+        reason: authenticated-app link styles, not the public inline link
+      - path: app/static/css/vendor/
+        reason: third-party stylesheets, not ours to change
+      - path: app/static/css/tailwind-output*
+        reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
+
+  - id: public-card
+    concept: The public site card, with its title and body
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-card", ".public-card-title", ".public-card-body"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use these classes from
+      public_site.css; the authenticated app uses components/card.html. Neither side defines a copy of the
+      other. Do not write a second rule for this component in another stylesheet or an inline <style>; a
+      page-specific layout is a rule on the page's own wrapper that does not restyle the shared component.
+      The gate flags a class rule whose name contains the component word, bare or prefixed, other than the
+      canonical class; and any rule outside public_site.css whose selector names the canonical class and
+      sets padding, border, radius, font, line height, letter spacing, text transform or decoration, colour,
+      background, shadow, outline, height or opacity (layout properties such as display, grid, flex, width,
+      margin, position and overflow are allowed). Not seen by the gate: attribute selectors; review catches
+      those.
+    must_not_create:
+      - id: second-card-rule
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-card(?:--[\w]+|-title|-body|-eyebrow)?)(?![\w-]))(?:[\w-]*[-_])?(?:card)(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+      - id: restyled-card
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-(?:card)(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline|height|min-height|opacity)[\w-]*\s*:'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+    known_exceptions:
+      - path: app/static/css/vendor/
+        reason: third-party stylesheets, not ours to change
+      - path: app/static/css/tailwind-output*
+        reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
+
+  - id: public-table
+    concept: The public site data table (fits its container or scrolls in a wrapper)
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-table"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use these classes from
+      public_site.css; the authenticated app uses components/table.html. Neither side defines a copy of the
+      other. Do not write a second rule for this component in another stylesheet or an inline <style>; a
+      page-specific layout is a rule on the page's own wrapper that does not restyle the shared component.
+      The gate flags a class rule whose name contains the component word, bare or prefixed, other than the
+      canonical class; and any rule outside public_site.css whose selector names the canonical class and
+      sets padding, border, radius, font, line height, letter spacing, text transform or decoration, colour,
+      background, shadow, outline, height or opacity (layout properties such as display, grid, flex, width,
+      margin, position and overflow are allowed). Not seen by the gate: attribute selectors and the bare
+      Tailwind utility names .table*; review catches those.
+    must_not_create:
+      - id: second-table-rule
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-table(?:--[\w]+)?|table|table-(?:auto|fixed|cell|row|row-group|column|column-group|caption|header-group|footer-group)|inline-table)(?![\w-]))(?:[\w-]*[-_])?(?:table|table-wrap)(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+      - id: restyled-table
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-(?:table)(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline|height|min-height|opacity)[\w-]*\s*:'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+    known_exceptions:
+      - path: app/static/css/vendor/
+        reason: third-party stylesheets, not ours to change
+      - path: app/static/css/tailwind-output*
+        reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
+
+  - id: public-faq
+    concept: The public site FAQ (details and summary with a rotating chevron)
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-faq"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use these classes from
+      public_site.css; the authenticated app has no FAQ component and does not use this class. Neither side
+      defines a copy of the other. The chevron icon is the faq_chevron macro in components/public_faq.html.
+      Do not write a second rule for this component in another stylesheet or an inline <style>; a page-
+      specific layout is a rule on the page's own wrapper that does not restyle the shared component. The
+      gate flags a class rule whose name contains the component word, bare or prefixed, other than the
+      canonical class; and any rule outside public_site.css whose selector names the canonical class and
+      sets padding, border, radius, font, line height, letter spacing, text transform or decoration, colour,
+      background, shadow, outline, height or opacity (layout properties such as display, grid, flex, width,
+      margin, position and overflow are allowed); for this entry also any summary selector. Not seen by the
+      gate: attribute selectors and :is()/:where() wrappers before summary; review catches those.
+    must_not_create:
+      - id: second-faq-rule
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-faq)(?![\w-]))(?:[\w-]*[-_])?(?:faq|accordion)(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+      - id: restyled-faq
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-(?:faq)(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline|height|min-height|opacity)[\w-]*\s*:'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+      - id: second-details-marker
+        regex: 'summary::-webkit-details-marker'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+      - id: second-summary-rule
+        regex: '^[ \t]*(?:[^\n{}<=;''"()]*[\s>+~,])?summary(?=\s*[{,>+~\[]|::?[a-z])[^\n{}<=;''"]*(?:\{|,[ \t]*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+    known_exceptions:
+      - path: app/static/css/vendor/
+        reason: third-party stylesheets, not ours to change
+      - path: app/static/css/tailwind-output*
+        reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
+
+  - id: public-stepper
+    concept: The public site roadmap stepper (a row of stages with a line and a dot)
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-stepper"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use these classes from
+      public_site.css; the authenticated app uses components/stepper.html. Neither side defines a copy of
+      the other. Do not write a second rule for this component in another stylesheet or an inline <style>; a
+      page-specific layout is a rule on the page's own wrapper that does not restyle the shared component.
+      The gate flags a class rule whose name contains the component word, bare or prefixed, other than the
+      canonical class; and any rule outside public_site.css whose selector names the canonical class and
+      sets padding, border, radius, font, line height, letter spacing, text transform or decoration, colour,
+      background, shadow, outline, height or opacity (layout properties such as display, grid, flex, width,
+      margin, position and overflow are allowed). Not seen by the gate: attribute selectors and the bare
+      Tailwind utility name .grow; review catches those.
+    must_not_create:
+      - id: second-stepper-rule
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-stepper(?:__[\w]+)?|grow(?:-0)?|flex-grow(?:-0)?)(?![\w-]))(?:[\w-]*[-_])?(?:stepper|steps|roadmap|grow|timeline)(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+      - id: restyled-stepper
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-(?:stepper)(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline|height|min-height|opacity)[\w-]*\s*:'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+    known_exceptions:
+      - path: app/static/css/vendor/
+        reason: third-party stylesheets, not ours to change
+      - path: app/static/css/tailwind-output*
+        reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
