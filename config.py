@@ -461,6 +461,11 @@ class Config:
     # ENABLED 2026-04-02: Quick wins from NORTH_STAR_ASSESSMENT.md Part 10
     ENABLE_NORTH_STAR_NAV = _env_bool("ENABLE_NORTH_STAR_NAV", True)
 
+    # Pages not ready for the soft launch are left out of the sidebar, the
+    # All-modules directory and search while this is on (the pages stay
+    # reachable by address). Turn it off to list them again.
+    HIDE_NOT_READY_MODULES = _env_bool("HIDE_NOT_READY_MODULES", True)
+
     # North Star Navigation Phase 2 (NORTH-STAR-002)
     # Complete ArchiMate 3.2 layer-based navigation with all 55 element types.
     # When enabled: 6-section IA, layer-first architecture, Portfolio/Architecture separation.

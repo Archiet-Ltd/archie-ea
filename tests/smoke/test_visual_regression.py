@@ -255,3 +255,5 @@ def test_write_baseline_when_asked(captured):
             fh.write(result)
         written += 1
     print("visual baseline written: %d screen(s)" % written)
+
+# Touched only to force the full browser-journey CI matrix on the arb-1440 baseline re-record.
