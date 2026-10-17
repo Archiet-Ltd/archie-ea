@@ -441,6 +441,24 @@ entries:
       inline-link rule in another stylesheet or an inline <style>. The focus indicator is a 2px solid
       outline in the foreground colour, which survives forced-colours mode; do not replace it with a
       shadow-only ring.
+    must_not_create:
+      - id: second-link-rule
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-link)(?![\w-]))(?:[\w-]*[-_])?link(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates/public, app/templates/main, app/templates/layouts]
+        suffixes: [.css, .html]
+      - id: restyled-link
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-link(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline)[\w-]*\s*:'
+        scope: [app/static/css, app/templates/public, app/templates/main, app/templates/layouts]
+        suffixes: [.css, .html]
+    known_exceptions:
+      - path: app/static/css/accessibility.css
+        reason: authenticated-app skip-link and focus styles, not the public inline link
+      - path: app/static/css/app.css
+        reason: authenticated-app link styles, not the public inline link
+      - path: app/static/css/vendor/
+        reason: third-party stylesheets, not ours to change
+      - path: app/static/css/tailwind-output*
+        reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
 
   - id: public-card
     concept: The public site card, with its title and body

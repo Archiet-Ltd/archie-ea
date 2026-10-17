@@ -18,7 +18,7 @@
 @media (min-width: 768px) { .pricing-page h2 { font-size: 1.875rem; } }
 .pricing-page .pp-sub { color: var(--pp-muted); max-width: 42.5rem; line-height: 1.7; margin: 0 0 2rem; }
 
-/* Focus: the toggle labels and links in the lead have no shared class; buttons, summaries and .public-link use the shared outline. */
+/* Focus: the toggle labels and links in the lead have no shared class; buttons, summaries and the shared inline link use the shared outline. */
 #pp-bill-year:focus-visible ~ .pp-toggle label[for="pp-bill-year"], #pp-bill-month:focus-visible ~ .pp-toggle label[for="pp-bill-month"] { outline: 2px solid hsl(var(--foreground)); outline-offset: 2px; }
 .pricing-page .pp-lead a:focus-visible { outline: 2px solid hsl(var(--foreground)); outline-offset: 2px; border-radius: 0.25rem; }
 
