@@ -14,8 +14,8 @@ icon: user-x
 **For scale-up CTOs and VPs of Engineering.**
 
 Pick any system on Ask and ask who is accountable for it. Entelim lists every recorded owner of that
-system, and of the systems it affects downstream, each with the ownership type, the organisation unit
-and the contact on record. If nothing is recorded, the answer says so instead of naming someone. The
+system, and of the systems it affects downstream, one card per distinct owner. If nothing is recorded
+anywhere in that chain, the answer says so instead of naming someone. The
 Org Chart and the Enterprise RACI matrix sit next to it for the wider picture of who answers for
 what.
 
@@ -29,12 +29,7 @@ system, who is on the hook, and is anyone?"
 ## What Entelim answers
 
 On the **Ask** page, choose "Who's accountable for ___, and can they take on more?", pick a system
-with the picker, and the answer appears as one card per owner:
-
-- the **ownership type** — Primary, Backup, Technical, Business or Steward
-- the **organisation unit** the owner belongs to, where one is recorded
-- the **primary contact**, or "No contact recorded" where there is none
-- a **"Since"** date, where a start date is recorded
+with the picker, and the answer appears as one card per distinct owner.
 
 The list starts with the system's own owners and then adds the owners of the elements it affects,
 walking up to three steps downstream. Each distinct owner appears once. When neither the system nor
@@ -59,9 +54,9 @@ operations who has just lost a long-serving engineer and wants to know what that
 ## How to find your gaps
 
 1. Open **Ask** and choose the accountability question.
-2. Pick a system. Read the cards: each is an owner with a recorded type, unit and contact.
-3. If the page reads "Ownership data is not yet connected" for that system and anything it affects, you have found a
-   gap. Open the application, go to its Ownership section, search for a user, choose Primary, Backup,
+2. Pick a system. Read the cards: each is an owner recorded against the system or something it affects.
+3. If the page reads "Ownership data is not yet connected" for that system and everything it affects, you have found a
+   gap. If cards appear, check whether they belong to the system itself or only to something downstream. Open the application, go to its Ownership section, search for a user, choose Primary, Backup,
    Technical or Business, and click Add owner. Then ask again.
 4. Run the same question for the systems you most depend on, and note any name that keeps appearing
    across them.
@@ -88,7 +83,7 @@ owner column to the dependencies that make an owner matter.
 
 ### Does Entelim assign an owner when none is recorded?
 
-No. A system with no recorded owner shows no owner card, and the page reads "Ownership data is not yet connected".
+No. When neither the system nor anything it affects has an owner, the page reads "Ownership data is not yet connected" instead of naming someone. Be aware that a system with no owner of its own can still show cards for owners of things downstream of it, so a card is not proof that the system itself is owned.
 Naming someone by guesswork would hide exactly the gap an auditor asks about.
 
 ### Can it tell me which person is a single point of failure?
@@ -99,8 +94,8 @@ workload or availability.
 
 ### Where do owners come from?
 
-From the ownership records you add to your applications and capabilities in Entelim. Each carries an
-ownership type, and an organisation unit and contact where those are recorded. The legacy owner text
+From the ownership records you add to your applications and capabilities in Entelim, each with an
+ownership type. The legacy owner text
 fields on an application are read-only and are not what Ask reads.
 
 ### What is the difference between the Org Chart and the RACI matrix?

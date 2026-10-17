@@ -27,8 +27,7 @@ inclination to learn a formal notation before Entelim can start answering anythi
 
 **Batch Import** takes the spreadsheet as it is. On the New Import screen you give the job a name and
 choose how much detail to generate: Quick, Standard or Comprehensive, with Comprehensive adding
-relationships at a higher cost. You then bring in the data one of three ways: upload a file (CSV,
-Excel — .xlsx or .xls — or JSON), paste the data in, or start from applications already in Entelim.
+relationships at a higher cost. You then bring in the data by uploading a CSV or Excel file (.xlsx or .xls) or by pasting the rows in.
 You can link the import to a transformation programme, and exports from SAP landscapes are recognised
 and tidied up automatically.
 
@@ -53,7 +52,7 @@ customer, a lender or an auditor what the business depends on.
 1. Tidy the spreadsheet so each row is a system, supplier or application, with a clear name.
 2. Open **Batch Import** and choose **New Import Job**. Name the job and pick Quick, Standard or
    Comprehensive.
-3. Upload the file, paste the rows, or choose existing applications as the source.
+3. Upload the file, or paste the rows.
 4. Let the job run, open its batch for review, check what was generated, and commit it.
 5. Open **Industry APQC Frameworks**, choose the closest industry, and compare its process list with
    what you run today.
@@ -80,8 +79,7 @@ reaches.
 
 ### What file formats can I import?
 
-CSV, Excel (.xlsx and .xls) and JSON files. You can also paste data straight in, or begin from
-applications you already have in Entelim.
+CSV and Excel (.xlsx and .xls) files, up to 10 MB. You can also paste rows straight in.
 
 ### Do I have to learn ArchiMate first?
 
@@ -91,8 +89,7 @@ committed.
 
 ### Is anything added to my model before I approve it?
 
-Not by default. Generated elements wait on a review screen until you commit the batch. The import
-settings include an auto-approve option for high-confidence items, which is off unless you switch it on.
+No. Generated elements wait on a review screen until you commit the batch.
 
 ### Can I try it on a company like mine?
 
