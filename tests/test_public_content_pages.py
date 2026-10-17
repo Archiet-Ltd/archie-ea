@@ -2774,7 +2774,14 @@ def test_new_role_page_appears_everywhere_with_no_other_edit(app):
         assert _robots_allows(rules, "/roles/zzz-e2e-role")
 
 
-_ROADMAP_VOICE = re.compile(r"Q[1-4] ?20\d\d|\bopens in\b|\barrives?\b|\bNext:|\bquarter\b|\broadmap\b")
+_ROADMAP_VOICE = re.compile(
+    r"Q[1-4] ?20\d\d|\bopens in\b|\barrives?\b|\bNext:|\bquarters?\b|\broadmaps?\b",
+    re.I,
+)
+# The module is legitimately called "Roadmaps" and lives at /modules/roadmaps;
+# only that exact name and link are exempt, so a lower-case or singular use
+# in prose still fails.
+_ROADMAP_MODULE_NAMES = ("Roadmaps", "/modules/roadmaps")
 _SELL_PAGE_SOURCES = [
     "app/templates/main/index.html",
     "app/templates/public/pricing.html",
@@ -2789,6 +2796,8 @@ def test_sell_pages_carry_no_roadmap_language(path):
     sells or explains the product as it is today."""
     root = Path(__file__).resolve().parents[1]
     text = (root / path).read_text(encoding="utf-8")
+    for name in _ROADMAP_MODULE_NAMES:
+        text = text.replace(name, "")
     assert _ROADMAP_VOICE.findall(text) == [], path
 
 

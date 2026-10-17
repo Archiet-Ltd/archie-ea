@@ -55,10 +55,10 @@ Delivered today by: [Applications](/modules/applications), [Portfolio](/modules/
 
 <h3 id="transformation-management">Transformation Management</h3>
 
-Plan change from where you are to where you want to be, through gaps, roadmaps, programmes and work
+Plan change from where you are to where you want to be, through gaps, transition plans, programmes and work
 packages, and prove the outcome when it lands.
 
-**Today:** record gaps, roadmaps, programmes and work packages in the same model as the estate they
+**Today:** record gaps, transition plans, programmes and work packages in the same model as the estate they
 change, and ask what any programme touches.
 
 Delivered today by: [Roadmaps](/modules/roadmaps), [Programme Tracking](/use-cases/programme-tracking).
@@ -188,7 +188,7 @@ Inventory, classify, evaluate and govern every AI system in the enterprise, incl
 and manage what AI costs you.
 
 **Today:** Entelim governs its own AI the way you govern yours: every action its assistant takes
-passes one permission check, writes wait for approval, and its agents are listed in a register you
+passes one permission check, the writes it proposes wait for approval, and its agents are listed in a register you
 can read.
 
 ## Get answers before you need them
@@ -264,5 +264,4 @@ For certifications and what we do and do not claim today, see [Security](/securi
 
 ---
 
-Every capability above is in the product today. See [how
-it's priced](/pricing) or [try it](/account/register).
+See [how it's priced](/pricing) or [try it](/account/register).

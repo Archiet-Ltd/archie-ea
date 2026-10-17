@@ -55,7 +55,7 @@ governed, time-aware, cited model of the enterprise to stand on, the same way a 
 sales assistant should read about customers. That positions Entelim as the company brain other AI
 tools plug into, rather than another AI feature bolted onto an architecture tool. Entelim's
 own assistant already works this way: every action passes one permission check and every change
-waits for approval. See [Agentic Automation](/features#agentic-automation) among the eighteen
+the assistant proposes waits for approval. See [Agentic Automation](/features#agentic-automation) among the eighteen
 capabilities.
 
 ## What we believe
@@ -91,7 +91,7 @@ locked into a proprietary format.
 
 ## How we run our own company on it
 
-Archiet Ltd, the company behind Entelim, runs its own operating model in Entelim: roadmaps and
+Archiet Ltd, the company behind Entelim, runs its own operating model in Entelim: transition plans and
 stop/go decisions trace back to the same twin the product sells, not a spreadsheet kept alongside
 it. See [how Archiet runs on Entelim](/how-archiet-runs-on-entelim).
 
