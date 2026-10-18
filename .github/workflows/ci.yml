@@ -92,7 +92,7 @@ jobs:
   # ---------------------------------------------------------------------------
   changes:
     name: Detect changed paths
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     outputs:
       is_content_only: ${{ steps.detect.outputs.is_content_only }}
@@ -180,7 +180,7 @@ jobs:
     name: Content page tests
     needs: changes
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only == 'true') && github.event_name == 'pull_request' }}
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     services:
       postgres:
         image: mirror.gcr.io/library/postgres:16
@@ -249,7 +249,7 @@ jobs:
 
   secret-scan:
     name: Secret scan (gitleaks)
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     steps:
       - uses: actions/checkout@v5
@@ -281,7 +281,7 @@ jobs:
   # on success(), so an unknown/skipped state still runs the tests.
   fast_gate:
     name: Fast static checks (compile + lint)
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     steps:
       - uses: actions/checkout@v5
@@ -312,7 +312,7 @@ jobs:
 
   static-gates:
     name: Static gates (compile + ratchets)
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     # The static tag includes route/navigation and CSRF coverage, which import
     # the real app, plus the reproducible CSS build. Install the application
@@ -344,7 +344,7 @@ jobs:
 
   boot-health:
     name: Boot health (no database)
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     # Catches the class of failure nothing else here can see: a blueprint that
     # silently fails to register, or a url_for() endpoint that no longer resolves
@@ -1012,7 +1012,7 @@ jobs:
   # continue-on-error and `|| true`, so it could not fail.
   db-gates:
     name: Database gates (schema drift)
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     services:
       postgres:
@@ -1082,7 +1082,7 @@ jobs:
 
   security-sast:
     name: SAST (bandit)
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     steps:
       - uses: actions/checkout@v5
@@ -1124,7 +1124,7 @@ jobs:
   smoke-main:
     name: Browser journeys — main shard ${{ matrix.shard }}
     needs: [changes, fast_gate]
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     strategy:
       fail-fast: false
@@ -1202,7 +1202,7 @@ jobs:
   smoke-adversarial:
     name: Browser journeys — adversarial
     needs: [changes, fast_gate]
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     services:
       postgres:
@@ -1274,7 +1274,7 @@ jobs:
   smoke-other:
     name: Browser journeys — other
     needs: [changes, fast_gate]
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     services:
       postgres:
@@ -1366,7 +1366,7 @@ jobs:
     name: Browser journeys (one per archetype)
     needs: [smoke-main, smoke-adversarial, smoke-other, changes, fast_gate]
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -1415,7 +1415,7 @@ jobs:
     name: Browser compatibility (${{ matrix.browser }})
     needs: [changes, fast_gate]
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -1511,7 +1511,7 @@ jobs:
     name: Level 10 archetype walkthrough
     needs: [changes, fast_gate]
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     # docs/TESTING_STANDARD.md level 10: not "does it break?" but "can this
     # archetype do their job, and could they have FOUND the page?". It runs as a
     # non-admin per persona, measures geometry at a fixed viewport rather than
@@ -1579,7 +1579,7 @@ jobs:
 
   dependency-audit:
     name: Dependency CVEs (pip-audit)
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     # A ratchet against scripts/ci/dependency_baseline.json: the count may fall,
     # never rise. The baseline is accepted risk, not proof of safety - every entry
@@ -1609,7 +1609,7 @@ jobs:
       - browser-compatibility
       - walkthrough
       - dependency-audit
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -1730,7 +1730,7 @@ jobs:
   failing-first-proof:
     name: Failing-first proof
     if: ${{ github.event_name == 'pull_request' && (github.event.action != 'labeled' || github.event.label.name == 'failing-first-exempt') }}
-    runs-on: ${{ vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     timeout-minutes: 45
     services:
       postgres:
