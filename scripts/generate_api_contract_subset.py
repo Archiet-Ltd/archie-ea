@@ -43,6 +43,10 @@ PUBLISHED_OPERATIONS = [
     "getCapability",
     "listValueStreams",
     "getValueStream",
+    "listDrivers",
+    "getDriver",
+    "listGoals",
+    "getGoal",
 ]
 
 
