@@ -1368,6 +1368,11 @@ def get_system_settings():
 # closes that (R1 admin-rbac systemic fix).
 @platform_admin_required
 @admin_required
+# admin_required alone is satisfied by any org's own admin for their own
+# brand-new, self-registered organisation -- no invitation into anyone
+# else's org needed (lead review of PR 430, item 4). admin_required is kept
+# rather than removed; platform_admin_required is the operative check.
+@platform_admin_required
 def save_system_settings():
     """Persist system settings to the database."""
     try:
