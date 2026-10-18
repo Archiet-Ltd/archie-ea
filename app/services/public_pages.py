@@ -276,7 +276,16 @@ FAMILY_URL_PREFIX = {
     "connector": "/connectors",
 }
 
-_md = markdown.Markdown(extensions=["extra"])
+_MARKDOWN_EXTENSIONS = ["extra"]
+
+
+def _render_markdown(text: str) -> str:
+    """Convert Markdown to HTML with a converter built for this call.
+
+    markdown.Markdown instances keep parser state and are not thread-safe,
+    so a shared one corrupts under simultaneous page renders.
+    """
+    return markdown.Markdown(extensions=_MARKDOWN_EXTENSIONS).convert(text)
 
 # Tags and attributes produced by standard Markdown (plus extra extension).
 # Any HTML tag or attribute not in these lists is stripped by bleach.
@@ -627,7 +636,7 @@ def _load_page(file_path: Path, family: str, slug: str, url: str) -> PublicPage:
     front_matter, body_md = _parse_front_matter(raw)
     if family == "function-per-segment":
         slug, url = _use_case_slug_and_url(front_matter, slug)
-    body_html = _sanitize_html(_md.reset().convert(body_md))
+    body_html = _sanitize_html(_render_markdown(body_md))
     title = _extract_title(body_html, front_matter)
     external_url = _build_external_url(front_matter)
     return PublicPage(
