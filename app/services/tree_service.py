@@ -10,6 +10,7 @@ Usage:
 """
 
 from app import db
+from app.middleware.tenant_context import current_org_id
 
 
 # ─── Tree Registry ────────────────────────────────────────────────────────────
@@ -275,6 +276,95 @@ def _import_model(dotted_path):
     return getattr(module, class_name)
 
 
+# ─── Tenant scope ─────────────────────────────────────────────────────────────
+# Every registry entry is exactly one of:
+#   tenant   - the model carries TenantMixin; the tenant middleware filters every
+#              statement and stamps organization_id on insert.
+#   hybrid   - shared reference rows (organization_id IS NULL) plus an
+#              organisation's own rows. Readable by everyone, writable only on
+#              the caller's own rows. UnifiedCapability enforces this in its own
+#              session listeners; ReferenceModelCapability is enforced here.
+#   platform - one catalogue shared by every organisation with no owner column;
+#              only a platform administrator may change it.
+HYBRID_TREES = {"capability", "reference_capability"}
+PLATFORM_TREES = {"apqc", "product_taxonomy"}
+
+FORBIDDEN = "Forbidden"
+
+
+def tree_scope(tree_key):
+    if tree_key in HYBRID_TREES:
+        return "hybrid"
+    if tree_key in PLATFORM_TREES:
+        return "platform"
+    return "tenant"
+
+
+def _write_gate(tree_key, Model):
+    """Return an error string when this caller may not write this tree, else None.
+
+    Fails closed: a tenant-scoped tree whose model lost its TenantMixin refuses
+    writes rather than serving every organisation's rows.
+    """
+    scope = tree_scope(tree_key)
+    if scope == "platform":
+        from flask_login import current_user
+
+        from app.middleware.tenant_decorators import is_platform_admin
+
+        if not is_platform_admin(current_user):
+            return f"{FORBIDDEN}: this tree is shared by every organisation"
+    elif scope == "tenant":
+        from app.models.mixins import TenantMixin
+
+        if not issubclass(Model, TenantMixin):
+            return f"{FORBIDDEN}: tree is not organisation-scoped"
+    return None
+
+
+def _visible(Model, tree_key):
+    """Criteria limiting a hybrid reference tree to shared plus own rows."""
+    if tree_key != "reference_capability":
+        return None
+    from sqlalchemy import or_
+
+    org_id = current_org_id()
+    if org_id is None:
+        return Model.organization_id.is_(None)
+    return or_(Model.organization_id == org_id, Model.organization_id.is_(None))
+
+
+def _load(Model, tree_key, node_id):
+    """Fetch one row through the filtered statement path.
+
+    ``Session.get`` returns an identity-map hit without emitting SQL, so the
+    tenant filter never runs; a select always does.
+    """
+    stmt = db.select(Model).where(Model.id == node_id)
+    visible = _visible(Model, tree_key)
+    if visible is not None:
+        stmt = stmt.where(visible)
+    return db.session.execute(stmt).scalar_one_or_none()
+
+
+def _owned_by_caller(Model, tree_key, row):
+    """A hybrid reference row may only be changed by the organisation that owns it."""
+    if tree_key != "reference_capability":
+        return True
+    org_id = current_org_id()
+    return org_id is not None and row.organization_id == org_id
+
+
+def _commit():
+    """Commit; a refused reference/cross-organisation write becomes FORBIDDEN."""
+    try:
+        db.session.commit()
+    except PermissionError as exc:
+        db.session.rollback()
+        return f"{FORBIDDEN}: {exc}"
+    return None
+
+
 def build_tree(tree_key):
     """
     Build nested tree JSON for a registered tree type.
@@ -298,7 +388,11 @@ def build_tree(tree_key):
         if col is not None:
             order_cols.append(col)
 
-    rows = Model.query.order_by(*order_cols).all() if order_cols else Model.query.all()
+    query = Model.query
+    visible = _visible(Model, tree_key)
+    if visible is not None:
+        query = query.filter(visible)
+    rows = query.order_by(*order_cols).all() if order_cols else query.all()
 
     # Build node dicts
     by_id = {}
@@ -333,7 +427,7 @@ def get_node(tree_key, node_id):
     """Get a single node by ID."""
     config = TREE_REGISTRY[tree_key]
     Model = _import_model(config["model"])
-    row = db.session.get(Model, node_id)
+    row = _load(Model, tree_key, node_id)
     if not row:
         return None
 
@@ -355,6 +449,10 @@ def create_node(tree_key, data):
     name_field = config["name_field"]
     parent_fk = config["parent_fk"]
 
+    denied = _write_gate(tree_key, Model)
+    if denied:
+        return None, denied
+
     name = (data.get("name") or data.get(name_field) or "").strip()
     if not name:
         return None, "Name is required"
@@ -362,7 +460,7 @@ def create_node(tree_key, data):
     kwargs = {name_field: name}
     parent_id = data.get("parent_id")
     if parent_id:
-        parent = db.session.get(Model, parent_id)
+        parent = _load(Model, tree_key, parent_id)
         if not parent:
             return None, "Parent not found"
         kwargs[parent_fk] = parent_id
@@ -372,9 +470,17 @@ def create_node(tree_key, data):
         if f in data:
             kwargs[f] = data[f]
 
+    if tree_key == "reference_capability":
+        org_id = current_org_id()
+        if org_id is None:
+            return None, f"{FORBIDDEN}: no organisation in context"
+        kwargs["organization_id"] = org_id
+
     row = Model(**kwargs)
     db.session.add(row)
-    db.session.commit()
+    error = _commit()
+    if error:
+        return None, error
     return get_node(tree_key, row.id), None
 
 
@@ -385,9 +491,15 @@ def update_node(tree_key, node_id, data):
     parent_fk = config["parent_fk"]
     name_field = config["name_field"]
 
-    row = db.session.get(Model, node_id)
+    denied = _write_gate(tree_key, Model)
+    if denied:
+        return None, denied
+
+    row = _load(Model, tree_key, node_id)
     if not row:
         return None, "Not found"
+    if not _owned_by_caller(Model, tree_key, row):
+        return None, f"{FORBIDDEN}: shared reference rows are read-only"
 
     if "name" in data or name_field in data:
         setattr(row, name_field, data.get("name") or data.get(name_field))
@@ -396,13 +508,17 @@ def update_node(tree_key, node_id, data):
         new_parent = data["parent_id"]
         if new_parent == node_id:
             return None, "Cannot parent to self"
+        if new_parent is not None and not _load(Model, tree_key, new_parent):
+            return None, "Parent not found"
         setattr(row, parent_fk, new_parent)
 
     for f in config["fields"]:
         if f in data:
             setattr(row, f, data[f])
 
-    db.session.commit()
+    error = _commit()
+    if error:
+        return None, error
     return get_node(tree_key, node_id), None
 
 
@@ -412,9 +528,15 @@ def delete_node(tree_key, node_id):
     Model = _import_model(config["model"])
     parent_fk = config["parent_fk"]
 
-    row = db.session.get(Model, node_id)
+    denied = _write_gate(tree_key, Model)
+    if denied:
+        return denied
+
+    row = _load(Model, tree_key, node_id)
     if not row:
         return "Not found"
+    if not _owned_by_caller(Model, tree_key, row):
+        return f"{FORBIDDEN}: shared reference rows are read-only"
 
     parent_id = getattr(row, parent_fk, None)
     children = Model.query.filter(getattr(Model, parent_fk) == node_id).all()
@@ -422,5 +544,4 @@ def delete_node(tree_key, node_id):
         setattr(child, parent_fk, parent_id)
 
     db.session.delete(row)
-    db.session.commit()
-    return None
+    return _commit()

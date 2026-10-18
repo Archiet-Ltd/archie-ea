@@ -146,7 +146,7 @@ class RegulatoryFramework(db.Model):
 # ============================================================================
 
 
-class ComplianceRequirement(db.Model):
+class ComplianceRequirement(TenantMixin, db.Model):
     """
     Specific compliance requirements that must be met in architecture/implementation.
 

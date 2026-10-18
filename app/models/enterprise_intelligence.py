@@ -21,7 +21,7 @@ from app.models.mixins import TenantMixin
 # ============================================================================
 
 
-class PortfolioInitiative(db.Model):
+class PortfolioInitiative(TenantMixin, db.Model):
     """
     Enterprise/Portfolio-level strategic initiative
     Maps to business strategy and cascades to projects/applications

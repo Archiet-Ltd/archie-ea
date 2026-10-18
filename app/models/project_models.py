@@ -120,7 +120,7 @@ class Project(TenantMixin, db.Model):
         return self.tasks.filter(Task.due_date < today, Task.status != "completed").count()
 
 
-class Task(db.Model):
+class Task(TenantMixin, db.Model):
     """
     Individual task within a project.
     """

@@ -752,7 +752,7 @@ class AnalysisScenario(db.Model):
         return f"<AnalysisScenario {self.id}: {self.scenario_name}>"
 
 
-class RequiredCapability(db.Model):
+class RequiredCapability(TenantMixin, db.Model):
     """
     Structured capability requirements with importance weighting.
 

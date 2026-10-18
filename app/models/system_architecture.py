@@ -17,10 +17,12 @@ from typing import Optional
 
 from sqlalchemy import event
 
+from app.models.mixins import TenantMixin
+
 from .. import db
 
 
-class SystemBoundary(db.Model):
+class SystemBoundary(TenantMixin, db.Model):
     """
     System Boundary model for ArchiMate 3.2.
 

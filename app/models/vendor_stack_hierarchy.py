@@ -16,7 +16,7 @@ from app import db
 from app.models.mixins import TenantMixin
 
 
-class VendorCapabilityHierarchy(db.Model):
+class VendorCapabilityHierarchy(TenantMixin, db.Model):
     """
     Hierarchical capability decomposition (L0 - L4).
     Enables gap analysis, heat maps, and build-vs-buy decisions at different abstraction levels.
@@ -169,7 +169,7 @@ class VendorServiceCatalog(TenantMixin, db.Model):
         return f"<VendorServiceCatalog {self.service_code}: {self.service_name}>"
 
 
-class VendorProcessHierarchy(db.Model):
+class VendorProcessHierarchy(TenantMixin, db.Model):
     """
     Business process hierarchy with BPMN decomposition (L0 - L4).
     Enables process mining, optimization, and automation opportunities.
