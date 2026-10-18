@@ -1,0 +1,418 @@
+{
+  "complianceStandards": [
+    {
+      "id": "gdpr",
+      "name": "GDPR",
+      "fullName": "General Data Protection Regulation",
+      "description": "EU data protection and privacy regulation",
+      "type": "regulation",
+      "jurisdiction": "eu",
+      "regions": ["europe"],
+      "industries": ["all"],
+      "maturityRequirements": {
+        "compliance_readiness": 3,
+        "data_management": 3,
+        "governance": 2,
+        "risk_management": 2
+      },
+      "priority": 1
+    },
+    {
+      "id": "hipaa",
+      "name": "HIPAA",
+      "fullName": "Health Insurance Portability and Accountability Act",
+      "description": "US healthcare data privacy and security regulation",
+      "type": "law",
+      "jurisdiction": "us",
+      "regions": ["north-america"],
+      "industries": [
+        "hospitals-health-systems",
+        "pharmaceutical",
+        "biotechnology",
+        "insurance"
+      ],
+      "maturityRequirements": {
+        "compliance_readiness": 3,
+        "risk_management": 3,
+        "data_management": 3,
+        "technology_readiness": 2
+      },
+      "priority": 1
+    },
+    {
+      "id": "soc2",
+      "name": "SOC 2",
+      "fullName": "Service Organization Control 2",
+      "description": "AICPA audit standard for service organizations",
+      "type": "audit-standard",
+      "jurisdiction": "us",
+      "regions": ["north-america"],
+      "industries": [
+        "software-development",
+        "saas-platforms",
+        "fintech",
+        "cybersecurity"
+      ],
+      "maturityRequirements": {
+        "governance": 3,
+        "process_maturity": 3,
+        "compliance_readiness": 3,
+        "risk_management": 2
+      },
+      "priority": 2
+    },
+    {
+      "id": "iso27001",
+      "name": "ISO 27001",
+      "fullName": "ISO/IEC 27001 Information Security Management",
+      "description": "International information security management standard",
+      "type": "standard",
+      "jurisdiction": "international",
+      "regions": ["all"],
+      "industries": ["all"],
+      "maturityRequirements": {
+        "governance": 3,
+        "compliance_readiness": 3,
+        "risk_management": 3,
+        "process_maturity": 3
+      },
+      "priority": 1
+    },
+    {
+      "id": "pci-dss",
+      "name": "PCI DSS",
+      "fullName": "Payment Card Industry Data Security Standard",
+      "description": "Security standard for organizations handling credit card data",
+      "type": "industry-standard",
+      "jurisdiction": "international",
+      "regions": ["all"],
+      "industries": ["fintech", "banking-traditional", "saas-platforms"],
+      "maturityRequirements": {
+        "compliance_readiness": 3,
+        "technology_readiness": 3,
+        "risk_management": 3,
+        "data_management": 2
+      },
+      "priority": 1
+    },
+    {
+      "id": "nist-csf",
+      "name": "NIST CSF",
+      "fullName": "NIST Cybersecurity Framework",
+      "description": "US framework for managing cybersecurity risks",
+      "type": "framework",
+      "jurisdiction": "us",
+      "regions": ["north-america"],
+      "industries": ["all"],
+      "maturityRequirements": {
+        "risk_management": 3,
+        "technology_readiness": 3,
+        "governance": 2,
+        "process_maturity": 2
+      },
+      "priority": 2
+    },
+    {
+      "id": "cobit",
+      "name": "COBIT",
+      "fullName": "Control Objectives for Information and Related Technologies",
+      "description": "ISACA framework for IT governance and management",
+      "type": "framework",
+      "jurisdiction": "international",
+      "regions": ["all"],
+      "industries": ["all"],
+      "maturityRequirements": {
+        "governance": 3,
+        "process_maturity": 3,
+        "risk_management": 3,
+        "compliance_readiness": 3
+      },
+      "priority": 3
+    },
+    {
+      "id": "sox",
+      "name": "SOX",
+      "fullName": "Sarbanes-Oxley Act",
+      "description": "US law for financial reporting and corporate governance",
+      "type": "law",
+      "jurisdiction": "us",
+      "regions": ["north-america"],
+      "industries": [
+        "banking-traditional",
+        "investment-management",
+        "insurance",
+        "fintech"
+      ],
+      "maturityRequirements": {
+        "governance": 4,
+        "compliance_readiness": 4,
+        "risk_management": 4,
+        "process_maturity": 4
+      },
+      "priority": 1
+    },
+    {
+      "id": "lgpd",
+      "name": "LGPD",
+      "fullName": "Lei Geral de Proteção de Dados",
+      "description": "Brazilian data protection law",
+      "type": "law",
+      "jurisdiction": "brazil",
+      "regions": ["latin-america"],
+      "industries": ["all"],
+      "maturityRequirements": {
+        "compliance_readiness": 3,
+        "data_management": 3,
+        "governance": 2,
+        "risk_management": 2
+      },
+      "priority": 1
+    },
+    {
+      "id": "pipeda",
+      "name": "PIPEDA",
+      "fullName": "Personal Information Protection and Electronic Documents Act",
+      "description": "Canadian privacy law for private sector organizations",
+      "type": "law",
+      "jurisdiction": "canada",
+      "regions": ["north-america"],
+      "industries": ["all"],
+      "maturityRequirements": {
+        "compliance_readiness": 3,
+        "data_management": 2,
+        "governance": 2
+      },
+      "priority": 2
+    },
+    {
+      "id": "appi",
+      "name": "APPI",
+      "fullName": "Act on the Protection of Personal Information",
+      "description": "Japanese data protection law",
+      "type": "law",
+      "jurisdiction": "japan",
+      "regions": ["asia-pacific"],
+      "industries": ["all"],
+      "maturityRequirements": {
+        "compliance_readiness": 3,
+        "data_management": 2,
+        "governance": 2
+      },
+      "priority": 1
+    },
+    {
+      "id": "pdpa-singapore",
+      "name": "PDPA (Singapore)",
+      "fullName": "Personal Data Protection Act",
+      "description": "Singapore data protection law",
+      "type": "law",
+      "jurisdiction": "singapore",
+      "regions": ["asia-pacific"],
+      "industries": ["all"],
+      "maturityRequirements": {
+        "compliance_readiness": 3,
+        "data_management": 2,
+        "governance": 2
+      },
+      "priority": 1
+    },
+    {
+      "id": "mlps",
+      "name": "MLPS",
+      "fullName": "Multi-Level Protection Scheme",
+      "description": "Chinese cybersecurity classification and protection system",
+      "type": "regulation",
+      "jurisdiction": "china",
+      "regions": ["asia-pacific"],
+      "industries": ["all"],
+      "maturityRequirements": {
+        "compliance_readiness": 3,
+        "technology_readiness": 3,
+        "governance": 3,
+        "risk_management": 3
+      },
+      "priority": 1
+    },
+    {
+      "id": "dpdpa",
+      "name": "DPDPA",
+      "fullName": "Digital Personal Data Protection Act",
+      "description": "Indian data protection law",
+      "type": "law",
+      "jurisdiction": "india",
+      "regions": ["asia-pacific"],
+      "industries": ["all"],
+      "maturityRequirements": {
+        "compliance_readiness": 3,
+        "data_management": 2,
+        "governance": 2
+      },
+      "priority": 1
+    },
+    {
+      "id": "asd-essential-eight",
+      "name": "ASD Essential Eight",
+      "fullName": "Australian Signals Directorate Essential Eight",
+      "description": "Australian cybersecurity mitigation strategies",
+      "type": "framework",
+      "jurisdiction": "australia",
+      "regions": ["asia-pacific"],
+      "industries": ["all"],
+      "maturityRequirements": {
+        "technology_readiness": 3,
+        "risk_management": 3,
+        "compliance_readiness": 2
+      },
+      "priority": 2
+    },
+    {
+      "id": "popia",
+      "name": "POPIA",
+      "fullName": "Protection of Personal Information Act",
+      "description": "South African data protection law",
+      "type": "law",
+      "jurisdiction": "south-africa",
+      "regions": ["africa"],
+      "industries": ["all"],
+      "maturityRequirements": {
+        "compliance_readiness": 3,
+        "data_management": 2,
+        "governance": 2
+      },
+      "priority": 1
+    },
+    {
+      "id": "ndpr",
+      "name": "NDPR",
+      "fullName": "Nigeria Data Protection Regulation",
+      "description": "Nigerian data protection regulation",
+      "type": "regulation",
+      "jurisdiction": "nigeria",
+      "regions": ["africa"],
+      "industries": ["all"],
+      "maturityRequirements": {
+        "compliance_readiness": 2,
+        "data_management": 2,
+        "governance": 2
+      },
+      "priority": 2
+    },
+    {
+      "id": "basel-iv",
+      "name": "Basel IV",
+      "fullName": "Basel IV Banking Regulations",
+      "description": "International banking supervision framework",
+      "type": "regulation",
+      "jurisdiction": "international",
+      "regions": ["all"],
+      "industries": ["banking-traditional", "investment-management"],
+      "maturityRequirements": {
+        "governance": 4,
+        "compliance_readiness": 4,
+        "risk_management": 4,
+        "data_management": 3
+      },
+      "priority": 1
+    },
+    {
+      "id": "mifid-ii",
+      "name": "MiFID II",
+      "fullName": "Markets in Financial Instruments Directive II",
+      "description": "EU financial services regulation",
+      "type": "directive",
+      "jurisdiction": "eu",
+      "regions": ["europe"],
+      "industries": ["banking-traditional", "investment-management", "fintech"],
+      "maturityRequirements": {
+        "governance": 3,
+        "compliance_readiness": 4,
+        "risk_management": 3,
+        "data_management": 3
+      },
+      "priority": 1
+    },
+    {
+      "id": "ccpa",
+      "name": "CCPA",
+      "fullName": "California Consumer Privacy Act",
+      "description": "California consumer data privacy law",
+      "type": "law",
+      "jurisdiction": "us-california",
+      "regions": ["north-america"],
+      "industries": ["all"],
+      "maturityRequirements": {
+        "compliance_readiness": 3,
+        "data_management": 3,
+        "governance": 2
+      },
+      "priority": 2
+    },
+    {
+      "id": "fedramp",
+      "name": "FedRAMP",
+      "fullName": "Federal Risk and Authorization Management Program",
+      "description": "US government cloud security program",
+      "type": "program",
+      "jurisdiction": "us",
+      "regions": ["north-america"],
+      "industries": ["software-development", "saas-platforms", "cybersecurity"],
+      "maturityRequirements": {
+        "governance": 4,
+        "compliance_readiness": 4,
+        "risk_management": 4,
+        "technology_readiness": 4
+      },
+      "priority": 2
+    }
+  ],
+  "regionMapping": {
+    "north-america": {
+      "name": "North America",
+      "recommended": ["hipaa", "soc2", "nist-csf", "sox", "ccpa", "pipeda"],
+      "common": ["iso27001", "pci-dss", "cobit"]
+    },
+    "europe": {
+      "name": "Europe",
+      "recommended": ["gdpr", "iso27001", "mifid-ii"],
+      "common": ["pci-dss", "cobit", "nist-csf"]
+    },
+    "asia-pacific": {
+      "name": "Asia Pacific",
+      "recommended": [
+        "appi",
+        "pdpa-singapore",
+        "mlps",
+        "dpdpa",
+        "asd-essential-eight"
+      ],
+      "common": ["iso27001", "pci-dss", "cobit"]
+    },
+    "latin-america": {
+      "name": "Latin America",
+      "recommended": ["lgpd"],
+      "common": ["iso27001", "pci-dss", "cobit"]
+    },
+    "africa": {
+      "name": "Africa",
+      "recommended": ["popia", "ndpr"],
+      "common": ["iso27001", "pci-dss", "cobit"]
+    },
+    "middle-east": {
+      "name": "Middle East",
+      "recommended": ["iso27001"],
+      "common": ["pci-dss", "cobit", "nist-csf"]
+    }
+  },
+  "industrySpecific": {
+    "banking-traditional": ["basel-iv", "sox", "mifid-ii", "pci-dss"],
+    "investment-management": ["basel-iv", "sox", "mifid-ii"],
+    "insurance": ["sox", "hipaa"],
+    "fintech": ["pci-dss", "soc2", "mifid-ii"],
+    "hospitals-health-systems": ["hipaa"],
+    "pharmaceutical": ["hipaa"],
+    "biotechnology": ["hipaa"],
+    "software-development": ["soc2", "iso27001"],
+    "saas-platforms": ["soc2", "iso27001", "fedramp"],
+    "cybersecurity": ["soc2", "iso27001", "fedramp"]
+  }
+}
