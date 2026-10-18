@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import json
-
 from app.modules.mcp.tests.test_scope_enforcement import (
-    _mcp_call,
     _mint_token_with_scope,
 )
 from app.modules.mcp.tests.test_tools import _make_user, _mcp_tools_list
