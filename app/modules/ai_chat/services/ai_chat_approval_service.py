@@ -818,6 +818,32 @@ class AIChatApprovalService:
                         organization_id=org_id,
                     )
                     result = {"success": accepted}
+                elif approval.entity_type == "control_evidence":
+                    # Accept evidence a connector sync found for an adopted
+                    # compliance control. Approving writes the evidence columns
+                    # of the control row (source: connector); refusing writes
+                    # nothing. The control row is re-checked against the
+                    # approval's own organisation inside the accept function.
+                    from app.modules.compliance.services.control_assurance_service import (
+                        may_record_control_work,
+                    )
+                    from app.modules.compliance.services.evidence_gap_service import (
+                        accept_control_evidence,
+                    )
+                    # The direct writer is limited to the control-work roles, so the
+                    # approval of the same write is too.
+                    if not may_record_control_work(actor):
+                        return {
+                            "success": False,
+                            "code": "FORBIDDEN",
+                            "error": "Only compliance and architect roles can accept control evidence",
+                        }
+                    accepted = accept_control_evidence(
+                        approval_id=approval.id,
+                        organization_id=approval.organization_id,
+                        accepted_by=effective_approver_id,
+                    )
+                    result = {"success": accepted}
                 else:
                     return {"success": False, "error": f"Unknown entity type: {approval.entity_type}"}
 

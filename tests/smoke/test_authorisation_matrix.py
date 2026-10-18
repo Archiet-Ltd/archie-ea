@@ -1189,6 +1189,50 @@ def test_application_technology_links_refuse_a_read_only_account(
     assert response.status == 403, "a Viewer wrote a technology link: %s" % response.status
 
 
+CONTROL_TESTS_PATH = "/dashboard/api/compliance/controls/%d/tests"
+CONTROL_MAPPING_PATH = "/dashboard/api/compliance/mappings/%d"
+
+
+def _write_control_route(page, live_server, method, path, body):
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf_token = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    send = page.request.post if method == "post" else page.request.put
+    return send(live_server + path, data=body, headers={"X-CSRFToken": csrf_token}, max_redirects=0)
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_control_test_and_evidence_routes_authorisation(archetype, page, live_server, seeded):
+    """Recording a control test, saving evidence and reading a control's tests: every archetype
+    holds the Architect role the write gate accepts, and the list is login-only. Control row 0
+    names nothing, so a caller past the gate gets the 404 that says so, never another
+    organisation's row."""
+    _login(page, live_server, seeded["emails"][archetype])
+    listed = page.request.get(live_server + CONTROL_TESTS_PATH % 0, max_redirects=0)
+    assert listed.status == 404, "%s reading a control's tests: expected 404, got %s" % (archetype, listed.status)
+    recorded = _write_control_route(
+        page, live_server, "post", CONTROL_TESTS_PATH % 0, {"test_kind": "design", "result": "effective"}
+    )
+    assert recorded.status == 404, "%s recording a test: expected 404, got %s" % (archetype, recorded.status)
+    saved = _write_control_route(
+        page, live_server, "put", CONTROL_MAPPING_PATH % 0, {"evidence_url": "https://example.test/e"}
+    )
+    assert saved.status == 404, "%s saving evidence: expected 404, got %s" % (archetype, saved.status)
+
+
+def test_control_test_and_evidence_routes_refuse_a_read_only_account(
+    page, live_server, seeded, technology_links_viewer
+):
+    _login(page, live_server, technology_links_viewer)
+    recorded = _write_control_route(
+        page, live_server, "post", CONTROL_TESTS_PATH % 0, {"test_kind": "design", "result": "effective"}
+    )
+    assert recorded.status == 403, "a Viewer recorded a control test: %s" % recorded.status
+    saved = _write_control_route(
+        page, live_server, "put", CONTROL_MAPPING_PATH % 0, {"evidence_url": "https://example.test/e"}
+    )
+    assert saved.status == 403, "a Viewer saved control evidence: %s" % saved.status
+
+
 OVERSIGHT_CLASSIFICATION_PERMITTED = {
     "platform_admin",
 }

@@ -345,7 +345,9 @@
             evidenceRecorded: !!c.evidence_url_recorded,
             verified: !!c.verified,
             verifiedDate: c.verified_date || null,
-            noEvidence: !!c.no_evidence
+            noEvidence: c.evidence_state === 'missing',
+            evidenceExpired: c.evidence_state === 'expired',
+            evidenceUndated: c.evidence_state === 'undated'
         };
     }
 

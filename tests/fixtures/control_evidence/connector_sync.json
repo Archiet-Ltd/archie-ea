@@ -1,0 +1,26 @@
+{
+  "source_system": "Okta",
+  "items": [
+    {
+      "control_ref": "access-reviews",
+      "evidence_url": "https://evidence.example.test/okta/access-review-q3",
+      "collected_at": "2026-10-01T09:00:00",
+      "valid_until": "2027-01-01T00:00:00",
+      "summary": "Quarterly access review export from the identity provider"
+    },
+    {
+      "control_ref": "mfa-enforced",
+      "evidence_url": "https://evidence.example.test/okta/mfa-policy",
+      "collected_at": "2026-10-02T09:00:00",
+      "valid_until": "2027-04-01T00:00:00",
+      "summary": "Sign-in policy requiring a second factor for every account"
+    },
+    {
+      "control_ref": "offboarding",
+      "evidence_url": "https://evidence.example.test/okta/deprovisioning-log",
+      "collected_at": "2026-10-03T09:00:00",
+      "valid_until": null,
+      "summary": "Deprovisioning log for leavers in the quarter"
+    }
+  ]
+}

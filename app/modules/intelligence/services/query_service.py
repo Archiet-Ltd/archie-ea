@@ -24,6 +24,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from app.extensions import db
 from app.middleware.tenant_context import current_org_id
 from app.modules.capabilities.services.capability_heatmap_service import CapabilityHeatmapService
+from app.modules.compliance.services.control_evidence import EXPIRED, GAP_STATES, MISSING, evidence_state
 from app.modules.intelligence.services.derived_facts import list_derived_facts
 from app.modules.intelligence.services.latency_probe import record_query_latency
 from app.modules.intelligence.services.plain_terms import plain_terms_sentence
@@ -65,6 +66,7 @@ NO_STEWARD_RECORDED_REASON = validate_reason_code("no_steward_recorded")
 NO_LINEAGE_RECORDED_REASON = validate_reason_code("no_lineage_recorded")
 NO_COMPLIANCE_CONTROLS_RECORDED_REASON = validate_reason_code("no_compliance_controls_recorded")
 NO_CONTROL_EVIDENCE_REASON = validate_reason_code("no_control_evidence")
+CONTROL_EVIDENCE_EXPIRED_REASON = validate_reason_code("control_evidence_expired")
 NO_POLICY_SCAN_RECORDED_REASON = validate_reason_code("no_policy_scan_recorded")
 # The programme lens's own plateau/gap block: a work package's stored
 # plateau_id/gap_id may be unset (a nullable FK) or point at a record
@@ -1592,6 +1594,7 @@ class IntelligenceQueryService:
                             "implementation_status": status,
                             "implemented": status in ("implemented", "verified"),
                             "evidence_url_recorded": bool((mapping.evidence_url or "").strip()),
+                            "evidence_state": evidence_state(mapping),
                             "verified": mapping.verified_date is not None,
                         }
                     )
@@ -2469,8 +2472,6 @@ class IntelligenceQueryService:
     # ------------------------------------------------------------------ #
 
     _COMPLIANCE_LIMIT = 200
-    # A control in one of these states is reported as recorded; it is not flagged as missing evidence.
-    _EVIDENCE_NOT_REQUIRED = frozenset({"not_applicable", "waived"})
 
     @staticmethod
     def _compliance_tenant_predicate(model, organization_id: int):
@@ -2550,15 +2551,14 @@ class IntelligenceQueryService:
 
         controls = []
         any_missing_evidence = False
+        any_expired_evidence = False
         for mapping, control, framework in rows:
             status = mapping.implementation_status
             has_url = bool((mapping.evidence_url or "").strip())
             verified = mapping.verified_date is not None
-            missing = (
-                not has_url and not verified
-                and status not in IntelligenceQueryService._EVIDENCE_NOT_REQUIRED
-            )
-            any_missing_evidence = any_missing_evidence or missing
+            state = evidence_state(mapping)
+            any_missing_evidence = any_missing_evidence or state == MISSING
+            any_expired_evidence = any_expired_evidence or state == EXPIRED
             controls.append({
                 "control_id": mapping.control_id,
                 "code": control.control_code if control else None,
@@ -2567,9 +2567,10 @@ class IntelligenceQueryService:
                 "framework_name": framework.name if framework else None,
                 "implementation_status": status,
                 "evidence_url_recorded": has_url,
+                "evidence_state": state,
                 "verified": verified,
                 "verified_date": mapping.verified_date.isoformat() if mapping.verified_date else None,
-                "no_evidence": missing,
+                "no_evidence": state in GAP_STATES,
             })
 
         violations = db.session.execute(
@@ -2602,8 +2603,11 @@ class IntelligenceQueryService:
         reasons = []
         if not controls:
             reasons.append(NO_COMPLIANCE_CONTROLS_RECORDED_REASON)
-        elif any_missing_evidence:
-            reasons.append(NO_CONTROL_EVIDENCE_REASON)
+        else:
+            if any_missing_evidence:
+                reasons.append(NO_CONTROL_EVIDENCE_REASON)
+            if any_expired_evidence:
+                reasons.append(CONTROL_EVIDENCE_EXPIRED_REASON)
         if last_scan is None:
             reasons.append(NO_POLICY_SCAN_RECORDED_REASON)
         return {

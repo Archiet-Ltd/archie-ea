@@ -16,6 +16,11 @@ from app.models.compliance_models import ComplianceControl, RegulatoryFramework
 from app.models.regulatory_change import RegulatoryChange, RegulatoryChangeImpact
 from app.models.regulatory_framework import FrameworkAdoption
 from app.models.technology_layer import Node
+from app.modules.compliance.services.control_evidence import (
+    evidence_state,
+    has_usable_evidence_link,
+    link_state,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -242,13 +247,15 @@ class ApplicabilityService:
                 "title": control.title,
                 "implementation_status": ac.implementation_status,
                 "evidence_url": ac.evidence_url,
+                "evidence_state": evidence_state(ac),
+                "evidence_valid_until": (
+                    ac.evidence_valid_until.isoformat() if ac.evidence_valid_until else None
+                ),
                 "notes": ac.notes,
                 "evidence_source": None,
             }
 
-            has_own_evidence = (
-                ac.evidence_url is not None and ac.evidence_url.strip() != ""
-            )
+            has_own_evidence = has_usable_evidence_link(ac)
 
             if not has_own_evidence:
                 source = None
@@ -266,8 +273,7 @@ class ApplicabilityService:
                         ).first()
                         if (
                             partner_ac is not None
-                            and partner_ac.evidence_url is not None
-                            and partner_ac.evidence_url.strip() != ""
+                            and has_usable_evidence_link(partner_ac)
                         ):
                             source = {
                                 "control_id": partner.id,
@@ -278,6 +284,8 @@ class ApplicabilityService:
                                     else None
                                 ),
                                 "evidence_url": partner_ac.evidence_url,
+                                "evidence_state": link_state(partner_ac),
+                                "evidence_valid_until": partner_ac.evidence_valid_until,
                                 "notes": partner_ac.notes,
                             }
 
@@ -294,8 +302,7 @@ class ApplicabilityService:
                         ).first()
                         if (
                             partner_ac is not None
-                            and partner_ac.evidence_url is not None
-                            and partner_ac.evidence_url.strip() != ""
+                            and has_usable_evidence_link(partner_ac)
                         ):
                             source = {
                                 "control_id": partner.id,
@@ -306,12 +313,20 @@ class ApplicabilityService:
                                     else None
                                 ),
                                 "evidence_url": partner_ac.evidence_url,
+                                "evidence_state": link_state(partner_ac),
+                                "evidence_valid_until": partner_ac.evidence_valid_until,
                                 "notes": partner_ac.notes,
                             }
                             break
 
                 if source is not None:
                     entry["evidence_url"] = source["evidence_url"]
+                    entry["evidence_state"] = source["evidence_state"]
+                    entry["evidence_valid_until"] = (
+                        source["evidence_valid_until"].isoformat()
+                        if source["evidence_valid_until"]
+                        else None
+                    )
                     entry["notes"] = source["notes"]
                     entry["evidence_source"] = {
                         "control_id": source["control_id"],
