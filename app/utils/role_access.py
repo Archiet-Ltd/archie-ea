@@ -1041,7 +1041,6 @@ NOT_READY_ENDPOINTS = {
     "implementation_planning.implementation_dashboard": "not available yet",
     "main.integrations": "refused for the demonstration user",
     "main.agentic_gaps_ui": "page says it is still being built",
-    "dynamic_dashboards.model_registry_index": "page says it is still being built",
     "application_mgmt.compliance_frameworks_dashboard": "compliance views are empty",
     "architecture.investment_priorities": "asks for setup before it shows anything",
     "strategic.investment_matrix": "asks for setup before it shows anything",
