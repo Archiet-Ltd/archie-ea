@@ -25,6 +25,7 @@
         action="{{ url_for('interface_register.update', element_id=interface.id) if interface else url_for('interface_register.create') }}"
         class="space-y-6 max-w-3xl">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if initiative_id %}<input type="hidden" name="initiative_id" value="{{ initiative_id }}">{% endif %}
 
     <div class="bg-card border border-border rounded-lg p-6 space-y-5">
       <div>

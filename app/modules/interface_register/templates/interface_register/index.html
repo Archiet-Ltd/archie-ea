@@ -27,7 +27,15 @@
   {% endif %}
 
   <div class="mb-4 flex justify-end gap-2">
-    <a href="{{ url_for('interface_register.new', architecture_id=architecture.id if architecture else None) }}"
+    {% for initiative in comparison_initiatives or [] %}
+    <a href="{{ url_for('interface_register.comparison', initiative_id=initiative.id) }}"
+       data-testid="{{ 'interface-comparison-link' if comparison_initiatives|length == 1 else 'interface-comparison-link-%d' % initiative.id }}"
+       class="inline-flex items-center gap-2 rounded-md text-sm font-medium border border-input bg-transparent hover:bg-accent hover:text-accent-foreground h-9 px-4">
+      <i data-lucide="git-compare" class="h-4 w-4" aria-hidden="true"></i>
+      As-is / To-be comparison{% if comparison_initiatives|length > 1 %}: {{ initiative.name }}{% endif %}
+    </a>
+    {% endfor %}
+    <a href="{{ url_for('interface_register.new', architecture_id=architecture.id if architecture else None, initiative_id=initiative_id) }}"
        data-testid="interface-register-new"
        class="inline-flex items-center gap-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4">
       <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
