@@ -64,6 +64,8 @@ _INFRA_RULES = {
     # above: not a module an already-signed-in persona looks for in nav.
     "/demonstration",
     "/demonstration/trial",
+    "/roles",  # the public role hub (app/main/views.py::public_roles_index)
+    "/connectors",  # the public connector hub (app/main/views.py::public_connectors_index)
 }
 
 _SINGLE_SEGMENT = re.compile(r"^/[^/]+/?$")

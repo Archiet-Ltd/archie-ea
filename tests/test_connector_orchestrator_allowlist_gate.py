@@ -91,6 +91,15 @@ class TestServiceLevelGate:
             orch_module.ConnectorOrchestrator, "_n8n_request", _fake_n8n_request
         )
 
+        import app.utils.ssrf_guard as guard
+
+        monkeypatch.setattr(
+            guard.socket,
+            "getaddrinfo",
+            lambda host, port, *a, **k: [(2, 1, 6, "", ("93.184.216.34", port))],
+        )
+        monkeypatch.setattr(guard, "_local_interface_addresses", lambda: set())
+
         from app.models.solution_models import Solution
 
         solution = Solution(name="Allowlist gate test solution", organization_id=org.id)

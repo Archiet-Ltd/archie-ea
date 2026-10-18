@@ -103,7 +103,29 @@ else:
 
 
 class Config:
+    # Webhook and compliance-check URLs may point at loopback/private hosts only
+    # where this is True. It is False everywhere by default; Development and
+    # Testing can opt in with the environment variable of the same name. No
+    # configuration class turns it on by itself, and Production never reads it.
+    ALLOW_INTERNAL_WEBHOOK_TARGETS = False
+    # Extra networks the outbound-URL guard refuses (comma-separated CIDRs).
+    SSRF_BLOCKED_CIDRS = [
+        c.strip() for c in os.environ.get("SSRF_BLOCKED_CIDRS", "").split(",") if c.strip()
+    ]
+
+    # Extra host suffixes accepted for Teams webhook addresses, on top of the
+    # Microsoft hosts (comma-separated; platform configuration only).
+    TEAMS_WEBHOOK_EXTRA_HOST_SUFFIXES = [
+        c.strip()
+        for c in os.environ.get("TEAMS_WEBHOOK_EXTRA_HOST_SUFFIXES", "").split(",")
+        if c.strip()
+    ]
+
     APP_NAME = os.environ.get("APP_NAME", "Entelim")
+    # The assistant's citation gate: "log" (default; answers are shown
+    # unchanged and an answer the gate would refuse is logged), "enforce"
+    # (the answer is replaced by "Not recorded") or "off".
+    ASSISTANT_CITATION_GATE_MODE = os.environ.get("ASSISTANT_CITATION_GATE_MODE", "log")
     SECRET_KEY = os.environ.get("SECRET_KEY")
     if not SECRET_KEY:
         import secrets
@@ -155,6 +177,13 @@ class Config:
         "DERIVED_RECOMPUTE_INTERVAL_MINUTES", "10"
     )
 
+    # Per-organisation graph projection snapshot refresh — how often each
+    # organisation's stored projection is brought up to date from the event
+    # log. Default 5 minutes.
+    GRAPH_PROJECTION_INTERVAL_MINUTES = os.environ.get(
+        "GRAPH_PROJECTION_INTERVAL_MINUTES", "5"
+    )
+
     # Per-organisation model-health drift scan — recurring interval,
     # configurable downward. Default 60 minutes.
     MODEL_HEALTH_SCAN_INTERVAL_MINUTES = os.environ.get(
@@ -193,6 +222,32 @@ class Config:
     JWT_TOKEN_LOCATION = ["headers"]
     JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY") or SECRET_KEY
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
+
+    # MCP server — OAuth-protected endpoint for AI assistants.
+    #
+    # PUBLIC_BASE_URL is the one place the server's externally-reachable
+    # origin is configured. Every absolute URL the OAuth/MCP surface emits
+    # (issuer, authorization/token/registration/revocation endpoints, the
+    # protected-resource metadata, the "resource" identifier itself) is built
+    # from this value — never from the Host header of an incoming request,
+    # and never from a literal fallback host baked into the code. A boot-time
+    # check (see app/_bootstrap/blueprints.py) refuses to start when
+    # MCP_ENABLED is true and this is empty, so a misconfigured deploy fails
+    # loudly instead of quietly serving relative or wrong-host metadata.
+    PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    MCP_ENABLED = _env_bool("MCP_ENABLED", False)
+
+    # DNS rebinding protection for POST /mcp (app/modules/mcp/blueprint.py):
+    # when a request carries an Origin header, it is compared against this
+    # value and refused (403) on a mismatch. Empty by default -- a request
+    # with no Origin header at all (every genuine non-browser MCP client)
+    # is unaffected either way; this only ever rejects a browser-originated
+    # request from an origin that was never allow-listed.
+    MCP_ALLOWED_ORIGIN = os.environ.get("MCP_ALLOWED_ORIGIN", "")
+    OAUTH_REFRESH_TOKEN_DAYS = int(os.environ.get("OAUTH_REFRESH_TOKEN_DAYS", "30"))
+    OAUTH_CLIENT_REGISTRATION_RATE_LIMIT = os.environ.get(
+        "OAUTH_CLIENT_REGISTRATION_RATE_LIMIT", "10 per hour"
+    )
 
     # Email
     MAIL_SERVER = os.environ.get("MAIL_SERVER", "smtp.sendgrid.net")
@@ -406,6 +461,11 @@ class Config:
     # ENABLED 2026-04-02: Quick wins from NORTH_STAR_ASSESSMENT.md Part 10
     ENABLE_NORTH_STAR_NAV = _env_bool("ENABLE_NORTH_STAR_NAV", True)
 
+    # Pages not ready for the soft launch are left out of the sidebar, the
+    # All-modules directory and search while this is on (the pages stay
+    # reachable by address). Turn it off to list them again.
+    HIDE_NOT_READY_MODULES = _env_bool("HIDE_NOT_READY_MODULES", True)
+
     # North Star Navigation Phase 2 (NORTH-STAR-002)
     # Complete ArchiMate 3.2 layer-based navigation with all 55 element types.
     # When enabled: 6-section IA, layer-first architecture, Portfolio/Architecture separation.
@@ -461,6 +521,9 @@ class Config:
 
 class DevelopmentConfig(Config):
     DEBUG = True
+    ALLOW_INTERNAL_WEBHOOK_TARGETS = os.environ.get(
+        "ALLOW_INTERNAL_WEBHOOK_TARGETS", ""
+    ).lower() in ("1", "true", "yes")
     ASSETS_DEBUG = True
 
     # N+1 query detection — set SQLALCHEMY_ECHO=true in .env to enable query logging
@@ -509,6 +572,9 @@ class DevelopmentConfig(Config):
 
 class TestingConfig(Config):
     TESTING = True
+    ALLOW_INTERNAL_WEBHOOK_TARGETS = os.environ.get(
+        "ALLOW_INTERNAL_WEBHOOK_TARGETS", ""
+    ).lower() in ("1", "true", "yes")
     # Pinned explicitly rather than left to inherit Flask's own default, which
     # falls back to the ambient FLASK_DEBUG/FLASK_ENV environment variables
     # (get_debug_flag()) whenever a config class leaves DEBUG unset. A

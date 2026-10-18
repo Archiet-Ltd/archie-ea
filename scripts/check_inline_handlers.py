@@ -80,7 +80,7 @@ EVENTS = (
 # is rendered by the macro as Alpine's @click, not as an attribute. Requiring an
 # open tag before it on the same line is what separates the two.
 HANDLER = re.compile(
-    r"<[a-zA-Z][a-zA-Z0-9-]*\b[^>]*?\son(?:%s)\s*=" % EVENTS
+    r"<[a-zA-Z][a-zA-Z0-9-]*\b[^>]*?\s(on(?:%s))\s*=" % EVENTS
 )
 ALLOW = re.compile(r"inline-handler-ok:[ \t]*\S")
 
@@ -133,18 +133,27 @@ def scan(root: str) -> list:
     for path in template_files(root):
         try:
             with open(path, encoding="utf-8") as fh:
-                lines = fh.read().split("\n")
+                text = fh.read()
         except (OSError, UnicodeDecodeError):
             continue
-        for number, line in enumerate(lines, 1):
-            if ALLOW.search(line):
+        lines = text.split("\n")
+        # Scan the whole file, not line by line: a tag whose attributes are
+        # laid out one per line (`<input` ... `onchange="..."` three lines
+        # later) is the normal shape in this codebase, and a per-line scan never
+        # saw it. That is how the capability map's row checkbox kept an
+        # onchange= for the life of the file with this gate reading 0, and
+        # logged a CSP violation on every page load once rows rendered.
+        for match in HANDLER.finditer(text):
+            start = match.start(1)
+            number = text.count("\n", 0, start) + 1
+            # The allow marker may sit on the line of the attribute or on the
+            # line the tag opens on.
+            opened = text.count("\n", 0, match.start()) + 1
+            if ALLOW.search(lines[number - 1]) or ALLOW.search(lines[opened - 1]):
                 continue
-            match = HANDLER.search(line)
-            if match:
-                attribute = match.group(0).rsplit(" ", 1)[-1].rstrip("=")
-                findings.append(
-                    (os.path.relpath(path, root).replace(os.sep, "/"), number, attribute)
-                )
+            findings.append(
+                (os.path.relpath(path, root).replace(os.sep, "/"), number, match.group(1))
+            )
     return findings
 
 

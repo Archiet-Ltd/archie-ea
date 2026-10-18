@@ -1,0 +1,65 @@
+{# Owner and approver panel for a work package (transformation planning).
+   Server-rendered from the services: the recorded owner of every element the
+   work package changes, or a no-owner flag, and its pending and approved
+   approvals. All data arrives already organisation-fenced in ``owner_panel``. #}
+<div data-testid="owner-panel" class="border border-border rounded-lg overflow-hidden">
+    <div class="px-4 py-3 bg-muted/50 border-b border-border">
+        <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/>
+            </svg>
+            <div>
+                <div class="font-semibold text-sm text-foreground">Owners and approvals</div>
+                <div class="text-xs text-muted-foreground">The recorded owner of each element this work package changes, and what it needs approved</div>
+            </div>
+        </div>
+    </div>
+    <div class="divide-y divide-border">
+        {% for element in owner_panel.elements %}
+        <div data-testid="owner-element" class="px-4 py-3 space-y-2">
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0">
+                    <span class="text-sm font-medium text-foreground truncate">{{ element.element_name or 'Unnamed element' }}</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground">{{ element.kind|capitalize }}</span>
+                </div>
+                {% if element.has_owner %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis">Owner recorded</span>
+                {% else %}
+                <span data-testid="no-owner-flag" class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis">No owner recorded</span>
+                {% endif %}
+            </div>
+            {% if element.owners %}
+            <ul class="text-xs text-muted-foreground space-y-1">
+                {% for owner in element.owners %}
+                <li>{{ owner.user_name if owner.user_name != owner.user_email else '—' }} <span class="text-muted-foreground">({{ owner.ownership_type_label }})</span></li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            {% if element.pending_approvals or element.approved_approvals %}
+            <div class="text-xs text-muted-foreground space-y-1">
+                {% for approval in element.pending_approvals %}
+                <div>Pending — {{ approval.summary }}</div>
+                {% endfor %}
+                {% for approval in element.approved_approvals %}
+                <div>Approved — {{ approval.summary }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% if owner_panel.work_package_approvals.pending or owner_panel.work_package_approvals.approved %}
+        <div data-testid="work-package-approvals" class="px-4 py-3 space-y-1 text-xs text-muted-foreground">
+            <div class="font-medium text-foreground">Approvals for this work package</div>
+            {% for approval in owner_panel.work_package_approvals.pending %}
+            <div>Pending — {{ approval.summary }}</div>
+            {% endfor %}
+            {% for approval in owner_panel.work_package_approvals.approved %}
+            <div>Approved — {{ approval.summary }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if not owner_panel.elements %}
+        <div class="px-4 py-3 text-xs text-muted-foreground">No elements linked to this work package yet.</div>
+        {% endif %}
+    </div>
+</div>

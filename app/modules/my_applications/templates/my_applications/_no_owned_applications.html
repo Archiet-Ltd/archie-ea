@@ -1,0 +1,14 @@
+{# Shown on every My Applications page when the signed-in user owns nothing yet.
+   These pages list the applications YOU own, so for a person who has not been
+   recorded as an owner (an organisation administrator, typically) the next step
+   is to become one from the portfolio -- say that, and link to it. #}
+{% from 'components/empty_state.html' import empty_state %}
+{{ empty_state(
+    icon='package',
+    title='No applications assigned yet',
+    description="This page lists the applications you own. Open an application in the portfolio and add yourself as an owner, and it will appear here. If you are not an administrator, ask one to assign an application to you.",
+    cta_text='Browse all applications',
+    cta_href=url_for('unified_applications.application_list'),
+    heading_testid='my-applications-empty-title',
+    description_testid='my-applications-empty-next-step',
+) }}

@@ -8,6 +8,7 @@ note: "No surface exists anywhere in the codebase for this use case (register: '
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
 url_slug: /use-cases/workforce-planning
+icon: user-plus
 ---
 
 # Who do we need, with which skills, by when?

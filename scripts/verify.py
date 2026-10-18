@@ -94,6 +94,9 @@ class Result:
     baseline: int | None = None
     duration_s: float = 0.0
     remediation: str = ""
+    # Further ratchet measurements of the same gate, {baseline key: value}, for a
+    # gate whose name does not map onto its baseline keys (--update-baseline).
+    extra: dict | None = None
 
 
 @dataclass
@@ -908,6 +911,44 @@ def gate_unregistered_checks(baseline: int) -> Result:
     return Result("unregistered-checks", PASS if count <= baseline else FAIL, detail, count, baseline)
 
 
+def gate_background_mechanisms(baseline: int, instances_baseline: int) -> Result:
+    """Every background-work mechanism is in docs/background-mechanisms.yml. RATCHET.
+
+    Static (no boot, no database): fails when a file under app/ (or manage.py) starts
+    rq, celery, apscheduler, threading.Thread, ThreadPoolExecutor, multiprocessing,
+    a detached subprocess or a fork in a function with no register entry, when an
+    entry names something no longer used, and when either the number of files holding
+    `thread` entries (`background_mechanisms_thread`) or the number of thread
+    instances (`background_mechanisms_thread_instances`) rises above its baseline. An
+    empty scan exits 2 and is a FAIL here: finding nothing proves nothing.
+    """
+    script = "scripts/check_background_mechanisms.py"
+
+    def count(flag):
+        proc = _run([sys.executable, script, flag])
+        try:
+            return int(proc.stdout.strip().splitlines()[-1]), proc
+        except (ValueError, IndexError):
+            return None, proc
+
+    files, proc = count("--count")
+    instances, proc2 = count("--count-instances")
+    if files is None or instances is None:
+        bad = proc if files is None else proc2
+        return Result("background-mechanisms", FAIL,
+                      f"could not parse count: {bad.stdout!r} {bad.stderr[:300]}")
+    proc = _run([sys.executable, script])
+    ok = proc.returncode == 0 and files <= baseline and instances <= instances_baseline
+    detail = ""
+    if not ok:
+        detail = proc.stdout[-1800:]
+        if instances > instances_baseline:
+            detail += f"\n  thread instances {instances} > baseline {instances_baseline}"
+    return Result("background-mechanisms", PASS if ok else FAIL, detail, files, baseline,
+                  extra={"background_mechanisms_thread": files,
+                         "background_mechanisms_thread_instances": instances})
+
+
 def gate_null_filters() -> Result:
     """No `|default(...)` feeds a filter that calls len(). Gated at ZERO.
 
@@ -1238,6 +1279,27 @@ def gate_unfenced_tables() -> Result:
         return Result("unfenced-tables", FAIL, f"could not parse: {proc.stdout!r}")
     detail = proc.stdout[-1500:] if count else ""
     return Result("unfenced-tables", PASS if count == 0 else FAIL, detail, count, 0)
+
+
+def gate_reuse_register() -> Result:
+    """One canonical implementation per concept (docs/reuse-register.yml). Gated at ZERO.
+
+    Static (no boot, no database). Fails when a register entry's canonical file or
+    symbol no longer exists, and when a definition matching a `must_not_create`
+    pattern appears outside the canonical file and the known exceptions beyond the
+    per-file counts in scripts/reuse_register_baseline.json (which only fall). The
+    failure prints the register entry so a builder knows what to reuse. See
+    scripts/check_reuse_register.py.
+    """
+    proc = _run([sys.executable, "scripts/check_reuse_register.py"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("reuse-register", FAIL,
+                      f"could not parse: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = proc.stdout[-1800:] if count or proc.returncode else ""
+    return Result("reuse-register", PASS if count == 0 and proc.returncode == 0 else FAIL,
+                  detail, count, 0)
 
 
 def gate_sidebar_links(baseline: int) -> Result:
@@ -1653,6 +1715,63 @@ def gate_llm_boundary(baseline: int) -> Result:
                   detail, count, baseline)
 
 
+INTERFACE_CONTRACT_SUBSET = REPO_ROOT / "app" / "config" / "api_contract_subset.yaml"
+_INTERFACE_CONTRACT_REPORTS: dict = {}
+
+
+def _interface_contract_report() -> dict:
+    """One application boot answers both interface-contract gates.
+
+    The checker prints {"violations": [...], "unbuilt": N}; each gate judges
+    its own half. Cached per subset path for the life of the process.
+    """
+    key = str(INTERFACE_CONTRACT_SUBSET)
+    if key not in _INTERFACE_CONTRACT_REPORTS:
+        proc = _run([sys.executable, "scripts/check_interface_contract.py",
+                     "--subset", key, "--json"])
+        try:
+            report = json.loads(proc.stdout.strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            report = {"error": f"could not parse checker output: {proc.stdout[-500:]!r} "
+                               f"{proc.stderr[-300:]}"}
+        _INTERFACE_CONTRACT_REPORTS[key] = report
+    return _INTERFACE_CONTRACT_REPORTS[key]
+
+
+def gate_interface_contract_unlisted() -> Result:
+    """Every token-accepting /api/v1 route is in the committed contract subset.
+    Zero tolerance — no ratchet."""
+    if not INTERFACE_CONTRACT_SUBSET.exists():
+        return Result("interface-contract-unlisted", SKIP,
+                      "no committed subset at app/config/api_contract_subset.yaml; "
+                      "run scripts/generate_api_contract_subset.py first")
+    report = _interface_contract_report()
+    if "error" in report:
+        return Result("interface-contract-unlisted", FAIL, report["error"])
+    violations = report["violations"]
+    if not violations:
+        return Result("interface-contract-unlisted", PASS,
+                      "all token-accepting routes are in the contract subset")
+    return Result("interface-contract-unlisted", FAIL,
+                  "\n".join(violations[:20]), measured=len(violations), baseline=0)
+
+
+def gate_interface_contract_unimplemented(baseline: int) -> Result:
+    """Subset operations with no matching token-accepting route — ratchet."""
+    if not INTERFACE_CONTRACT_SUBSET.exists():
+        return Result("interface-contract-unimplemented", SKIP,
+                      "no committed subset at app/config/api_contract_subset.yaml; "
+                      "run scripts/generate_api_contract_subset.py first")
+    report = _interface_contract_report()
+    if "error" in report:
+        return Result("interface-contract-unimplemented", FAIL, report["error"])
+    count = int(report["unbuilt"])
+    detail = "" if count <= baseline else f"{count} unbuilt operation(s) > baseline {baseline}"
+    return Result("interface-contract-unimplemented",
+                  PASS if count <= baseline else FAIL,
+                  detail, count, baseline)
+
+
 def gate_count_checker(name: str, script: str, baseline: int) -> Result:
     """Run a checker whose final stdout line is its finding count."""
     proc = _run([sys.executable, script, "--count"])
@@ -1673,6 +1792,20 @@ def gate_count_checker(name: str, script: str, baseline: int) -> Result:
 
 def build_gates(baseline: dict) -> list[Gate]:
     return [
+        Gate("interface-contract-unlisted",
+             "Every token-accepting /api/v1 route is in the committed contract subset",
+             "zero", gate_interface_contract_unlisted,
+             remediation="run scripts/generate_api_contract_subset.py to regenerate the "
+                         "subset, or add the missing route to the contract",
+             tags=["static"]),
+        Gate("interface-contract-unimplemented",
+             "Subset operations with no matching token-accepting route",
+             "ratchet",
+             lambda: gate_interface_contract_unimplemented(
+                 baseline.get("interface_contract_unimplemented", 0)),
+             remediation="implement the missing route, or remove the operation from the "
+                         "subset's PUBLISHED_GROUPS",
+             tags=["static"]),
         Gate("compile", "Every module bytecode-compiles", "command", gate_compile,
              remediation="fix the reported SyntaxError", tags=["static", "fast"]),
         Gate("undefined-exports", "No __all__ entry names a missing symbol", "zero",
@@ -1754,6 +1887,12 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="give the model TenantMixin, or list the table in "
                          "scripts/unfenced_tables.txt with a reason in review",
              tags=["static", "security"]),
+        Gate("reuse-register", "one canonical implementation per concept; no second copy beside it",
+             "zero", gate_reuse_register,
+             remediation="reuse the implementation named in docs/reuse-register.yml "
+                         "(python scripts/check_reuse_register.py --entries), or add a "
+                         "known_exceptions entry with a reason",
+             tags=["static", "process"]),
         Gate("llm-boundary", "codegen emitters make no direct LLM calls (deterministic boundary)",
              "ratchet", lambda: gate_llm_boundary(baseline.get("llm_boundary", 0)),
              remediation="move the LLM call out of the emitter; the LLM may only propose "
@@ -1939,6 +2078,15 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="run scripts/check_public_repo_hygiene.py; remove the "
                          "content/reference, or mark the line 'hygiene-ok: <reason>'",
              tags=["static", "qa"]),
+        Gate("background-mechanisms",
+             "every background-work mechanism is listed in the one register",
+             "ratchet",
+             lambda: gate_background_mechanisms(
+                 baseline.get("background_mechanisms_thread", 22),
+                 baseline.get("background_mechanisms_thread_instances", 29)),
+             remediation="add the file to docs/background-mechanisms.yml with its class, "
+                         "disposition and tenant_context (see scripts/check_background_mechanisms.py)",
+             tags=["static"]),
         Gate("unregistered-checks",
              "no scripts/check_*.py exists with no Gate(...) entry in build_gates()",
              "ratchet", lambda: gate_unregistered_checks(baseline.get("unregistered_checks", 41)),
@@ -2147,7 +2295,12 @@ def main(argv: list[str] | None = None) -> int:
         results.append(result)
 
     if args.update_baseline:
-        measured = {r.name.replace("-", "_"): r.measured for r in results if r.measured is not None}
+        measured = {}
+        for r in results:
+            if r.extra:
+                measured.update(r.extra)
+            elif r.measured is not None:
+                measured[r.name.replace("-", "_")] = r.measured
         new = {**baseline, **{k: v for k, v in measured.items() if k in baseline}}
         lowered = {k: (baseline[k], new[k]) for k in new if new[k] < baseline.get(k, new[k])}
         save_baseline(new, f"updated {time.strftime('%Y-%m-%d')}")

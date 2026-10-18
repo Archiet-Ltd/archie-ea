@@ -22,6 +22,7 @@ from app.flask_email import send_email
 from app.jobs.tenant_safe_job import platform_scope
 from app.models import User
 from app.models.org_role import OrgRole
+from app.models.user import password_hash_is_current
 from app.services import session_registry
 
 _log = logging.getLogger(__name__)
@@ -82,13 +83,27 @@ class AccountService:
         """Authenticate a user by email and password.
 
         Returns the User object if credentials are valid, None otherwise.
+        A service account is refused here even if it somehow holds a password:
+        it exists only as the subject of scoped client-credentials tokens and
+        must never gain a session through the sign-in path.
         """
         user = User.find_by_email(email)
+        if user is not None and getattr(user, "is_service_user", False):
+            return None
         if (
             user is not None
             and user.password_hash is not None
             and user.verify_password(password)
         ):
+            if not password_hash_is_current(user.password_hash):
+                # Upgrade a hash from an older method or cost while the plain
+                # password is in hand; never let a failed upgrade fail the sign-in.
+                try:
+                    user.password = password
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+                    _log.warning("password hash upgrade failed for user %s", user.id, exc_info=True)
             return user
         return None
 
@@ -232,6 +247,43 @@ class AccountService:
                 on_result=record,
             )
         return "requested"
+
+    @staticmethod
+    def notify_sign_in_method_connected(user, provider_label):
+        """Tell the account holder that a sign-in method was connected.
+
+        The one sender of this notice, for every path that connects an
+        external sign-in to an account that already signed in another way.
+        The message goes to the account's own address only, names the
+        sign-in method and the time in UTC, and carries no organisation name
+        and no link token. It is sent after the response, like the password
+        reset link. Never raises: a notice that cannot be sent must not stop
+        the sign-in it reports.
+        """
+        from datetime import datetime, timezone
+
+        from app.flask_email import deliver_email_after_response, mail_available
+
+        user_id = getattr(user, "id", None)
+        try:
+            if not mail_available():
+                _log.info(
+                    "sign-in method connected for user %s; no mail server, notice not sent",
+                    user_id,
+                )
+                return
+            deliver_email_after_response(
+                recipient=user.email,
+                subject="A sign-in method was connected to your account",
+                template="account/email/sign_in_method_connected",
+                user=user,
+                provider_label=provider_label,
+                connected_at=datetime.now(timezone.utc),
+            )
+        except Exception:
+            _log.error(
+                "sign-in method notice for user %s could not be sent", user_id, exc_info=True
+            )
 
     @staticmethod
     def reset_link_usable(token):

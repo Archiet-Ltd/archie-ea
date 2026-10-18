@@ -22,6 +22,12 @@
         <!-- Title Section (Jumbotron-style) -->
         {{ page_shell(title='Implementation Planning', subtitle='Enterprise Architecture Migration & Implementation Roadmap') }}
 
+        {# The owner/approver panel renders only on the work package detail
+           view, where the route passes ``owner_panel`` from the services. #}
+        {% if owner_panel %}
+        {% include 'implementation_planning/_owner_panel.html' %}
+        {% endif %}
+
         {# A failed load must be visible on the page, not only in a toast that
            has already faded by the time the user reads the roadmap. #}
         <div x-show="loadError" x-cloak class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="loadError"></div>

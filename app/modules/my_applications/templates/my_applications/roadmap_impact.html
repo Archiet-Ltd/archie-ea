@@ -123,6 +123,10 @@
             {% endfor %}
         </div>
     </div>
+    {% elif not apps %}
+    <div class="bg-card border border-border rounded-lg">
+        {% include 'my_applications/_no_owned_applications.html' %}
+    </div>
     {% else %}
     <!-- No Impacts -->
     <div class="bg-card border border-border rounded-lg p-12 text-center">

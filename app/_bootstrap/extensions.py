@@ -107,6 +107,10 @@ def init_extensions(app):
 
         if "/api/" not in request.path:
             return e
+        from app.utils.plain_errors import PLAIN, plain_json
+
+        if e.code in PLAIN:
+            return plain_json(e.code, (e.name or "error").lower().replace(" ", "_"))
         return jsonify({
             "success": False,
             "error": e.description,
@@ -431,6 +435,32 @@ def init_scheduler(app):
             trigger=IntervalTrigger(minutes=30),
             id="error_digest",
             name="Unresolved Error Digest",
+            replace_existing=True,
+            max_instances=1,
+        )
+
+        # Per-owner in-app notification digest: email each opted-in user their
+        # own unread in-app notifications. Daily, like the maturity/summary
+        # digests; per-day idempotency and weekly_digest / digest_frequency
+        # preferences gate what each user actually receives. Runs per
+        # organisation through the tenant-safe harness
+        # (send_owner_digests -> run_for_each_tenant / tenant_scope).
+        def run_owner_digest():
+            with app.app_context():
+                try:
+                    from app._bootstrap._digest_emails import send_owner_digests
+                    send_owner_digests(app)
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).error(
+                        "APScheduler owner-digest error: %s", exc
+                    )
+
+        scheduler.add_job(
+            func=run_owner_digest,
+            trigger=CronTrigger(hour=7, minute=30),
+            id="owner_digest",
+            name="Per-Owner Notification Digest",
             replace_existing=True,
             max_instances=1,
         )
@@ -799,6 +829,46 @@ def init_scheduler(app):
                 "Model-health scan scheduler job was not registered: %s", exc
             )
 
+        # Per-organisation graph projection: applies the event-log tail to
+        # each organisation's stored projection snapshot and re-stores it
+        # (app/jobs/graph_projection_job.py). Tenant job: one organisation
+        # per visit through run_for_each_tenant.
+        graph_projection_registered = False
+        try:
+            def run_graph_projection():
+                with app.app_context():
+                    from app.jobs.graph_projection_job import run_graph_projection_refresh
+
+                    run = run_graph_projection_refresh(app)
+                    if run.failed:
+                        app.logger.error(
+                            "APScheduler graph projection refresh partial failure: %s",
+                            run.as_dict(),
+                        )
+                    else:
+                        app.logger.info(
+                            "APScheduler graph projection refresh: %s", run.as_dict()
+                        )
+
+            graph_projection_interval_minutes = int(
+                app.config["GRAPH_PROJECTION_INTERVAL_MINUTES"]
+            )
+            if graph_projection_interval_minutes <= 0:
+                raise ValueError("interval must be positive")
+            scheduler.add_job(
+                func=run_graph_projection,
+                trigger=IntervalTrigger(minutes=graph_projection_interval_minutes),
+                id="graph_projection_refresh",
+                name="Graph Projection Refresh",
+                replace_existing=True,
+                max_instances=1,
+            )
+            graph_projection_registered = True
+        except Exception as exc:
+            app.logger.error(
+                "Graph projection refresh scheduler job was not registered: %s", exc
+            )
+
         # Remove any undeclared job ids BEFORE starting the scheduler —
         # every job must be in PLATFORM_JOBS or TENANT_JOBS in
         # app/jobs/tenant_safe_job.py, or it runs unfiltered.  If enforcement
@@ -838,6 +908,8 @@ def init_scheduler(app):
             scheduled_jobs += ", derived-facts recompute (interval)"
         if model_health_registered:
             scheduled_jobs += ", model-health drift scan (interval)"
+        if graph_projection_registered:
+            scheduled_jobs += ", graph projection refresh (interval)"
         if event_log_partition_registered:
             scheduled_jobs += ", event log partition maintenance (daily)"
         app.logger.info("APScheduler started: %s", scheduled_jobs)

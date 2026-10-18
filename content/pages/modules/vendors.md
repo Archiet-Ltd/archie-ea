@@ -8,6 +8,7 @@ answers_use_cases:
   - {id: UC-S4-05, segment: S4}
 capture_status: live
 cta: plans
+icon: truck
 ---
 
 # Vendors

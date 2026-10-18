@@ -223,6 +223,32 @@ def pull_financials(business_case_id):
     return success_response({"business_case": business_case.to_dict(), "aggregation": report})
 
 
+@business_case_bp.route("/api/list")
+@login_required
+def api_list():
+    """JSON list of all Business Cases for the current tenant."""
+    cases = service.list_business_cases()
+    return success_response([
+        {
+            "id": bc.id,
+            "title": bc.title or "",
+            "status": bc.status,
+            "updated_at": bc.updated_at.isoformat() if bc.updated_at else None,
+        }
+        for bc in cases
+    ])
+
+
+@business_case_bp.route("/api/<int:business_case_id>")
+@login_required
+def api_detail(business_case_id):
+    """JSON detail of one Business Case."""
+    case = service.get_business_case_or_none(business_case_id)
+    if case is None:
+        return not_found_response("Business Case")
+    return success_response(case.to_dict())
+
+
 # Import AI section-draft route — adds POST /api/<id>/ai-draft-section to this
 # blueprint (side-effect import), matching the
 # app/modules/architecture/routes/arb_review_ai_routes.py pattern.

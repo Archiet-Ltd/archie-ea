@@ -8,6 +8,7 @@ answers_use_cases:
   - {id: UC-S2-04, segment: S2}
 capture_status: live
 cta: plans
+icon: plug
 ---
 
 # Integrations

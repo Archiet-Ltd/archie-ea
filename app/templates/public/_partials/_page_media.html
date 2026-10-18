@@ -1,0 +1,43 @@
+{#- smoke-coverage-ok: covered by tests/test_module_screenshots.py (screenshot and recording figures) and
+   tests/test_public_landing_layout.py (landing layout media band).
+   Partial: public/_partials/_page_media.html -- the screenshot and recording figures of a
+   module or use-case page, included from both layouts of public/page.html (document and
+   landing) so the markup exists once. Expects `screenshot` / `recording` (may be None). -#}
+  {% if screenshot %}
+  {# A real captured screen of this module/use case -- see
+     app/services/public_pages.py:get_page_screenshot(). Only ever set for a
+     capture_status: live page whose captured file exists on disk. #}
+  <figure class="public-figure mt-10" data-testid="page-screenshot">
+    {# Captured at 2x and shown at its own CSS width (1:1), so the UI text in
+       it stays 12px or larger. Below 1100px the desktop crop would have to
+       shrink, so the phone-width crop of the same screen is shown instead, at
+       its natural size (public_site.css .public-figure img: never stretched). #}
+    <picture>
+      {% if screenshot.mobile %}
+      <source media="(max-width: 1099px)" srcset="{{ screenshot.mobile.url }}"
+              width="{{ screenshot.mobile.width }}" height="{{ screenshot.mobile.height }}">
+      {% endif %}
+      <img src="{{ screenshot.url }}" alt="{{ screenshot.alt }}"
+           width="{{ screenshot.width }}" height="{{ screenshot.height }}"
+           loading="lazy" decoding="async"
+           class="rounded-lg border border-border shadow-sm">
+    </picture>
+    <figcaption class="mt-2 text-sm text-muted-foreground">{{ screenshot.caption }}</figcaption>
+  </figure>
+  {% endif %}
+
+  {% if recording %}
+  {# A short recording of a multi-step answer -- see
+     app/services/public_pages.py:get_page_recording(). Never autoplays: no
+     autoplay attribute, preload="none" so nothing fetches until the visitor
+     presses play. #}
+  <figure class="public-figure mt-10" data-testid="page-recording">
+    <video controls muted playsinline preload="none"
+           poster="{{ recording.poster_url }}" aria-label="{{ recording.alt }}"
+           width="{{ recording.width }}" height="{{ recording.height }}"
+           class="w-full rounded-lg border border-border shadow-sm">
+      <source src="{{ recording.video_url }}" type="video/webm">
+    </video>
+    <figcaption class="mt-2 text-sm text-muted-foreground">{{ recording.caption }}</figcaption>
+  </figure>
+  {% endif %}
