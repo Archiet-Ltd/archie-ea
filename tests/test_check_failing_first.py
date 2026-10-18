@@ -471,3 +471,21 @@ def test_plan_writes_mode_once(repo, tmp_path, monkeypatch):
     )
     lines = [ln for ln in out.read_text().splitlines() if ln.startswith("mode=")]
     assert lines == ["mode=run"]
+
+
+def test_base_worktree_run_does_not_inherit_coverage_measurement(monkeypatch):
+    """The base-worktree pytest run must not measure coverage into the caller's data file.
+
+    Under ``pytest --cov`` the parent exports COV_CORE_* (and CI sets COVERAGE_FILE);
+    inherited, the child records paths of a deleted temporary worktree and the
+    aggregate job's ``coverage combine`` + ``coverage xml`` then fails with
+    "No source for code: 'app/feature.py'".
+    """
+    monkeypatch.setenv("COV_CORE_SOURCE", "app")
+    monkeypatch.setenv("COV_CORE_DATAFILE", ".coverage.3")
+    monkeypatch.setenv("COV_CORE_CONFIG", ".coveragerc")
+    monkeypatch.setenv("COVERAGE_FILE", ".coverage.3")
+    monkeypatch.setenv("KEEP_ME", "1")
+    env = ff._unmeasured_env()
+    assert not [k for k in env if k.startswith(("COV_CORE_", "COVERAGE_"))]
+    assert env["KEEP_ME"] == "1"
