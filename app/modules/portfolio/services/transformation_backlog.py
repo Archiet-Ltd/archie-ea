@@ -28,16 +28,14 @@ def _rank(priority: str | None) -> int:
     return PRIORITY_ORDER.index(value) if value in PRIORITY_ORDER else len(PRIORITY_ORDER)
 
 
-def open_gaps_without_work_package() -> List[Dict[str, Any]]:
-    from app.models.implementation_migration import Gap
-    from app.models.unified_work_package import UnifiedWorkPackage
+def open_gaps_without_work_package(organization_id: int) -> List[Dict[str, Any]]:
+    """The organisation's open gaps that no work package is linked to.
 
-    addressed = db.select(UnifiedWorkPackage.gap_id).where(UnifiedWorkPackage.gap_id.is_not(None))
-    rows = db.session.execute(
-        db.select(Gap)
-        .where(Gap.id.not_in(addressed))
-        .where(db.or_(Gap.resolution_status.is_(None), Gap.resolution_status.not_in(CLOSED_GAP_STATUSES)))
-    ).scalars().all()
+    "No work package" is decided by the gap register's one reader, so this list
+    and the gap screens always agree on which gaps are addressed.
+    """
+    from app.services.gap_register_service import get_gaps_not_addressed
+
     return [
         {
             "kind": "gap",
@@ -49,15 +47,17 @@ def open_gaps_without_work_package() -> List[Dict[str, Any]]:
             "owner": g.owner,
             "target_date": g.target_resolution_date,
         }
-        for g in rows
+        for g in get_gaps_not_addressed(organization_id)
+        if g.resolution_status is None or g.resolution_status not in CLOSED_GAP_STATUSES
     ]
 
 
-def unscheduled_work_packages() -> List[Dict[str, Any]]:
+def unscheduled_work_packages(organization_id: int) -> List[Dict[str, Any]]:
     from app.models.unified_work_package import UnifiedWorkPackage as WP
 
     rows = db.session.execute(
         db.select(WP)
+        .where(WP.organization_id == organization_id)
         .where(WP.start_date.is_(None))
         .where(db.or_(WP.status.is_(None), WP.status.not_in(CLOSED_WORK_PACKAGE_STATUSES)))
     ).scalars().all()
@@ -76,9 +76,9 @@ def unscheduled_work_packages() -> List[Dict[str, Any]]:
     ]
 
 
-def transformation_backlog() -> Dict[str, Any]:
+def transformation_backlog(organization_id: int) -> Dict[str, Any]:
     """The backlog in order, with the number of each kind of item."""
-    items = open_gaps_without_work_package() + unscheduled_work_packages()
+    items = open_gaps_without_work_package(organization_id) + unscheduled_work_packages(organization_id)
     items.sort(key=lambda i: (_rank(i["priority"]), (i["name"] or "").lower(), i["kind"], i["id"]))
     return {
         "items": items,

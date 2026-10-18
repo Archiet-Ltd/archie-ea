@@ -346,6 +346,9 @@ def test_portfolio_manager_my_work_membership():
     assert _my_work_labels(ROLE_PORTFOLIO_MANAGER) == [
         "Ask a question",
         "Portfolio",
+        # The identified-but-unplanned work, and what the platform recommends.
+        "Transformation backlog",
+        "Recommendations",
         # Approval Inbox — one queue for every pending change proposal,
         # shared by every persona with GENERAL permission.
         "Approval Inbox",

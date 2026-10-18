@@ -52,11 +52,13 @@ def _finding_title(finding: Dict[str, Any]) -> str:
     return "Review “%s”" % first
 
 
-def _from_backlog() -> List[Dict[str, Any]]:
+def _from_backlog(org_id: Optional[int]) -> List[Dict[str, Any]]:
     from app.modules.portfolio.services.transformation_backlog import transformation_backlog
 
+    if org_id is None:
+        return []
     items = []
-    for entry in transformation_backlog()["items"]:
+    for entry in transformation_backlog(org_id)["items"]:
         if entry["kind"] == "gap":
             title = "Plan a work package for the gap “%s”" % entry["name"]
             why = "This gap is open and no work package resolves it."
@@ -105,7 +107,7 @@ def _model_health(org_id: Optional[int]):
 def recommendations(org_id: Optional[int], limit: int = TOP) -> Dict[str, Any]:
     """The organisation's recommendations in order, capped at ``limit``."""
     health, health_state = _model_health(org_id)
-    items = _from_backlog() + health
+    items = _from_backlog(org_id) + health
     items.sort(key=lambda i: (_rank(i["level"]), _SOURCE_ORDER[i["source"]], i["title"].lower()))
     return {
         "items": items[:limit],
