@@ -752,31 +752,19 @@ def test_admin_under_the_limit_adds_into_their_own_organisation(app, db_session,
     assert created.organization_id == org.id
 
 
-def test_pricing_page_has_a_buy_button_per_plan(app, client):
+def test_pricing_page_has_a_talk_to_us_button_per_paid_plan(app, client):
+    import re
+
     with app.app_context():
         resp = client.get("/pricing")
     html = resp.get_data(as_text=True)
     assert resp.status_code == 200
-    # Buy buttons route through the click-tracking redirect
-    # (app/main/views.py::track_plan_click) before landing on registration, so
-    # the plan-preserving registration URL now travels as the redirect's
-    # "next" parameter.
-    assert "/t/plan-click?plan=startup&amp;next=/account/register?plan%3Dstartup%26interval%3Dyear" in html
-    assert "/t/plan-click?plan=team&amp;next=/account/register?plan%3Dteam%26interval%3Dyear" in html
-    assert "/t/plan-click?plan=team&amp;next=/account/register?plan%3Dteam%26interval%3Dmonth" in html
-    assert 'data-testid="buy-enterprise"' in html
-
-
-def test_pricing_contact_sales_button_points_at_the_contact_page(app, client):
-    """'Contact sales' leads to /contact (via the click-tracking redirect,
-    app/main/views.py::track_plan_click), which now carries the sales enquiry
-    form rather than the old pre-launch waiting list."""
-    import re
-
-    resp = client.get("/pricing")
-    html = resp.get_data(as_text=True)
-    assert re.search(
-        r'<a href="/t/plan-click\?plan=enterprise&amp;next=/contact"[^>]*data-testid="buy-enterprise"', html)
+    # Paid plans lead to the contact form (via the click-tracking redirect,
+    # app/main/views.py::track_plan_click), not to a buy flow.
+    for plan in ("startup", "team", "enterprise"):
+        assert re.search(
+            rf'<a href="/t/plan-click\?plan={plan}&amp;next=/contact"[^>]*data-testid="buy-{plan}"[^>]*>Talk to us</a>', html)
+    assert "register?plan" not in html
 
 
 def test_signing_in_returns_the_visitor_to_the_plan_they_chose(app, db_session, client, login_as, no_billing):
