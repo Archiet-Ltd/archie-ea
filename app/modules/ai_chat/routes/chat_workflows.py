@@ -1705,7 +1705,6 @@ def greenfield_workflow_confirm(step_name):
 
     try:
         from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, GreenfieldWorkflow
-        from app.models.solution_architect_models import SolutionAnalysisSession
 
         kernel = WorkbenchKernel(user_id=current_user.id)
         session = _owned_workspace(workspace_id)
@@ -1764,7 +1763,6 @@ def greenfield_workflow_skip(step_name):
 
     try:
         from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, GreenfieldWorkflow
-        from app.models.solution_architect_models import SolutionAnalysisSession
 
         kernel = WorkbenchKernel(user_id=current_user.id)
         session = _owned_workspace(workspace_id)
@@ -1929,7 +1927,6 @@ def brownfield_workflow_confirm(step_name):
 
     try:
         from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, BrownfieldWorkflow
-        from app.models.solution_architect_models import SolutionAnalysisSession
 
         kernel = WorkbenchKernel(user_id=current_user.id)
         session = _owned_workspace(workspace_id)
@@ -1988,7 +1985,6 @@ def brownfield_workflow_skip(step_name):
 
     try:
         from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, BrownfieldWorkflow
-        from app.models.solution_architect_models import SolutionAnalysisSession
 
         kernel = WorkbenchKernel(user_id=current_user.id)
         session = _owned_workspace(workspace_id)
