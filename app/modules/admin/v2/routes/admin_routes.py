@@ -46,6 +46,13 @@ import hmac
 import hashlib
 import json
 from datetime import datetime, timedelta
+
+
+def _base_url_field_allowed(form) -> bool:
+    """Check a settings form's base_url with the outbound-URL guard before it is saved."""
+    from app.services.connector_framework import connector_url_field_allowed
+
+    return connector_url_field_allowed(form.base_url)
 from html import escape
 
 from werkzeug.exceptions import HTTPException
@@ -96,6 +103,7 @@ _svc = AdminUserService
 @login_required
 @admin_required
 @timed_route
+@platform_admin_required
 def send_digest():
     """PLT-009/PLT-031: Manual trigger for weekly digest emails."""
     from flask import current_app
@@ -883,6 +891,7 @@ def test_api_settings(settings_id):
 @timed_route
 @login_required
 @admin_required
+@platform_admin_required
 def preview_env_keys():
     """Preview API keys found in environment variables but not yet in the database."""
     import os
@@ -974,6 +983,7 @@ def update_provider_model():
 @login_required
 @admin_required
 @audit_log("load_env_keys")
+@platform_admin_required
 def load_env_keys():
     """Import selected API keys from environment variables into the database."""
     import os
@@ -1567,7 +1577,7 @@ def abacus_settings():
 
     form = AbacusSettingsForm()
 
-    if form.validate_on_submit():
+    if form.validate_on_submit() and _base_url_field_allowed(form):
         import os
 
         credentials = {}
@@ -2453,7 +2463,7 @@ def jira_settings():
 
     form = JiraSettingsForm()
 
-    if form.validate_on_submit():
+    if form.validate_on_submit() and _base_url_field_allowed(form):
         credentials = {}
         if form.api_token.data and form.api_token.data.strip():
             credentials = {
@@ -3992,6 +4002,14 @@ def webhook_settings():
         if webhook_type not in ("generic", "teams", "slack"):
             webhook_type = "generic"
 
+        from app.services.webhook_service import WebhookTargetRefused, validate_webhook_url
+
+        try:
+            url = validate_webhook_url(url)
+        except WebhookTargetRefused as exc:
+            flash(f"Webhook URL refused: {exc}", "error")
+            return redirect(url_for("admin.webhook_settings"))
+
         if not selected_events:
             selected_events = ["*"]
 
@@ -4698,6 +4716,7 @@ def export_portfolio_pptx():
 @login_required
 @admin_required
 @timed_route
+@platform_admin_required
 def ai_confidence_calibration():
     """AI confidence calibration dashboard — tracks whether AI confidence
     labels match actual architect acceptance rates."""

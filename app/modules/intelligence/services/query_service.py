@@ -11,14 +11,10 @@ same traversal per initiative seed) and ``value_streams_at_risk`` -- "which
 value streams depend on a capability below threshold", the curated path
 only (T-S1). Coverage over derived and explicit relationships for the
 value-stream question is reserved for a later task and is not added here.
-``accountability_for_element`` (L4) exists as a route and question card
-but is currently WITHDRAWN -- it returns an honest
-``ownership_reader_not_built`` reason on every call: the ownership data
-source is decided, no shared tenant-safe reader for it exists yet, and a
-real tenant-scoping fix to ``OrganizationUnit`` is needed before one is
-safe to build -- see the method's own docstring. Five of six lenses in
-``intelligence-lenses-v1.md`` are currently answered, plus the Strategic
-value-streams-at-risk surface.
+``accountability_for_element`` (L4) resolves ApplicationOwner records for
+the element's ApplicationComponent and returns them as the ``owners``
+array. When no ownership records exist, the array is empty and the
+response carries a ``no_ownership_records`` reason.
 """
 
 from __future__ import annotations
@@ -54,17 +50,15 @@ NOT_COSTED_REASON = validate_reason_code("not_costed")
 NO_INITIATIVE_LINKED_REASON = validate_reason_code("no_initiative_linked")
 NO_BUDGET_RECORDED_REASON = validate_reason_code("no_budget_recorded")
 # Distinct from NO_OWNERSHIP_REASON above ("no_ownership_recorded") -- that
-# one describes a single element's missing owner field inside the L1 impact
-# traversal; this one describes an ApplicationComponent with zero
-# ApplicationOwnership rows at all, a different absence condition on a
-# different table, for L4. Currently unused -- accountability_for_element's
-# ownership read is withdrawn (see its own docstring), so nothing produces
-# this today; kept in the closed vocabulary for whichever reader replaces
-# the withdrawn one, not removed on the strength of a temporary gap.
+# one describes a single impact row with no owner; this one describes the L4
+# accountability answer as a whole: neither the element itself nor anything
+# it affects has an owner recorded. Produced by accountability_for_element.
 NO_OWNERSHIP_RECORDS_REASON = validate_reason_code("no_ownership_records")
 CAPACITY_NOT_AVAILABLE_REASON = validate_reason_code("capacity_not_available")
 # Distinct from a "decision pending" state -- the ownership data source IS
-# decided; what doesn't exist yet is a shared, tenant-safe reader for it.
+# decided; the tenant-safe batch reader exists and is used by
+# accountability_for_element. This reason code is kept in the closed
+# vocabulary for backward compatibility but is no longer produced.
 OWNERSHIP_READER_NOT_BUILT_REASON = validate_reason_code("ownership_reader_not_built")
 NO_DATA_RECORDED_REASON = validate_reason_code("no_data_recorded")
 NO_STEWARD_RECORDED_REASON = validate_reason_code("no_steward_recorded")
@@ -92,6 +86,14 @@ NO_LICENCE_RECORDED_REASON = validate_reason_code("no_licence_recorded")
 # against quantity_entitled would report an invented under-use finding, not
 # a measurement, so under_used is withheld with this reason instead.
 LICENCE_USAGE_NOT_SYNCED_REASON = validate_reason_code("licence_usage_not_synced")
+
+# R1-B30: set / filter blast radius and risk propagation reasons, and the
+# ceilings the combined answers are held to (seeds asked, rows kept).
+NO_SEED_ELEMENTS_REASON = validate_reason_code("no_seed_elements")
+SEED_LIMIT_REACHED_REASON = validate_reason_code("seed_limit_reached")
+ROWS_TRUNCATED_REASON = validate_reason_code("rows_truncated")
+SET_IMPACT_MAX_SEEDS = 25
+SET_IMPACT_MAX_ROWS = 1000
 
 # T-005 (D1): the NFR-5 measurement point is this exact, PINNED series --
 # never widened, never aggregated across label values.
@@ -260,6 +262,130 @@ def _resolve_owners_batch(
             },
             None,
         )
+    return results
+
+
+def _resolve_application_owners_batch(
+    element_ids: List[int],
+    org_id: int,
+    elements: Dict[str, Dict[str, Any]],
+) -> Dict[int, List[Dict[str, str]]]:
+    """Batch-resolve ApplicationOwner records for a set of element IDs.
+
+    Resolves each element id to the correct owner key:
+    - ApplicationComponent elements: resolve to ``application_id`` via
+      ``ApplicationComponent.archimate_element_id``, then query
+      ``ApplicationOwner`` by ``application_id``.
+    - Capability elements: resolve to ``UnifiedCapability.id`` via
+      ``UnifiedCapability.archimate_element_id`` (organisation-scoped), then
+      query ``ApplicationOwner`` by ``element_type='capability'`` +
+      that capability id.
+    - Other element types: no owner store exists, return empty list.
+
+    Uses the canonical ``ApplicationOwner`` batch reader methods so the
+    single-row readers and this batch path share one implementation.
+
+    User-name resolution is done ONCE for every owner row, in a single
+    batched ``User`` read inside ``ApplicationOwner.display_rows_for_owner_rows``,
+    so the owner fetch costs a constant number of reads however many rows
+    the page holds.
+
+    Returns ``{element_id: [{"name": str, "role": str}, ...]}``, with an
+    empty list for elements that have no ApplicationOwner record or whose
+    type has no owner store.
+    """
+    from app.models.application_owner import ApplicationOwner
+
+    distinct_ids = sorted(set(element_ids))
+    results: Dict[int, List[Dict[str, str]]] = {eid: [] for eid in distinct_ids}
+    if not distinct_ids:
+        return results
+
+    # Classify each element id by its ArchiMate type.
+    app_component_ids: List[int] = []
+    element_type_ids: Dict[str, List[int]] = {}
+    for eid in distinct_ids:
+        el_type = (elements.get(str(eid)) or {}).get("type")
+        if el_type == "ApplicationComponent":
+            app_component_ids.append(eid)
+        elif el_type and el_type.lower() in ApplicationOwner.ELEMENT_TYPES:
+            element_type_ids.setdefault(el_type.lower(), []).append(eid)
+        # Other types: no owner store, leave as empty list in results.
+
+    # Collect every owner row across both owner stores first, then resolve
+    # the user names in ONE batched query for all of them.
+    pending: Dict[int, List[Any]] = {}
+    all_owner_rows: List[Any] = []
+
+    # Resolve ApplicationComponent elements via application_id.
+    if app_component_ids:
+        from app.models.application_portfolio import ApplicationComponent
+
+        components = (
+            db.session.execute(
+                db.select(ApplicationComponent)
+                .where(ApplicationComponent.archimate_element_id.in_(app_component_ids))
+                .where(ApplicationComponent.organization_id == org_id)
+                .order_by(ApplicationComponent.id)
+            )
+            .scalars()
+            .all()
+        )
+        comp_by_element: Dict[int, Any] = {}
+        for comp in components:
+            comp_by_element.setdefault(comp.archimate_element_id, comp)
+
+        app_ids = [comp.id for comp in comp_by_element.values()]
+        if app_ids:
+            owners_by_app = ApplicationOwner.get_owners_for_applications_batch(app_ids, org_id)
+            # Build element_id -> component_id -> owners map.
+            for eid, comp in comp_by_element.items():
+                owners = owners_by_app.get(comp.id, [])
+                if owners:
+                    pending[eid] = owners
+                    all_owner_rows.extend(owners)
+
+    # Capability owners are stored against the UnifiedCapability id (the id
+    # capability_ownership_service writes), NOT the ArchiMate element id, so
+    # map each Capability element to its UnifiedCapability row in this
+    # organisation first, read the owners by that id, and map back.
+    # Other ApplicationOwner.ELEMENT_TYPES (data_entity, ai_system) are keyed
+    # by their own tables' ids, which no ArchiMate element type maps to here:
+    # they are inert on this path today and are not looked up by element id,
+    # because the two id spaces would collide and name the wrong person.
+    capability_element_ids = element_type_ids.get("capability", [])
+    if capability_element_ids:
+        from app.models.unified_capability import UnifiedCapability
+
+        cap_rows = db.session.execute(
+            db.select(UnifiedCapability.id, UnifiedCapability.archimate_element_id)
+            .where(UnifiedCapability.archimate_element_id.in_(capability_element_ids))
+            .where(UnifiedCapability.organization_id == org_id)
+            .order_by(UnifiedCapability.id)
+        ).all()
+        element_by_cap: Dict[int, int] = {}
+        for cap_id, archimate_id in cap_rows:
+            element_by_cap.setdefault(cap_id, archimate_id)
+        owners_by_cap = ApplicationOwner.get_owners_for_elements_batch(
+            "capability", list(element_by_cap), org_id
+        )
+        for cap_id, owners in owners_by_cap.items():
+            if owners:
+                pending.setdefault(element_by_cap[cap_id], []).extend(owners)
+                all_owner_rows.extend(owners)
+
+    # One batched user read for every owner row on the page, through the one
+    # public converter on the model (nothing is read for an empty list).
+    display_by_id = {
+        shown["id"]: shown
+        for shown in ApplicationOwner.display_rows_for_owner_rows(all_owner_rows, org_id)
+    }
+    for eid, owners in pending.items():
+        results[eid] = [
+            {"name": display_by_id[o.id]["user_name"], "role": display_by_id[o.id]["ownership_type_label"]}
+            for o in owners
+        ]
+
     return results
 
 
@@ -814,26 +940,11 @@ class IntelligenceQueryService:
                     # collect every distinct element id needing a lookup
                     # across the WHOLE result set first, then resolve in a
                     # small constant number of queries.
-                    owners_by_element: Dict[int, Tuple[Optional[Dict[str, Any]], Optional[str]]] = {}
-                    if with_owner and rows:
-                        owners_by_element = _resolve_owners_batch(
-                            [row["element_id"] for row in rows], org_id
-                        )
+                    # NOTE: owner resolution is moved AFTER pagination below
+                    # so the 2,400-row walk only resolves owners for the
+                    # page's rows, not the full result set.
 
                     for row in rows:
-                        if with_owner:
-                            owner, reason = owners_by_element.get(
-                                row["element_id"], (None, NO_OWNERSHIP_REASON)
-                            )
-                        else:
-                            owner, reason = None, None
-                        row["owner"] = owner
-                        # Derived rows may already carry a staleness reason
-                        # (set by _derived_row, e.g. "derivation_stale"). That
-                        # takes precedence; an owner-absence reason only fills
-                        # in when the row has no reason of its own yet.
-                        existing_reason = row.get("reason")
-                        row["reason"] = existing_reason if existing_reason else reason
                         # A Capability row carries the block the helper
                         # already computed for it, untouched; any other row
                         # carries no ``maturity`` key at all --
@@ -876,20 +987,54 @@ class IntelligenceQueryService:
                     # standing in for "measured, found none".
                     maturity_flags = _maturity_flags(NO_CAPABILITY_IN_CHAIN_REASON, maturity_by_element)
 
-        summary["latency_ms"] = scope.latency_ms
+            # Stable pagination: preserve canonical walk order (explicit rows
+            # first in BFS order, then derived rows).  The cursor is a 0-based
+            # index into the full unpaginated list; next_cursor is the index of
+            # the first row that would appear on the next page.
+            total = len(rows)
+            next_cursor = None
+            if page_size is not None and page_size > 0:
+                slice_start = cursor if cursor is not None else 0
+                page = rows[slice_start : slice_start + page_size]
+                if slice_start + page_size < total:
+                    next_cursor = slice_start + page_size
+                rows = page
 
-        # Stable pagination: preserve canonical walk order (explicit rows
-        # first in BFS order, then derived rows).  The cursor is a 0-based
-        # index into the full unpaginated list; next_cursor is the index of
-        # the first row that would appear on the next page.
-        total = len(rows)
-        next_cursor = None
-        if page_size is not None and page_size > 0:
-            slice_start = cursor if cursor is not None else 0
-            page = rows[slice_start : slice_start + page_size]
-            if slice_start + page_size < total:
-                next_cursor = slice_start + page_size
-            rows = page
+            # Owner resolution for the page's rows only (moved after
+            # pagination so the 2,400-row walk resolves owners for 50 rows, not
+            # 2,400 -- keeps latency within budget while the query count stays
+            # constant regardless of page size).
+            if with_owner and rows:
+                owners_by_element = _resolve_owners_batch(
+                    [row["element_id"] for row in rows], org_id
+                )
+                application_owners_by_element = _resolve_application_owners_batch(
+                    [row["element_id"] for row in rows], org_id, elements
+                )
+                for row in rows:
+                    owner, _legacy_reason = owners_by_element.get(
+                        row["element_id"], (None, NO_OWNERSHIP_REASON)
+                    )
+                    owners = application_owners_by_element.get(row["element_id"], [])
+                    row["owner"] = owner
+                    row["owners"] = owners
+                    # The absence reason follows the owners the row carries: it is
+                    # stated only when there is no owner record AND no legacy owner.
+                    owner_reason = None if (owners or owner) else NO_OWNERSHIP_REASON
+                    existing_reason = row.get("reason")
+                    row["reason"] = existing_reason if existing_reason else owner_reason
+            else:
+                for row in rows:
+                    row["owner"] = None
+                    row["owners"] = []
+                    # The row's own reason (e.g. a derived staleness reason) is
+                    # kept; without owner resolution there is no owner-absence
+                    # reason, so the key holds its builder value (None for an
+                    # explicit row) rather than being dropped from the row.
+                    existing_reason = row.get("reason")
+                    row["reason"] = existing_reason if existing_reason else None
+
+        summary["latency_ms"] = scope.latency_ms
 
         return {
             "rows": rows,
@@ -999,6 +1144,524 @@ class IntelligenceQueryService:
                 )
 
         return {"risks": risk_payloads, "reasons": [], "elements": all_elements}
+
+    # ------------------------------------------------------------------ #
+    # R1-B30: set / filter blast radius (TB-0037) and risk propagation
+    # (TB-0038). Both are built ON ``cross_layer_impact`` above -- the one
+    # canonical walk -- and never walk the graph themselves.
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def set_impact(
+        element_ids: Optional[Iterable[int]] = None,
+        *,
+        element_filter: Optional[Dict[str, Any]] = None,
+        include_derived: bool = True,
+        include_stale: bool = False,
+        max_depth: int = 3,
+        direction: str = "downstream",
+        with_owner: bool = True,
+    ) -> Dict[str, Any]:
+        """"What breaks if these fail together?": the combined, de-duplicated,
+        ranked blast radius of a set of elements, or of every element matching
+        a filter (``{"type": ..., "layer": ...}``).
+
+        Cost: each seed is one ``cross_layer_impact`` walk (about a dozen
+        statements), so the statement count grows linearly with the number of
+        seeds, bounded by ``SET_IMPACT_MAX_SEEDS``; only owner resolution is a
+        constant number of batched reads. The bound is pinned by a test.
+
+        Each seed is answered by ``cross_layer_impact`` (so the combined
+        answer is, by construction, the union of the single answers); an
+        element reached from several seeds is ONE row carrying every seed that
+        reaches it and every relation it was reached by. Rows are ranked by how
+        many of the failing seeds reach them (most first), then by distance,
+        then by name. A seed that does not resolve in the caller's organisation
+        is reported as unresolved exactly like one that never existed.
+        """
+        if direction not in VALID_DIRECTIONS:
+            raise ValueError(f"direction must be one of {sorted(VALID_DIRECTIONS)}")
+        if not (1 <= max_depth <= 10):
+            raise ValueError("max_depth must be between 1 and 10")
+
+        org_id = current_org_id()
+        base: Dict[str, Any] = {
+            "seed_element_ids": [],
+            "unresolved_seed_ids": [],
+            "rows": [],
+            "total": 0,
+            "truncated": False,
+            "summary": {
+                "seed_count": 0,
+                "resolved_seed_count": 0,
+                "row_count": 0,
+                "shared_row_count": 0,
+                "explicit_count": 0,
+                "derived_count": 0,
+                "stale_count": 0,
+                "derivation_state": "not_computed",
+            },
+            "reasons": [],
+            "elements": {},
+        }
+        if org_id is None:
+            base["reasons"] = [NO_TENANT_CONTEXT_REASON]
+            return base
+
+        from app.models import ArchiMateElement
+
+        # Named elements come first and are never dropped: more of them than the
+        # ceiling is refused, and the filter only fills the places left over.
+        seeds: List[int] = []
+        for raw in element_ids or []:
+            if raw not in seeds:
+                seeds.append(raw)
+        if len(seeds) > SET_IMPACT_MAX_SEEDS:
+            raise ValueError(f"name at most {SET_IMPACT_MAX_SEEDS} elements in one question")
+        if element_filter is not None:
+            type_filter = element_filter.get("type")
+            layer_filter = element_filter.get("layer")
+            if not type_filter and not layer_filter:
+                raise ValueError("a filter needs an element type or a layer")
+            stmt = db.select(ArchiMateElement.id).where(ArchiMateElement.organization_id == org_id)
+            if type_filter:
+                stmt = stmt.where(ArchiMateElement.type == type_filter)
+            if layer_filter:
+                stmt = stmt.where(ArchiMateElement.layer == layer_filter)
+            matched = list(
+                db.session.execute(
+                    stmt.order_by(ArchiMateElement.id).limit(SET_IMPACT_MAX_SEEDS + len(seeds) + 1)
+                ).scalars()
+            )
+            named = set(seeds)
+            room = SET_IMPACT_MAX_SEEDS - len(seeds)
+            extra = [m for m in matched if m not in named]
+            if len(extra) > room:
+                extra = extra[:room]
+                filter_cut = True
+            else:
+                filter_cut = False
+            seeds.extend(extra)
+        else:
+            filter_cut = False
+
+        reasons: List[str] = []
+        if filter_cut:
+            reasons.append(SEED_LIMIT_REACHED_REASON)
+        if not seeds:
+            base["reasons"] = [NO_SEED_ELEMENTS_REASON]
+            return base
+
+        combined: Dict[int, Dict[str, Any]] = {}
+        resolved_seeds: List[int] = []
+        unresolved: List[int] = []
+        derivation_states: set = set()
+        elements: Dict[str, Dict[str, Any]] = {}
+
+        for seed in seeds:
+            single = IntelligenceQueryService.cross_layer_impact(
+                seed,
+                include_derived=include_derived,
+                include_stale=include_stale,
+                max_depth=max_depth,
+                direction=direction,
+                with_owner=False,
+            )
+            if ELEMENT_NOT_FOUND_REASON in (single.get("reasons") or []):
+                unresolved.append(seed)
+                continue
+            resolved_seeds.append(seed)
+            derivation_states.add(single["summary"]["derivation_state"])
+            elements.update(single.get("elements") or {})
+            for row in single["rows"]:
+                eid = row["element_id"]
+                entry = combined.get(eid)
+                if entry is None:
+                    entry = combined[eid] = {
+                        "element_id": eid,
+                        "is_seed": False,
+                        "seed_ids": [],
+                        "relations": [],
+                        "maturity": None,
+                        "health": None,
+                        "reason": None,
+                    }
+                if seed not in entry["seed_ids"]:
+                    entry["seed_ids"].append(seed)
+                relation = dict(row["relation"])
+                relation["from_seed"] = seed
+                entry["relations"].append(relation)
+                if entry["maturity"] is None and row.get("maturity") is not None:
+                    entry["maturity"] = row["maturity"]
+                if entry["health"] is None and row.get("health") is not None:
+                    entry["health"] = row["health"]
+                if entry["reason"] is None and row.get("reason"):
+                    entry["reason"] = row["reason"]
+
+        seed_set = set(resolved_seeds)
+        for entry in combined.values():
+            entry["is_seed"] = entry["element_id"] in seed_set
+            entry["seed_ids"].sort()
+            entry["seed_count"] = len(entry["seed_ids"])
+            entry["depth"] = min(rel["depth"] for rel in entry["relations"])
+
+        # Seed names are needed for the ranking and the page even when no row
+        # names them: one tenant-fenced batched select, never one per seed.
+        elements.update(_resolve_elements_batch(resolved_seeds, org_id))
+
+        def _name_key(entry: Dict[str, Any]) -> str:
+            return (_name_in(elements, entry["element_id"]) or "").lower()
+
+        ranked = sorted(
+            combined.values(),
+            key=lambda e: (-e["seed_count"], e["depth"], _name_key(e), e["element_id"]),
+        )
+        total = len(ranked)
+        truncated = total > SET_IMPACT_MAX_ROWS
+        if truncated:
+            ranked = ranked[:SET_IMPACT_MAX_ROWS]
+            reasons.append(ROWS_TRUNCATED_REASON)
+        for position, entry in enumerate(ranked, start=1):
+            entry["rank"] = position
+
+        # Owners for the kept rows only, in the same constant number of
+        # batched reads the single answer uses.
+        if with_owner and ranked:
+            ids = [e["element_id"] for e in ranked]
+            owners_by_element = _resolve_owners_batch(ids, org_id)
+            application_owners = _resolve_application_owners_batch(ids, org_id, elements)
+            for entry in ranked:
+                owner, _legacy = owners_by_element.get(entry["element_id"], (None, NO_OWNERSHIP_REASON))
+                owners = application_owners.get(entry["element_id"], [])
+                entry["owner"] = owner
+                entry["owners"] = owners
+                if not entry["reason"] and not (owners or owner):
+                    entry["reason"] = NO_OWNERSHIP_REASON
+        else:
+            for entry in ranked:
+                entry["owner"] = None
+                entry["owners"] = []
+
+        if not resolved_seeds:
+            reasons.append(ELEMENT_NOT_FOUND_REASON)
+        elif not combined:
+            reasons.append(NO_DATA_RECORDED_REASON)
+
+        if not derivation_states:
+            state = "not_computed"
+        elif derivation_states == {"current"}:
+            state = "current"
+        elif derivation_states == {"not_computed"}:
+            state = "not_computed"
+        elif "stale" in derivation_states:
+            state = "stale"
+        else:
+            state = "partial"
+
+        relation_kinds = [rel for e in combined.values() for rel in e["relations"]]
+        summary = {
+            "seed_count": len(seeds),
+            "resolved_seed_count": len(resolved_seeds),
+            "row_count": total,
+            "shared_row_count": sum(1 for e in combined.values() if e["seed_count"] > 1),
+            "explicit_count": sum(1 for rel in relation_kinds if rel["kind"] == "explicit"),
+            "derived_count": sum(1 for rel in relation_kinds if rel["kind"] == "derived"),
+            "stale_count": sum(1 for rel in relation_kinds if rel.get("stale")),
+            "derivation_state": state,
+        }
+        return {
+            "seed_element_ids": resolved_seeds,
+            "unresolved_seed_ids": unresolved,
+            "rows": ranked,
+            "total": total,
+            "truncated": truncated,
+            "summary": summary,
+            "reasons": reasons,
+            "elements": elements,
+        }
+
+    @staticmethod
+    def risk_propagation(
+        element_id: int,
+        *,
+        max_depth: int = 3,
+        include_derived: bool = False,
+    ) -> Dict[str, Any]:
+        """"Which risks reach <element> through what it depends on, along which
+        path, and which controls sit on that path?"
+
+        Direction: a risk recorded on something the element depends on (the
+        element's upstream in the one canonical walk) reaches the element, so
+        an indirect risk on a supplier shows on the business service that the
+        supplier serves. Risks come from the one risk register, read-only: a
+        risk seeded on an element (``Risk.archimate_element_id``) or linked to
+        an application (``RiskEntityLink`` with ``entity_type`` application,
+        whose ``entity_id`` is an ``ApplicationComponent`` id, resolved to its
+        element through ``ApplicationComponent.archimate_element_id``). Closed
+        risks do not propagate. Controls are the ``ApplicationComplianceControl``
+        mappings of the applications on the path, with their implementation
+        status and whether evidence is recorded -- a control is reported, not
+        assumed to mitigate.
+
+        Paths run over drawn relationships only unless ``include_derived`` is
+        set; a derived path says so on the row.
+        """
+        from app.models import ArchiMateElement
+        from app.models.application_compliance import ApplicationComplianceControl
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.compliance_models import ComplianceControl
+        from app.models.risk import Risk, RiskStatus
+        from app.models.risk_entity_link import RiskEntityLink
+
+        if not (1 <= max_depth <= 10):
+            raise ValueError("max_depth must be between 1 and 10")
+
+        org_id = current_org_id()
+        empty: Dict[str, Any] = {
+            "root_element_id": element_id,
+            "rows": [],
+            "total": 0,
+            "truncated": False,
+            "summary": {
+                "risk_count": 0,
+                "indirect_count": 0,
+                "direct_count": 0,
+                "highest_risk_level": None,
+                "derivation_state": "not_computed",
+            },
+            "reasons": [],
+            "elements": {},
+        }
+        if org_id is None:
+            return {**empty, "reasons": [NO_TENANT_CONTEXT_REASON]}
+
+        element = db.session.execute(
+            db.select(ArchiMateElement.id).where(
+                ArchiMateElement.id == element_id, ArchiMateElement.organization_id == org_id
+            )
+        ).scalar_one_or_none()
+        if element is None:
+            return {**empty, "reasons": [ELEMENT_NOT_FOUND_REASON]}
+
+        walk = IntelligenceQueryService.cross_layer_impact(
+            element_id,
+            include_derived=include_derived,
+            max_depth=max_depth,
+            direction="upstream",
+            with_owner=False,
+        )
+
+        def _preference(path: Dict[str, Any]) -> Tuple[int, int]:
+            # Shallowest first, a drawn path before a derived one.
+            return (path["depth"], 1 if path["kind"] == "derived" else 0)
+
+        # The best way each upstream element is reached from the root; the
+        # root itself is depth 0.
+        reach: Dict[int, Dict[str, Any]] = {
+            element_id: {
+                "depth": 0,
+                "chain_elements": [element_id],
+                "chain": [],
+                "kind": "direct",
+                "confidence": None,
+                "derived_id": None,
+            }
+        }
+        for row in walk["rows"]:
+            relation = row["relation"]
+            candidate = {
+                "depth": relation["depth"],
+                "chain_elements": list(relation.get("chain_elements") or [row["element_id"]]),
+                "chain": list(relation.get("chain") or []),
+                "kind": relation["kind"],
+                "confidence": relation.get("confidence"),
+                "derived_id": relation.get("derived_id"),
+            }
+            current = reach.get(row["element_id"])
+            if current is None or _preference(candidate) < _preference(current):
+                reach[row["element_id"]] = candidate
+
+        reached_ids = sorted(reach)
+
+        # Which risks reach the reached elements: seeded on the element itself,
+        # or linked to an application whose element is reached. The two id
+        # spaces (element id, application component id) are kept apart.
+        components = db.session.execute(
+            db.select(ApplicationComponent.id, ApplicationComponent.archimate_element_id).where(
+                ApplicationComponent.organization_id == org_id,
+                ApplicationComponent.archimate_element_id.in_(reached_ids),
+            )
+        ).all()
+        element_by_component: Dict[int, int] = {}
+        for component_id, mirrored_element_id in sorted(components):
+            element_by_component[component_id] = mirrored_element_id
+
+        links = []
+        if element_by_component:
+            links = db.session.execute(
+                db.select(RiskEntityLink.risk_id, RiskEntityLink.entity_id).where(
+                    RiskEntityLink.organization_id == org_id,
+                    RiskEntityLink.entity_type == "application",
+                    RiskEntityLink.entity_id.in_(list(element_by_component)),
+                )
+            ).all()
+        linked_elements_by_risk: Dict[int, List[int]] = {}
+        for risk_id, component_id in links:
+            linked_elements_by_risk.setdefault(risk_id, []).append(element_by_component[component_id])
+
+        risks = (
+            db.session.execute(
+                db.select(Risk)
+                .where(
+                    Risk.organization_id == org_id,
+                    Risk.status != RiskStatus.CLOSED,
+                    db.or_(
+                        Risk.archimate_element_id.in_(reached_ids),
+                        Risk.id.in_(list(linked_elements_by_risk) or [-1]),
+                    ),
+                )
+                .order_by(Risk.id)
+            )
+            .scalars()
+            .all()
+        )
+
+        path_element_ids: set = set()
+        entries_by_risk: Dict[int, List[Dict[str, Any]]] = {}
+        for risk in risks:
+            entry_points: Dict[int, str] = {}
+            if risk.archimate_element_id in reach:
+                entry_points[risk.archimate_element_id] = "element"
+            for linked_element in linked_elements_by_risk.get(risk.id, []):
+                entry_points.setdefault(linked_element, "application_link")
+            entries = []
+            for entry_element, seeded_on in entry_points.items():
+                path = reach[entry_element]
+                entries.append(
+                    {
+                        "element_id": entry_element,
+                        "seeded_on": seeded_on,
+                        "depth": path["depth"],
+                        "path_elements": path["chain_elements"],
+                        "path_relationships": path["chain"],
+                        "path_kind": path["kind"],
+                        "path_confidence": path["confidence"],
+                        "path_derived_id": path["derived_id"],
+                    }
+                )
+            entries.sort(key=lambda e: (e["depth"], e["path_kind"] == "derived", e["element_id"]))
+            entries_by_risk[risk.id] = entries
+            if entries:
+                path_element_ids.update(entries[0]["path_elements"])
+
+        # Controls for every application on any entry path, in one read.
+        controls_by_element: Dict[int, List[Dict[str, Any]]] = {}
+        if path_element_ids:
+            path_components = db.session.execute(
+                db.select(ApplicationComponent.id, ApplicationComponent.archimate_element_id).where(
+                    ApplicationComponent.organization_id == org_id,
+                    ApplicationComponent.archimate_element_id.in_(sorted(path_element_ids)),
+                )
+            ).all()
+            element_of_component: Dict[int, int] = {}
+            for component_id, mirrored_element_id in sorted(path_components):
+                element_of_component[component_id] = mirrored_element_id
+            if element_of_component:
+                control_rows = db.session.execute(
+                    db.select(ApplicationComplianceControl, ComplianceControl)
+                    .outerjoin(
+                        ComplianceControl,
+                        ComplianceControl.id == ApplicationComplianceControl.control_id,
+                    )
+                    .where(
+                        ApplicationComplianceControl.organization_id == org_id,
+                        ApplicationComplianceControl.application_id.in_(list(element_of_component)),
+                    )
+                    .order_by(ApplicationComplianceControl.id)
+                    .limit(IntelligenceQueryService._COMPLIANCE_LIMIT)
+                ).all()
+                for mapping, control in control_rows:
+                    status = mapping.implementation_status
+                    applies_to = element_of_component[mapping.application_id]
+                    controls_by_element.setdefault(applies_to, []).append(
+                        {
+                            "control_id": mapping.control_id,
+                            "code": control.control_code if control else None,
+                            "name": control.title if control else None,
+                            "applies_to_element_id": applies_to,
+                            "implementation_status": status,
+                            "implemented": status in ("implemented", "verified"),
+                            "evidence_url_recorded": bool((mapping.evidence_url or "").strip()),
+                            "verified": mapping.verified_date is not None,
+                        }
+                    )
+
+        rows: List[Dict[str, Any]] = []
+        for risk in risks:
+            entries = entries_by_risk[risk.id]
+            if not entries:
+                continue
+            best = entries[0]
+            controls: List[Dict[str, Any]] = []
+            for path_element in best["path_elements"]:
+                controls.extend(controls_by_element.get(path_element, []))
+            rows.append(
+                {
+                    "risk_id": risk.id,
+                    "title": risk.title,
+                    "status": risk.status.value if risk.status else None,
+                    "likelihood": risk.likelihood,
+                    "impact": risk.impact,
+                    "risk_score": risk.risk_score,
+                    "risk_level": risk.risk_level,
+                    "owner": risk.owner,
+                    "mitigation_plan": risk.mitigation_plan,
+                    "indirect": best["depth"] > 0,
+                    "seeded_on_element_id": best["element_id"],
+                    "seeded_on": best["seeded_on"],
+                    "depth": best["depth"],
+                    "path_elements": best["path_elements"],
+                    "path_relationships": best["path_relationships"],
+                    "path_kind": best["path_kind"],
+                    "path_confidence": best["path_confidence"],
+                    "path_derived_id": best["path_derived_id"],
+                    "other_entry_points": len(entries) - 1,
+                    "controls": controls,
+                    "implemented_control_count": sum(1 for c in controls if c["implemented"]),
+                }
+            )
+
+        rows.sort(key=lambda r: (-r["risk_score"], r["depth"], r["risk_id"]))
+        total = len(rows)
+        truncated = total > SET_IMPACT_MAX_ROWS
+        reasons: List[str] = []
+        if truncated:
+            rows = rows[:SET_IMPACT_MAX_ROWS]
+            reasons.append(ROWS_TRUNCATED_REASON)
+        if not rows:
+            reasons.append(NO_RISK_RECORDED_REASON)
+
+        elements = _resolve_elements_batch(
+            {eid for r in rows for eid in r["path_elements"]} | {element_id}, org_id
+        )
+        level_order = ["low", "medium", "high", "critical"]
+        levels = [r["risk_level"] for r in rows]
+        summary = {
+            "risk_count": total,
+            "indirect_count": sum(1 for r in rows if r["indirect"]),
+            "direct_count": sum(1 for r in rows if not r["indirect"]),
+            "highest_risk_level": max(levels, key=level_order.index) if levels else None,
+            "derivation_state": walk["summary"]["derivation_state"] if include_derived else "not_used",
+        }
+        return {
+            "root_element_id": element_id,
+            "rows": rows,
+            "total": total,
+            "truncated": truncated,
+            "summary": summary,
+            "reasons": reasons,
+            "elements": elements,
+        }
 
     @staticmethod
     def portfolio_component_for_element(element_id: int) -> Dict[str, Any]:
@@ -1569,45 +2232,63 @@ class IntelligenceQueryService:
     @staticmethod
     def accountability_for_element(element_id: int) -> Dict[str, Any]:
         """L4, "who's accountable for ___, and can they take on more?":
-        WITHDRAWN -- the ownership data source is decided, but no shared,
-        tenant-safe reader for it exists yet, and this method's own first
-        version shipped one anyway rather than using the one that already
-        existed. Not a "still undecided" state; a "not built safely yet"
-        one, and the two must not be conflated in copy or reason naming.
 
-        The original version re-implemented the element -> component ->
-        ownership -> unit chain that ``_resolve_owners_batch``/
-        ``_sec09_tenant_check`` already provide (``cross_layer_impact``'s
-        own owner field), without that function's tenant assertion. It also
-        had a real, unreviewed tenant-isolation gap of its own:
-        ``OrganizationUnit`` carries no ``TenantMixin``/``organization_id``,
-        and the original fetched it by ``organization_unit_id`` with no
-        tenant predicate at all, so a cross-tenant-seeded
-        ``organization_unit_id`` on an otherwise correctly-scoped
-        ``ApplicationOwnership`` row would have leaked another
-        organisation's unit name/type/head-of-unit -- not caught by this
-        lens's own tests, which only exercised the element-level
-        cross-tenant case. It also showed expired ownership (no
-        ``end_date`` filter) as current, and serialised PII fields
-        (``contact_email``, ``head_of_unit``, ...) nothing in the template
-        ever rendered.
+        The answer is the element's OWN owners first, then the owners of the
+        elements it affects (the canonical ``cross_layer_impact`` walk, whose
+        rows never include the seed itself). Both come through the same
+        batch owner reader, and each distinct owner is listed once. When
+        neither the element nor anything it affects has an owner, the array
+        is empty and the response carries ``no_ownership_records``; a walk
+        that could not run (no tenant, unknown element) passes its own
+        reason through instead.
 
-        Withdrawing the read entirely -- no query against either table --
-        rather than patching those in place, since the underlying gap
-        (``OrganizationUnit`` has no tenant scoping of its own) needs a
-        real, separate fix before ANY reader of it is safe, not just this
-        one. The route, question card and tests stay in place so the lens
-        is easy to re-enable once a shared, tenant-safe reader exists;
-        only the query itself is disabled.
+        ``capacity_not_available`` is kept as ``True`` -- capacity data
+        is not yet connected.
         """
-        # No record_query_latency wrapper -- there is no query to time, and
-        # sampling a constant into the NFR-5 latency series would only
-        # dilute it with meaningless near-zero readings.
-        del element_id  # withdrawn; kept for a stable call signature
+        result = IntelligenceQueryService.cross_layer_impact(
+            element_id,
+            include_derived=False,
+            max_depth=3,
+            direction="downstream",
+            with_owner=True,
+        )
+        walk_reasons = [
+            r for r in (result.get("reasons") or [])
+            if r in (NO_TENANT_CONTEXT_REASON, ELEMENT_NOT_FOUND_REASON)
+        ]
+        if walk_reasons:
+            return {
+                "owners": [],
+                "capacity_not_available": True,
+                "reasons": walk_reasons,
+            }
+        rows = result.get("rows") or []
+
+        # The element's own owners, through the same batch reader.
+        org_id = current_org_id()
+        seed_elements = _resolve_elements_batch([element_id], org_id)
+        seed_owners = _resolve_application_owners_batch(
+            [element_id], org_id, seed_elements
+        ).get(element_id, [])
+
+        # Own owners first, then each affected row's, each distinct owner once.
+        seen: Dict[str, Dict[str, str]] = {}
+        for owner in list(seed_owners) + [
+            o for row in rows for o in row.get("owners", [])
+        ]:
+            key = f"{owner.get('name', '')}|{owner.get('role', '')}"
+            if key not in seen:
+                seen[key] = owner
+
+        owners = list(seen.values())
+        reasons = []
+        if not owners:
+            reasons.append(NO_OWNERSHIP_RECORDS_REASON)
+
         return {
-            "owners": [],
+            "owners": owners,
             "capacity_not_available": True,
-            "reasons": [OWNERSHIP_READER_NOT_BUILT_REASON, CAPACITY_NOT_AVAILABLE_REASON],
+            "reasons": reasons,
         }
 
     # ------------------------------------------------------------------ #

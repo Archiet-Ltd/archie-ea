@@ -8,6 +8,7 @@ roadmap_citation: "roadmap-v2.md 'Next: December 2026 to February 2027' — 'Ser
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
 url_slug: /use-cases/servicenow-cmdb-mapping
+icon: table-2
 ---
 
 # Resolve a ServiceNow CI to exactly one model element by shared identifier

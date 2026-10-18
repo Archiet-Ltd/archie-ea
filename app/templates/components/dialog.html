@@ -1,4 +1,8 @@
 {# shadcn/ui Dialog Component (Alpine.js powered) #}
+{# smoke-coverage-ok: backdrop fallback now reads the canonical --background token instead of a hardcoded
+   white RGB triplet; renders identically in the only reachable theme (light: --background is 0 0% 100%,
+   same white the old fallback always produced since --background-rgb was never actually declared anywhere);
+   no dark-mode toggle exists yet to reach the branch where the two differ #}
 {% macro dialog(trigger_text='Open', title='', description='') %}
     <div x-data="{ dialogOpen: false }">
         <button type="button" @click="dialogOpen = true" class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2" aria-label="Open">
@@ -9,7 +13,7 @@
             x-show="dialogOpen" x-trap.inert="dialogOpen" x-cloak role="dialog" aria-modal="true"
             @keydown.escape.window="dialogOpen = false"
             x-transition.opacity
-            class="modal-root hidden" style="position:fixed;inset:0;z-index:50;background:rgba(var(--background-rgb,255,255,255),0.8);backdrop-filter:blur(4px);" >  <!-- inline-style-ok -->
+            class="modal-root hidden" style="position:fixed;inset:0;z-index:50;background:hsl(var(--background) / 0.8);backdrop-filter:blur(4px);" >  <!-- inline-style-ok -->
             <div
                 @click.away="dialogOpen = false"
                 x-transition

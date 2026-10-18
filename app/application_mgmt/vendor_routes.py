@@ -12,6 +12,7 @@ from app import db
 from datetime import datetime
 import os
 from app.utils.pagination import safe_int_arg
+from app.middleware.tenant_decorators import platform_admin_required
 
 
 # Legacy redirect — /dashboard/vendors → canonical vendor catalogue
@@ -126,6 +127,7 @@ def vendors_dashboard():
 
 @application_mgmt.route('/applications/vendors/create', methods=['GET', 'POST'])
 @login_required
+@platform_admin_required
 def create_vendor():
     """Create a new vendor organization."""
     from app.models.vendor.vendor_organization import VendorOrganization
@@ -492,6 +494,7 @@ def vendor_applications_portfolio(vendor_id):
 
 @application_mgmt.route('/applications/vendors/<int:vendor_id>/edit', methods=['GET', 'POST'])
 @login_required
+@platform_admin_required
 def edit_vendor(vendor_id):
     """Edit vendor organization."""
     from app.models.vendor.vendor_organization import VendorOrganization
@@ -531,6 +534,7 @@ def edit_vendor(vendor_id):
 
 @application_mgmt.route('/applications/vendors/<int:vendor_id>/delete', methods=['POST'])
 @login_required
+@platform_admin_required
 def delete_vendor(vendor_id):
     """Delete vendor organization."""
     from app.models.vendor.vendor_organization import VendorOrganization
@@ -654,6 +658,7 @@ def manage_product_capabilities(vendor_id, product_id):
 # Vendor Onboarding Routes
 @application_mgmt.route('/applications/vendors/<int:vendor_id>/activate', methods=['POST'])
 @login_required
+@platform_admin_required
 def activate_vendor(vendor_id):
     """Activate a vendor from catalog to contracted status."""
     from app.services.vendor_onboarding_service import VendorOnboardingService
@@ -707,6 +712,7 @@ def activate_vendor(vendor_id):
 
 @application_mgmt.route('/applications/vendors/<int:vendor_id>/products/<int:product_id>/deploy', methods=['POST'])
 @login_required
+@platform_admin_required
 def deploy_vendor_product(vendor_id, product_id):
     """Deploy a vendor product as an application instance."""
     from app.services.vendor_onboarding_service import VendorOnboardingService

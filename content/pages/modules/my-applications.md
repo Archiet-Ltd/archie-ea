@@ -9,6 +9,7 @@ answers_use_cases:
   - {id: UC-S2-10, segment: S2}
 capture_status: live
 cta: plans
+icon: user-check
 ---
 
 # My Applications

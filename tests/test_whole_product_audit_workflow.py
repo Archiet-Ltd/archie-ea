@@ -37,7 +37,8 @@ def test_whole_product_audit_runs_every_role_and_retains_failure_evidence():
 
     assert set(job["strategy"]["matrix"]["persona"]) == set(_valid_roles())
     assert "workflow_dispatch" in raw
-    assert "postgres:16" in raw
+    assert "mirror.gcr.io/library/postgres:16" in raw
+    assert "public.ecr.aws" not in raw
     assert "scripts/production_readiness_audit.py" in raw
     assert "--persona ${{ matrix.persona }}" in raw
     assert "if: always()" in raw

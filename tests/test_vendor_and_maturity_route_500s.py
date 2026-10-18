@@ -54,6 +54,9 @@ def logged_in_client(app, db_session, org, login_as):
         role=role,
         confirmed=True,
     )
+    # The vendor catalogue is platform-wide, so its write routes are for a
+    # platform administrator.
+    user.is_platform_admin = True
     db_session.add(user)
     db_session.flush()
 

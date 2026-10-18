@@ -327,13 +327,6 @@ def init_cli(app):
         app.logger.warning(f"⚠️  Failed to register value-stream ArchiMate backfill CLI: {e}")
 
     try:
-        from app.commands.backfill_data_archimate import init_app as init_data_archimate
-        init_data_archimate(app)
-        app.logger.info("✅ Data-entity ArchiMate backfill CLI command registered")
-    except Exception as e:
-        app.logger.warning(f"⚠️  Failed to register data-entity ArchiMate backfill CLI: {e}")
-
-    try:
         from app.commands.backfill_archimate_layer_casing import init_app as init_layer_casing
         init_layer_casing(app)
         app.logger.info("✅ ArchiMate layer-casing backfill CLI command registered")
@@ -539,6 +532,14 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register demo company seed CLI: {e}")
 
+# Domain element backfill
+    try:
+        from app.commands.backfill_domain_elements import init_app as init_domain_elements
+        init_domain_elements(app)
+        app.logger.info("✅ Domain element backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register domain element backfill CLI: {e}")
+
 # Application owners backfill
     try:
         from app.commands import backfill_application_owners
@@ -546,6 +547,22 @@ def init_cli(app):
         app.logger.info("✅ Application owners backfill CLI command registered")
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register application owners backfill CLI: {e}")
+
+# ServiceNow connector config backfill (M2, cloud-review-pr448-961a0c35-v1.md)
+    try:
+        from app.commands import backfill_servicenow_connector_config
+        backfill_servicenow_connector_config.init_app(app)
+        app.logger.info("✅ ServiceNow connector config backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register ServiceNow connector config backfill CLI: {e}")
+
+# Jira/M365 connector row-secret migration (F1, cloud-review-pr448-a85f082b-v1.md)
+    try:
+        from app.commands import migrate_connector_row_secrets
+        migrate_connector_row_secrets.init_app(app)
+        app.logger.info("✅ Connector row-secret migration CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register connector row-secret migration CLI: {e}")
 
     # Cost fact store backfill
     try:

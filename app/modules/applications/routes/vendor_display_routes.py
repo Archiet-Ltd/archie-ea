@@ -21,6 +21,7 @@ from app.decorators import audit_log
 from ._helpers import _vendors_impl
 from . import unified_applications_bp
 from app.utils.pagination import safe_int_arg
+from app.middleware.tenant_decorators import platform_admin_required
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +96,7 @@ def vendors():
 @unified_applications_bp.route("/vendors/create", methods=["GET", "POST"])
 @login_required
 @audit_log("create_vendor")
+@platform_admin_required
 def vendors_create():
     """Render and process the standalone vendor create form."""
     from app.models.vendor.vendor_organization import VendorOrganization

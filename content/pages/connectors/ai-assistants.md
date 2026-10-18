@@ -6,7 +6,7 @@ state: held
 capture_status: awaiting_capture
 cta: plans
 description: "Entelim's MCP server lets an AI assistant such as Claude read your architecture model and answer what it affects, read-only and scoped to your own data."
-source: app/modules/mcp/blueprint.py, app/modules/mcp/tools/{lens,element,canvas}_tools.py,
+source: app/modules/mcp/blueprint.py, app/modules/ai_chat/tools/route_read_tools.py,
   app/modules/oauth_provider/{routes,metadata_routes,assistants_routes,scopes}.py, config.py,
   read 11 October 2026
 ---

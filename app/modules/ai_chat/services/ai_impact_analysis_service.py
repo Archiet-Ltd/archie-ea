@@ -277,6 +277,7 @@ class AIImpactAnalysisService:
                 "depth": row["relation"]["depth"],
                 "owner": row.get("owner"),
                 "health": row.get("health"),
+                "owners": row.get("owners", []),
             }
             depth = row["relation"]["depth"]
             if depth == 1:

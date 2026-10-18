@@ -77,10 +77,24 @@ def _install_platform_scope_engine_hook() -> None:
             )
 
 
+_session_hooks_installed = False
+
+
 def install_tenant_filter(app):
-    """Wire SQLAlchemy event listeners for automatic tenant scoping."""
+    """Wire SQLAlchemy event listeners for automatic tenant scoping.
+
+    The listeners are registered on the process-global ``db.session``, so they
+    are registered once however many apps are created in this process (the test
+    suite creates one per module). Registering them again stacked each hook, and
+    every ORM statement then issued one ``set_config`` per copy.
+    """
+    global _session_hooks_installed
 
     _install_platform_scope_engine_hook()
+
+    if _session_hooks_installed:
+        return
+    _session_hooks_installed = True
 
     @db.event.listens_for(db.session, "after_begin")
     def _set_database_tenant_after_begin(session, transaction, connection):

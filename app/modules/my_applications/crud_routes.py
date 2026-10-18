@@ -19,7 +19,7 @@ an application this user has no relationship to at all.
 from flask import flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from app.decorators import requires_application_owner
+from app.decorators import requires_application_owner_or_org_admin
 from app.extensions import db
 from app.models.application_owner import ApplicationOwner
 from app.models.application_portfolio import ApplicationComponent
@@ -53,7 +53,7 @@ def _owned_application_or_404(app_id):
 
 @my_applications_bp.route("/app/<int:app_id>/edit", methods=["GET", "POST"])
 @login_required
-@requires_application_owner
+@requires_application_owner_or_org_admin
 def app_edit(app_id):
     """Maintain the application record you are accountable for."""
     app = _owned_application_or_404(app_id)

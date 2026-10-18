@@ -1353,9 +1353,20 @@ def test_concurrent_same_revision_brief_freeze_serializes_one_snapshot(app, deci
         event.remove(engine, "after_cursor_execute", pause_first)
 
     assert first.is_alive() is False and second.is_alive() is False
-    assert len(results) == 1
-    assert len(errors) == 1 and isinstance(errors[0], CommandConflict)
-    assert errors[0].reason == "stale_revision"
+    # Two interleavings are legitimate and the outcome depends on timing. If the
+    # second worker is blocked on the row lock when the first commits, it finds
+    # the revision moved and fails with stale_revision. If it only claims after
+    # the first result exists, the database claim reconciles its rotated
+    # transport key to that result and it is a replay. Either way exactly one
+    # worker created the version and nobody else created a second.
+    assert len(errors) <= 1
+    for error in errors:
+        assert isinstance(error, CommandConflict) and error.reason == "stale_revision"
+    assert len(results) + len(errors) == 2
+    assert sum(1 for result in results if result.created) == 1
+    assert {result.object_ids["decision_brief_version_id"] for result in results} != set() and len(
+        {result.object_ids["decision_brief_version_id"] for result in results}
+    ) == 1
     with Session(engine) as session:
         assert session.scalar(
             select(func.count())
