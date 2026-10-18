@@ -77,16 +77,22 @@ def _make_user(db_session, org_id, label, role_name, enterprise_role="solution_a
 
 def _make_row(db_session, element_type, org_id, name):
     """Insert one typed row for *org_id*; organization_id is set explicitly."""
+    from flask import current_app, g
+
     registry, _ = _registry()
     model = registry[element_type]
-    row = model(name=name)
-    if hasattr(row, "description"):
-        row.description = "isolation probe"
-    if element_type == "Resource":
-        row.code = f"R-{uuid.uuid4().hex[:10]}"
-    row.organization_id = org_id
-    db_session.add(row)
-    db_session.flush()
+    # Row-creation listeners mirror the row into archimate_elements, which
+    # needs the tenant context a signed-in request would carry.
+    with current_app.test_request_context("/"):
+        g.current_org_id = org_id
+        row = model(name=name)
+        if hasattr(row, "description"):
+            row.description = "isolation probe"
+        if element_type == "Resource":
+            row.code = f"R-{uuid.uuid4().hex[:10]}"
+        row.organization_id = org_id
+        db_session.add(row)
+        db_session.flush()
     return row
 
 

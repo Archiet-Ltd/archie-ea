@@ -1144,13 +1144,15 @@ def detail_element(layer, element_type, element_id):
         abort(404)
     model_class = MODEL_REGISTRY.get(element_type)
 
+    # filter_by always emits SQL, so the tenant filter applies even when the row
+    # is already in the session identity map (Query.get would skip it).
     element = None
     if model_class:
-        element = model_class.query.get(element_id)
+        element = model_class.query.filter_by(id=element_id).first()
 
     # Fall back to archimate_elements table (native ArchiMate elements)
     if element is None:
-        element = ArchiMateElement.query.get_or_404(element_id)
+        element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
         model_class = ArchiMateElement
 
     # Get relationships
@@ -1195,11 +1197,11 @@ def update_element(layer, element_type, element_id):
         flash(f"Element type {element_type} is not yet supported", "warning")
         return redirect(url_for("archimate_crud.dashboard"))
 
-    element = model_class.query.get(element_id)
+    element = model_class.query.filter_by(id=element_id).first()
     # Fall back to archimate_elements for elements stored there directly
     _from_ae = False
     if element is None:
-        element = ArchiMateElement.query.get(element_id)
+        element = ArchiMateElement.query.filter_by(id=element_id).first()
         _from_ae = True
     if element is None:
         if request.is_json:
@@ -1356,11 +1358,11 @@ def delete_element(layer, element_type, element_id):
         flash(f"Element type {element_type} is not yet supported", "warning")
         return redirect(url_for("archimate_crud.dashboard"))
 
-    element = model_class.query.get(element_id)
+    element = model_class.query.filter_by(id=element_id).first()
     # Fall back to archimate_elements for elements stored there directly
     _from_ae = False
     if element is None:
-        element = ArchiMateElement.query.get(element_id)
+        element = ArchiMateElement.query.filter_by(id=element_id).first()
         _from_ae = True
     if element is None:
         if request.is_json:
@@ -1479,7 +1481,7 @@ def validate_archimate_model():
 def validate_archimate_element(element_id):
     """Validate a single ArchiMate element against ArchiMate 3.2 metamodel rules."""
     from app.modules.architecture.services.archimate_validation_service import ArchiMateValidationService
-    element = ArchiMateElement.query.get_or_404(element_id)
+    element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
     service = ArchiMateValidationService()
     issues = service.validate_element(element)
     return jsonify({'issues': issues, 'valid': len(issues) == 0})
@@ -1504,7 +1506,7 @@ def bulk_delete(layer, element_type):
     try:
         deleted_count = 0
         for element_id in element_ids:
-            element = model_class.query.get(element_id)
+            element = model_class.query.filter_by(id=element_id).first()
             if element:
                 # Delete linked ArchiMateElement
                 if element.archimate_element_id:
@@ -1710,7 +1712,7 @@ def api_element_detail(element_id):
 @write_role_required
 def api_element_patch(element_id):
     """ARC-006: Partial update of an ArchiMate element's core fields."""
-    element = ArchiMateElement.query.get_or_404(element_id)
+    element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
     data = request.get_json() or {}
 
     allowed = {"name", "type", "layer", "description", "element_type"}
