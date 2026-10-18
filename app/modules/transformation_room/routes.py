@@ -237,7 +237,8 @@ def register_transformation_room_routes(blueprint) -> None:
                 command_key=request.form.get("command_key", "").strip() or str(uuid.uuid4()),
             )
             return redirect(
-                f"/solutions/programmes/{programme_id}/workstreams/{workstream_id}/{target_stage}",
+                f"/solutions/programmes/{programme_id}/workstreams/{workstream_id}/"
+                f"{TransformationGateService.page_for_stage(target_stage)}",
                 code=303,
             )
         except (TypeError, ValueError) as error:

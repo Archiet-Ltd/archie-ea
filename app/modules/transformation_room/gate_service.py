@@ -169,6 +169,16 @@ class TransformationGateService:
         "outcomes": "completed",
     }
     TERMINAL_STAGES = frozenset({"completed"})
+    # Lifecycle stages are states; the room has seven pages. The decision page
+    # carries every stage from a frozen brief through the governance outcome.
+    STAGE_PAGES = {
+        "decision_ready": "decision",
+        "in_governance": "decision",
+        "approved_with_conditions": "decision",
+        "approved": "decision",
+        "rejected": "decision",
+        "completed": "outcomes",
+    }
     STAGE_ORDER = {
         "objective": 0,
         "discover": 1,
@@ -1429,6 +1439,11 @@ class TransformationGateService:
         )
 
     @classmethod
+    def page_for_stage(cls, stage: str) -> str:
+        """Name the room page that shows a lifecycle stage."""
+        return cls.STAGE_PAGES.get(stage, stage)
+
+    @classmethod
     def next_action(cls, *, actor: ActorContext, workstreams: Sequence[ProgrammeWorkstream]):
         for workstream in sorted(
             workstreams,
@@ -1440,7 +1455,7 @@ class TransformationGateService:
             if target is None:
                 return GateBlocker("lifecycle_action_required", "Choose the next governed lifecycle action.",
                                    "workstream", workstream.id,
-                                   f"/solutions/programmes/{workstream.programme_id}/workstreams/{workstream.id}/{workstream.lifecycle_stage}")
+                                   f"/solutions/programmes/{workstream.programme_id}/workstreams/{workstream.id}/{cls.page_for_stage(workstream.lifecycle_stage)}")
             gate = cls.evaluate(actor=actor, workstream_id=workstream.id, target_stage=target)
             if gate.blockers:
                 return gate.blockers[0]
@@ -1450,7 +1465,7 @@ class TransformationGateService:
             # is the stage the message actually names.
             return GateBlocker("transition_ready", f"Advance this workstream to {target.replace('_', ' ')}.",
                                "workstream", workstream.id,
-                               f"/solutions/programmes/{workstream.programme_id}/workstreams/{workstream.id}/{target}")
+                               f"/solutions/programmes/{workstream.programme_id}/workstreams/{workstream.id}/{cls.page_for_stage(target)}")
         return None
 
 
