@@ -60,8 +60,12 @@ def test_open_gap_without_work_package_is_listed_until_one_is_linked(app, db_ses
     gap = _gap(db_session, org_a, "No single customer view")
     with tenant_ctx(org_a.id):
         assert "No single customer view" in _names(transformation_backlog())
-    _wp(db_session, org_a, "Build customer hub", start=dt.datetime(2027, 1, 4), gap=gap)
+    from app.services import work_package_service
+
+    wp = _wp(db_session, org_a, "Build customer hub", start=dt.datetime(2027, 1, 4))
     with tenant_ctx(org_a.id):
+        work_package_service.link_gap(wp.id, gap.id, organization_id=org_a.id)
+        db_session.flush()
         assert "No single customer view" not in _names(transformation_backlog())
 
 
@@ -119,3 +123,19 @@ def test_page_renders_for_each_organisation_and_empty_state(app, db_session, two
     body = client.get("/portfolio/backlog").get_data(as_text=True)
     assert "Visible to A" not in body
     assert "data-backlog-empty" in body
+
+
+def test_a_gap_linked_through_the_link_writer_leaves_the_backlog(app, db_session, two_orgs, tenant_ctx):
+    """The link a person makes on the screen (the one link record, read through the
+    work package service) takes the gap off the backlog, the same as the
+    gaps-not-addressed list does."""
+    from app.services import work_package_service
+
+    org_a, _ = two_orgs
+    gap = _gap(db_session, org_a, "Linked on the screen")
+    wp = _wp(db_session, org_a, "Plan the fix", start=dt.datetime(2027, 4, 1))
+    with tenant_ctx(org_a.id):
+        assert "Linked on the screen" in _names(transformation_backlog())
+        work_package_service.link_gap(wp.id, gap.id, organization_id=org_a.id)
+        db_session.flush()
+        assert "Linked on the screen" not in _names(transformation_backlog())

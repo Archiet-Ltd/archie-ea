@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from app import db
+from app.utils.tenant import current_organization_id as current_org_id
 
 # Recorded priority, most urgent first. A value outside this list sorts last and
 # is shown as recorded rather than being mapped to something it was not.
@@ -29,15 +30,16 @@ def _rank(priority: str | None) -> int:
 
 
 def open_gaps_without_work_package() -> List[Dict[str, Any]]:
-    from app.models.implementation_migration import Gap
-    from app.models.unified_work_package import UnifiedWorkPackage
+    """Open gaps of the active organisation that no work package is linked to.
 
-    addressed = db.select(UnifiedWorkPackage.gap_id).where(UnifiedWorkPackage.gap_id.is_not(None))
-    rows = db.session.execute(
-        db.select(Gap)
-        .where(Gap.id.not_in(addressed))
-        .where(db.or_(Gap.resolution_status.is_(None), Gap.resolution_status.not_in(CLOSED_GAP_STATUSES)))
-    ).scalars().all()
+    "Addressed" is read from the one link record through the gaps-not-addressed
+    reader, so this list and the gap register can never disagree about it."""
+    from app.services.gap_register_service import get_gaps_not_addressed
+
+    rows = [
+        g for g in get_gaps_not_addressed(current_org_id())
+        if g.resolution_status is None or g.resolution_status not in CLOSED_GAP_STATUSES
+    ]
     return [
         {
             "kind": "gap",
@@ -54,13 +56,16 @@ def open_gaps_without_work_package() -> List[Dict[str, Any]]:
 
 
 def unscheduled_work_packages() -> List[Dict[str, Any]]:
+    """Work packages of the active organisation with no start date that are not finished."""
     from app.models.unified_work_package import UnifiedWorkPackage as WP
+    from app.services import work_package_service
 
-    rows = db.session.execute(
-        db.select(WP)
-        .where(WP.start_date.is_(None))
-        .where(db.or_(WP.status.is_(None), WP.status.not_in(CLOSED_WORK_PACKAGE_STATUSES)))
-    ).scalars().all()
+    rows = (
+        work_package_service.query_for(current_org_id())
+        .filter(WP.start_date.is_(None))
+        .filter(db.or_(WP.status.is_(None), WP.status.not_in(CLOSED_WORK_PACKAGE_STATUSES)))
+        .all()
+    )
     return [
         {
             "kind": "work_package",
