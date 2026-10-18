@@ -264,6 +264,12 @@ BANNED_CLAIMS = [
         "this way before anyone noticed, and check_untenanted_reads.py --count measured "
         "2349 against a baseline of 2361 on this page's own PR, i.e. slack exists right now",
     ),
+    (
+        "your team's own AI assistants can work directly over your twin",
+        "the assistant connector is read-only: an outside assistant can read and answer "
+        "questions over a tenant's model, but it cannot change it, so 'work directly over' "
+        "overclaims",
+    ),
 ]
 
 # Front-matter keys that are metadata-only and must never appear as visible
