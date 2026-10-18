@@ -29,7 +29,6 @@
 {% endblock %}
 
 {% block content %}
-{% set _billing = 'billing.billing_index' in flask.current_app.view_functions %}
 {% set _yes = '<span class="pp-yes" role="img" aria-label="Included"></span>'|safe %}
 {% set _no = '<span class="pp-no" aria-label="Not included">&mdash;</span>'|safe %}
 <div class="pricing-page">
@@ -91,14 +90,7 @@
             <span data-interval="year">{{ note_year }}</span>
             <span data-interval="month">{{ note_month }}</span>
           </p>
-          {% if _billing %}
-          <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
-             class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-interval="year" data-testid="buy-{{ key }}">Buy {{ name }}, billed annually</a>
-          <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='month')) }}"
-             class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-interval="month" data-testid="buy-{{ key }}-monthly">Buy {{ name }}, billed monthly</a>
-          {% else %}
-          <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-{{ key }}">Contact us to buy {{ name }}</a>
-          {% endif %}
+          <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-testid="buy-{{ key }}">Talk to us</a>
           <div class="pp-alt"></div>
           <ul class="pp-list">
             <li class="pp-lead-in">Everything in Community, plus</li>
@@ -113,7 +105,7 @@
           <p class="pp-for">Enterprise architecture teams.</p>
           <p class="pp-price"><span class="pp-from">From</span> $24,000<small>/year</small></p>
           <p class="pp-note">Annual contract from $24,000/year.</p>
-          <a href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-enterprise">Contact sales</a>
+          <a href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-enterprise">Talk to us</a>
           <div class="pp-alt"></div>
           <ul class="pp-list">
             <li class="pp-lead-in">Everything in Team, plus</li>
@@ -146,7 +138,7 @@
           <tbody>
             {% set _rows = [
               ('Modelling', [
-                ('People included', ['3', '10', 'Editors you buy; askers free', 'No limit']),
+                ('People included', ['3', '10', 'Paid editors; askers free', 'No limit']),
                 ('Business Model Canvas', [1, 1, 1, 1]),
                 ('Twin map of systems, suppliers and dependencies', [1, 1, 1, 1]),
                 ('Import from ArchiMate Open Exchange and spreadsheets', [1, 1, 1, 1]),
