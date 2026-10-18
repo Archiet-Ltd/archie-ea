@@ -117,7 +117,7 @@ def test_an_element_on_one_side_only_is_a_presence_question_not_a_value_one():
 
 def test_value_mode_is_opt_in_and_other_concepts_are_compared_as_before(
         app, db_session, make_org, tenant_ctx):
-    assert set(gate.VALUE_PAIRS) == {CONCEPT}
+    assert CONCEPT in gate.VALUE_PAIRS
     assert set(gate.VALUE_PAIRS) <= set(gate.CONCEPTS)
 
     # A plain dict of count observations (no value readings) compares as before.

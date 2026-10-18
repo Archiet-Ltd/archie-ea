@@ -137,7 +137,11 @@ def _build_overview_context():
         _cov_where = "WHERE organization_id = :org" if _org is not None else ""
         row = db.session.execute(text(f"""
             SELECT
-                COUNT(*) FILTER (WHERE application_owner IS NOT NULL OR business_owner IS NOT NULL) AS owner_n,
+                COUNT(*) FILTER (WHERE application_owner IS NOT NULL OR business_owner IS NOT NULL OR EXISTS (
+                    SELECT 1 FROM application_owners ao
+                    WHERE ao.application_id = application_components.id
+                      AND ao.organization_id = application_components.organization_id
+                      AND ao.ownership_type IN ('primary', 'business'))) AS owner_n,
                 COUNT(*) FILTER (WHERE vendor_product_id IS NOT NULL OR vendor_name IS NOT NULL) AS vendor_n,
                 COUNT(*) FILTER (WHERE total_cost_of_ownership IS NOT NULL OR license_cost IS NOT NULL OR maintenance_cost IS NOT NULL) AS cost_n,
                 COUNT(*) FILTER (WHERE business_criticality IS NOT NULL) AS crit_n
@@ -215,7 +219,11 @@ def api_coverage_debug():
         _org_where = " WHERE organization_id = :org" if _org is not None else ""
         row = db.session.execute(text(f"""
             SELECT
-                COUNT(*) FILTER (WHERE application_owner IS NOT NULL OR business_owner IS NOT NULL) AS owner_n,
+                COUNT(*) FILTER (WHERE application_owner IS NOT NULL OR business_owner IS NOT NULL OR EXISTS (
+                    SELECT 1 FROM application_owners ao
+                    WHERE ao.application_id = application_components.id
+                      AND ao.organization_id = application_components.organization_id
+                      AND ao.ownership_type IN ('primary', 'business'))) AS owner_n,
                 COUNT(*) FILTER (WHERE vendor_product_id IS NOT NULL OR vendor_name IS NOT NULL) AS vendor_n,
                 COUNT(*) FILTER (WHERE total_cost_of_ownership IS NOT NULL OR license_cost IS NOT NULL OR maintenance_cost IS NOT NULL) AS cost_n,
                 COUNT(*) FILTER (WHERE business_criticality IS NOT NULL) AS crit_n,

@@ -5,7 +5,12 @@ Migrates legacy ownership data into the application_owners table one
 organisation at a time:
 
 1. Rows from the application_ownership table (enterprise_intelligence.py).
-2. Text business_owner / technical_owner columns on ApplicationComponent.
+2. Text application_owner / business_owner / technical_owner columns on
+   ApplicationComponent (kept in place, never cleared or dropped here).
+
+The organisation-unit rows of application_ownership are a different axis (which
+unit holds the budget, with a percentage and dates) and stay readable where they
+are; step 1 only copies the named contact of each row across as a person.
 
 A text owner that matches no user in that organisation is recorded in a
 per-organisation unresolved list and is never guessed.
@@ -50,41 +55,6 @@ def _application_in_org(app_id: int, org_id: int):
     ).scalar_one_or_none()
 
 
-def _resolve_user_by_name(name: str, org_id: int) -> Optional[object]:
-    """Find a user in *org_id* whose display name or email matches *name*.
-
-    Tries, in order:
-      1. Exact case-insensitive match on ``first_name || ' ' || last_name``
-      2. Exact case-insensitive match on ``email``
-
-    Returns ``None`` when no single user matches.  Does NOT match on
-    first-name-only or last-name-only — the brief says "never guessed".
-    """
-    from app.models.user import User
-
-    name_lower = name.strip().lower()
-
-    # Full-name match
-    users = (
-        User.query.filter(User.organization_id == org_id)
-        .filter(db.func.lower(db.func.concat(User.first_name, " ", User.last_name)) == name_lower)
-        .all()
-    )
-    if len(users) == 1:
-        return users[0]
-
-    # Email match
-    users = (
-        User.query.filter(User.organization_id == org_id)
-        .filter(db.func.lower(User.email) == name_lower)
-        .all()
-    )
-    if len(users) == 1:
-        return users[0]
-
-    return None
-
-
 def _record_unresolved(org_id: int, app_name: str, field: str, name: str, unresolved: List[Dict]) -> None:
     """Append an unresolved entry to the list."""
     unresolved.append({
@@ -125,6 +95,7 @@ def backfill_owner_data(dry_run: bool = False, organization_ids: Optional[List[i
     from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import ApplicationComponent
     from app.models.enterprise_intelligence import ApplicationOwnership
+    from app.services.element_ownership_service import APPLICATION_OWNER_FIELDS, resolve_user_by_name
 
     if organization_ids:
         org_ids = sorted(organization_ids)
@@ -139,6 +110,7 @@ def backfill_owner_data(dry_run: bool = False, organization_ids: Optional[List[i
     total_text_owners = 0
     total_skipped = 0
     total_merged = 0
+    total_unresolved = 0
     all_unresolved = {}
 
     for org_id in sorted(org_ids):
@@ -202,10 +174,10 @@ def backfill_owner_data(dry_run: bool = False, organization_ids: Optional[List[i
             user = None
 
             if contact_name:
-                user = _resolve_user_by_name(contact_name, org_id)
+                user = resolve_user_by_name(contact_name, org_id)
             if user is None and contact_email:
                 # Try e-mail match when there is no contact name
-                user = _resolve_user_by_name(contact_email, org_id)
+                user = resolve_user_by_name(contact_email, org_id)
 
             if user is None:
                 # No contact name either: record as "(no contact)"
@@ -269,8 +241,8 @@ def backfill_owner_data(dry_run: bool = False, organization_ids: Optional[List[i
             .all()
         )
         for app_obj in apps:
-            for field_name, new_type in [("business_owner", "business"), ("technical_owner", "technical")]:
-                name = getattr(app_obj, field_name, None)
+            for field_name, new_type in APPLICATION_OWNER_FIELDS.items():
+                name = getattr(app_obj, "legacy_" + field_name, None)
                 if not name or not name.strip():
                     continue
 
@@ -289,7 +261,7 @@ def backfill_owner_data(dry_run: bool = False, organization_ids: Optional[List[i
                     total_skipped += 1
                     continue
 
-                user = _resolve_user_by_name(name, org_id)
+                user = resolve_user_by_name(name, org_id)
                 if user is None:
                     _record_unresolved(org_id, app_obj.name, field_name, name.strip(), unresolved)
                     continue
@@ -321,6 +293,7 @@ def backfill_owner_data(dry_run: bool = False, organization_ids: Optional[List[i
                     total_text_owners += 1
 
         if unresolved:
+            total_unresolved += len(unresolved)
             all_unresolved[str(org_id)] = unresolved
             click.echo(f"    unresolved: {len(unresolved)} text owner(s) matched no user")
             for u in unresolved:
@@ -342,6 +315,7 @@ def backfill_owner_data(dry_run: bool = False, organization_ids: Optional[List[i
         "text_owner_fields": total_text_owners,
         "skipped_existing": total_skipped,
         "organisations_processed": len(org_ids),
+        "unresolved_text_owners": total_unresolved,
         "unresolved_orgs": len(all_unresolved),
         "merged_legacy_rows": total_merged,
     }

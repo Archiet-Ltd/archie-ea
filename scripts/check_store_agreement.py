@@ -197,12 +197,16 @@ class ValueSide:
     filter_eq  attribute -> value, as on Surface
     """
 
-    def __init__(self, name, target, key, field, filter_eq=None):
+    def __init__(self, name, target, key, field, filter_eq=None, reader=None):
         self.name = name
         self.target = target
         self.key = key
         self.field = field
         self.filter_eq = filter_eq or {}
+        # A value that is not one column of one model (a name that must be read
+        # through a join, say) supplies its own `reader(db, org_id)` ->
+        # {key: value}; the tenancy rule is then the reader's, and it states it.
+        self.reader = reader
 
 
 class ValuePair:
@@ -217,11 +221,19 @@ class ValuePair:
     before.
     """
 
-    def __init__(self, name, left, right, tolerance="0.005"):
+    def __init__(self, name, left, right, tolerance="0.005", agree=None,
+                 presence=False):
         self.name = name
         self.left = left
         self.right = right
         self.tolerance = Decimal(tolerance)
+        # `agree(left_value, right_value)` replaces the numeric tolerance for a
+        # value that is not an amount (an owner's name against the user it was
+        # recorded as). `presence=True` also reports an element read on the
+        # left that the right does not hold at all: for a retired store that
+        # must be copied across completely, that absence is the finding.
+        self.agree = agree
+        self.presence = presence
 
 
 class ValueReading:
@@ -415,19 +427,16 @@ CONCEPTS = {
         Surface("orm:Risk", "orm", "app.models.risk.Risk"),
         Surface("GET /api/risks", "http", "/api/risks", extract="len:"),
     ],
-    # "How many applications have an owner recorded", asked of the two owner
-    # stores and of the owner text columns on the application itself.
+    # "Which applications have an owner recorded", asked of the one owner
+    # record. The owner text columns on the application are a retired store and
+    # are compared by value below (VALUE_PAIRS): every name held there must be
+    # the person recorded in ApplicationOwner. ApplicationOwnership is not a
+    # surface here: it records which organisation UNIT holds an application
+    # (budget, percentage, dates), a different question from which person owns it.
     "application owners": [
         Surface("orm:ApplicationOwner(applications)", "orm",
                 "app.models.application_owner.ApplicationOwner",
                 distinct="application_id"),
-        Surface("orm:ApplicationOwnership(applications)", "orm",
-                "app.models.enterprise_intelligence.ApplicationOwnership",
-                distinct="application_id"),
-        Surface("orm:ApplicationComponent(owner text recorded)", "orm",
-                "app.models.application_portfolio.ApplicationComponent",
-                filter_not_null=("application_owner", "business_owner",
-                                 "technical_owner")),
         # A primary owner is a subset of "has an owner": declared narrower.
         Surface("orm:ApplicationOwner(applications, primary)", "orm",
                 "app.models.application_owner.ApplicationOwner",
@@ -550,7 +559,71 @@ _APPLICATION_COST_COLUMNS = {
 }
 _APPLICATION_COST_FACT_SOURCE = "application_cost_accessor"
 
+def _read_legacy_owner_text(field):
+    """{application id: owner name} still held as text on the application.
+
+    Reads the retired column itself (`legacy_<field>`), not the owner field
+    that answers from the owner record, or the two sides could not differ.
+    """
+    def read(db, org_id):
+        from app.models.application_portfolio import ApplicationComponent
+
+        column = getattr(ApplicationComponent, "legacy_" + field)
+        rows = (db.session.query(ApplicationComponent.id, column)
+                .filter(ApplicationComponent.organization_id == org_id)
+                .filter(column.isnot(None)).all())
+        return {i: text.strip().lower() for i, text in rows if text and text.strip()}
+    return read
+
+
+def _read_recorded_owner_identities(ownership_type):
+    """{application id: names and emails of its recorded owners of that type}."""
+    def read(db, org_id):
+        from app.models.application_owner import ApplicationOwner
+        from app.models.user import User
+
+        rows = (db.session.query(ApplicationOwner.application_id, User.first_name,
+                                 User.last_name, User.email)
+                .join(User, User.id == ApplicationOwner.user_id)
+                .filter(ApplicationOwner.organization_id == org_id)
+                .filter(User.organization_id == org_id)
+                .filter(ApplicationOwner.application_id.isnot(None))
+                .filter(ApplicationOwner.ownership_type == ownership_type).all())
+        identities = {}
+        for application_id, first, last, email in rows:
+            names = identities.setdefault(application_id, set())
+            names.add(" ".join(p for p in (first, last) if p).strip().lower())
+            if email:
+                names.add(email.strip().lower())
+        return identities
+    return read
+
+
+# application owner field -> the ownership type it is recorded as (the same map
+# app.services.element_ownership_service.APPLICATION_OWNER_FIELDS holds; a test
+# pins the two together).
+_APPLICATION_OWNER_FIELDS = {
+    "application_owner": "primary",
+    "business_owner": "business",
+    "technical_owner": "technical",
+}
+
+
+def _owner_text_is_recorded_owner(text, identities):
+    return text in identities
+
+
 VALUE_PAIRS = {
+    "application owners": [
+        ValuePair(
+            "application.%s text = recorded %s owner" % (field, ownership_type),
+            ValueSide("orm:ApplicationComponent.legacy_%s" % field, "", "", "",
+                      reader=_read_legacy_owner_text(field)),
+            ValueSide("orm:ApplicationOwner(%s)" % ownership_type, "", "", "",
+                      reader=_read_recorded_owner_identities(ownership_type)),
+            agree=_owner_text_is_recorded_owner, presence=True)
+        for field, ownership_type in _APPLICATION_OWNER_FIELDS.items()
+    ],
     "applications with a recorded annual cost": [
         ValuePair(
             "application.%s = cost fact %s" % (column, category),
@@ -570,6 +643,12 @@ VALUE_PAIRS = {
 # Concepts and surfaces deliberately NOT registered, and why -- naming the
 # exclusion is the point, because a hollow entry here would defeat the file:
 #
+#   organisation-    ApplicationOwnership (application_ownership) records which
+#   unit ownership   organisation UNIT holds an application -- budget holder,
+#                     product owner, a percentage and dates -- not which person
+#                     owns it. It is a different question from "application
+#                     owners", so it is not a surface of that concept; the
+#                     reuse register carries it as its own entry.
 #   maturity gaps     CapabilityGapAnalysis and CapabilityGapDetail
 #                     (capability_gap_analysis, capability_gap_details) are
 #                     not the planned-gap register above. They are the
@@ -767,15 +846,31 @@ def _compare_values(value_readings):
                              "so its values were not compared"
                              % (concept, pair.name))
                 continue
+            if pair.presence:
+                missing = sorted(set(reading.left_values) - set(reading.right_values))
+                if missing:
+                    findings.append(
+                        "  %s [unmigrated] %s: %d element(s) carry a value in %s "
+                        "that %s does not hold (ids %s%s)"
+                        % (concept, pair.name, len(missing), pair.left.name,
+                           pair.right.name,
+                           ", ".join(str(k) for k in missing[:5]),
+                           "" if len(missing) <= 5 else ", ..."))
             shared = sorted(set(reading.left_values) & set(reading.right_values))
             if not shared:
-                notes.append("  %s [no-evidence] %s: no element carries a "
-                             "value on both sides; nothing was compared"
-                             % (concept, pair.name))
+                if not (pair.presence and reading.left_values):
+                    notes.append("  %s [no-evidence] %s: no element carries a "
+                                 "value on both sides; nothing was compared"
+                                 % (concept, pair.name))
                 continue
-            differing = [k for k in shared
-                         if abs(reading.left_values[k] - reading.right_values[k])
-                         > pair.tolerance]
+            if pair.agree is not None:
+                differing = [k for k in shared
+                             if not pair.agree(reading.left_values[k],
+                                               reading.right_values[k])]
+            else:
+                differing = [k for k in shared
+                             if abs(reading.left_values[k] - reading.right_values[k])
+                             > pair.tolerance]
             if not differing:
                 continue
             shown = "; ".join(
@@ -1120,6 +1215,12 @@ def _read_values(side, db, org_id):
     events scope a TenantMixin model, a bare organization_id column is filtered
     here, and anything else cannot be read for one organisation.
     """
+    if side.reader is not None:
+        try:
+            return side.reader(db, org_id)
+        except Exception:
+            db.session.rollback()
+            return None
     module, _, cls = side.target.rpartition(".")
     try:
         model = getattr(__import__(module, fromlist=[cls]), cls)
