@@ -528,7 +528,8 @@ def test_backfill_is_idempotent(db_session, make_org):
 
     assert len(rows1) == len(rows2), "second run should create no additional rows"
     assert stats2["text_owner_fields"] == 0  # all skipped
-    assert stats2["skipped_existing"] >= 1
+    # The resolved text was cleared by the first run, so there is nothing left to skip.
+    assert stats2["skipped_existing"] == 0
 
 
 # ── 6. Ownership coverage view ──────────────────────────────────────────────

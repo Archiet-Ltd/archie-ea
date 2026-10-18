@@ -252,9 +252,65 @@ def test_backfill_moves_every_text_field_and_is_idempotent(db_session, make_org)
     assert {src for *_, src in after_first} == {"application_owner", "business_owner"}
     assert second["text_owner_fields"] == 0
     assert _state(org) == after_first
-    # The text stays where it was: nothing is cleared or dropped by the backfill.
+    # A name that resolved to a user is cleared once recorded; one that did not stays.
     assert application.legacy_technical_owner == "Nobody Known"
-    assert application.legacy_business_owner == joe.email
+    assert application.legacy_business_owner is None
+
+
+def test_a_removed_owner_does_not_bring_back_the_legacy_text_after_backfill(db_session, make_org):
+    """B2: the backfill left the text in place, so removing the owner re-showed it."""
+    from app.commands.backfill_application_owners import backfill_owner_data
+    from app.models.application_owner import ApplicationOwner
+
+    org = make_org("one-store-removed")
+    jane = _person(db_session, org, "jane")
+    application = _make_app(db_session, org, "Legacy", legacy_business_owner=_full_name(jane))
+    backfill_owner_data(organization_ids=[org.id])
+    assert application.business_owner == _full_name(jane)
+
+    for row in ApplicationOwner.query.filter_by(application_id=application.id, organization_id=org.id).all():
+        db_session.delete(row)
+    db_session.flush()
+    application.__dict__.pop("_owner_text_cache", None)
+
+    assert application.business_owner is None
+    backfill_owner_data(organization_ids=[org.id])
+    assert application.business_owner is None
+
+
+def test_a_recorded_owner_without_a_name_reads_as_their_email_not_a_dash(db_session, make_org):
+    """B1a: a dash read as "no owner" in the evidence snapshot."""
+    org = make_org("one-store-nameless")
+    nameless = _person(db_session, org, "pat")
+    nameless.first_name = None
+    nameless.last_name = None
+    application = _make_app(db_session, org, "Ledger")
+    application.application_owner = nameless.email
+    db_session.flush()
+
+    assert application.application_owner == nameless.email
+    application.__dict__.pop("_owner_text_cache", None)
+    assert application.application_owner == nameless.email
+
+
+def test_reading_an_owner_joins_the_applications_own_transaction(db_session, make_org):
+    """B1b: the read ran on the global session and began a transaction on it."""
+    from sqlalchemy.orm import object_session
+
+    org = make_org("one-store-session")
+    jane = _person(db_session, org, "jane")
+    application = _make_app(db_session, org, "Ledger")
+    application.business_owner = _full_name(jane)
+    db_session.flush()
+    application.__dict__.pop("_owner_text_cache", None)
+
+    session = object_session(application)
+    assert application.business_owner == _full_name(jane)
+    assert session.in_transaction()
+    # A caller that reads the owner and then begins its own nested work on the
+    # application's session must not find a transaction begun behind its back.
+    with session.begin_nested():
+        assert application.business_owner == _full_name(jane)
 
 
 def test_backfill_of_one_organisation_leaves_the_other_untouched(db_session, make_org):

@@ -22,7 +22,7 @@ APPLICATION_OWNER_FIELDS = {
     "business_owner": "business",
     "technical_owner": "technical",
 }
-# What an owner with no recorded name reads as -- never the email address.
+# What an owner with neither a name nor an email reads as.
 NAMELESS_OWNER_LABEL = "\u2014"
 
 
@@ -181,20 +181,31 @@ def resolve_user_by_name(name: str, organization_id: int):  # reuse-ok: the one 
     return None
 
 
-def owner_label(first_name: Optional[str], last_name: Optional[str]) -> str:
-    """The name an owner is shown by; a nameless owner is a dash, not an email."""
-    return " ".join(part for part in (first_name, last_name) if part).strip() or NAMELESS_OWNER_LABEL
+def owner_label(first_name: Optional[str], last_name: Optional[str], email: Optional[str] = None) -> str:
+    """The name an owner is shown by; a nameless owner is shown by email.
+
+    A recorded owner must never read as absent, so a user with no name reads as
+    the email address rather than a placeholder consumers treat as "no owner".
+    """
+    return " ".join(part for part in (first_name, last_name) if part).strip() or email or NAMELESS_OWNER_LABEL
 
 
-def _owner_labels_for(application_ids: Iterable[int], organization_id: int, ownership_type: str) -> dict:
+def _owner_labels_for(
+    application_ids: Iterable[int], organization_id: int, ownership_type: str, application=None,
+) -> dict:
     """{application_id: label of its first owner of *ownership_type*}, one query."""
     from app.models.user import User
 
     application_ids = [i for i in application_ids if i is not None]
     if not application_ids:
         return {}
-    rows = db.session.execute(
-        db.select(ApplicationOwner.application_id, User.first_name, User.last_name)
+    from sqlalchemy.orm import object_session
+
+    # Read on the session the application was loaded in, so the query joins its
+    # transaction instead of beginning one on the global session.
+    session = (object_session(application) if application is not None else None) or db.session
+    rows = session.execute(
+        db.select(ApplicationOwner.application_id, User.first_name, User.last_name, User.email)
         .join(User, User.id == ApplicationOwner.user_id)
         .where(ApplicationOwner.application_id.in_(application_ids))
         .where(ApplicationOwner.organization_id == organization_id)
@@ -203,8 +214,8 @@ def _owner_labels_for(application_ids: Iterable[int], organization_id: int, owne
         .order_by(ApplicationOwner.id)
     ).all()
     labels: dict = {}
-    for application_id, first_name, last_name in rows:
-        labels.setdefault(application_id, owner_label(first_name, last_name))
+    for application_id, first_name, last_name, email in rows:
+        labels.setdefault(application_id, owner_label(first_name, last_name, email))
     return labels
 
 
@@ -220,7 +231,7 @@ def preload_application_owner_text(applications: Iterable) -> None:
     for organization_id, apps in by_org.items():
         ids = [a.id for a in apps]
         for field, ownership_type in APPLICATION_OWNER_FIELDS.items():
-            labels = _owner_labels_for(ids, organization_id, ownership_type)
+            labels = _owner_labels_for(ids, organization_id, ownership_type, application=apps[0])
             for application in apps:
                 application.__dict__.setdefault("_owner_text_cache", {})[field] = labels.get(application.id)
 
@@ -242,6 +253,7 @@ def application_owner_text(application, field: str) -> Optional[str]:
         if application.id is not None and application.organization_id is not None:
             label = _owner_labels_for(
                 [application.id], application.organization_id, APPLICATION_OWNER_FIELDS[field],
+                application=application,
             ).get(application.id)
         cache = application.__dict__.setdefault("_owner_text_cache", {})
         cache[field] = label
@@ -294,7 +306,7 @@ def apply_staged_application_owners(application, organization_id: Optional[int])
         if user is None:
             unresolved.append(field)
             recorded = bool(application.id is not None and organization_id is not None and _owner_labels_for(
-                [application.id], organization_id, APPLICATION_OWNER_FIELDS[field]))
+                [application.id], organization_id, APPLICATION_OWNER_FIELDS[field], application=application))
             if recorded:
                 logger.info(
                     "Owner text %r for application %s matched no user; the recorded %s owner is kept",
@@ -360,6 +372,7 @@ def application_owner_expression(model, field: str):
     users = User.__table__.alias("owner_field_user")
     name = db.func.coalesce(
         db.func.nullif(db.func.trim(db.func.concat_ws(" ", users.c.first_name, users.c.last_name)), ""),
+        users.c.email,
         NAMELESS_OWNER_LABEL,
     )
     recorded = (

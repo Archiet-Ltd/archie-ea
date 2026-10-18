@@ -6,7 +6,9 @@ organisation at a time:
 
 1. Rows from the application_ownership table (enterprise_intelligence.py).
 2. Text application_owner / business_owner / technical_owner columns on
-   ApplicationComponent (kept in place, never cleared or dropped here).
+   ApplicationComponent. A name that resolves to a user is cleared from the
+   column once recorded (as the live write path does), so removing that owner
+   later cannot bring the old text back; a name that matches no user stays.
 
 The organisation-unit rows of application_ownership are a different axis (which
 unit holds the budget, with a percentage and dates) and stay readable where they
@@ -259,6 +261,8 @@ def backfill_owner_data(dry_run: bool = False, organization_ids: Optional[List[i
                 )
                 if existing:
                     total_skipped += 1
+                    if not dry_run:
+                        setattr(app_obj, "legacy_" + field_name, None)
                     continue
 
                 user = resolve_user_by_name(name, org_id)
@@ -276,6 +280,8 @@ def backfill_owner_data(dry_run: bool = False, organization_ids: Optional[List[i
                 ).first()
                 if existing_by_type is not None or _owner_key_in_run(seen_keys, app_obj.id, user.id, new_type):
                     total_skipped += 1
+                    if not dry_run:
+                        setattr(app_obj, "legacy_" + field_name, None)
                     continue
 
                 if not dry_run:
@@ -290,6 +296,7 @@ def backfill_owner_data(dry_run: bool = False, organization_ids: Optional[List[i
                     db.session.add(owner)
                     db.session.flush()
                     _owner_key_in_run(seen_keys, app_obj.id, user.id, new_type)
+                    setattr(app_obj, "legacy_" + field_name, None)
                     total_text_owners += 1
 
         if unresolved:
