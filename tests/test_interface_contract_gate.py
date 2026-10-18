@@ -136,12 +136,13 @@ class TestGenerateApiContractSubset:
         script = REPO_ROOT / "scripts" / "generate_api_contract_subset.py"
         assert script.exists(), f"{script} does not exist"
 
-    def test_generator_filters_by_group(self, tmp_path: Path):
-        """Only operations whose first path segment is in PUBLISHED_GROUPS
-        are kept. /capabilities must be excluded when only 'elements' is
-        published."""
+    def test_generator_filters_by_operation_id(self, tmp_path: Path):
+        """Operations are selected by operationId (PUBLISHED_OPERATIONS),
+        not by whole path group: listCapabilities is kept because it is
+        listed, while createCapability on the same path is not, so a slice
+        publishes exactly the operations it builds."""
         contract = _minimal_contract()
-        # Add a /capabilities path that should be filtered out
+        # listCapabilities is published; createCapability on the same path is not
         contract["paths"]["/capabilities"] = {
             "get": {
                 "operationId": "listCapabilities",
@@ -159,7 +160,24 @@ class TestGenerateApiContractSubset:
                     }
                 },
                 "security": [{"entelimOAuth": ["strategy:read"]}],
-            }
+            },
+            "post": {
+                "operationId": "createCapability",
+                "summary": "Create a capability",
+                "tags": ["Strategy"],
+                "parameters": [],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object"}
+                            }
+                        },
+                    }
+                },
+                "security": [{"entelimOAuth": ["strategy:write"]}],
+            },
         }
         src = tmp_path / "source.yaml"
         _write_contract(src, contract)
@@ -180,10 +198,11 @@ class TestGenerateApiContractSubset:
         assert "paths" in subset
         assert "/elements" in subset["paths"], "Missing /elements path"
         assert "/elements/{id}" in subset["paths"], "Missing /elements/{id} path"
-        # Must NOT have /capabilities
-        assert "/capabilities" not in subset["paths"], (
-            "/capabilities should have been filtered out"
-        )
+        # /capabilities is kept, but only for the listed operation
+        assert "/capabilities" in subset["paths"], "Missing /capabilities path"
+        kept = subset["paths"]["/capabilities"]
+        assert "get" in kept, "listCapabilities should be published"
+        assert "post" not in kept, "createCapability should not be published"
 
     def test_generator_follows_ref_transitively(self, tmp_path: Path):
         """A response that references a schema that references another schema
