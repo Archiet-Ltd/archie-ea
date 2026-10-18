@@ -2,7 +2,7 @@
 import logging
 from datetime import date
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, abort, jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from app import db
@@ -454,6 +454,7 @@ def risk_register():
         .all()
     )
     risk_rows = [serialize_risk_row(r) for r in risks]
+    ranked = risk_service.ranked_risks()
     return render_template(
         "governance/risk_register.html",
         risks=risks,
@@ -462,10 +463,28 @@ def risk_register():
         total=len(risks),
         current_sort=sort_key if sort_key in _RISK_SORT_COLUMNS else "id",
         current_dir=direction if direction in ("asc", "desc") else "asc",
+        ranked=ranked,
         raid_items=raid_items,
         raid_kinds=[k.value for k in RaidKind],
         programmes=[{"id": p.id, "name": p.name} for p in programmes],
     )
+
+
+@risk_bp.route("/risks/<int:risk_id>")
+@login_required
+def risk_page(risk_id):
+    """One risk on its own page: where it ranks and why, and what it touches."""
+    from app.middleware.tenant_context import current_org_id
+
+    org_id = current_org_id()
+    risk = db.session.execute(
+        db.select(Risk).where(Risk.id == risk_id, Risk.organization_id == org_id)
+    ).scalar_one_or_none() if org_id is not None else None
+    if risk is None:
+        abort(404)
+    ranked = risk_service.ranked_risks()
+    row = next((r for r in ranked["rows"] if r["risk_id"] == risk.id), None)
+    return render_template("governance/risk_page.html", risk=risk, row=row, rule=ranked["rule"])
 
 
 @risk_bp.route("/solutions/<int:solution_id>/risks", methods=["GET"])
