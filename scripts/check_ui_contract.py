@@ -33,7 +33,10 @@ HATCH = "ui-contract-ok"
 
 # native alert/confirm/prompt not preceded by a dot or word char (so `.confirm(`
 # on Platform.modal.confirm and `x.alert(` are excluded) — genuine native calls.
-_NATIVE = re.compile(r"(?<![.\w])(?:alert|confirm|prompt)\s*\(")
+# `window.alert(` and friends are the same native dialogs and are matched too.
+_NATIVE = re.compile(
+    r"(?<![.\w])(?:alert|confirm|prompt)\s*\(|\bwindow\.(?:alert|confirm|prompt)\s*\("
+)
 # a *definition* of something named alert/confirm/prompt (macro, function, or
 # method) is not a native-dialog call — exclude it.
 _NATIVE_DEF = re.compile(

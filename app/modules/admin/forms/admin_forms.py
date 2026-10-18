@@ -104,6 +104,21 @@ class ChangeAccountTypeForm(FlaskForm):
     submit = SubmitField("Update role")
 
 
+class ChangeBusinessUnitForm(FlaskForm):
+    """Assign a person to a unit (or clear the assignment — the empty choice
+    means "no unit"). The unit choices are populated by the route from the
+    caller's organisation only, so a unit from another organisation can never
+    be chosen."""
+
+    business_unit_id = SelectField(
+        "Business unit",
+        validators=[Optional()],
+        choices=[],
+        description="The unit this person belongs to. Empty means no unit.",
+    )
+    submit = SubmitField("Update business unit")
+
+
 class InviteUserForm(FlaskForm):
     role = QuerySelectField(
         "Account type",

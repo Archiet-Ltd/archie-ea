@@ -9,6 +9,7 @@ import logging
 
 from flask import Blueprint, jsonify, render_template, request
 from flask_login import login_required
+from werkzeug.exceptions import HTTPException
 
 # Destructive and mutating routes were guarded by @login_required only, so any
 # authenticated user could delete another user's records. Matches the gating
@@ -24,6 +25,30 @@ from . import service
 logger = logging.getLogger(__name__)
 
 organization_bp = Blueprint("organization", __name__, url_prefix="/organization")
+
+# The roles that may edit the org chart; the write routes and the page's edit
+# controls share this one list.
+_EDIT_ROLES = ("admin", "architect", "business_architect")
+_edit_gate = require_roles(*_EDIT_ROLES)(lambda: True)
+
+
+def _can_edit_org_chart():
+    """True when the signed-in user passes the same role gate as the write routes."""
+    try:
+        return bool(_edit_gate())
+    except HTTPException:
+        return False
+
+
+def _parent_id_from(payload):
+    """The ``parent_id`` of a JSON payload: an integer, or None for "no parent".
+    Anything else raises ValueError."""
+    value = payload.get("parent_id")
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError("parent_id must be an integer")
+    return value
 
 
 @organization_bp.route("/")
@@ -43,7 +68,9 @@ def index():
 def chart():
     """Org chart page — D3 tree of BusinessActors linked by
     Composition/Aggregation relationships (or a flat fallback)."""
-    return render_template("organization/chart.html")
+    return render_template(
+        "organization/chart.html", can_edit_org_chart=_can_edit_org_chart()
+    )
 
 
 @organization_bp.route("/chart/api/data")
@@ -52,6 +79,96 @@ def chart_data():
     """JSON hierarchy data consumed by the D3 org chart."""
     tree = service.build_org_tree()
     return success_response(tree)
+
+
+# ---------------------------------------------------------------------------
+# Org chart editing — add / rename / move / remove units and the
+# capabilities-per-unit panel. Every write is organisation-scoped by the
+# tenant query filter and role-gated exactly like the RACI cell editor
+# below; a unit of another organisation is never found, renamed, moved,
+# removed or shown.
+# ---------------------------------------------------------------------------
+
+
+@organization_bp.route("/chart/api/units", methods=["POST"])
+@login_required
+@require_roles(*_EDIT_ROLES)
+def chart_unit_create():
+    """Add a child unit under a parent on the org chart."""
+    payload = request.get_json(silent=True) or {}
+    try:
+        parent_id = _parent_id_from(payload)
+        unit = service.add_child_unit(
+            parent_id=parent_id,
+            name=payload.get("name"),
+            actor_type=payload.get("actor_type"),
+        )
+    except ValueError as exc:
+        return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
+    return success_response({
+        "id": unit.id,
+        "name": unit.name,
+        "actor_type": unit.actor_type,
+        "parent_id": parent_id,
+    })
+
+
+@organization_bp.route("/chart/api/units/<int:unit_id>", methods=["PATCH"])
+@login_required
+@require_roles(*_EDIT_ROLES)
+def chart_unit_rename(unit_id):
+    """Rename a unit on the org chart."""
+    if service.get_org_unit(unit_id) is None:
+        return not_found_response("Unit")
+    payload = request.get_json(silent=True) or {}
+    try:
+        unit = service.rename_unit(unit_id=unit_id, name=payload.get("name"))
+    except ValueError as exc:
+        return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
+    return success_response({"id": unit.id, "name": unit.name})
+
+
+@organization_bp.route("/chart/api/units/<int:unit_id>/parent", methods=["PATCH"])
+@login_required
+@require_roles(*_EDIT_ROLES)
+def chart_unit_move(unit_id):
+    """Move a unit under another parent; ``{"parent_id": null}`` detaches it
+    to the root. A move that would create a cycle is refused."""
+    if service.get_org_unit(unit_id) is None:
+        return not_found_response("Unit")
+    payload = request.get_json(silent=True) or {}
+    try:
+        result = service.move_unit(
+            unit_id=unit_id, new_parent_id=_parent_id_from(payload)
+        )
+    except ValueError as exc:
+        return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
+    return success_response(result)
+
+
+@organization_bp.route("/chart/api/units/<int:unit_id>", methods=["DELETE"])
+@login_required
+@require_roles(*_EDIT_ROLES)
+def chart_unit_remove(unit_id):
+    """Remove a unit that has no children and no people assigned to it."""
+    if service.get_org_unit(unit_id) is None:
+        return not_found_response("Unit")
+    try:
+        service.remove_unit(unit_id=unit_id)
+    except ValueError as exc:
+        return error_response(str(exc), code="VALIDATION_ERROR", status_code=400)
+    return success_response({"unit_id": unit_id, "deleted": True})
+
+
+@organization_bp.route("/chart/api/units/<int:unit_id>/capabilities")
+@login_required
+def chart_unit_capabilities(unit_id):
+    """Read-only capabilities-per-unit panel data: the capabilities owned by
+    the people of a unit and its descendants (each with its owner), plus the
+    people with no unit owning capabilities, and an honest empty state."""
+    if service.get_org_unit(unit_id) is None:
+        return not_found_response("Unit")
+    return success_response(service.capabilities_for_unit(unit_id=unit_id))
 
 
 @organization_bp.route("/workforce-transition")
@@ -200,7 +317,7 @@ def _apply_role_workforce_fields(role, data):
 
 @organization_bp.route("/workforce-transition/api/roles", methods=["POST"])
 @login_required
-@require_roles("admin", "architect", "business_architect")
+@require_roles(*_EDIT_ROLES)
 def workforce_transition_role_create():
     """Create a Business Role with its workforce-transition fields set from
     the start — the gap this endpoint closes: previously the only way to
@@ -226,7 +343,7 @@ def workforce_transition_role_create():
 
 @organization_bp.route("/workforce-transition/api/roles/<int:role_id>", methods=["PATCH"])
 @login_required
-@require_roles("admin", "architect", "business_architect")
+@require_roles(*_EDIT_ROLES)
 def workforce_transition_role_update(role_id):
     """Update an existing Business Role's workforce-transition fields."""
     from app.models.business_layer import BusinessRole
@@ -278,7 +395,7 @@ def raci_data():
 
 @organization_bp.route("/raci/api/cell", methods=["POST"])
 @login_required
-@require_roles("admin", "architect", "business_architect")
+@require_roles(*_EDIT_ROLES)
 def raci_cell_save():
     """Upsert one RACI matrix cell.
 
@@ -349,7 +466,7 @@ def stakeholder_search():
 
 @organization_bp.route("/raci/api/stakeholder", methods=["POST"])
 @login_required
-@require_roles("admin", "architect", "business_architect")
+@require_roles(*_EDIT_ROLES)
 def raci_stakeholder_create():
     """Create a Business Actor by name from the RACI picker.
 
