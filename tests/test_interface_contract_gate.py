@@ -324,22 +324,26 @@ class TestGenerateApiContractSubset:
         )
 
     def test_regenerated_subset_matches_committed(self, tmp_path: Path):
-        """Regenerating the subset from the canonical contract copy (named by
-        API_CONTRACT_SOURCE) must reproduce the committed
-        app/config/api_contract_subset.yaml byte for byte.
+        """Regenerating the subset must reproduce the committed
+        app/config/api_contract_subset.yaml.
 
-        Skipped, with the reason shown, when API_CONTRACT_SOURCE is not set
-        or names a missing file.
+        The canonical contract copy lives outside this repository, so CI has
+        no API_CONTRACT_SOURCE. This test therefore always runs: with the
+        variable set it regenerates from the canonical copy and compares byte
+        for byte; without it, it regenerates from the committed subset itself
+        and proves the generator is a fixed point on its own output (same
+        operations, same components, same body hash), so a generator change
+        that alters the committed content is caught either way. Only the
+        two header lines naming the source file and its sha256 may differ.
         """
+        committed = REPO_ROOT / "app" / "config" / "api_contract_subset.yaml"
+        assert committed.exists(), "No committed subset to compare against"
         source = os.environ.get("API_CONTRACT_SOURCE")
-        if not source:
-            pytest.skip(
-                "API_CONTRACT_SOURCE is not set; cannot regenerate the subset "
-                "from the canonical contract copy"
-            )
-        source_path = Path(source)
-        if not source_path.exists():
-            pytest.skip(f"API_CONTRACT_SOURCE names a missing file: {source}")
+        from_canonical = bool(source)
+        source_path = Path(source) if source else committed
+        assert source_path.exists(), (
+            f"API_CONTRACT_SOURCE names a missing file: {source_path}"
+        )
 
         out = tmp_path / "regenerated.yaml"
         result = _run(
@@ -350,11 +354,23 @@ class TestGenerateApiContractSubset:
         )
         assert result.returncode == 0, f"Generator failed:\n{result.stderr}"
 
-        committed = REPO_ROOT / "app" / "config" / "api_contract_subset.yaml"
-        assert committed.exists(), "No committed subset to compare against"
-        assert out.read_bytes() == committed.read_bytes(), (
-            "Regenerated subset differs from the committed subset byte for "
-            "byte; regenerate it with scripts/generate_api_contract_subset.py "
+        if from_canonical:
+            assert out.read_bytes() == committed.read_bytes(), (
+                "Regenerated subset differs from the committed subset byte for "
+                "byte; regenerate it with scripts/generate_api_contract_subset.py "
+                "and commit the result"
+            )
+            return
+
+        def body(path: Path) -> list[str]:
+            return [
+                ln for ln in path.read_text(encoding="utf-8").splitlines()
+                if not ln.startswith(("# Source:", "# SHA256:"))
+            ]
+
+        assert body(out) == body(committed), (
+            "The generator does not reproduce the committed subset from "
+            "itself; regenerate it with scripts/generate_api_contract_subset.py "
             "and commit the result"
         )
 

@@ -27,6 +27,7 @@ from app.decorators import admin_required, audit_log
 from app.middleware.tenant_decorators import is_active_org_admin
 from app.models.adm_kanban import create_adm_phases, KanbanCard
 from app.models.archimate_core import ArchiMateElement
+from app.middleware.tenant_decorators import platform_admin_required
 
 adm_kanban_view_bp = Blueprint("adm_kanban_view", __name__, url_prefix="/adm-kanban")
 
@@ -71,6 +72,7 @@ def boards_detail_redirect(rest):
 @login_required
 @admin_required
 @audit_log("init_adm_phases")
+@platform_admin_required
 def init_phases():
     """Initialize ADM phases (admin only)"""
     try:

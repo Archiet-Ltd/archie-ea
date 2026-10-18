@@ -7,6 +7,7 @@ from flask import Blueprint, jsonify, render_template, request
 from flask_login import login_required
 
 from app.decorators import audit_log
+from app.middleware.tenant_decorators import platform_admin_required
 
 confidence_review_bp = Blueprint(
     "confidence_review_dashboard", __name__, url_prefix="/reviews"
@@ -141,6 +142,7 @@ def api_bulk_reject():
 @confidence_review_bp.route("/api/thresholds", methods=["POST"])
 @login_required
 @audit_log("review_thresholds_save")
+@platform_admin_required
 def api_save_thresholds():
     """Save confidence threshold configuration."""
     from app.models.confidence_review import ConfidenceThreshold
