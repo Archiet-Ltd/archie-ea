@@ -12,7 +12,10 @@ from datetime import date
 from flask import render_template, request
 from flask_login import current_user, login_required
 
-from app.decorators import requires_application_owner
+from app.decorators import (
+    requires_application_owner,
+    requires_application_owner_or_org_admin,
+)
 from app.models.application_owner import ApplicationOwner
 from app.models.application_portfolio import ApplicationComponent
 from app.utils.pagination import safe_int_arg
@@ -60,7 +63,7 @@ def get_owned_apps():
 
 @my_applications_bp.route("/")
 @login_required
-@requires_application_owner
+@requires_application_owner_or_org_admin
 def dashboard():
     """Application manager dashboard - overview of owned applications."""
     # Total Apps, the health tiles and the panel rows are all read from the one
@@ -77,7 +80,7 @@ def dashboard():
 
 @my_applications_bp.route("/list")
 @login_required
-@requires_application_owner
+@requires_application_owner_or_org_admin
 def app_list():
     """List applications owned by current user."""
     # app_list.html iterates item.application.name / item.ownership_type /
@@ -154,7 +157,7 @@ def app_detail(app_id):
 
 @my_applications_bp.route("/health")
 @login_required
-@requires_application_owner
+@requires_application_owner_or_org_admin
 def health_overview():
     """Health overview of owned applications."""
     apps = get_owned_apps()
@@ -180,7 +183,7 @@ def health_overview():
 
 @my_applications_bp.route("/roadmap")
 @login_required
-@requires_application_owner
+@requires_application_owner_or_org_admin
 def roadmap_impact():
     """View roadmap items affecting owned applications."""
     apps = get_owned_apps()

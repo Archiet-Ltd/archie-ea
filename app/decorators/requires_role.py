@@ -174,6 +174,35 @@ def requires_application_owner(f):
     return requires_role(["application_manager"])(f)
 
 
+def requires_application_owner_or_org_admin(f):
+    """
+    The My Applications pages: the application manager persona, and the
+    administrator of the organisation, who is the person that assigns owners and
+    so has to be able to open the pages those owners use.
+
+    Admission is the one organisation-administrator check
+    (``rbac_service.is_org_admin``) for the caller's own organisation; every
+    other role is judged exactly as ``requires_application_owner`` judges it.
+    The pages list the applications the *signed-in user* owns, so an
+    administrator who owns none sees an empty state rather than anyone's rows.
+    """
+    owner_gated = requires_application_owner(f)
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if current_user.is_authenticated:
+            from flask import g
+
+            from app.services.rbac_service import rbac_service
+
+            org_id = getattr(g, "current_org_id", None) or current_user.organization_id
+            if rbac_service.is_org_admin(current_user, org_id):
+                return f(*args, **kwargs)
+        return owner_gated(*args, **kwargs)
+
+    return decorated_function
+
+
 def requires_any_architect(f):
     """
     Shorthand decorator for architect routes (SA, EA, or BA).
