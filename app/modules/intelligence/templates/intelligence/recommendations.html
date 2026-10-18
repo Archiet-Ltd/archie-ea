@@ -1,0 +1,55 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, empty_state %}
+
+{% block title %}Recommendations{% endblock %}
+
+{% block content %}
+{% set home_url = url_for('dashboard.overview') if 'dashboard.overview' in flask.current_app.view_functions else none %}
+<div class="p-6 space-y-6">
+    {{ page_shell(
+        title='Recommendations',
+        subtitle='What to do next, taken from your transformation backlog and your model-health findings, most urgent first.',
+        breadcrumb=[('Home', home_url), ('Recommendations', none)]
+    ) }}
+
+    {% if result.model_health_state == 'not_computed' %}
+    <p class="rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground" data-testid="recs-health-missing">
+        The model-health report has not been computed yet, so no model findings are listed.
+        {% if 'genome_drift.index' in flask.current_app.view_functions %}
+        <a class="underline" href="{{ url_for('genome_drift.index') }}">Open Model Health</a> to start a scan.
+        {% endif %}
+    </p>
+    {% endif %}
+
+    {% if result['items'] %}
+    <p class="text-sm text-muted-foreground" data-testid="recs-count">
+        Showing {{ result['items']|length }} of {{ result.total }}.
+        Ordered by the urgency recorded on each item, then by where it came from, then by title.
+    </p>
+    <ol class="space-y-3" data-testid="recs-list">
+        {% for r in result['items'] %}
+        <li class="rounded-lg border border-border bg-card px-4 py-3" data-testid="recommendation" data-source="{{ r.source }}">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <p class="font-medium text-foreground">{{ r.title }}</p>
+                <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs">{{ r.level or '—' }}</span>
+            </div>
+            {% if r.why %}<p class="mt-1 text-sm text-muted-foreground">{{ r.why }}</p>{% endif %}
+            <p class="mt-1 text-xs text-muted-foreground">
+                From the {{ 'transformation backlog' if r.source == 'backlog' else 'model-health report' }}
+                {% if r.source == 'backlog' and 'portfolio.backlog' in flask.current_app.view_functions %}
+                &middot; <a class="underline" href="{{ url_for('portfolio.backlog') }}">Open the backlog</a>
+                {% elif r.source == 'model_health' and 'genome_drift.index' in flask.current_app.view_functions %}
+                &middot; <a class="underline" href="{{ url_for('genome_drift.index') }}">Open Model Health</a>
+                {% endif %}
+                {% for eid in r.element_ids[:1] %}
+                &middot; <a class="underline" href="{{ url_for('intelligence_ui.traceability', element=eid) }}">Trace it</a>
+                {% endfor %}
+            </p>
+        </li>
+        {% endfor %}
+    </ol>
+    {% else %}
+        {{ empty_state('check-circle', 'Nothing to recommend', 'There are no open gaps without a work package, no unscheduled work packages and no model-health findings.') }}
+    {% endif %}
+</div>
+{% endblock %}
