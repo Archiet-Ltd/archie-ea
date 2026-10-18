@@ -140,6 +140,13 @@
   "capability-visibility/visibility-helper": {
    "app/modules/portfolio/services/demand_triage.py": 2
   },
+  "connector-framework/base-connector": {
+   "app/modules/admin/v2/services/connector_framework_v2.py": 1,
+   "app/modules/vendors/connectors/base_connector.py": 1
+  },
+  "connector-framework/connector-manager": {
+   "app/modules/admin/v2/services/connector_framework_v2.py": 1
+  },
   "critical-path/critical-path-walk": {
    "app/models/roadmap_models.py": 1,
    "app/models/solution_workflow.py": 1,
@@ -238,6 +245,9 @@
    "app/services/detection_strategies/base.py": 1,
    "app/services/fuzzy_matcher.py": 1,
    "app/services/togaf_deliverable_prefill_service.py": 1
+  },
+  "open-exchange-import/oef-importer": {
+   "app/modules/architecture/routes/architect_ui_routes.py": 2
   },
   "public-button/second-button-rule": {
    "app/static/css/app.css": 18,
