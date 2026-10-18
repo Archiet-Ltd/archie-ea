@@ -41,14 +41,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased, joinedload
 from app.utils.pagination import safe_int_arg
 
-try:
-    from flask_rq import get_queue
-
-    HAS_RQ = True
-except ImportError:
-    HAS_RQ = False
-    get_queue = None
-
 from app.extensions import csrf, db
 from app.services.billing_plans import PlanLimitReached
 from ..forms.admin_forms import (

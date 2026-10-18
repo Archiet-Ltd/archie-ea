@@ -9,14 +9,6 @@ import logging
 from flask import g, session, url_for
 from flask_login import logout_user
 
-try:
-    from flask_rq import get_queue
-
-    HAS_RQ = True
-except ImportError:
-    HAS_RQ = False
-    get_queue = None
-
 from app.extensions import db
 from app.flask_email import send_email
 from app.jobs.tenant_safe_job import platform_scope
@@ -24,16 +16,14 @@ from app.models import User
 from app.models.org_role import OrgRole
 from app.models.user import password_hash_is_current
 from app.services import session_registry
+from app.services.job_queue_service import QUEUE_INTERACTIVE, enqueue_or_run
 
 _log = logging.getLogger(__name__)
 
 
 def _queue_email(*args, **kwargs):
     """Send email via queue if available, otherwise send synchronously."""
-    if HAS_RQ and get_queue:
-        get_queue().enqueue(send_email, *args, **kwargs)
-    else:
-        send_email(*args, **kwargs)
+    enqueue_or_run(QUEUE_INTERACTIVE, send_email, *args, **kwargs)
 
 
 class AccountService:

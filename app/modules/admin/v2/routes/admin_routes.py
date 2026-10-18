@@ -34,14 +34,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
 from app.utils.pagination import safe_int_arg
 
-try:
-    from flask_rq import get_queue
-
-    HAS_RQ = True
-except ImportError:
-    HAS_RQ = False
-    get_queue = None
-
 import hmac
 import hashlib
 import json

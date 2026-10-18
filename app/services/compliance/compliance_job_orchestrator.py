@@ -8,12 +8,11 @@ import logging
 from datetime import UTC, datetime
 from typing import Dict, List, Optional, Set, Tuple
 
-from flask_rq2 import RQ
-
 from app import db
 from app.models import BusinessCapability
 from app.models.compliance_models import ComplianceControl
 from app.services.capability_gap_service import CapabilityGapAnalysisService
+from app.services.job_queue_service import QUEUE_AGENT, get_job_queue_service
 from app.tasks.compliance_tasks import generate_requirements_for_control
 
 logger = logging.getLogger(__name__)
@@ -43,11 +42,12 @@ class ComplianceJobOrchestrator:
                 "message": "No eligible compliance controls found for the prioritized capabilities.",
             }
 
-        rq = RQ()
+        job_queue = get_job_queue_service()
         queued_jobs: List[Dict] = []
 
         for control, capability_id in control_candidates:
-            job = rq.queue.enqueue(
+            job = job_queue.enqueue(
+                QUEUE_AGENT,
                 generate_requirements_for_control,
                 control_id=control.id,
                 user_id=user_id,

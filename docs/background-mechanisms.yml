@@ -40,14 +40,6 @@ mechanisms:
   disposition: move-to-pool
   tenant_context: each job runs through the tenant-safe job harness (run_for_each_tenant / tenant_scope);
     platform jobs are declared in PLATFORM_JOBS and guarded by job_lock
-- kind: rq
-  file: app/_bootstrap/extensions.py
-  entry: init_extensions
-  purpose: Creates the Flask-RQ queue extension used by the worker image
-  class: queue
-  disposition: move-to-pool
-  tenant_context: 'none: the extension only holds the queue; each enqueuing caller passes its own organisation
-    in the job arguments'
 - kind: thread
   file: app/_bootstrap/routes.py
   entry: _register_health_check._probe_with_timeout
@@ -71,41 +63,6 @@ mechanisms:
   class: scheduler
   disposition: move-to-pool
   tenant_context: every job it hosts runs through the tenant-safe job harness
-- kind: rq
-  file: app/modules/account/services/account_service.py
-  entry: <module>
-  purpose: Queues outgoing account e-mail on the Flask-RQ queue when it is installed
-  class: queue
-  disposition: move-to-pool
-  tenant_context: 'none: the e-mail is fully rendered before it is queued'
-- kind: rq
-  file: app/modules/admin/routes/admin_routes.py
-  entry: <module>
-  purpose: Imports the Flask-RQ queue for admin e-mail sending
-  class: queue
-  disposition: move-to-pool
-  tenant_context: 'none: the e-mail is fully rendered before it is queued'
-- kind: rq
-  file: app/modules/admin/services/admin_user_service.py
-  entry: <module>
-  purpose: Queues invitation and reset e-mail on the Flask-RQ queue when it is installed
-  class: queue
-  disposition: move-to-pool
-  tenant_context: 'none: the e-mail is fully rendered before it is queued'
-- kind: rq
-  file: app/modules/admin/v2/routes/admin_routes.py
-  entry: <module>
-  purpose: Imports the Flask-RQ queue for admin e-mail sending (second admin layout)
-  class: queue
-  disposition: retire-after-pool
-  tenant_context: 'none: the e-mail is fully rendered before it is queued'
-- kind: rq
-  file: app/modules/admin/v2/services/admin_user_service_v2.py
-  entry: <module>
-  purpose: Second copy of the admin user e-mail queueing (second admin layout)
-  class: queue
-  disposition: retire-after-pool
-  tenant_context: 'none: the e-mail is fully rendered before it is queued'
 - kind: thread
   file: app/modules/ai_chat/routes/chat_core.py
   entry: send_message_stream
@@ -274,14 +231,6 @@ mechanisms:
   class: request-helper
   disposition: keep
   tenant_context: the organisation is passed explicitly into each call and set in its app context
-- kind: rq
-  file: app/services/compliance/compliance_job_orchestrator.py
-  entry: <module>
-  purpose: Queues requirement-generation jobs for compliance controls on a Flask-RQ queue
-  class: queue
-  disposition: move-to-pool
-  tenant_context: only user_id and control_id are passed; the job sets no explicit organisation scope,
-    to be fixed when the work moves to the pool
 - kind: thread
   file: app/services/ea_workflow_engine.py
   entry: EAWorkflowEngine.resume_workflow
@@ -362,11 +311,18 @@ mechanisms:
   disposition: move-to-pool
   tenant_context: organisation_id_of and tenant_scope from the tenant-safe job harness
 - kind: rq
+  file: app/services/job_queue_service.py
+  entry: JobQueueService.get_queue
+  purpose: The four named queues (interactive, agent, ingestion, compute) on one Redis connection; every
+    rq enqueue goes through JobQueueService.enqueue and names its queue
+  class: queue
+  disposition: keep
+  tenant_context: 'none: the queue only carries the job; each enqueuing caller passes its own organisation
+    in the job arguments'
+- kind: rq
   file: manage.py
   entry: <module>
-  purpose: 'The run-worker command (the image command of Dockerfile.worker and the worker service in docker-compose)
-    is the RQ consumer: a Worker listening on the default queue, which receives every rq entry in this
-    register'
+  purpose: 'The run-worker command (the image command of Dockerfile.worker and the worker service in docker-compose) is the RQ consumer: a Worker listening on the four named queues (interactive, agent, ingestion, compute), or on those named with --queue'
   class: queue
   disposition: move-to-pool
   tenant_context: 'none: the worker runs whatever job it dequeues; each enqueuing caller passes its own

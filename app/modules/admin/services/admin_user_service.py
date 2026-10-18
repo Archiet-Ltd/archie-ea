@@ -13,14 +13,6 @@ from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models import Role, User
 
-try:
-    from flask_rq import get_queue
-
-    HAS_RQ = True
-except ImportError:
-    HAS_RQ = False
-    get_queue = None
-
 logger = logging.getLogger(__name__)
 
 
@@ -32,10 +24,9 @@ class AdminUserService:
         """Send email via queue if available, otherwise send synchronously."""
         from app.flask_email import send_email
 
-        if HAS_RQ and get_queue:
-            get_queue().enqueue(send_email, *args, **kwargs)
-        else:
-            send_email(*args, **kwargs)
+        from app.services.job_queue_service import QUEUE_INTERACTIVE, enqueue_or_run
+
+        enqueue_or_run(QUEUE_INTERACTIVE, send_email, *args, **kwargs)
 
     @staticmethod
     def get_all_users():

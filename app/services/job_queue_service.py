@@ -16,6 +16,31 @@ from app.models import Job, JobStatus
 
 logger = logging.getLogger(__name__)
 
+# The four named queues of the worker pool. A job type goes on the queue that
+# matches what it does, so a long simulation can never delay a password-reset
+# e-mail. The order is the order a worker drains them: interactive first.
+QUEUE_INTERACTIVE = "interactive"  # a person is waiting on the outcome (e-mail, notices)
+QUEUE_INGESTION = "ingestion"  # bringing outside data in (imports, syncs)
+QUEUE_COMPUTE = "compute"  # long calculation (scans, simulations, rebuilds)
+QUEUE_AGENT = "agent"  # work that calls a language model
+QUEUE_NAMES = (QUEUE_INTERACTIVE, QUEUE_AGENT, QUEUE_INGESTION, QUEUE_COMPUTE)
+
+
+class RqUnavailable(RuntimeError):
+    """The redis / rq packages are not installed, so nothing can be queued."""
+
+
+def resolve_worker_queues(requested=None) -> List[str]:
+    """Queue names a worker listens on, in drain order; all four when none are named."""
+    if not requested:
+        return list(QUEUE_NAMES)
+    unknown = [name for name in requested if name not in QUEUE_NAMES]
+    if unknown:
+        raise ValueError(
+            f"Unknown queue {', '.join(unknown)}; the queues are {', '.join(QUEUE_NAMES)}"
+        )
+    return [name for name in QUEUE_NAMES if name in requested]
+
 
 class JobQueueService:
     """Service for managing background jobs with database persistence."""
@@ -25,6 +50,51 @@ class JobQueueService:
     def __init__(self):
         self._shutdown_event = threading.Event()
         self._worker_thread: Optional[threading.Thread] = None
+        self._redis = None
+
+    # ------------------------------------------------------------------
+    # Named queues (rq). One Redis connection, four queues on it.
+    # ------------------------------------------------------------------
+
+    def rq_connection(self):
+        """The one Redis connection every named queue shares, built from the RQ_DEFAULT_* config."""
+        if self._redis is None:
+            try:
+                from redis import Redis
+            except ImportError as exc:  # pragma: no cover - depends on the image
+                raise RqUnavailable("redis is not installed") from exc
+            from flask import current_app
+
+            cfg = current_app.config
+            self._redis = Redis(
+                host=cfg.get("RQ_DEFAULT_HOST") or "localhost",
+                port=cfg.get("RQ_DEFAULT_PORT") or 6379,
+                db=cfg.get("RQ_DEFAULT_DB") or 0,
+                password=cfg.get("RQ_DEFAULT_PASSWORD"),
+            )
+        return self._redis
+
+    def use_rq_connection(self, connection) -> None:
+        """Replace the shared connection (the worker command and tests supply their own)."""
+        self._redis = connection
+
+    def get_queue(self, name: str):
+        """The named queue, on the shared connection. Refuses a name outside the four."""
+        if name not in QUEUE_NAMES:
+            raise ValueError(f"Unknown queue {name!r}; the queues are {', '.join(QUEUE_NAMES)}")
+        try:
+            from rq import Queue
+        except ImportError as exc:  # pragma: no cover - depends on the image
+            raise RqUnavailable("rq is not installed") from exc
+        return Queue(name, connection=self.rq_connection())
+
+    def enqueue(self, queue_name: str, func, *args, **kwargs):
+        """Put ``func(*args, **kwargs)`` on the named queue.
+
+        Rq options (``job_timeout``, ``description`` ...) pass through as keywords. The caller
+        carries any organisation in the arguments, as it did on the single default queue.
+        """
+        return self.get_queue(queue_name).enqueue(func, *args, **kwargs)
 
     def create_job(
         self,
@@ -270,6 +340,19 @@ class JobQueueService:
                 "organization_id": org_id,
                 "finding_count": report.get("summary", {}).get("total", 0),
             }
+
+
+def enqueue_or_run(queue_name: str, func, *args, **kwargs):
+    """Queue ``func`` on the named queue, or call it now when rq is not installed.
+
+    Used by work that must still happen on a machine without a worker (a development
+    laptop): the e-mail is sent in the request instead of queued.
+    """
+    service = get_job_queue_service()
+    try:
+        return service.enqueue(queue_name, func, *args, **kwargs)
+    except RqUnavailable:
+        return func(*args, **kwargs)
 
 
 # Global service instance
