@@ -1020,18 +1020,21 @@ jobs:
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: archie_test
-        ports: ["5432:5432"]
+        ports: ["5432"]
         options: >-
           --health-cmd pg_isready --health-interval 10s
           --health-timeout 5s --health-retries 5
           --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
-      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/archie_test
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/archie_test
       FLASK_CONFIG: testing
       SECRET_KEY: ci-only-not-secret
     steps:
       - uses: actions/checkout@v5
+      - name: Resolve the postgres service's mapped port
+        # Own runners run several jobs at once, so the service no longer binds host port 5432.
+        run: |
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -1124,7 +1127,7 @@ jobs:
   smoke-main:
     name: Browser journeys — main shard ${{ matrix.shard }}
     needs: [changes, fast_gate]
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     strategy:
       fail-fast: false
@@ -1202,7 +1205,7 @@ jobs:
   smoke-adversarial:
     name: Browser journeys — adversarial
     needs: [changes, fast_gate]
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     services:
       postgres:
@@ -1274,7 +1277,7 @@ jobs:
   smoke-other:
     name: Browser journeys — other
     needs: [changes, fast_gate]
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     services:
       postgres:
@@ -1366,7 +1369,7 @@ jobs:
     name: Browser journeys (one per archetype)
     needs: [smoke-main, smoke-adversarial, smoke-other, changes, fast_gate]
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -1415,7 +1418,7 @@ jobs:
     name: Browser compatibility (${{ matrix.browser }})
     needs: [changes, fast_gate]
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -1511,7 +1514,7 @@ jobs:
     name: Level 10 archetype walkthrough
     needs: [changes, fast_gate]
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     # docs/TESTING_STANDARD.md level 10: not "does it break?" but "can this
     # archetype do their job, and could they have FOUND the page?". It runs as a
     # non-admin per persona, measures geometry at a fixed viewport rather than
