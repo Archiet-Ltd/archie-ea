@@ -18,7 +18,7 @@ from app.main import routes_hybrid_mapping  # noqa
 # Removed in dead-code-route-cleanup (Phase 10).
 from app.main import routes_strategic_roadmap  # noqa
 # routes_technology_roadmap deleted — /technology-roadmap redirects to /capability-roadmap
-from app.main import routes_agentic_gaps  # noqa
+# agent-implementation UI route module deleted — template-only page, no buyer question behind it
 from app.main import routes_vendor_analysis  # noqa
 from app.main.views import main  # noqa
 
