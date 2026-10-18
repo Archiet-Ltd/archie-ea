@@ -6,12 +6,9 @@ vendored JointJS stack and composer_renderer.js. No Flask app and no existing
 consumer is involved, so a failure here is a failure of the new surface alone.
 The nine existing consumers are covered separately by the regression walk.
 """
-import os
 import pathlib
 
 import pytest
-
-playwright_sync = pytest.importorskip("playwright.sync_api")
 
 HARNESS = pathlib.Path(__file__).resolve().parent.parent / "composer_renderer" / "harness.html"
 
@@ -21,19 +18,6 @@ BANDS = [
     {"layer": "application", "label": "Application"},
     {"layer": "technology", "label": "Technology"},
 ]
-
-
-@pytest.fixture(scope="module")
-def browser():
-    with playwright_sync.sync_playwright() as p:
-        try:
-            b = p.chromium.launch()
-        except Exception:
-            b = p.chromium.launch(
-                executable_path=os.environ.get("SMOKE_CHROMIUM_EXECUTABLE") or "/opt/pw-browsers/chromium"
-            )
-        yield b
-        b.close()
 
 
 @pytest.fixture()
