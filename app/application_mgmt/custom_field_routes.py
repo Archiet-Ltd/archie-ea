@@ -13,6 +13,7 @@ from flask_login import login_required
 from sqlalchemy import func
 
 from app.decorators import audit_log, require_roles
+from app.middleware.tenant_decorators import platform_admin_required
 from app.utils.tenant_users import escape_like_literal
 
 from .. import db
@@ -146,8 +147,17 @@ def custom_fields_list():
 @application_mgmt.route("/admin/custom-fields/create", methods=["GET", "POST"])
 @login_required
 @require_roles("admin")
+@platform_admin_required
 def custom_field_create():
-    """Create a new custom field definition"""
+    """Create a new custom field definition
+
+    Platform-admin-only (lead review of PR 430, Part 3): writes the global
+    ``custom_field_definitions`` table, which carries no ``organization_id``
+    at all. ``require_roles("admin")`` is satisfied by any org's own admin
+    for their own brand-new, self-registered organisation -- no invitation
+    into anyone else's org needed. ``require_roles`` is kept rather than
+    removed; ``platform_admin_required`` is the operative check.
+    """
     if request.method == "GET":
         # Template requires WTForms, redirect to list page
         return redirect(url_for("application_mgmt.custom_fields_list"))
@@ -221,8 +231,12 @@ def custom_field_create():
 @application_mgmt.route("/admin/custom-fields/<int:id>/edit", methods=["GET", "POST"])
 @login_required
 @require_roles("admin")
+@platform_admin_required
 def custom_field_edit(id):
-    """Edit custom field definition"""
+    """Edit custom field definition
+
+    Platform-admin-only -- see ``custom_field_create``'s docstring above.
+    """
     field = CustomFieldDefinition.query.get_or_404(id)
 
     if request.method == "POST":
@@ -319,9 +333,13 @@ def custom_field_edit(id):
 @application_mgmt.route("/admin/custom-fields/<int:id>/delete", methods=["POST"])
 @login_required
 @require_roles("admin")
+@platform_admin_required
 @audit_log("custom_field_delete")
 def custom_field_delete(id):
-    """Delete or deactivate custom field"""
+    """Delete or deactivate custom field
+
+    Platform-admin-only -- see ``custom_field_create``'s docstring above.
+    """
     field = CustomFieldDefinition.query.get_or_404(id)
 
     # Check if field has values
@@ -348,9 +366,13 @@ def custom_field_delete(id):
 @application_mgmt.route("/admin/custom-fields/bulk-delete", methods=["POST"])
 @login_required
 @require_roles("admin")
+@platform_admin_required
 @audit_log("custom_fields_bulk_delete")
 def custom_fields_bulk_delete():
-    """Bulk delete or deactivate custom fields"""
+    """Bulk delete or deactivate custom fields
+
+    Platform-admin-only -- see ``custom_field_create``'s docstring above.
+    """
     field_ids = request.form.getlist("field_ids")
 
     if not field_ids:
