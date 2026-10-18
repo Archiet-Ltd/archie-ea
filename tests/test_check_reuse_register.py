@@ -1061,3 +1061,67 @@ def test_update_baseline_refuses_a_new_key_unless_allowed_and_names_each_one(tmp
     ok, messages = gate.update_baseline(root, entries, allow_new_keys=True)
     assert ok is True
     assert any(m.startswith("new key written: name-matching/normaliser") for m in messages)
+
+
+# ------------------------------------------------------------------ the sync concepts (twin slice 0)
+
+TWIN_CONCEPTS = {
+    "connector-framework", "identity-crosswalk", "cost-fact-store", "event-log", "answer-envelope",
+    "spreadsheet-import", "open-exchange-import", "archimate-element-writer", "entity-matching", "ai-chat-approval",
+}
+
+
+def test_the_register_lists_every_sync_concept_with_a_pattern_and_an_existing_canonical():
+    entries, problems = gate.load_register(REPO)
+    assert problems == []
+    by_id = {e["id"]: e for e in entries}
+    assert TWIN_CONCEPTS <= set(by_id)
+    for concept in TWIN_CONCEPTS:
+        entry = by_id[concept]
+        assert entry["status"] == "active" and entry["must_not_create"], concept
+        assert (REPO / entry["canonical"]["path"]).is_file(), concept
+
+
+def _connector_framework_tree(tmp_path, extra=None):
+    """The real connector-framework entry and its real baseline, over a tiny tree that holds the canonical symbols."""
+    entries, _ = gate.load_register(REPO)
+    entry = next(e for e in entries if e["id"] == "connector-framework")
+    canonical = "\n".join(
+        f"class {s}:\n    pass" if s[0].isupper() else f"def {s}():\n    pass" for s in entry["canonical"]["symbols"])
+    real = json.loads((REPO / "scripts" / "reuse_register_baseline.json").read_text(encoding="utf-8"))["patterns"]
+    baseline = {k: v for k, v in real.items() if k.startswith("connector-framework/")}
+    root = tmp_path
+    (root / "docs").mkdir(parents=True)
+    (root / "scripts").mkdir(parents=True)
+    (root / "docs" / "reuse-register.yml").write_text(
+        yaml.safe_dump({"version": 1, "entries": [entry]}), encoding="utf-8")
+    (root / "scripts" / "reuse_register_baseline.json").write_text(json.dumps({"patterns": baseline}), encoding="utf-8")
+    files = {entry["canonical"]["path"]: canonical}
+    files.update(extra or {})
+    for rel, code in files.items():
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(code, encoding="utf-8")
+    return root, baseline
+
+
+def test_the_recorded_connector_duplicates_pass_and_a_new_second_connector_manager_fails(tmp_path):
+    # The two existing look-alikes, at the recorded files, are inside the baseline.
+    existing = {
+        "app/modules/admin/v2/services/connector_framework_v2.py":
+            "class BaseConnector:\n    pass\n\n\nclass ConnectorManager:\n    pass\n",
+        "app/modules/vendors/connectors/base_connector.py": "class BaseCloudPricingConnector:\n    pass\n",
+    }
+    root, baseline = _connector_framework_tree(tmp_path / "today", extra=existing)
+    assert baseline["connector-framework/connector-manager"]
+    fails, _ = _run(root)
+    assert fails == []
+
+    # A builder adds a connector manager of their own beside the framework: the ratchet fails and names the entry.
+    seeded = dict(existing, **{"app/services/github_sync_manager.py": "class GitHubConnectorManager:\n    pass\n"})
+    root, _ = _connector_framework_tree(tmp_path / "seeded", extra=seeded)
+    fails, _ = _run(root)
+    assert len(fails) == 1
+    assert "connector-framework/connector-manager" in fails[0]
+    assert "app/services/github_sync_manager.py:1" in fails[0]
+    assert "app/services/connector_framework.py" in fails[0]  # where to reuse it from
