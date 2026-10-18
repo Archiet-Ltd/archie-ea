@@ -14,9 +14,8 @@
   heading='Choose a plan',
   heading_id='buy-heading',
   testid='pricing-buy',
-  intro='Annual billing is selected; monthly is one click away. Any tax due is shown on the payment page before you pay.'
+  intro='Start free, or talk to us about a paid plan.'
 ) %}
-{% set _billing = 'billing.billing_index' in flask.current_app.view_functions %}
 {% set _btn = 'public-btn transition-colors' %}
 <section aria-labelledby="{{ heading_id }}" class="mt-12 space-y-4" data-testid="{{ testid }}">
   <h2 id="{{ heading_id }}" class="text-2xl font-semibold text-foreground">{{ heading }}</h2>
@@ -30,21 +29,13 @@
     {% for key, name in [('startup', 'Startup'), ('team', 'Team')] %}
     <div class="rounded-lg border border-border bg-card p-5 flex flex-col gap-3">
       <p class="font-semibold text-foreground">{{ name }}</p>
-      {% if _billing %}
-      <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
-         class="{{ _btn }} mt-auto bg-primary text-primary-foreground hover:bg-primary/90"
-         data-testid="buy-{{ key }}">Buy {{ name }}, billed annually</a>
-      <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='month')) }}"
-         class="text-sm text-primary underline text-center">or pay monthly</a>
-      {% else %}
-      <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent">Contact us to buy {{ name }}</a>
-      {% endif %}
+      <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="{{ _btn }} mt-auto bg-primary text-primary-foreground hover:bg-primary/90" data-testid="buy-{{ key }}">Talk to us</a>
     </div>
     {% endfor %}
     <div class="rounded-lg border border-border bg-card p-5 flex flex-col gap-3">
       <p class="font-semibold text-foreground">Enterprise</p>
       <p class="text-sm text-muted-foreground">Sold by annual contract.</p>
-      <a href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent" data-testid="buy-enterprise">Contact sales</a>
+      <a href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="{{ _btn }} mt-auto border border-input bg-background text-foreground hover:bg-accent" data-testid="buy-enterprise">Talk to us</a>
     </div>
   </div>
 </section>
