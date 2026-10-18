@@ -25,6 +25,10 @@ class UsageEvent(db.Model):
     EVENT_USER_LOGIN = "user_login"
     EVENT_BLUEPRINT_GENERATED = "blueprint_generated"
     EVENT_MCP_TOOL_CALL = "mcp_tool_call"
+    # Launch funnel: each is recorded at most once per organisation (see
+    # app/services/funnel_events.py).
+    EVENT_ORGANISATION_SIGNED_UP = "organisation_signed_up"
+    EVENT_FIRST_ANSWER_SHOWN = "first_answer_shown"
 
     id = db.Column(db.Integer, primary_key=True)
     organization_id = db.Column(
