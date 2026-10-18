@@ -8,6 +8,24 @@
     <!-- Page Header (page_shell renders the single breadcrumb for this page -- M5) -->
     {{ page_shell(title='Usage Analytics Dashboard', breadcrumb=[('Home', '/'), ('Usage Analytics Dashboard', none)], subtitle='Track page views, feature interactions, and errors across the platform') }}
 
+    {% if funnel %}
+    <!-- Launch funnel (platform administrators only) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" data-testid="funnel-counts">
+        <div class="bg-background rounded-lg shadow p-6">
+            <p class="text-sm text-muted-foreground">Organisations signed up</p>
+            <p class="text-2xl font-bold text-primary" data-testid="funnel-signed-up">{{ funnel.signed_up }}</p>
+        </div>
+        <div class="bg-background rounded-lg shadow p-6">
+            <p class="text-sm text-muted-foreground">Shown a first answer</p>
+            <p class="text-2xl font-bold text-primary" data-testid="funnel-first-answer">{{ funnel.first_answer }}</p>
+        </div>
+        <div class="bg-background rounded-lg shadow p-6">
+            <p class="text-sm text-muted-foreground">Health-check requests</p>
+            <p class="text-2xl font-bold text-primary" data-testid="funnel-health-check">{{ funnel.health_check }}</p>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Summary Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div class="bg-background rounded-lg shadow p-6">
