@@ -738,6 +738,16 @@ class AIChatApprovalService:
 
                 result = execute_connector_proposal(approval)
 
+            elif approval.operation_type in ("repository_classification", "owner_proposal"):
+                # The GitHub connector's proposals: an unmatched repository
+                # classified for a person to decide (an approved application is
+                # created through data_service), and a proposed owner that would
+                # replace a person-recorded one. Queued by app/connectors/github.py,
+                # executed by the same module.
+                from app.connectors.github import execute_github_proposal
+
+                result = execute_github_proposal(approval, data_service)
+
             elif approval.operation_type == "create":
                 if approval.entity_type == "capability":
                     result = data_service.create_capability(payload)
