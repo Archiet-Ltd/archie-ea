@@ -424,3 +424,34 @@ def test_no_site_assigns_the_legacy_columns_outside_the_owner_service():
     assert offenders == []
 
 
+
+
+# ── the dashboard coverage figure ────────────────────────────────────────────
+
+
+def test_owner_coverage_counts_a_recorded_owner_and_only_this_organisations(
+        app, db_session, make_org, client, login_as):
+    from flask import g
+
+    from app.modules.dashboard.routes.dashboard_views import _build_overview_context
+    from app.services.element_ownership_service import set_element_owner
+
+    org_a, org_b = make_org("one-store-cov-a"), make_org("one-store-cov-b")
+    jane_a, jane_b = _person(db_session, org_a, "janea"), _person(db_session, org_b, "janeb")
+    owned = _make_app(db_session, org_a, "Owned")
+    _make_app(db_session, org_a, "Unowned")
+    other = _make_app(db_session, org_b, "Other")
+    set_element_owner(element_type="application", element_id=owned.id, user_id=jane_a.id,
+                      organization_id=org_a.id, ownership_type="primary")
+    set_element_owner(element_type="application", element_id=other.id, user_id=jane_b.id,
+                      organization_id=org_b.id, ownership_type="primary")
+    db_session.flush()
+
+    login_as(client, jane_a)
+    with app.test_request_context("/dashboard/overview"):
+        from flask_login import login_user
+
+        login_user(jane_a)
+        g.current_org_id = org_a.id
+        context = _build_overview_context()
+    assert context["data_coverage"]["owner"] == 50

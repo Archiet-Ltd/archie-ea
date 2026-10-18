@@ -137,11 +137,7 @@ def _build_overview_context():
         _cov_where = "WHERE organization_id = :org" if _org is not None else ""
         row = db.session.execute(text(f"""
             SELECT
-                COUNT(*) FILTER (WHERE application_owner IS NOT NULL OR business_owner IS NOT NULL OR EXISTS (
-                    SELECT 1 FROM application_owners ao
-                    WHERE ao.application_id = application_components.id
-                      AND ao.organization_id = application_components.organization_id
-                      AND ao.ownership_type IN ('primary', 'business'))) AS owner_n,
+                COUNT(*) FILTER (WHERE application_owner IS NOT NULL OR business_owner IS NOT NULL) AS owner_n,
                 COUNT(*) FILTER (WHERE vendor_product_id IS NOT NULL OR vendor_name IS NOT NULL) AS vendor_n,
                 COUNT(*) FILTER (WHERE total_cost_of_ownership IS NOT NULL OR license_cost IS NOT NULL OR maintenance_cost IS NOT NULL) AS cost_n,
                 COUNT(*) FILTER (WHERE business_criticality IS NOT NULL) AS crit_n
@@ -152,6 +148,29 @@ def _build_overview_context():
         data_coverage["vendor"] = round(row[1] / total_apps * 100)
         data_coverage["cost"] = round(row[2] / total_apps * 100)
         data_coverage["criticality"] = round(row[3] / total_apps * 100)
+        if _org is not None:
+            # An owner is recorded as an ApplicationOwner row; the owner text
+            # columns counted above only hold a name that matched no user.
+            from app.models.application_owner import ApplicationOwner
+            from app.models.application_portfolio import ApplicationComponent
+
+            has_owner_text = db.or_(
+                ApplicationComponent.legacy_application_owner.isnot(None),
+                ApplicationComponent.legacy_business_owner.isnot(None),
+            )
+            has_recorded_owner = (
+                db.select(ApplicationOwner.id)
+                .where(ApplicationOwner.application_id == ApplicationComponent.id)
+                .where(ApplicationOwner.organization_id == _org)
+                .where(ApplicationOwner.ownership_type.in_(("primary", "business")))
+                .exists()
+            )
+            owned = db.session.execute(
+                db.select(db.func.count(ApplicationComponent.id))
+                .where(ApplicationComponent.organization_id == _org)
+                .where(db.or_(has_owner_text, has_recorded_owner))
+            ).scalar_one()
+            data_coverage["owner"] = round(owned / total_apps * 100)
     except Exception as e:
         db.session.rollback()
         data_coverage["query_error"] = str(e)
@@ -219,11 +238,7 @@ def api_coverage_debug():
         _org_where = " WHERE organization_id = :org" if _org is not None else ""
         row = db.session.execute(text(f"""
             SELECT
-                COUNT(*) FILTER (WHERE application_owner IS NOT NULL OR business_owner IS NOT NULL OR EXISTS (
-                    SELECT 1 FROM application_owners ao
-                    WHERE ao.application_id = application_components.id
-                      AND ao.organization_id = application_components.organization_id
-                      AND ao.ownership_type IN ('primary', 'business'))) AS owner_n,
+                COUNT(*) FILTER (WHERE application_owner IS NOT NULL OR business_owner IS NOT NULL) AS owner_n,
                 COUNT(*) FILTER (WHERE vendor_product_id IS NOT NULL OR vendor_name IS NOT NULL) AS vendor_n,
                 COUNT(*) FILTER (WHERE total_cost_of_ownership IS NOT NULL OR license_cost IS NOT NULL OR maintenance_cost IS NOT NULL) AS cost_n,
                 COUNT(*) FILTER (WHERE business_criticality IS NOT NULL) AS crit_n,
