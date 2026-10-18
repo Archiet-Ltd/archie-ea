@@ -396,14 +396,11 @@ def api_software():
 def strategic_planning_dashboard():
     """Strategic Planning Dashboard"""
     try:
-        # Get strategic metrics with ArchiMate fallback for empty tables
+        # Gaps come from the one gap register, with no fallback to ArchiMate
+        # Gap elements (see enterprise_dashboard).
         from app.services.gap_register_service import count_gaps
 
         gap_count = count_gaps(current_org_id())
-        if gap_count == 0:
-            gap_count = ArchiMateElement.query.filter(
-                ArchiMateElement.type.in_(["Gap", "GAP"])
-            ).count()
 
         plateau_count = 0
         try:
@@ -1211,14 +1208,13 @@ def enterprise_dashboard():
         solutions_count = Solution.query.count()
         software_modules_count = SoftwareModule.query.count()
 
-        # Gaps with ArchiMate fallback for empty tables
+        # Gaps: the one gap register, the same count the roadmap and Gap
+        # Analysis show. There is no fallback to ArchiMate Gap elements: a
+        # second reader answering "how many gaps" is how this screen came to
+        # say 3 beside a register that said 0.
         from app.services.gap_register_service import count_gaps
 
         gaps_count = count_gaps(current_org_id())
-        if gaps_count == 0:
-            gaps_count = ArchiMateElement.query.filter(
-                ArchiMateElement.type.in_(["Gap", "GAP"])
-            ).count()
 
         return render_template(
             "enterprise/enterprise_dashboard.html",

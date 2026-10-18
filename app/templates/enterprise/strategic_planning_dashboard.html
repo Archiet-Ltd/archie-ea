@@ -28,7 +28,7 @@
     <!-- Metrics Cards -->
     <div class="space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {{ metrics_card(title='Gaps Identified', value=gap_count or 0, icon='search') }}
+            {{ metrics_card(title='Gaps Identified', value=gap_count, value_testid='gap-count', icon='search') }}
             {{ metrics_card(title='Implementation Plateaus', value=plateau_count or 0, icon='target') }}
             {{ metrics_card(title='Work Packages', value=workpackage_count or 0, icon='package') }}
         </div>

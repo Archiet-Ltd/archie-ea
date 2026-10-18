@@ -56,6 +56,20 @@ def test_cto_escalates_an_open_exception_and_it_persists(browser, live_server):
     expect(page.get_by_test_id("supported-version-share")).to_be_visible(timeout=PAGE_TIMEOUT)
     expect(page.get_by_test_id(f"exception-{exception_id}")).to_be_visible(timeout=PAGE_TIMEOUT)
 
+    # The disagreement panel never claims an all-clear it did not compute: it
+    # either names how many questions it compared, or says nothing could be.
+    panel = page.get_by_test_id("store-agreement-panel")
+    expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
+    panel_text = panel.inner_text()
+    if "No disagreement found" in panel_text:
+        assert "Compared " in panel_text and " questions" in panel_text, panel_text
+    else:
+        assert (
+            "Nothing could be compared yet" in panel_text
+            or "store-disagreement" in panel_text
+            or "Could not compare surfaces" in panel_text
+        ), panel_text
+
     page.get_by_role("button", name="Escalate").click()
     page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
 
