@@ -94,6 +94,7 @@ else:
     # had no chat history tables at all and /ai-chat/threads 500'd.
     from .conversation import ConversationMessageRecord, ConversationThreadRecord  # noqa
     from .external_identity_crosswalk import ExternalIdentityCrosswalk  # noqa: F401
+    from .operational_record import OperationalRecord  # noqa: F401
     from .consulting_partner import *  # noqa
     from .capability_archimate_mapping import *  # noqa
     from .copilot_insight import *  # noqa
