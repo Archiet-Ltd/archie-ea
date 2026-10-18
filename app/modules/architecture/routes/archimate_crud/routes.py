@@ -21,6 +21,7 @@ from flask_login import login_required
 from sqlalchemy import or_
 
 from app import db
+from app.decorators import require_roles
 from app.utils.tenant_users import escape_like_literal
 from . import archimate_crud
 from .services.ai_generation_service import AIGenerationService
@@ -112,6 +113,11 @@ import logging
 from app.utils.pagination import safe_int_arg
 
 logger = logging.getLogger(__name__)
+
+# One write-role gate for every mutating route in this module, matching the
+# generic Elements page (architecture_crud_routes.py): admin or architect.
+# Reads stay open to any signed-in user.
+write_role_required = require_roles("admin", "architect")
 
 # Model registry mapping element types to model classes
 MODEL_REGISTRY = {
@@ -1016,6 +1022,7 @@ def _selected_layer_for(layer):
 
 @archimate_crud.route(f"/{_LAYER_URL_PATTERN}/<element_type>/new", methods=["GET", "POST"])
 @login_required
+@write_role_required
 def create_element(layer, element_type):
     """Create a new element"""
     model_class = MODEL_REGISTRY.get(element_type)
@@ -1179,6 +1186,7 @@ def detail_element(layer, element_type, element_id):
     f"/{_LAYER_URL_PATTERN}/<element_type>/<int:element_id>/edit", methods=["GET", "POST"]
 )
 @login_required
+@write_role_required
 def update_element(layer, element_type, element_id):
     """Update an element"""
     model_class = MODEL_REGISTRY.get(element_type)
@@ -1335,6 +1343,7 @@ def _record_element_update(before, after):
     f"/{_LAYER_URL_PATTERN}/<element_type>/<int:element_id>/delete", methods=["POST"]
 )
 @login_required
+@write_role_required
 def delete_element(layer, element_type, element_id):
     """Delete an element"""
     model_class = MODEL_REGISTRY.get(element_type)
@@ -1478,6 +1487,7 @@ def validate_archimate_element(element_id):
 
 @archimate_crud.route(f"/{_LAYER_URL_PATTERN}/<element_type>/bulk-delete", methods=["POST"])
 @login_required
+@write_role_required
 def bulk_delete(layer, element_type):
     """Bulk delete elements"""
     model_class = MODEL_REGISTRY.get(element_type)
@@ -1697,6 +1707,7 @@ def api_element_detail(element_id):
 
 @archimate_crud.route("/api/elements/<int:element_id>", methods=["PATCH"])
 @login_required
+@write_role_required
 def api_element_patch(element_id):
     """ARC-006: Partial update of an ArchiMate element's core fields."""
     element = ArchiMateElement.query.get_or_404(element_id)
@@ -2472,6 +2483,7 @@ def api_health_scorecard():
 
 @archimate_crud.route("/api/health-scorecard/repair", methods=["POST"])
 @login_required
+@write_role_required
 def api_health_scorecard_repair():
     """Run inference engine repair for a specific health test failure.
 

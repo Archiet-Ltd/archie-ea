@@ -1827,7 +1827,7 @@ class Principle(TenantMixin, db.Model):
         return f"<Principle {self.name} [{self.enforcement_level}]>"
 
 
-class ConstraintElement(db.Model):
+class ConstraintElement(TenantMixin, db.Model):
     """
     ArchiMate 3.2 Constraint element.
 

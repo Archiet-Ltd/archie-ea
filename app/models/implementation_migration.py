@@ -358,7 +358,7 @@ class WorkPackage(TenantMixin, db.Model):
         return f"<WorkPackage {self.name} status={self.status}>"
 
 
-class Deliverable(db.Model):
+class Deliverable(TenantMixin, db.Model):
     """Specific outputs or results produced by work packages."""
 
     __tablename__ = "deliverables"

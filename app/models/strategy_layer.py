@@ -17,7 +17,7 @@ from app.models.mixins import TenantMixin
 from .. import db
 
 
-class StrategyResource(db.Model):
+class StrategyResource(TenantMixin, db.Model):
     """
     ArchiMate 3.2 Resource - Strategic resource (human, information, tangible)
 

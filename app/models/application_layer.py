@@ -527,7 +527,7 @@ class ApplicationEvent(TenantMixin, db.Model):
 # ============================================================================
 
 
-class ApplicationCollaboration(db.Model):
+class ApplicationCollaboration(TenantMixin, db.Model):
     """
     ArchiMate 3.2 Application Collaboration - Aggregate of application components working together
 
@@ -842,7 +842,7 @@ class ApplicationProcess(TenantMixin, db.Model):
 # ============================================================================
 
 
-class ApplicationInteraction(db.Model):
+class ApplicationInteraction(TenantMixin, db.Model):
     """
     ArchiMate 3.2 Application Interaction - Collaboration between application components
 
@@ -1102,7 +1102,7 @@ def create_dataobject_archimate_element(mapper, connection, target):
         target.archimate_element_id = result.inserted_primary_key[0]
 
 
-class ApplicationService(db.Model):
+class ApplicationService(TenantMixin, db.Model):
     """
     ArchiMate 3.2 Application Service
     """
