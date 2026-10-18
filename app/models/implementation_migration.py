@@ -892,6 +892,35 @@ def _enforce_gap_kind(mapper, connection, target):
     validate_gap_kind(target)
 
 
+# A deliverable written outside a request (work-package merges, seeders) has no
+# tenant context to take its organisation from, so it inherits the organisation
+# of the record it hangs off. Nothing is guessed: with none of these set the
+# column stays NULL and the insert is refused rather than filed under a tenant.
+_DELIVERABLE_ORG_SOURCES = (
+    ("unified_work_package_id", "unified_work_packages"),
+    ("work_package_id", "work_packages"),
+    ("archimate_element_id", "archimate_elements"),
+    ("application_component_id", "application_components"),
+)
+
+
+@event.listens_for(Deliverable, "before_insert")
+def _deliverable_inherits_organization(mapper, connection, target):
+    if target.organization_id is not None:
+        return
+    for column, table in _DELIVERABLE_ORG_SOURCES:
+        parent_id = getattr(target, column)
+        if parent_id is None:
+            continue
+        org_id = connection.execute(
+            db.text(f"SELECT organization_id FROM {table} WHERE id = :id"),  # nosec B608 - literal table names
+            {"id": parent_id},
+        ).scalar()
+        if org_id is not None:
+            target.organization_id = org_id
+            return
+
+
 # ---------------------------------------------------------------------------
 # Late binding of back-populated relationships to avoid circular imports.
 # ---------------------------------------------------------------------------
