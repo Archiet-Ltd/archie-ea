@@ -541,6 +541,7 @@ def test_large_impact_walk_first_page_within_latency_budget(app, db_session, mak
     # Counting statements is deterministic where a 2,000 ms timer flaked on a
     # loaded runner (5.4 s measured).
     statement_count = len(statements)
+    assert statement_count > 0, "the statement counter saw nothing, so the budget below proves nothing"
     assert statement_count <= STATEMENT_BUDGET, (
         f"First page of a 2,400-row walk issued {statement_count} SQL statements; "
         f"budget {STATEMENT_BUDGET}. Per-row queries are back:\n"

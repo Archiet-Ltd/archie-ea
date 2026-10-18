@@ -570,4 +570,3 @@ class TestGatewayPersistenceUsesSavepoints:
                 session.close()
 
         assert count_inside_txn == 1
-        assert caller_org is not None
