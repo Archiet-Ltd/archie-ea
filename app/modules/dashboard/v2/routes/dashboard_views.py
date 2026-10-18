@@ -37,15 +37,6 @@ def index():
     return redirect(url_for("dashboard.overview"))
 
 
-def _setup_link(endpoint, **values):
-    """URL for a setup-checklist step. Blueprints register non-fatally, so a
-    missing endpoint must leave the step pointing at the dashboard rather than
-    raising BuildError and taking the whole page down."""
-    if endpoint not in current_app.view_functions:
-        return url_for("dashboard.overview")
-    return url_for(endpoint, **values)
-
-
 @dashboard_bp_v2.route("/overview")
 @timed_route
 @login_required
@@ -619,14 +610,7 @@ def overview():
     # the checklist, so the setup card can never call a populated workspace
     # empty. Capabilities are counted from the store the "New Capability" dialog
     # writes; elements from the ArchiMate repository.
-    try:
-        capability_count = (
-            db.session.query(db.func.count(BusinessCapability.id)).scalar() or 0
-        )
-    except Exception as exc:
-        logger.warning("capability count unavailable for setup checklist: %s", exc)
-        db.session.rollback()
-        capability_count = 0
+    capability_count = nav_stats.get("capabilities") or 0
     element_count = nav_stats.get("elements") or 0
     dashboard_mode = (
         "guided"
@@ -639,20 +623,25 @@ def overview():
 
     guided_steps = []
     if dashboard_mode == "guided":
+        from app.template_helpers import safe_url_for_with_fallback
         from app.utils.role_access import can_edit_capabilities
+
+        # A blueprint that failed to register leaves its step pointing here
+        # rather than raising BuildError and taking the dashboard down.
+        FALLBACK_HREF = "/dashboard/overview"
 
         # Guided mode means no capabilities exist, so this step is about
         # creating the first one -- or, for a role that cannot, who can.
         if can_edit_capabilities(current_user):
             capability_step = {
                 "description": "No capabilities yet. Add the first one, then connect applications to it.",
-                "href": _setup_link("unified_low_priority.capability_map_capabilities", new=1),
+                "href": safe_url_for_with_fallback("unified_low_priority.capability_map_capabilities", FALLBACK_HREF, new=1),
                 "cta": "Add a capability",
             }
         else:
             capability_step = {
-                "description": "No capabilities yet. An enterprise or business architect adds them.",
-                "href": _setup_link("unified_low_priority.capability_map_capabilities"),
+                "description": "No capabilities yet. An architect or administrator adds them.",
+                "href": safe_url_for_with_fallback("unified_low_priority.capability_map_capabilities", FALLBACK_HREF),
                 "cta": "View capabilities",
             }
         guided_steps = [
@@ -665,7 +654,7 @@ def overview():
                     if applications_count
                     else f"Bring your application portfolio into {current_app.config['APP_NAME']}."
                 ),
-                "href": _setup_link("unified_applications.application_list", **{"import": 1}),
+                "href": safe_url_for_with_fallback("unified_applications.application_list", FALLBACK_HREF, **{"import": 1}),
                 "cta": "Import",
                 "done": applications_count > 0,
             },
