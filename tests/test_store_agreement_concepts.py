@@ -154,7 +154,13 @@ def test_gaps_compare_only_surfaces_showing_the_same_kinds():
         "all": {"orm:Gap", "GET /implementation/api/gaps",
                 "GET /api/roadmap/gaps"},
         "capability shortfall": {"orm:Gap(capability shortfall)",
-                                 "GET /api/roadmap/statistics"},
+                                 "GET /api/roadmap/statistics",
+                                 # The three screens that show a gap total:
+                                 # each reads count_gaps, which leaves out
+                                 # plateau transitions.
+                                 "GET /enterprise/ (Enterprise Dashboard)",
+                                 "GET /enterprise/strategic (Strategic Planning)",
+                                 "GET /enterprise/implementation/gap-analysis (Gap Analysis)"},
         "plateau transition": {"orm:Gap(plateau transition)",
                                "orm:ImplementationGap"},
     }

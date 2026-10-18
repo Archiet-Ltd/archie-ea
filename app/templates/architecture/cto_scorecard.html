@@ -78,8 +78,16 @@
       <li class="text-foreground">{{ finding }}</li>
       {% endfor %}
     </ul>
+    {% elif agreement.compared %}
+    {{ empty_state(icon='check-circle', headline='No disagreement found', body='Compared ' ~ agreement.compared ~ ' of ' ~ agreement.questions ~ ' questions, each answered by every store and screen that shows it. Every one gave the same number.') }}
     {% else %}
-    {{ empty_state(icon='check-circle', headline='No disagreement found', body='Every surface checked answers the same question with the same number.') }}
+    {{ empty_state(icon='circle-help', headline='Nothing could be compared yet', body='No question had two sources with data to compare, so there is no claim to make either way.') }}
+    {% endif %}
+    {% if not agreement.error and agreement.not_compared %}
+    <p class="mt-3 text-xs text-muted-foreground" data-testid="not-compared">Not compared, for lack of data: {{ agreement.not_compared|join(', ') }}.</p>
+    {% endif %}
+    {% if not agreement.error and not agreement.screens_asked %}
+    <p class="mt-3 text-xs text-muted-foreground" data-testid="screens-not-asked">Screens were not asked in this view; only stores were compared.</p>
     {% endif %}
   </div>
 </div>
