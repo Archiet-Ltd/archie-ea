@@ -16,6 +16,7 @@ from app.extensions import db
 from app.modules.vendors.services.vendor_product_service import VendorProductService
 from app.utils.pagination import safe_int_arg
 from app.utils.tenant_users import escape_like_literal
+from app.middleware.tenant_decorators import platform_admin_required
 
 logger = logging.getLogger(__name__)
 
@@ -316,6 +317,7 @@ def get_product_categories():
 @vendor_product_bp.route("/<int:vendor_id>/products", methods=["POST"])
 @login_required
 @audit_log("vendor_product_create")
+@platform_admin_required
 def create_vendor_product(vendor_id):
     """Create a new product for a vendor organisation."""
     from app.models.vendor.vendor_organization import VendorOrganization, VendorProduct

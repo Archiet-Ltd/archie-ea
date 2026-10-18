@@ -577,15 +577,21 @@ def api_list_work_packages():
     offset = (page - 1) * per_page
 
     items = []
+    gaps_by_wp = work_package_service.gaps_for_work_packages(
+        paginated.items, current_organization_id())
     for idx, wp in enumerate(paginated.items):
         items.append({
             "id": wp.id,
+            "detail_url": url_for("implementation_planning.work_package_detail", work_package_id=wp.id)
+            if "implementation_planning.work_package_detail" in current_app.view_functions else None,
+            "gaps": gaps_by_wp.get(wp.id, []),
             "row_number": offset + idx + 1,
             "name": wp.name or "",
             "summary": wp.summary,
             "status": wp.status or "Planned",
             "priority": wp.priority or "Normal",
-            "percent_complete": wp.progress_percentage or 0,
+            # None stays None: a work package with no recorded progress shows a dash.
+            "percent_complete": wp.progress_percentage,
             "target_date": str(wp.end_date.date()) if wp.end_date else None,
             "togaf_phase": wp.togaf_phase or "",
             "created_at": str(wp.created_at) if wp.created_at else None,
@@ -854,8 +860,13 @@ def api_delete_work_package(wp_id):
 def plateaus():
     """Implementation Plateaus"""
     try:
+        from app.services.gap_register_service import get_plateau_gap_rows
+
         plateaus = Plateau.query.limit(500).all()
-        return render_template("enterprise/plateaus.html", plateaus=plateaus)
+        return render_template(
+            "enterprise/plateaus.html", plateaus=plateaus,
+            plateau_gaps=get_plateau_gap_rows([p.id for p in plateaus], current_org_id()),
+        )
     except SQLAlchemyError as e:
         current_app.logger.error(f"Database error loading plateaus: {e}")
         raise DatabaseError(
@@ -903,9 +914,12 @@ def gap_analysis():
         )
         total_gap_count = count_gaps(current_org_id())
         not_addressed_gaps = get_gaps_not_addressed(current_org_id())
+        work_packages_by_gap = work_package_service.work_packages_for_gaps(
+            [g.id for g in gaps], current_org_id())
 
         return render_template(
             "enterprise/gap_analysis.html", gaps=gaps,
+            work_packages_by_gap=work_packages_by_gap,
             total_gap_count=total_gap_count,
             not_addressed_gaps=not_addressed_gaps,
             current_sort=sort_key if sort_key in _GAP_SORT_COLUMNS else "name",

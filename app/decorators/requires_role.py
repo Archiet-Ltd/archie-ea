@@ -212,6 +212,33 @@ def requires_application_owner(f):
     return requires_role(["application_manager"])(f)
 
 
+def requires_application_owner_or_org_admin(f):
+    """
+    The My Applications routes: the application manager persona, and the
+    administrator of the ACTIVE organisation, who is the person that assigns
+    owners and so has to be able to open the pages those owners use.
+
+    Admission is ``is_active_org_admin`` -- the one predicate for that question.
+    It refuses when no active organisation is set, and for a person switched into
+    an organisation as a viewer, rather than falling back to their home
+    organisation. Every other role is judged exactly as
+    ``requires_application_owner`` judges it. The routes act on the applications
+    the *signed-in user* owns, so an administrator who owns none sees an empty
+    state, and one who owns some sees only those.
+    """
+    owner_gated = requires_application_owner(f)
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        from app.middleware.tenant_decorators import is_active_org_admin
+
+        if current_user.is_authenticated and is_active_org_admin():
+            return f(*args, **kwargs)
+        return owner_gated(*args, **kwargs)
+
+    return decorated_function
+
+
 def requires_any_architect(f):
     """
     Shorthand decorator for architect routes (SA, EA, or BA).

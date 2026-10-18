@@ -253,17 +253,44 @@ def test_fetch_refuses_a_cheap_but_huge_yaml_document_quickly(world, production_
 
 
 def test_fetch_node_budget_refuses_a_yaml_document_under_the_byte_cap(world, production_like, http_calls):
+    """A small-but-huge-node YAML body is refused early, by work done rather than by clock.
+
+    What this proves: the parser gives up once the node budget is spent, so it
+    composes at most MAX_YAML_NODES nodes (plus the one that trips the check)
+    out of the ~70,000 in the body, and the route answers 502. That is the
+    work bound the old two-second timer stood in for; it cannot flake on a
+    loaded runner. The wall-clock guard below is only a last-resort safety net
+    (several times the old budget) against the parser running away.
+    """
     import time
 
-    body = "a: [" + ",".join(["[]"] * 70000) + "]\n"
+    import yaml
+    from app.modules.solutions_strategic.v2.routes import integration_contract_routes as r
+
+    nodes_in_body = 70000
+    body = "a: [" + ",".join(["[]"] * nodes_in_body) + "]\n"
     assert len(body) < 256 * 1024
+    assert nodes_in_body > 3 * r.MAX_YAML_NODES
+
+    composed = {"n": 0}
+    real_compose = yaml.composer.Composer.compose_node
+
+    def counting_compose(self, parent, index):
+        composed["n"] += 1
+        return real_compose(self, parent, index)
+
     http_calls.reply = lambda: _Resp(body=body, ctype="application/yaml")
     c = _insert_contract(world, "https://api.example.com/openapi.yaml")
     started = time.monotonic()
-    resp = world.as_a().post(f"/api/enterprise/contracts/{c.id}/fetch-spec")
-    assert time.monotonic() - started < 2
+    client = world.as_a()
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(yaml.composer.Composer, "compose_node", counting_compose)
+        resp = client.post(f"/api/enterprise/contracts/{c.id}/fetch-spec")
+    elapsed = time.monotonic() - started
     assert resp.status_code == 502
     assert resp.get_json() == {"error": "Spec could not be parsed"}
+    assert 0 < composed["n"] <= r.MAX_YAML_NODES + 1, composed["n"]
+    assert elapsed < 20  # safety net only; the node count above is the real assertion
 
 
 def test_yaml_node_budget_boundary():

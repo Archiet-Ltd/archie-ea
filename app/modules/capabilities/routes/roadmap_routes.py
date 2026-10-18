@@ -35,7 +35,7 @@ from flask_login import current_user, login_required
 from app.decorators import WORK_PACKAGE_WRITE_ROLES, require_roles
 from app.middleware.tenant_context import current_org_id
 
-from app.decorators import audit_log
+from app.decorators import audit_log, require_roles
 from app.services.rate_limiter import rate_limit
 
 from app import db
@@ -43,6 +43,11 @@ from app import db
 from . import capability_map
 import logging
 logger = logging.getLogger(__name__)
+
+# Roles that may change what a gap, a work package and a plateau are linked to.
+_LINK_WRITE_ROLES = (
+    "admin", "architect", "business_architect", "cto", "portfolio_manager", "application_manager",
+)
 
 
 @capability_map.route("/api/roadmap/capabilities")
@@ -2204,6 +2209,7 @@ def api_capability_traceability(capability_id):
 @login_required
 @require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @rate_limit(30, "1m")
+@require_roles(*_LINK_WRITE_ROLES)
 @audit_log("roadmap_gap_link_plateau")
 def api_roadmap_gap_link_plateau(gap_id: int, plateau_id: int):
     """Link a gap to a plateau within the active organisation.
@@ -2235,6 +2241,7 @@ def api_roadmap_gap_link_plateau(gap_id: int, plateau_id: int):
 @login_required
 @require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @rate_limit(30, "1m")
+@require_roles(*_LINK_WRITE_ROLES)
 @audit_log("roadmap_gap_unlink_plateau")
 def api_roadmap_gap_unlink_plateau(gap_id: int, plateau_id: int):
     """Unlink a gap from a plateau within the active organisation.
@@ -2260,6 +2267,95 @@ def api_roadmap_gap_unlink_plateau(gap_id: int, plateau_id: int):
         db.session.rollback()
         current_app.logger.error("Error unlinking gap from plateau: %s", exc, exc_info=True)
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
+
+
+def _link_error(exc):
+    from app.services import work_package_service
+
+    status = 404 if isinstance(exc, work_package_service.WorkPackageNotFound) else 400
+    return jsonify({"success": False, "error": str(exc)}), status
+
+
+@capability_map.route("/api/roadmap/gaps/<int:gap_id>/link-work-package/<int:wp_id>", methods=["POST"])
+@login_required
+@rate_limit(30, "1m")
+@require_roles(*_LINK_WRITE_ROLES)
+@audit_log("roadmap_gap_link_work_package")
+def api_roadmap_gap_link_work_package(gap_id: int, wp_id: int):
+    """Link a gap to a work package of the active organisation (both ways at once:
+    the one link record is read from either side).
+
+    Response 200: {"success": true, "gap_id": int, "work_package": {...}}
+    Response 404: the gap or the work package is not in this organisation.
+    """
+    from app.services import work_package_service
+
+    org_id = current_org_id()
+    try:
+        wp = work_package_service.link_gap(wp_id, gap_id, organization_id=org_id)
+        payload = work_package_service.to_roadmap_dict(wp, org_id)
+        db.session.commit()
+    except work_package_service.WorkPackageError as exc:
+        db.session.rollback()
+        return _link_error(exc)
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.error("Error linking gap to work package: %s", exc, exc_info=True)
+        return jsonify({"success": False, "error": "An internal error occurred"}), 500
+    return jsonify({"success": True, "gap_id": gap_id, "work_package": payload})
+
+
+@capability_map.route("/api/roadmap/gaps/<int:gap_id>/unlink-work-package/<int:wp_id>", methods=["POST"])
+@login_required
+@rate_limit(30, "1m")
+@require_roles(*_LINK_WRITE_ROLES)
+@audit_log("roadmap_gap_unlink_work_package")
+def api_roadmap_gap_unlink_work_package(gap_id: int, wp_id: int):
+    """Remove the link between a gap and a work package of the active organisation."""
+    from app.services import work_package_service
+
+    org_id = current_org_id()
+    try:
+        removed = work_package_service.unlink_gap(wp_id, gap_id, organization_id=org_id)
+        db.session.commit()
+    except work_package_service.WorkPackageError as exc:
+        db.session.rollback()
+        return _link_error(exc)
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.error("Error unlinking gap from work package: %s", exc, exc_info=True)
+        return jsonify({"success": False, "error": "An internal error occurred"}), 500
+    return jsonify({"success": True, "gap_id": gap_id, "work_package_id": wp_id, "removed": removed})
+
+
+@capability_map.route("/api/roadmap/gaps/search")
+@login_required
+@rate_limit(120, "1m")
+def api_roadmap_gaps_search():
+    """Search picker for the gap register: this organisation's gaps whose name
+    contains ``q`` (at most 10). Response: {"success": true, "gaps": [{"id", "name"}]}"""
+    from app.models.implementation_migration import GAP_KIND_PLATEAU_TRANSITION, Gap
+
+    org_id = current_org_id()
+    q = (request.args.get("q") or "").strip()
+    query = Gap.query.filter(
+        Gap.organization_id == org_id, Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION
+    ).order_by(Gap.name)
+    if q:
+        query = query.filter(Gap.name.ilike("%" + q.replace("%", r"\%").replace("_", r"\_") + "%"))
+    return jsonify({"success": True, "gaps": [{"id": g.id, "name": g.name} for g in query.limit(10).all()]})
+
+
+@capability_map.route("/api/roadmap/work-packages/search")
+@login_required
+@rate_limit(120, "1m")
+def api_roadmap_work_packages_search():
+    """Search picker for work packages: this organisation's, by name (at most 10)."""
+    from app.services import work_package_service
+
+    rows = work_package_service.search_work_packages(
+        current_org_id(), request.args.get("q") or "", limit=10)
+    return jsonify({"success": True, "work_packages": [{"id": w.id, "name": w.name} for w in rows]})
 
 
 @capability_map.route("/api/roadmap/gaps/not-addressed")

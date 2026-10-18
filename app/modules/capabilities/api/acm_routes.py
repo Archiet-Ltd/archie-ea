@@ -12,6 +12,7 @@ from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
 from app.decorators import audit_log
+from app.middleware.tenant_decorators import platform_admin_required
 
 from app.models.application_portfolio import ApplicationComponent
 from app.models.technical_capability import TechnicalCapability
@@ -118,6 +119,7 @@ def get_domain_summary():
 @acm_bp.route("/seed", methods=["POST"])
 @login_required
 @audit_log("acm_capabilities_seed")
+@platform_admin_required
 def seed_capabilities():
     """Seed the database with ACM technical capabilities."""
     result = ACMTechnicalCapabilityService.seed_capabilities()
