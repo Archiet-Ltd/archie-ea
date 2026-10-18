@@ -12,12 +12,13 @@ import pytest
 
 
 def _user(db_session, org, *, platform=False, role_name="Administrator"):
-    from app.models import Role
-    from app.models.user import User
+    from app.models.user import Permission, Role, User
 
     role = Role.query.filter_by(name=role_name).first()
     if role is None:
-        pytest.skip(f"no {role_name} role seeded in this database")
+        role = Role(name=role_name, permissions=Permission.ADMINISTER)
+        db_session.add(role)
+        db_session.flush()
     user = User(
         email=f"gate-{uuid.uuid4().hex[:8]}@example.test",
         first_name="Gate",
