@@ -1,0 +1,9 @@
+name: probe-self-hosted
+on:
+  push:
+    branches: ['probe/self-hosted-runner-check']
+jobs:
+  probe:
+    runs-on: [self-hosted, ibm-vsi]
+    steps:
+      - run: echo self-hosted runner reachable && hostname
