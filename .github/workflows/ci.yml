@@ -1133,7 +1133,7 @@ jobs:
   smoke-main:
     name: Browser journeys — main shard ${{ matrix.shard }}
     needs: [changes, fast_gate]
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","ibm-vsi"]') || 'ubuntu-latest' }}
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     strategy:
       fail-fast: false
@@ -1213,7 +1213,7 @@ jobs:
   smoke-adversarial:
     name: Browser journeys — adversarial
     needs: [changes, fast_gate]
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","ibm-vsi"]') || 'ubuntu-latest' }}
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     services:
       postgres:
@@ -1287,7 +1287,7 @@ jobs:
   smoke-other:
     name: Browser journeys — other
     needs: [changes, fast_gate]
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","ibm-vsi"]') || 'ubuntu-latest' }}
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     services:
       postgres:
@@ -1381,7 +1381,7 @@ jobs:
     name: Browser journeys (one per archetype)
     needs: [smoke-main, smoke-adversarial, smoke-other, changes, fast_gate]
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","ibm-vsi"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -1431,7 +1431,7 @@ jobs:
     name: Browser compatibility (${{ matrix.browser }})
     needs: [changes, fast_gate]
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","ibm-vsi"]') || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -1528,7 +1528,7 @@ jobs:
     name: Level 10 archetype walkthrough
     needs: [changes, fast_gate]
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","ibm-vsi"]') || 'ubuntu-latest' }}
     # docs/TESTING_STANDARD.md level 10: not "does it break?" but "can this
     # archetype do their job, and could they have FOUND the page?". It runs as a
     # non-admin per persona, measures geometry at a fixed viewport rather than
