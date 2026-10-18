@@ -70,7 +70,7 @@
         <input type="checkbox" id="inquiry-consent" name="consent" value="1" required class="mt-1">
         <label for="inquiry-consent" class="text-sm text-muted-foreground">{{ page.front_matter.get('inquiry_consent_text', '') }}</label>
       </div>
-      <button type="submit" class="public-btn public-btn--primary" data-testid="offer-inquiry-submit">Request this</button>
+      <button type="submit" class="public-btn public-btn--primary" data-testid="offer-inquiry-submit">{{ page.front_matter.get("inquiry_button", "Request this") }}</button>
     </form>
     {% endif %}
   </section>
