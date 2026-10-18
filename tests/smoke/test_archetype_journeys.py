@@ -386,6 +386,38 @@ def test_application_edit_and_fact_sheet_render_the_technical_profile_fields(pag
         "the fact sheet's Deployment panel did not show the value just saved on the edit form"
 
 
+def test_model_history_pages_show_recorded_changes_and_the_model_as_of_a_date(page, live_server, seeded):
+    """Both history pages loaded their data from an API that wraps its answer,
+    read the unwrapped field, and so always said nothing was recorded even
+    when versions existed. Record a version, open the real pages, and see it."""
+    import uuid
+    from datetime import datetime, timedelta
+
+    from app import create_app, db
+    from app.models.entity_history import EntityHistory
+
+    name = "History smoke element %s" % uuid.uuid4().hex[:6]
+    record_id = 900000 + int(uuid.uuid4().int % 90000)
+    now = datetime.utcnow()
+    app = create_app("testing")
+    with app.app_context():
+        db.session.add(EntityHistory(
+            organization_id=seeded["ids"]["org"], table_name="archimate_elements", record_id=record_id,
+            snapshot={"id": record_id, "name": name, "type": "ApplicationComponent",
+                      "layer": "application", "organization_id": seeded["ids"]["org"]},
+            valid_from=now - timedelta(days=2), recorded_at=now - timedelta(days=2), source="trigger"))
+        db.session.commit()
+
+    _login(page, live_server, seeded["emails"]["enterprise_architect"])
+    _visit(page, live_server, "/intelligence/history/changes")
+    page.get_by_role("button", name="Show changes").click()
+    page.get_by_text("#%d" % record_id).first.wait_for(timeout=PAGE_TIMEOUT)
+
+    _visit(page, live_server, "/intelligence/history/as-of")
+    page.get_by_role("button", name="Show model").click()
+    page.get_by_text(name).first.wait_for(timeout=PAGE_TIMEOUT)
+
+
 def test_application_manager_maintains_an_owned_application(page, live_server, seeded):
     """Set health on an owned application and see it reach the health overview."""
     _login(page, live_server, seeded["emails"]["application_manager"])
