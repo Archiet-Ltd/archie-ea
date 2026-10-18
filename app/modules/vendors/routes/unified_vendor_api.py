@@ -19,6 +19,7 @@ from app.utils.api_helpers import api_error
 from app.utils.validators import validate_string
 
 from app.decorators import audit_log, require_roles
+from app.middleware.tenant_decorators import platform_admin_required
 from app.services.rate_limiter import rate_limit
 from app.extensions import db
 from app.models.vendor_organization import VendorOrganization, VendorProduct
@@ -146,8 +147,17 @@ def list_vendors():
 
 @unified_vendors_api_bp.route("/bulk", methods=["DELETE"])
 @login_required
+@platform_admin_required
 def bulk_delete_vendors():
-    """Bulk delete vendors by IDs."""
+    """Bulk delete vendors by IDs.
+
+    Platform-admin-only (found while fixing the vendor-catalogue findings in
+    the refuter review of PR 428 -- not itself one of the named findings,
+    but the same shared, platform-wide ``VendorOrganization`` catalogue and
+    strictly worse: this route had no role or admin check of any kind, only
+    ``login_required``, so any authenticated user on the platform, admin or
+    not, could bulk-delete vendors any other tenant relies on.
+    """
     data = request.get_json() or {}
     ids = data.get("ids", [])
     if not ids:
@@ -243,10 +253,20 @@ def search_vendors():
 @unified_vendors_api_bp.route("/", methods=["POST"])
 @login_required
 @require_roles("admin", "architect")
+@platform_admin_required
 @audit_log("vendor_create")
 @rate_limit(20, "1h")
 def create_vendor():
-    """Create new vendor organization with validation and duplicate prevention."""
+    """Create new vendor organization with validation and duplicate prevention.
+
+    Platform-admin-only (lead review of PR 430, D-2 follow-up): writes the
+    global, platform-wide ``VendorOrganization`` catalogue, not an
+    organisation-scoped resource. ``require_roles("admin", "architect")`` is
+    satisfied by any org's own admin/architect for their own brand-new,
+    self-registered organisation -- no invitation into anyone else's org
+    needed. ``require_roles`` is kept rather than removed;
+    ``platform_admin_required`` is the operative check.
+    """
     from datetime import datetime
     from sqlalchemy import func
 
@@ -329,10 +349,14 @@ def create_vendor():
 @unified_vendors_api_bp.route("/<int:vendor_id>", methods=["PUT", "PATCH"])
 @login_required
 @require_roles("admin", "architect")
+@platform_admin_required
 @audit_log("vendor_update")
 @rate_limit(30, "1h")
 def update_vendor(vendor_id):
-    """Update vendor organization with allowlist protection and audit logging. PROD-009"""
+    """Update vendor organization with allowlist protection and audit logging. PROD-009
+
+    Platform-admin-only -- see ``create_vendor``'s docstring above.
+    """
     from datetime import datetime
 
     data = request.get_json() or {}
@@ -412,10 +436,20 @@ def update_vendor(vendor_id):
 @unified_vendors_api_bp.route("/<int:vendor_id>", methods=["DELETE"])
 @login_required
 @require_roles("admin")
+@platform_admin_required
 @audit_log("vendor_delete")
 @rate_limit(10, "1h")
 def delete_vendor(vendor_id):
-    """Delete vendor organization."""
+    """Delete vendor organization.
+
+    Platform-admin-only (refuter review of PR 428, vendor-catalogue findings):
+    ``require_roles("admin")`` is satisfied by the Role named "Administrator"
+    that every self-registered organisation's own admin holds -- the same
+    global-flag problem as the rest of this review, applied to the shared,
+    platform-wide ``VendorOrganization`` catalogue. ``require_roles("admin")``
+    is kept rather than removed; ``platform_admin_required`` is the operative
+    check.
+    """
     vendor = VendorOrganization.query.get_or_404(vendor_id)
 
     vendor_name = vendor.name
