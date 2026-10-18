@@ -92,7 +92,7 @@ jobs:
   # ---------------------------------------------------------------------------
   changes:
     name: Detect changed paths
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","ibm-vsi"]') || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     outputs:
       is_content_only: ${{ steps.detect.outputs.is_content_only }}
@@ -249,7 +249,7 @@ jobs:
 
   secret-scan:
     name: Secret scan (gitleaks)
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","ibm-vsi"]') || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     steps:
       - uses: actions/checkout@v5
@@ -281,7 +281,7 @@ jobs:
   # on success(), so an unknown/skipped state still runs the tests.
   fast_gate:
     name: Fast static checks (compile + lint)
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","ibm-vsi"]') || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     steps:
       - uses: actions/checkout@v5
@@ -312,7 +312,7 @@ jobs:
 
   static-gates:
     name: Static gates (compile + ratchets)
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","ibm-vsi"]') || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     # The static tag includes route/navigation and CSRF coverage, which import
     # the real app, plus the reproducible CSS build. Install the application
@@ -344,7 +344,7 @@ jobs:
 
   boot-health:
     name: Boot health (no database)
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","ibm-vsi"]') || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     # Catches the class of failure nothing else here can see: a blueprint that
     # silently fails to register, or a url_for() endpoint that no longer resolves
@@ -1012,7 +1012,7 @@ jobs:
   # continue-on-error and `|| true`, so it could not fail.
   db-gates:
     name: Database gates (schema drift)
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","ibm-vsi"]') || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     services:
       postgres:
@@ -1082,7 +1082,7 @@ jobs:
 
   security-sast:
     name: SAST (bandit)
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","ibm-vsi"]') || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     steps:
       - uses: actions/checkout@v5
@@ -1579,7 +1579,7 @@ jobs:
 
   dependency-audit:
     name: Dependency CVEs (pip-audit)
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","ibm-vsi"]') || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     # A ratchet against scripts/ci/dependency_baseline.json: the count may fall,
     # never rise. The baseline is accepted risk, not proof of safety - every entry
