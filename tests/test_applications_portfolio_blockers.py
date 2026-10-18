@@ -180,6 +180,8 @@ def test_vendor_create_modal_wiring_is_consistent():
 
 def test_vendor_management_create_persists(app, db_session, make_org, client, login_as):
     org, user = _admin_user(db_session, make_org)
+    # The vendor catalogue is platform-wide: only a platform administrator creates vendors.
+    user.is_platform_admin = True
     db_session.commit()
     login_as(client, user)
 

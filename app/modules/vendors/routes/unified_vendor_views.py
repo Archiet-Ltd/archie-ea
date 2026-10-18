@@ -27,6 +27,7 @@ from app.extensions import db
 from app.modules.vendors.services.vendor_onboarding_service import (
     VendorOnboardingService,
 )
+from app.middleware.tenant_decorators import platform_admin_required
 
 
 def _get_vendor_list_context():
@@ -366,6 +367,7 @@ def vendor_catalog():
 @unified_vendors_bp.route("/create", methods=["GET", "POST"])
 @login_required
 @require_roles("admin", "architect")
+@platform_admin_required
 def create_vendor():
     """Create new vendor - renders simple create form."""
     return render_template(
@@ -384,6 +386,7 @@ def vendor_detail(vendor_id):
 @login_required
 @require_roles("admin", "architect")
 @audit_log("vendor_edit")
+@platform_admin_required
 def edit_vendor(vendor_id):
     """Edit vendor organization - real implementation."""
     from app.modules.vendors.forms import CreateVendorForm
@@ -436,6 +439,7 @@ def edit_vendor(vendor_id):
 @login_required
 @require_roles("admin", "architect")
 @audit_log("vendor_activate")
+@platform_admin_required
 def activate_vendor(vendor_id):
     """Activate a vendor from catalog to contracted status."""
     try:
@@ -485,6 +489,7 @@ def activate_vendor(vendor_id):
 @login_required
 @require_roles("admin", "architect")
 @audit_log("vendor_product_deploy")
+@platform_admin_required
 def deploy_vendor_product(vendor_id, product_id):
     """Deploy a vendor product as an application (canonical flask-base-master flow)."""
     try:
@@ -553,6 +558,7 @@ def vendor_deployment_portfolio(vendor_id):
 @login_required
 @require_roles("admin")
 @audit_log("vendor_delete")
+@platform_admin_required
 def delete_vendor(vendor_id):
     """Delete vendor - directly deletes and shows success message."""
     vendor = VendorOrganization.query.get_or_404(vendor_id)
@@ -579,6 +585,7 @@ def delete_vendor(vendor_id):
 @login_required
 @require_roles("admin")
 @audit_log("vendor_import")
+@platform_admin_required
 def import_vendors():
     """
     Bulk import vendors from CSV/Excel.
