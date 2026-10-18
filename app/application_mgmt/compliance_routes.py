@@ -1,10 +1,11 @@
 """API routes for compliance framework management."""
 
-from flask import current_app, jsonify, render_template, request
+from flask import current_app, g, jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from app import db
 from app.application_mgmt import application_mgmt
+from app.application_mgmt.framework_catalogue_routes import may_adopt_frameworks, organisation_adoptions
 from app.decorators import require_roles
 from app.models.application_compliance import ApplicationComplianceControl
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
@@ -50,6 +51,21 @@ def compliance_frameworks_dashboard():
 
     total_controls = ComplianceControl.query.filter_by(is_active=True).count()
 
+    # Which frameworks this organisation has adopted, and how many controls it
+    # copied (the same query the adoptions endpoint answers from).
+    org_id = getattr(g, "current_org_id", None)
+    adopted = {}
+    adoption_error = False
+    if org_id is not None:
+        try:
+            adopted = {
+                a.framework_id: a.adopted_controls.count()
+                for a in organisation_adoptions(org_id)
+            }
+        except Exception:
+            current_app.logger.exception("Could not load framework adoptions")
+            adoption_error = True
+
     # Org-scoped mapping coverage (TenantMixin auto-filters inside the request).
     mappings = ApplicationComplianceControl.query.all()
     mapped_by_status = {}
@@ -65,6 +81,9 @@ def compliance_frameworks_dashboard():
         total_mappings=len(mappings),
         mapped_by_status=mapped_by_status,
         load_error=False,
+        adopted=adopted,
+        adoption_error=adoption_error,
+        can_adopt=may_adopt_frameworks(),
     )
 
 

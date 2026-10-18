@@ -17,10 +17,33 @@ from app.modules.compliance.services.applicability_service import ApplicabilityS
 
 # ── Framework adoption ────────────────────────────────────────────────
 
+# The roles that may adopt a framework. One list: the adopt endpoint below is
+# guarded by it and the compliance dashboard shows the Adopt action by it.
+ADOPT_ROLES = ("admin", "architect", "business_architect", "security_architect")
+
+
+def organisation_adoptions(org_id):
+    """The active framework adoptions of one organisation: the one query behind
+    the adoptions endpoint and the compliance dashboard."""
+    return FrameworkAdoption.query.filter_by(organization_id=org_id, status="active").all()
+
+
+def may_adopt_frameworks():
+    """True when the signed-in user holds a role the adopt endpoint accepts.
+
+    Asks the same ``require_roles`` guard the endpoint uses, so the screen and
+    the endpoint cannot disagree about who may adopt."""
+    from werkzeug.exceptions import HTTPException
+
+    try:
+        return bool(require_roles(*ADOPT_ROLES)(lambda: True)())
+    except HTTPException:
+        return False
+
 
 @application_mgmt.route("/api/compliance/frameworks/<int:framework_id>/adopt", methods=["POST"])
 @login_required
-@require_roles("admin", "architect", "business_architect", "security_architect")
+@require_roles(*ADOPT_ROLES)
 def adopt_framework(framework_id):
     """Adopt a framework for the current organisation, copying its controls."""
     org_id = getattr(g, "current_org_id", None)
@@ -55,9 +78,7 @@ def list_adoptions():
     if org_id is None:
         return jsonify({"adoptions": []})
 
-    adoptions = FrameworkAdoption.query.filter_by(
-        organization_id=org_id, status="active"
-    ).all()
+    adoptions = organisation_adoptions(org_id)
 
     return jsonify({
         "adoptions": [
