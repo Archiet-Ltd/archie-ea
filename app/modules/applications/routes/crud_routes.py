@@ -64,7 +64,7 @@ from app.utils.validators import (
 )
 
 from app.schemas.api_schemas import ApplicationCreateSchema, _load_and_validate
-from app.services.application_cost_accessor import apply_cost_to_application
+from app.services.application_cost_accessor import apply_cost_to_application, get_annual_cost
 from app.utils.duplicate_guard import (
     allow_duplicate_requested,
     duplicate_conflict_response,
@@ -822,6 +822,7 @@ def application_edit(id):
                     "applications/edit.html", application=app,
                     lifecycle_stage_choices=APPLICATION_LIFECYCLE_STAGES,
                     lifecycle_stage_choices_lower=[v.lower() for v in APPLICATION_LIFECYCLE_STAGES],
+                    annual_cost=get_annual_cost(app),
                 ), 400
 
             # Capture additional fields if submitted (API calls, expanded forms)
@@ -829,6 +830,7 @@ def application_edit(id):
                 "architecture_style",
                 "deployment_model",
                 "business_domain",
+                "vendor_name",
                 "application_category",
                 "programming_languages",
                 "frameworks",
@@ -928,6 +930,7 @@ def application_edit(id):
             lifecycle_stage_choices=APPLICATION_LIFECYCLE_STAGES,
             lifecycle_stage_choices_lower=[v.lower() for v in APPLICATION_LIFECYCLE_STAGES],
             application_owners=application_owners,
+            annual_cost=get_annual_cost(app),
         )
 
     except HTTPException:

@@ -40,6 +40,7 @@ from app import db
 from app.models.application_portfolio import ApplicationComponent
 from app.models.audit_log import AuditLog
 from app.services.ai_import_service import get_ai_import_service
+from app.services.application_cost_accessor import apply_imported_row_costs
 from app.utils.file_validation import (
     InvalidFileTypeError,
     get_allowed_extensions_display,
@@ -1342,6 +1343,9 @@ def application_import():
                     _set_if_present(existing_app, "description", _clean(
                         get_csv_field(row, "Description", "App Description")
                     ))
+                    _set_if_present(existing_app, "vendor_name", _clean(
+                        get_csv_field(row, "Vendor", "Vendor Name", "Package Vendor", "vendor_name")
+                    ))
                     _set_if_present(existing_app, "lifecycle_status", _clean(
                         get_csv_field(
                             row, "Lifecycle Status", "lifecycle_status", "Lifecycle"
@@ -1385,6 +1389,7 @@ def application_import():
                             "Process Codes",
                         )
                     ))
+                    apply_imported_row_costs(existing_app, row)
                     updated += 1
                     processed_names.add(name_lower)  # Track that we've seen this name
                 else:
@@ -1432,6 +1437,9 @@ def application_import():
                             get_csv_field(
                                 row, "Business Domain", "business_domain", "Domain"
                             )
+                        ),
+                        vendor_name=_clean(
+                            get_csv_field(row, "Vendor", "Vendor Name", "Package Vendor", "vendor_name")
                         ),
                         business_owner=_clean(
                             get_csv_field(
@@ -1515,6 +1523,7 @@ def application_import():
                         ),
                     )
                     db.session.add(app)
+                    apply_imported_row_costs(app, row)
                     count += 1
                     processed_names.add(name_lower)  # Track that we've seen this name
 
@@ -1814,9 +1823,13 @@ def application_import():
                     _set_if_present(existing_app, "application_functions_text", _clean(
                         item.get("application_functions_text")
                     ))
+                    _set_if_present(existing_app, "vendor_name", _clean(
+                        item.get("vendor_name") or item.get("vendor")
+                    ))
                     _set_if_present(existing_app, "imported_apqc_codes", _clean(
                         item.get("imported_apqc_codes")
                     ))
+                    apply_imported_row_costs(existing_app, item)
                     updated += 1
                     processed_names.add(name_lower)  # Track that we've seen this name
                 else:
@@ -1841,8 +1854,10 @@ def application_import():
                             item.get("application_functions_text")
                         ),
                         imported_apqc_codes=_clean(item.get("imported_apqc_codes")),
+                        vendor_name=_clean(item.get("vendor_name") or item.get("vendor")),
                     )
                     db.session.add(app)
+                    apply_imported_row_costs(app, item)
                     count += 1
                     processed_names.add(name_lower)  # Track that we've seen this name
 
@@ -2238,6 +2253,7 @@ def application_import():
                     _set_if_present(existing_app, "rto_hours", _parse_user_count(
                         get_field("RTO", "rto_hours")
                     ))
+                    apply_imported_row_costs(existing_app, row_dict)
                     updated += 1
                     processed_names.add(name_lower)
                 else:
@@ -2291,6 +2307,7 @@ def application_import():
                         rto_hours=_parse_user_count(get_field("RTO", "rto_hours")),
                     )
                     db.session.add(app)
+                    apply_imported_row_costs(app, row_dict)
                     count += 1
                     processed_names.add(name_lower)
 

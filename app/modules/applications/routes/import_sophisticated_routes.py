@@ -16,6 +16,7 @@ from app import db
 from app.decorators import audit_log
 from app.models.application_portfolio import ApplicationComponent
 from app.models.import_audit import ImportAuditService, ImportSessionLog
+from app.services.application_cost_accessor import sync_cost_columns
 from app.services.unified_import.duplicate_detector import DuplicateDetector
 
 from . import unified_applications_bp
@@ -1174,6 +1175,7 @@ def upload_excel_applications():
                             if old_val != val:
                                 changed_fields[key] = {"old": str(old_val) if old_val else None, "new": str(val)}
                                 setattr(existing_app, key, val)
+                        sync_cost_columns(existing_app, changed_fields)
                         if changed_fields:
                             current_app.logger.debug(
                                 "Import merge updated %s: %s",
@@ -1187,11 +1189,13 @@ def upload_excel_applications():
                     else:  # duplicate mode
                         new_app = ApplicationComponent(**app_data)
                         db.session.add(new_app)
+                        sync_cost_columns(new_app, app_data)
                         audit_changes.append({"app_name": name, "action": "created"})
                         records_created += 1
                 else:
                     new_app = ApplicationComponent(**app_data)
                     db.session.add(new_app)
+                    sync_cost_columns(new_app, app_data)
                     audit_changes.append({"app_name": name, "action": "created"})
                     records_created += 1
 
