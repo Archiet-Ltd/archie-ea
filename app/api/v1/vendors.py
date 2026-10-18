@@ -10,6 +10,7 @@ from flask import Blueprint, request
 from flask_login import login_required
 
 from app.decorators import audit_log
+from app.middleware.tenant_decorators import platform_admin_required
 from sqlalchemy import or_
 
 from app import db
@@ -197,10 +198,16 @@ def get_vendor(vendor_id):
 
 @vendors_bp.route("/", methods=["POST"])
 @login_required
+@platform_admin_required
 @audit_log("api_vendor_create")
 def create_vendor():
     """
     Create a new vendor
+
+    Platform-admin-only (lead review of PR 430, item 1, CRITICAL): writes
+    the global, platform-wide ``VendorOrganization`` catalogue and was
+    ``login_required`` only -- any signed-in user, not even an org admin,
+    could create a vendor.
     ---
     tags:
       - Vendors
@@ -322,10 +329,13 @@ def create_vendor():
 
 @vendors_bp.route("/<int:vendor_id>", methods=["PUT"])
 @login_required
+@platform_admin_required
 @audit_log("api_vendor_update")
 def update_vendor(vendor_id):
     """
     Update an existing vendor
+
+    Platform-admin-only -- see ``create_vendor``'s docstring above.
     ---
     tags:
       - Vendors
@@ -438,10 +448,17 @@ def update_vendor(vendor_id):
 
 @vendors_bp.route("/<int:vendor_id>", methods=["DELETE"])
 @login_required
+@platform_admin_required
 @audit_log("api_vendor_delete")
 def delete_vendor(vendor_id):
     """
     Delete a vendor
+
+    Platform-admin-only -- see ``create_vendor``'s docstring above. This
+    route also bulk-deletes via ``Query.filter_by(...).delete()``, which
+    bypasses the ORM session (and therefore the before_flush platform-write
+    guard) entirely -- this decorator is the only defence for this specific
+    delete call, not the guard.
     ---
     tags:
       - Vendors
