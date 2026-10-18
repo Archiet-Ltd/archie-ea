@@ -44,7 +44,7 @@ publishes its own [plans and pricing](/pricing) directly.
 |---|---|---|
 | Vendor | BOC Group | Archiet Ltd |
 | Licence | Free Community Edition; proprietary paid Enterprise Edition | Open source, AGPL, plus a commercial licence |
-| AI / natural-language questions | Via external AI tools (ChatGPT, Copilot) connected through MCP, per BOC's own marketing | Entelim's own built-in AI Chat, no external AI tool or MCP connector required |
+| AI / natural-language questions | Via external AI tools (ChatGPT, Copilot) connected through MCP, per BOC's own marketing | Entelim's own AI Chat answers inside Entelim, and an outside assistant can also be connected to read the model, read-only |
 | Self-hostable | Not stated for the paid Enterprise Edition on the pages reviewed | Yes |
 | Pricing | Community Edition free; Enterprise Edition price varies by users and modules, annual billing, per Gartner Peer Insights — no fixed figure published | Published on the [pricing page](/pricing); free to self-host under AGPL |
 
@@ -78,7 +78,7 @@ BOC offers a free ADOIT:Community Edition and paid multi-user Enterprise Edition
 
 ### What would we give up by leaving BOC Group ADOIT?
 
-You would give up BOC's marketed route to ask ChatGPT, Copilot or another AI tool about your architecture with answers pulled from ADOIT. Entelim's AI Chat works inside Entelim, and connecting an outside assistant to your model is not something you can do today. There is no one-click transfer, since Entelim imports files.
+You would give up BOC's marketed route to ask ChatGPT, Copilot or another AI tool about your architecture with answers pulled from ADOIT. Entelim's AI Chat works inside Entelim, and an outside assistant can also be connected to read your model, read-only. There is no one-click transfer, since Entelim imports files.
 
 ### What would we gain by moving from BOC Group ADOIT to Entelim?
 
