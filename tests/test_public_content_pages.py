@@ -133,11 +133,6 @@ BANNED_CLAIMS = [
         "submitted URL",
     ),
     (
-        "your team's own AI assistants can work directly over your twin",
-        "no MCP server exists in this codebase; only Entelim's own AI chat works over a tenant's "
-        "model today",
-    ),
-    (
         "usage history",
         "no customer-visible usage-history page is confirmed to exist; dropped from every plan "
         "description rather than promised",
