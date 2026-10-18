@@ -250,6 +250,16 @@ def _is_connector_tool(schema: dict) -> bool:
     )
 
 
+def _title_from_name(name: str) -> str:
+    """Convert a tool name to a plain English title."""
+    if name.startswith("ask_"):
+        return "Ask " + name[4:].replace("_", " ")
+    # For non-ask tools: replace underscores with spaces and capitalise first letter
+    spaced = name.replace("_", " ")
+    # Capitalise the first letter of the entire string
+    return spaced[0].upper() + spaced[1:] if spaced else spaced
+
+
 def connector_tools() -> list[dict]:
     """The tools the connector publishes, in its wire format, sorted by name.
 
@@ -260,11 +270,15 @@ def connector_tools() -> list[dict]:
     tools = []
     for schema in TOOL_SCHEMAS:
         if _is_connector_tool(schema):
+            title = schema.get("title")
+            if title is None:
+                title = _title_from_name(schema["name"])
             tools.append({
                 "name": schema["name"],
                 "description": schema["description"],
                 "inputSchema": schema["parameters"],
                 "annotations": {"readOnlyHint": True},
+                "title": title,
             })
     for alias, target in CONNECTOR_ALIASES.items():
         for tool in list(tools):
