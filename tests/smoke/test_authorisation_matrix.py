@@ -1556,3 +1556,33 @@ def test_approval_impact_route_authorisation(archetype, page, live_server, seede
         assert response.json()["impact"]["state"] == "not_in_model"
     else:
         assert response.status == 403, "%s reached the impact route (%s)" % (archetype, response.status)
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_ai_chat_entity_matching_write_permission(archetype, page, live_server, seeded):
+    """POST /ai-chat/entity-matching carries @login_required and no enterprise-
+    role gate, but the chat writes it can reach (linking a capability to a
+    solution) are refused to a user without write access. Every canonical
+    archetype holds a write-capable role, so none is refused (403); the
+    read-only Viewer refusal, with its audit row, is pinned in
+    tests/test_ai_chat_write_gate.py."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.post(
+        live_server + "/ai-chat/entity-matching",
+        data={"document_text": "Attach the Customer Management capability to a solution."},
+        headers={"X-CSRFToken": _csrf_token(page)},
+        max_redirects=0,
+    )
+    assert response.status not in (401, 403), (
+        "%s was refused on /ai-chat/entity-matching (got %s) despite holding write access"
+        % (archetype, response.status)
+    )
+
+
+def test_ai_chat_entity_matching_rejects_anonymous(page, live_server):
+    response = page.request.post(
+        live_server + "/ai-chat/entity-matching",
+        data={"document_text": "x"},
+        max_redirects=0,
+    )
+    assert response.status in (302, 401)
