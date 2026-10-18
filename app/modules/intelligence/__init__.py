@@ -40,6 +40,7 @@ def register(app) -> None:
         # The answer routes attach to both blueprints, so they are imported
         # before either is registered (a route added afterwards would be lost).
         from app.modules.intelligence.routes import answer_routes  # noqa: F401
+        from app.modules.intelligence.routes import scenario_routes  # noqa: F401
 
         app.register_blueprint(intelligence_api)
     except Exception:

@@ -267,6 +267,14 @@ GAP_WORK_PACKAGE_LINK_POST_POLICY = {
 for _allowed in GAP_WORK_PACKAGE_LINK_POST_POLICY.values():
     _allowed.add("platform_admin")
 
+# Scenario branches: every write needs the general permission, which every
+# seeded archetype holds; the id 0 used here names no branch, so a persona that
+# reaches the handler is answered 404 (a read-only Viewer is refused with 403
+# before it, pinned with a real Viewer account in the intelligence tests).
+SCENARIO_POST_POLICY = {
+    "/api/v1/intelligence/scenarios/0/changes": set(ARCHETYPES),
+}
+
 OVERSIGHT_POST_POLICY = {
     "/ai-chat/oversight/pause":  set(),
     "/ai-chat/oversight/resume": set(),
@@ -861,6 +869,32 @@ def test_gap_work_package_link_post_authorisation(
     )
     if actual == ALLOWED:
         assert response.status == 404, (archetype, path, response.status)
+
+
+@pytest.mark.parametrize("path,allowed", SCENARIO_POST_POLICY.items())
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_scenario_post_authorisation(archetype, path, allowed, page, live_server, seeded):
+    """A persona that may write reaches the handler (404 for a branch that does
+    not exist); anyone else is refused before it."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.post(live_server + path, form={"csrf_token": csrf}, max_redirects=0)
+    expected = ALLOWED if archetype in allowed else DENIED
+    actual = DENIED if response.status in (401, 403) else ALLOWED
+    assert actual == expected, (
+        "%s reached %s: expected %s, got %s" % (archetype, path, expected, response.status)
+    )
+    if actual == ALLOWED:
+        assert response.status == 404, (archetype, path, response.status)
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_scenario_list_route_authorisation(archetype, page, live_server, seeded):
+    """GET /api/v1/intelligence/scenarios carries only ``@login_required``."""
+    _login(page, live_server, seeded["emails"][archetype])
+    path = "/api/v1/intelligence/scenarios"
+    assert _observe(page, live_server, path) == ALLOWED, f"{archetype} could not reach {path}"
 
 
 @pytest.mark.parametrize("path,allowed", OVERSIGHT_POST_POLICY.items())

@@ -271,6 +271,9 @@ else:
     # Implementation Planning Models - Roadmap and plateau management
     from .implementation_planning import *  # noqa - ImplementationPlateau, RoadmapDeliverable, RoadmapGap, Resource, RoadmapScenario, RoadmapAudit
 
+    # Scenario branches - what-if changes laid over the base model
+    from .scenario import ScenarioBranch, ScenarioChange  # noqa: F401
+
     # Import Session Models - Transactional staging with checkpointing
     from .import_session import *  # noqa - ImportSession, StagingElement, ImportCheckpoint
     from .jira_sync_tracking import *  # noqa - JiraSyncTracking, PushStatus (Jira push integration)

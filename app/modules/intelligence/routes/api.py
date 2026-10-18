@@ -445,9 +445,37 @@ def cross_layer_impact(element_id: int):
             status_code=400,
         )
 
+    scenario_id = None
+    scenario_raw = request.args.get("scenario_id")
+    if scenario_raw is not None:
+        try:
+            scenario_id = int(scenario_raw)
+        except (TypeError, ValueError):
+            return error_response(
+                "scenario_id must be an integer",
+                code="INVALID_PARAMETER",
+                status_code=400,
+            )
+        from app.modules.intelligence.services.scenario_service import overlay_for
+
+        if overlay_for(organization_id, scenario_id) is None:
+            return error_response(
+                "Scenario not found",
+                code="NOT_FOUND",
+                details={"reason": validate_reason_code("scenario_not_found")},
+                status_code=404,
+            )
+
     from app.models import ArchiMateElement
 
-    element = ArchiMateElement.query.filter_by(id=element_id).first()
+    # Under a scenario the element may exist only on the branch, or be removed
+    # by it; the query service answers both honestly, so the base lookup is
+    # left to it.
+    element = (
+        True
+        if scenario_id is not None
+        else ArchiMateElement.query.filter_by(id=element_id).first()
+    )
     if element is None:
         # Same call site, same status/code/message for "does not exist" and
         # "belongs to another tenant" -- the tenant-isolation listener has
@@ -474,6 +502,7 @@ def cross_layer_impact(element_id: int):
         with_owner=with_owner,
         cursor=cursor,
         page_size=page_size,
+        scenario_id=scenario_id,
     )
 
     if result.get("rows") is None:
