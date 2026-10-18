@@ -574,24 +574,27 @@ def test_no_hard_coded_colour_values_and_no_per_domain_palette():
         assert not re.search(r"#[0-9a-fA-F]{3,8}\b", re.sub(r"&#\d+;", "", source)), name
         assert not re.search(r"\.domain-[a-z]+", source), name
         assert not re.search(r"\brgba?\(|\bhsla?\(\s*\d", source), name
-    graph = _scripts()["graph.js"]
-    for layer in ("motivation", "strategy", "business", "application", "technology", "implementation"):
-        assert f"layer-{layer}" in graph
-    assert "layer-risk" not in graph
+    # The drawing engine reads the --layer-* tokens at draw time; the page only asks for it.
+    twin = _code(_scripts()["twin_map.js"])
+    assert "tokens: true" in twin and "nodeStyle: 'compact'" in twin and "layout: 'bands'" in twin
+    overlay = _code(_scripts()["node_overlay.js"])
+    assert "layer-" not in overlay and "style.background" not in overlay and "style.color" not in overlay
 
 
 def test_derived_edges_are_dashed_and_badged_and_explicit_edges_are_solid():
-    graph = _scripts()["graph.js"]
-    assert "var DASH = '5,5'" in graph
-    assert re.search(r"stroke-dasharray.*d\.edge\.kind === 'derived' \? DASH : null", graph)
-    assert "Intelligence.WORKED_OUT" in graph
+    # The page tells the engine which connections were worked out; the engine draws the
+    # dash and the written badge (asserted on the rendered page in the browser tests).
+    twin = _code(_scripts()["twin_map.js"])
+    assert "provenance: edge.kind === 'derived' ? 'derived' : 'recorded'" in twin
+    assert "stale: edge.stale === true" in twin
     assert "var WORKED_OUT = 'Worked out';" in _code(_scripts()["core.js"])
 
 
 def test_the_map_text_is_written_with_text_never_html():
-    graph = _scripts()["graph.js"]
-    assert ".html(" not in graph
-    assert "innerHTML" not in graph
+    overlay = _scripts()["node_overlay.js"]
+    assert ".html(" not in overlay
+    assert "innerHTML" not in overlay
+    assert "textContent" in overlay
     for name, source in _scripts().items():
         assert "innerHTML" not in source and "insertAdjacentHTML" not in source, name
 
@@ -763,8 +766,8 @@ def test_the_row_kind_in_the_drawer_title_is_true_of_the_row_and_adds_no_badge_k
 
 
 def test_the_map_badge_and_table_say_when_a_worked_out_connection_may_be_out_of_date():
-    graph = _code(_scripts()["graph.js"])
-    assert "WORKED_OUT_STALE" in graph and "GLYPH_CLOCK" in graph
+    twin = _code(_scripts()["twin_map.js"])
+    assert "stale: edge.stale === true" in twin
     core = _code(_scripts()["core.js"])
     assert "var WORKED_OUT_STALE = 'Worked out, may be out of date';" in core
     table = _templates()["_map_table.html"]

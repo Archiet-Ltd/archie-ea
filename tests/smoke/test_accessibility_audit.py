@@ -385,7 +385,7 @@ def _reach_intelligence_state(page, base, graph, kind):
         page.goto(base + "/intelligence/twin-map?element=%s" % graph["service"],
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         _wait_for_component(page, "twinMapSurface")
-        page.wait_for_selector("svg .intel-edge", state="attached")
+        page.wait_for_selector("svg [data-edge]", state="attached")
         page.wait_for_selector("[data-graph-nodes] button", state="visible")
         opener = page.locator("[data-map-row][data-kind=derived]").get_by_role("button", name="Why?")
     if kind.endswith("-drawer"):
