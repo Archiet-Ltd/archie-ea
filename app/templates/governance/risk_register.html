@@ -63,8 +63,46 @@
         </div>
     </div>
 
+    {# Ranked list: exposure comes from the one impact answer, see risk_service.ranked_risks. #}
+    {% if ranked is defined and ranked %}
+    <div class="rounded-lg border border-border bg-card p-4" id="ranked-risks">
+        <h2 class="text-sm font-semibold text-foreground">Top risks ({{ ranked.total }})</h2>
+        <p class="text-xs text-muted-foreground mt-0.5 mb-3" id="ranked-risks-rule">{{ ranked.rule }}</p>
+        {% if ranked.rows %}
+        <ol class="divide-y divide-border">
+            {% for r in ranked.rows %}
+            <li class="py-3 flex gap-3" data-risk-row="{{ r.risk_id }}">
+                <span class="text-lg font-semibold tabular-nums text-foreground w-8 shrink-0">{{ r.rank }}</span>
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <a href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" class="text-sm font-medium text-foreground hover:underline">{{ r.title }}</a>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground capitalize">{{ r.status }}</span>
+                        <span class="text-xs text-muted-foreground">Reaches <span class="tabular-nums">{{ r.exposure if r.exposure is not none else '—' }}</span></span>
+                    </div>
+                    <p class="text-xs text-muted-foreground mt-0.5" data-risk-reason>{{ r.reason }}</p>
+                    {% if r.touches %}
+                    <p class="text-xs text-muted-foreground mt-1">Touches:
+                        {% for t in r.touches %}
+                        {% if t.kind == 'application' and 'unified_applications.application_fact_sheet' in flask.current_app.view_functions %}
+                        <a href="{{ url_for('unified_applications.application_fact_sheet', id=t.id) }}" class="text-primary hover:underline">{{ t.name }}</a>{{ ',' if not loop.last }}
+                        {% elif 'archimate.element_impact_graph_page' in flask.current_app.view_functions %}
+                        <a href="{{ url_for('archimate.element_impact_graph_page', element_id=t.element_id) }}" class="text-primary hover:underline">{{ t.name }}</a>{{ ',' if not loop.last }}
+                        {% else %}{{ t.name }}{{ ',' if not loop.last }}{% endif %}
+                        {% endfor %}
+                    </p>
+                    {% endif %}
+                </div>
+            </li>
+            {% endfor %}
+        </ol>
+        {% else %}
+        <p class="text-sm text-muted-foreground">No risks recorded yet.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <div class="rounded-lg border border-border bg-card p-4">
-        <h2 class="text-sm font-semibold text-foreground mb-3">Risks</h2>
+        <h2 class="text-sm font-semibold text-foreground mb-3">All risks</h2>
 
         {# Migrated onto the shared data_table component (components/data_table.html)
            instead of a hand-rolled <table> — it already had search, sort, a
@@ -421,9 +459,7 @@
                                         <span class="inline-flex items-center px-1.5 py-0 rounded text-2xs font-medium bg-muted text-muted-foreground capitalize mr-1.5" x-text="link.entity_type"></span>
                                         <span :class="link.entity_label ? 'text-foreground' : 'text-destructive-emphasis'" x-text="link.entity_label || ('Deleted ' + link.entity_type + ' (#' + link.entity_id + ')')"></span>
                                     </span>
-                                    <button type="button" @click="removeLink(link.id)" aria-label="Unmap" class="text-muted-foreground hover:text-destructive-emphasis shrink-0">
-                                        <i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                                    </button>
+                                    <button type="button" @click="removeLink(link.id)" aria-label="Unmap" class="text-xs text-muted-foreground hover:text-destructive-emphasis shrink-0">Unmap</button>
                                 </li>
                             </template>
                         </ul>
@@ -613,10 +649,25 @@ function riskRegister() {
                     self.linkSearch = '';
                     self.linkResults = [];
                     Platform.toast.success('Risk mapped to ' + (link.entity_label || entity.name) + '.');
+                    self.refreshRanked();
                 })
                 .catch(function (err) {
                     Platform.toast.error('Could not map this risk.');
                     throw err;
+                });
+        },
+
+        // The ranked card is drawn on the server: after a link is added or
+        // removed, fetch the page again and swap in the new card.
+        refreshRanked() {
+            Platform.fetch(window.location.pathname + window.location.search, { silent: true })
+                .then(function (html) {
+                    const fresh = new DOMParser().parseFromString(html, 'text/html').getElementById('ranked-risks');
+                    const current = document.getElementById('ranked-risks');
+                    if (fresh && current) { current.innerHTML = fresh.innerHTML; }
+                })
+                .catch(function () {
+                    Platform.toast.error('The ranked list could not be refreshed. Reload the page to see it.');
                 });
         },
 
@@ -631,6 +682,7 @@ function riskRegister() {
                     self.selectedRisk.entity_links = (self.selectedRisk.entity_links || [])
                         .filter(function (l) { return l.id !== linkId; });
                     Platform.toast.success('Link removed.');
+                    self.refreshRanked();
                 })
                 .catch(function (err) {
                     Platform.toast.error('Could not remove that link.');
