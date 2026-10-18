@@ -119,6 +119,27 @@ def twin_map():
     )
 
 
+@intelligence_ui.route("/recommendations", methods=["GET"])
+@login_required
+def recommendations_page():
+    """List what to do next, derived from the backlog and the model-health report.
+
+    Every item names the record it came from; nothing is generated or stored.
+    """
+    from app.modules.intelligence.services.recommendations import recommendations
+
+    org_id = getattr(g, "current_org_id", None)
+    if org_id is None:
+        from flask_login import current_user
+
+        org_id = getattr(current_user, "organization_id", None)
+    return render_template(
+        "intelligence/recommendations.html",
+        result=recommendations(org_id),
+        workspace_counts_available=_workspace_counts_available(),
+    )
+
+
 # The maturity threshold the value-streams-at-risk answer is asked for. The
 # page shell opens on the same bounds and default as the API route that answers
 # it; the browser then canonicalises the address bar to that same allowed
