@@ -596,6 +596,7 @@ def test_api_settings(settings_id):
 @admin_bp.route("/api-settings/env-keys", methods=["GET"])
 @login_required
 @admin_required
+@platform_admin_required
 def preview_env_keys():
     """Preview API keys found in environment variables but not yet in the database."""
     import os
@@ -683,6 +684,7 @@ def update_provider_model():
 @login_required
 @admin_required
 @audit_log("admin_api_keys_load_env")
+@platform_admin_required
 def load_env_keys():
     """Import selected API keys from environment variables into the database."""
     import os

@@ -103,6 +103,7 @@ _svc = AdminUserService
 @login_required
 @admin_required
 @timed_route
+@platform_admin_required
 def send_digest():
     """PLT-009/PLT-031: Manual trigger for weekly digest emails."""
     from flask import current_app
@@ -890,6 +891,7 @@ def test_api_settings(settings_id):
 @timed_route
 @login_required
 @admin_required
+@platform_admin_required
 def preview_env_keys():
     """Preview API keys found in environment variables but not yet in the database."""
     import os
@@ -981,6 +983,7 @@ def update_provider_model():
 @login_required
 @admin_required
 @audit_log("load_env_keys")
+@platform_admin_required
 def load_env_keys():
     """Import selected API keys from environment variables into the database."""
     import os
@@ -4713,6 +4716,7 @@ def export_portfolio_pptx():
 @login_required
 @admin_required
 @timed_route
+@platform_admin_required
 def ai_confidence_calibration():
     """AI confidence calibration dashboard — tracks whether AI confidence
     labels match actual architect acceptance rates."""
