@@ -242,6 +242,7 @@ jobs:
       - name: Upload the content test results
         if: ${{ always() }}
         uses: actions/upload-artifact@v6
+        continue-on-error: true
         with:
           name: content-tests-junit
           path: content-tests.xml
@@ -576,6 +577,7 @@ jobs:
       # its junit/coverage/route evidence, so the combine job can report which
       # tests failed rather than only "a shard's artifact never arrived".
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: tests-shard-${{ matrix.shard }}
@@ -745,6 +747,7 @@ jobs:
             exit "$status"
           fi
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: fast-tests-junit
@@ -879,6 +882,7 @@ jobs:
               handle.write("\n".join(lines) + "\n")
           PY
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: quarantine-tests-junit
@@ -988,6 +992,7 @@ jobs:
           print(f"line coverage: {rate:.2f}%  ({covered}/{valid} statements)")
           PY
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: coverage-xml
@@ -1064,6 +1069,7 @@ jobs:
           print(f"  with licence: {sum(1 for x in c if x.get('licenses'))}")
           PY
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: sbom-cyclonedx
@@ -1184,6 +1190,7 @@ jobs:
           -p scripts.ci.test_sharding
           --junitxml=tests/smoke/_artifacts/chromium-main-${{ matrix.shard }}.xml
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: smoke-junit-main-${{ matrix.shard }}
@@ -1192,6 +1199,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: smoke-main-${{ matrix.shard }}
@@ -1256,6 +1264,7 @@ jobs:
           -m adversarial --timeout=3600 -W ignore::DeprecationWarning
           --junitxml=tests/smoke/_artifacts/chromium-adversarial.xml
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: smoke-junit-adversarial
@@ -1264,6 +1273,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: smoke-adversarial
@@ -1343,6 +1353,7 @@ jobs:
           -m guide_history --timeout=900 -W ignore::DeprecationWarning
           --junitxml=tests/smoke/_artifacts/chromium-guide-history.xml
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: smoke-junit-other
@@ -1353,6 +1364,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: smoke-other
@@ -1407,6 +1419,7 @@ jobs:
       - name: Upload browser qualification evidence
         if: always()
         uses: actions/upload-artifact@v6
+        continue-on-error: true
         with:
           name: smoke-chromium-${{ github.sha }}
           path: |
@@ -1501,6 +1514,7 @@ jobs:
       - name: Upload compatibility evidence
         if: always()
         uses: actions/upload-artifact@v6
+        continue-on-error: true
         with:
           name: smoke-${{ matrix.browser }}-${{ github.sha }}
           path: |
@@ -1572,6 +1586,7 @@ jobs:
       - name: Upload the report
         if: always()
         uses: actions/upload-artifact@v6
+        continue-on-error: true
         with:
           name: walkthrough-report
           path: |
@@ -1710,6 +1725,7 @@ jobs:
           )
           PY
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         with:
           name: release-${{ github.sha }}
           path: release.json
@@ -1817,6 +1833,7 @@ jobs:
         if: ${{ steps.plan.outputs.mode == 'run' }}
         run: python scripts/ci/check_failing_first.py judge --plan failing-first-plan.json --junit failing-first.xml
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: ${{ always() && steps.plan.outputs.mode == 'run' }}
         with:
           name: failing-first-proof
