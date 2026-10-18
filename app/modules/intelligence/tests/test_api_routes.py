@@ -333,16 +333,18 @@ def test_expanded_chain_marks_an_unresolved_link_instead_of_dropping_it(
     assert "source_id" not in expanded[1]
 
 
-def test_module_registers_exactly_sixteen_routes(app):
+def test_module_registers_exactly_nineteen_routes(app):
     """The impact, risk, portfolio, programme, strategy, accountability,
     data, compliance, traceability, value-streams-at-risk, yield, catalogue
     list, catalogue run and ask routes all mount on this same existing
     blueprint rather than a new one each. Still exactly one blueprint, now
-    sixteen routes on it -- all six lenses of the catalogue, the L7 data
+    nineteen routes on it -- all six lenses of the catalogue, the L7 data
     lens, the L6 compliance lens, the traceability check over the impact
     walk, the Strategic value-streams-at-risk surface,
     recompute/derived/yield, and R1-B39's query catalogue (list + run) and
-    plain-language ask endpoints.
+    plain-language ask endpoints, and R1-B30's stored answers (ask, list and
+    open by address -- login_required, fenced to the caller's active
+    organisation, rows in the authorisation matrix).
     """
     rules = [
         rule for rule in app.url_map.iter_rules() if rule.endpoint.startswith("intelligence_api.")
@@ -365,6 +367,9 @@ def test_module_registers_exactly_sixteen_routes(app):
         "intelligence_api.query_catalogue_list",
         "intelligence_api.query_catalogue_run",
         "intelligence_api.ask_nl_question",
+        "intelligence_api.ask_answer",
+        "intelligence_api.list_answers",
+        "intelligence_api.get_answer",
     }
 
 
@@ -851,16 +856,14 @@ def test_accountability_endpoint_unknown_element_is_404(app, db_session, make_or
     assert resp.get_json()["error"]["details"]["reason"] == "element_not_found"
 
 
-def test_accountability_endpoint_returns_the_withdrawn_reason(
+def test_accountability_endpoint_returns_empty_owners_when_none_recorded(
     app, db_session, make_org, client, login_as
 ):
-    """The ownership read is withdrawn (a tenant-isolation gap found in
-    external review of the original PR, see
-    IntelligenceQueryService.accountability_for_element's docstring) --
-    every real element returns this honest reason, not owner data."""
+    """When no ApplicationOwner records exist, the endpoint returns empty
+    owners with no_ownership_records reason."""
     from app.models.application_portfolio import ApplicationComponent
 
-    org = make_org("accountability-route-withdrawn")
+    org = make_org("accountability-route-empty")
     user = _make_user(db_session, org)
     a = _make_element(db_session, org.id, "A")
     component = ApplicationComponent(name="A App", organization_id=org.id, archimate_element_id=a.id)
@@ -873,17 +876,14 @@ def test_accountability_endpoint_returns_the_withdrawn_reason(
     data = resp.get_json()["data"]
     assert data["owners"] == []
     assert data["capacity_not_available"] is True
-    assert "ownership_reader_not_built" in data["reasons"]
+    assert "no_ownership_records" in data["reasons"]
 
 
-def test_accountability_endpoint_never_returns_seeded_ownership_data(
+def test_accountability_endpoint_never_returns_application_ownership_data(
     app, db_session, make_org, client, login_as
 ):
-    """The regression guard that matters: a real, well-formed ownership
-    graph exists -- exactly the shape the original (unsafe) implementation
-    would have served over HTTP, including the cross-tenant-leakable
-    organization_unit fields -- and the endpoint must still return nothing
-    from it."""
+    """ApplicationOwnership (the old model) is not returned by the
+    accountability endpoint — only ApplicationOwner records are."""
     from app.models.application_portfolio import ApplicationComponent
     from app.models.enterprise_intelligence import ApplicationOwnership, OrganizationUnit
 
@@ -908,7 +908,7 @@ def test_accountability_endpoint_never_returns_seeded_ownership_data(
     assert resp.status_code == 200
     data = resp.get_json()["data"]
     assert data["owners"] == []
-    assert data["reasons"] == ["ownership_reader_not_built", "capacity_not_available"]
+    assert "no_ownership_records" in data["reasons"]
 
 
 def test_accountability_endpoint_cross_tenant_element_is_404_not_leak(

@@ -89,15 +89,19 @@ def test_register_mounts_exactly_the_api_and_ui_blueprints():
     # run and ask routes without updating this count. Corrected to the real
     # count (confirmed by running this test against the real app) rather
     # than only bumped for that brief's own addition.
-    assert len(bp.deferred_functions) == 16, (
-        "exactly sixteen routes: POST .../recompute, GET .../derived/<id>, "
+    # R1-B30 added the three stored-answer routes (POST and GET /answers, GET
+    # /answers/<address>): login_required, fenced to the caller's active
+    # organisation, with authorisation-matrix rows.
+    assert len(bp.deferred_functions) == 19, (
+        "exactly nineteen routes: POST .../recompute, GET .../derived/<id>, "
         "GET .../impact/<element_id>, GET .../risk/<element_id>, "
         "GET .../portfolio/<element_id>, GET .../programme/<element_id>, "
         "GET .../strategy/<element_id>, GET .../accountability/<element_id>, "
         "GET .../data/<element_id>, GET .../compliance/<element_id>, "
         "GET .../traceability/<element_id>, "
         "GET .../value-streams-at-risk, GET .../yield, "
-        "GET .../catalogue, GET .../catalogue/<entry_id>, POST .../ask"
+        "GET .../catalogue, GET .../catalogue/<entry_id>, POST .../ask, "
+        "POST .../answers, GET .../answers, GET .../answers/<address>"
     )
 
 

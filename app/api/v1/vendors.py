@@ -27,6 +27,7 @@ from app.utils.api_response import (
     validation_error_response,
 )
 from app.utils.pagination import safe_int_arg
+from app.middleware.tenant_decorators import platform_admin_required
 
 vendors_bp = Blueprint("vendors_v1", __name__)
 
@@ -198,6 +199,7 @@ def get_vendor(vendor_id):
 @vendors_bp.route("/", methods=["POST"])
 @login_required
 @audit_log("api_vendor_create")
+@platform_admin_required
 def create_vendor():
     """
     Create a new vendor
@@ -323,6 +325,7 @@ def create_vendor():
 @vendors_bp.route("/<int:vendor_id>", methods=["PUT"])
 @login_required
 @audit_log("api_vendor_update")
+@platform_admin_required
 def update_vendor(vendor_id):
     """
     Update an existing vendor
@@ -439,6 +442,7 @@ def update_vendor(vendor_id):
 @vendors_bp.route("/<int:vendor_id>", methods=["DELETE"])
 @login_required
 @audit_log("api_vendor_delete")
+@platform_admin_required
 def delete_vendor(vendor_id):
     """
     Delete a vendor

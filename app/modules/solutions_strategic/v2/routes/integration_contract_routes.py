@@ -6,6 +6,7 @@ and SLA parameters that the code generator uses instead of placeholder URLs.
 Blueprint: integration_contract_bp, prefix /api/enterprise
 """
 
+import json
 import logging
 
 import requests as http_requests
@@ -23,7 +24,24 @@ from app.utils.pagination import safe_int_arg
 
 logger = logging.getLogger(__name__)
 
-from app.utils.route_guards import require_entity
+from app.utils.route_guards import entity_in_active_org, require_entity_in_active_org
+from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
+
+#: Largest spec the server will read from a contract's spec_url.
+MAX_SPEC_BYTES = 2 * 1024 * 1024
+# YAML is parsed in pure Python (about 65 microseconds a node), so a body inside
+# the byte cap can still pin a worker for a minute. YAML gets a lower byte cap
+# and a node and depth budget; JSON (a C parser) keeps the full cap.
+MAX_YAML_BYTES = 256 * 1024
+MAX_YAML_NODES = 20_000
+MAX_YAML_DEPTH = 64
+_SPEC_CHUNK_BYTES = 8 * 1024
+_SPEC_FETCH_TIMEOUT = (5, 15)  # connect, read
+_JSON_TYPES = {"application/json", "text/json"}
+_YAML_TYPES = {"application/yaml", "application/x-yaml", "text/yaml", "text/x-yaml"}
+# Raw-file hosts (raw.githubusercontent.com, GitLab raw) serve specs as plain
+# text. Accepted only when the body parses to a JSON or YAML object.
+_TEXT_TYPES = {"text/plain"}
 
 integration_contract_bp = Blueprint(
     "integration_contract_api",
@@ -95,7 +113,141 @@ def _validate_contract_payload(data, is_update=False):
                         key,
                     )
 
+    # The URL the server will later fetch. Refused here, and checked again at
+    # fetch time (a name can start resolving somewhere else).
+    if cleaned.get("spec_url"):
+        err = _check_spec_url(cleaned["spec_url"])
+        if err:
+            return None, err
+
     return cleaned, None
+
+
+def _check_spec_url(url):
+    """Return an error message for a spec_url the server must not fetch, else None."""
+    if not isinstance(url, str) or len(url) > 500:
+        return "spec_url must be a URL of at most 500 characters"
+    try:
+        validate_user_supplied_url(url)
+    except BlockedOutboundURL as exc:
+        logger.warning("spec_url refused: %s", exc)
+        return "spec_url is not an allowed address"
+    return None
+
+
+def _contract_in_active_org(contract_id):
+    """The contract, only when its application belongs to the active organisation.
+
+    IntegrationContract has no organisation column of its own; its application
+    does. A contract with no application belongs to nobody and is never served.
+    Unknown organisation, foreign organisation and missing row all answer None.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+
+    contract = IntegrationContract.query.get(contract_id)  # tenant-scoping-ok: organisation proven through its application below
+    if contract is None or not entity_in_active_org(ApplicationComponent, contract.application_id):
+        return None
+    return contract
+
+
+def _no_alias_yaml_loader():
+    """A SafeLoader that refuses YAML aliases.
+
+    Anchors and aliases let a few hundred bytes load as a shared graph with
+    billions of leaves ("billion laughs"); the byte cap cannot see that, and
+    serialising the result would exhaust the worker. A spec has no need of them.
+    """
+    import yaml
+
+    class _NoAliasLoader(yaml.SafeLoader):
+        _nodes = 0
+        _depth = 0
+
+        def compose_node(self, parent, index):
+            if self.check_event(yaml.events.AliasEvent):
+                raise yaml.YAMLError("aliases are not allowed")
+            self._nodes += 1
+            if self._nodes > MAX_YAML_NODES or self._depth > MAX_YAML_DEPTH:
+                raise yaml.YAMLError("document is too large or too deep")
+            self._depth += 1
+            try:
+                return super().compose_node(parent, index)
+            finally:
+                self._depth -= 1
+
+    return _NoAliasLoader
+
+
+def _parse_spec(raw, kind):
+    """Parse a fetched spec body. ``kind`` is "json", "yaml" or "text" (either).
+
+    Raises ``ValueError`` with a caller-safe message.
+    """
+    import yaml
+
+    data = None
+    try:
+        # JSON first whenever it could be JSON: it is parsed in C, and every
+        # JSON document is also YAML, so nothing legitimate is lost.
+        if kind == "json" or raw.lstrip()[:1] in (b"{", b"["):
+            try:
+                data = json.loads(raw)
+            except ValueError:
+                if kind == "json":
+                    raise
+        if data is None:
+            if len(raw) > MAX_YAML_BYTES:
+                raise ValueError("YAML spec is too large")
+            data = yaml.load(raw, Loader=_no_alias_yaml_loader())  # noqa: S506  # nosec B506 - SafeLoader subclass that also rejects aliases and caps nodes and depth
+    except Exception:  # parse detail can echo the content
+        raise ValueError("Spec could not be parsed") from None
+    if not isinstance(data, dict):
+        raise ValueError("Spec must be a JSON or YAML object")
+    return data
+
+
+def _read_spec(url):
+    """Fetch ``url`` with no redirects, a size cap and a JSON/YAML content type.
+
+    Returns the parsed object, or raises ``ValueError`` with a message that is
+    safe to show the caller. Nothing about the remote side (addresses, error
+    text, body) is put in that message.
+    """
+    resp = http_requests.get(
+        url,
+        timeout=_SPEC_FETCH_TIMEOUT,
+        allow_redirects=False,
+        stream=True,
+        # No compression: the bytes counted against the cap are the bytes parsed,
+        # so a small compressed body cannot expand to tens of megabytes.
+        headers={"Accept": "application/json, application/yaml", "Accept-Encoding": "identity"},
+    )
+    try:
+        if 300 <= resp.status_code < 400:
+            raise ValueError("Spec URL redirects; redirects are not followed")
+        if resp.status_code >= 400:
+            raise ValueError(f"Spec URL returned {resp.status_code}")
+        ctype = (resp.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        is_json = ctype in _JSON_TYPES or ctype.endswith("+json")
+        is_yaml = ctype in _YAML_TYPES or ctype.endswith("+yaml")
+        is_text = ctype in _TEXT_TYPES
+        if not (is_json or is_yaml or is_text):
+            raise ValueError("Spec URL must serve JSON or YAML")
+        encoding = (resp.headers.get("Content-Encoding") or "identity").strip().lower()
+        if encoding not in ("", "identity"):
+            raise ValueError("Spec is too large")
+        declared = resp.headers.get("Content-Length")
+        if declared and declared.isdigit() and int(declared) > MAX_SPEC_BYTES:
+            raise ValueError("Spec is too large")
+        chunks, total = [], 0
+        for chunk in resp.iter_content(chunk_size=_SPEC_CHUNK_BYTES):
+            total += len(chunk)
+            if total > MAX_SPEC_BYTES:
+                raise ValueError("Spec is too large")
+            chunks.append(chunk)
+    finally:
+        resp.close()
+    return _parse_spec(b"".join(chunks), "json" if is_json else "yaml" if is_yaml else "text")
 
 
 # ── CRUD ─────────────────────────────────────────────────────────────────
@@ -110,6 +262,15 @@ def create_contract():
     if err:
         return jsonify({"error": err}), 400
 
+    from app.models.application_portfolio import ApplicationComponent
+
+    # A contract is owned through its application; one with none would belong
+    # to no organisation, so it cannot be created.
+    if cleaned.get("application_id") is None:
+        return jsonify({"error": "application_id is required"}), 400
+    if not entity_in_active_org(ApplicationComponent, cleaned["application_id"]):
+        return jsonify({"error": "Application not found"}), 404
+
     contract = IntegrationContract(**cleaned)
     db.session.add(contract)
     db.session.commit()
@@ -122,7 +283,16 @@ def create_contract():
 @login_required
 def list_contracts():
     """List contracts with optional filters: ?q=, ?protocol=, ?application_id=, ?auth_method=."""
-    query = IntegrationContract.query
+    from app.middleware.tenant_context import current_org_id
+    from app.models.application_portfolio import ApplicationComponent
+
+    org_id = current_org_id()
+    if org_id is None:
+        return jsonify({"items": [], "total": 0, "page": 1, "per_page": 0, "pages": 0})
+    # Only contracts whose application is in the active organisation.
+    query = IntegrationContract.query.join(  # tenant-scoping-ok: joined to the active organisation's applications
+        ApplicationComponent, ApplicationComponent.id == IntegrationContract.application_id
+    ).filter(ApplicationComponent.organization_id == org_id)
 
     q = request.args.get("q", "").strip()
     if q:
@@ -163,7 +333,7 @@ def list_contracts():
 @login_required
 def get_contract(contract_id):
     """Get a single contract by ID."""
-    contract = IntegrationContract.query.get(contract_id)
+    contract = _contract_in_active_org(contract_id)
     if not contract:
         return jsonify({"error": "Contract not found"}), 404
     return jsonify(contract.to_dict())
@@ -173,7 +343,7 @@ def get_contract(contract_id):
 @login_required
 def update_contract(contract_id):
     """Update an existing contract."""
-    contract = IntegrationContract.query.get(contract_id)
+    contract = _contract_in_active_org(contract_id)
     if not contract:
         return jsonify({"error": "Contract not found"}), 404
 
@@ -181,6 +351,14 @@ def update_contract(contract_id):
     cleaned, err = _validate_contract_payload(data, is_update=True)
     if err:
         return jsonify({"error": err}), 400
+
+    if "application_id" in cleaned:
+        from app.models.application_portfolio import ApplicationComponent
+
+        if not entity_in_active_org(ApplicationComponent, cleaned["application_id"]):
+            return jsonify({"error": "Application not found"}), 404
+    elif "application_id" in data and data["application_id"] is None:
+        return jsonify({"error": "application_id cannot be cleared"}), 400
 
     for key, value in cleaned.items():
         setattr(contract, key, value)
@@ -194,7 +372,7 @@ def update_contract(contract_id):
 @login_required
 def delete_contract(contract_id):
     """Delete a contract."""
-    contract = IntegrationContract.query.get(contract_id)
+    contract = _contract_in_active_org(contract_id)
     if not contract:
         return jsonify({"error": "Contract not found"}), 404
 
@@ -211,24 +389,25 @@ def delete_contract(contract_id):
 @login_required
 def fetch_spec(contract_id):
     """Fetch an OpenAPI/AsyncAPI spec from the contract's spec_url and store it."""
-    contract = IntegrationContract.query.get(contract_id)
+    contract = _contract_in_active_org(contract_id)
     if not contract:
         return jsonify({"error": "Contract not found"}), 404
 
     if not contract.spec_url:
         return jsonify({"error": "No spec_url configured on this contract"}), 400
 
+    # Checked again here: rows saved before the check existed, and names that
+    # have since started resolving to an internal address.
+    if _check_spec_url(contract.spec_url):
+        return jsonify({"error": "spec_url is not an allowed address"}), 400
+
     try:
-        resp = http_requests.get(contract.spec_url, timeout=30, allow_redirects=True)
-        resp.raise_for_status()
-        spec_data = resp.json()
-    except http_requests.HTTPError as exc:
-        status = exc.response.status_code if exc.response is not None else "unknown"
-        return jsonify({
-            "error": f"Spec URL returned {status}",
-        }), 502
-    except Exception as exc:
-        return jsonify({"error": f"Failed to fetch spec: {exc}"}), 502
+        spec_data = _read_spec(contract.spec_url)
+    except ValueError as exc:  # raised by _read_spec with a caller-safe message
+        return jsonify({"error": str(exc)}), 502
+    except Exception as exc:  # connection detail stays in the log
+        logger.warning("Spec fetch failed for contract %s: %s", contract_id, type(exc).__name__)
+        return jsonify({"error": "Failed to fetch spec"}), 502
 
     contract.spec_content = spec_data
     # Auto-detect format from spec content
@@ -261,10 +440,10 @@ def list_contracts_for_app(app_id):
     """List all contracts for a specific application."""
     from app.models.application_portfolio import ApplicationComponent
 
-    require_entity(ApplicationComponent, app_id, description="Application not found")
+    require_entity_in_active_org(ApplicationComponent, app_id, description="Application not found")
 
     contracts = (
-        IntegrationContract.query
+        IntegrationContract.query  # tenant-scoping-ok: application proven in the active organisation above
         .filter_by(application_id=app_id)
         .order_by(IntegrationContract.name)
         .all()

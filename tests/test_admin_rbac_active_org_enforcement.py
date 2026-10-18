@@ -389,11 +389,13 @@ def _seed_real_entities_for_sweep(db_session, victim_org, attacker):
     canvas = BusinessModelCanvas(organization_id=victim_org.id)
     db_session.add(canvas)
 
-    policy = CompliancePolicy(name=f"Sweep Policy {suffix}")
+    policy = CompliancePolicy(name=f"Sweep Policy {suffix}", organization_id=victim_org.id)
     db_session.add(policy)
     db_session.flush()
 
-    violation = ComplianceViolation(policy_id=policy.id, description="sweep probe")
+    violation = ComplianceViolation(
+        policy_id=policy.id, description="sweep probe", organization_id=victim_org.id
+    )
     db_session.add(violation)
 
     requirement = SolutionRequirement(

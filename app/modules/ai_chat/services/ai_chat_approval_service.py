@@ -292,6 +292,37 @@ class AIChatApprovalService:
                 exc_info=True,
             )
 
+    def _discard_staged_connector_credential(self, approval: AIChatCRUDApproval) -> None:
+        """M1: a rejected connectors proposal must never let its staged
+        secret become reachable later -- delete it, best-effort, the same
+        way _audit_nonblocking treats its own write as non-critical next to
+        the already-durable rejection above it.
+        """
+        try:
+            import json
+
+            from app.modules.codegen.services.credential_vault import OrgCredentialVault
+
+            payload = json.loads(approval.operation_payload or "{}")
+            connector_type = payload.get("connector_type")
+            if not connector_type:
+                return
+            from app.services.connector_framework import CONNECTOR_CREDENTIAL_TYPES
+
+            vault = OrgCredentialVault()
+            credential_type = CONNECTOR_CREDENTIAL_TYPES.get(connector_type)
+            if credential_type:
+                vault.discard_staged(approval.organization_id, connector_type, credential_type, approval.id)
+            vault.discard_staged(approval.organization_id, connector_type, "credentials", approval.id)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            self.logger.warning(
+                "Approval %s rejected but its staged connector credential could not be discarded",
+                approval.id,
+                exc_info=True,
+            )
+
     # ------------------------------------------------------------------ #
     # Audit trail (ARCH-022)                                              #
     # ------------------------------------------------------------------ #
@@ -497,6 +528,11 @@ class AIChatApprovalService:
             )
             db.session.commit()
 
+            # Owners of the thing being changed are told, in the app and by
+            # email. After the commit and fully contained: a notification
+            # problem must never undo or fail a recorded proposal.
+            self._notify_owners_of_new_approval(approval, requester, operation_payload)
+
             self.logger.info(
                 f"Created pending approval {approval.id} for {operation_type} {entity_type} "
                 f"(chat_session_id={chat_session_id!r}, agent_turn_id={agent_turn_id!r})"
@@ -594,6 +630,27 @@ class AIChatApprovalService:
                     "permission to review and approve it."
                 )
 
+            # Connector changes require an administrator proposer (every connector
+            # route carries admin_required) but GENERAL write permission alone was
+            # enough to reach this method, so an ordinary user could approve -- and
+            # so apply -- an admin-only connector create/update/delete/sync. Refuse
+            # before the entity_type == "connectors" dispatch below ever runs.
+            if approval.entity_type == "connectors" and not actor.is_admin():
+                self._audit(
+                    approval,
+                    event="execution_refused",
+                    to_status=approval.status.value,
+                    actor_user_id=effective_approver_id,
+                    from_status=approval.status.value,
+                    reason="connector changes require an administrator approver",
+                )
+                db.session.commit()
+                return {
+                    "success": False,
+                    "code": "FORBIDDEN",
+                    "error": "Connector changes require an administrator to approve.",
+                }
+
             # Check status
             if approval.status != ApprovalStatus.PENDING:
                 return {
@@ -671,7 +728,17 @@ class AIChatApprovalService:
             # Execute the operation
             data_service = AIDataInteractionService(user_id=self.user_id)
 
-            if approval.operation_type == "create":
+            # Connector changes (create/update/delete/sync) execute through
+            # the one connector framework, whose change path only accepts an
+            # approved proposal for the same organisation (or an explicit
+            # organisational delegation, which never reaches this dispatch).
+            # The framework's apply path refuses a write without one.
+            if approval.entity_type == "connectors":
+                from app.services.connector_framework import execute_connector_proposal
+
+                result = execute_connector_proposal(approval)
+
+            elif approval.operation_type == "create":
                 if approval.entity_type == "capability":
                     result = data_service.create_capability(payload)
                 elif approval.entity_type == "application":
@@ -734,6 +801,19 @@ class AIChatApprovalService:
                     )
                     org_id = approval.organization_id
                     accepted = accept_assessment(
+                        approval_id=approval.id,
+                        organization_id=org_id,
+                    )
+                    result = {"success": accepted}
+                elif approval.entity_type == "ai_system_grounding_source":
+                    # Accept a proposed grounding data source. Approving
+                    # writes the proposed-use property through the property
+                    # service; refusing writes nothing.
+                    from app.modules.enterprise_genome.services.ai_system_grounding import (
+                        accept_grounding_source,
+                    )
+                    org_id = approval.organization_id
+                    accepted = accept_grounding_source(
                         approval_id=approval.id,
                         organization_id=org_id,
                     )
@@ -945,6 +1025,8 @@ class AIChatApprovalService:
                     "code": "NOT_FOUND",
                     "error": f"Approval {approval_id} not found after rejection",
                 }
+            if approval.entity_type == "connectors":
+                self._discard_staged_connector_credential(approval)
             self._audit_nonblocking(
                 approval,
                 event="cancelled" if is_requester_cancellation else "rejected",
@@ -971,6 +1053,207 @@ class AIChatApprovalService:
             db.session.rollback()
             self.logger.error(f"Failed to reject approval {approval_id}: {e}")
             return {"success": False, "error": f"Rejection failed: {str(e)}"}
+
+    def _notify_owners_of_new_approval(
+        self, approval: AIChatCRUDApproval, requester: User, operation_payload: Dict[str, Any]
+    ) -> int:
+        """Tell the owners of what a new proposal changes, in-app and by email.
+
+        Recipients are the owners the one ownership store records for the
+        proposal's target (never the requester), in the approval's own
+        organisation. Written through the one notification writer; the email
+        goes through the shared log-or-send helper, so an unconfigured mail
+        server logs instead of dropping it. Returns the number of owners told.
+        Never raises: the proposal is already committed.
+        """
+        try:
+            from html import escape
+
+            from flask import after_this_request, current_app, has_request_context, request
+
+            from app._bootstrap._digest_emails import _safe_send_email
+            from app.services.architecture_change_impact_service import (
+                resolve_approval_targets,
+                target_owner_rows,
+            )
+            from app.services.notification_service import NotificationService
+
+            org_id = approval.organization_id
+            if org_id is None:
+                return 0
+            targets = resolve_approval_targets(
+                approval.operation_type,
+                approval.entity_type,
+                approval.entity_id,
+                operation_payload if isinstance(operation_payload, dict) else {},
+                org_id,
+            )
+            owner_user_ids = {row.user_id for row in target_owner_rows(targets, org_id)}
+            owner_user_ids.discard(requester.id)
+            if not owner_user_ids:
+                return 0
+            recipients = (
+                User.query.filter(User.organization_id == org_id, User.id.in_(owner_user_ids))
+                .order_by(User.id)
+                .all()
+            )
+            inbox_path = f"/ai-chat/approvals/inbox?approval={approval.id}"
+            message = f"A change needs your review: {approval.summary}"
+            notifications = [
+                (
+                    user,
+                    NotificationService.create(
+                        user.id,
+                        message,
+                        inbox_path,
+                        organization_id=org_id,
+                        event_type="approval_requested",
+                        entity_type="approval",
+                        entity_id=approval.id,
+                    ),
+                )
+                for user in recipients
+            ]
+            db.session.commit()
+
+            subject = "A change to something you own needs review"
+            # The email link must be absolute: a relative href goes nowhere in
+            # a mail client. The public base URL, else this request's host;
+            # with neither, the link is left out rather than sent relative.
+            base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
+            if not base and has_request_context():
+                base = request.host_url.rstrip("/")
+            link = (
+                f'<p><a href="{escape(base + inbox_path)}">Open the approval inbox</a></p>'
+                if base
+                else ""
+            )
+            body = (
+                "<p>A proposed change to something you own is waiting for review:</p>"
+                f"<p>{escape(approval.summary or '')}</p>" + link
+            )
+            targets = [(user.email, note.id) for user, note in notifications if user.email]
+            app_obj = current_app._get_current_object()
+
+            def send_emails():
+                # Own application context: this runs after the response has
+                # gone, so a slow mail server never holds up the proposal.
+                from flask import g
+
+                from app.models.models import Notification
+
+                with app_obj.app_context():
+                    g.current_org_id = org_id
+                    sent_ids = [
+                        note_id
+                        for email, note_id in targets
+                        if _safe_send_email(app_obj, subject, [email], body)
+                    ]
+                    if sent_ids:
+                        try:
+                            Notification.query.filter(
+                                Notification.id.in_(sent_ids),
+                                Notification.organization_id == org_id,
+                            ).update({Notification.email_sent_at: datetime.utcnow()}, synchronize_session=False)
+                            db.session.commit()
+                        except Exception:
+                            db.session.rollback()
+                            self.logger.warning("Could not record email delivery for approval %s", approval.id)
+
+            if has_request_context():
+
+                @after_this_request
+                def _send_when_closed(response):
+                    response.call_on_close(send_emails)
+                    return response
+
+            else:
+                send_emails()
+            return len(notifications)
+        except Exception as exc:
+            db.session.rollback()
+            self.logger.warning("Could not notify owners of approval %s: %s", approval.id, exc)
+            return 0
+
+    def _active_org_actor(self):
+        """The reviewer (GENERAL) and the ACTIVE organisation, or an error.
+
+        The automatic tenant filter does nothing when no organisation is
+        active, so an unset organisation is refused here as not found rather
+        than read through an unfiltered query. That the reviewer belongs to the
+        active organisation is settled by ``_acting_user`` (it loads the user
+        inside the active organisation), as it is for approve and reject.
+        """
+        from app.middleware.tenant_context import current_org_id
+
+        actor, actor_error = self._acting_user(require_general=True)
+        if actor_error:
+            return None, None, actor_error
+        org_id = current_org_id()
+        if org_id is None:
+            return None, None, {
+                "success": False,
+                "code": "NOT_FOUND",
+                "error": "No active organization for this request",
+            }
+        return actor, org_id, None
+
+    def get_approval_impact(self, approval_id: int) -> Dict[str, Any]:
+        """What approving one proposal would affect (services, interfaces, owners).
+
+        Computed on demand for one proposal by the change-impact service over
+        the canonical impact engine, so the inbox list stays flat in the number
+        of proposals. A foreign or unknown id is not found.
+        """
+        _, org_id, error = self._active_org_actor()
+        if error:
+            return error
+        approval = AIChatCRUDApproval.query.filter_by(id=approval_id, organization_id=org_id).first()
+        if not approval:
+            return {"success": False, "code": "NOT_FOUND", "error": f"Approval {approval_id} not found"}
+        from app.services.architecture_change_impact_service import ArchitectureChangeImpactService
+
+        return {
+            "success": True,
+            "impact": ArchitectureChangeImpactService().assess_approval_impact(approval, org_id),
+        }
+
+    RECENT_DECISIONS_LIMIT = 20
+
+    def get_recent_decisions(self) -> Dict[str, Any]:
+        """The organisation's latest approved and rejected proposals, newest first.
+
+        A rejected proposal keeps its reason here, so the decision is still
+        visible after a reload. One read, bounded by RECENT_DECISIONS_LIMIT.
+        """
+        _, org_id, error = self._active_org_actor()
+        if error:
+            return error
+        rows = (
+            AIChatCRUDApproval.query.filter(
+                AIChatCRUDApproval.organization_id == org_id,
+                AIChatCRUDApproval.status.in_([ApprovalStatus.APPROVED, ApprovalStatus.REJECTED]),
+            )
+            .order_by(AIChatCRUDApproval.id.desc())
+            .limit(self.RECENT_DECISIONS_LIMIT)
+            .all()
+        )
+        return {
+            "success": True,
+            "decisions": [
+                {
+                    "id": row.id,
+                    "operation_type": row.operation_type,
+                    "entity_type": row.entity_type,
+                    "summary": row.summary,
+                    "status": row.status.value,
+                    "rejected_reason": row.rejected_reason if row.status == ApprovalStatus.REJECTED else None,
+                    "created_at": row.created_at.isoformat() if row.created_at else None,
+                    "approved_at": row.approved_at.isoformat() if row.approved_at else None,
+                }
+                for row in rows
+            ],
+        }
 
     def get_pending_approvals(self) -> List[Dict[str, Any]]:
         """

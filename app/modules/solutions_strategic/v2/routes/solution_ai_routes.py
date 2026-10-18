@@ -1,3 +1,4 @@
+from werkzeug.exceptions import HTTPException
 from app.services.archimate_backbone import sync_archimate_element
 import json
 import logging
@@ -952,6 +953,9 @@ def generate_blueprint_section(solution_id, section_id):
             "elements": elements,
             "created": result.get("created", {}),
         })
+    except HTTPException:
+        # A 404 or 403 from the lookup is the refusal itself, not an internal error.
+        raise
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error in generate_blueprint_section {section_id}: {e}", exc_info=True)
@@ -971,6 +975,9 @@ def generate_strategy_layer_route(solution_id):
         orch = SolutionAIOrchestrator()
         result = orch.generate_strategy_layer(solution_id, capability_ids)
         return jsonify(result)
+    except HTTPException:
+        # A 404 or 403 from the lookup is the refusal itself, not an internal error.
+        raise
     except Exception as e:
         logger.error(f"Error in generate_strategy_layer: {e}", exc_info=True)
         return api_error("Strategy generation failed", 500)
@@ -1027,6 +1034,9 @@ def generate_architecture_layers_route(solution_id):
                 )
 
         return jsonify(result)
+    except HTTPException:
+        # A 404 or 403 from the lookup is the refusal itself, not an internal error.
+        raise
     except Exception as e:
         logger.error(f"Error in generate_architecture_layers: {e}", exc_info=True)
         return api_error("Architecture generation failed", 500)
@@ -1100,6 +1110,9 @@ def generate_implementation_layer_route(solution_id):
                 )
 
         return jsonify(result)
+    except HTTPException:
+        # A 404 or 403 from the lookup is the refusal itself, not an internal error.
+        raise
     except Exception as e:
         logger.error(f"Error in generate_implementation_layer: {e}", exc_info=True)
         return api_error("Implementation generation failed", 500)

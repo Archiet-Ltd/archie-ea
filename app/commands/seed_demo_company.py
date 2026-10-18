@@ -1144,6 +1144,8 @@ def seed_demo_company() -> dict:
     from app.jobs.tenant_safe_job import tenant_scope
     from werkzeug.security import generate_password_hash
 
+    from app.models.user import PASSWORD_HASH_METHOD
+
     stats: dict[str, int] = {}
 
     # ── 1. organisation ─────────────────────────────────────────────────
@@ -1178,7 +1180,7 @@ def seed_demo_company() -> dict:
                 email=_DEMO_USER_EMAIL,
                 first_name=_DEMO_USER_FIRST,
                 last_name=_DEMO_USER_LAST,
-                password_hash=generate_password_hash(demo_password),
+                password_hash=generate_password_hash(demo_password, method=PASSWORD_HASH_METHOD),
                 organization_id=org_id,
                 confirmed=True,
                 role=viewer_role,
@@ -1306,7 +1308,7 @@ def seed_demo_company() -> dict:
                 email=email,
                 first_name=first,
                 last_name=last,
-                password_hash=generate_password_hash(owner_password),
+                password_hash=generate_password_hash(owner_password, method=PASSWORD_HASH_METHOD),
                 organization_id=org_id,
                 confirmed=True,
                 role=viewer_role,

@@ -46,6 +46,20 @@ from app.decorators import admin_required
 from app._decorators_base import permission_required
 from app.models import Permission
 from app.modules.enterprise_genome.emit.ai_systems_register import emit_ai_systems_register
+from app.modules.ai_chat.services.ai_chat_approval_service import (
+    AIChatApprovalService,
+)
+from app.modules.enterprise_genome.services.ai_system_grounding import (
+    propose_grounding_source,
+)
+from app.modules.enterprise_genome.services.ai_system_lineage import (
+    get_data_entities_for_system,
+    get_providers_for_system,
+    get_systems_using_provider,
+)
+from app.modules.enterprise_genome.services.ai_system_obligations import (
+    get_obligations_for_system,
+)
 from app.modules.enterprise_genome.services.ai_systems_seed import (
     register_ai_system,
     seed_archie_copilot,
@@ -103,6 +117,37 @@ def _may_write(user) -> bool:
     return getattr(user, "is_authenticated", False) and user.can(Permission.GENERAL)
 
 
+def _approval_payload_element(approval_id: int, org_id: int):
+    """The element id a grounding-source approval's payload names, or ``None``
+    when no such approval exists in this organisation or its payload is not
+    readable JSON.
+
+    Read-only. The accept and refuse routes use it to answer 404 before any
+    state is touched when the URL element and the approval's own element
+    disagree, so an approval can only ever be decided through the element it
+    was proposed for.
+    """
+    import json
+
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+    from app.modules.enterprise_genome.services.ai_system_grounding import (
+        ENTITY_GROUNDING_SOURCE,
+    )
+
+    approval = AIChatCRUDApproval.query.filter_by(
+        id=approval_id,
+        organization_id=org_id,
+        entity_type=ENTITY_GROUNDING_SOURCE,
+    ).first()
+    if approval is None:
+        return None
+    try:
+        payload = json.loads(approval.operation_payload)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return payload.get("element_id")
+
+
 @ai_systems_genome_bp.route("/ai-systems")
 @login_required
 def ai_systems():
@@ -112,6 +157,26 @@ def ai_systems():
     slice_data = None
     if org_id is not None:
         slice_data = build_ai_systems_slice(org_id, db.session)
+        # Enrich each system with lineage and obligations data
+        users_by_provider: dict = {}
+        for s in slice_data.get("systems", []):
+            el_id = s.get("archimate_element_id")
+            if el_id:
+                s["providers"] = get_providers_for_system(el_id, org_id)
+                s["data_entities"] = get_data_entities_for_system(el_id, org_id)
+                s["obligations"] = get_obligations_for_system(el_id, org_id)
+                # For each provider, the organisation's systems that use it
+                # (one query per distinct provider on the page).
+                provider_systems = {}
+                for p in s.get("providers", []):
+                    name = p.get("name")
+                    if name:
+                        if name not in users_by_provider:
+                            users_by_provider[name] = get_systems_using_provider(
+                                name, org_id
+                            )
+                        provider_systems[name] = users_by_provider[name]
+                s["provider_systems"] = provider_systems
         register_html = emit_ai_systems_register(
             slice_data,
             can_release=_may_release(current_user, org_id),
@@ -386,3 +451,153 @@ def ai_system_delete_owner(element_id, owner_id):
     db.session.delete(record)
     db.session.commit()
     return "", 204
+
+
+# --- Grounding source routes -------------------------------------------------
+
+
+@ai_systems_genome_bp.route(
+    "/ai-systems/<int:element_id>/grounding-source/propose", methods=["POST"]
+)
+@login_required
+@permission_required(Permission.GENERAL)
+def ai_system_propose_grounding_source(element_id):
+    """Propose a data entity as a grounding source for an AI system.
+
+    Creates a pending approval record in the approval queue. The source is NOT
+    applied — another user with general permission accepts it in the approval
+    queue. Org-scoped: another organisation's element id is refused.
+    """
+    org_id = _current_org_id()
+    if org_id is None:
+        return redirect(url_for("ai_systems_genome.ai_systems"))
+
+    element = _org_scoped_element(element_id, org_id)
+    if element is None:
+        abort(404)
+
+    data_entity_id = request.form.get("data_entity_id", type=int)
+    if not data_entity_id:
+        flash("A data entity id is required to propose a grounding source.", "error")
+        return redirect(url_for("ai_systems_genome.ai_systems"))
+
+    try:
+        propose_grounding_source(
+            element=element,
+            data_entity_id=data_entity_id,
+            organization_id=org_id,
+            proposed_by_user_id=current_user.id,
+        )
+        db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        logger.exception(
+            "Grounding source proposal failed for org %s element %s",
+            org_id, element_id,
+        )
+        flash("The grounding source proposal could not be recorded.", "error")
+
+    return redirect(url_for("ai_systems_genome.ai_systems"))
+
+
+@ai_systems_genome_bp.route(
+    "/ai-systems/<int:element_id>/grounding-source/<int:approval_id>/accept",
+    methods=["POST"],
+)
+@login_required
+@permission_required(Permission.GENERAL)
+def ai_system_accept_grounding_source(element_id, approval_id):
+    """Accept a proposed grounding source.
+
+    Reads the proposal payload from the approval record and writes the
+    grounding source property onto the element's acm_properties. Org-scoped.
+    Answers 404 when the approval's payload names a different element than the
+    URL — an approval is decided only through its own element.
+    """
+    org_id = _current_org_id()
+    if org_id is None:
+        return redirect(url_for("ai_systems_genome.ai_systems"))
+
+    element = _org_scoped_element(element_id, org_id)
+    if element is None:
+        abort(404)
+
+    # An approval is decided through the element it was proposed for: refuse
+    # with 404 when the URL element and the approval's payload element differ.
+    if _approval_payload_element(approval_id, org_id) != element_id:
+        abort(404)
+
+    # Decide through the one approval service, as the approval queue does: it
+    # records the approver, claims the approval once and writes the approval
+    # audit trail before dispatching to accept_grounding_source.
+    try:
+        result = AIChatApprovalService(user_id=current_user.id).approve_and_execute(
+            approval_id, current_user.id
+        )
+        if result.get("success"):
+            flash("Grounding source approved.", "success")
+        else:
+            flash(
+                result.get("error") or "Could not approve grounding source.",
+                "error",
+            )
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        logger.exception(
+            "Grounding source accept failed for org %s approval %s",
+            org_id, approval_id,
+        )
+        flash("The grounding source could not be approved.", "error")
+
+    return redirect(url_for("ai_systems_genome.ai_systems"))
+
+
+@ai_systems_genome_bp.route(
+    "/ai-systems/<int:element_id>/grounding-source/<int:approval_id>/refuse",
+    methods=["POST"],
+)
+@login_required
+@permission_required(Permission.GENERAL)
+def ai_system_refuse_grounding_source(element_id, approval_id):
+    """Refuse a proposed grounding source.
+
+    The system stays unchanged; no property is written. Org-scoped.
+    Answers 404 when the approval's payload names a different element than the
+    URL — an approval is decided only through its own element.
+    """
+    org_id = _current_org_id()
+    if org_id is None:
+        return redirect(url_for("ai_systems_genome.ai_systems"))
+
+    element = _org_scoped_element(element_id, org_id)
+    if element is None:
+        abort(404)
+
+    # An approval is decided through the element it was proposed for: refuse
+    # with 404 when the URL element and the approval's payload element differ.
+    if _approval_payload_element(approval_id, org_id) != element_id:
+        abort(404)
+
+    try:
+        result = AIChatApprovalService(user_id=current_user.id).reject_approval(
+            approval_id, reason="Refused by reviewer"
+        )
+        if result.get("success"):
+            flash("Grounding source refused.", "success")
+        else:
+            flash(
+                result.get("error") or "Could not refuse grounding source.",
+                "error",
+            )
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        logger.exception(
+            "Grounding source refuse failed for org %s approval %s",
+            org_id, approval_id,
+        )
+        flash("The grounding source could not be refused.", "error")
+
+    return redirect(url_for("ai_systems_genome.ai_systems"))

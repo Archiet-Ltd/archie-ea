@@ -27,6 +27,7 @@ from app.decorators import admin_required, audit_log
 from app.middleware.tenant_decorators import is_active_org_admin
 from app.models.adm_kanban import create_adm_phases, KanbanCard
 from app.models.archimate_core import ArchiMateElement
+from app.middleware.tenant_decorators import platform_admin_required
 
 adm_kanban_view_bp = Blueprint("adm_kanban_view", __name__, url_prefix="/adm-kanban")
 
@@ -71,6 +72,7 @@ def boards_detail_redirect(rest):
 @login_required
 @admin_required
 @audit_log("init_adm_phases")
+@platform_admin_required
 def init_phases():
     """Initialize ADM phases (admin only)"""
     try:
@@ -157,7 +159,8 @@ def gap_analysis():
 @adm_kanban_view_bp.route("/plateau-roadmap")
 @login_required
 def plateau_roadmap():
-    """Plateau Roadmap — group cards by their target Plateau."""
+    """Plateau Roadmap — group cards by their target Plateau, and show each
+    plateau's critical path computed from the one work package store."""
     try:
         plateaus = (
             KanbanCard.query
@@ -187,11 +190,28 @@ def plateau_roadmap():
         current_app.logger.error("Plateau roadmap query failed: %s", exc)
         plateaus, plateau_cards, unassigned_count = [], {}, 0
 
+    # The critical path panel is computed on its own: a failure in it is
+    # logged and the panel is empty; the plateau cards above still show.
+    try:
+        from app.services import work_package_service
+        from app.utils.tenant import current_organization_id
+
+        critical_paths = work_package_service.critical_paths_for_roadmap(
+            current_organization_id()
+        )
+    except Exception as exc:
+        current_app.logger.error("Plateau roadmap critical path failed: %s", exc)
+        from app import db
+
+        db.session.rollback()
+        critical_paths = []
+
     return render_template(
         "adm_kanban/plateau_roadmap.html",
         plateaus=plateaus,
         plateau_cards=plateau_cards,
         unassigned_count=unassigned_count,
+        critical_paths=critical_paths,
     )
 
 

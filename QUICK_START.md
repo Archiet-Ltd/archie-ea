@@ -37,7 +37,7 @@ Read **DATA_REALITY.md** (actual production field distributions).
 
 ### Step 3: UI patterns
 
-Read **docs/design_system/pattern_registry.json** (canonical UI patterns).
+Read **`app/static/css/shadcn_tokens.css`** and **`docs/reuse-register.yml`** (canonical UI tokens and patterns).
 - Every modal, card, table, button, badge has one correct implementation
 - Do not invent new patterns; use existing ones
 

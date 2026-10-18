@@ -7,7 +7,9 @@ import pytest
 
 
 CASES = [
-    ("application_layer", "ApplicationInterface", "create_interface_archimate_element"),
+    # ApplicationInterface is NOT here: it was routed onto the shared flush
+    # listener (its per-model raw-insert hook was removed), so its ownership
+    # behaviour is covered by test_backbone_flush_listener_keeps_source_owner.
     ("application_layer", "ApplicationEvent", "create_event_archimate_element"),
     ("application_layer", "ApplicationFunction", "create_applicationfunction_archimate_element"),
     ("application_layer", "ApplicationProcess", "create_applicationprocess_archimate_element"),
@@ -83,3 +85,37 @@ def test_physical_registered_insert_listener_keeps_source_owner(model_name):
     assert len(statements) == 1
     assert statements[0].get("organization_id") == 29
     assert target.archimate_element_id == 71
+
+
+def test_backbone_flush_listener_keeps_source_owner(db_session, make_org, tenant_ctx):
+    """An ApplicationInterface created through the ORM is mirrored by the shared
+    flush listener, and the element it writes keeps the source row's owner and
+    provenance.
+
+    This is the ownership guarantee the raw-insert hook used to provide for
+    this type; ApplicationInterface is now routed onto the one shared writer,
+    and the same guarantee must hold there (fails on main, where the raw-insert
+    hook writes no provenance property, and if the listener resolves or writes
+    a different organisation)."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.application_layer import ApplicationInterface
+
+    org = make_org("bf-own-interface")
+    with tenant_ctx(org.id):
+        interface = ApplicationInterface(
+            name="Owned interface",
+            interface_type="REST",
+            organization_id=org.id,
+        )
+        db_session.add(interface)
+        db_session.flush()
+
+    element = db_session.get(ArchiMateElement, interface.archimate_element_id)
+    assert element is not None
+    assert element.organization_id == org.id, (
+        "the flush-listener-created element must keep the source row's owner"
+    )
+    assert element.custom_properties == {"source_model": "ApplicationInterface"}, (
+        "the flush-listener-created element must carry the shared writer's "
+        "provenance"
+    )

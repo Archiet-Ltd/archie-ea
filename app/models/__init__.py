@@ -70,6 +70,12 @@ else:
     # Feature models that were defined but never imported here, so create_all() skipped
     # their tables -> routes querying them returned UndefinedTable 500s on a fresh install.
     from .import_history import *  # noqa
+    # ADM board portfolios, RIDA log, cross-board dependencies: defined but never
+    # imported, so create_all() skipped all four tables and user deletion hit
+    # UndefinedTable (adm-board-portfolios bucket).
+    from .adm_portfolio import (  # noqa: F401
+        ADMBoardPortfolio, ADMBoardPortfolioLink, ADMRIDALog, ADMCrossBoardDependency,
+    )
     # BA-B1: artefact_share_links. Imported here so create_all() builds the
     # table on a fresh install and reconcile-schema sees the mapped model on an
     # existing one — every column below the primary key is nullable or has a
@@ -124,6 +130,7 @@ else:
     from .regulatory_framework import *  # noqa - FrameworkAdoption (tenant-hybrid framework catalogue)
     from .regulatory_change import *  # noqa - RegulatoryChange, RegulatoryChangeImpact (regulatory change tracker)
     from .cost_fact import *  # noqa - CostFact, ExchangeRate (one cost fact store)
+    from .graph_projection_snapshot import *  # noqa - GraphProjectionSnapshot (per-organisation graph projection copy)
     from .cost_intelligence import *  # noqa - CapabilityCostAllocation, VendorContract, SLA (Cost intelligence)
     from .decision_ledger import *  # noqa - DecisionLedger (append-only governance ledger)
 
@@ -310,6 +317,9 @@ else:
     from .technology_layer import *  # noqa - Node, Device, SystemSoftware, TechnologyInterface, Path, CommunicationNetwork, TechnologyService
     from .truly_missing_models import *  # noqa - Solution, SolutionPattern, SolutionContract
     from .adm_kanban import ADMPhase, KanbanBoard, KanbanCard, KanbanCardComment, KanbanCardAttachment, ADMPhaseStep  # noqa: F401
+    # Registers card_archimate_elements and its backref on ArchiMateElement before any create_all, so
+    # deleting an element never queries a table that was not created (import-order dependence).
+    from . import adm_kanban_junctions  # noqa: F401
     from .solution_architect_models import *  # noqa - SolutionAnalysisSession, SolutionProblemDefinition, etc.
     from app.models.solution_architect_models import RequirementChangeLog  # noqa: F401
     from .solution_lifecycle_models import *  # noqa - SolutionRisk, SolutionTCOItem, SolutionMetric, SolutionPlateau
@@ -350,6 +360,9 @@ else:
 
     # H1: Risk <-> Application/Solution/Programme links
     from .risk_entity_link import RiskEntityLink  # noqa: F401
+
+    # R1-B30: stored answers with a permanent address
+    from .answer_record import AnswerRecord  # noqa: F401
 
     # One inherent/residual score history row per change to a Risk
     from .risk_score_history import RiskScoreHistory, SCORE_KINDS  # noqa: F401

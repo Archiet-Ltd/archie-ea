@@ -15,7 +15,7 @@ from flask_login import current_user
 
 from app import csrf
 from app.decorators import audit_log, require_auth
-from app.services.webhook_service import WebhookService
+from app.services.webhook_service import WebhookService, WebhookTargetRefused
 from app.utils.pagination import safe_int_arg
 webhook_bp = Blueprint("webhook", __name__, url_prefix="/api/webhooks")
 
@@ -102,6 +102,8 @@ def create_subscription():
                 ), 400
 
         service = WebhookService()
+        if not isinstance(data, dict) or not isinstance(data.get("events"), list):
+            return jsonify({"success": False, "error": "events must be a list"}), 400
         # Generate one when the caller supplies none. The receiver only enforces
         # signatures when the subscription has a secret, so a secretless
         # subscription was an unauthenticated write endpoint that anyone knowing
@@ -133,6 +135,10 @@ def create_subscription():
             )
         return jsonify({"success": True, "data": payload}), 201
 
+    except WebhookTargetRefused as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except PermissionError:
+        return jsonify({"success": False, "error": "No active organisation"}), 403
     except Exception as e:
         current_app.logger.error(f"Error creating webhook subscription: {str(e)}")
         return jsonify(
@@ -182,6 +188,8 @@ def update_subscription(subscription_id):
             return jsonify({"success": False, "error": "Subscription not found"}), 404
 
         return jsonify({"success": True, "data": subscription.to_dict()})
+    except WebhookTargetRefused as e:
+        return jsonify({"success": False, "error": str(e)}), 400
     except Exception as e:
         current_app.logger.error(f"Error updating webhook subscription: {str(e)}")
         return jsonify(

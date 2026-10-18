@@ -11,7 +11,7 @@ the same prefix — ADR 0008 rule 3). Provides:
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import render_template, request
 from flask_login import login_required
@@ -34,9 +34,11 @@ def _parse_datetime_param(raw: str | None, param_name: str) -> tuple[datetime | 
         )
     try:
         # Accept both date-only and full datetime
-        if "T" in raw:
-            return datetime.fromisoformat(raw), None
-        return datetime.fromisoformat(raw + "T00:00:00"), None
+        parsed = datetime.fromisoformat(raw if "T" in raw else raw + "T00:00:00")
+        if parsed.tzinfo is not None:
+            # Compare and query in one representation: naive UTC, like the defaults.
+            parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+        return parsed, None
     except ValueError:
         return None, error_response(
             f"{param_name} must be a valid ISO date or datetime (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)",
@@ -61,8 +63,8 @@ def history_as_of_page():
     as_of_raw = request.args.get("as_of")
     if as_of_raw:
         as_of_date, err = _parse_datetime_param(as_of_raw, "as_of")
-        if err:
-            return err
+        if err or as_of_date is None:
+            as_of_date = datetime.utcnow()
     else:
         as_of_date = datetime.utcnow()
 
@@ -92,25 +94,20 @@ def history_changes_page():
     """Render the 'changes between dates' page.
 
     Query params:
-    - from (required): ISO date/datetime
-    - to (required): ISO date/datetime
+    - from (optional): ISO date/datetime, defaults to 30 days before ``to``
+    - to (optional): ISO date/datetime, defaults to now
     """
-    from_raw = request.args.get("from")
-    to_raw = request.args.get("to")
+    # The sidebar opens this page with no dates, and the page loads its own data
+    # from the API, so a missing or unreadable date falls back to "the last 30
+    # days" instead of answering a raw JSON 400 to a person who clicked a link.
+    from datetime import timedelta
 
-    from_date, err = _parse_datetime_param(from_raw, "from")
-    if err:
-        return err
-    to_date, err = _parse_datetime_param(to_raw, "to")
-    if err:
-        return err
-
-    if from_date >= to_date:
-        return error_response(
-            "from must be before to",
-            code="INVALID_RANGE",
-            status_code=400,
-        )
+    to_date, err = _parse_datetime_param(request.args.get("to"), "to")
+    if err or to_date is None:
+        to_date = datetime.utcnow()
+    from_date, err = _parse_datetime_param(request.args.get("from"), "from")
+    if err or from_date is None or from_date >= to_date:
+        from_date = to_date - timedelta(days=30)
 
     organization_id = current_organization_id()
     if organization_id is None:

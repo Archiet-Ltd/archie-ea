@@ -24,8 +24,11 @@ PW="$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)"
 # start a fresh process that imports the Flask app - that is what OOM-killed
 # this box. The password goes in as an env var, not an argv, so it does not
 # appear in the process list.
+# method is the literal value of PASSWORD_HASH_METHOD in app/models/user.py:
+# this script cannot import the app, so the one pinned format is duplicated
+# here as a string.
 HASH="$(docker compose exec -T -e MONPW="$PW" server python -c \
-    'import os; from werkzeug.security import generate_password_hash; print(generate_password_hash(os.environ["MONPW"]))' \
+    'import os; from werkzeug.security import generate_password_hash; print(generate_password_hash(os.environ["MONPW"], method="scrypt:32768:8:1"))' \
     | tr -d '\r\n')"
 
 if [ -z "$HASH" ]; then

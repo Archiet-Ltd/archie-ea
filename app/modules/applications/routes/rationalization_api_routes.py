@@ -17,7 +17,7 @@ from app.services.rate_limiter import rate_limit
 
 from . import unified_applications_bp
 from app.utils.pagination import safe_int_arg
-from app.utils.route_guards import require_entity
+from app.utils.route_guards import require_entity, require_entity_in_active_org
 from app.utils.tenant_users import escape_like_literal
 
 logger = logging.getLogger(__name__)
@@ -348,13 +348,20 @@ def rationalization_tracking():
         from app.models.application_rationalization import RationalizationBenefitsTracker
         from sqlalchemy import func
 
-        projected = db.session.query(
-            func.coalesce(func.sum(RationalizationBenefitsTracker.projected_annual_savings), 0)
-        ).scalar() or 0
-        actual = db.session.query(
-            func.coalesce(func.sum(RationalizationBenefitsTracker.actual_annual_savings), 0)
-        ).scalar() or 0
-        financial = {"projected": float(projected), "actual": float(actual)}
+        # tenant-scoping-ok: the join to ApplicationComponent (a TenantMixin model) carries the automatic per-organization SELECT filter, scoping these sums to the current tenant's own applications.
+        projected, actual = (
+            db.session.query(
+                func.coalesce(func.sum(RationalizationBenefitsTracker.projected_annual_savings), 0),
+                func.coalesce(func.sum(RationalizationBenefitsTracker.actual_annual_savings), 0),
+            )
+            .select_from(RationalizationBenefitsTracker)
+            .join(
+                ApplicationComponent,
+                RationalizationBenefitsTracker.application_id == ApplicationComponent.id,
+            )
+            .one()
+        )
+        financial = {"projected": float(projected or 0), "actual": float(actual or 0)}
     except Exception as e:
         current_app.logger.error(f"Error loading tracking financials: {e}")
         financial = {"projected": 0, "actual": 0}
@@ -3356,6 +3363,10 @@ def rationalization_save_benefits(app_id):
     from app.models.application_rationalization import (
         ApplicationRationalizationScore,
         RationalizationBenefitsTracker,
+    )
+
+    require_entity_in_active_org(
+        ApplicationComponent, app_id, description="Application not found"
     )
 
     try:

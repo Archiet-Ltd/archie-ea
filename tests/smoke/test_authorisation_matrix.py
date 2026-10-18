@@ -57,7 +57,8 @@ POLICY = {
     # (RegulatoryFramework/ComplianceControl, a different store from the
     # procurement compliance page above) -- every persona can reach it.
     "/dashboard/compliance":   set(ARCHETYPES),
-    # risk.risk_register is @login_required only.
+    # risk.risk_register and risk.risk_page (/risks/<id>, 404 for another
+    # organisation's risk, pinned in tests/test_risk_ranking.py) are @login_required only.
     "/risks/":                 set(ARCHETYPES),
     # capability_support.index is @login_required only: the viewer's own
     # capabilities and the applications of their own organisation.
@@ -66,6 +67,12 @@ POLICY = {
     "/my-applications/list":   {"application_manager"},
     "/my-applications/health": {"application_manager"},
     "/applications/ownership-coverage": {"cto", "portfolio_manager"},
+    # The duplicate lookup in the Add Application dialog carries the same
+    # @require_roles("admin", "architect") as the create route it precedes.
+    # Every archetype holds the Architect role (platform_admin the
+    # Administrator role), so every archetype reaches it; the read-only
+    # Viewer role, which is refused, is pinned in tests/test_application_registration_check.py.
+    "/applications/api/registration-check": set(ARCHETYPES),
     "/ai-chat":                set(ARCHETYPES),
     # Ask and Twin map: both pages carry @login_required and no role gate, so
     # every archetype is expected to reach them. Stating that in two rows is
@@ -75,6 +82,12 @@ POLICY = {
     # impact endpoint they read, not by the page.
     "/intelligence/ask":       set(ARCHETYPES),
     "/intelligence/twin-map":  set(ARCHETYPES),
+    # R1-B30 (TB-0106): the Answers page (ask a set or risk question, list the
+    # organisation's stored answers). @login_required and no role gate, like Ask
+    # and Twin map, so every archetype reaches it; each stored answer is fenced
+    # to the organisation that asked it (an address from another organisation
+    # is a 404, pinned in the module tests and the journey).
+    "/intelligence/answers":   set(ARCHETYPES),
 # Model Health / Drift: carries @login_required and no role gate, so every
     # archetype is expected to reach it.
     "/genome/model-health/":   set(ARCHETYPES),
@@ -219,6 +232,12 @@ POLICY = {
     # implementation_planning blueprint, so every signed-in persona reaches
     # it; the gaps it shows are fenced per organisation by Gap's TenantMixin.
     "/implementation/gaps":    set(ARCHETYPES),
+    # Gap and work package pickers (link a gap to a work package): both carry
+    # @login_required and no role gate, are fenced to the caller's organisation
+    # by the query, and every persona may search; writing the link is the
+    # role-gated POST pinned in GAP_WORK_PACKAGE_LINK_POST_POLICY below.
+    "/capability-map/api/roadmap/gaps/search":          set(ARCHETYPES),
+    "/capability-map/api/roadmap/work-packages/search": set(ARCHETYPES),
 }
 for _allowed in POLICY.values():
     _allowed.add("platform_admin")
@@ -226,6 +245,30 @@ for _allowed in POLICY.values():
 ACCOUNT_POST_POLICY = {
     "/account/switch-organization": set(ARCHETYPES),
 }
+
+# Initiative goal links: add is @login_required only, like the sibling
+# portfolio write routes -- deliberately open to every signed-in persona; the
+# boundary that matters is the organisation, enforced in the service and
+# covered by tests/test_initiative_goal_links.py. An empty form is posted so
+# the route answers (redirect) before it looks anything up. The remove route
+# carries the same decorator; it needs a real link to answer 302, so its
+# boundary is pinned in the isolation tests instead.
+GOAL_LINK_POST_POLICY = {
+    "/portfolio/initiatives/0/goals": set(ARCHETYPES),
+}
+
+# Linking a gap to a work package (and removing the link) is role-gated by
+# require_roles on the route: a persona holding the Architect role (every seeded
+# archetype) or Administrator (platform_admin) reaches the handler, which answers
+# 404 for the id 0 used here; a read-only Viewer is answered 403 before the
+# handler runs (pinned with a real Viewer account in tests/test_gap_work_package_link.py).
+GAP_WORK_PACKAGE_LINK_POST_POLICY = {
+    "/capability-map/api/roadmap/gaps/0/link-work-package/0":   set(ARCHETYPES),
+    "/capability-map/api/roadmap/gaps/0/unlink-work-package/0": set(ARCHETYPES),
+}
+
+for _allowed in GAP_WORK_PACKAGE_LINK_POST_POLICY.values():
+    _allowed.add("platform_admin")
 
 OVERSIGHT_POST_POLICY = {
     "/ai-chat/oversight/pause":  set(),
@@ -235,9 +278,11 @@ OVERSIGHT_POST_POLICY = {
 for _allowed in OVERSIGHT_POST_POLICY.values():
     _allowed.add("platform_admin")
 
-# AI Systems Register routes: release (admin_required); assess, classify and
-# the owner write routes (permission_required(GENERAL)). These are tested with a real element id
-# seeded in the fixture below.
+# AI Systems Register routes: release (admin_required); assess, classify,
+# grounding-source propose/accept/refuse and the owner write routes
+# (permission_required(GENERAL)). These are tested with a real element id
+# (and, for the grounding accept/refuse routes, a real approval id) seeded in
+# the fixture below.
 AI_SYSTEMS_RELEASE_PERMITTED = {"platform_admin"}
 AI_SYSTEMS_ASSESS_PERMITTED = {
     "solution_architect", "enterprise_architect", "business_architect",
@@ -248,6 +293,10 @@ AI_SYSTEMS_ASSESS_PERMITTED = {
 }
 AI_SYSTEMS_CLASSIFY_PERMITTED = AI_SYSTEMS_ASSESS_PERMITTED
 AI_SYSTEMS_OWNER_WRITE_PERMITTED = AI_SYSTEMS_ASSESS_PERMITTED
+# The three grounding-source routes share the same permission_required(GENERAL)
+# gate as the classification routes: any archetype with general permission can
+# propose, accept or refuse a grounding source.
+AI_SYSTEMS_GROUNDING_SOURCE_PERMITTED = AI_SYSTEMS_ASSESS_PERMITTED
 
 # The versioned Transformation Room collection is portfolio data.  These are
 # the persisted enterprise roles admitted by TransformationProgrammeService;
@@ -536,6 +585,41 @@ def test_data_entity_page_rejects_anonymous(page, live_server, seeded_data_entit
 
 
 @pytest.fixture(scope="module")
+def seeded_risk(seeded):
+    """A real Risk in the seeded org, for the risk page's <id> path."""
+    from app import create_app, db
+    from app.models.risk import Risk
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        title = "Auth-matrix probe risk %s" % org_id
+        risk = Risk.query.filter_by(title=title, organization_id=org_id).first()
+        if risk is None:
+            risk = Risk(title=title, likelihood=3, impact=3, organization_id=org_id)
+            db.session.add(risk)
+            db.session.commit()
+        return risk.id
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_risk_page_authorisation(archetype, page, live_server, seeded, seeded_risk):
+    """GET /risks/<id> carries @login_required and no role gate, like the risk
+    register it is opened from; the risk is fenced to its organisation by the lookup."""
+    _login(page, live_server, seeded["emails"][archetype])
+    path = "/risks/%d" % seeded_risk
+    actual = _observe(page, live_server, path)
+    assert actual == ALLOWED, "%s could not reach %s: expected ALLOWED" % (archetype, path)
+
+
+def test_risk_page_rejects_anonymous(page, live_server, seeded_risk):
+    path = "/risks/%d" % seeded_risk
+    response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert "/account/login" in page.url or (response is not None and response.status >= 400), (
+        "%s was served without signing in" % path)
+
+
+@pytest.fixture(scope="module")
 def seeded_interface_initiative(seeded):
     """A real TechnologyRoadmapInitiative wired to an ArchitectureModel in the
     seeded org, for the comparison POST routes (D5) -- provision_comparison
@@ -741,6 +825,47 @@ def test_account_switch_organization_authorisation(
     )
 
 
+@pytest.mark.parametrize("path,allowed", GOAL_LINK_POST_POLICY.items())
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_initiative_goal_link_post_authorisation(
+    archetype, path, allowed, page, live_server, seeded
+):
+    """The goal-link add route is login_required-open to every persona."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.post(
+        live_server + path, form={"csrf_token": csrf}, max_redirects=0
+    )
+    expected = ALLOWED if archetype in allowed else DENIED
+    actual = ALLOWED if response.status < 400 else DENIED
+    assert actual == expected, (
+        "%s reached %s: expected %s, got %s" % (archetype, path, expected, actual)
+    )
+
+
+@pytest.mark.parametrize("path,allowed", GAP_WORK_PACKAGE_LINK_POST_POLICY.items())
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_gap_work_package_link_post_authorisation(
+    archetype, path, allowed, page, live_server, seeded
+):
+    """The link routes are role-gated: a role that may write reaches the handler
+    (404 for a record that does not exist), anyone else is refused before it."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.post(
+        live_server + path, form={"csrf_token": csrf}, max_redirects=0
+    )
+    expected = ALLOWED if archetype in allowed else DENIED
+    actual = DENIED if response.status in (401, 403) else ALLOWED
+    assert actual == expected, (
+        "%s reached %s: expected %s, got %s" % (archetype, path, expected, response.status)
+    )
+    if actual == ALLOWED:
+        assert response.status == 404, (archetype, path, response.status)
+
+
 @pytest.mark.parametrize("path,allowed", OVERSIGHT_POST_POLICY.items())
 @pytest.mark.parametrize("archetype", ARCHETYPES)
 def test_oversight_post_routes_authorisation(
@@ -920,6 +1045,70 @@ def test_intelligence_yield_route_rejects_anonymous_browser_session(page, live_s
     path = "/api/v1/intelligence/yield"
     response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert response is not None
+    assert response.status == 401
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_intelligence_answers_list_route_authorisation(archetype, page, live_server, seeded):
+    """R1-B30 (TB-0106): GET /api/v1/intelligence/answers (the organisation's
+    stored answers) carries only ``@login_required`` -- no enterprise-role
+    gate -- so every one of the eleven canonical archetypes is expected to
+    reach it once authenticated. Asking (POST) shares the gate and the
+    per-organisation fence; an address is opened through the unguessable
+    32-character token on ``/answers/<address>``, which is 404 for any other
+    organisation. Anonymous is covered separately below.
+    """
+    _login(page, live_server, seeded["emails"][archetype])
+    path = "/api/v1/intelligence/answers"
+    actual = _observe(page, live_server, path)
+    assert actual == ALLOWED, (
+        f"{archetype} could not reach {path}: expected ALLOWED (login_required only)"
+    )
+
+
+def test_intelligence_answers_routes_reject_anonymous_browser_session(page, live_server):
+    for path in ("/api/v1/intelligence/answers", "/api/v1/intelligence/answers/" + "a" * 32):
+        response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert response is not None
+        assert response.status == 401, path
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_intelligence_answers_ask_and_open_authorisation(archetype, page, live_server, seeded):
+    """R1-B30: POST /api/v1/intelligence/answers (ask) and GET
+    /api/v1/intelligence/answers/<address> (open) carry only ``@login_required``,
+    so no archetype is refused by a role gate. An empty question is the 400
+    that says so (a refused caller would get 401/403 before the body is read);
+    an address nobody was issued is the 404 an address of another organisation
+    also answers with."""
+    _login(page, live_server, seeded["emails"][archetype])
+    csrf_token = _csrf_token(page)
+    asked = page.request.post(
+        live_server + "/api/v1/intelligence/answers",
+        data={},
+        headers={"X-CSRFToken": csrf_token},
+        max_redirects=0,
+    )
+    assert asked.status == 400, (
+        "%s asking an answer: expected 400 (reached, empty question), got %s" % (archetype, asked.status)
+    )
+    opened = page.request.get(
+        live_server + "/api/v1/intelligence/answers/" + "a" * 32, max_redirects=0
+    )
+    assert opened.status == 404, (
+        "%s opening an unissued address: expected 404, got %s" % (archetype, opened.status)
+    )
+
+
+def test_intelligence_answers_ask_rejects_anonymous_browser_session(page, live_server):
+    page.goto(live_server + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    token = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.post(
+        live_server + "/api/v1/intelligence/answers",
+        data={"question": "set_impact"},
+        headers={"X-CSRFToken": token},
+        max_redirects=0,
+    )
     assert response.status == 401
 
 
@@ -1141,6 +1330,42 @@ def seeded_ai_system_element(seeded):
         return el.id
 
 
+@pytest.fixture
+def seeded_grounding_approval(seeded, seeded_ai_system_element):
+    """A pending grounding-source approval in the seeded org, so the
+    grounding-source accept and refuse POST routes have a real approval id in
+    the URL. Function-scoped: every probe gets its own pending approval, so a
+    permitted archetype's accept never leaves a decided approval for the next
+    probe to hit."""
+    from app import create_app, db
+    from app.models.models import ArchiMateElement
+    from app.modules.enterprise_genome.services.ai_system_grounding import (
+        propose_grounding_source,
+    )
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        element = db.session.get(ArchiMateElement, seeded_ai_system_element)
+        data_entity = ArchiMateElement(
+            name="Auth-matrix probe data entity",
+            type="DataObject",
+            layer="application",
+            organization_id=org_id,
+            custom_properties={},
+        )
+        db.session.add(data_entity)
+        db.session.flush()
+        approval = propose_grounding_source(
+            element=element,
+            data_entity_id=data_entity.id,  # a real data entity of this org
+            organization_id=org_id,
+            proposed_by_user_id=None,
+        )
+        db.session.commit()
+        return approval.id
+
+
 @pytest.mark.parametrize("archetype", ARCHETYPES)
 def test_ai_system_release_route_authorisation(
     archetype, page, live_server, seeded, seeded_ai_system_element
@@ -1224,6 +1449,65 @@ def test_ai_system_classify_route_authorisation(
 
 
 @pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_ai_system_grounding_source_propose_route_authorisation(
+    archetype, page, live_server, seeded, seeded_ai_system_element
+):
+    """POST /genome/ai-systems/<id>/grounding-source/propose is
+    permission_required(GENERAL), the same gate as the classification routes."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.post(
+        live_server + "/genome/ai-systems/%d/grounding-source/propose"
+        % seeded_ai_system_element,
+        form={"csrf_token": _csrf_token(page), "data_entity_id": "1"},
+        max_redirects=0,
+    )
+    _expect_gate(
+        response, archetype, AI_SYSTEMS_GROUNDING_SOURCE_PERMITTED,
+        "grounding source propose",
+    )
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_ai_system_grounding_source_accept_route_authorisation(
+    archetype, page, live_server, seeded, seeded_ai_system_element,
+    seeded_grounding_approval,
+):
+    """POST /genome/ai-systems/<id>/grounding-source/<approval_id>/accept is
+    permission_required(GENERAL), the same gate as the classification routes."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.post(
+        live_server + "/genome/ai-systems/%d/grounding-source/%d/accept"
+        % (seeded_ai_system_element, seeded_grounding_approval),
+        form={"csrf_token": _csrf_token(page)},
+        max_redirects=0,
+    )
+    _expect_gate(
+        response, archetype, AI_SYSTEMS_GROUNDING_SOURCE_PERMITTED,
+        "grounding source accept",
+    )
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_ai_system_grounding_source_refuse_route_authorisation(
+    archetype, page, live_server, seeded, seeded_ai_system_element,
+    seeded_grounding_approval,
+):
+    """POST /genome/ai-systems/<id>/grounding-source/<approval_id>/refuse is
+    permission_required(GENERAL), the same gate as the classification routes."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.post(
+        live_server + "/genome/ai-systems/%d/grounding-source/%d/refuse"
+        % (seeded_ai_system_element, seeded_grounding_approval),
+        form={"csrf_token": _csrf_token(page)},
+        max_redirects=0,
+    )
+    _expect_gate(
+        response, archetype, AI_SYSTEMS_GROUNDING_SOURCE_PERMITTED,
+        "grounding source refuse",
+    )
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
 def test_ai_system_owner_set_route_authorisation(
     archetype, page, live_server, seeded, seeded_ai_system_element
 ):
@@ -1251,3 +1535,63 @@ def test_ai_system_owner_delete_route_authorisation(
         max_redirects=0,
     )
     _expect_gate(response, archetype, AI_SYSTEMS_OWNER_WRITE_PERMITTED, "owner delete")
+
+
+# Approval inbox routes (the one approval queue). All four are login_required
+# and answer for a reviewer with GENERAL permission, which every archetype
+# holds; a read-only Viewer role is refused (covered against the services in
+# tests/test_approval_impact_preview.py, since no archetype is read-only).
+APPROVAL_INBOX_PERMITTED = set(ARCHETYPES)
+
+
+@pytest.fixture
+def seeded_impact_approval(seeded):
+    """A pending change proposal in the seeded organisation, so the impact route
+    has a real approval id in the URL. Function-scoped."""
+    from app import create_app, db
+    from app.modules.ai_chat.services.ai_chat_approval_service import create_approval_record
+
+    app = create_app("testing")
+    with app.app_context():
+        approval = create_approval_record(
+            organization_id=seeded["ids"]["org"],
+            operation_type="create",
+            entity_type="capability",
+            summary="Auth-matrix probe proposal",
+            operation_payload={"name": "Auth-matrix probe capability"},
+            user_id=None,
+        )
+        db.session.commit()
+        return approval.id
+
+
+@pytest.mark.parametrize("path", [
+    "/ai-chat/approvals/inbox",
+    "/ai-chat/approvals/queue",
+    "/ai-chat/approvals/decided",
+])
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_approval_inbox_reads_authorisation(archetype, path, page, live_server, seeded):
+    """The inbox page and its two JSON reads are reachable by every archetype
+    that holds GENERAL permission (all of them) and by nobody else."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.get(live_server + path, max_redirects=0)
+    if archetype in APPROVAL_INBOX_PERMITTED:
+        assert response.status == 200, "%s was refused %s (%s)" % (archetype, path, response.status)
+    else:
+        assert response.status == 403, "%s reached %s (%s)" % (archetype, path, response.status)
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_approval_impact_route_authorisation(archetype, page, live_server, seeded, seeded_impact_approval):
+    """GET /ai-chat/approvals/<id>/impact answers the same archetypes, with the
+    impact state stated (a new capability is not in the model yet)."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.get(
+        live_server + "/ai-chat/approvals/%d/impact" % seeded_impact_approval, max_redirects=0
+    )
+    if archetype in APPROVAL_INBOX_PERMITTED:
+        assert response.status == 200, "%s was refused the impact route (%s)" % (archetype, response.status)
+        assert response.json()["impact"]["state"] == "not_in_model"
+    else:
+        assert response.status == 403, "%s reached the impact route (%s)" % (archetype, response.status)
