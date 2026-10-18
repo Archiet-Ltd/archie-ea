@@ -74,6 +74,7 @@ from ...forms.admin_forms import (
 from app.modules.account.forms.account_forms import CreatePasswordForm
 from app.decorators import admin_required, audit_log, governance_gate_reader_required
 from app.middleware.tenant_decorators import (
+    is_platform_admin,
     org_admin_required,
     platform_admin_required,
     require_org_or_platform_admin,
@@ -102,9 +103,19 @@ _svc = AdminUserService
 @admin_bp_v2.route("/send-digest", methods=["POST"])
 @login_required
 @admin_required
+@platform_admin_required
 @timed_route
 def send_digest():
-    """PLT-009/PLT-031: Manual trigger for weekly digest emails."""
+    """PLT-009/PLT-031: Manual trigger for weekly digest emails.
+
+    Platform-admin-only (refuter review of PR 428, D-2): this sends weekly
+    digest emails to every tenant on the platform and reveals platform-wide
+    counts in its response. ``admin_required`` only proves the caller is an
+    administrator of *some* organisation -- true for every self-registered
+    user -- so it let any org admin trigger a platform-wide mailing.
+    ``admin_required`` is kept rather than removed; ``platform_admin_required``
+    is the operative check.
+    """
     from flask import current_app
     from app._bootstrap._digest_emails import (
         send_data_maturity_digest,
@@ -507,8 +518,14 @@ def registered_users():
     # /admin/organizations read as a platform undercounting itself rather
     # than the same figure viewed at two different scopes. Name the scope
     # and surface the platform-wide total so the two views reconcile.
+    #
+    # D-6 (refuter review of PR 428): that reconciliation total is itself a
+    # cross-tenant leak -- a plain org admin, authorised only for their own
+    # organisation, learned how many users exist on the WHOLE platform.
+    # Compute it only for an actual platform admin; the template omits the
+    # reconciliation line entirely when this is None.
     current_org = db.session.get(Organization, g.current_org_id)
-    platform_total_users = User.query.count()
+    platform_total_users = User.query.count() if is_platform_admin(current_user) else None
     return render_template(
         "admin/registered_users.html",
         users=users,
@@ -890,8 +907,21 @@ def test_api_settings(settings_id):
 @timed_route
 @login_required
 @admin_required
+@platform_admin_required
 def preview_env_keys():
-    """Preview API keys found in environment variables but not yet in the database."""
+    """Preview which of the platform's own LLM provider keys are configured.
+
+    Platform-admin-only (lead's own review, finding S1): reads ``os.environ``
+    directly -- the platform's real ``OPENAI_API_KEY``, ``ANTHROPIC_API_KEY``,
+    ``OPENROUTER_API_KEY`` and the rest of ``env_key_map`` below -- and returned
+    the last four characters of each real key value, plus which providers are
+    configured, to any caller ``admin_required`` admits: every self-registered
+    organisation admin for their own brand-new org, no invitation into anyone
+    else's org needed. Same sweep, same root cause, as ``load_env_keys`` just
+    below. ``admin_required`` is kept rather than removed; ``platform_admin_required``
+    is the operative check, same pattern as ``jira_settings`` above and the
+    rest of this branch.
+    """
     import os
 
     env_key_map = {
@@ -980,9 +1010,25 @@ def update_provider_model():
 @timed_route
 @login_required
 @admin_required
+@platform_admin_required
 @audit_log("load_env_keys")
 def load_env_keys():
-    """Import selected API keys from environment variables into the database."""
+    """Import the platform's own LLM provider API keys into the calling org's
+    ``APISettings`` rows.
+
+    Platform-admin-only (lead's own review, finding S1, CRITICAL, reproduced):
+    ``APISettings`` is tenant-scoped (``organization_id`` auto-set on INSERT by
+    the tenant-isolation ORM listener), but the values written here come
+    straight from ``os.environ`` -- the platform's real ``OPENAI_API_KEY``,
+    ``ANTHROPIC_API_KEY``, ``OPENROUTER_API_KEY`` and the rest of
+    ``env_key_map`` below. ``admin_required`` alone let any self-registered
+    organisation admin call this for their own brand-new org and walk away
+    with a working copy of the platform's real key, now stored and usable
+    from inside that org -- no invitation into anyone else's org needed.
+    ``admin_required`` is kept rather than removed; ``platform_admin_required``
+    is the operative check, same pattern as ``jira_settings`` above and the
+    rest of this branch.
+    """
     import os
 
     data = request.get_json()
@@ -2429,9 +2475,20 @@ def sso_settings():
 @admin_bp_v2.route("/jira-settings", methods=["GET", "POST"])
 @timed_route
 @login_required
+@admin_required
 @platform_admin_required
 def jira_settings():
-    """Manage Jira push integration configuration."""
+    """Manage Jira push integration configuration.
+
+    Platform-admin-only (refuter review of PR 428, D-1): ``ExternalSystem``
+    carries no ``organization_id`` -- one "jira" row serves the whole
+    platform, including the encrypted credential. ``admin_required`` alone
+    let any self-registered organisation admin repoint the platform's Jira
+    integration at a host of their choosing while the previously-saved
+    credential stayed in place, so the next push or test sent that real
+    credential to an attacker-controlled endpoint. ``admin_required`` is kept
+    rather than removed; ``platform_admin_required`` is the operative check.
+    """
     from flask_wtf import FlaskForm
     from wtforms import BooleanField, PasswordField, StringField
     from wtforms.validators import DataRequired
@@ -2583,6 +2640,7 @@ def jira_settings():
 @admin_bp_v2.route("/jira-settings/test-connection", methods=["POST"])
 @timed_route
 @login_required
+@admin_required
 @platform_admin_required
 def jira_test_connection():
     """Test Jira API connectivity."""
@@ -2705,6 +2763,7 @@ def jira_webhook():
 
 @admin_bp_v2.route("/jira-settings/save-env-config", methods=["POST"])
 @login_required
+@admin_required
 @platform_admin_required
 def save_env_jira_config():
     """Save .env Jira credentials to database."""
@@ -2748,6 +2807,7 @@ def save_env_jira_config():
 @admin_bp_v2.route("/jira-settings/trigger-push", methods=["POST"])
 @timed_route
 @login_required
+@admin_required
 @platform_admin_required
 def jira_trigger_push():
     """Create a Job and start pushing applications to Jira."""
@@ -2788,6 +2848,7 @@ def jira_trigger_push():
 @admin_bp_v2.route("/jira-settings/push-status", methods=["GET"])
 @timed_route
 @login_required
+@admin_required
 @platform_admin_required
 def jira_push_status():
     """Return JSON push status for polling."""
@@ -2815,6 +2876,7 @@ def jira_push_status():
 @admin_bp_v2.route("/jira-settings/kanban-push-status", methods=["GET"])
 @timed_route
 @login_required
+@admin_required
 @platform_admin_required
 def jira_kanban_push_status():
     """Return JSON kanban push status for polling."""
@@ -2831,6 +2893,7 @@ def jira_kanban_push_status():
 @admin_bp_v2.route("/jira-settings/trigger-kanban-push", methods=["POST"])
 @timed_route
 @login_required
+@admin_required
 @platform_admin_required
 def jira_trigger_kanban_push():
     """Push all unpushed KanbanCard rows to Jira."""
@@ -2847,6 +2910,7 @@ def jira_trigger_kanban_push():
 @admin_bp_v2.route("/jira-settings/push-epics", methods=["POST"])
 @timed_route
 @login_required
+@admin_required
 @platform_admin_required
 def jira_push_epics():
     """Create one Jira Epic per ADM phase as an ArchiMate Plateau."""
@@ -2862,6 +2926,7 @@ def jira_push_epics():
 @admin_bp_v2.route("/jira-settings/push-applications", methods=["POST"])
 @timed_route
 @login_required
+@admin_required
 @platform_admin_required
 def jira_push_applications():
     """Push ApplicationComponents (ArchiMate Application Layer, Phase C/D) to Jira."""
@@ -2877,6 +2942,7 @@ def jira_push_applications():
 @admin_bp_v2.route("/jira-settings/push-dependencies", methods=["POST"])
 @timed_route
 @login_required
+@admin_required
 @platform_admin_required
 def jira_push_dependencies():
     """Create Jira Subtasks from KanbanCard.depends_on (ArchiMate TriggeringRelationship).
@@ -2895,6 +2961,7 @@ def jira_push_dependencies():
 @admin_bp_v2.route("/jira-settings/field-discovery", methods=["GET"])
 @timed_route
 @login_required
+@admin_required
 @platform_admin_required
 def jira_field_discovery():
     """Trigger discover_fields and return available Jira fields."""
@@ -4712,10 +4779,19 @@ def export_portfolio_pptx():
 @admin_bp_v2.route("/ai-confidence")
 @login_required
 @admin_required
+@platform_admin_required
 @timed_route
 def ai_confidence_calibration():
     """AI confidence calibration dashboard — tracks whether AI confidence
-    labels match actual architect acceptance rates."""
+    labels match actual architect acceptance rates.
+
+    Platform-admin-only (refuter review of PR 428, D-6): the query below
+    aggregates ``AISuggestion`` with no organisation filter at all --
+    ``AISuggestion`` carries no ``organization_id`` -- so this was a genuine
+    cross-tenant aggregate behind an org-scoped ``admin_required`` check.
+    ``admin_required`` is kept rather than removed; ``platform_admin_required``
+    is the operative check.
+    """
     from app.models.ai_suggestion import AISuggestion
     from sqlalchemy import func, case
 
