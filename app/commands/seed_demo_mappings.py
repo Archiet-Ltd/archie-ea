@@ -35,7 +35,12 @@ capability write listeners call), never by a copy of its SQL here; when no
 unified row can be made, the old row is still written and the pair is reported
 as not linked in the unified store.
 
-Idempotent; safe to re-run.
+Idempotent; safe to re-run. Idempotence is read-then-insert: the seed looks up
+the pairs it would write and skips the ones present. There is no unique
+constraint on (application, capability) in either mapping table, and adding one
+would need a schema revision plus a clean-up of any duplicates production
+already holds, so it is left as its own change; this command is a CLI run by one
+person against one organisation, not a concurrent writer.
 
     flask --app manage seed-demo-mappings --org-id 7 --dry-run
     flask --app manage seed-demo-mappings --org-id 7
