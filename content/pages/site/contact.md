@@ -27,3 +27,7 @@ report a security issue privately rather than in public, so it can be fixed firs
 
 [Sign in](/account/login) — account-specific questions are best raised from inside the product,
 where we can see your organisation's context.
+
+## Something not working?
+
+The [known issues](/known-issues) page lists the limits you may meet and what to do instead.
