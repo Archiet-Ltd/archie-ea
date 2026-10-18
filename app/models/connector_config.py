@@ -242,6 +242,7 @@ class ConnectorType(str, Enum):
     ERP = "erp"
     CRM = "crm"
     ITSM = "itsm"
+    PRODUCTIVITY = "productivity"  # Microsoft 365 licence usage
     EA_TOOL = "ea_tool"  # Enterprise Architecture tools (Abacus, Ardoq, LeanIX, etc.)
 
 

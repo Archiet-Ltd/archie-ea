@@ -119,6 +119,8 @@ def _build_renewal_brief_context(contract) -> Dict[str, Any]:
                 "product_name": lic.product_name,
                 "quantity_entitled": lic.quantity_entitled,
                 "quantity_deployed": lic.quantity_deployed,
+                "seats_used": lic.effective_usage[0],
+                "seats_used_basis": lic.effective_usage[1],
                 "compliance_status": lic.compliance_status,
             }
             for lic in licences[:MAX_CONTEXT_ROWS]
@@ -196,7 +198,8 @@ def _build_remediation_context(license_entitlement) -> Dict[str, Any]:
         "license_metric": license_entitlement.license_metric,
         "quantity_entitled": license_entitlement.quantity_entitled,
         "quantity_deployed": license_entitlement.quantity_deployed,
-        "quantity_used": license_entitlement.quantity_used,
+        "quantity_used": license_entitlement.effective_usage[0],
+        "quantity_used_basis": license_entitlement.effective_usage[1],
         "unit_cost": float(license_entitlement.unit_cost) if license_entitlement.unit_cost else None,
         "compliance_status": license_entitlement.compliance_status,
     }
@@ -289,8 +292,8 @@ def _build_licenses_position_context(organization_id: int) -> Dict[str, Any]:
     unused = [
         lic
         for lic in licences
-        if lic.quantity_entitled and lic.quantity_used is not None
-        and lic.quantity_used < lic.quantity_entitled
+        if lic.quantity_entitled and lic.effective_usage[0] is not None
+        and lic.effective_usage[0] < lic.quantity_entitled
     ]
 
     return {
@@ -309,7 +312,8 @@ def _build_licenses_position_context(organization_id: int) -> Dict[str, Any]:
             {
                 "product_name": lic.product_name,
                 "quantity_entitled": lic.quantity_entitled,
-                "quantity_used": lic.quantity_used,
+                "quantity_used": lic.effective_usage[0],
+                "quantity_used_basis": lic.effective_usage[1],
             }
             for lic in unused[:MAX_CONTEXT_ROWS]
         ],

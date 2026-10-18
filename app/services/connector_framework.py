@@ -432,6 +432,7 @@ def _register_concrete_connectors():
         return
     from app.connectors.abacus import AbacusConnector
     from app.connectors.jira import JiraALMConnector
+    from app.connectors.m365 import M365LicenceUsageConnector
     from app.connectors.servicenow import ServiceNowCMDBConnector
 
     _CONNECTOR_CLASSES.update(
@@ -439,6 +440,7 @@ def _register_concrete_connectors():
             "abacus": AbacusConnector,
             "ea_tool": AbacusConnector,
             "jira": JiraALMConnector,
+            "m365": M365LicenceUsageConnector,
             "servicenow": ServiceNowCMDBConnector,
         }
     )
@@ -1022,6 +1024,12 @@ def run_connector_sync(
         else ConnectorStatus.ERROR.value
     )
 
+    usage = result.pop("licence_usage", None)
+    if usage:
+        from app.services.licence_usage_service import record_licence_usage
+
+        result.update(record_licence_usage(org_id=resolved, connector_id=cfg.id, usage=usage))
+
     touched = result.get("elements_touched")
     if touched:
         result["crosswalk_links_written"] = _write_touched_crosswalk_links(
@@ -1084,6 +1092,14 @@ def _credential_field_map(connector_type: str, org_id: int, config: dict) -> dic
         # grant needs its own form field for it, not a value made up here.
         return {
             "base_url": config.get("instance_url", ""),
+            "client_id": config.get("client_id", ""),
+            "client_secret": _secret("client_secret"),
+        }
+
+    if connector_type == "m365":
+        return {
+            "base_url": "https://graph.microsoft.com/v1.0",
+            "tenant_id": config.get("tenant_id", ""),
             "client_id": config.get("client_id", ""),
             "client_secret": _secret("client_secret"),
         }

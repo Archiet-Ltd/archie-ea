@@ -139,8 +139,43 @@ class LicenseEntitlement(TenantMixin, db.Model):
             "unit_cost": float(self.unit_cost) if self.unit_cost else None,
             "compliance_status": self.compliance_status,
             "utilization_percent": self.utilization_percent,
+            "measured_usage": (self.latest_measurement.seats_used if self.latest_measurement else None),
             "organization_id": self.organization_id,
         }
+
+    @property
+    def latest_measurement(self):
+        """The most recent measured seat count, or None when none was fetched."""
+        from .license_usage_measurement import LicenseUsageMeasurement
+
+        return (
+            self.usage_measurements.order_by(
+                LicenseUsageMeasurement.fetched_at.desc(), LicenseUsageMeasurement.id.desc()
+            ).first()
+            if self.id is not None
+            else None
+        )
+
+    @property
+    def effective_usage(self):
+        """Seats used for a decision: the measured figure when one exists, else
+        the typed one. Returns ``(seats, basis)`` with basis ``"measured"``,
+        ``"typed"`` or ``None`` (nothing recorded, seats is None)."""
+        measurement = self.latest_measurement
+        if measurement is not None:
+            return measurement.seats_used, "measured"
+        if self.quantity_used is not None:
+            return self.quantity_used, "typed"
+        return None, None
+
+    @property
+    def effective_utilization_percent(self):
+        seats, _basis = self.effective_usage
+        if seats is None:
+            return None
+        if not self.quantity_entitled:
+            return 0
+        return round((seats / self.quantity_entitled) * 100, 1)
 
     @property
     def vendor(self):
@@ -186,9 +221,10 @@ class LicenseEntitlement(TenantMixin, db.Model):
         Without a unit cost or recorded usage there is nothing to value, so
         the entitlement contributes nothing to a shelfware total.
         """
-        if not self.unit_cost or self.quantity_used is None:
+        seats, _basis = self.effective_usage
+        if not self.unit_cost or seats is None:
             return Decimal("0.00")
-        unused = max(0, self.quantity_entitled - self.quantity_used)
+        unused = max(0, self.quantity_entitled - seats)
         return self.unit_cost * unused
 
     def update_compliance_status(self):

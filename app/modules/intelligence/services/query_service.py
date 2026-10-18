@@ -1837,7 +1837,12 @@ class IntelligenceQueryService:
 
             entries: List[Dict[str, Any]] = []
             for row in rows:
-                if row.last_usage_sync is None:
+                measurement = row.latest_measurement
+                if measurement is not None:
+                    # Measured seats win over the typed figure.
+                    under_used = measurement.seats_used < row.quantity_entitled
+                    under_used_reason = None
+                elif row.last_usage_sync is None:
                     under_used = None
                     under_used_reason = LICENCE_USAGE_NOT_SYNCED_REASON
                 else:
@@ -1851,6 +1856,9 @@ class IntelligenceQueryService:
                         "quantity_entitled": row.quantity_entitled,
                         "quantity_deployed": row.quantity_deployed,
                         "quantity_used": row.quantity_used,
+                        "measured_seats_used": measurement.seats_used if measurement else None,
+                        "measured_source": measurement.source if measurement else None,
+                        "measured_at": measurement.fetched_at.isoformat() if measurement else None,
                         "under_used": under_used,
                         "under_used_reason": under_used_reason,
                         "unit_cost": float(row.unit_cost) if row.unit_cost is not None else None,

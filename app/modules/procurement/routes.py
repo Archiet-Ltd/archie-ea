@@ -260,9 +260,9 @@ def compliance_dashboard():
 
     # Shelfware (entitled but not used)
     shelfware_value = sum(
-        (item.quantity_entitled - item.quantity_used) * float(item.unit_cost or 0)
+        (item.quantity_entitled - item.effective_usage[0]) * float(item.unit_cost or 0)
         for item in licenses
-        if item.quantity_entitled and item.quantity_used and item.quantity_entitled > item.quantity_used
+        if item.quantity_entitled and item.effective_usage[0] and item.quantity_entitled > item.effective_usage[0]
     )
 
     return render_template(
