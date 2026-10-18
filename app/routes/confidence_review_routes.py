@@ -4,9 +4,10 @@ Provides UI for reviewing low-confidence mappings before they are committed.
 """
 
 from flask import Blueprint, jsonify, render_template, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.decorators import audit_log
+from app.middleware.tenant_decorators import platform_admin_required
 
 confidence_review_bp = Blueprint(
     "confidence_review_dashboard", __name__, url_prefix="/reviews"
@@ -140,9 +141,18 @@ def api_bulk_reject():
 
 @confidence_review_bp.route("/api/thresholds", methods=["POST"])
 @login_required
+@platform_admin_required
 @audit_log("review_thresholds_save")
 def api_save_thresholds():
-    """Save confidence threshold configuration."""
+    """Save confidence threshold configuration.
+
+    Platform-admin-only (lead review of PR 430, item 6): writes the global,
+    platform-wide ``ConfidenceThreshold`` table and was ``login_required``
+    only -- any signed-in user could rewrite platform confidence thresholds.
+    ``created_by_id`` is also taken from ``current_user.id`` now, not from
+    the request body: a caller could previously claim the row was created by
+    anyone.
+    """
     from app.models.confidence_review import ConfidenceThreshold
     from app import db
 
@@ -156,7 +166,7 @@ def api_save_thresholds():
         auto_approval_threshold=data.get("auto_approval_threshold", 0.8),
         rejection_threshold=data.get("rejection_threshold", 0.3),
         requires_human_review=data.get("requires_human_review", True),
-        created_by_id=data.get("user_id"),
+        created_by_id=current_user.id,
     )
 
     db.session.add(threshold)
