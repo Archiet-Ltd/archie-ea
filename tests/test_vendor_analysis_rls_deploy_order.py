@@ -72,8 +72,8 @@ def scratch():
         connection.execute(
             text("CREATE TABLE business_capability (id serial PRIMARY KEY, name text, organization_id integer)")
         )
-        # options_analysis is deliberately given a WRONG organisation on one row (what the
-        # creator-based rule produced); the capability must win.
+        # options_analysis carries its own organisation, stamped from the creator's
+        # organisation; capability_id is client-supplied and may name another organisation's.
         connection.execute(
             text(
                 "CREATE TABLE options_analysis (id serial PRIMARY KEY, capability_id integer, "
@@ -90,18 +90,19 @@ def scratch():
                 "('cap-a', 1), ('cap-b', 2), ('cap-orphan', NULL)"
             )
         )
-        # analysis 1 -> capability A, but creator-derived organisation says B (mismatch);
-        # analysis 2 -> capability B; analysis 3 -> capability with no organisation;
-        # analysis 4 -> no capability row at all.
+        # analysis 1 -> own organisation B, capability belongs to A (mismatch: B must win);
+        # analysis 2 -> own organisation B, capability B; analysis 3 -> no organisation,
+        # capability with none either; analysis 4 -> no organisation, no capability row;
+        # analysis 5 -> no organisation, capability A (falls back to A).
         connection.execute(
             text(
                 "INSERT INTO options_analysis (capability_id, organization_id) VALUES "
-                "(1, 2), (2, 2), (3, NULL), (99, NULL)"
+                "(1, 2), (2, 2), (3, NULL), (99, NULL), (1, NULL)"
             )
         )
         for table in CHILDREN:
             connection.execute(
-                text(f"INSERT INTO {table} (analysis_id, note) VALUES (1,'a'), (2,'b'), (3,'x'), (4,'y')")  # nosec B608
+                text(f"INSERT INTO {table} (analysis_id, note) VALUES (1,'a'), (2,'b'), (3,'x'), (4,'y'), (5,'f')")  # nosec B608
             )
     yield engine
     engine.dispose()
@@ -151,23 +152,51 @@ def test_revision_alone_adds_the_column_index_and_foreign_key(scratch, table):
 
 
 @pytest.mark.parametrize("table", CHILDREN)
-def test_capability_chain_attributes_rows_and_wins_over_the_parent_rows_organisation(scratch, table):
+def test_child_keeps_its_analysis_organisation_even_when_the_capability_belongs_to_another(scratch, table):
     _upgrade(scratch)
     orgs = _org_by_note(scratch, table)
-    assert orgs["a"] == 1, "capability organisation (A) must beat the analysis row's organisation (B)"
+    assert orgs["a"] == 2, "analysis organisation (B) must beat its capability's organisation (A)"
     assert orgs["b"] == 2
+
+
+@pytest.mark.parametrize("table", CHILDREN)
+def test_null_parent_falls_back_to_the_capability_and_unresolved_rows_stay_null(scratch, table):
+    _upgrade(scratch)
+    orgs = _org_by_note(scratch, table)
+    assert orgs["f"] == 1
     # unresolved rows stay NULL, nothing is guessed, and the revision did not raise
     assert orgs["x"] is None
     assert orgs["y"] is None
 
 
-def test_a_row_already_carrying_the_wrong_organisation_is_corrected_to_the_capability(scratch):
+def test_an_existing_organisation_is_never_overwritten(scratch):
     _upgrade(scratch)
     with scratch.begin() as connection:
-        connection.execute(text("UPDATE vendor_options SET organization_id = 2 WHERE note = 'a'"))
+        connection.execute(text("UPDATE vendor_options SET organization_id = 1 WHERE note = 'a'"))
     # RLS is now enabled but the migration role owns the table, so it still sees the row.
     _upgrade(scratch)
     assert _org_by_note(scratch, "vendor_options")["a"] == 1
+
+
+def test_an_existing_foreign_key_under_another_name_is_not_duplicated(scratch):
+    with scratch.begin() as connection:
+        connection.execute(text("ALTER TABLE vendor_options ADD COLUMN organization_id integer"))
+        connection.execute(
+            text(
+                "ALTER TABLE vendor_options ADD CONSTRAINT legacy_vendor_org_fk "
+                "FOREIGN KEY (organization_id) REFERENCES organizations (id)"
+            )
+        )
+    _upgrade(scratch)
+    with scratch.connect() as connection:
+        count = connection.execute(
+            text(
+                "SELECT count(*) FROM pg_constraint WHERE contype = 'f' "
+                "AND conrelid = to_regclass('public.vendor_options') "
+                "AND conname IN ('legacy_vendor_org_fk', 'fk_vendor_options_organization_id')"
+            )
+        ).scalar()
+    assert count == 1
 
 
 @pytest.mark.parametrize("table", CHILDREN)
@@ -202,9 +231,9 @@ def test_a_non_owner_role_sees_only_its_organisations_rows(scratch):
             with scratch.connect() as connection:
                 connection.execute(text(f"SET ROLE {role}"))  # nosec B608
                 connection.execute(text("SELECT set_config('archie.organization_id', '1', false)"))
-                assert [r[0] for r in connection.execute(text(f"SELECT note FROM {table}"))] == ["a"]  # nosec B608
+                assert [r[0] for r in connection.execute(text(f"SELECT note FROM {table}"))] == ["f"]  # nosec B608
                 connection.execute(text("SELECT set_config('archie.organization_id', '2', false)"))
-                assert [r[0] for r in connection.execute(text(f"SELECT note FROM {table}"))] == ["b"]  # nosec B608
+                assert sorted(r[0] for r in connection.execute(text(f"SELECT note FROM {table}"))) == ["a", "b"]  # nosec B608
                 connection.execute(text("SELECT set_config('archie.organization_id', '', false)"))
                 assert list(connection.execute(text(f"SELECT note FROM {table}"))) == []  # nosec B608
     finally:

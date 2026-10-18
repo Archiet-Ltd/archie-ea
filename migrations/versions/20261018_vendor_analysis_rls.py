@@ -15,14 +15,23 @@ for an existing column would find none, apply no policy, and still be recorded a
 applied. Each table gets a nullable ``organization_id``, an index and a foreign
 key to ``organizations``, then a backfill, then the policies.
 
-The backfill has one rule: a row belongs to the organisation that owns the
-capability its analysis examines (``analysis_id`` -> ``options_analysis`` ->
-``capability_id`` -> ``business_capability.organization_id``), the same rule
-``backfill-layer-tenancy`` uses for these tables. The capability always wins: a
-row already carrying a different organisation is corrected to it. A row whose
-chain does not resolve is left NULL, the count is printed and the deploy
-carries on; it matches no organisation's policy and is visible to the platform
-scope alone until it is attributed.
+The backfill has one rule, parent first: a row belongs to the organisation of its
+own analysis (``analysis_id`` -> ``options_analysis.organization_id``), which is
+stamped from the caller's organisation when the analysis is created. Only when
+that value is NULL does it fall back to the organisation owning the analysis's
+capability (``options_analysis.capability_id`` -> ``business_capability.organization_id``).
+The capability is not authoritative: ``capability_id`` is taken from the request
+with no ownership check, so it can name another organisation's capability. The
+rule only fills: a row that already carries an organisation is never changed.
+A row whose chain does not resolve is left NULL, the count is printed and the
+deploy carries on; it matches no organisation's policy and is visible to the
+platform scope alone until it is attributed. This is the only derivation of
+these five tables' organisation; ``backfill-layer-tenancy`` no longer has one.
+
+``downgrade()`` reverses the policies and row-level security only. It
+deliberately leaves the ``organization_id`` column, its index and its foreign
+key in place: they are inert without the policies, and dropping the column
+would discard the attribution this revision computed.
 
 Idempotent: every step checks before it acts, so a second run is a no-op.
 
@@ -91,9 +100,21 @@ def _add_column(bind, table: str) -> None:
     if not _has_column(bind, table, "organization_id"):
         op.add_column(table, sa.Column("organization_id", sa.Integer(), nullable=True))
     op.create_index(f"ix_{table}_organization_id", table, ["organization_id"], if_not_exists=True)
-    fk = f"fk_{table}_organization_id"
-    if not bind.execute(text("SELECT 1 FROM pg_constraint WHERE conname = :n"), {"n": fk}).scalar():
-        op.create_foreign_key(fk, table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE")
+    # Detect by column, not by name: a foreign key already on organization_id
+    # under any other name must not get a second one beside it.
+    has_fk = bind.execute(
+        text(
+            "SELECT 1 FROM pg_constraint con "
+            "JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = ANY (con.conkey) "
+            "WHERE con.contype = 'f' AND con.conrelid = to_regclass(:t) "
+            "AND att.attname = 'organization_id'"
+        ),
+        {"t": f"public.{table}"},
+    ).scalar()
+    if not has_fk:
+        op.create_foreign_key(
+            f"fk_{table}_organization_id", table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE"
+        )
 
 
 def _can_derive(bind) -> bool:
@@ -106,16 +127,17 @@ def _can_derive(bind) -> bool:
 
 
 def _backfill(bind, table: str) -> None:
-    """Attribute a row to the organisation owning its analysis's capability."""
+    """Fill a row from its analysis's own organisation, else its capability's; never overwrite."""
     if not _has_column(bind, table, "analysis_id"):
         return
+    parent = "a.organization_id" if _has_column(bind, "options_analysis", "organization_id") else "NULL"
     # Table name is a literal module constant; nothing here is user input.
     bind.execute(
         text(
-            f"UPDATE {table} AS c SET organization_id = b.organization_id "  # nosec B608 - table names from a literal constant
-            "FROM options_analysis AS a JOIN business_capability AS b ON b.id = a.capability_id "
-            "WHERE c.analysis_id = a.id AND b.organization_id IS NOT NULL "
-            "AND c.organization_id IS DISTINCT FROM b.organization_id"
+            f"UPDATE {table} AS c SET organization_id = COALESCE({parent}, b.organization_id) "  # nosec B608 - table names from a literal constant
+            "FROM options_analysis AS a LEFT JOIN business_capability AS b ON b.id = a.capability_id "
+            f"WHERE c.analysis_id = a.id AND c.organization_id IS NULL "
+            f"AND COALESCE({parent}, b.organization_id) IS NOT NULL"
         )
     )
 
