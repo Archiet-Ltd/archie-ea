@@ -827,3 +827,26 @@ def test_document_layout_unchanged_for_other_families(app, url):
         assert 'data-testid="pricing-plans"' in main
     else:
         assert '<article class="public-page-content' in main
+
+
+ROLE_SLUGS = ("enterprise-architects", "cto-and-cio", "it-portfolio-managers", "solution-architects")
+
+
+def test_home_and_role_pages_open_with_the_one_shared_hero(app):
+    """The home page and every role page render their opening through
+    public/_partials/_hero.html: the same grid, frame and figure markup, the role's own
+    captured screen in the frame, and exactly one primary action."""
+    with app.test_client() as client:
+        home = client.get("/").data.decode()
+        assert 'data-testid="home-hero"' in home and "home-frame__img" in home
+        for slug in ROLE_SLUGS:
+            html = client.get(f"/roles/{slug}").data.decode()
+            hero = html[html.index('data-testid="landing-hero"'): html.index('data-testid="landing-hero-figure"')]
+            assert "home-hero__grid" in html and "home-frame" in html, slug
+            assert hero.count("public-btn") == 1, slug
+            figure = html[html.index('data-testid="landing-hero-figure"'):]
+            figure = figure[: figure.index("</figure>")]
+            assert f"/static/img/roles/{slug}.webp" in figure, slug
+            assert f"/static/img/roles/{slug}-mobile.webp" in figure, slug
+            assert 'data-testid="page-screenshot"' not in html, f"{slug}: screenshot repeated below the hero"
+            assert html.count("<h1") == 1, slug
