@@ -10,6 +10,7 @@ from flask_login import login_required
 
 from app import db
 from app.decorators import audit_log
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.technical_capability import ACMDomain
 from app.services.acm_hybrid_manager import ACMHybridManager
 from app.utils.pagination import safe_int_arg
@@ -20,6 +21,7 @@ acm_hybrid_bp = Blueprint("acm_hybrid", __name__, url_prefix="/api/acm-hybrid")
 
 @acm_hybrid_bp.route("/seed", methods=["POST"])
 @login_required
+@platform_admin_required
 @audit_log("acm_seed_capabilities")
 def seed_capabilities():
     """
@@ -277,6 +279,7 @@ def get_capability(code):
 
 @acm_hybrid_bp.route("/capabilities/<code>", methods=["PUT"])
 @login_required
+@platform_admin_required
 @audit_log("acm_update_capability")
 def update_capability(code):
     """
@@ -315,6 +318,7 @@ def update_capability(code):
 
 @acm_hybrid_bp.route("/capabilities/<code>", methods=["DELETE"])
 @login_required
+@platform_admin_required
 @audit_log("acm_delete_capability")
 def delete_capability(code):
     """
