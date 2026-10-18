@@ -12,10 +12,7 @@ from datetime import date
 from flask import render_template, request
 from flask_login import current_user, login_required
 
-from app.decorators import (
-    requires_application_owner,
-    requires_application_owner_or_org_admin,
-)
+from app.decorators import requires_application_owner_or_org_admin
 from app.models.application_owner import ApplicationOwner
 from app.models.application_portfolio import ApplicationComponent
 from app.utils.pagination import safe_int_arg
@@ -132,7 +129,7 @@ def app_list():
 
 @my_applications_bp.route("/app/<int:app_id>")
 @login_required
-@requires_application_owner
+@requires_application_owner_or_org_admin
 def app_detail(app_id):
     """View details of an owned application."""
     # Verify ownership
