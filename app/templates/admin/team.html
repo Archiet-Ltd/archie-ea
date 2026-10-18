@@ -173,6 +173,14 @@
                         </form>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div class="flex items-center justify-end gap-3">
+                        {% if member.external_id and not member.is_platform_admin %}
+                        <form method="POST" action="{{ url_for('team.team_reset_sign_in', user_id=member.id) }}" data-team-reset-sign-in>
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" aria-label="Reset single sign-on for {{ member.email }}"
+                                class="text-foreground hover:text-primary">Reset single sign-on</button>
+                        </form>
+                        {% endif %}
                         {% if member.id != current_user.id %}
                         <button type="button"
                             data-action="remove-member"
@@ -183,6 +191,7 @@
                         {% else %}
                         <span class="text-muted-foreground/60 text-xs">(you)</span>
                         {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% else %}

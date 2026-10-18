@@ -23,7 +23,14 @@ destination was requested with a logged-in client:
 from flask import current_app, render_template, url_for
 from flask_login import current_user, login_required
 
-from app.utils.role_access import _ZONE_TITLES, SIDEBAR_ZONES, can_access_section, link_requires_satisfied
+from app.utils.role_access import (
+    _ZONE_TITLES,
+    SIDEBAR_ZONES,
+    can_access_section,
+    get_user_role,
+    is_hidden_not_ready,
+    link_requires_satisfied,
+)
 
 from . import modules_directory_bp
 
@@ -56,7 +63,18 @@ _SECTION_BY_ENDPOINT_PREFIX = {
     # grants portfolio_manager and platform_admin, matching that reality;
     # the /admin/ URL prefix itself is misleading but out of scope here.
     "formula_register.": "portfolio_management",
+    # The same section the pages' own guard checks (data_governance_routes.py,
+    # interface_register/routes/register_routes.py).
+    "data_governance.": "data_integration",
+    "interface_register.": "data_integration",
 }
+
+# Procurement pages are guarded by role, not by section: the procurement section
+# is also granted to personas (compliance, finance) whose pages are a different
+# set, so the section alone offered them pages that answer 403. Mirrors
+# requires_procurement / requires_procurement_or_finance (decorators/requires_role.py).
+_PROCUREMENT_ROLES = {"procurement", "portfolio_manager"}
+_PROCUREMENT_OR_FINANCE_ENDPOINTS = {"procurement.licenses_list", "procurement.spend_analytics"}
 
 
 def _link_visible(endpoint: str, requires: str | None = None) -> bool:
@@ -75,8 +93,14 @@ def _link_visible(endpoint: str, requires: str | None = None) -> bool:
     `link_requires_satisfied()` (role_access.py) is the single shared predicate
     `get_sidebar_zones()` itself uses, so this page and the sidebar never disagree.
     """
-    if endpoint in _NOT_RENDERED:
+    if endpoint in _NOT_RENDERED or is_hidden_not_ready(endpoint):
         return False
+    if endpoint.startswith("procurement.") and not getattr(current_user, "is_platform_admin", False):
+        roles = set(_PROCUREMENT_ROLES)
+        if endpoint in _PROCUREMENT_OR_FINANCE_ENDPOINTS:
+            roles.add("finance")
+        if get_user_role(current_user) not in roles:
+            return False
     if not link_requires_satisfied(current_user, requires):
         return False
     for prefix, section in _SECTION_BY_ENDPOINT_PREFIX.items():

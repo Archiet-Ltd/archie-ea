@@ -1662,12 +1662,11 @@ def api_confirm_vendor_matches():
                     )
 
                 if not archimate_element:
-                    archimate_element = ArchiMateElement(
-                        name=app_obj.name,
-                        type="ApplicationComponent",
-                        layer="application",
-                        description=app_obj.description or "",
-                        properties=(
+                    from app.services.archimate_backbone import ensure_archimate_element
+                    pointer_before = app_obj.archimate_element_id
+                    archimate_element = ensure_archimate_element(app_obj)
+                    if archimate_element is not None and archimate_element.id != pointer_before:
+                        archimate_element.properties = (  # untyped-property-write-ok: vendor matching metadata stored in legacy properties field
                             json.dumps(
                                 {
                                     "vendor_matched": True,
@@ -1680,11 +1679,7 @@ def api_confirm_vendor_matches():
                             )
                             if match.get("confidence")
                             else None
-                        ),
-                    )
-                    db.session.add(archimate_element)
-                    db.session.flush()
-                    app_obj.archimate_element_id = archimate_element.id
+                        )
 
                 confirmed_count += 1
 

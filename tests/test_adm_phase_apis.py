@@ -178,6 +178,7 @@ def test_compliance_matrix_uses_real_linkage(db_session, tenant_ctx, make_org):
         organization_id=org.id,
     )
     policy = CompliancePolicy(
+        organization_id=org.id,
         name=f"Matrix Policy {suffix}",
         policy_type="security",
         description="test policy",
@@ -185,6 +186,7 @@ def test_compliance_matrix_uses_real_linkage(db_session, tenant_ctx, make_org):
     db_session.add_all([review, policy])
     db_session.flush()
     violation = ComplianceViolation(
+        organization_id=org.id,
         policy_id=policy.id,
         description="test violation",
         affected_system=application.name,

@@ -82,6 +82,7 @@ def _signed_assertion_b64(
 </saml:Conditions>
 <saml:AttributeStatement>
 <saml:Attribute Name="givenName"><saml:AttributeValue>{given_name}</saml:AttributeValue></saml:Attribute>
+<saml:Attribute Name="urn:oasis:names:tc:SAML:attribute:subject-id"><saml:AttributeValue>subject-{email}</saml:AttributeValue></saml:Attribute>
 </saml:AttributeStatement>
 </saml:Assertion>"""
 

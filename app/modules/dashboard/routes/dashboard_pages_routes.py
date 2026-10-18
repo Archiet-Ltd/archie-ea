@@ -356,6 +356,11 @@ def rationalization_dashboard():
 @login_required
 def calculate_rationalization_score(app_id):
     """Calculate rationalization score for a specific application."""
+    # Another organisation's (or a missing) application is a 404, not a 500: the
+    # tenant filter hides it from this lookup.
+    from app.models import ApplicationComponent as _AppComponent
+
+    _AppComponent.query.get_or_404(app_id)
     try:
         score = RationalizationScoringService.calculate_app_score(app_id)
         if score:
@@ -550,6 +555,10 @@ def analyze_portfolio_duplicates():
 @login_required
 def calculate_app_similarity(app1_id, app2_id):
     """Calculate similarity between two applications."""
+    from app.models import ApplicationComponent as _AppComponent
+
+    _AppComponent.query.get_or_404(app1_id)
+    _AppComponent.query.get_or_404(app2_id)
     try:
         service = ApplicationConsolidationService()
         analysis = service.calculate_similarity_score(app1_id, app2_id)

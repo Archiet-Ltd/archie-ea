@@ -238,3 +238,7 @@ errors; all 75 retained archives passed decompression checks.
 
 Run it after any change to the schema or the backup mechanism, and on a schedule
 if nothing else forces it — the failure mode is silent until an incident.
+
+## Outbound URL safety
+
+Webhook targets and compliance-check service URLs are refused when they point at loopback, private, link-local, metadata or carrier-grade NAT addresses, or at the host's own interface addresses. Set `SSRF_BLOCKED_CIDRS` in the production environment to the host's public IP(s) (comma separated CIDRs, for example `203.0.113.10/32`) so the public address is refused too. Leave `ALLOW_INTERNAL_WEBHOOK_TARGETS` unset in production (it is only read in Development and Testing configurations).

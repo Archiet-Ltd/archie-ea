@@ -244,6 +244,32 @@ def team_change_role():
     return redirect(url_for("team.team"))
 
 
+@team_bp.route("/team/member/<int:user_id>/reset-sign-in", methods=["POST"])
+@login_required
+def team_reset_sign_in(user_id):
+    """Clear a member's single sign-on link so their next single sign-on
+    sign-in connects their account again."""
+    org_id = _require_org_id()
+    require_org_or_platform_admin(org_id)
+    from app.services.sso_service import SSOService
+
+    try:
+        SSOService().reset_member_sign_in_link(
+            org_id, user_id, actor_id=current_user.id, reason="team page"
+        )
+    except LookupError:
+        abort(404)
+    except PermissionError as exc:
+        flash(str(exc), "error")
+    else:
+        flash(
+            "Single sign-on link reset. The member's next single sign-on sign-in "
+            "will connect their account again.",
+            "success",
+        )
+    return redirect(url_for("team.team"))
+
+
 @team_bp.route("/team/member/<int:user_id>", methods=["DELETE"])
 @login_required
 def team_remove_member(user_id):

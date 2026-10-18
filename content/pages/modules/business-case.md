@@ -9,6 +9,7 @@ answers_use_cases:
 capture_status: live
 cta: plans
 description: "Write an IT business case with capex, annual opex, three-year TCO, ROI, payback and NPV, linked to the capability or initiative it funds. Try it free."
+icon: calculator
 ---
 
 # IT business case template with TCO and ROI

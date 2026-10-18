@@ -35,6 +35,20 @@ def _registered_models(app):
 
 
 @pytest.fixture(autouse=True)
+def _public_resolver(monkeypatch):
+    """The outbound guard resolves the identity provider's host; answer with a
+    public address so these tests never touch the network."""
+    import app.utils.ssrf_guard as guard
+
+    monkeypatch.setattr(
+        guard.socket,
+        "getaddrinfo",
+        lambda host, port, *a, **k: [(2, 1, 6, "", ("93.184.216.34", port))],
+    )
+    monkeypatch.setattr(guard, "_local_interface_addresses", lambda: set())
+
+
+@pytest.fixture(autouse=True)
 def _fresh_jwks_cache():
     """The key set is cached in-process; every test starts with it empty."""
     from app.services.sso_service import SSOService

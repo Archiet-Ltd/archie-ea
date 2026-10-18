@@ -171,6 +171,14 @@ def create_issue(solution_id):
     POST /api/solutions/<solution_id>/issues
     Create a new issue
     """
+    from app.models.solution_models import Solution
+    from app.utils.route_guards import entity_exists
+
+    # The solution must be one this organisation can see; a foreign or unknown id is a
+    # 404, never a row stamped with our organisation that points at someone else's solution.
+    if not entity_exists(Solution, solution_id):
+        return jsonify({'error': 'Solution not found'}), 404
+
     try:
         data = request.get_json()
 

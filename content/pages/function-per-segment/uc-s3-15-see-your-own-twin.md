@@ -7,6 +7,7 @@ source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
 url_slug: /use-cases/see-your-own-twin
+icon: scan
 ---
 
 # See a plausible, clearly generated twin of your own company before the first conversation

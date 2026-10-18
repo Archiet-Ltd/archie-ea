@@ -868,7 +868,7 @@ def test_cross_tenant_successor_resolves_to_none_and_leaks_nothing(
     assert identity["successor_cycle_id"] is None
     assert identity["successor_review_item_id"] is None
     assert foreign.review.title not in repr(view)
-    assert str(foreign.review.id) not in str(identity.values())
+    assert foreign.review.review_number not in repr(view)
 
 
 def test_absent_successor_is_none_not_invented(db_session, make_org, tenant_ctx):

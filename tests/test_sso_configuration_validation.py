@@ -61,6 +61,11 @@ def _configuration_app(monkeypatch, *, existing=True, csrf=False):
         OrgRole, "get_role",
         classmethod(lambda cls, org_id, user_id: "org_admin" if org_id == 7 else None),
     )
+    # The domain-claim check reads every other organisation's configuration;
+    # in this database-free app no other organisation claims anything.
+    monkeypatch.setattr(
+        sso_routes._svc, "domains_claimed_by_other_orgs", lambda org_id, domains: {}
+    )
 
     class User(UserMixin):
         id = "sso-validation"

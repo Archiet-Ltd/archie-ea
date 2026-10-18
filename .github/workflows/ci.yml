@@ -15,6 +15,24 @@ name: CI
 # UI, even though all jobs are skipped for non-`ci-fast` labels by the job-level
 # `if:` guards. The concurrency group's `cancel-in-progress` excludes labeled
 # events so that adding an unrelated label never cancels an in-progress CI run.
+# Two lanes. An ordinary pull-request push (opened, synchronize, reopened, no
+# `full-ci` label) runs the fast lane: the cheap gates (secret scan, static gates,
+# boot health, schema drift, SAST, dependency CVEs) and the `fast-tests` job, which
+# runs the test files the change touches. The eight pytest shards, the aggregate
+# `tests` job and the browser jobs are skipped on that push; a skipped job is not
+# a test result. The full suite runs on a push to main/master/the deploy branch,
+# on workflow_dispatch, and on a pull request that carries the `full-ci` label
+# (adding the label triggers it; every later push to that pull request runs it
+# again). A pull request is merged only after the full run on its final head.
+# Known quirk: a run started by the `labeled` event waits in the same concurrency
+# group as the run it follows, and a newer pending run replaces an older pending
+# one. If the full run never appears after `full-ci` is added, remove and re-add
+# the label; until a full run exists the merge gate sees 0 of 8 shards.
+# Accepted design limit: a Python file under app/ that no test imports selects no
+# tests in the fast lane. That is why a full run on the final head is mandatory
+# before merge; the fast lane is a quick signal, never merge evidence.
+# The lane is decided once, in the `changes` job; a job that needs the full suite
+# tests for `lane != 'fast'`, so an unanswered question runs everything.
 on:
   push:
     # main/master AND the branch production actually deploys from. That branch
@@ -40,13 +58,15 @@ on:
 # a new commit lands on it -- nothing still reads its result. Without this,
 # three pushes to one PR in quick succession run three full, uncancelled CI
 # suites at once, each competing with the others for the same shared runner
-# capacity and queuing every job behind itself. Scoped to pull_request only:
-# a push to main/master never cancels another push's run, so every commit
-# that lands there still gets its own complete CI (and release-image build)
-# rather than losing to whichever push landed after it.
+# capacity and queuing every job behind itself. The same applies to pushes to
+# main: every merge starts a full run and nothing cancelled the older ones, so
+# runs queued for hours behind tips that were already superseded. A newer main
+# tip contains every older one, so older main runs are cancelled too. Other
+# branches and workflow_dispatch runs are never cancelled; the deploy workflow
+# has its own group with cancel-in-progress false.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action != 'labeled' }}
+  cancel-in-progress: ${{ (github.event_name == 'pull_request' && github.event.action != 'labeled') || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
 
 permissions:
   contents: read
@@ -67,10 +87,170 @@ env:
   BANDIT_VERSION: "1.9.4"
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Path detection: identify content-only PRs so heavy jobs can skip.
+  # ---------------------------------------------------------------------------
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
+    outputs:
+      is_content_only: ${{ steps.detect.outputs.is_content_only }}
+      lane: ${{ steps.final.outputs.lane }}
+    steps:
+      - name: Choose the lane
+        # An ordinary pull-request push runs the fast lane (the cheap gates plus
+        # the tests the change touches). Everything else runs the full suite: a
+        # push to a protected branch, a manual dispatch, and a pull request that
+        # carries the `full-ci` label, including each later push to that pull
+        # request. A job that needs the full suite tests for `lane != 'fast'`, so
+        # a missing answer runs everything rather than nothing.
+        id: lane
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HAS_FULL_CI: ${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ] && [ "$HAS_FULL_CI" != "true" ]; then
+            lane=fast
+          else
+            lane=full
+          fi
+          echo "lane=$lane" | tee -a "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Escalate when the fast lane cannot cover the change
+        # A change to shared test or application wiring, or a wide change that
+        # matched few tests, runs the full suite even without the label. The
+        # selector runs from the base branch's copy (the checked-out copy only
+        # for the first introduction); any failure here means the full suite.
+        id: final
+        env:
+          LANE: ${{ steps.lane.outputs.lane }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          lane="$LANE"
+          if [ "$lane" = "fast" ]; then
+            base="origin/${BASE_REF:-main}"
+            selector="${RUNNER_TEMP}/changed_test_selection.py"
+            if ! git show "${base}:scripts/ci/changed_test_selection.py" > "$selector" 2>/dev/null; then
+              selector=scripts/ci/changed_test_selection.py
+            fi
+            if reason=$(python -I "$selector" --base "$base" --escalate); then
+              if [ -n "$reason" ]; then
+                lane=full
+                echo "Full suite required: $reason"
+                echo "### Full suite runs without the label: $reason" >> "$GITHUB_STEP_SUMMARY"
+              fi
+            else
+              lane=full
+              echo "The selector failed; running the full suite."
+            fi
+          fi
+          echo "lane=$lane" | tee -a "$GITHUB_OUTPUT"
+      - name: Detect content-only changes
+        id: detect
+        # Run the detector as it exists on the base branch, so a pull request
+        # cannot change the rules that decide which of its own checks are skipped.
+        # The checked-out copy is the fallback only for the first introduction:
+        # the base branch exists but has no detector yet. If the base branch
+        # cannot be resolved at all, nothing is trusted and everything runs.
+        run: |
+          BASE="${GITHUB_BASE_REF:-main}"
+          if git show "origin/${GITHUB_BASE_REF:-main}:scripts/ci/detect_content_only.py" > /tmp/detect_content_only.py 2>/dev/null; then
+            python /tmp/detect_content_only.py
+          elif git rev-parse --verify --quiet "origin/${BASE}" >/dev/null; then
+            python scripts/ci/detect_content_only.py
+          else
+            echo "is_content_only=false" | tee -a "${GITHUB_OUTPUT:-/dev/null}"
+          fi
+
+  # A content-only PR skips the eight pytest shards and the browser jobs, but
+  # the public-page and template tests must still run (a content change can
+  # break them, and they would otherwise sit in the skipped shards and let the
+  # regression pass unseen). This light job runs ONLY when the detector says the
+  # diff is content-only: a Postgres service like the tests-shard job, then
+  # pytest on the files scripts/ci/content_test_selection.py computes. It is
+  # deliberately not a required check (see EXCLUDED_CHECKS in
+  # scripts/deploy_workflow.py): on a push to main this job does not run.
+  content-page-tests:
+    name: Content page tests
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only == 'true') && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: mirror.gcr.io/library/postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_test
+        ports: ["5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Create an isolated virtual environment for this job's dependencies
+        # Same reason as tests-shard: a self-hosted runner's leftover ~/.local
+        # site-packages must not shadow this job's dependencies.
+        run: |
+          python -m venv --clear .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Resolve the postgres service's mapped port
+        run: |
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || {
+            echo "::warning::pip install from the cache failed; retrying without it"
+            pip install --no-cache-dir -r requirements.txt
+          }
+          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+      - name: Create schema
+        run: |
+          python -c "import psycopg2" 2>/dev/null || pip install psycopg2-binary
+          flask --app manage init-db
+          flask --app manage schema-upgrade
+          flask --app manage reconcile-schema
+      - name: Apply the capability provenance migration
+        run: flask --app manage apply-unified-capability-provenance-migration
+      - name: Install Chromium for the browser tests in the selection
+        run: python -m playwright install --with-deps chromium
+      - name: Run the public page tests
+        # The selection is computed, not hand-picked: every test file outside
+        # tests/smoke that refers to public pages or templates, or fetches a
+        # public route, plus the template contract test. No --maxfail: the
+        # whole run is recorded in content-tests.xml so the merge gate can
+        # accept failures only when every failing id is a known failure.
+        run: |
+          python scripts/ci/content_test_selection.py > content-tests.txt
+          wc -l content-tests.txt
+          xargs -r pytest -q -o xfail_strict=true --junitxml=content-tests.xml < content-tests.txt
+      - name: Upload the content test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: content-tests-junit
+          path: content-tests.xml
+          if-no-files-found: ignore
+
   secret-scan:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -91,10 +271,49 @@ jobs:
         # themselves out of the build log.
 
 
+  # Cheap first gate: compile + the fast lint ratchets (verify.py --tag fast).
+  # Needs only ruff, not the application requirements, so it finishes in a couple
+  # of minutes; the heavy jobs (pytest shards, browser journeys, walkthrough)
+  # list it in `needs:` and skip when it fails, instead of spending tens of
+  # minutes of runner time on a change that does not even compile. It is NOT a
+  # required check: the full `Static gates` job below still runs in parallel and
+  # stays the required one. The heavy jobs gate on `result != 'failure'`, never
+  # on success(), so an unknown/skipped state still runs the tests.
+  fast_gate:
+    name: Fast static checks (compile + lint)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install ruff only
+        run: python -m pip install "ruff==${RUFF_VERSION}"
+      - name: Lint every workflow file (pinned actionlint, checksum verified)
+        # An invalid workflow file is rejected by GitHub as a whole: no job runs
+        # and nothing marks the PR red. Lint them here, on every run (this job
+        # has no path filter, so a workflow-only change is covered). The release
+        # tarball is fetched from the official release for the pinned version and
+        # its SHA-256 is checked against the published value before it is
+        # unpacked; a mismatch fails the step. Bump version and hash together.
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
+          ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+        run: |
+          set -euo pipefail
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl --fail --location --retry 3 --silent --show-error             --output "${RUNNER_TEMP}/${archive}"             "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          echo "${ACTIONLINT_SHA256}  ${RUNNER_TEMP}/${archive}" | sha256sum --check --strict -
+          tar -xzf "${RUNNER_TEMP}/${archive}" -C "${RUNNER_TEMP}" actionlint
+          "${RUNNER_TEMP}/actionlint" -color .github/workflows/*.yml
+      - name: Compile + fast ratchets
+        run: python scripts/verify.py --tag fast
+
   static-gates:
     name: Static gates (compile + ratchets)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     # The static tag includes route/navigation and CSRF coverage, which import
     # the real app, plus the reproducible CSS build. Install the application
     # dependencies and the exact standalone Tailwind binary those gates need;
@@ -126,7 +345,7 @@ jobs:
   boot-health:
     name: Boot health (no database)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     # Catches the class of failure nothing else here can see: a blueprint that
     # silently fails to register, or a url_for() endpoint that no longer resolves
     # (a BuildError 500 on every page rendering the sidebar).
@@ -170,23 +389,24 @@ jobs:
   # references that id, and because "Tests (pytest + coverage)" is the
   # required-check name branch protection was configured against.
   #
-  # Splitting: no per-test duration history exists for this suite (producing
-  # one means running the full two-hour suite once first, which defeats the
-  # purpose), and a plain hash of each test file's path was measured to put
-  # 1,194 of 6,690 tests in one bucket against an 836 average — 43% over,
-  # already enough on its own to miss the 30-minute target. Instead,
-  # scripts/ci/test_sharding.py has every shard collect the full test set (as
-  # pytest always does before filtering), group items by file, and run the
-  # same deterministic greedy bin-pack by file size that every shard process
-  # computes independently and agrees on. Measured on this suite: 836-837
-  # tests per shard, within 0.1% of even, and it re-derives file sizes from
-  # the real collection every run rather than a committed file that goes
-  # stale. All tests in one file stay in one shard, so file-local shared
-  # state (a module- or class-scoped fixture) is never split across two
-  # database sessions; it does not protect against state shared ACROSS files.
+  # Splitting: scripts/ci/test_sharding.py has every shard collect the full
+  # test set (as pytest always does before filtering), group items by file,
+  # and run the same deterministic greedy longest-first bin-pack that every
+  # shard process computes independently and agrees on. The weight of a file
+  # is its measured run time from the committed tests/shard_durations.json
+  # (regenerate with scripts/ci/update_shard_durations.py, which reads the
+  # junit files of recent runs); a file not in the table is weighted by its
+  # test count times the median seconds per test, so a new file always lands
+  # in exactly one shard. Balancing by test count alone left one shard at
+  # 72 minutes while the rest ran 27-43. The "Shard balance report" step in
+  # the tests job below warns when the table has drifted. All tests in one
+  # file stay in one shard, so file-local shared state (a module- or
+  # class-scoped fixture) is never split across two database sessions; it
+  # does not protect against state shared ACROSS files.
   tests-shard:
     name: Tests (pytest + coverage) — shard ${{ matrix.shard }}
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    needs: [changes, fast_gate]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     # Same-repository runs (push/dispatch and same-repo PRs) select a runner
     # via repository variables: vars.CI_FAST_RUNNER takes precedence when the
     # PR carries the ci-fast label, vars.CI_SHARD_RUNNER routes to a managed
@@ -203,12 +423,12 @@ jobs:
       # same-repository runs (default 6 when the variable is unset).
       # GitHub-hosted runners (forked PRs) have no such limit, so all eight
       # shards start together there.
-      max-parallel: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && 8 || vars.CI_SHARD_MAX_PARALLEL || 6) || 8 }}
+      max-parallel: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && 8 || fromJSON(vars.CI_SHARD_MAX_PARALLEL || '6')) || 8 }}
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:16
+        image: mirror.gcr.io/library/postgres:16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: archie_test
@@ -227,6 +447,9 @@ jobs:
       # tests/test_ci_nav_verification_lifecycle.py fails when this, the
       # matrix and the tests job's combine count disagree.
       CI_SHARD_TOTAL: "8"
+      # Tests listed in scripts/ci/quarantine.txt are deselected here and run,
+      # reported but not blocking, in the quarantine job.
+      CI_QUARANTINE_MODE: exclude
       COVERAGE_FILE: .coverage.${{ matrix.shard }}
     steps:
       - uses: actions/checkout@v5
@@ -309,6 +532,25 @@ jobs:
       # that projection would fail or skip here on a schema production never has.
       - name: Apply the capability provenance migration
         run: flask --app manage apply-unified-capability-provenance-migration
+      - name: Accept the quarantine list from the base branch
+        # A pull request cannot quarantine its own failing test: the list that
+        # counts is the base branch's, and this pull request's copy may only
+        # remove lines. Additions are ignored and reported. Pushes to protected
+        # branches use the checked-out list, which has already been reviewed.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch --quiet --depth=1 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+            tool="${RUNNER_TEMP}/quarantine_base.py"
+            if ! git show "origin/${BASE_REF}:scripts/ci/quarantine.py" > "$tool" 2>/dev/null; then
+              tool=scripts/ci/quarantine.py
+            fi
+            python -I "$tool" resolve --base "origin/${BASE_REF}" \
+              --out "${RUNNER_TEMP}/quarantine.txt" --list scripts/ci/quarantine.txt
+            echo "CI_QUARANTINE_FILE=${RUNNER_TEMP}/quarantine.txt" >> "$GITHUB_ENV"
+          fi
       - name: Run this shard's tests with coverage and route verification
         # route_verification.json is ignored execution evidence, scoped to
         # this shard's slice of the suite; the tests job below unions every
@@ -321,7 +563,7 @@ jobs:
           pytest -q --maxfail=20 --ignore=tests/smoke \
             --cov=app --cov-report= \
             -o xfail_strict=true --junitxml=backend-tests-${{ matrix.shard }}.xml \
-            -p scripts.route_verification_audit -p scripts.ci.test_sharding
+            -p scripts.route_verification_audit -p scripts.ci.quarantine -p scripts.ci.test_sharding
       - name: Run the assistant connector tests (connector switched on)
         # These need MCP_ENABLED and PUBLIC_BASE_URL at app creation, which the
         # sharded run leaves off; one shard runs them in their own pytest session.
@@ -347,10 +589,308 @@ jobs:
           # nothing to combine.
           include-hidden-files: true
 
+  # ---------------------------------------------------------------------------
+  # Fast lane. An ordinary pull-request push (no `full-ci` label) runs the cheap
+  # gates above plus this job: the test files the pull request changes and the
+  # test files that import a module it changes, on one runner. The eight shards
+  # and the browser jobs are skipped on that push; a skipped job is not a test
+  # result, and the pull request must not merge on the strength of this job
+  # alone: the full suite runs when the `full-ci` label is added, and again on
+  # every later push to a labelled pull request.
+  # ---------------------------------------------------------------------------
+  fast-tests:
+    name: Changed-file tests (fast lane)
+    needs: [changes, fast_gate]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && needs.changes.result == 'success' && needs.changes.outputs.lane == 'fast' && needs.fast_gate.result != 'failure' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: mirror.gcr.io/library/postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_test
+        ports: ["5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret
+      CI_QUARANTINE_MODE: exclude
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Select the tests this pull request touches
+        id: select
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        # Run the selector as it exists on the base branch, like the content-only
+        # detector, so a pull request cannot narrow its own selection. The
+        # checked-out copy is the fallback for the first introduction only.
+        run: |
+          BASE="origin/${BASE_REF:-main}"
+          SELECTOR="${RUNNER_TEMP}/changed_test_selection.py"
+          if ! git show "$BASE:scripts/ci/changed_test_selection.py" > "$SELECTOR" 2>/dev/null; then
+            SELECTOR=scripts/ci/changed_test_selection.py
+          fi
+          python -I "$SELECTOR" --base "$BASE" > fast-tests.txt
+          grep -c . fast-tests.txt || true
+          cat fast-tests.txt
+          if grep -q . fast-tests.txt; then
+            echo "any=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "any=false" >> "$GITHUB_OUTPUT"
+            echo "No test file is affected by this change; nothing to install or run."
+          fi
+          mapfile -t files < fast-tests.txt
+          echo "browsers=$(python -I "$SELECTOR" --browsers "${files[@]}")" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Fast lane"
+            echo "$(grep -c . fast-tests.txt || true) test files selected. The full suite runs when the pull request carries the full-ci label."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Create an isolated virtual environment for this job's dependencies
+        if: ${{ steps.select.outputs.any == 'true' }}
+        # Same reason as tests-shard: a self-hosted runner's leftover ~/.local
+        # site-packages must not shadow this job's dependencies.
+        run: |
+          python -m venv --clear .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Resolve the postgres service's mapped port
+        if: ${{ steps.select.outputs.any == 'true' }}
+        run: |
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+      - name: Install deps
+        if: ${{ steps.select.outputs.any == 'true' }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || {
+            echo "::warning::pip install from the cache failed; retrying without it"
+            pip install --no-cache-dir -r requirements.txt
+          }
+          pip install pytest-cov
+          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+      - uses: actions/setup-node@v4
+        if: ${{ steps.select.outputs.any == 'true' }}
+        with:
+          node-version: "22"
+      - name: Install the browsers the selected tests name
+        if: ${{ steps.select.outputs.any == 'true' }}
+        # Chromium always; Firefox and WebKit only when a selected file names
+        # them. The same host-wide lock as the shards, for the same reason.
+        env:
+          EXTRA_BROWSERS: ${{ steps.select.outputs.browsers }}
+        run: |
+          read -ra extra <<< "$EXTRA_BROWSERS"
+          for attempt in $(seq 1 10); do
+            if flock /tmp/archie-ci-browser-install.lock \
+                python -m playwright install --with-deps chromium "${extra[@]}"; then
+              exit 0
+            fi
+            echo "Browser install attempt $attempt failed; retrying in 60 seconds."
+            sleep 60
+          done
+          exit 1
+      - name: Create schema
+        if: ${{ steps.select.outputs.any == 'true' }}
+        run: |
+          python -c "import psycopg2" 2>/dev/null || pip install psycopg2-binary
+          flask --app manage init-db
+          flask --app manage schema-upgrade
+          flask --app manage reconcile-schema
+      - name: Apply the capability provenance migration
+        if: ${{ steps.select.outputs.any == 'true' }}
+        run: flask --app manage apply-unified-capability-provenance-migration
+      - name: Accept the quarantine list from the base branch
+        if: ${{ steps.select.outputs.any == 'true' }}
+        # A pull request cannot quarantine its own failing test: the list that
+        # counts is the base branch's, and this pull request's copy may only
+        # remove lines. Additions are ignored and reported. Pushes to protected
+        # branches use the checked-out list, which has already been reviewed.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch --quiet --depth=1 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+            tool="${RUNNER_TEMP}/quarantine_base.py"
+            if ! git show "origin/${BASE_REF}:scripts/ci/quarantine.py" > "$tool" 2>/dev/null; then
+              tool=scripts/ci/quarantine.py
+            fi
+            python -I "$tool" resolve --base "origin/${BASE_REF}" \
+              --out "${RUNNER_TEMP}/quarantine.txt" --list scripts/ci/quarantine.txt
+            echo "CI_QUARANTINE_FILE=${RUNNER_TEMP}/quarantine.txt" >> "$GITHUB_ENV"
+          fi
+      - name: Run the selected tests
+        if: ${{ steps.select.outputs.any == 'true' }}
+        run: |
+          if ! grep -q . fast-tests.txt; then
+            echo "No test file is affected by this change."
+            exit 0
+          fi
+          # One pytest run, so one junit file. Exit 5 means everything selected was
+          # quarantined (deselected), which is a pass here.
+          mapfile -t files < fast-tests.txt
+          status=0
+          pytest -q --maxfail=20 -o xfail_strict=true \
+            --junitxml=fast-tests.xml -p scripts.ci.quarantine "${files[@]}" || status=$?
+          if [ "$status" -ne 0 ] && [ "$status" -ne 5 ]; then
+            exit "$status"
+          fi
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: fast-tests-junit
+          path: fast-tests.xml
+          if-no-files-found: ignore
+
+  # Quarantined tests (scripts/ci/quarantine.txt): deselected from the blocking
+  # shards above, run here on every full run, reported but never blocking. Not a
+  # required check.
+  quarantine-tests:
+    name: Quarantined tests (non-blocking)
+    needs: [changes, fast_gate]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
+    continue-on-error: true
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
+    services:
+      postgres:
+        image: mirror.gcr.io/library/postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_test
+        ports: ["5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret
+      CI_QUARANTINE_MODE: only
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Create an isolated virtual environment for this job's dependencies
+        # Same reason as tests-shard: a self-hosted runner's leftover ~/.local
+        # site-packages must not shadow this job's dependencies.
+        run: |
+          python -m venv --clear .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Resolve the postgres service's mapped port
+        run: |
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || {
+            echo "::warning::pip install from the cache failed; retrying without it"
+            pip install --no-cache-dir -r requirements.txt
+          }
+          pip install pytest-cov
+          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install browsers for rendered UI regression tests
+        run: |
+          for attempt in $(seq 1 10); do
+            if flock /tmp/archie-ci-browser-install.lock \
+                python -m playwright install --with-deps chromium firefox webkit; then
+              exit 0
+            fi
+            echo "Browser install attempt $attempt failed; retrying in 60 seconds."
+            sleep 60
+          done
+          exit 1
+      - name: Create schema
+        run: |
+          python -c "import psycopg2" 2>/dev/null || pip install psycopg2-binary
+          flask --app manage init-db
+          flask --app manage schema-upgrade
+          flask --app manage reconcile-schema
+      - name: Apply the capability provenance migration
+        run: flask --app manage apply-unified-capability-provenance-migration
+      - name: Accept the quarantine list from the base branch
+        # A pull request cannot quarantine its own failing test: the list that
+        # counts is the base branch's, and this pull request's copy may only
+        # remove lines. Additions are ignored and reported. Pushes to protected
+        # branches use the checked-out list, which has already been reviewed.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch --quiet --depth=1 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+            tool="${RUNNER_TEMP}/quarantine_base.py"
+            if ! git show "origin/${BASE_REF}:scripts/ci/quarantine.py" > "$tool" 2>/dev/null; then
+              tool=scripts/ci/quarantine.py
+            fi
+            python -I "$tool" resolve --base "origin/${BASE_REF}" \
+              --out "${RUNNER_TEMP}/quarantine.txt" --list scripts/ci/quarantine.txt
+            echo "CI_QUARANTINE_FILE=${RUNNER_TEMP}/quarantine.txt" >> "$GITHUB_ENV"
+          fi
+      - name: Run the quarantined tests
+        # Exit code 5 is "nothing collected" (every entry removed or renamed).
+        run: |
+          pytest -q --ignore=tests/smoke -o xfail_strict=true \
+            --junitxml=quarantine-tests.xml -p scripts.ci.quarantine || [ $? -eq 5 ]
+      - name: Report the result
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import xml.etree.ElementTree as ET
+
+          try:
+              root = ET.parse("quarantine-tests.xml").getroot()
+          except (OSError, ET.ParseError):
+              print("no quarantine report produced")
+              raise SystemExit(0)
+          failed, total = [], 0
+          for case in root.iter("testcase"):
+              total += 1
+              if case.find("failure") is not None or case.find("error") is not None:
+                  failed.append(f"{case.get('classname', '')}::{case.get('name', '')}")
+          summary_line = f"Quarantined tests: {total} run, {len(failed)} failed (not blocking)"
+          lines = [f"### {summary_line}"]
+          lines += [f"- {name}" for name in failed]
+          for name in failed:
+              print(f"::warning::quarantined test failed: {name}")
+          print(f"::notice title=Quarantined tests::{summary_line}")
+          with open("quarantine-report.json", "w", encoding="utf-8") as handle:
+              json.dump({"run": total, "failed": failed}, handle, indent=2)
+          print("\n".join(lines))
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
+              handle.write("\n".join(lines) + "\n")
+          PY
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: quarantine-tests-junit
+          path: |
+            quarantine-tests.xml
+            quarantine-report.json
+          if-no-files-found: ignore
+
   tests:
     name: Tests (pytest + coverage)
-    needs: tests-shard
-    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast')) }}
+    needs: [tests-shard, changes, fast_gate]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     # Same runner selection as tests-shard above: vars.CI_FAST_RUNNER takes
     # precedence when the PR carries the ci-fast label, vars.CI_SHARD_RUNNER
     # routes to a managed pool when set, otherwise the job falls back to the
@@ -418,6 +958,12 @@ jobs:
         run: >-
           python scripts/ci/check_junit_qualification.py
           shard-artifacts/tests-shard-*/backend-tests-*.xml
+      - name: Shard balance report
+        # Warns (never fails) when a shard ran more than 25% off what the
+        # committed duration table predicted; see scripts/ci/check_shard_balance.py.
+        if: always()
+        continue-on-error: true
+        run: python scripts/ci/check_shard_balance.py shard-artifacts/tests-shard-*/backend-tests-*.xml
       - name: Combine coverage and summarize
         if: always()
         run: |
@@ -467,10 +1013,10 @@ jobs:
   db-gates:
     name: Database gates (schema drift)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:16
+        image: mirror.gcr.io/library/postgres:16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: archie_test
@@ -537,7 +1083,7 @@ jobs:
   security-sast:
     name: SAST (bandit)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -563,17 +1109,104 @@ jobs:
       - name: bandit (fail on any open high-severity finding)
         run: python scripts/ci/bandit_gate.py --high
 
-  smoke:
-    name: Browser journeys (one per archetype)
+  # ── Browser journey shards ──────────────────────────────────────────────
+  # The old single smoke job ran five pytest steps sequentially (~70 min).
+  # These three parallel jobs each boot their own app and database (no shared
+  # state) and upload their junit reports as artifacts. The aggregate job
+  # below (same job id `smoke`, same required-check name) downloads all
+  # reports and runs check_junit_qualification.py on the same five categories.
+  #
+  # Runner use: 3 smoke-main shards + 1 adversarial + 1 other = 5 jobs
+  # instead of 1. On a self-hosted pool with 6+ runners this adds no queue
+  # delay; on a smaller pool the shorter individual jobs may still finish
+  # sooner than the old 70-minute serial job.
+
+  smoke-main:
+    name: Browser journeys — main shard ${{ matrix.shard }}
+    needs: [changes, fast_gate]
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
-    # Renders real pages in a real browser against a real database. Every cheaper
-    # layer has passed defects this catches: a front end blocked by integrity
-    # hashes, handlers that 500 on their first row, and pages returning 200 while
-    # rendering blank values.
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:16
+        image: mirror.gcr.io/library/postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_smoke
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/archie_smoke
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/archie_smoke
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret-0123456789abcdef
+      SMOKE_BOOT_TIMEOUT: "300"
+      SMOKE_PAGE_TIMEOUT: "45000"
+      SMOKE_BROWSER: chromium
+      SMOKE_REQUIRE_BROWSER: "1"
+      SMOKE_SCREENSHOT_DIR: tests/smoke/_shots
+      CI_SHARD_TOTAL: "3"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install playwright pytest-timeout
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Create schema
+        id: smoke-schema
+        run: |
+          python -m flask --app manage init-db
+          python -m flask --app manage schema-upgrade
+          python -m flask --app manage reconcile-schema
+      - name: Run this shard's archetype journeys
+        env:
+          CI_SHARD_INDEX: ${{ matrix.shard }}
+        run: >-
+          pytest tests/smoke -q -p no:randomly --timeout=900
+          -W ignore::DeprecationWarning
+          -m "not adversarial and not census and not ai_protocol and not guide_history"
+          -p scripts.ci.test_sharding
+          --junitxml=tests/smoke/_artifacts/chromium-main-${{ matrix.shard }}.xml
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: smoke-junit-main-${{ matrix.shard }}
+          path: |
+            tests/smoke/_artifacts/chromium-main-${{ matrix.shard }}.xml
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: smoke-main-${{ matrix.shard }}
+          path: |
+            tests/smoke/_artifacts/chromium-main-${{ matrix.shard }}.xml
+            tests/smoke/_shots/
+            /tmp/smoke-server-*.log
+          if-no-files-found: ignore
+          retention-days: 30
+
+  smoke-adversarial:
+    name: Browser journeys — adversarial
+    needs: [changes, fast_gate]
+    runs-on: ubuntu-latest
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
+    services:
+      postgres:
+        image: mirror.gcr.io/library/postgres:16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: archie_smoke
@@ -611,59 +1244,185 @@ jobs:
           python -m flask --app manage init-db
           python -m flask --app manage schema-upgrade
           python -m flask --app manage reconcile-schema
-      - name: Run archetype journeys
-        run: pytest tests/smoke -q -p no:randomly --timeout=900 -W ignore::DeprecationWarning -m "not adversarial and not census and not ai_protocol and not guide_history" --junitxml=tests/smoke/_artifacts/chromium-main.xml
-      - name: Interaction-reality census (dead controls, junk modals, silent forms)
-        if: ${{ !cancelled() && steps.smoke-schema.outcome == 'success' }}
-        run: pytest tests/smoke/test_interaction_reality.py -q -p no:randomly -m census --timeout=1200 -W ignore::DeprecationWarning --junitxml=tests/smoke/_artifacts/chromium-census.xml
       - name: Adversarial regression probes (isolated test database)
         if: ${{ !cancelled() && steps.smoke-schema.outcome == 'success' }}
         env:
           SMOKE_AI_PROTOCOL_STUB: "1"
-        run: pytest tests/smoke/test_adversarial_probes.py -q -p no:randomly -m adversarial --timeout=3600 -W ignore::DeprecationWarning --junitxml=tests/smoke/_artifacts/chromium-adversarial.xml
+        run: >-
+          pytest tests/smoke/test_adversarial_probes.py -q -p no:randomly
+          -m adversarial --timeout=3600 -W ignore::DeprecationWarning
+          --junitxml=tests/smoke/_artifacts/chromium-adversarial.xml
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: smoke-junit-adversarial
+          path: |
+            tests/smoke/_artifacts/chromium-adversarial.xml
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: smoke-adversarial
+          path: |
+            tests/smoke/_artifacts/chromium-adversarial.xml
+            tests/smoke/_shots/
+            /tmp/smoke-server-*.log
+          if-no-files-found: ignore
+          retention-days: 30
+
+  smoke-other:
+    name: Browser journeys — other
+    needs: [changes, fast_gate]
+    runs-on: ubuntu-latest
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
+    services:
+      postgres:
+        image: mirror.gcr.io/library/postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_smoke
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/archie_smoke
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/archie_smoke
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret-0123456789abcdef
+      SMOKE_BOOT_TIMEOUT: "300"
+      SMOKE_PAGE_TIMEOUT: "45000"
+      SMOKE_BROWSER: chromium
+      SMOKE_REQUIRE_BROWSER: "1"
+      SMOKE_SCREENSHOT_DIR: tests/smoke/_shots
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install playwright pytest-timeout
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Create schema
+        id: smoke-schema
+        run: |
+          python -m flask --app manage init-db
+          python -m flask --app manage schema-upgrade
+          python -m flask --app manage reconcile-schema
+      - name: Interaction-reality census (dead controls, junk modals, silent forms)
+        if: ${{ !cancelled() && steps.smoke-schema.outcome == 'success' }}
+        run: >-
+          pytest tests/smoke/test_interaction_reality.py -q -p no:randomly
+          -m census --timeout=1200 -W ignore::DeprecationWarning
+          --junitxml=tests/smoke/_artifacts/chromium-census.xml
       - name: Enabled AI protocol and persistence journeys (local provider only)
         if: ${{ !cancelled() && steps.smoke-schema.outcome == 'success' }}
         env:
           SMOKE_AI_PROTOCOL_STUB: "1"
-        run: pytest tests/smoke/test_ai_protocol_journeys.py -q -p no:randomly -m ai_protocol --timeout=900 -W ignore::DeprecationWarning --junitxml=tests/smoke/_artifacts/chromium-ai-protocol.xml
+        run: >-
+          pytest tests/smoke/test_ai_protocol_journeys.py -q -p no:randomly
+          -m ai_protocol --timeout=900 -W ignore::DeprecationWarning
+          --junitxml=tests/smoke/_artifacts/chromium-ai-protocol.xml
       - name: Providerless saved-guide history journeys
         if: ${{ !cancelled() && steps.smoke-schema.outcome == 'success' }}
         env:
           AI_PAGE_GUIDE_ENABLED: "true"
           SMOKE_AI_PROTOCOL_STUB: ""
-        run: pytest tests/smoke/test_page_guide_history_journey.py -q -p no:randomly -m guide_history --timeout=900 -W ignore::DeprecationWarning --junitxml=tests/smoke/_artifacts/chromium-guide-history.xml
+        run: >-
+          pytest tests/smoke/test_page_guide_history_journey.py -q -p no:randomly
+          -m guide_history --timeout=900 -W ignore::DeprecationWarning
+          --junitxml=tests/smoke/_artifacts/chromium-guide-history.xml
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: smoke-junit-other
+          path: |
+            tests/smoke/_artifacts/chromium-census.xml
+            tests/smoke/_artifacts/chromium-ai-protocol.xml
+            tests/smoke/_artifacts/chromium-guide-history.xml
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: smoke-other
+          path: |
+            tests/smoke/_artifacts/chromium-census.xml
+            tests/smoke/_artifacts/chromium-ai-protocol.xml
+            tests/smoke/_artifacts/chromium-guide-history.xml
+            tests/smoke/_shots/
+            /tmp/smoke-server-*.log
+          if-no-files-found: ignore
+          retention-days: 30
+
+  smoke:
+    name: Browser journeys (one per archetype)
+    needs: [smoke-main, smoke-adversarial, smoke-other, changes, fast_gate]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - uses: actions/download-artifact@v6
+        if: always()
+        with:
+          pattern: smoke-junit-*
+          path: shard-artifacts
       - name: Require all browser reports without skips
         if: always()
-        run: >-
-          python scripts/ci/check_junit_qualification.py
-          tests/smoke/_artifacts/chromium-main.xml
-          tests/smoke/_artifacts/chromium-census.xml
-          tests/smoke/_artifacts/chromium-adversarial.xml
-          tests/smoke/_artifacts/chromium-ai-protocol.xml
-          tests/smoke/_artifacts/chromium-guide-history.xml
+        run: |
+          set -euo pipefail
+          reports=()
+          for name in chromium-main-0.xml chromium-main-1.xml chromium-main-2.xml chromium-adversarial.xml chromium-census.xml chromium-ai-protocol.xml chromium-guide-history.xml; do
+            found=$(find shard-artifacts -name "${name}" | head -1)
+            if [ -z "$found" ]; then
+              echo "missing browser report ${name}"
+              exit 1
+            fi
+            reports+=("$found")
+          done
+          python scripts/ci/check_junit_qualification.py "${reports[@]}"
+      - name: Fail if any browser job did not succeed
+        if: always() && (needs.smoke-main.result != 'success' || needs.smoke-adversarial.result != 'success' || needs.smoke-other.result != 'success')
+        run: |
+          echo "one or more browser journey jobs did not succeed (main=${{ needs.smoke-main.result }}, adversarial=${{ needs.smoke-adversarial.result }}, other=${{ needs.smoke-other.result }})"
+          exit 1
       - name: Upload browser qualification evidence
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: smoke-chromium-${{ github.sha }}
           path: |
-            tests/smoke/_shots/
-            tests/smoke/_artifacts/
-            /tmp/smoke-server-*.log
+            shard-artifacts/
           if-no-files-found: ignore
           retention-days: 30
 
   browser-compatibility:
     name: Browser compatibility (${{ matrix.browser }})
+    needs: [changes, fast_gate]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
     strategy:
       fail-fast: false
       matrix:
         browser: [firefox, webkit]
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:16
+        image: mirror.gcr.io/library/postgres:16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: archie_browser_compat
@@ -750,8 +1509,9 @@ jobs:
 
   walkthrough:
     name: Level 10 archetype walkthrough
+    needs: [changes, fast_gate]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
     # docs/TESTING_STANDARD.md level 10: not "does it break?" but "can this
     # archetype do their job, and could they have FOUND the page?". It runs as a
     # non-admin per persona, measures geometry at a fixed viewport rather than
@@ -763,7 +1523,7 @@ jobs:
     # are authorised to set -- no gate in levels 0-9 asks that question.
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:16
+        image: mirror.gcr.io/library/postgres:16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: archie_walkthrough
@@ -800,7 +1560,7 @@ jobs:
       - name: Start the app
         run: |
           nohup python -m flask --app manage run --no-reload --port 5001 > /tmp/walkthrough-server.log 2>&1 &
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             curl -sf -o /dev/null http://127.0.0.1:5001/account/login && break
             sleep 5
           done
@@ -820,7 +1580,7 @@ jobs:
   dependency-audit:
     name: Dependency CVEs (pip-audit)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || contains(github.event.pull_request.labels.*.name, 'ci-fast') }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     # A ratchet against scripts/ci/dependency_baseline.json: the count may fall,
     # never rise. The baseline is accepted risk, not proof of safety - every entry
     # is a real advisory a security review will ask about.
@@ -859,7 +1619,8 @@ jobs:
       - name: Prove production Compose cannot rebuild or shadow application code
         shell: bash
         run: |
-          export ARCHIE_IMAGE="ghcr.io/example/archie@sha256:$(printf '0%.0s' {1..64})"
+          ARCHIE_IMAGE="ghcr.io/example/archie@sha256:$(printf '0%.0s' {1..64})"
+          export ARCHIE_IMAGE
           export SECRET_KEY="release-compose-contract-only"
           docker compose -f docker-compose.yml -f deploy/docker-compose.production.yml --profile email config --format json > /tmp/production-compose.json
           python - <<'PY'
@@ -951,3 +1712,113 @@ jobs:
           path: release.json
           if-no-files-found: error
           retention-days: 90
+
+  # ---------------------------------------------------------------------------
+  # Failing-first proof (informational). On a pull request that changes
+  # application code, the tests it adds or changes must be able to fail: they
+  # are run alone against the merge base's application code, with the PR's test
+  # files overlaid, and at least one of them must fail or error there. Tests
+  # that also pass on the old code are listed as candidates for vacuous tests.
+  #
+  # Deliberately NOT a required check and not a deploy prerequisite (see
+  # EXCLUDED_CHECKS in scripts/deploy_workflow.py); nothing `needs` it. It runs
+  # on pull requests only, so it never exists on a push to main. The label
+  # `failing-first-exempt` passes it for pure refactors and documentation.
+  # The name must never start with "Tests (pytest + coverage)": the merge gate
+  # matches the pytest shards by that name.
+  # ---------------------------------------------------------------------------
+  failing-first-proof:
+    name: Failing-first proof
+    if: ${{ github.event_name == 'pull_request' && (github.event.action != 'labeled' || github.event.label.name == 'failing-first-exempt') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: mirror.gcr.io/library/postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_test
+        ports: ["5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret
+      # Passed through the environment, never interpolated into a script.
+      PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Name the base checkout location
+        # The runner context is not available in job-level env, so it is set here.
+        run: echo "BASE_CHECKOUT=$RUNNER_TEMP/failing-first-base" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Decide whether there is anything to prove
+        id: plan
+        # Exempt label, no application code changed, or no runnable changed test
+        # are all settled here, before any dependency is installed.
+        run: |
+          python scripts/ci/check_failing_first.py plan \
+            --base-ref "origin/${GITHUB_BASE_REF}" --head HEAD --plan failing-first-plan.json
+      - name: Create an isolated virtual environment for this job's dependencies
+        if: ${{ steps.plan.outputs.mode == 'run' }}
+        run: |
+          python -m venv --clear .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Resolve the postgres service's mapped port
+        if: ${{ steps.plan.outputs.mode == 'run' }}
+        run: |
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+      - name: Install deps
+        # The head's requirements are a superset of the base's, so a PR that adds
+        # a dependency can still be imported by the overlaid tests.
+        if: ${{ steps.plan.outputs.mode == 'run' }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || {
+            echo "::warning::pip install from the cache failed; retrying without it"
+            pip install --no-cache-dir -r requirements.txt
+          }
+          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+      - name: Install Chromium for browser tests in the selection
+        if: ${{ steps.plan.outputs.mode == 'run' && steps.plan.outputs.has_playwright == 'true' }}
+        run: python -m playwright install --with-deps chromium
+      - name: Check out the merge base and overlay the PR's test files
+        # The PR's application files are NOT applied: only test modules and test
+        # support files (conftest, helpers, fixtures) are copied from the head.
+        if: ${{ steps.plan.outputs.mode == 'run' }}
+        run: python scripts/ci/check_failing_first.py prepare --plan failing-first-plan.json --dest "$BASE_CHECKOUT"
+      - name: Create schema (the base's schema, so tables a PR adds are missing)
+        if: ${{ steps.plan.outputs.mode == 'run' }}
+        working-directory: ${{ env.BASE_CHECKOUT }}
+        run: |
+          python -c "import psycopg2" 2>/dev/null || pip install psycopg2-binary
+          flask --app manage init-db
+          flask --app manage schema-upgrade
+          flask --app manage reconcile-schema
+          flask --app manage apply-unified-capability-provenance-migration
+      - name: Run only the changed tests against the base code
+        # Failures here are the point; the judge step decides the outcome.
+        if: ${{ steps.plan.outputs.mode == 'run' }}
+        run: |
+          python scripts/ci/check_failing_first.py run \
+            --plan failing-first-plan.json --dest "$BASE_CHECKOUT" --junit failing-first.xml
+      - name: Judge
+        if: ${{ steps.plan.outputs.mode == 'run' }}
+        run: python scripts/ci/check_failing_first.py judge --plan failing-first-plan.json --junit failing-first.xml
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() && steps.plan.outputs.mode == 'run' }}
+        with:
+          name: failing-first-proof
+          path: |
+            failing-first-plan.json
+            failing-first.xml
+          if-no-files-found: ignore
+          retention-days: 7

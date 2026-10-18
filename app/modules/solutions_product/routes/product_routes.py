@@ -12,6 +12,7 @@ from flask import Blueprint, jsonify, request, send_file
 from flask_login import login_required
 
 from app import db
+from app.middleware.tenant_decorators import org_admin_required
 from app.utils.pagination import safe_int_arg
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,29 @@ solution_product_bp = Blueprint(
     __name__,
     url_prefix="/api/solutions",
 )
+
+
+def _solution_in_active_org(solution_id) -> bool:
+    """True when the solution belongs to the caller's active organisation.
+
+    Bundles, previews and pushes are keyed by solution id + bundle id on a
+    table with no organisation column, so every bundle route proves the
+    solution first. Fails closed when the active organisation is unknown.
+    """
+    from app.models.solution_models import Solution
+    from app.utils.route_guards import entity_in_active_org
+
+    return entity_in_active_org(Solution, solution_id)
+
+
+def _bundle_not_found(solution_id, bundle_id, *, with_detail=True):
+    """The one 404 for an unknown bundle -- also the answer for a solution the
+    caller cannot see, so a foreign solution is indistinguishable from a
+    missing bundle."""
+    body = {"success": False, "error": "Bundle not found"}
+    if with_detail:
+        body["detail"] = f"No bundle with ID '{bundle_id}' exists for solution {solution_id}."
+    return jsonify(body), 404
 
 
 @solution_product_bp.route("/<int:solution_id>/product/generate", methods=["POST"])
@@ -218,17 +242,16 @@ def run_product(solution_id, bundle_id):
     )
     from app.modules.solutions_product.services.sandbox_runner import SandboxRunner
 
+    if not _solution_in_active_org(solution_id):
+        return _bundle_not_found(solution_id, bundle_id)
+
     record = SolutionCodeBundle.query.filter_by(
         solution_id=solution_id,
         bundle_id=bundle_id,
     ).first()
 
     if not record:
-        return jsonify({
-            "success": False,
-            "error": "Bundle not found",
-            "detail": f"No bundle with ID '{bundle_id}' exists for solution {solution_id}.",
-        }), 404
+        return _bundle_not_found(solution_id, bundle_id)
 
     # Regenerate code (deterministic = same output from same spec)
     try:
@@ -285,17 +308,16 @@ def download_product(solution_id, bundle_id):
         DeterministicCodeGenerator,
     )
 
+    if not _solution_in_active_org(solution_id):
+        return _bundle_not_found(solution_id, bundle_id)
+
     record = SolutionCodeBundle.query.filter_by(
         solution_id=solution_id,
         bundle_id=bundle_id,
     ).first()
 
     if not record:
-        return jsonify({
-            "success": False,
-            "error": "Bundle not found",
-            "detail": f"No bundle with ID '{bundle_id}' exists for solution {solution_id}.",
-        }), 404
+        return _bundle_not_found(solution_id, bundle_id)
 
     # Regenerate code (deterministic)
     try:
@@ -350,16 +372,16 @@ def preview_product(solution_id, bundle_id):
     )
     from app.modules.solutions_product.services.sandbox_runner import SandboxRunner
 
+    if not _solution_in_active_org(solution_id):
+        return _bundle_not_found(solution_id, bundle_id, with_detail=False)
+
     record = SolutionCodeBundle.query.filter_by(
         solution_id=solution_id,
         bundle_id=bundle_id,
     ).first()
 
     if not record:
-        return jsonify({
-            "success": False,
-            "error": "Bundle not found",
-        }), 404
+        return _bundle_not_found(solution_id, bundle_id, with_detail=False)
 
     try:
         bundle = build_product_spec_bundle(solution_id)
@@ -393,7 +415,15 @@ def stop_preview_product(solution_id, bundle_id):
 
     DELETE /api/solutions/<id>/product/<bundle_id>/preview
     """
+    from app.modules.solutions_product.models import SolutionCodeBundle
     from app.modules.solutions_product.services.sandbox_runner import SandboxRunner
+
+    if not _solution_in_active_org(solution_id):
+        return _bundle_not_found(solution_id, bundle_id, with_detail=False)
+    # tenant-scoping-ok: keyed to the solution proven in the active organisation just above
+    if not SolutionCodeBundle.query.filter_by(solution_id=solution_id, bundle_id=bundle_id).first():
+        return _bundle_not_found(solution_id, bundle_id, with_detail=False)
+
     runner = SandboxRunner()
     runner.stop_preview(bundle_id)
     return jsonify({"success": True, "message": "Preview stopped"})
@@ -420,17 +450,16 @@ def push_to_github(solution_id, bundle_id):
         GitIntegrationService,
     )
 
+    if not _solution_in_active_org(solution_id):
+        return _bundle_not_found(solution_id, bundle_id)
+
     record = SolutionCodeBundle.query.filter_by(
         solution_id=solution_id,
         bundle_id=bundle_id,
     ).first()
 
     if not record:
-        return jsonify({
-            "success": False,
-            "error": "Bundle not found",
-            "detail": f"No bundle with ID '{bundle_id}' exists for solution {solution_id}.",
-        }), 404
+        return _bundle_not_found(solution_id, bundle_id)
 
     # Regenerate code (deterministic = same output from same spec)
     try:
@@ -625,15 +654,13 @@ def synthesize_business_logic(solution_id, bundle_id):
     calls the BusinessLogicSynthesizer for each, and stores the generated
     handler bodies back into spec_data.synthesized_handlers.
     """
-    from app.models.solution_models import Solution
     from app.modules.solutions_product.models import SolutionCodeBundle
     from app.modules.solutions_product.services.business_logic_synthesizer import (
         BusinessLogicSynthesizer,
     )
 
-    solution = Solution.query.get(solution_id)
-    if not solution:
-        return jsonify({"success": False, "error": "Solution not found"}), 404
+    if not _solution_in_active_org(solution_id):
+        return _bundle_not_found(solution_id, bundle_id)
 
     record = SolutionCodeBundle.query.filter_by(
         solution_id=solution_id,
@@ -641,11 +668,7 @@ def synthesize_business_logic(solution_id, bundle_id):
     ).first()
 
     if not record:
-        return jsonify({
-            "success": False,
-            "error": "Bundle not found",
-            "detail": f"No bundle with ID '{bundle_id}' exists for solution {solution_id}.",
-        }), 404
+        return _bundle_not_found(solution_id, bundle_id)
 
     try:
         synthesizer = BusinessLogicSynthesizer()
@@ -684,7 +707,13 @@ def check_compliance(solution_id):
     """
     from flask_login import current_user
     from app.models.published_api_spec import PublishedAPISpec
+    from app.models.solution_models import Solution
     from app.modules.solutions_product.services.compliance_checker import ComplianceChecker
+    from app.utils.route_guards import require_entity_in_active_org
+
+    # Published specs carry no organisation; the solution does. Resolve the
+    # solution in the active organisation before reading any spec.
+    require_entity_in_active_org(Solution, solution_id, description="Solution not found")
 
     body = request.json or {}
     service_url = body.get("service_url", "").strip()
@@ -695,7 +724,27 @@ def check_compliance(solution_id):
     if not service_url.startswith(("http://", "https://")):
         return jsonify({"success": False, "error": "service_url must start with http:// or https://"}), 400
 
+    from app.utils.ssrf_guard import BlockedOutboundURL, clamp_timeout, validate_user_supplied_url
+
+    try:
+        validate_user_supplied_url(service_url)
+        check_timeout = clamp_timeout(body.get("timeout", 10))
+    except BlockedOutboundURL:
+        return jsonify({"success": False, "error": "service_url refused: URL not allowed"}), 400
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+
     spec_id = body.get("spec_id")
+    if spec_id:
+        # A posted spec id is only honoured for this solution's own specs.
+        if isinstance(spec_id, bool) or not isinstance(spec_id, int):
+            return jsonify({"success": False, "error": "spec_id must be an integer"}), 400
+        # PublishedAPISpec has no organisation column; it is keyed to this
+        # solution, which was proven to be the active organisation's above.
+        # tenant-scoping-ok: keyed to the solution proven in the active organisation
+        own_spec = PublishedAPISpec.query.filter_by(id=spec_id, solution_id=solution_id).first()
+        if own_spec is None:
+            return jsonify({"success": False, "error": "Spec not found"}), 404
     if not spec_id:
         # Use latest published spec for this solution
         latest_spec = (
@@ -724,7 +773,7 @@ def check_compliance(solution_id):
         result = checker.check(
             published_spec_id=spec_id,
             service_url=service_url,
-            timeout=body.get("timeout", 10),
+            timeout=check_timeout,
             checked_by_id=current_user.id if current_user and current_user.is_authenticated else None,
         )
     except Exception as e:
@@ -921,7 +970,14 @@ def create_webhook(solution_id):
         "retry_count": 3
     }
     """
+    from app.models.solution_models import Solution
     from app.models.spec_webhook import SpecWebhook
+    from app.utils.route_guards import require_entity_in_active_org
+
+    # A webhook row has no organisation of its own and fire_webhooks selects by
+    # solution id alone, so the solution must be the caller's active
+    # organisation's before anything is registered against it.
+    require_entity_in_active_org(Solution, solution_id, description="Solution not found")
 
     body = request.json or {}
     url = (body.get("url") or "").strip()
@@ -939,6 +995,25 @@ def create_webhook(solution_id):
                 "success": False,
                 "error": "HTTPS required for webhook URLs in production (HTTP allowed for localhost)",
             }), 400
+
+    from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
+    from app.modules.solutions_product.services.drift_remediation_service import (
+        is_allowed_auth_header_env,
+    )
+
+    try:
+        validate_user_supplied_url(url)
+    except (BlockedOutboundURL, ValueError):
+        return jsonify({"success": False, "error": "url refused: URL not allowed"}), 400
+
+    auth_header_env = body.get("auth_header_env")
+    if auth_header_env in ("", None):
+        auth_header_env = None
+    elif not is_allowed_auth_header_env(auth_header_env):
+        return jsonify({
+            "success": False,
+            "error": "auth_header_env must match WEBHOOK_TOKEN_<NAME> (capitals, digits, underscores)",
+        }), 400
 
     # Validate event types
     valid_types = {"spec_changed", "drift_detected", "compliance_failed"}
@@ -960,7 +1035,7 @@ def create_webhook(solution_id):
         solution_id=solution_id,
         url=url,
         event_types=event_types,
-        auth_header_env=body.get("auth_header_env"),
+        auth_header_env=auth_header_env,
         retry_count=retry_count,
         enabled=body.get("enabled", True),
     )
@@ -1014,9 +1089,15 @@ def update_webhook(solution_id, webhook_id):
     body = request.json or {}
 
     if "url" in body:
-        url = body["url"].strip()
+        url = body["url"].strip() if isinstance(body["url"], str) else ""
         if not url.startswith(("http://", "https://")):
             return jsonify({"success": False, "error": "url must start with http:// or https://"}), 400
+        from app.utils.ssrf_guard import BlockedOutboundURL, validate_user_supplied_url
+
+        try:
+            validate_user_supplied_url(url)
+        except (BlockedOutboundURL, ValueError):
+            return jsonify({"success": False, "error": "url refused: URL not allowed"}), 400
         webhook.url = url
 
     if "event_types" in body:
@@ -1033,7 +1114,19 @@ def update_webhook(solution_id, webhook_id):
         webhook.event_types = event_types
 
     if "auth_header_env" in body:
-        webhook.auth_header_env = body["auth_header_env"]
+        from app.modules.solutions_product.services.drift_remediation_service import (
+            is_allowed_auth_header_env,
+        )
+
+        new_env = body["auth_header_env"]
+        if new_env in ("", None):
+            new_env = None
+        elif not is_allowed_auth_header_env(new_env):
+            return jsonify({
+            "success": False,
+            "error": "auth_header_env must match WEBHOOK_TOKEN_<NAME> (capitals, digits, underscores)",
+        }), 400
+        webhook.auth_header_env = new_env
 
     if "retry_count" in body:
         rc = body["retry_count"]
@@ -1201,17 +1294,27 @@ def get_compliance_schedule(solution_id):
 
 
 @solution_product_bp.route("/<int:solution_id>/compliance/run-all", methods=["POST"])
-@login_required
+@org_admin_required
 def run_all_compliance_checks(solution_id):
-    """Trigger immediate compliance checks for all solutions with schedules.
+    """Trigger immediate compliance checks for the scheduled solutions of the
+    caller's active organisation.
 
     POST /api/solutions/<id>/compliance/run-all
-    Admin-only: uses solution_id as a namespace anchor but runs all scheduled checks.
+    Admin-only (administrator of the active organisation, or platform admin):
+    each check calls the solution's service URL and may fire its webhooks, so a
+    plain member must not start them. solution_id must be a solution of the
+    active organisation, and the run is limited to that organisation's
+    solutions -- never to every organisation on the instance.
     """
+    from app.middleware.tenant_context import current_org_id
+    from app.models.solution_models import Solution
     from app.modules.solutions_product.services.drift_remediation_service import DriftRemediationService
+    from app.utils.route_guards import require_entity_in_active_org
+
+    require_entity_in_active_org(Solution, solution_id, description="Solution not found")
 
     svc = DriftRemediationService()
-    results = svc.schedule_checks()
+    results = svc.schedule_checks(organization_id=current_org_id())
 
     return jsonify({
         "success": True,

@@ -14,7 +14,6 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-import aiohttp
 
 from ..services.connector_framework import (
     BaseConnector,
@@ -78,13 +77,28 @@ class DatadogAPMConnector(BaseConnector):
         except (ValueError, TypeError):
             return None
 
+    def _checked_base_url(self) -> str:
+        """https://api.<site>, after the outbound-URL guard.
+
+        ``site`` is tenant-configured, so it is held to a plain domain name
+        (no scheme, port, path or credentials) before it becomes a host.
+        """
+        import re
+
+        from app.services.connector_framework import ConnectorURLRefused, validate_connector_url
+
+        site = str((self.config.config or {}).get("site") or "").strip().lower()
+        if not re.fullmatch(r"([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?", site):
+            raise ConnectorURLRefused("The connector URL is not an allowed address")
+        return validate_connector_url(f"https://api.{site}")
+
     async def test_connection(self) -> bool:
         """Test connectivity to Datadog API."""
         try:
             headers = self._get_auth_headers()
-            url = f"https://api.{self.config.config['site']}/api/v1/validate"
+            url = f"{self._checked_base_url()}/api/v1/validate"
 
-            async with aiohttp.ClientSession() as session:
+            async with self._outbound_session() as session:
                 async with session.get(url, headers=headers) as response:
                     return response.status == 200
 
@@ -128,7 +142,7 @@ class DatadogAPMConnector(BaseConnector):
     async def _fetch_metrics(self, since: datetime) -> List[Dict[str, Any]]:
         """Fetch metrics from Datadog."""
         headers = self._get_auth_headers()
-        base_url = f"https://api.{self.config.config['site']}/api/v2/metrics"
+        base_url = f"{self._checked_base_url()}/api/v2/metrics"
 
         # Define key APM metrics to fetch
         metrics_queries = [
@@ -142,7 +156,7 @@ class DatadogAPMConnector(BaseConnector):
 
         all_metrics = []
 
-        async with aiohttp.ClientSession() as session:
+        async with self._outbound_session() as session:
             for query in metrics_queries:
                 try:
                     params = {

@@ -19,6 +19,13 @@ import os
 from datetime import datetime
 from html import escape
 
+
+def _url_field_allowed(field) -> bool:
+    """Save-time outbound-URL check for a connector settings form field."""
+    from app.services.connector_framework import connector_url_field_allowed
+
+    return connector_url_field_allowed(field)
+
 from flask import (
     Blueprint,
     flash,
@@ -1249,7 +1256,7 @@ def abacus_settings():
 
     form = AbacusSettingsForm()
 
-    if form.validate_on_submit():
+    if form.validate_on_submit() and _url_field_allowed(form.base_url):
         import os
 
         credentials = {}
@@ -2658,7 +2665,7 @@ def jira_settings():
 
     form = JiraSettingsForm()
 
-    if form.validate_on_submit():
+    if form.validate_on_submit() and _url_field_allowed(form.base_url):
         credentials = {}
         if form.api_token.data and form.api_token.data.strip():
             credentials = {
@@ -3950,7 +3957,7 @@ def servicenow_integration():
     
     form = ServiceNowSettingsForm()
     
-    if form.validate_on_submit():
+    if form.validate_on_submit() and _url_field_allowed(form.instance_url):
         # Build credentials dict
         credentials = {}
         if form.password.data and form.password.data.strip():

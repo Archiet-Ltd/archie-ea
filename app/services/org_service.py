@@ -8,6 +8,7 @@ class OrgService:
     def create_org(name, admin_email, admin_password=None, admin_first_name=None, admin_last_name=None):
         from app.models.user import Role
         from app.models.user import Permission
+        from app.models.user import PASSWORD_HASH_METHOD
         import re
         from werkzeug.security import generate_password_hash
         import uuid
@@ -24,7 +25,7 @@ class OrgService:
             db.session.flush()
         user = User(
             email=admin_email,
-            password_hash=generate_password_hash(admin_password) if admin_password else None,
+            password_hash=generate_password_hash(admin_password, method=PASSWORD_HASH_METHOD) if admin_password else None,
             first_name=admin_first_name,
             last_name=admin_last_name,
             organization_id=org.id,

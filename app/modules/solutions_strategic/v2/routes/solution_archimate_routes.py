@@ -20,7 +20,7 @@ from flask_login import current_user, login_required
 from app import db
 from app.models.solution_models import Solution
 from app.utils.pagination import safe_int_arg
-from app.utils.route_guards import require_entity
+from app.utils.route_guards import require_entity, require_entity_in_active_org
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +128,10 @@ def add_solution_element(solution_id):
 def remove_solution_element(solution_id, element_id):
     """Unlink an ArchiMate element from a solution. Returns 204."""
     from app.models.solution_element import SolutionElement
+
+    # The junction has no organisation column: prove the solution is the
+    # active organisation's before looking up (or deleting) a row by its id.
+    require_entity_in_active_org(Solution, solution_id, description="Solution not found")
 
     se = SolutionElement.query.filter_by(
         solution_id=solution_id, id=element_id
@@ -449,6 +453,10 @@ def trace_element_chain(solution_id, element_id):
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
     from app.models.solution_models import SolutionArchiMateElement
 
+    # The solution scope below comes from the organisation-less junction, so
+    # the solution must be the active organisation's first.
+    require_entity_in_active_org(Solution, solution_id, description="Solution not found")
+
     el = ArchiMateElement.query.get_or_404(element_id)
 
     # Get solution scope
@@ -668,6 +676,10 @@ def unlink_archimate_element(solution_id, element_id):
     Returns 204 on success, 404 if not linked.
     """
     from app.models.solution_archimate_element import SolutionArchiMateElement
+
+    # The junction has no organisation column: prove the solution is the
+    # active organisation's before looking up (or deleting) a row by its id.
+    require_entity_in_active_org(Solution, solution_id, description="Solution not found")
 
     link = SolutionArchiMateElement.query.filter_by(
         solution_id=solution_id, element_id=element_id
@@ -1063,8 +1075,19 @@ def propagate_stale(solution_id, element_id):
     (breadth-first, max 3 hops) to identify elements that may be stale
     because this element was edited or rejected.
     """
+    from app.middleware.tenant_context import current_org_id
     from app.models.archimate_core import ArchiMateRelationship
     from app.models.solution_models import SolutionArchiMateElement
+
+    # The solution-to-element junction has no organisation column, so the
+    # solution must be proven visible first. Name the active organisation
+    # explicitly (the automatic filter is off when it is unknown); a foreign
+    # or unknown solution is 404, never a membership answer.
+    org_id = current_org_id()
+    if org_id is None or not db.session.query(Solution.id).filter(
+        Solution.id == solution_id, Solution.organization_id == org_id
+    ).first():
+        return jsonify({"error": "Solution not found"}), 404
 
     # Get all element IDs in this solution for scope filtering
     linked = SolutionArchiMateElement.query.filter_by(
