@@ -1302,8 +1302,12 @@ def get_capability_vendors(capability_id):
 @main.route("/integrations")
 @login_required
 def integrations():
-    """System Integrations - Third-party service connections and API management"""
-    return redirect(url_for("connectors.dashboard"))
+    """System Integrations - Third-party service connections and API management.
+
+    Opens the one connectors page (health, last synchronisation, the change
+    queue and the form that adds a connector), not the read-only health view
+    it used to land on, which has no way to configure anything."""
+    return redirect(url_for("m365_connector.connectors_index"))
 
 
 @main.route("/settings")
