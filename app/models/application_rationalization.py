@@ -17,7 +17,7 @@ import logging
 from datetime import date, datetime
 
 from .. import db
-from .mixins import TenantMixin
+from .mixins import HybridTenantMixin, TenantMixin, install_hybrid_scope
 
 
 # ============================================================================
@@ -611,6 +611,17 @@ class ApplicationRationalizationScore(TenantMixin, db.Model):
     # one.
     formula_version = db.Column(db.Integer, nullable=True)
 
+    # The ScoringConfiguration row (its thresholds, and its weights when no
+    # registered formula applied) that produced this score. The version it
+    # had at the time is ``scoring_model_version``. Nullable: scores written
+    # before this column existed do not say which row they used.
+    scoring_configuration_id = db.Column(
+        db.Integer,
+        db.ForeignKey("scoring_configurations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # TIME framework recommendation (legacy scoring output — do NOT remove)
     rationalization_action = db.Column(db.String(20), nullable=False, index=True)
     # TOLERATE, INVEST, MIGRATE, ELIMINATE
@@ -756,16 +767,15 @@ class ApplicationRationalizationScore(TenantMixin, db.Model):
                 return self.override_disposition
         return self.disposition_action
 
-    def calculate_overall_score(self):
+    def calculate_overall_score(self, weights=None):
         """
-        Calculate weighted overall health score.
-
-        Weights (must sum to 100):
-        - Technical Health: 30%
-        - Business Value: 35%
-        - Cost Efficiency: 25%
-        - Vendor Risk: 10%
+        Calculate weighted overall health score from ``weights``, a dict of
+        dimension key -> fraction (as ``ScoringConfiguration.get_weights_dict``
+        returns). No weights means no score: the weighting is a governed
+        record, never a constant here.
         """
+        if not weights:
+            return None
         if any(
             score is None
             for score in [
@@ -778,10 +788,10 @@ class ApplicationRationalizationScore(TenantMixin, db.Model):
             return None
 
         weighted = (
-            self.technical_health_score * 0.30
-            + self.business_value_score * 0.35
-            + self.cost_efficiency_score * 0.25
-            + self.vendor_risk_score * 0.10
+            self.technical_health_score * weights["technical_health"]
+            + self.business_value_score * weights["business_value"]
+            + self.cost_efficiency_score * weights["cost_efficiency"]
+            + self.vendor_risk_score * weights["vendor_risk"]
         )
 
         return int(round(weighted))
@@ -1310,9 +1320,16 @@ class ReplacementPlan(db.Model):
 # ============================================================================
 
 
-class ScoringConfiguration(db.Model):
+class ScoringConfiguration(HybridTenantMixin, db.Model):
     """
     Configurable scoring weights for application rationalization.
+
+    ``organization_id IS NULL`` marks a shared row, readable by every
+    organisation and changeable only by a platform administrator; a row with an
+    organisation is that organisation's own and invisible to every other
+    (``install_hybrid_scope`` below). ``configuration_version`` rises by one
+    whenever a weight or threshold changes, and every score records the
+    configuration id and version that produced it.
 
     Enables business units to customize the importance of each
     scoring dimension based on their specific priorities and mission needs.
@@ -1728,3 +1745,44 @@ class RationalizationBenefitsTracker(db.Model):
                 / float(self.projected_annual_savings)
                 * 100
             )
+
+
+def _platform_writer() -> bool:
+    try:
+        from flask_login import current_user
+
+        from app.middleware.tenant_decorators import is_platform_admin
+
+        return bool(is_platform_admin(current_user))
+    except Exception:  # no login context: treated as an ordinary caller
+        return False
+
+
+install_hybrid_scope(ScoringConfiguration, platform_writer=_platform_writer)
+
+_VERSIONED_FIELDS = (
+    "technical_health_weight",
+    "business_value_weight",
+    "cost_efficiency_weight",
+    "vendor_risk_weight",
+    "eliminate_threshold",
+    "migrate_technical_threshold",
+    "migrate_business_threshold",
+    "invest_business_threshold",
+    "invest_technical_threshold",
+    "tolerate_min_threshold",
+)
+
+
+@db.event.listens_for(db.session, "before_flush")
+def _bump_scoring_configuration_version(session, flush_context, instances):
+    """A changed weight or threshold is a new version of the formula; the
+    earlier version's scores keep the version they recorded."""
+    from sqlalchemy import inspect as sa_inspect
+
+    for row in (i for i in session.dirty if isinstance(i, ScoringConfiguration)):
+        attrs = sa_inspect(row).attrs
+        if attrs.configuration_version.history.has_changes():
+            continue
+        if any(attrs[f].history.has_changes() for f in _VERSIONED_FIELDS):
+            row.configuration_version = (row.configuration_version or 1) + 1

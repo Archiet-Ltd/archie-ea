@@ -109,6 +109,72 @@ class HybridTenantMixin:  # migration-exempt
         )
 
 
+def install_hybrid_scope(model, *, platform_writer):
+    """Read and write enforcement for a ``HybridTenantMixin`` model.
+
+    Inside a request, a SELECT sees the current organisation's own rows plus
+    the shared ones (``organization_id IS NULL``). A shared row, or another
+    organisation's row, can be created, changed or deleted only when
+    ``platform_writer()`` is true; an ordinary organisation can write only
+    rows it owns. Outside a request (CLI, scheduler) nothing is filtered, as
+    for every tenant model: callers scope explicitly there.
+
+    Same behaviour as the handlers written for ``UnifiedCapability`` in
+    app/models/unified_capability.py, expressed once for any hybrid model.
+    """
+    from sqlalchemy import inspect as sa_inspect
+    from sqlalchemy import or_
+    from sqlalchemy.orm import with_loader_criteria
+
+    from app import db
+
+    from flask import g, has_request_context
+
+    # Reads the id the tenant middleware already set and never resolves it:
+    # current_org_id() can query, and a query here re-enters this listener.
+    def _org_id():  # reuse-ok: the resolving helper recurses when called from a session event
+        if not has_request_context():
+            return None
+        return getattr(g, "current_org_id", None)
+
+    @db.event.listens_for(db.session, "do_orm_execute")
+    def _scope_reads_and_bulk_writes(state):
+        organization_id = _org_id()
+        if organization_id is None:
+            return
+        if not (state.is_select or state.is_update or state.is_delete):
+            return
+        if state.is_select:
+            predicate = lambda cls: or_(  # noqa: E731
+                cls.organization_id == organization_id, cls.organization_id.is_(None)
+            )
+        elif platform_writer():
+            return
+        else:
+            predicate = lambda cls: cls.organization_id == organization_id  # noqa: E731
+        state.statement = state.statement.options(
+            with_loader_criteria(model, predicate, include_aliases=True)
+        )
+
+    @db.event.listens_for(db.session, "before_flush")
+    def _refuse_foreign_writes(session, flush_context, instances):
+        organization_id = _org_id()
+        if organization_id is None or platform_writer():
+            return
+        for row in (i for i in session.new if isinstance(i, model)):
+            if row.organization_id is None:
+                raise PermissionError("shared rows are read-only inside an organisation")
+            if row.organization_id != organization_id:
+                raise PermissionError("rows owned by another organisation are read-only")
+        for row in (i for i in session.dirty.union(session.deleted) if isinstance(i, model)):
+            history = sa_inspect(row).attrs.organization_id.history
+            original = history.deleted[0] if history.deleted else row.organization_id
+            if original is None:
+                raise PermissionError("shared rows are read-only inside an organisation")
+            if original != organization_id or row.organization_id != organization_id:
+                raise PermissionError("rows owned by another organisation are read-only")
+
+
 class OptimisticLockMixin:
     """Mixin for SQLAlchemy-enforced optimistic locking.
 

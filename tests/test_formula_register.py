@@ -317,3 +317,148 @@ class TestFormulaRegisterRoutes:
         resp = client.get("/admin/formula-register/")
         assert resp.status_code == 200
         assert b"No version registered yet" in resp.data
+
+
+# ---------------------------------------------------------------------------
+# R2-B01: the scoring configuration is the governed record the scores name.
+# ---------------------------------------------------------------------------
+
+
+def _config(name, organization_id=None, **weights):
+    from app.models.application_rationalization import ScoringConfiguration
+
+    return ScoringConfiguration(
+        name=name,
+        scope_type="global",
+        organization_id=organization_id,
+        is_default=True,
+        technical_health_weight=weights.get("technical_health_weight", 30),
+        business_value_weight=weights.get("business_value_weight", 35),
+        cost_efficiency_weight=weights.get("cost_efficiency_weight", 25),
+        vendor_risk_weight=weights.get("vendor_risk_weight", 10),
+    )
+
+
+def _clear_configs(db_session):
+    from app.models.application_rationalization import ScoringConfiguration
+
+    db_session.query(ScoringConfiguration).delete()
+    db_session.flush()
+
+
+def _application(db_session, org):
+    from app.models.application_portfolio import ApplicationComponent
+
+    comp = ApplicationComponent(name=f"App {uuid.uuid4().hex[:6]}", organization_id=org.id)
+    db_session.add(comp)
+    db_session.flush()
+    return comp
+
+
+class TestScoringConfigurationIsTheGovernedRecord:
+    def test_a_score_records_the_configuration_id_and_version(self, app, db_session, make_org, tenant_ctx):
+        from app.services.rationalization_scoring_service import RationalizationScoringService
+
+        _clear_configs(db_session)
+        org = make_org("cfg-score")
+        cfg = _config("Org weights", organization_id=org.id)
+        db_session.add(cfg)
+        db_session.flush()
+        comp = _application(db_session, org)
+
+        with tenant_ctx(org.id):
+            score = RationalizationScoringService.calculate_app_score(comp.id, app=comp)
+            db_session.flush()
+
+        assert score.scoring_configuration_id == cfg.id
+        assert str(score.scoring_model_version) == str(cfg.configuration_version) == "1"
+
+    def test_an_organisations_own_configuration_is_invisible_to_another(
+        self, app, db_session, make_org, tenant_ctx
+    ):
+        from app.models.application_rationalization import ScoringConfiguration
+
+        _clear_configs(db_session)
+        org_a, org_b = make_org("cfg-a"), make_org("cfg-b")
+        own = _config("A only", organization_id=org_a.id)
+        db_session.add(own)
+        db_session.flush()
+
+        with tenant_ctx(org_a.id):
+            assert [c.id for c in ScoringConfiguration.query.all()] == [own.id]
+        with tenant_ctx(org_b.id):
+            assert ScoringConfiguration.query.all() == []
+
+    def test_a_shared_row_is_visible_to_both_and_cannot_be_changed_inside_a_tenant(
+        self, app, db_session, make_org, tenant_ctx
+    ):
+        import pytest
+
+        from app.models.application_rationalization import ScoringConfiguration
+
+        _clear_configs(db_session)
+        org_a, org_b = make_org("cfg-sh-a"), make_org("cfg-sh-b")
+        shared = _config("Shared baseline")
+        db_session.add(shared)
+        db_session.flush()
+
+        for org in (org_a, org_b):
+            with tenant_ctx(org.id):
+                assert [c.id for c in ScoringConfiguration.query.all()] == [shared.id]
+
+        with tenant_ctx(org_a.id):
+            row = ScoringConfiguration.query.get(shared.id)
+            row.technical_health_weight = 50
+            with pytest.raises(PermissionError):
+                db_session.flush()
+            db_session.expire_all()
+
+        assert ScoringConfiguration.query.get(shared.id).technical_health_weight == 30
+
+    def test_no_resolvable_configuration_gives_no_score_and_no_weights(
+        self, app, db_session, make_org, tenant_ctx
+    ):
+        from app.models.application_rationalization import ApplicationRationalizationScore
+        from app.services.rationalization_scoring_service import RationalizationScoringService
+
+        _clear_configs(db_session)
+        org = make_org("cfg-none")
+        comp = _application(db_session, org)
+
+        with tenant_ctx(org.id):
+            assert RationalizationScoringService.calculate_app_score(comp.id, app=comp) is None
+            assert RationalizationScoringService.get_model_metadata()["weights"] is None
+
+        assert ApplicationRationalizationScore().calculate_overall_score() is None
+        assert db_session.query(ApplicationRationalizationScore).filter_by(
+            application_component_id=comp.id
+        ).count() == 0
+
+    def test_a_weight_change_is_version_two_and_the_old_score_keeps_version_one(
+        self, app, db_session, make_org, tenant_ctx
+    ):
+        from app.services.rationalization_scoring_service import RationalizationScoringService
+
+        _clear_configs(db_session)
+        org = make_org("cfg-ver")
+        cfg = _config("Versioned", organization_id=org.id)
+        db_session.add(cfg)
+        db_session.flush()
+        first_app = _application(db_session, org)
+        second_app = _application(db_session, org)
+
+        with tenant_ctx(org.id):
+            old = RationalizationScoringService.calculate_app_score(first_app.id, app=first_app)
+            db_session.flush()
+
+            cfg.technical_health_weight = 40
+            cfg.business_value_weight = 25
+            db_session.flush()
+            assert cfg.configuration_version == 2
+
+            new = RationalizationScoringService.calculate_app_score(second_app.id, app=second_app)
+            db_session.flush()
+
+        assert str(old.scoring_model_version) == "1"
+        assert str(new.scoring_model_version) == "2"
+        assert old.scoring_configuration_id == new.scoring_configuration_id == cfg.id

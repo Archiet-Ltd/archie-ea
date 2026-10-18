@@ -5,7 +5,7 @@ Provides reusable mixins for SQLAlchemy models including serialization,
 auditing, and other common patterns.
 """
 
-from .core import AuditMixin, HierarchyMixin, HybridTenantMixin, OptimisticLockMixin, SoftDeleteMixin, StatusMixin, TenantMixin, TimestampMixin
+from .core import AuditMixin, HierarchyMixin, HybridTenantMixin, OptimisticLockMixin, install_hybrid_scope, SoftDeleteMixin, StatusMixin, TenantMixin, TimestampMixin
 from .serialization import SerializationMixin
 
 __all__ = [
@@ -13,6 +13,7 @@ __all__ = [
     "SoftDeleteMixin",
     "TenantMixin",
     "HybridTenantMixin",
+    "install_hybrid_scope",
     "TimestampMixin",
     "AuditMixin",
     "HierarchyMixin",

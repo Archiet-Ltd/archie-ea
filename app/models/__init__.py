@@ -98,7 +98,6 @@ else:
     from .capability_archimate_mapping import *  # noqa
     from .copilot_insight import *  # noqa
     from .frontend_configuration import *  # noqa
-    from .scoring_config import *  # noqa
     from .usage_event import *  # noqa
     from .simple_duplicate_detection import *  # noqa
     from .optimization import *  # noqa

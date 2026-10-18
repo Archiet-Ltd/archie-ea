@@ -10,6 +10,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
+from flask import has_request_context
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
@@ -83,29 +84,24 @@ class RationalizationScoringService:
 
     @classmethod
     def get_model_metadata(cls):
-        """Return current scoring model metadata."""
+        """Return current scoring model metadata.
+
+        Weights and thresholds are read from the configuration an
+        organisation's scores resolve to; with none, they are ``None``.
+        """
+        config = cls.get_scoring_configuration()
         return {
             "version": cls.MODEL_VERSION,
-            "weights": {
-                "technical_health": 0.30,
-                "business_value": 0.35,
-                "cost_efficiency": 0.25,
-                "vendor_risk": 0.10,
-            },
+            "configuration_id": config.id if config else None,
+            "configuration_version": config.configuration_version if config else None,
+            "weights": config.get_weights_dict() if config else None,
             "capability_coverage": {
                 "type": "adjustment",
                 "max_adjustment": 10.0,
                 "level_weights": {"L1": 3.0, "L2": 2.0, "L3+": 1.0},
                 "spof_l1_l2_blocks_eliminate": True,
             },
-            "thresholds": {
-                "eliminate_overall": 40,
-                "eliminate_bv_ce": 40,
-                "migrate_tech": 40,
-                "migrate_bv": 50,
-                "invest_bv": 70,
-                "invest_tech": 50,
-            },
+            "thresholds": config.to_dict()["thresholds"] if config else None,
         }
 
     @classmethod
@@ -216,74 +212,48 @@ class RationalizationScoringService:
         scope_type: str = "global",
         scope_entity_id: Optional[int] = None,
         scope_entity_type: Optional[str] = None,
-    ) -> ScoringConfiguration:
+        organization_id: Optional[int] = None,
+    ) -> Optional[ScoringConfiguration]:
         """
-        Get the appropriate scoring configuration for the given scope.
+        Resolve the scoring configuration for the given scope, or ``None``.
 
-        Falls back to default federal CIO weights (30/35/25/10) if no
-        custom configuration exists for the specified scope.
-
-        Args:
-            scope_type: Configuration scope (global, division, department, business_unit)
-            scope_entity_id: ID of the scoped entity
-            scope_entity_type: Type of entity (BusinessUnit, Department, etc.)
-
-        Returns:
-            ScoringConfiguration object
+        The organisation's own active rows are preferred over shared rows
+        (``organization_id IS NULL``); inside a request the tenant scope on
+        ``ScoringConfiguration`` already limits the query to those two sets,
+        and ``organization_id`` does the same outside one. Within that, a
+        business-unit row for the given scope wins, then the default row,
+        then a global row. Nothing is created and no weighting is assumed:
+        with no configuration the caller has no score to report.
         """
-        try:
-            # Try to find specific configuration
-            query = ScoringConfiguration.query.filter_by(
-                is_active=True
+        query = ScoringConfiguration.query.filter_by(is_active=True)
+        if organization_id is not None:
+            query = query.filter(
+                db.or_(
+                    ScoringConfiguration.organization_id == organization_id,
+                    ScoringConfiguration.organization_id.is_(None),
+                )
             )
+        else:
+            if not has_request_context():
+                query = query.filter(ScoringConfiguration.organization_id.is_(None))
+        # Organisation-owned rows first, then the newest.
+        ordered = query.order_by(
+            ScoringConfiguration.organization_id.is_(None), ScoringConfiguration.id.desc()
+        )
 
-            # For non-global scopes, try specific config first
-            if scope_type != "global" and scope_entity_id is not None:
-                specific_config = query.filter_by(
-                    scope_type=scope_type,
-                    scope_entity_id=scope_entity_id,
-                    scope_entity_type=scope_entity_type,
-                ).first()
-                if specific_config:
-                    return specific_config
+        if scope_type != "global" and scope_entity_id is not None:
+            specific = ordered.filter_by(
+                scope_type=scope_type,
+                scope_entity_id=scope_entity_id,
+                scope_entity_type=scope_entity_type,
+            ).first()
+            if specific:
+                return specific
 
-            # Try default configuration
-            default_config = query.filter_by(is_default=True).first()
-            if default_config:
-                return default_config
-
-            # Return global configuration or create default
-            global_config = query.filter_by(scope_type="global").first()
-            if global_config:
-                return global_config
-
-            # Create default CIO.gov baseline configuration if none exists
-            logger.warning("No scoring configuration found, creating default CIO.gov baseline")
-            default = ScoringConfiguration(
-                name="CIO.gov Federal Baseline",
-                description="Default weights per CIO.gov Application Rationalization Playbook",
-                scope_type="global",
-                technical_health_weight=30,
-                business_value_weight=35,
-                cost_efficiency_weight=25,
-                vendor_risk_weight=10,
-                is_default=True,
-            )
-            db.session.add(default)
-            db.session.flush()
-            return default
-
-        except Exception as e:
-            logger.error(f"Error getting scoring configuration: {e}", exc_info=True)
-            # Return a transient default configuration (not persisted)
-            return ScoringConfiguration(
-                name="Emergency Default",
-                scope_type="global",
-                technical_health_weight=30,
-                business_value_weight=35,
-                cost_efficiency_weight=25,
-                vendor_risk_weight=10,
-            )
+        return (
+            ordered.filter_by(is_default=True).first()
+            or ordered.filter_by(scope_type="global").first()
+        )
 
     @staticmethod
     def resolve_policy(app: "ApplicationComponent") -> Optional["RationalizationPolicy"]:
@@ -628,8 +598,14 @@ class RationalizationScoringService:
             # Get scoring configuration
             if scoring_config is None:
                 scoring_config = RationalizationScoringService.get_scoring_configuration(
-                    scope_type="global"
+                    scope_type="global", organization_id=app.organization_id
                 )
+            if scoring_config is None:
+                logger.warning(
+                    "No scoring configuration for organisation %s: application %s not scored",
+                    app.organization_id, application_id,
+                )
+                return None
 
             # Resolve the policy overlay for this application.
             # The policy can override dimension weights and TIME thresholds.
@@ -888,6 +864,7 @@ class RationalizationScoringService:
             score.action_rationale = justification
             score.assessment_date = datetime.utcnow().date()
             score.scoring_model_version = scoring_config.configuration_version
+            score.scoring_configuration_id = scoring_config.id
 
             # `active_formula` here is the same object
             # resolved above when the overall score was computed -- it is
@@ -1027,8 +1004,10 @@ class RationalizationScoringService:
 
             if scoring_config is None:
                 scoring_config = RationalizationScoringService.get_scoring_configuration(
-                    scope_type="global"
+                    scope_type="global", organization_id=app.organization_id
                 )
+            if scoring_config is None:
+                return {"error": "No scoring configuration is available for this organisation"}
 
             # Resolve policy overlay (read-only — no DB flush in this method).
             active_policy = RationalizationScoringService.resolve_policy(app)

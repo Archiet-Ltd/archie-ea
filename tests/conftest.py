@@ -114,8 +114,29 @@ def _schema(app):
         db.create_all()
         Role.insert_roles()
         seed_implementation_planning_flag()
+        _seed_shared_scoring_baseline()
         db.session.remove()
     return True
+
+
+def _seed_shared_scoring_baseline():
+    """The one shared scoring configuration a deployed database holds (the
+    schema upgrade inserts it into an empty table). Scoring no longer invents
+    a default weighting when none exists, so a test database needs it as the
+    deployed one has it."""
+    from app import db
+    from app.models.application_rationalization import ScoringConfiguration
+
+    if db.session.query(ScoringConfiguration.id).first() is None:
+        db.session.add(
+            ScoringConfiguration(
+                name="CIO.gov Federal Baseline",
+                description="Default weights per CIO.gov Application Rationalization Playbook",
+                scope_type="global",
+                is_default=True,
+            )
+        )
+        db.session.commit()
 
 @pytest.fixture
 def db_session(app, _schema):

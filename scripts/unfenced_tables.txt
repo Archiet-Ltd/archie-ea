@@ -330,7 +330,6 @@ sap_metadata
 saved_diagram_elements
 saved_diagram_relationships
 savings_realizations
-scoring_configs
 scoring_configurations
 security_scans
 service_dependency
