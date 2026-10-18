@@ -173,3 +173,76 @@ def test_legacy_technology_first_programme_post_is_retired(
     assert response.get_json()["redirect_url"] == "/solutions/new-programme"
     with app.app_context():
         assert StrategicInitiative.query.filter_by(name="Bypass").first() is None
+
+
+_LEGACY_COCKPIT_TEXT = ("TYPE None", "CLEAN-CORE SCORE", "SOLUTIONS 0", "Take Snapshot")
+
+
+def test_transformation_programme_never_renders_legacy_cockpit_on_drift_fit_gap_rollup(
+    app, programme_fixture, login_as
+):
+    """Catches drift, fit-gap and rollup rendering technology-cockpit chrome for a transformation programme."""
+    programme_id = _create_programme(programme_fixture).object_ids["programme_id"]
+    overview = f"/solutions/programmes/{programme_id}/overview"
+    client = app.test_client()
+    login_as(client, programme_fixture.owner_id)
+
+    for suffix in ("drift", "fit-gap", "api/rollup"):
+        response = client.get(f"/solutions/programmes/{programme_id}/{suffix}")
+        assert response.status_code == 302, suffix
+        assert response.headers["Location"].endswith(overview), suffix
+        body = response.get_data(as_text=True)
+        for text in _LEGACY_COCKPIT_TEXT:
+            assert text not in body, (suffix, text)
+
+
+def test_legacy_programme_keeps_drift_fit_gap_rollup(app, programme_fixture, login_as):
+    """Catches the transformation guard changing what a legacy programme sees."""
+    with app.app_context():
+        legacy = StrategicInitiative(
+            organization_id=programme_fixture.organization_id,
+            name="Legacy technology programme",
+            description="Preserved compatibility record",
+            initiative_type="brownfield",
+            owner_id=programme_fixture.owner_id,
+        )
+        db.session.add(legacy)
+        db.session.commit()
+        legacy_id = legacy.id
+
+    client = app.test_client()
+    login_as(client, programme_fixture.owner_id)
+    for suffix in ("drift", "fit-gap", "api/rollup"):
+        response = client.get(f"/solutions/programmes/{legacy_id}/{suffix}")
+        assert response.status_code == 200, suffix
+    assert "Legacy technology programme" in client.get(
+        f"/solutions/programmes/{legacy_id}/drift"
+    ).get_data(as_text=True)
+
+
+def test_transformation_guard_is_scoped_to_the_asking_organisation(
+    app, programme_fixture, login_as
+):
+    """Catches the guard answering for, or leaking, another organisation's programmes."""
+    programme_id = _create_programme(programme_fixture).object_ids["programme_id"]
+    with app.app_context():
+        foreign_legacy = StrategicInitiative(
+            organization_id=programme_fixture.foreign_organization_id,
+            name="Foreign legacy programme",
+            description="Other organisation",
+            initiative_type="brownfield",
+            owner_id=programme_fixture.foreign_owner_id,
+        )
+        db.session.add(foreign_legacy)
+        db.session.commit()
+        foreign_id = foreign_legacy.id
+
+    client = app.test_client()
+    login_as(client, programme_fixture.foreign_owner_id)
+    for suffix in ("drift", "fit-gap", "api/rollup"):
+        # org A's transformation programme is invisible to org B: never its overview.
+        foreign_view = client.get(f"/solutions/programmes/{programme_id}/{suffix}")
+        assert foreign_view.status_code != 302, suffix
+        assert "Simplify the application estate" not in foreign_view.get_data(as_text=True)
+        # org B's own legacy programme is untouched.
+        assert client.get(f"/solutions/programmes/{foreign_id}/{suffix}").status_code == 200, suffix

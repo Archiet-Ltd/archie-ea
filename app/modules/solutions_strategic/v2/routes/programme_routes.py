@@ -464,6 +464,23 @@ def ea_briefing_generate():
     return jsonify({"success": True, "briefing": briefing.to_dict(), "push": push}), 201
 
 
+def _transformation_programme_redirect(initiative_id):
+    """Redirect a transformation programme to its own overview, else None.
+
+    The legacy technology cockpit, drift, fit-gap and rollup screens make no
+    sense for a business-transformation programme, so each of them asks here
+    first. Only the caller's own organisation's records match.
+    """
+    canonical = StrategicInitiative.query.filter(
+        StrategicInitiative.id == initiative_id,
+        StrategicInitiative.organization_id == getattr(g, "current_org_id", None),
+        StrategicInitiative.record_kind == "transformation_programme",
+    ).first()
+    if canonical is None:
+        return None
+    return redirect(f"/solutions/programmes/{canonical.id}/overview", code=302)
+
+
 @solution_design_bp.route("/programmes/<int:initiative_id>/drift", methods=["GET"])
 @login_required
 def programme_drift(initiative_id):
@@ -472,6 +489,10 @@ def programme_drift(initiative_id):
     Renders the cockpit template with show_drift=True so the full snapshot
     table is visible.  No new template required (Rule 1).
     """
+    guarded = _transformation_programme_redirect(initiative_id)
+    if guarded is not None:
+        return guarded
+
     from app.modules.solutions_strategic.v2.services.programme_governance_service import (
         ProgrammeGovernanceService,
     )
@@ -492,13 +513,9 @@ def programme_drift(initiative_id):
 @login_required
 def programme_cockpit(initiative_id):
     """Programme governance cockpit."""
-    canonical = StrategicInitiative.query.filter(
-        StrategicInitiative.id == initiative_id,
-        StrategicInitiative.organization_id == getattr(g, "current_org_id", None),
-        StrategicInitiative.record_kind == "transformation_programme",
-    ).first()
-    if canonical is not None:
-        return redirect(f"/solutions/programmes/{canonical.id}/overview", code=302)
+    guarded = _transformation_programme_redirect(initiative_id)
+    if guarded is not None:
+        return guarded
 
     from app.modules.solutions_strategic.v2.services.programme_governance_service import (
         ProgrammeGovernanceService,
@@ -538,6 +555,10 @@ def create_programme_entity():
 @login_required
 def programme_rollup(initiative_id):
     """Governance rollup as JSON."""
+    guarded = _transformation_programme_redirect(initiative_id)
+    if guarded is not None:
+        return guarded
+
     from app.modules.solutions_strategic.v2.services.programme_governance_service import (
         ProgrammeGovernanceService,
     )
@@ -611,6 +632,10 @@ def delete_programme(initiative_id):
 @login_required
 def programme_fit_gap(initiative_id):
     """Programme fit-gap workbench (PROG-004) — bulk classification across members."""
+    guarded = _transformation_programme_redirect(initiative_id)
+    if guarded is not None:
+        return guarded
+
     from app.models.solution_models import SolutionFitGapEntry
     from app.modules.solutions_strategic.v2.services.programme_governance_service import (
         ProgrammeGovernanceService,
