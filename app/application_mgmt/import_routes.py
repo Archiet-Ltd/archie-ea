@@ -24,6 +24,7 @@ from flask import (
 from flask_login import current_user, login_required
 
 from .. import db
+from app.middleware.tenant_decorators import platform_admin_required
 from ..models.application_portfolio import ApplicationComponent
 from . import application_mgmt
 from .routes import (
@@ -2832,10 +2833,15 @@ def analyze_import():
 
 @application_mgmt.route("/applications/auto-create-vendors", methods=["POST"])
 @login_required
+@platform_admin_required
 def auto_create_vendors():
     """
     Auto-create missing vendors before import.
     Creates VendorOrganization records for vendors that don't exist.
+
+    Platform-admin-only (lead review of PR 430, item 3): writes the global,
+    platform-wide ``VendorOrganization`` catalogue and was ``login_required``
+    only -- any signed-in user could create vendor rows ahead of an import.
     """
     try:
         from ..models.vendor.vendor_organization import VendorOrganization
