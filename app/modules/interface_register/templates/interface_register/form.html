@@ -7,10 +7,10 @@
 <div class="flex-1 overflow-auto p-6" x-data="interfaceComponentPicker()">
   {{ page_shell(
       title=('Edit ' ~ interface.name) if interface else 'New interface',
-      subtitle=initiative.name if initiative else None,
+      subtitle=None,
       breadcrumb=[
           ('Home', url_for('main.index')),
-          ('Interface Register', url_for('interface_register.index', initiative_id=initiative.id) if initiative else url_for('interface_register.index')),
+          ('Interface Register', url_for('interface_register.index')),
           (interface.name if interface else 'New interface', None)
       ]
   ) }}
@@ -25,7 +25,6 @@
         action="{{ url_for('interface_register.update', element_id=interface.id) if interface else url_for('interface_register.create') }}"
         class="space-y-6 max-w-3xl">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="initiative_id" value="{{ initiative.id if initiative else '' }}">
 
     <div class="bg-card border border-border rounded-lg p-6 space-y-5">
       <div>
@@ -35,6 +34,19 @@
                placeholder="e.g. Customer Master Replication (S/4 to CRM)"
                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" autofocus>
       </div>
+
+      {% if architectures %}
+      <div>
+        <label class="block text-sm font-medium text-foreground mb-1.5" for="architecture_id">Architecture model</label>
+        <select id="architecture_id" name="architecture_id"
+                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          <option value="">None</option>
+          {% for model in architectures %}
+          <option value="{{ model.id }}" {% if selected_architecture_id == model.id %}selected{% endif %}>{{ model.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
 
       <div>
         <label class="block text-sm font-medium text-foreground mb-1.5" for="description">Description</label>
@@ -224,7 +236,7 @@
     </div>
 
     <div class="flex items-center justify-between">
-      <a href="{{ url_for('interface_register.index', initiative_id=initiative.id) if initiative else url_for('interface_register.index') }}"
+      <a href="{{ url_for('interface_register.index') }}"
          class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors">
         Cancel
       </a>

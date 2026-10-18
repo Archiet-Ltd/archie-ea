@@ -79,35 +79,35 @@ def _resolve_current_provider_consumer(element):
     return current_provider, current_consumer
 
 
+def _parse_architecture_id(raw):
+    try:
+        return int(raw) if raw not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
 @interface_register_bp.route("/", methods=["GET"])
 @login_required
 def index():
-    """US-1: register list. Redirects to the initiative picker when
-    initiative_id is absent — never guesses one."""
+    """US-1: register list for the organisation, optionally narrowed to one
+    architecture model with ?architecture_id=. No roadmap initiative needed."""
     guard = _guard()
     if guard:
         return guard
 
-    initiative_id = request.args.get("initiative_id", type=int)
-    if not initiative_id:
-        initiatives = service.list_initiatives_for_org(g.current_org_id)
-        return render_template(
-            "interface_register/index.html",
-            initiative=None,
-            initiatives=initiatives,
-            rows=[],
-        )
+    architecture_id = request.args.get("architecture_id", type=int)
+    architecture = None
+    if architecture_id is not None:
+        try:
+            architecture = service.resolve_architecture(architecture_id)
+        except service.InterfaceRegisterError:
+            return render_template("errors/404.html"), 404
 
-    try:
-        initiative = service.resolve_initiative(initiative_id, g.current_org_id)
-    except service.InterfaceRegisterError:
-        return render_template("errors/404.html"), 404
-
-    rows = service.list_interfaces(initiative_id, g.current_org_id)
+    rows = service.list_org_interfaces(g.current_org_id, architecture_id)
     return render_template(
         "interface_register/index.html",
-        initiative=initiative,
-        initiatives=None,
+        architecture=architecture,
+        architectures=service.list_architectures_for_org(),
         rows=rows,
     )
 
@@ -120,18 +120,11 @@ def new():
     if guard:
         return guard
 
-    initiative_id = request.args.get("initiative_id", type=int)
-    if not initiative_id:
-        return redirect(url_for("interface_register.index"))
-
-    try:
-        initiative = service.resolve_initiative(initiative_id, g.current_org_id)
-    except service.InterfaceRegisterError:
-        return render_template("errors/404.html"), 404
-
+    architecture_id = request.args.get("architecture_id", type=int)
     return render_template(
         "interface_register/form.html",
-        initiative=initiative,
+        architectures=service.list_architectures_for_org(),
+        selected_architecture_id=architecture_id,
         interface=None,
         metadata=None,
         errors=None,
@@ -149,23 +142,18 @@ def create():
     if guard:
         return guard
 
-    initiative_id = request.form.get("initiative_id", type=int)
-    if not initiative_id:
-        flash("An initiative is required to create an interface.", "error")
-        return redirect(url_for("interface_register.index"))
+    architecture_id = _parse_architecture_id(request.form.get("architecture_id"))
 
     try:
-        initiative = service.resolve_initiative(initiative_id, g.current_org_id)
-    except service.InterfaceRegisterError:
-        return render_template("errors/404.html"), 404
-
-    try:
-        element = service.create_interface(initiative_id, request.form, g.current_org_id)
+        element = service.create_interface(
+            None, request.form, g.current_org_id, architecture_id=architecture_id
+        )
     except service.InterfaceRegisterError as exc:
         return (
             render_template(
                 "interface_register/form.html",
-                initiative=initiative,
+                architectures=service.list_architectures_for_org(),
+                selected_architecture_id=architecture_id,
                 interface=None,
                 metadata=None,
                 errors=str(exc),
@@ -175,7 +163,7 @@ def create():
         )
 
     flash(f'"{element.name}" added to the interface register.', "success")
-    return redirect(url_for("interface_register.index", initiative_id=initiative_id))
+    return redirect(url_for("interface_register.index", architecture_id=architecture_id))
 
 
 @interface_register_bp.route("/<int:element_id>/edit", methods=["GET"])
@@ -191,14 +179,6 @@ def edit(element_id):
         return render_template("errors/404.html"), 404
 
     element = record["element"]
-    props = element.custom_properties or {}
-    initiative_id = props.get("initiative_id")
-    initiative = None
-    if initiative_id:
-        try:
-            initiative = service.resolve_initiative(initiative_id, g.current_org_id)
-        except service.InterfaceRegisterError:
-            initiative = None
 
     # D5 fix: resolve the interface's current provider/consumer so the edit
     # form's picker rehydrates instead of showing an empty picker that, if
@@ -208,7 +188,8 @@ def edit(element_id):
 
     return render_template(
         "interface_register/form.html",
-        initiative=initiative,
+        architectures=service.list_architectures_for_org(),
+        selected_architecture_id=element.architecture_id,
         interface=element,
         metadata=record["metadata"],
         errors=None,
@@ -230,19 +211,9 @@ def update(element_id):
     if record is None:
         return render_template("errors/404.html"), 404
 
-    props = record["element"].custom_properties or {}
-    initiative_id = props.get("initiative_id")
-
     try:
         element = service.update_interface(element_id, request.form, g.current_org_id)
     except service.InterfaceRegisterError as exc:
-        initiative = None
-        if initiative_id:
-            try:
-                initiative = service.resolve_initiative(initiative_id, g.current_org_id)
-            except service.InterfaceRegisterError:
-                initiative = None
-
         # N2 fix: the 400 re-render also needs the current provider/consumer,
         # same as the GET edit path, or the picker misleadingly shows "no
         # provider" when the interface genuinely has one.
@@ -252,7 +223,10 @@ def update(element_id):
         return (
             render_template(
                 "interface_register/form.html",
-                initiative=initiative,
+                architectures=service.list_architectures_for_org(),
+                selected_architecture_id=_parse_architecture_id(
+                    request.form.get("architecture_id")
+                ),
                 interface=record["element"],
                 metadata=record["metadata"],
                 errors=str(exc),
@@ -264,4 +238,6 @@ def update(element_id):
         )
 
     flash(f'"{element.name}" updated.', "success")
-    return redirect(url_for("interface_register.index", initiative_id=initiative_id))
+    return redirect(
+        url_for("interface_register.index", architecture_id=element.architecture_id)
+    )
