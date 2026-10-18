@@ -17,6 +17,7 @@ from flask_login import login_required
 
 from app import db
 from app.decorators import audit_log
+from app.middleware.tenant_decorators import platform_admin_required
 
 from ._helpers import _vendors_impl
 from . import unified_applications_bp
@@ -94,9 +95,18 @@ def vendors():
 
 @unified_applications_bp.route("/vendors/create", methods=["GET", "POST"])
 @login_required
+@platform_admin_required
 @audit_log("create_vendor")
 def vendors_create():
-    """Render and process the standalone vendor create form."""
+    """Render and process the standalone vendor create form.
+
+    Platform-admin-only (found while fixing PR 430's named vendor create/
+    update routes, same vulnerability class, lead review): this route had
+    NO role check at all -- any signed-in user, not even an org admin,
+    could create a row in the global, platform-wide ``VendorOrganization``
+    catalogue. ``platform_admin_required`` is the fix; there was no existing
+    decorator to keep.
+    """
     from app.models.vendor.vendor_organization import VendorOrganization
 
     if request.method == "POST":
