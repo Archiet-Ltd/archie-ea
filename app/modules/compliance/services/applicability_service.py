@@ -7,6 +7,7 @@ location, and business function.  Results are stored for audit.
 """
 
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -47,10 +48,26 @@ class ApplicabilityService:
         ],
     }
 
+    @staticmethod
+    def _rule_key(framework_code: str) -> str:
+        """The rules' spelling of a framework code.
+
+        The catalogue spells some codes with spaces around the hyphen ("ISO - 27001")
+        and the rules do not ("ISO-27001"); both name the same framework, so the
+        lookup ignores whitespace around hyphens. Without this a catalogue code
+        found no rule and every node counted as in scope.
+        """
+        return re.sub(r"\s*-\s*", "-", (framework_code or "").strip())
+
+    @classmethod
+    def rules_for(cls, framework_code: str) -> List[Dict[str, Any]]:
+        """The applicability rules for a framework code, in either spelling."""
+        return cls.FRAMEWORK_RULES.get(cls._rule_key(framework_code), [])
+
     @classmethod
     def evaluate_node(cls, node: Node, framework_code: str) -> bool:
         """Return True if *node* is in scope for *framework_code*."""
-        rules = cls.FRAMEWORK_RULES.get(framework_code, [])
+        rules = cls.rules_for(framework_code)
         if not rules:
             return True  # no rules = everything in scope
 
@@ -88,7 +105,7 @@ class ApplicabilityService:
                     "name": node.name,
                     "node_type": node.node_type,
                     "deployment_model": node.deployment_model,
-                    "rule_applied": str(cls.FRAMEWORK_RULES.get(framework_code, [])),
+                    "rule_applied": str(cls.rules_for(framework_code)),
                 })
         return in_scope
 

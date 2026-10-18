@@ -14,7 +14,10 @@ Pre-configured frameworks:
 - SOX (Financial Compliance - public companies)
 - PCI-DSS (Payment Card Security)
 
-Frameworks are available as static JSON data in app/data/compliance_frameworks.json
+The frameworks that carry a full control catalogue (ISO/IEC 27001, SOC 2, GDPR, NIS2,
+DORA, the EU AI Act) live in one place, app/services/compliance/data/default_catalogue.json.
+The manufacturing list below holds the other frameworks. ``seed_manufacturing_frameworks``
+(the ``seed-framework-catalogue`` command) loads both through one helper.
 """
 
 import json
@@ -36,7 +39,9 @@ class RegulatoryFrameworkService:
     """Service for managing regulatory frameworks and compliance controls"""
 
     # UK MANUFACTURING-SPECIFIC regulatory frameworks
-    # Includes Digital Product Passport (DPP), EPD/LCA, and UK regulations
+    # Includes Digital Product Passport (DPP), EPD/LCA, and UK regulations.
+    # ISO 27001, SOC 2, GDPR and DORA are NOT here: they come from the default
+    # catalogue file, the one source for those codes.
     MANUFACTURING_FRAMEWORKS = [
         {
             "code": "UK-DPP",
@@ -393,43 +398,6 @@ class RegulatoryFrameworkService:
             ],
         },
         {
-            "code": "ISO - 27001",
-            "name": "ISO/IEC 27001:2022 Information Security Management",
-            "description": "International standard for information security management systems",
-            "category": "security",
-            "jurisdiction": "Global",
-            "enforcement_level": "recommended",
-            "penalty_risk": "high",
-            "applies_to_manufacturing": True,
-            "applies_to_region": "Global",
-            "industry_specific": "general",
-            "official_url": "https://www.iso.org/standard/27001",
-            "standard_version": "2022",
-            "controls": [
-                {
-                    "control_id": "A.8.2",
-                    "title": "Access Control",
-                    "description": "Ensure authorized access and prevent unauthorized access to systems",
-                    "control_type": "technical",
-                    "criticality": "critical",
-                },
-                {
-                    "control_id": "A.8.10",
-                    "title": "Information Deletion",
-                    "description": "Delete information stored in information systems",
-                    "control_type": "technical",
-                    "criticality": "high",
-                },
-                {
-                    "control_id": "A.8.24",
-                    "title": "Use of Cryptography",
-                    "description": "Ensure proper and effective use of cryptography",
-                    "control_type": "technical",
-                    "criticality": "critical",
-                },
-            ],
-        },
-        {
             "code": "OSHA - 1910",
             "name": "OSHA 29 CFR 1910 - Occupational Safety and Health",
             "description": "US federal workplace safety and health regulations",
@@ -513,36 +481,6 @@ class RegulatoryFrameworkService:
             ],
         },
         {
-            "code": "GDPR",
-            "name": "General Data Protection Regulation",
-            "description": "EU regulation on data protection and privacy",
-            "category": "privacy",
-            "jurisdiction": "EU",
-            "enforcement_level": "mandatory",
-            "penalty_risk": "critical",
-            "applies_to_manufacturing": True,
-            "applies_to_region": "EU",
-            "industry_specific": "general",
-            "official_url": "https://gdpr.eu/",
-            "standard_version": "2018",
-            "controls": [
-                {
-                    "control_id": "Article - 32",
-                    "title": "Security of Processing",
-                    "description": "Implement appropriate technical and organizational measures",
-                    "control_type": "technical",
-                    "criticality": "critical",
-                },
-                {
-                    "control_id": "Article - 33",
-                    "title": "Notification of Personal Data Breach",
-                    "description": "Notify supervisory authority within 72 hours of breach",
-                    "control_type": "administrative",
-                    "criticality": "critical",
-                },
-            ],
-        },
-        {
             "code": "SOX",
             "name": "Sarbanes-Oxley Act",
             "description": "US law for financial reporting and corporate governance",
@@ -593,128 +531,6 @@ class RegulatoryFrameworkService:
                     "control_type": "technical",
                     "criticality": "critical",
                 },
-            ],
-        },
-        {
-            "code": "SOC-2",
-            "name": "AICPA SOC 2 — Trust Services Criteria",
-            "description": "Service Organisation Control 2 framework for managing customer data based on five trust service criteria: security, availability, processing integrity, confidentiality and privacy.",
-            "category": "security",
-            "jurisdiction": "US",
-            "enforcement_level": "recommended",
-            "penalty_risk": "medium",
-            "applies_to_manufacturing": True,
-            "applies_to_region": "Global",
-            "industry_specific": "general",
-            "official_url": "https://www.aicpa.org/soc",
-            "standard_version": "2017",
-            "controls": [
-                {"control_code": "CC1.1", "title": "COSO Principle 1 — Integrity and ethical values",
-                 "description": "The entity demonstrates a commitment to integrity and ethical values.",
-                 "category": "Common Criteria", "priority": "high"},
-                {"control_code": "CC1.2", "title": "COSO Principle 2 — Board independence and oversight",
-                 "description": "The board of directors demonstrates independence from management and exercises oversight.",
-                 "category": "Common Criteria", "priority": "medium"},
-                {"control_code": "CC2.1", "title": "COSO Principle 13 — Use of relevant information",
-                 "description": "The entity obtains or generates and uses relevant, quality information to support internal control.",
-                 "category": "Common Criteria", "priority": "medium"},
-                {"control_code": "CC3.1", "title": "COSO Principle 14 — Internal communication",
-                 "description": "The entity internally communicates information to support internal control.",
-                 "category": "Common Criteria", "priority": "medium"},
-                {"control_code": "CC4.1", "title": "COSO Principle 16 — Monitoring activities",
-                 "description": "The entity selects, develops and performs ongoing evaluations of controls.",
-                 "category": "Common Criteria", "priority": "medium"},
-                {"control_code": "CC5.1", "title": "COSO Principle 17 — Evaluation of deficiencies",
-                 "description": "The entity evaluates and communicates internal control deficiencies in a timely manner.",
-                 "category": "Common Criteria", "priority": "medium"},
-                {"control_code": "CC6.1", "title": "Logical and physical access controls",
-                 "description": "The entity implements logical and physical access controls to protect assets.",
-                 "category": "Security", "priority": "critical"},
-                {"control_code": "CC6.2", "title": "User access provisioning",
-                 "description": "Access to system resources is provisioned based on authorised user roles.",
-                 "category": "Security", "priority": "high"},
-                {"control_code": "CC6.3", "title": "Security awareness and training",
-                 "description": "Personnel responsible for security are provided with appropriate training.",
-                 "category": "Security", "priority": "medium"},
-                {"control_code": "CC6.6", "title": "External communication threats",
-                 "description": "The entity implements controls to detect and mitigate threats from external communications.",
-                 "category": "Security", "priority": "high"},
-                {"control_code": "CC6.7", "title": "Data encryption and transmission",
-                 "description": "The entity encrypts sensitive data at rest and in transit.",
-                 "category": "Security", "priority": "high"},
-                {"control_code": "CC7.1", "title": "Change detection and monitoring",
-                 "description": "The entity detects changes to the system that may affect security.",
-                 "category": "Availability", "priority": "high"},
-                {"control_code": "CC7.2", "title": "Incident response",
-                 "description": "The entity has procedures to respond to security incidents.",
-                 "category": "Availability", "priority": "high"},
-                {"control_code": "CC8.1", "title": "Change management authorisation",
-                 "description": "The entity authorises, designs, develops and tests system changes.",
-                 "category": "Processing Integrity", "priority": "medium"},
-                {"control_code": "CC9.1", "title": "Confidential information identification",
-                 "description": "The entity identifies and maintains confidential information.",
-                 "category": "Confidentiality", "priority": "high"},
-            ],
-        },
-        {
-            "code": "DORA",
-            "name": "EU Digital Operational Resilience Act (DORA)",
-            "description": "EU regulation on digital operational resilience for the financial sector, covering ICT risk management, incident reporting, digital operational resilience testing and third-party risk.",
-            "category": "security",
-            "jurisdiction": "EU",
-            "enforcement_level": "mandatory",
-            "penalty_risk": "high",
-            "applies_to_manufacturing": False,
-            "applies_to_region": "EU",
-            "industry_specific": "financial",
-            "official_url": "https://eur-lex.europa.eu/eli/reg/2022/2554",
-            "standard_version": "2022",
-            "controls": [
-                {"control_code": "DORA-Art.5", "title": "ICT governance and organisation",
-                 "description": "The management body shall define and oversee the ICT risk management framework.",
-                 "category": "ICT Risk Management", "priority": "critical"},
-                {"control_code": "DORA-Art.6", "title": "ICT risk management framework",
-                 "description": "A sound ICT risk management framework shall be established as part of the overall risk management system.",
-                 "category": "ICT Risk Management", "priority": "critical"},
-                {"control_code": "DORA-Art.7", "title": "ICT systems, protocols and tools",
-                 "description": "ICT systems and tools shall be identified, classified and adequately protected.",
-                 "category": "ICT Risk Management", "priority": "high"},
-                {"control_code": "DORA-Art.8", "title": "Identification of ICT-related incidents",
-                 "description": "Mechanisms to promptly detect anomalous activities and ICT-related incidents shall be in place.",
-                 "category": "ICT Risk Management", "priority": "high"},
-                {"control_code": "DORA-Art.9", "title": "Protection and prevention",
-                 "description": "Measures shall be in place to protect ICT systems and prevent incidents.",
-                 "category": "ICT Risk Management", "priority": "high"},
-                {"control_code": "DORA-Art.10", "title": "Detection",
-                 "description": "Mechanisms to promptly detect anomalous activities shall be in place.",
-                 "category": "ICT Risk Management", "priority": "high"},
-                {"control_code": "DORA-Art.11", "title": "Response and recovery",
-                 "description": "Comprehensive ICT business continuity policies and disaster recovery plans shall be in place.",
-                 "category": "ICT Risk Management", "priority": "critical"},
-                {"control_code": "DORA-Art.12", "title": "Backup policies and restoration",
-                 "description": "Backup policies and restoration and recovery procedures shall be established.",
-                 "category": "ICT Risk Management", "priority": "high"},
-                {"control_code": "DORA-Art.13", "title": "Learning and evolving",
-                 "description": "Capabilities and staff shall be kept up to date with evolving ICT risk.",
-                 "category": "ICT Risk Management", "priority": "medium"},
-                {"control_code": "DORA-Art.15", "title": "ICT incident management process",
-                 "description": "An ICT incident management process shall be established to detect, manage and notify ICT-related incidents.",
-                 "category": "Incident Reporting", "priority": "critical"},
-                {"control_code": "DORA-Art.17", "title": "Classification of ICT-related incidents",
-                 "description": "ICT-related incidents shall be classified based on criteria including impact and duration.",
-                 "category": "Incident Reporting", "priority": "high"},
-                {"control_code": "DORA-Art.19", "title": "Reporting of major incidents",
-                 "description": "Major ICT-related incidents shall be reported to the competent authority.",
-                 "category": "Incident Reporting", "priority": "critical"},
-                {"control_code": "DORA-Art.24", "title": "Digital operational resilience testing",
-                 "description": "A comprehensive digital operational resilience testing programme shall be established.",
-                 "category": "Resilience Testing", "priority": "high"},
-                {"control_code": "DORA-Art.26", "title": "Threat-led penetration testing",
-                 "description": "Advanced threat-led penetration testing shall be carried out at least every three years.",
-                 "category": "Resilience Testing", "priority": "high"},
-                {"control_code": "DORA-Art.28", "title": "Third-party ICT risk strategy",
-                 "description": "A strategy on ICT third-party risk shall be established and regularly reviewed.",
-                 "category": "Third-Party Risk", "priority": "critical"},
             ],
         },
     ]
@@ -801,52 +617,237 @@ class RegulatoryFrameworkService:
 
         return frameworks
 
+    # Keys older framework lists used for control fields, mapped onto the columns.
+    _LEGACY_CONTROL_KEYS = {
+        "control_id": "control_code",
+        "criticality": "priority",
+        "control_type": "category",
+    }
+
+    # Titles this platform itself shipped wrongly in an earlier release, keyed by
+    # (framework code, control code) -> (the title it shipped, the correct title).
+    # The seeder only adds missing codes, so a database that loaded the old rows
+    # would otherwise keep them. A row is corrected only while its title is still
+    # exactly the one that shipped: a title an administrator has since edited is
+    # never touched.
+    KNOWN_WRONG_CONTROL_TITLES = {
+        ("ISO - 27001", "A.8.2"): ("Access Control", "Privileged access rights"),
+        ("SOC-2", "CC3.1"): (
+            "COSO Principle 14 \u2014 Internal communication",
+            "Objectives specified clearly enough to assess risk",
+        ),
+        ("SOC-2", "CC5.1"): (
+            "COSO Principle 17 \u2014 Evaluation of deficiencies",
+            "Selection and development of control activities",
+        ),
+        ("SOC-2", "CC6.3"): (
+            "Security awareness and training",
+            "Role-based access and least privilege",
+        ),
+        ("DORA", "DORA-Art.15"): (
+            "ICT incident management process",
+            "Further harmonisation of ICT risk management tools, methods, processes and policies",
+        ),
+        ("DORA", "DORA-Art.17"): (
+            "Classification of ICT-related incidents",
+            "ICT-related incident management process",
+        ),
+    }
+
+    @staticmethod
+    def _columns(model) -> set:
+        return {c.name for c in model.__table__.columns}
+
+    @staticmethod
+    def _control_values(control_data: Dict) -> Dict:
+        """Translate one control dict to ComplianceControl column values."""
+        columns = RegulatoryFrameworkService._columns(ComplianceControl)
+        values = {}
+        for key, value in control_data.items():
+            key = RegulatoryFrameworkService._LEGACY_CONTROL_KEYS.get(key, key)
+            if key in columns and key not in ("id", "framework_id"):
+                values.setdefault(key, value)
+        return values
+
+    @staticmethod
+    def validate_framework_list(frameworks: List[Dict], source: str) -> None:
+        """Raise ValueError naming the entry when a framework list is incomplete.
+
+        Runs on every list the seeder loads -- the shipped catalogue file and the
+        manufacturing list alike -- so a control with no code fails with a message
+        that names it instead of a KeyError in the middle of a seed.
+        """
+        seen_frameworks = set()
+        for fw in frameworks:
+            code = fw.get("code")
+            if not code or not fw.get("name"):
+                raise ValueError(f"{source}: a framework needs a code and a name: {fw.get('code')!r}")
+            if code in seen_frameworks:
+                raise ValueError(f"{source}: duplicate framework code {code!r}")
+            seen_frameworks.add(code)
+            seen = set()
+            for control in fw.get("controls", []):
+                values = RegulatoryFrameworkService._control_values(control)
+                for field in ("control_code", "title"):
+                    if not values.get(field):
+                        raise ValueError(f"{source}: {code}: control {control!r} has no {field}")
+                if values["control_code"] in seen:
+                    raise ValueError(
+                        f"{source}: {code}: duplicate control_code {values['control_code']}"
+                    )
+                seen.add(values["control_code"])
+
+    @staticmethod
+    def _add_to_existing_adoptions(framework, new_controls) -> int:
+        """Give every organisation that already adopted ``framework`` the new controls.
+
+        An adoption copies the framework's controls when it is made, so controls
+        added to the catalogue afterwards would be missing from it and its
+        evidence coverage would read complete. Each new control is added as
+        "planned" -- not started -- to the adoption it belongs to, under that
+        adoption's own organisation. Returns the number of rows added.
+        """
+        if not new_controls:
+            return 0
+        from app.models.application_compliance import ApplicationComplianceControl
+        from app.models.regulatory_framework import FrameworkAdoption
+
+        added = 0
+        adoptions = FrameworkAdoption.query.filter(
+            FrameworkAdoption.framework_id == framework.id,
+            FrameworkAdoption.organization_id.isnot(None),
+        ).all()
+        for adoption in adoptions:
+            for control in new_controls:
+                db.session.add(
+                    ApplicationComplianceControl(
+                        organization_id=adoption.organization_id,
+                        adoption_id=adoption.id,
+                        control_id=control.id,
+                        implementation_status="planned",
+                    )
+                )
+                added += 1
+        return added
+
+    @staticmethod
+    def upsert_framework_with_controls(framework_data: Dict, add_missing_controls: bool = True):
+        """Create a framework with its controls, or top up one that already exists.
+
+        A framework that already exists (matched on ``code``) keeps its own row.
+        With ``add_missing_controls`` the controls whose ``control_code`` is absent
+        are added -- and given to every organisation that already adopted the
+        framework -- and a control still carrying a title this platform shipped
+        wrongly (``KNOWN_WRONG_CONTROL_TITLES``) is corrected. Any other existing
+        control is never edited. Does not commit.
+
+        Returns:
+            (framework, created, controls_added, titles_corrected)
+        """
+        data = dict(framework_data)
+        controls_data = data.pop("controls", [])
+
+        framework = RegulatoryFramework.query.filter_by(code=data["code"]).first()
+        created = framework is None
+        if created:
+            columns = RegulatoryFrameworkService._columns(RegulatoryFramework)
+            framework = RegulatoryFramework(
+                **{k: v for k, v in data.items() if k in columns and k != "id"}
+            )
+            framework.last_updated = datetime.utcnow()
+            framework.next_review_date = datetime.utcnow() + timedelta(days=365)
+            db.session.add(framework)
+            db.session.flush()  # Get framework ID
+        elif not add_missing_controls:
+            return framework, False, 0, 0
+
+        existing = (
+            {}
+            if created
+            else {
+                control.control_code: control
+                for control in ComplianceControl.query.filter_by(framework_id=framework.id)
+            }
+        )
+        new_controls = []
+        corrected = 0
+        for control_data in controls_data:
+            values = RegulatoryFrameworkService._control_values(control_data)
+            code = values["control_code"]
+            if code in existing:
+                continue
+            control = ComplianceControl(framework_id=framework.id, **values)
+            db.session.add(control)
+            existing[code] = control
+            new_controls.append(control)
+        # Corrections run on what the database already holds, independent of
+        # whether the current catalogue still lists the control.
+        for (fw_code, control_code), (wrong, right) in (
+            RegulatoryFrameworkService.KNOWN_WRONG_CONTROL_TITLES.items()
+        ):
+            current = existing.get(control_code)
+            if fw_code == framework.code and current is not None and current.title == wrong:
+                current.title = right
+                corrected += 1
+        db.session.flush()
+        if not created:
+            RegulatoryFrameworkService._add_to_existing_adoptions(framework, new_controls)
+            db.session.flush()
+        return framework, created, len(new_controls), corrected
+
+    @staticmethod
+    def load_default_catalogue() -> Dict:
+        """Load and validate the default global catalogue shipped with the app."""
+        json_path = os.path.join(os.path.dirname(__file__), "data", "default_catalogue.json")
+        with open(json_path, "r", encoding="utf-8") as f:
+            catalogue = json.load(f)
+        if not catalogue.get("catalogue_version"):
+            raise ValueError("default catalogue has no catalogue_version")
+        RegulatoryFrameworkService.validate_framework_list(
+            catalogue.get("frameworks", []), "default catalogue"
+        )
+        return catalogue
+
     @staticmethod
     def seed_manufacturing_frameworks():
         """
-        Seed database with manufacturing-specific regulatory frameworks.
-        Now loads from JSON by default.
+        Seed the shared framework catalogue: the manufacturing list and the default
+        catalogue file, both through ``upsert_framework_with_controls``.
+
+        Safe to run repeatedly. Creates missing frameworks, adds missing controls
+        to every framework (and to organisations that already adopted it), and
+        corrects the titles listed in ``KNOWN_WRONG_CONTROL_TITLES``. Global master
+        data: no organisation's own rows are edited.
 
         Returns:
-            Number of frameworks seeded
+            Number of frameworks added
         """
-        logger.info("Seeding manufacturing regulatory frameworks from JSON...")
+        logger.info("Seeding the shared regulatory framework catalogue...")
+
+        manufacturing = [dict(fw) for fw in RegulatoryFrameworkService.MANUFACTURING_FRAMEWORKS]
+        RegulatoryFrameworkService.validate_framework_list(manufacturing, "manufacturing list")
+        catalogue = RegulatoryFrameworkService.load_default_catalogue()
 
         seeded_count = 0
-
-        # Load from JSON instead of hardcoded data
-        frameworks = RegulatoryFrameworkService.load_frameworks_from_json()
-
-        for framework_data in frameworks:
-            # Check if framework already exists
-            existing = RegulatoryFramework.query.filter_by(code=framework_data["code"]).first()
-
-            if existing:
-                logger.info(f"Framework {framework_data['code']} already exists, skipping")
-                continue
-
-            # Extract controls separately
-            controls_data = framework_data.pop("controls", [])
-
-            # Create framework
-            framework = RegulatoryFramework(**framework_data)
-            framework.last_updated = datetime.utcnow()
-            framework.next_review_date = datetime.utcnow() + timedelta(days=365)
-
-            db.session.add(framework)
-            db.session.flush()  # Get framework ID
-
-            # Create controls
-            for control_data in controls_data:
-                control = ComplianceControl(framework_id=framework.id, **control_data)
-                db.session.add(control)
-
-            seeded_count += 1
-            logger.info(f"Seeded framework: {framework.code} with {len(controls_data)} controls")
+        controls_added = 0
+        titles_corrected = 0
+        for framework_data in manufacturing + catalogue["frameworks"]:
+            _, created, added, corrected = RegulatoryFrameworkService.upsert_framework_with_controls(
+                framework_data
+            )
+            seeded_count += 1 if created else 0
+            controls_added += added
+            titles_corrected += corrected
 
         db.session.commit()
 
-        logger.info(f"Seeding complete: {seeded_count} frameworks added")
+        logger.info(
+            "Seeding complete (catalogue %s): %d frameworks added, %d controls added, %d titles corrected",
+            catalogue["catalogue_version"],
+            seeded_count,
+            controls_added,
+            titles_corrected,
+        )
         return seeded_count
 
     @staticmethod
