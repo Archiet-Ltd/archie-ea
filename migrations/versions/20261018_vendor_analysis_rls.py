@@ -9,16 +9,28 @@ unions every revision carrying a ``TENANT_TABLES``/``HYBRID_TABLES`` constant,
 so this file alone brings the tables under the guard; the base revision's
 helper functions and policy text are copied here rather than imported.
 
-A row with an organisation is visible only under that organisation's session;
-the platform scope sees all rows. ``organization_id`` stays nullable until the
-tenancy backfill has attributed every row; rows left with no organisation match
-no organisation's policy and are visible to the platform scope alone until they
-are attributed.
+The column is added here, ahead of the policy, because on a real deploy
+``schema-upgrade`` runs before ``reconcile-schema``: a revision that only checked
+for an existing column would find none, apply no policy, and still be recorded as
+applied. Each table gets a nullable ``organization_id``, an index and a foreign
+key to ``organizations``, then a backfill, then the policies.
+
+The backfill has one rule: a row belongs to the organisation that owns the
+capability its analysis examines (``analysis_id`` -> ``options_analysis`` ->
+``capability_id`` -> ``business_capability.organization_id``), the same rule
+``backfill-layer-tenancy`` uses for these tables. The capability always wins: a
+row already carrying a different organisation is corrected to it. A row whose
+chain does not resolve is left NULL, the count is printed and the deploy
+carries on; it matches no organisation's policy and is visible to the platform
+scope alone until it is attributed.
+
+Idempotent: every step checks before it acts, so a second run is a no-op.
 
 Revision ID: 20261018_vendor_analysis_rls
 Revises: 20261016_compliance_org_rls
 Create Date: 2026-10-18
 """
+import sqlalchemy as sa
 from alembic import op
 from sqlalchemy import text
 
@@ -56,21 +68,62 @@ TENANT_TABLES = (
 HYBRID_TABLES = ()
 
 
-def _skip_reason(bind, table: str):
-    present = bind.execute(
-        text("SELECT to_regclass(:t) IS NOT NULL"), {"t": f"public.{table}"}
-    ).scalar()
-    if not present:
-        return "absent"
-    has_column = bind.execute(
+def _present(bind, table: str) -> bool:
+    return bool(
+        bind.execute(text("SELECT to_regclass(:t) IS NOT NULL"), {"t": f"public.{table}"}).scalar()
+    )
+
+
+def _has_column(bind, table: str, column: str) -> bool:
+    return bool(
+        bind.execute(
+            text(
+                "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND table_name = :t AND column_name = :c)"
+            ),
+            {"t": table, "c": column},
+        ).scalar()
+    )
+
+
+def _add_column(bind, table: str) -> None:
+    """Nullable organization_id, index and foreign key; each step checks first."""
+    if not _has_column(bind, table, "organization_id"):
+        op.add_column(table, sa.Column("organization_id", sa.Integer(), nullable=True))
+    op.create_index(f"ix_{table}_organization_id", table, ["organization_id"], if_not_exists=True)
+    fk = f"fk_{table}_organization_id"
+    if not bind.execute(text("SELECT 1 FROM pg_constraint WHERE conname = :n"), {"n": fk}).scalar():
+        op.create_foreign_key(fk, table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE")
+
+
+def _can_derive(bind) -> bool:
+    return (
+        _present(bind, "options_analysis")
+        and _present(bind, "business_capability")
+        and _has_column(bind, "options_analysis", "capability_id")
+        and _has_column(bind, "business_capability", "organization_id")
+    )
+
+
+def _backfill(bind, table: str) -> None:
+    """Attribute a row to the organisation owning its analysis's capability."""
+    if not _has_column(bind, table, "analysis_id"):
+        return
+    # Table name is a literal module constant; nothing here is user input.
+    bind.execute(
         text(
-            "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
-            "WHERE table_schema = 'public' AND table_name = :t "
-            "AND column_name = 'organization_id')"
-        ),
-        {"t": table},
-    ).scalar()
-    if not has_column:
+            f"UPDATE {table} AS c SET organization_id = b.organization_id "  # nosec B608 - table names from a literal constant
+            "FROM options_analysis AS a JOIN business_capability AS b ON b.id = a.capability_id "
+            "WHERE c.analysis_id = a.id AND b.organization_id IS NOT NULL "
+            "AND c.organization_id IS DISTINCT FROM b.organization_id"
+        )
+    )
+
+
+def _skip_reason(bind, table: str):
+    if not _present(bind, table):
+        return "absent"
+    if not _has_column(bind, table, "organization_id"):
         print(f"WARNING row-level security skipped: {table} has no organization_id column")
         return "no organization_id column"
     may_alter = bind.execute(
@@ -103,6 +156,20 @@ def _fence(bind, table: str) -> None:
 
 def upgrade():
     bind = op.get_bind()
+    derivable = _can_derive(bind)
+    for table in TENANT_TABLES:
+        if not _present(bind, table):
+            continue
+        _add_column(bind, table)
+        if derivable:
+            _backfill(bind, table)
+        remaining = bind.execute(text(f"SELECT COUNT(*) FROM {table} WHERE organization_id IS NULL")).scalar()  # nosec B608 - literal names
+        if remaining:
+            print(
+                f"vendor analysis org fence: {remaining} row(s) in {table} have no derivable "
+                "organisation; left NULL"
+            )
+
     for table in TENANT_TABLES:
         reason = _skip_reason(bind, table)
         if reason is not None:
