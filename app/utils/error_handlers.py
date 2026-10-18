@@ -30,26 +30,24 @@ def register_error_handlers(app: Flask):
 
     @app.errorhandler(404)
     def handle_404(error):
+        from app.utils.plain_errors import plain_json, render_plain_error
         if request.accept_mimetypes.accept_json and not request.accept_mimetypes.accept_html:
-            return jsonify({"success": False, "error": "Not found", "error_code": "NOT_FOUND"}), 404
-        from flask import render_template
+            return plain_json(404, "not_found", error_code="NOT_FOUND")
         try:
-            return render_template("errors/404.html"), 404
+            return render_plain_error(404, "errors/404.html")
         except Exception:
-            # Error templates are standalone HTML — this should never fail.
-            # If it does, return bare response rather than cascade into Flask's default.
-            return "<h1>404 — Not Found</h1><p><a href='/'>Go to Dashboard</a></p>", 404
+            return "<h1>We could not find that page</h1><p><a href='/'>Go to the dashboard</a></p>", 404
 
     @app.errorhandler(500)
     def handle_500(error):
         logger.error("Internal server error: %s", error, exc_info=True)
+        from app.utils.plain_errors import plain_json, render_plain_error
         if request.accept_mimetypes.accept_json and not request.accept_mimetypes.accept_html:
-            return jsonify({"success": False, "error": "Internal server error", "error_code": "INTERNAL_ERROR"}), 500
-        from flask import render_template
+            return plain_json(500, "internal_error")
         try:
-            return render_template("errors/500.html"), 500
+            return render_plain_error(500, "errors/500.html")
         except Exception:
-            return "<h1>500 — Internal Server Error</h1><p><a href='/'>Go to Dashboard</a></p>", 500
+            return "<h1>Something went wrong on our side</h1><p><a href='/'>Go to the dashboard</a></p>", 500
 
     @app.errorhandler(FlaskShadcnException)
     def handle_app_error(error):

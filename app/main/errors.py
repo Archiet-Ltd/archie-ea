@@ -4,6 +4,7 @@ from flask import current_app, jsonify, render_template, request
 
 from app.main.views import main
 from app.services.rate_limiter import RateLimitExceeded
+from app.utils.plain_errors import PLAIN, plain_json, render_plain_error
 
 
 def _log_exception(e):
@@ -70,6 +71,8 @@ def _api_error(status, message):
     """
     if "/api/" not in request.path:
         return None
+    if status in PLAIN:
+        return plain_json(status, message.lower().replace(" ", "_"))
     return jsonify({
         "success": False,
         "error": message,
@@ -83,7 +86,7 @@ def forbidden(e):
     if api is not None:
         return api
     try:
-        return render_template("errors/403.html"), 403
+        return render_plain_error(403, "errors/403.html")
     except Exception:
         _log_exception(e)
         return ("Forbidden", 403)
@@ -95,7 +98,7 @@ def page_not_found(e):
     if api is not None:
         return api
     try:
-        return render_template("errors/404.html"), 404
+        return render_plain_error(404, "errors/404.html")
     except Exception:
         _log_exception(e)
         return ("Page Not Found", 404)
@@ -107,7 +110,7 @@ def internal_server_error(e):
     if api is not None:
         return api
     try:
-        return render_template("errors/500.html"), 500
+        return render_plain_error(500, "errors/500.html")
     except Exception:
         _log_exception(e)
         return ("Internal Server Error", 500)

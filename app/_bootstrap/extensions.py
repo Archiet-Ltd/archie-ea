@@ -107,6 +107,10 @@ def init_extensions(app):
 
         if "/api/" not in request.path:
             return e
+        from app.utils.plain_errors import PLAIN, plain_json
+
+        if e.code in PLAIN:
+            return plain_json(e.code, (e.name or "error").lower().replace(" ", "_"))
         return jsonify({
             "success": False,
             "error": e.description,
