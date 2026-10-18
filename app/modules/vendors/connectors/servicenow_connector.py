@@ -117,6 +117,16 @@ class ServiceNowConnector:
         
         # Base API endpoint
         self.api_base = f"{self.instance_url}/api/now/table"
+
+    def _checked_api_base(self) -> str:
+        """The table API base after the outbound-URL guard (raises ConnectorURLRefused).
+
+        Called before every request: the instance address comes from settings or
+        a caller, and a name can start resolving to an internal address.
+        """
+        from app.services.connector_framework import validate_connector_url
+
+        return f"{validate_connector_url(self.instance_url)}/api/now/table"
     
     def health_check(self) -> bool:
         """Verify ServiceNow connectivity and credentials.
@@ -130,7 +140,7 @@ class ServiceNowConnector:
         
         try:
             # Test with lightweight sys_user query (just get current user)
-            url = f"{self.api_base}/sys_user"
+            url = f"{self._checked_api_base()}/sys_user"
             params = {
                 'sysparm_query': f'user_name={self.username}',
                 'sysparm_limit': 1,
@@ -142,6 +152,7 @@ class ServiceNowConnector:
                 auth=(self.username, self.password),
                 params=params,
                 timeout=10,
+                allow_redirects=False,
                 headers={'Accept': 'application/json'}
             )
             
@@ -157,6 +168,9 @@ class ServiceNowConnector:
                 
         except requests.RequestException as e:
             logger.error(f"ServiceNow health check failed: {e}")
+            return False
+        except ValueError as e:  # ConnectorURLRefused: address not allowed
+            logger.error(f"ServiceNow health check refused: {e}")
             return False
     
     def sync_applications(
@@ -224,7 +238,7 @@ class ServiceNowConnector:
         Returns:
             List of application dictionaries
         """
-        url = f"{self.api_base}/cmdb_ci_appl"
+        url = f"{self._checked_api_base()}/cmdb_ci_appl"
         
         # Build query parameters
         params = {
@@ -268,6 +282,7 @@ class ServiceNowConnector:
                     auth=(self.username, self.password),
                     params=params,
                     timeout=self.timeout,
+                    allow_redirects=False,
                     headers={'Accept': 'application/json'}
                 )
                 response.raise_for_status()

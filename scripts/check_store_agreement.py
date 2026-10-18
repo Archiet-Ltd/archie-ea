@@ -429,6 +429,10 @@ CONCEPTS = {
                 distinct="application_id",
                 tenant_via=[("application_id", "application_components"),
                             ("created_by_id", "users")]),
+        Surface("orm:CostFact(applications)", "orm",
+                "app.models.cost_fact.CostFact",
+                filter_eq={"element_type": "application"},
+                distinct="element_id"),
     ],
     # /procurement/contracts renders VendorContract for the organisation as
     # HTML; its query is the orm:VendorContract surface.
@@ -444,6 +448,14 @@ CONCEPTS = {
                        "VendorOrganization's own docstring"),
         Surface("GET /api/v1/vendors/", "http",
                 "/api/v1/vendors/?per_page=1", extract="data.pagination.total"),
+    ],
+    "interfaces": [
+        Surface("orm:ApplicationInterface", "orm",
+                "app.models.application_layer.ApplicationInterface"),
+    ],
+    "data entities": [
+        Surface("orm:DataEntity", "orm",
+                "app.models.process_data.DataEntity"),
     ],
 }
 

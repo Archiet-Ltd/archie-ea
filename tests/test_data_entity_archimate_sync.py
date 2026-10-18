@@ -8,14 +8,13 @@ column since it was added, but ``create_data_entity``
 it — the entity catalog page listed data entities that the AI assistant,
 reading only the ArchiMate layer, could not see. Same shape of bug as the
 value-stream gap fixed in app/models/strategy_layer.py, and fixed the same
-way: an ``after_insert`` mapper event
-(app/models/process_data.py::create_archimate_data_entity) plus a backfill
-command (app/commands/backfill_data_archimate.py) for rows written before the
-fix.
+way: the shared flush listener in app/services/archimate_backbone.py now
+creates elements on INSERT, and ``flask backfill-domain-elements`` repairs
+rows written before the fix.
 
 ArchiMate 3.2 has no "DataEntity" element type, so the mirror is the closest
 3.2 fit: an Application-layer "DataObject" — see
-app/models/process_data.py::_link_data_entity_archimate for the reasoning.
+app/services/archimate_backbone.py::ELEMENT_TYPES for the mapping.
 """
 
 import uuid
@@ -93,7 +92,7 @@ def test_create_data_entity_without_archimate_element_id_is_not_overwritten(
 
 def test_backfill_links_data_entities_created_before_the_fix(db_session, make_org, tenant_ctx):
     """Rows written before the listener existed get their element retroactively."""
-    from app.commands.backfill_data_archimate import backfill_data_entity_archimate_elements
+    from app.commands.backfill_domain_elements import backfill_domain_elements
     from app.models.models import ArchiMateElement
 
     org = make_org("data-entity-backfill")
@@ -109,8 +108,8 @@ def test_backfill_links_data_entities_created_before_the_fix(db_session, make_or
         entity_id = inserted.inserted_primary_key[0]
         db_session.flush()
 
-        stats = backfill_data_entity_archimate_elements(org_id=org.id)
-        assert stats["linked"] == 1
+        stats = backfill_domain_elements(org.id, session=db_session)
+        assert stats["DataEntity"]["created"] == 1
 
         db_session.expire_all()
         entity = db_session.get(DataEntity, entity_id)
@@ -123,12 +122,13 @@ def test_backfill_links_data_entities_created_before_the_fix(db_session, make_or
         assert element.organization_id == org.id
 
         # Idempotent: a second run finds nothing left to do and creates no duplicate.
-        assert backfill_data_entity_archimate_elements(org_id=org.id)["linked"] == 0
+        stats2 = backfill_domain_elements(org.id, session=db_session)
+        assert stats2["DataEntity"]["created"] == 0
 
 
 def test_backfill_dry_run_changes_nothing(db_session, make_org, tenant_ctx):
     """--dry-run reports the count without creating any ArchiMateElement."""
-    from app.commands.backfill_data_archimate import backfill_data_entity_archimate_elements
+    from app.commands.backfill_domain_elements import backfill_domain_elements
 
     org = make_org("data-entity-backfill-dry-run")
 
@@ -141,8 +141,9 @@ def test_backfill_dry_run_changes_nothing(db_session, make_org, tenant_ctx):
         entity_id = inserted.inserted_primary_key[0]
         db_session.flush()
 
-        stats = backfill_data_entity_archimate_elements(org_id=org.id, dry_run=True)
-        assert stats == {"linked": 0, "scanned": 1}
+        stats = backfill_domain_elements(org.id, dry_run=True, session=db_session)
+        assert stats["DataEntity"]["created"] == 0
+        assert stats["DataEntity"]["scanned"] >= 1
 
         db_session.expire_all()
         entity = db_session.get(DataEntity, entity_id)

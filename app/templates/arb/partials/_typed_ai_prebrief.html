@@ -28,7 +28,7 @@
                 {% call card_title(class='text-lg') %}
                     <span id="ai-prebrief-heading">AI pre-brief</span>
                 {% endcall %}
-                <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">AI-suggested draft</span>
+                <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-info-emphasis">AI-suggested draft</span>
             </div>
             <button type="button" @click="generate()" :disabled="loading"
                     class="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
@@ -54,7 +54,7 @@
 
         <div class="flex flex-wrap items-center gap-2">
             <span class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Draft disposition</span>
-            <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+            <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-info-emphasis"
                   x-text="prebrief && prebrief.draft_disposition.replace(/_/g, ' ')"></span>
         </div>
 

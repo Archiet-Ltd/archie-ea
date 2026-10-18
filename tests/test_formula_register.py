@@ -160,6 +160,11 @@ def test_weight_change_creates_next_version_and_old_score_keeps_its_version(
         assert score.scoring_configuration_id == config.id
 
         # The overall score re-derives from the resolved configuration's weights.
+        # Scoring leaves an unmeasured input empty; fill any so all four count.
+        for column in ("technical_health_score", "business_value_score",
+                       "cost_efficiency_score", "vendor_risk_score"):
+            if getattr(score, column) is None:
+                setattr(score, column, 50)
         expected = round(
             score.technical_health_score * 0.25
             + score.business_value_score * 0.45

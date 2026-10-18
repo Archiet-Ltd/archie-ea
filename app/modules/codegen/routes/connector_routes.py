@@ -17,6 +17,7 @@ from app.models.solution_models import Solution
 from app.modules.codegen.models import CodegenGeneration
 from app.modules.codegen.routes.codegen_routes import codegen_bp
 from app.modules.codegen.routes._helpers import _check_access
+from app.utils.route_guards import require_entity_in_active_org
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 @login_required
 def list_connectors(solution_id):
     """List available connectors and suggest matches based on architecture tech stacks."""
-    solution = Solution.query.get_or_404(solution_id)
+    solution = require_entity_in_active_org(Solution, solution_id)
     if not _check_access(solution):
         abort(403)
 
@@ -61,7 +62,7 @@ def list_connectors(solution_id):
 @login_required
 def test_connector_connection(solution_id):
     """Test connectivity to an external system before creating a connector."""
-    solution = Solution.query.get_or_404(solution_id)
+    solution = require_entity_in_active_org(Solution, solution_id)
     if not _check_access(solution):
         abort(403)
 
@@ -83,7 +84,7 @@ def test_connector_connection(solution_id):
 @login_required
 def create_connector(solution_id):
     """Create a connector and start an n8n sync workflow."""
-    solution = Solution.query.get_or_404(solution_id)
+    solution = require_entity_in_active_org(Solution, solution_id)
     if not _check_access(solution):
         abort(403)
 
@@ -109,6 +110,15 @@ def create_connector(solution_id):
     except ConnectorNotPermitted as exc:
         return jsonify({"success": False, "error": str(exc)}), 403
 
+    from app.utils.ssrf_guard import BlockedOutboundURL
+
+    try:
+        ConnectorOrchestrator._check_workflow_urls(
+            credentials, target_api_url, connector_type, object_mappings
+        )
+    except BlockedOutboundURL:
+        return jsonify({"success": False, "error": "That address is not allowed."}), 400
+
     try:
         orch = ConnectorOrchestrator()
         connector = orch.create_sync_workflow(
@@ -125,16 +135,18 @@ def create_connector(solution_id):
             "n8n_workflow_id": connector.n8n_workflow_id,
             "sync_frequency": connector.sync_frequency,
         }), 201
+    except BlockedOutboundURL:
+        return jsonify({"success": False, "error": "That address is not allowed."}), 400
     except RuntimeError as exc:
         logger.error("Connector creation failed: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 502
+        return jsonify({"success": False, "error": "The connector could not be created."}), 502
 
 
 @codegen_bp.route("/solutions/<int:solution_id>/codegen/connectors/active", methods=["GET"])
 @login_required
 def list_active_connectors(solution_id):
     """List active connectors for a solution."""
-    solution = Solution.query.get_or_404(solution_id)
+    solution = require_entity_in_active_org(Solution, solution_id)
     if not _check_access(solution):
         abort(403)
 
@@ -162,7 +174,7 @@ def list_active_connectors(solution_id):
 @login_required
 def delete_connector(solution_id, connector_id):
     """Delete a connector and its n8n workflow."""
-    solution = Solution.query.get_or_404(solution_id)
+    solution = require_entity_in_active_org(Solution, solution_id)
     if not _check_access(solution):
         abort(403)
 
@@ -187,7 +199,7 @@ def delete_connector(solution_id, connector_id):
 @login_required
 def discover_connector_objects(solution_id, connector_id):
     """Discover available source objects for a connector."""
-    solution = Solution.query.get_or_404(solution_id)
+    solution = require_entity_in_active_org(Solution, solution_id)
     if not _check_access(solution):
         abort(403)
 
@@ -207,7 +219,7 @@ def discover_connector_objects(solution_id, connector_id):
 @login_required
 def update_connector_mappings(solution_id, connector_id):
     """Update object mappings for a connector."""
-    solution = Solution.query.get_or_404(solution_id)
+    solution = require_entity_in_active_org(Solution, solution_id)
     if not _check_access(solution):
         abort(403)
 
@@ -232,7 +244,7 @@ def update_connector_mappings(solution_id, connector_id):
 @login_required
 def update_connector_schedule(solution_id, connector_id):
     """Update the sync frequency for a connector."""
-    solution = Solution.query.get_or_404(solution_id)
+    solution = require_entity_in_active_org(Solution, solution_id)
     if not _check_access(solution):
         abort(403)
 
@@ -257,7 +269,7 @@ def update_connector_schedule(solution_id, connector_id):
 @login_required
 def pause_connector(solution_id, connector_id):
     """Pause sync for a connector by deactivating its n8n workflow."""
-    solution = Solution.query.get_or_404(solution_id)
+    solution = require_entity_in_active_org(Solution, solution_id)
     if not _check_access(solution):
         abort(403)
 
@@ -280,7 +292,7 @@ def pause_connector(solution_id, connector_id):
 @login_required
 def resume_connector(solution_id, connector_id):
     """Resume sync for a connector by reactivating its n8n workflow."""
-    solution = Solution.query.get_or_404(solution_id)
+    solution = require_entity_in_active_org(Solution, solution_id)
     if not _check_access(solution):
         abort(403)
 
@@ -303,7 +315,7 @@ def resume_connector(solution_id, connector_id):
 @login_required
 def connector_sync_history(solution_id, connector_id):
     """Get sync execution history for a connector from n8n."""
-    solution = Solution.query.get_or_404(solution_id)
+    solution = require_entity_in_active_org(Solution, solution_id)
     if not _check_access(solution):
         abort(403)
 

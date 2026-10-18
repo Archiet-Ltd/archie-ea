@@ -1,15 +1,8 @@
-"""SSOService.provision_user must not attach an SSO login to an existing
-user who belongs to a different organisation than the one whose SSO
-config produced the login.
-
-SSOConfig.email_domain is operator-entered with no ownership verification,
-so one organisation's admin can configure it to claim another
-organisation's real domain. Without this check, a login through that
-config silently attached to and took over the other organisation's
-existing user (updating external_id/sso_provider) instead of being
-refused -- effectively an account takeover reachable with only ordinary
-org-admin access to the attacking organisation, not any special
-privilege.
+"""SSOService.provision_user must not attach an SSO login to an existing user who belongs to a different
+organisation than the one whose SSO config produced the login. Test 1 uses a claiming organisation with no SSO
+configuration, so it is now refused at the configured-domain check; the cross-organisation refusal with a
+matching configured domain is proved by test_cross_org_member_in_a_claimed_domain_is_still_refused in
+tests/test_sso_cross_org_domain_claim_per_org.py.
 """
 
 from __future__ import annotations
@@ -46,10 +39,24 @@ def _make_user(db_session, org_id, email):
     return user
 
 
+def _configure_sso(db_session, org, email_domain):
+    """Give ``org`` an SSO configuration that lists ``email_domain``, as an
+    organisation whose own sign-in provisions these addresses has."""
+    from app.models.sso_config import SSOConfig
+
+    config = SSOConfig(
+        organization_id=org.id, protocol="oidc", enabled=True, email_domain=email_domain
+    )
+    db_session.add(config)
+    db_session.flush()
+    return config
+
+
 class TestProvisionUserIsTenantScoped:
     def test_refuses_to_attach_to_an_existing_user_in_a_different_org(
         self, db_session, org_a, org_b
     ):
+        """Refused before any account is touched: the claiming organisation has no configured domain."""
         from app.services.sso_service import SSONotConfiguredError, SSOService
 
         email = f"victim-{uuid.uuid4().hex[:8]}@acme.example"
@@ -76,6 +83,7 @@ class TestProvisionUserIsTenantScoped:
     def test_still_provisions_a_new_user_for_the_correct_org(self, db_session, org_a):
         from app.services.sso_service import SSOService
 
+        _configure_sso(db_session, org_a, "example.com")
         email = f"newuser-{uuid.uuid4().hex[:8]}@example.com"
         svc = SSOService()
         user = svc.provision_user(org_a, {"email": email, "sub": "real-idp-sub"})
@@ -86,6 +94,7 @@ class TestProvisionUserIsTenantScoped:
     def test_still_updates_an_existing_user_in_the_same_org(self, db_session, org_a):
         from app.services.sso_service import SSOService
 
+        _configure_sso(db_session, org_a, "example.com")
         email = f"sameorg-{uuid.uuid4().hex[:8]}@example.com"
         existing = _make_user(db_session, org_a.id, email)
 

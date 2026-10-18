@@ -214,3 +214,118 @@ class CurrencyService:
 
 # Global service instance
 currency_service = CurrencyService()
+
+
+# --- Dated exchange rates ----------------------------------------------------
+# Rates live in the platform reference table ``exchange_rates``. Nothing here
+# converts silently: a pair with no rate on file answers None, and a total that
+# needs that pair answers "missing" rather than a sum.
+
+from dataclasses import dataclass, field  # noqa: E402
+from datetime import date  # noqa: E402
+from decimal import Decimal  # noqa: E402
+from typing import Iterable, List  # noqa: E402
+
+
+def get_exchange_rate(from_currency: str, to_currency: str, on_date: Optional[date] = None):
+    """Units of ``to_currency`` per one ``from_currency`` in effect on ``on_date``.
+
+    The rate in effect is the latest one dated on or before ``on_date`` (today
+    when omitted). A recorded opposite pair is inverted. Returns ``None`` when
+    neither direction has a rate.
+    """
+    from app import db
+    from app.models.cost_fact import ExchangeRate
+
+    source, target = (from_currency or "").upper(), (to_currency or "").upper()
+    if not source or not target:
+        return None
+    if source == target:
+        return Decimal(1)
+    on_date = on_date or date.today()
+
+    def _latest(frm, to):
+        # tenant-scoping-ok: exchange_rates is a platform reference table shared by every organisation
+        return db.session.execute(
+            db.select(ExchangeRate)
+            .where(ExchangeRate.from_currency == frm, ExchangeRate.to_currency == to,
+                   ExchangeRate.effective_date <= on_date)
+            .order_by(ExchangeRate.effective_date.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+
+    direct = _latest(source, target)
+    inverse = _latest(target, source)
+    # Prefer the more recent of the two; a direct rate wins a tie.
+    if direct is not None and (inverse is None or direct.effective_date >= inverse.effective_date):
+        return Decimal(direct.rate)
+    if inverse is not None and Decimal(inverse.rate) != 0:
+        return Decimal(1) / Decimal(inverse.rate)
+    return None
+
+
+def record_exchange_rate(actor, from_currency: str, to_currency: str, rate, effective_date: date,
+                         source: Optional[str] = None):
+    """Write a dated rate. Only a platform administrator may; anyone else is refused."""
+    from app import db
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.models.cost_fact import ExchangeRate
+
+    if actor is None or not is_platform_admin(actor):
+        raise PermissionError("exchange rates are written by the platform, not by an organisation")
+    rate = Decimal(str(rate))
+    if rate <= 0:
+        raise ValueError("an exchange rate must be positive")
+    frm, to = from_currency.upper(), to_currency.upper()
+    # tenant-scoping-ok: exchange_rates is a platform reference table shared by every organisation
+    row = db.session.execute(
+        db.select(ExchangeRate).where(
+            ExchangeRate.from_currency == frm, ExchangeRate.to_currency == to,
+            ExchangeRate.effective_date == effective_date)
+    ).scalar_one_or_none()
+    if row is None:
+        row = ExchangeRate(from_currency=frm, to_currency=to, effective_date=effective_date)
+        db.session.add(row)
+    row.rate = rate
+    row.source = source
+    db.session.flush()
+    return row
+
+
+@dataclass
+class ConvertedTotal:
+    """A total in ``currency``. ``amount`` is None when any fact lacked a rate."""
+
+    currency: str
+    amount: Optional[Decimal]
+    missing: List[tuple] = field(default_factory=list)  # (from_currency, period date) with no rate
+
+    @property
+    def is_missing(self) -> bool:
+        return self.amount is None
+
+
+def convert_total(facts: Iterable, reporting_currency: str) -> ConvertedTotal:
+    """Sum cost facts in ``reporting_currency`` at each fact's period rate.
+
+    A fact in another currency is converted at the rate in effect at the end of
+    its period. If any fact has no rate the whole total is missing (``amount``
+    None) and ``missing`` names each pair; no partial sum is ever returned.
+    """
+    reporting = reporting_currency.upper()
+    total = Decimal(0)
+    missing: List[tuple] = []
+    count = 0
+    for fact in facts:
+        count += 1
+        as_of = fact.period_end or fact.period_start
+        rate = get_exchange_rate(fact.currency, reporting, as_of)
+        if rate is None:
+            pair = (fact.currency, as_of)
+            if pair not in missing:
+                missing.append(pair)
+            continue
+        total += Decimal(fact.amount) * rate
+    if missing or count == 0:
+        return ConvertedTotal(currency=reporting, amount=None, missing=missing)
+    return ConvertedTotal(currency=reporting, amount=total)

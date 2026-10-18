@@ -28,6 +28,7 @@ from ..models.policy_monitoring import (
     PolicyExemption,
     PolicyViolation,
 )
+from ..utils.tenant_sql import current_org_id
 
 logger = logging.getLogger(__name__)
 
@@ -299,6 +300,9 @@ class PolicyMonitoringService:
             application = ApplicationComponent.query.get(application_id)
             if not application:
                 return {"success": False, "error": "Application not found"}
+            # Tenant scoping: ensure application belongs to current organisation
+            if application.organization_id != current_org_id():
+                return {"success": False, "error": "Application not found"}
 
             # Get all active and effective policies
             active_policies = ArchitecturePolicy.query.filter(
@@ -403,7 +407,7 @@ class PolicyMonitoringService:
             Dictionary with overall scan results
         """
         try:
-            applications = ApplicationComponent.query.all()
+            applications = ApplicationComponent.query.filter_by(organization_id=current_org_id()).all()
 
             results = {
                 "success": True,

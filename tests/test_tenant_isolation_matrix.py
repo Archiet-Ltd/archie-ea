@@ -97,6 +97,15 @@ INTENTIONALLY_GLOBAL = {
         "organisation only (PropertyService.template_query, the model's own "
         "comment) — TenantMixin would hide the shared NULL rows from everyone"
     ),
+    "Notification": (
+        "rows belong to a recipient user and are fenced by user_id, not purely "
+        "by organization_id — the bell queries by user_id and legacy rows for "
+        "a user with no organisation stay NULL on purpose; the row-level "
+        "security policy in 20261011_notif_rls admits a NULL-org row whose "
+        "owning user belongs to the session organisation, which a plain "
+        "TenantMixin with_loader_criteria filter (organization_id == "
+        "current org) would hide from that user's own bell"
+    ),
     "LLMInteraction": (
         "queried by user_id (implies one tenant), by pipeline_stage_id -> "
         "architecture_id (same), or by an explicit organization_id filter in "
@@ -179,14 +188,30 @@ def test_the_justification_list_has_not_gone_stale():
 
 @pytest.fixture(scope="module")
 def app():
+    """This module's own app fixture (predates tests/conftest.py's shared one).
+
+    It must seed the same roles and feature flag conftest.py's ``_schema``
+    fixture seeds for every other module, not just create tables: the route
+    sweep below logs test users in through the real role guard, and a CI shard
+    that runs this file alone (no earlier test in the shard has already called
+    ``Role.insert_roles()``) otherwise 403s every one of those users before the
+    tenant-isolation check on their route ever runs, misreporting a cross-
+    tenant leak check as merely "unproven" on every affected route.
+    """
     import os
 
     os.environ.setdefault("SECRET_KEY", "x" * 32)
     from app import create_app, db
+    from app.models.user import Role
+
+    from tests.conftest import seed_implementation_planning_flag
 
     application = create_app("testing")
     with application.app_context():
         db.create_all()
+        Role.insert_roles()
+        seed_implementation_planning_flag()
+        db.session.remove()
     return application
 
 
@@ -291,6 +316,9 @@ def test_bulk_delete_is_tenant_filtered(app):
         ApplicationComponent.query.filter(
             ApplicationComponent.name == "bulk-target %s" % marker
         ).delete(synchronize_session=False)
+        from tests._outbox_cleanup import purge_outbox_events
+
+        purge_outbox_events(db.session, [a_id, b_id])
         Organization.query.filter(Organization.id.in_([a_id, b_id])).delete(
             synchronize_session=False)
         db.session.commit()
@@ -403,27 +431,11 @@ SHARED_MODELS = {
 # Leaks the sweep finds in code another open change owns. Each stays a strict
 # expected failure naming its owner (test_known_leak_is_still_open below), so it
 # turns red the moment the owner's fix lands and the entry must come out.
-_PR258 = "PR 258 (scoring/consolidation): consolidation entries are fenced through their application"
-_PR274 = "PR 274 and PR 218 edit solution_design_routes.py; the fix waits for them to land"
 KNOWN_LEAKS = {
     # PR 421 (one work package store) scoped the deliverable update and delete
     # through the organisation's own work packages; test_known_leak_is_still_open
     # went XPASS(strict) on both, so their entries come out.
-    "DELETE /api/v1/mappings/application-to-vendor/<int:mapping_id>": "PR 269 (vendor/contract)",
-    "DELETE /api/v1/mappings/unified-to-application/<int:mapping_id>": "capability store brief",
-    "DELETE /api/v1/mappings/unified-to-vendor-org/<int:mapping_id>": "capability store brief",
     "DELETE /capability-map/api/archimate-mappings/<int:mapping_id>": "capability store brief",
-    "DELETE /consolidation-list/api/entry/<int:entry_id>": _PR258,
-    "PUT /consolidation-list/api/entry/<int:entry_id>": _PR258,
-    "GET /consolidation-list/api/entry/<int:entry_id>/detail": _PR258,
-    # PR 220 and PR 218 landed (verified: test_known_leak_is_still_open was
-    # XPASS(strict) on every one of these 14 routes) -- all proven, not
-    # leaking, so their entries come out rather than mask a real regression.
-    "DELETE /solutions/<int:solution_id>/archimate-elements/<int:mapping_id>": _PR274,
-    "DELETE /solutions/<int:solution_id>/capabilities/<int:mapping_id>": _PR274,
-    "POST /solutions/<int:solution_id>/copilot-insights/<int:insight_id>/dismiss": _PR274,
-    "GET /solutions/api/<int:solution_id>/reasoning/<int:reasoning_id>": _PR274,
-    "GET /solutions/api/registry/specs/<int:spec_id>": _PR274,
 }
 
 # Parameters whose record the codebase reading no longer finds, because the lookup moved

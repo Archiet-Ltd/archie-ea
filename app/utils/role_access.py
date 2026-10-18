@@ -320,6 +320,24 @@ def can_edit_capabilities(user) -> bool:
         return False
 
 
+def can_retire_applications(user) -> bool:
+    """True when the user may mark an application for retirement.
+
+    Mirrors the retirement route's own rule, require_roles("admin",
+    "architect"): an administrator, or a user whose role is Architect.
+    """
+    if not user:
+        return False
+    if is_admin(user):
+        return True
+    try:
+        role = getattr(user, "role", None)
+        name = str(getattr(role, "name", "") or "").strip().lower()
+        return name == "architect"
+    except Exception:  # noqa: BLE001 - a template gate must not 500 a page
+        return False
+
+
 def is_procurement(user) -> bool:
     """Check if user has procurement role."""
     return get_user_role(user) == ROLE_PROCUREMENT
@@ -570,7 +588,7 @@ _ADMIN_LINKS = [
     # Management stays one click away as a tile on Command Center
     # (app/templates/admin/index.html).
     _link("Audit Log", "admin.audit_log_viewer", "scroll-text", requires="admin"),
-    _link("Settings", "main.settings", "settings"),
+    _link("Settings", "main.settings", "settings", requires="platform_admin"),
     # Added in the Task 3 fix round (review finding: orphaned real routes —
     # both existed, worked, and had no sidebar link of any kind).
     _link("Salesforce Integration", "admin.salesforce_integration", "cloud"),
@@ -1006,6 +1024,35 @@ SIDEBAR_ZONES: Dict[str, List[Dict]] = {
 }
 
 
+# Pages that are not ready for the soft launch. One list, one switch
+# (config HIDE_NOT_READY_MODULES, on by default): while it is on, get_sidebar_zones()
+# drops these links and the All-modules directory and global search (which build
+# on the same link data) leave them out. Nothing is deleted: the routes stay, and
+# switching the setting off lists them again. The value says why each is held back.
+NOT_READY_ENDPOINTS = {
+    "implementation_planning.implementation_dashboard": "not available yet",
+    "main.integrations": "refused for the demonstration user",
+    "main.agentic_gaps_ui": "page says it is still being built",
+    "dynamic_dashboards.model_registry_index": "page says it is still being built",
+    "application_mgmt.compliance_frameworks_dashboard": "compliance views are empty",
+    "architecture.investment_priorities": "asks for setup before it shows anything",
+    "strategic.investment_matrix": "asks for setup before it shows anything",
+    "intelligence_ui.history_changes_page": "answers with a raw error without a date range",
+}
+
+
+def is_hidden_not_ready(endpoint: str) -> bool:
+    """True when `endpoint` is on NOT_READY_ENDPOINTS and the hide switch is on."""
+    if endpoint not in NOT_READY_ENDPOINTS:
+        return False
+    try:
+        from flask import current_app
+
+        return bool(current_app.config.get("HIDE_NOT_READY_MODULES", True))
+    except RuntimeError:  # no application context
+        return True
+
+
 def get_sidebar_zones(user) -> List[Dict]:
     """Resolve the current user's role and return their ordered sidebar zones.
 
@@ -1046,7 +1093,11 @@ def get_sidebar_zones(user) -> List[Dict]:
     for z in zones:
         if z["zone"] == "admin" and not is_admin:
             continue
-        links = [link for link in z["links"] if link_requires_satisfied(user, link.get("requires"))]
+        links = [
+            link
+            for link in z["links"]
+            if link_requires_satisfied(user, link.get("requires")) and not is_hidden_not_ready(link["endpoint"])
+        ]
         visible.append({**z, "links": links})
     return visible
 
@@ -1110,6 +1161,7 @@ def role_access_context_processor():
     return {
         "can_access_section": can_access_section,
         "can_edit_capabilities": can_edit_capabilities,
+        "can_retire_applications": can_retire_applications,
         "get_visible_sections": get_visible_sections,
         "is_admin": is_admin,
         "is_procurement": is_procurement,

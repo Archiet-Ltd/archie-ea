@@ -6,6 +6,7 @@ state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
 url_slug: /use-cases/single-point-of-failure
+icon: zap-off
 ---
 
 # If our one cloud platform or payment provider goes down, what stops?

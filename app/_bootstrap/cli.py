@@ -185,6 +185,23 @@ def init_cli(app):
             f"{result['recipients']} recipient(s)."
         )
 
+    # Per-owner in-app notification digest: email each opted-in user their own
+    # unread in-app notifications, run per organisation through the same
+    # tenant-safe harness the platform digests use.
+    @app.cli.command("send-owner-digest")
+    def send_owner_digest_cmd():
+        """Send each opted-in user their unread in-app notifications by email."""
+        from app._bootstrap._digest_emails import send_owner_digests
+        from flask import current_app
+
+        click.echo("Generating per-owner notification digests...")
+        run = send_owner_digests(current_app._get_current_object())
+        sent = sum((r.value or {}).get("sent", 0) for r in run.results if r.ok)
+        click.echo(
+            f"Done: digests sent in {run.succeeded} organisation(s), "
+            f"{sent} digest email(s); {run.failed} failed."
+        )
+
     # ACM-001: Cloud pricing API sync CLI commands
     try:
         from app.commands.cloud_pricing_commands import register_commands as register_cloud_pricing
@@ -275,6 +292,20 @@ def init_cli(app):
         app.logger.warning(f"\u26a0\ufe0f  Failed to register dedupe entities CLI: {e}")
 
     try:
+        from app.commands.prune_oauth_clients import init_app as init_prune_oauth_clients
+        init_prune_oauth_clients(app)
+        app.logger.info("OAuth client pruning CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register OAuth client pruning CLI: {e}")
+
+    try:
+        from app.commands.create_service_client import init_app as init_create_service_client
+        init_create_service_client(app)
+        app.logger.info("Service client creation CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register service client creation CLI: {e}")
+
+    try:
         from app.commands.clean_test_artefacts import init_app as init_clean_test_artefacts
         init_clean_test_artefacts(app)
         app.logger.info("\u2705 Clean test artefacts CLI command registered")
@@ -294,13 +325,6 @@ def init_cli(app):
         app.logger.info("✅ Value-stream ArchiMate backfill CLI command registered")
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register value-stream ArchiMate backfill CLI: {e}")
-
-    try:
-        from app.commands.backfill_data_archimate import init_app as init_data_archimate
-        init_data_archimate(app)
-        app.logger.info("✅ Data-entity ArchiMate backfill CLI command registered")
-    except Exception as e:
-        app.logger.warning(f"⚠️  Failed to register data-entity ArchiMate backfill CLI: {e}")
 
     try:
         from app.commands.backfill_archimate_layer_casing import init_app as init_layer_casing
@@ -508,6 +532,14 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register demo company seed CLI: {e}")
 
+# Domain element backfill
+    try:
+        from app.commands.backfill_domain_elements import init_app as init_domain_elements
+        init_domain_elements(app)
+        app.logger.info("✅ Domain element backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register domain element backfill CLI: {e}")
+
 # Application owners backfill
     try:
         from app.commands import backfill_application_owners
@@ -515,6 +547,30 @@ def init_cli(app):
         app.logger.info("✅ Application owners backfill CLI command registered")
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register application owners backfill CLI: {e}")
+
+# ServiceNow connector config backfill (M2, cloud-review-pr448-961a0c35-v1.md)
+    try:
+        from app.commands import backfill_servicenow_connector_config
+        backfill_servicenow_connector_config.init_app(app)
+        app.logger.info("✅ ServiceNow connector config backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register ServiceNow connector config backfill CLI: {e}")
+
+# Jira/M365 connector row-secret migration (F1, cloud-review-pr448-a85f082b-v1.md)
+    try:
+        from app.commands import migrate_connector_row_secrets
+        migrate_connector_row_secrets.init_app(app)
+        app.logger.info("✅ Connector row-secret migration CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register connector row-secret migration CLI: {e}")
+
+    # Cost fact store backfill
+    try:
+        from app.commands import backfill_cost_facts
+        backfill_cost_facts.init_app(app)
+        app.logger.info("✅ Cost fact backfill CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register cost fact backfill CLI: {e}")
 
     try:
         from app.commands.clear_foreign_assignees import init_app as init_clear_foreign_assignees

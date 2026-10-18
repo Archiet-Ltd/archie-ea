@@ -34,7 +34,7 @@ jobs:
           - non_technical_owner
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:16
+        image: mirror.gcr.io/library/postgres:16
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: archie_whole_product

@@ -13,6 +13,29 @@ from app import db
 logger = logging.getLogger(__name__)
 
 
+def normalise_email_domain(raw):
+    """One spelling for a domain: stripped, lower-cased, no trailing dot, IDNA (punycode)
+    encoded, so "BigCorp.com.", "bigcorp.com" and a Unicode or punycode spelling of the
+    same name compare equal. A value IDNA cannot encode is kept as lower-cased."""
+    domain = (raw or "").strip().lower().rstrip(".")
+    if not domain:
+        return ""
+    try:
+        return domain.encode("idna").decode("ascii").lower()
+    except UnicodeError:
+        return domain
+
+
+def split_email_domains(raw):
+    """The configured domains in an ``email_domain`` value: comma-separated, each normalised
+    (see :func:`normalise_email_domain`), blanks dropped. The one implementation;
+    SSOConfig.email_domains, the sign-in domain lookup and the /admin/sso domain check
+    all call it."""
+    if not raw:
+        return []
+    return [d for d in (normalise_email_domain(part) for part in raw.split(",")) if d]
+
+
 class SSOConfig(db.Model):  # migration-exempt
     """Per-organisation SSO configuration for SAML 2.0 / OIDC federation."""
 
@@ -122,9 +145,7 @@ class SSOConfig(db.Model):  # migration-exempt
     @property
     def email_domains(self):
         """Return list of configured email domains (supports comma-separated)."""
-        if not self.email_domain:
-            return []
-        return [d.strip().lower() for d in self.email_domain.split(",") if d.strip()]
+        return split_email_domains(self.email_domain)
 
     def sp_entity_id_or_default(self, base_url):
         """This organisation's SAML SP entity id, falling back to a URL

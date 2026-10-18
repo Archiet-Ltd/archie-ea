@@ -158,11 +158,9 @@ compliance_checks
 compliance_controls
 compliance_gaps
 compliance_governance_reports
-compliance_policies
 compliance_requirements
 compliance_requirements_model
 compliance_scan_reports
-compliance_violations
 composite_structures
 confidence_thresholds
 consolidation_candidates
@@ -203,6 +201,7 @@ element_templates
 enterprise_capabilities
 equipment
 error_events
+exchange_rates
 exception_process
 experience_elements
 external_systems
@@ -478,3 +477,9 @@ workflow_nodes
 workflow_pipelines
 workflow_run_watchers
 workflow_templates
+# oauth_authorization_codes: redeemed by hash at the token endpoint before an organisation is known
+# oauth_clients: registered before any user or organisation exists (dynamic client registration)
+# oauth_tokens: looked up by token hash before the organisation is known; the row carries organization_id and every use is checked against it
+oauth_authorization_codes
+oauth_clients
+oauth_tokens

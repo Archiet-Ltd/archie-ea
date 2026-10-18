@@ -8,6 +8,7 @@ roadmap_citation: "roadmap-v2.md 'Later: 2027' — 'Incident feeds from monitori
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
 url_slug: /use-cases/pagerduty-and-datadog-incidents
+icon: siren
 ---
 
 # Read our incidents from PagerDuty or Datadog against the model

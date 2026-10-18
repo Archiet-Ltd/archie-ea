@@ -16,6 +16,15 @@ from app.modules.ai_chat.tools.executor import ToolCall
 import json
 import logging
 from typing import Callable, Optional
+from app.modules.ai_chat.services.ai_hallucination_detector import (
+    Grounding,
+    find_uncited_claims,
+    organisation_names_in_text,
+)
+from app.modules.intelligence.services.answer_envelope import (
+    as_whole_number,
+    classify_estate_question,
+)
 from app.utils.tracing import traced
 
 logger = logging.getLogger(__name__)
@@ -34,11 +43,13 @@ except Exception:  # registry import failure must not take the turn with it
 _AGENT_PREFIX = """You are an Enterprise Architecture Copilot with DIRECT WRITE ACCESS
 to the architecture repository. You do not give advice for humans to act on — you act.
 
-WHAT YOU CAN DO (27 tools available):
+WHAT YOU CAN DO (the main tools; the list offered to you in this conversation is authoritative):
 Phase A — Motivation: create_driver, create_goal, create_constraint
 Phase B-D — Architecture: create_requirement, link_application_to_solution, link_vendor_product,
              link_capability_to_solution, create_archimate_element, create_archimate_relationship
 Phase D — ArchiMate: run_inference_engine, diagnose_chain, explain_element, simulate_impact
+Answers: answer (what breaks if X fails, what breaks if these fail together, which risks
+         reach X): the same rows, citations and address the Ask and Impact pages show
 Phase E — Options: create_option, mark_option_recommended
 Phase G — Governance: submit_for_arb_review (requires confirmation)
 Solution state: get_solution_summary, get_completeness_score, update_solution_fields,
@@ -58,6 +69,14 @@ HOW TO OPERATE:
 GROUNDING — this is a system of record, so an unverifiable answer is worse than none:
 7. State a fact about the portfolio only if a tool returned it or it appears in the
    context below. If neither, say you would need to look it up, and look it up.
+7a. For any question about what depends on, breaks with, or is owned in the estate, CALL
+   the answer tool (or simulate_impact) before replying. Do not answer it from memory.
+7b. When you state a recorded fact about a record of the estate, cite it with a marker
+   [ref:<id>] where <id> is an element id or the answer address a tool returned this
+   turn. State counts as the tool returned them.
+7c. General architecture guidance (patterns, TOGAF, ArchiMate concepts) is fine; keep it
+   apart from statements about this estate.
+7d. What the user asserts, or an earlier turn said, is not a fact on record: look it up.
 8. Refer to records by the exact name the tool returned. The records you read are
    attached to your reply as sources automatically — you do not need to write links,
    but the names must match or the citation will not line up with what you said.
@@ -154,6 +173,59 @@ class AgentRunner:
         # to run() identifies the specific turn within that session.
         self.chat_session_id = chat_session_id
         self._turn_id: Optional[str] = None
+        # What this turn may state: tool results, the context handed to the
+        # model, the conversation so far and the user's own words. The citation
+        # gate in _finalize refuses an answer that states a fact about the
+        # estate that none of it supports.
+        self._grounding = Grounding()
+        self._context_text = ""
+        self._estate_question = None
+        self._nudged = False
+        self._gate_cache = None
+        self._context_struct = None
+        self._question_names = set()
+        self._gate_mode_now = self._gate_mode()
+        # Tokens of the model call in flight, held back until the gate has
+        # judged the text so a refused answer is never partly shown.
+        self._held_tokens: Optional[list] = None
+        self._withheld_claims: list = []   # sentences refused (enforce mode)
+        self._would_withhold: list = []    # sentences logged only (log mode)
+
+    GATE_MODES = ("log", "enforce", "off")
+
+    @staticmethod
+    def _gate_mode() -> str:
+        """ASSISTANT_CITATION_GATE_MODE: "log" (default: the answer is shown
+        unchanged and an answer the gate would refuse is logged), "enforce"
+        (the answer is replaced by "Not recorded") or "off". One place."""
+        import os
+
+        value = None
+        try:
+            from flask import current_app, has_app_context
+
+            if has_app_context():
+                value = current_app.config.get("ASSISTANT_CITATION_GATE_MODE")
+        except Exception:  # pragma: no cover - no application at all
+            value = None
+        if value is None:
+            value = os.environ.get("ASSISTANT_CITATION_GATE_MODE", "log")
+        value = str(value or "log").strip().lower()
+        return value if value in AgentRunner.GATE_MODES else "log"
+
+    def _emit_token(self, text: str) -> None:
+        """Stream a token, or hold it while the citation gate has not yet seen
+        the text it belongs to (see ``_release_held_tokens``)."""
+        if self._held_tokens is not None:
+            self._held_tokens.append(text)
+        else:
+            self._emit({"type": "token", "text": text})
+
+    def _release_held_tokens(self, release: bool) -> None:
+        held, self._held_tokens = self._held_tokens, None
+        if release:
+            for text in held or []:
+                self._emit({"type": "token", "text": text})
 
     @staticmethod
     def _inject_trusted_tool_context(
@@ -249,6 +321,46 @@ class AgentRunner:
             return None
         return None
 
+    # Tools that return the canonical answer envelope.
+    _ANSWER_TOOLS = frozenset({"answer", "simulate_impact"})
+
+    def _collect_answer_sources(self, result: dict, sources: list) -> None:
+        """The stored answer first (its page opens the same rows the Ask page
+        shows), then the elements its rows name, each linked to its record."""
+        body = result.get("result") if isinstance(result, dict) else None
+        if not isinstance(result, dict) or not result.get("success") or not isinstance(body, dict):
+            return
+        seen = {(s["type"], s["id"]) for s in sources}
+        address = body.get("address")
+        if address and ("answer", address) not in seen and len(sources) < self.MAX_SOURCES:
+            sources.append({
+                "type": "answer",
+                "id": address,
+                "name": f"Answer: {str(body.get('question_kind', 'impact')).replace('_', ' ')}",
+                "url": body.get("page_url"),
+            })
+        elements = body.get("elements") or {}
+        shown_ids = {r.get("element_id") for r in body.get("rows") or [] if isinstance(r, dict)}
+        shown_ids |= set(body.get("params", {}).get("element_ids") or [])
+        if body.get("params", {}).get("element_id") is not None:
+            shown_ids.add(body["params"]["element_id"])
+        for key, element in elements.items():
+            if len(sources) >= self.MAX_SOURCES:
+                return
+            if not isinstance(element, dict) or element.get("id") is None or not element.get("name"):
+                continue
+            if shown_ids and element["id"] not in shown_ids:
+                continue
+            if ("archimate_element", element["id"]) in seen:
+                continue
+            seen.add(("archimate_element", element["id"]))
+            sources.append({
+                "type": "archimate_element",
+                "id": element["id"],
+                "name": element["name"],
+                "url": self._source_url("archimate_element", element),
+            })
+
     def _collect_sources(self, tool_name: str, result: dict, sources: list) -> None:
         """Record the entities a read tool actually returned, for citation.
 
@@ -261,6 +373,9 @@ class AgentRunner:
         several tools in one turn, and capped so a broad query cannot bury the
         answer under its own footnotes.
         """
+        if tool_name in self._ANSWER_TOOLS:
+            self._collect_answer_sources(result, sources)
+            return
         entity_type = self._TOOL_ENTITY.get(tool_name)
         if not entity_type or not isinstance(result, dict) or not result.get("success"):
             return
@@ -431,8 +546,34 @@ class AgentRunner:
         import uuid as _uuid
         self._turn_id = str(_uuid.uuid4())
 
+        self._context_struct = None
         # Build system prompt with live domain context
         system_prompt = self._build_system_prompt(domain, context, persona, user_message=user_message)
+
+        # Only this turn's tool results and the structured context the system
+        # injected ground a claim about the estate. The words of the user and
+        # earlier assistant turns do not: a fact someone asserted is not a fact
+        # on record.
+        self._grounding = Grounding()
+        self._grounding.add_context(self._context_struct)
+        self._grounding.add_context(self._context_text)
+        self._gate_mode_now = self._gate_mode()
+        self._estate_question = (
+            None if self._gate_mode_now == "off"
+            else self._classify_estate(user_message, context, history)
+        )
+        self._question_names = set()
+        self._withheld_claims = []
+        self._would_withhold = []
+        if self._gate_mode_now != "off":
+            try:
+                from app.middleware.tenant_context import current_org_id
+
+                self._question_names = organisation_names_in_text(user_message, current_org_id())
+            except Exception:
+                logger.warning("AgentRunner: question name lookup failed", exc_info=True)
+        self._nudged = False
+        self._gate_cache = None
 
         # Get provider, model, and first available API key
         try:
@@ -511,6 +652,9 @@ class AgentRunner:
 
         # Build tool schemas for the provider
         tool_schemas = self._build_tool_schemas(provider, TOOL_SCHEMAS)
+        offered_tools = {
+            s["name"] for s in TOOL_SCHEMAS if "chat" in s.get("surfaces", ["chat"])
+        }
 
         # Initialise message history with the prior turns of this conversation.
         #
@@ -532,6 +676,7 @@ class AgentRunner:
 
         for iteration in range(MAX_ITERATIONS):
             # Call LLM
+            self._held_tokens = []
             try:
                 llm_resp = self._call_llm(
                     provider, model, api_key, system_prompt, messages, tool_schemas,
@@ -539,6 +684,7 @@ class AgentRunner:
                     base_url=base_url,
                 )
             except Exception as e:
+                self._release_held_tokens(False)
                 logger.exception("AgentRunner LLM call failed (iteration %d)", iteration)
                 return self._finalize(
                     self._fallback(f"LLM call failed: {e}"),
@@ -548,6 +694,36 @@ class AgentRunner:
 
             # Text-only response — we're done
             if not llm_resp.get("tool_calls"):
+                # The final text is shown only if the citation gate passes it.
+                final_text = llm_resp.get("text") or ""
+                if (
+                    self._gate_mode_now == "enforce"
+                    and self._estate_question
+                    and self._grounding.tool_results == 0
+                    and not self._nudged
+                    and iteration < MAX_ITERATIONS - 1
+                ):
+                    # An estate question must be answered from a stored answer.
+                    # One nudge to look it up, then the gate decides.
+                    self._nudged = True
+                    self._release_held_tokens(False)
+                    messages.append({"role": "assistant", "content": final_text or "(no answer)"})
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            "Before replying, call the answer tool for this question "
+                            "and reply only from the rows it returns, citing each "
+                            "record with [ref:<id>]."
+                        ),
+                    })
+                    continue
+                if self._gate_mode_now == "enforce":
+                    gate_passes = not self._find_uncited(final_text)
+                else:
+                    # Monitor mode: the answer is shown unchanged; the gate
+                    # is evaluated (and logged) once, in _apply_citation_gate.
+                    gate_passes = True
+                self._release_held_tokens(gate_passes)
                 return self._finalize(
                     {
                         "response": llm_resp.get("text", ""),
@@ -563,6 +739,10 @@ class AgentRunner:
                     model_used=model,
                 )
 
+            # Text before a tool call is a preface, not an answer: it is never
+            # streamed, never kept in the history of the turn and never stored.
+            self._release_held_tokens(False)
+
             # Process each tool call
             tool_results = []
             for tc_raw in llm_resp["tool_calls"]:
@@ -575,7 +755,20 @@ class AgentRunner:
                 )
                 schema = TOOL_SCHEMA_BY_NAME.get(tc.name, {})
 
-                if self._should_queue(schema, self.auto_execute):
+                if tc.name not in offered_tools:
+                    # Tool selection is the server's: only a tool offered on the
+                    # chat surface can run, whatever text (a pasted document, a
+                    # retrieved excerpt, an earlier tool result) names another.
+                    logger.warning(
+                        "AgentRunner: refusing tool %r, not offered on the chat surface",
+                        tc.name,
+                    )
+                    result = {
+                        "success": False,
+                        "error": f"Tool '{tc.name}' is not available here.",
+                        "code": "TOOL_NOT_OFFERED",
+                    }
+                elif self._should_queue(schema, self.auto_execute):
                     # Queue for user approval. Either the tool is always-approve
                     # (destructive/significant regardless of the gate), or it
                     # mutates and this session has auto-execute off - the
@@ -602,6 +795,9 @@ class AgentRunner:
                     self._emit({"type": "tool_start", "tool": tc.name, "args": tc.arguments})
                     result = executor.execute(tc)
                     self._collect_sources(tc.name, result, sources)
+                    self._grounding.add_tool_result(
+                        result, mutates=tc.name in _MUTATING_TOOLS
+                    )
                     self._emit({"type": "tool_result", "tool": tc.name, "result": result})
 
                     if result.get("success"):
@@ -638,6 +834,8 @@ class AgentRunner:
                 "required_actions": required_actions,
                 "pending_approvals": pending_approvals,
                 "sources": sources,
+                # Text the system built from tool receipts, not model prose.
+                "system_generated": True,
             },
             user_message=user_message,
             domain=domain,
@@ -650,29 +848,48 @@ class AgentRunner:
     # System prompt construction                                           #
     # ------------------------------------------------------------------ #
 
+    @staticmethod
+    def _short_token(value, default: str) -> str:
+        """A short single-line label from client input (a phase letter)."""
+        text = "".join(ch for ch in str(value or "") if ch.isalnum() or ch in " -_.")[:32]
+        return text.strip() or default
+
     def _build_system_prompt(self, domain: str, context: Optional[dict], persona: Optional[str], user_message: str = "") -> str:
         """Build agent system prompt: agent prefix + solution context + live domain context."""
         # Inject solution context if present (blueprint panel provides this)
         solution_block = ""
-        if context and context.get("solution_id"):
+        solution_id = as_whole_number((context or {}).get("solution_id"))
+        if isinstance(solution_id, bool) or not isinstance(solution_id, int):
+            solution_id = None
+        if solution_id is not None:
+            # The id is coerced to a whole number and the name, which the client
+            # supplies, is fenced: neither can carry an instruction into the
+            # system role or change which solution the tools default to.
+            from app.modules.ai_chat.services.architect_persona_charters import fence_untrusted
+
+            solution_name = str(context.get("solution_name") or "Unknown")[:200]
             solution_block = (
                 f"\nACTIVE SOLUTION CONTEXT:\n"
-                f"  Solution ID: {context['solution_id']}\n"
-                f"  Name: {context.get('solution_name', 'Unknown')}\n"
-                f"  ADM Phase: {context.get('current_phase', 'A')}\n"
-                f"All create/link tools default to solution_id={context['solution_id']} "
+                f"  Solution ID: {solution_id}\n"
+                f"  ADM Phase: {self._short_token(context.get('current_phase'), 'A')}\n"
+                f"All create/link tools default to solution_id={solution_id} "
                 f"unless the user specifies otherwise.\n"
+                + fence_untrusted("SOLUTION NAME", solution_name)
             )
 
         # Portfolio context — compact snapshot of related solutions
         portfolio_block = ""
-        if context and context.get("solution_id"):
+        if solution_id is not None:
             try:
+                from app.modules.ai_chat.services.architect_persona_charters import fence_untrusted
                 from app.modules.ai_chat.services.portfolio_context import PortfolioContextBuilder
-                portfolio_block = "\n" + PortfolioContextBuilder().build(
-                    solution_id=context["solution_id"],
-                    user_id=self.user_id,
-                    question=user_message,
+                portfolio_block = fence_untrusted(
+                    "PORTFOLIO CONTEXT",
+                    PortfolioContextBuilder().build(
+                        solution_id=solution_id,
+                        user_id=self.user_id,
+                        question=user_message,
+                    ),
                 )
             except Exception as _pb_err:
                 logger.debug("AgentRunner: portfolio context failed: %s", _pb_err)
@@ -684,7 +901,20 @@ class AgentRunner:
             ctx_result = svc.get_domain_context(domain, context or {})
             if ctx_result.get("success"):
                 raw_ctx = ctx_result.get("context", {})
-                ctx_block = self._serialise_context(raw_ctx)
+                # Organisation-owned text (names, descriptions, uploaded
+                # documents) is data, not instruction: it is fenced.
+                from app.modules.ai_chat.services.architect_persona_charters import fence_untrusted
+
+                # The structured rows the model is handed ground its answer.
+                serialised = self._serialise_context(raw_ctx)
+                # Only what the model actually saw (whole keys are dropped
+                # when over budget) grounds anything.
+                try:
+                    seen = json.loads(serialised) if serialised else None
+                except ValueError:
+                    seen = None
+                self._context_struct = seen if isinstance(seen, dict) else None
+                ctx_block = fence_untrusted("LIVE ARCHITECTURE DATA", serialised)
         except Exception as e:
             logger.debug("AgentRunner: context build failed: %s", e)
 
@@ -724,6 +954,10 @@ class AgentRunner:
         # drops whole keys when it is over budget, so anything appended after it
         # is safe from that trimming — and the HARD RULES are the last thing that
         # should be sacrificed to make room.
+        # What the turn may state: the fenced blocks the model was handed.
+        # The client-supplied solution name is not grounding; the live-data and
+        # portfolio blocks the system built are.
+        self._context_text = portfolio_block
         return _AGENT_PREFIX + solution_block + portfolio_block + ctx_block + persona_note
 
     # ------------------------------------------------------------------ #
@@ -732,6 +966,11 @@ class AgentRunner:
 
     @staticmethod
     def _build_tool_schemas(provider: str, schemas: list) -> list:
+        # The one place the chat model's tool list is built. A tool that is not
+        # offered on the chat surface (the connector's route-backed tools, which
+        # need a request context the streaming path lacks) is left out; an entry
+        # with no "surfaces" key is a chat tool, as before.
+        schemas = [s for s in schemas if "chat" in s.get("surfaces", ["chat"])]
         if provider == "anthropic":
             return [
                 {
@@ -842,7 +1081,7 @@ class AgentRunner:
             tool_choice={"type": "auto"},
         ) as stream:
             for text in stream.text_stream:
-                self._emit({"type": "token", "text": text})
+                self._emit_token(text)
             final = stream.get_final_message()
 
         text = None
@@ -927,7 +1166,7 @@ class AgentRunner:
                 delta = chunk.choices[0].delta
                 if delta.content:
                     text_acc += delta.content
-                    self._emit({"type": "token", "text": delta.content})
+                    self._emit_token(delta.content)
                 if delta.tool_calls:
                     for tc in delta.tool_calls:
                         idx = tc.index
@@ -955,6 +1194,18 @@ class AgentRunner:
     # Message history management                                          #
     # ------------------------------------------------------------------ #
 
+    @staticmethod
+    def _fenced_result(tc_raw: dict, result: dict) -> str:
+        """A tool result as the model sees it: inside the one untrusted-content
+        fence. Names, descriptions and uploaded text in a result are data; an
+        instruction in one is reported, not followed, and cannot select a tool."""
+        from app.modules.ai_chat.services.architect_persona_charters import fence_untrusted
+
+        label = "".join(
+            ch for ch in str(tc_raw.get("name", "tool")) if ch.isalnum() or ch == "_"
+        )[:60]
+        return fence_untrusted(f"TOOL RESULT {label}", json.dumps(result, default=str))
+
     def _append_tool_results(
         self, provider: str, messages: list, llm_resp: dict, tool_results: list
     ) -> list:
@@ -963,9 +1214,15 @@ class AgentRunner:
 
         if provider == "anthropic":
             # Append the full raw content blocks from the assistant
+            # Text blocks that accompany a tool call are dropped: only the
+            # tool_use blocks are carried forward.
+            blocks = [
+                b for b in llm_resp["raw"].content
+                if (b.get("type") if isinstance(b, dict) else getattr(b, "type", None)) != "text"
+            ]
             messages.append({
                 "role": "assistant",
-                "content": llm_resp["raw"].content,
+                "content": blocks,
             })
             # Append tool results as a user message
             messages.append({
@@ -974,18 +1231,15 @@ class AgentRunner:
                     {
                         "type": "tool_result",
                         "tool_use_id": tc_raw["id"],
-                        "content": json.dumps(result, default=str),
+                        "content": self._fenced_result(tc_raw, result),
                     }
                     for tc_raw, result in tool_results
                 ],
             })
         else:  # openai
             # raw is None in streaming mode — reconstruct assistant message from accumulated fields
-            if llm_resp.get("raw") is not None:
-                raw_msg = llm_resp["raw"].choices[0].message
-                assistant_content = raw_msg.content
-            else:
-                assistant_content = llm_resp.get("text")
+            # The text that accompanies a tool call is not carried forward.
+            assistant_content = None
             messages.append({
                 "role": "assistant",
                 "content": assistant_content,
@@ -1005,7 +1259,7 @@ class AgentRunner:
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc_raw["id"],
-                    "content": json.dumps(result, default=str),
+                    "content": self._fenced_result(tc_raw, result),
                 })
 
         return messages
@@ -1234,6 +1488,16 @@ class AgentRunner:
                     "user_message": user_message,
                     "domain": domain,
                     "context": context,
+                    **(
+                        {"citation_gate_withheld": self._withheld_claims}
+                        if self._withheld_claims
+                        else {}
+                    ),
+                    **(
+                        {"citation_gate_would_withhold": self._would_withhold}
+                        if self._would_withhold
+                        else {}
+                    ),
                 },
                 tools_called=[
                     {
@@ -1269,6 +1533,140 @@ class AgentRunner:
             logger.warning("AgentRunner: failed to write run record", exc_info=True)
             return "Run record could not be written — the run completed but was not recorded"
 
+    @staticmethod
+    def _classify_estate(user_message: str, context=None, history=None) -> Optional[str]:
+        """The answer kind when this message is an estate question, else None:
+        its wording must match a cue AND the message itself must name an
+        element or application of the organisation (the gate's fenced
+        lookup). Context and earlier turns never make a question an estate
+        question; a follow-up gets no nudge, and an answer that names records
+        without markers is caught by the name rule anyway."""
+        kind = classify_estate_question(user_message)
+        if not kind:
+            return None
+        try:
+            from app.middleware.tenant_context import current_org_id
+
+            if organisation_names_in_text(user_message, current_org_id()):
+                return kind
+        except Exception:
+            logger.warning("AgentRunner: estate question lookup failed", exc_info=True)
+        return None
+
+    def _find_uncited(self, text: str) -> list:
+        """Run the citation gate on *text* for this turn, once per distinct
+        text. A failure of the gate or of the organisation-name lookup fails
+        CLOSED for an estate answer (an estate question, or a turn in which a
+        tool ran) and open only for a turn that never touched the estate."""
+        cached = self._gate_cache
+        if cached is not None and cached[0] == text:
+            return cached[1]
+        try:
+            from app.middleware.tenant_context import current_org_id
+
+            org_names = organisation_names_in_text(text, current_org_id())
+            uncited = find_uncited_claims(
+                text,
+                self._grounding,
+                org_names=org_names,
+                estate_question=bool(self._estate_question),
+                question_names=self._question_names,
+            )
+        except Exception:
+            logger.warning("AgentRunner: citation gate failed", exc_info=True)
+            if self._gate_mode_now == "enforce" and (
+                self._estate_question or self._grounding.tool_results > 0
+            ):
+                uncited = [{"claim": "", "unsupported": ["the citation check could not run"]}]
+            else:
+                uncited = []
+        self._gate_cache = (text, uncited)
+        return uncited
+
+    CITATION_REFUSAL = (
+        "Not recorded: I can't give this answer, because it states facts about "
+        "your estate that none of the records I read this turn support. "
+        "Ask me to look the specific item up, for example what breaks if a named "
+        "application fails, and I will answer from the recorded rows."
+    )
+
+    def _apply_citation_gate(self, result: dict) -> None:
+        """Check an answer's statements about the estate against this turn's
+        tool results and context, according to ASSISTANT_CITATION_GATE_MODE.
+
+        "log" (default): the answer is shown unchanged; an answer the gate
+        would have refused is logged once (record names and reasons, not the
+        text) and its sentences are kept on the run record under
+        ``citation_gate_would_withhold``. "enforce": such an answer is replaced
+        by an honest "not recorded" and its sentences are kept under
+        ``citation_gate_withheld``. "off": nothing runs. The result carries
+        counts only (``citation_gate``); sentences never reach the browser.
+        """
+        mode = self._gate_mode_now
+        text = result.get("response")
+        if mode == "off" or result.get("error") or result.get("system_generated") \
+                or not isinstance(text, str) or not text.strip():
+            return
+        try:
+            uncited = self._find_uncited(text)
+        except Exception:
+            if mode == "enforce":
+                raise
+            logger.warning("AgentRunner: citation gate failed (monitor mode)", exc_info=True)
+            return
+        enforce = mode == "enforce"
+        # Counts only: the result is spread into the stream's done event, and
+        # the claims withheld must not reach the browser. They go to the run
+        # record (see _record_run) and the log.
+        result["citation_gate"] = {
+            "checked": True,
+            "mode": mode,
+            "refused": bool(uncited) and enforce,
+            "would_refuse": bool(uncited),
+            "uncited_count": len(uncited),
+            "sources": len(result.get("sources") or []),
+        }
+        if not uncited:
+            return
+        if enforce:
+            self._withheld_claims = uncited
+        else:
+            self._would_withhold = uncited
+        if enforce:
+            logger.warning(
+                "AgentRunner: citation gate refused an answer (%d uncited claim(s))",
+                len(uncited),
+            )
+            result["response"] = self.CITATION_REFUSAL
+            return
+        self._log_would_refuse(uncited)
+
+    def _log_would_refuse(self, uncited: list) -> None:
+        """One structured WARNING per answer the gate would have refused. The
+        unverified record names are logged; the answer text is not."""
+        try:
+            from app.middleware.tenant_context import current_org_id
+
+            organization_id = current_org_id()
+        except Exception:
+            organization_id = None
+        reasons = []
+        for claim in uncited[:20]:
+            reasons.extend(str(item)[:120] for item in claim.get("unsupported", [])[:5])
+        event = {
+            "event": "citation_gate_would_refuse",
+            "mode": "log",
+            "organization_id": organization_id,
+            "conversation_id": self.chat_session_id,
+            "question_class": self._estate_question,
+            "unverified_sentences": len(uncited),
+            "reasons": reasons,
+        }
+        logger.warning(
+            "citation_gate_would_refuse %s", json.dumps(event, default=str),
+            extra={"gate_event": event},
+        )
+
     def _finalize(
         self,
         result: dict,
@@ -1278,7 +1676,8 @@ class AgentRunner:
         persona: Optional[str],
         model_used: Optional[str] = None,
     ) -> dict:
-        """Record the run and return the result dict."""
+        """Apply the citation gate, record the run and return the result dict."""
+        self._apply_citation_gate(result)
         record_error = self._record_run(
             persona=persona,
             domain=domain,

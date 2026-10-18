@@ -40,7 +40,7 @@ governance — as one open-source product, self-hostable, built specifically on 
 | Vendor | Bizzdesign (following the 2024 merger with MEGA and Alfabet) | Archiet Ltd |
 | Licence | Proprietary | Open source, AGPL, plus a commercial licence |
 | Self-hostable | Not stated on the vendor's own product page | Yes |
-| Pricing | Not published on the vendor's product page | Published at /pricing; free to self-host under AGPL |
+| Pricing | Not published on the vendor's product page | Published on the [pricing page](/pricing); free to self-host under AGPL |
 | Disciplines | Enterprise Architecture, Application Portfolio Management, Technology Portfolio Management, Business Process Management, Data Management, Governance/Risk/Compliance | Modelling, application portfolio, business case, governance — one product |
 | Modelling notation | Not stated on the vendor's product page | ArchiMate 3.2, specifically |
 
@@ -57,12 +57,47 @@ governance — as one open-source product, self-hostable, built specifically on 
 
 ArchiMate Open Exchange and CSV are the working path to bring a model across.
 
-## Frequently asked
+## Frequently asked questions
 
-**Is this still "MEGA HOPEX"?**
-No. MEGA's own domain now redirects to Bizzdesign's, and the product's current page doesn't mention
-MEGA at all — it's Bizzdesign HOPEX, following the 2024 merger.
+### How do we move from Bizzdesign HOPEX to Entelim, and how much work is it?
 
-**Do we have to publish our code if we use Entelim?**
-No. Self-hosting is free under AGPL. A commercial licence is available for organisations that don't
-want AGPL's obligations.
+There is no direct connector from Bizzdesign HOPEX, so you move your data as files. Export an ArchiMate Open Exchange file if it offers one, or spreadsheets if not, then import them with batch import. The work is the export from Bizzdesign HOPEX and checking what arrived, which the import history records. If you would rather not do it yourselves, the [architecture health check](/architecture-health-check) does the import and analysis for a fixed $4,500, and [onboarding](/team-annual-onboarding) is $1,500 on top of the Team plan.
+
+### Will we lose data moving from Bizzdesign HOPEX?
+
+What comes across is what you can export: elements, relationships and properties from an Open Exchange file, and the columns of a spreadsheet. Anything that lives only inside the old tool, such as its own reports, dashboards, workflow records and user accounts, does not come across, so export what you need before your contract ends. Nothing is removed from Bizzdesign HOPEX by importing, so keep it running until you have compared counts and spot-checked the results.
+
+### What would Entelim cost us compared with Bizzdesign HOPEX?
+
+Bizzdesign's HOPEX product page shows no prices, so request a quote for your user count and modules. Entelim's price does not depend on how many applications you hold: Community is free for up to three people, Startup is $49 a month for up to ten, Team is $29 per editor a month ($290 billed annually) with read-only members free, and Enterprise starts at $24,000 a year. Self-hosting is free. Twenty editors on Team annual come to $5,800 a year.
+
+### What would we give up by leaving Bizzdesign HOPEX?
+
+You would give up a six-discipline platform from one vendor: enterprise architecture, application portfolio management, technology portfolio management, business process management, data management, and governance, risk and compliance. There is no one-click transfer, since Entelim imports files.
+
+### What would we gain by moving from Bizzdesign HOPEX to Entelim?
+
+A published price, free self-hosting, and ArchiMate 3.2 as the stated modelling standard. Entelim covers modelling, application portfolio, business case and governance in one product, with a proof drawer for every derived connection.
+
+### Can we run Bizzdesign HOPEX and Entelim side by side before deciding?
+
+Yes. Import a copy of your model into the free Community plan or a self-hosted copy, ask the same questions in both, and leave Bizzdesign HOPEX untouched. The health check puts your own data through Entelim for a fixed price and date.
+
+### Is this still MEGA HOPEX?
+
+No. mega.com now redirects to Bizzdesign's site, and the HOPEX product page there does not mention MEGA. The product is Bizzdesign HOPEX, following the 2024 merger of MEGA, Horizzon and Alfabet under the Bizzdesign name.
+
+### Is Bizzdesign HOPEX pricing public anywhere?
+
+No. The HOPEX product page shows no prices, so request a quote for your user count and the modules you need. Entelim's plans are published on the [pricing page](/pricing).
+
+### Do we have to publish our code if we use Entelim?
+
+No. Self-hosting is free under AGPL, and a commercial licence is available for organisations that do not want AGPL's obligations.
+
+## Sources
+
+The facts about Bizzdesign HOPEX on this page come from the public pages below, each read on the date shown.
+
+- [mega.com HOPEX address](https://www.mega.com/hopex-platform), read 23 September 2026. Redirects permanently to bizzdesign.com/hopex-platform.
+- [bizzdesign.com HOPEX platform](https://bizzdesign.com/hopex-platform), read 23 September 2026. Presents HOPEX as six disciplines in one platform: Enterprise Architecture, Application Portfolio Management, Technology Portfolio Management, Business Process Management, Data Management, and Governance, Risk and Compliance. Shows no prices and does not name ArchiMate on that page.

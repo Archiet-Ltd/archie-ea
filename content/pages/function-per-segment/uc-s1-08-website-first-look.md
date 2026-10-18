@@ -8,6 +8,7 @@ cta: waiting_list
 capture_status: not_applicable_not_yet_built
 url_slug: /use-cases/website-first-look
 also_serves: [S4]
+icon: eye
 ---
 
 # From our website address, tell me what kind of company we are and what you can answer first

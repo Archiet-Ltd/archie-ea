@@ -2062,6 +2062,11 @@ class Notification(db.Model):
     url = db.Column(db.String(500), nullable=True)
     read = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    organization_id = db.Column(db.Integer, db.ForeignKey("organizations.id"), nullable=True, index=True)
+    event_type = db.Column(db.String(64), nullable=True)
+    entity_type = db.Column(db.String(64), nullable=True)
+    entity_id = db.Column(db.Integer, nullable=True)
+    email_sent_at = db.Column(db.DateTime, nullable=True)
 
 
 # BA-003: Business Layer ArchiMate ORM entities — re-exported from canonical modules.

@@ -1,3 +1,4 @@
+// smoke-coverage-ok: the changed business-case builders are pure string helpers, exercised under node by tests/test_business_case_unmeasured_scores.py
 /**
  * Application Rationalization - External JavaScript
  * Extracted from rationalization.html inline scripts
@@ -1349,6 +1350,64 @@ function buildRadarChart(results) {
   });
 }
 
+// A dimension score of null means "not measured" and must never be coerced to 0:
+// a 0 reads as a measured worst case and would raise a risk the data never showed.
+const SCORE_NOT_MEASURED = 'Not measured';
+
+function buildScoreTableHtml(score) {
+  if (!score) {
+    return '<p>Score data unavailable. Run Options Analysis to populate financial metrics.</p>';
+  }
+  function row(label, value, bands) {
+    if (!hasScore(value)) {
+      return '<tr><td>' + label + '</td><td>' + SCORE_NOT_MEASURED + '</td><td>' + SCORE_NOT_MEASURED + '</td></tr>';
+    }
+    return '<tr><td>' + label + '</td><td>' + value.toFixed(1) + '/100</td><td>' +
+      (value >= 70 ? bands[0] : value >= 40 ? bands[1] : bands[2]) + '</td></tr>';
+  }
+  let html = '<table>' +
+    '<thead><tr><th>Dimension</th><th>Score</th><th>Assessment</th></tr></thead>' +
+    '<tbody>' +
+      row('Technical Health', score.technical_score, ['Healthy', 'Needs Attention', 'Critical']) +
+      row('Business Value', score.business_score, ['High Value', 'Moderate Value', 'Low Value']) +
+      row('Cost Efficiency', score.cost_score, ['Efficient', 'Average', 'Inefficient']) +
+      row('Vendor Risk', score.vendor_score, ['Low Risk', 'Moderate Risk', 'High Risk']) +
+    '</tbody></table>';
+  if (score.rationale) {
+    html += '<p><strong>TIME Rationale:</strong> ' + escapeForDoc(score.rationale) + '</p>';
+  }
+  return html;
+}
+
+function buildRiskItemsHtml(score) {
+  let items = '';
+  let flagged = false;
+  if (score) {
+    if (hasScore(score.technical_score) && score.technical_score < 40) {
+      flagged = true;
+      items += '<li><strong>Technical Debt Risk:</strong> Technical health score is below 40, indicating significant technical debt that may increase migration or maintenance costs.</li>';
+    }
+    if (hasScore(score.cost_score) && score.cost_score < 40) {
+      flagged = true;
+      items += '<li><strong>Cost Inefficiency Risk:</strong> Cost efficiency score is below 40, suggesting the application may be consuming disproportionate resources.</li>';
+    }
+    if (hasScore(score.vendor_score) && score.vendor_score < 40) {
+      flagged = true;
+      items += '<li><strong>Vendor Concentration Risk:</strong> Vendor risk score is below 40, indicating potential single-vendor dependency or contract concerns.</li>';
+    }
+    if (hasScore(score.business_score) && score.business_score > 70) {
+      flagged = true;
+      items += '<li><strong>Business Continuity Risk:</strong> High business value (' + score.business_score.toFixed(0) + ') means any disruption during transition will have significant impact.</li>';
+    }
+  }
+  if (!flagged) {
+    items += '<li>No critical risk indicators detected based on the dimensions that were measured.</li>';
+  }
+  items += '<li>Implementation complexity and timeline should be assessed during detailed planning.</li>';
+  items += '<li>Data migration and integration challenges should be evaluated per target architecture.</li>';
+  return items;
+}
+
 function generateBusinessCase() {
   let appId = validateAppId('options-app-id');
   if (!appId) {
@@ -1406,27 +1465,7 @@ function generateBusinessCase() {
       '    <p>None of the candidate options was scored, so no option can be recommended over another. The strategies above are the standard candidates for this TIME action and are listed for reference only.</p>';
 
   // Build financial table rows
-  let financialRows = '';
-  if (currentAppScore) {
-    let techScore = currentAppScore.technical_score || 0;
-    let bizScore = currentAppScore.business_score || 0;
-    let costScoreVal = currentAppScore.cost_score || 0;
-    let vendorScoreVal = currentAppScore.vendor_score || 0;
-
-    financialRows = '<table>' +
-      '<thead><tr><th>Dimension</th><th>Score</th><th>Assessment</th></tr></thead>' +
-      '<tbody>' +
-        '<tr><td>Technical Health</td><td>' + techScore.toFixed(1) + '/100</td><td>' + (techScore >= 70 ? 'Healthy' : techScore >= 40 ? 'Needs Attention' : 'Critical') + '</td></tr>' +
-        '<tr><td>Business Value</td><td>' + bizScore.toFixed(1) + '/100</td><td>' + (bizScore >= 70 ? 'High Value' : bizScore >= 40 ? 'Moderate Value' : 'Low Value') + '</td></tr>' +
-        '<tr><td>Cost Efficiency</td><td>' + costScoreVal.toFixed(1) + '/100</td><td>' + (costScoreVal >= 70 ? 'Efficient' : costScoreVal >= 40 ? 'Average' : 'Inefficient') + '</td></tr>' +
-        '<tr><td>Vendor Risk</td><td>' + vendorScoreVal.toFixed(1) + '/100</td><td>' + (vendorScoreVal >= 70 ? 'Low Risk' : vendorScoreVal >= 40 ? 'Moderate Risk' : 'High Risk') + '</td></tr>' +
-      '</tbody></table>';
-    if (currentAppScore.rationale) {
-      financialRows += '<p><strong>TIME Rationale:</strong> ' + escapeForDoc(currentAppScore.rationale) + '</p>';
-    }
-  } else {
-    financialRows = '<p>Score data unavailable. Run Options Analysis to populate financial metrics.</p>';
-  }
+  let financialRows = buildScoreTableHtml(currentAppScore);
 
   // Build options table rows — an unscored option gets no rank and no figures
   let optionsTableRows = sortedResults.map(function(r, i) {
@@ -1440,26 +1479,7 @@ function generateBusinessCase() {
   }).join('');
 
   // Build risk items
-  let riskItems = '';
-  if (currentAppScore) {
-    if ((currentAppScore.technical_score || 0) < 40) {
-      riskItems += '<li><strong>Technical Debt Risk:</strong> Technical health score is below 40, indicating significant technical debt that may increase migration or maintenance costs.</li>';
-    }
-    if ((currentAppScore.cost_score || 0) < 40) {
-      riskItems += '<li><strong>Cost Inefficiency Risk:</strong> Cost efficiency score is below 40, suggesting the application may be consuming disproportionate resources.</li>';
-    }
-    if ((currentAppScore.vendor_score || 0) < 40) {
-      riskItems += '<li><strong>Vendor Concentration Risk:</strong> Vendor risk score is below 40, indicating potential single-vendor dependency or contract concerns.</li>';
-    }
-    if ((currentAppScore.business_score || 0) > 70) {
-      riskItems += '<li><strong>Business Continuity Risk:</strong> High business value (' + (currentAppScore.business_score || 0).toFixed(0) + ') means any disruption during transition will have significant impact.</li>';
-    }
-  }
-  if (!currentAppScore || ((currentAppScore.technical_score || 50) >= 40 && (currentAppScore.cost_score || 50) >= 40 && (currentAppScore.vendor_score || 50) >= 40 && (currentAppScore.business_score || 50) <= 70)) {
-    riskItems += '<li>No critical risk indicators detected based on current scoring dimensions.</li>';
-  }
-  riskItems += '<li>Implementation complexity and timeline should be assessed during detailed planning.</li>';
-  riskItems += '<li>Data migration and integration challenges should be evaluated per target architecture.</li>';
+  let riskItems = buildRiskItemsHtml(currentAppScore);
 
   let businessCaseHtml = '<!DOCTYPE html>\n' +
 '<html>\n' +
