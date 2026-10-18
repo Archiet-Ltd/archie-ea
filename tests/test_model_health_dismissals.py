@@ -165,3 +165,26 @@ def test_other_organisation_cannot_dismiss_or_see(app, db_session, make_org, cli
 
     assert stored(org_a.id)[key_a]["reason"] == "a-only reason"
     assert stored(org_b.id) in (None, {})
+
+
+def test_a_read_only_viewer_cannot_dismiss_or_restore(app, db_session, make_org, client, login_as):
+    from app.models.drift_report import DriftReport
+    from app.models.user import Role
+
+    org, user, finding = _user_and_report(db_session, make_org, "viewer")
+    key = fd.finding_key(finding)
+    user.role = Role.query.filter_by(name="Viewer").first()
+    db_session.flush()
+
+    login_as(client, user)
+    assert client.post(
+        "/genome/model-health/dismiss", data={"finding_key": key, "reason": "Not allowed to say"}
+    ).status_code == 403
+    assert DriftReport.for_org(org.id).dismissals in (None, {})
+
+    assert fd.dismiss(DriftReport.for_org(org.id), key, "Recorded by an editor", "Editor")
+    db_session.commit()
+    login_as(client, user)
+    assert client.post("/genome/model-health/restore", data={"finding_key": key}).status_code == 403
+    db_session.expire_all()
+    assert key in DriftReport.for_org(org.id).dismissals

@@ -31,6 +31,9 @@ from flask import Blueprint, flash, g, redirect, render_template, request, url_f
 from flask_login import current_user, login_required
 from markupsafe import Markup
 
+from app._decorators_base import permission_required
+from app.models import Permission
+
 from app.modules.genome.emit.drift_report import (
     DRIFT_CSRF_PLACEHOLDER,
     emit_drift_report_html,
@@ -269,6 +272,7 @@ def rescan():
 
 @genome_drift_bp.route("/dismiss", methods=["POST"])
 @login_required
+@permission_required(Permission.GENERAL)
 def dismiss_finding():
     """Dismiss one finding as a false positive, recording the reason given."""
     org_id = _active_org_id()
@@ -294,6 +298,7 @@ def dismiss_finding():
 
 @genome_drift_bp.route("/restore", methods=["POST"])
 @login_required
+@permission_required(Permission.GENERAL)
 def restore_finding():
     """Return a dismissed finding to the open list."""
     org_id = _active_org_id()
