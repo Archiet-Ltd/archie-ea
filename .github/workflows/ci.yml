@@ -571,7 +571,7 @@ jobs:
         env:
           MCP_ENABLED: "true"
           PUBLIC_BASE_URL: https://mcp-test.example
-        run: pytest -q app/modules/mcp app/modules/oauth_provider
+        run: pytest -q app/modules/mcp app/modules/oauth_provider tests/test_api_v1_strategy_reads.py tests/test_api_v1_application_reads.py
       # if: always() -- a failing shard (real test failures) must still upload
       # its junit/coverage/route evidence, so the combine job can report which
       # tests failed rather than only "a shard's artifact never arrived".

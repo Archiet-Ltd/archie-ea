@@ -1,7 +1,7 @@
 # API Contract Subset — auto-generated
 # Source: api-model-v1.yaml
-# SHA256: f34b68f30dd7d8e52334a523eae0af7f025f379232f3280754811be6a74204fc
-# Body-SHA256: a4487ff93859f41bbbca65f19a7e4328fc5f1bd0e47eeb0986fe662977d3b345
+# SHA256: f5effe50b479e95de22fb93d60216ccb71034e690cdd47adfdd0177cc979efde
+# Body-SHA256: 5734707289da562017c00269858614a07718a2355110b242133b94ec5baa9948
 # Do not edit by hand.
 openapi: 3.1.0
 info:
@@ -47,11 +47,173 @@ servers:
 security:
 - entelimOAuth: []
 tags:
+- name: Application
+  description: Application operations
 - name: Model
   description: Model operations
 - name: Strategy
   description: Strategy operations
 paths:
+  /application-components:
+    get:
+      operationId: listApplicationComponents
+      summary: List Application Component records
+      tags:
+      - Application
+      parameters:
+      - $ref: '#/components/parameters/Filter'
+      - $ref: '#/components/parameters/Q'
+      - $ref: '#/components/parameters/Sort'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/IncludeRetired'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/ScopeParam'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Link:
+              $ref: '#/components/headers/Link'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationComponentPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-pagination:
+        style: cursor
+        limit_default: 50
+        limit_max: 200
+        order: stable, by the sort key then id
+      x-personas:
+      - PER-030
+      - PER-019
+      - PER-012
+      - PER-009
+      - PER-010
+      - PER-014
+      - PER-002
+      - PER-003
+      x-use-case-ids:
+      - UC-001
+      - UC-002
+      - UC-004
+      - UC-010
+      - UC-011
+      - UC-012
+      x-use-cases:
+      - Assign an owner to an application from its page
+      - Read the model through the token-secured interface
+      - See what breaks if a core platform fails, with owner and health on every row
+      x-entity-id: ENT-0035
+      x-entity: Application Component
+      x-archimate: Application Component
+  /application-components/{id}:
+    get:
+      operationId: getApplicationComponent
+      summary: Get a Application Component
+      tags:
+      - Application
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationComponent'
+        '304':
+          description: Not modified since the ETag given in If-None-Match.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '410':
+          $ref: '#/components/responses/Gone'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-personas:
+      - PER-030
+      - PER-019
+      - PER-012
+      - PER-009
+      - PER-010
+      - PER-014
+      - PER-002
+      - PER-003
+      x-use-case-ids:
+      - UC-001
+      - UC-002
+      - UC-004
+      - UC-010
+      - UC-011
+      - UC-012
+      x-use-cases:
+      - Assign an owner to an application from its page
+      - Read the model through the token-secured interface
+      - See what breaks if a core platform fails, with owner and health on every row
+      x-entity-id: ENT-0035
+      x-entity: Application Component
+      x-archimate: Application Component
   /capabilities:
     get:
       operationId: listCapabilities
@@ -685,6 +847,92 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
   schemas:
+    ApplicationComponent:
+      description: 'Application Component: An application or system in the portfolio;
+        the most connected entity of the twin.'
+      allOf:
+      - $ref: '#/components/schemas/EntityBase'
+      - $ref: '#/components/schemas/ApplicationComponentAttributes'
+      - type: object
+        properties:
+          lifecycle_state:
+            type: string
+            enum:
+            - planned
+            - in-development
+            - active
+            - phasing-out
+            - retired
+            readOnly: true
+            description: States of lifecycle set LC-ASSET.
+        additionalProperties: false
+      x-entity-id: ENT-0035
+      x-ontology-class: ONT-0041 Application Component
+      x-archimate: Application Component
+      x-scope: tenant
+      x-identity-key: tenant_id + external identifier (preferred) or normalised name
+      x-lifecycle-set: LC-ASSET
+      unevaluatedProperties: false
+    ApplicationComponentAttributes:
+      type: object
+      properties:
+        application_type:
+          type: string
+          enum:
+          - custom
+          - cots
+          - saas
+          - paas-built
+          - low-code
+          - end-user
+        criticality:
+          type: string
+          enum:
+          - tier-0
+          - tier-1
+          - tier-2
+          - tier-3
+        hosting_model:
+          type: string
+          enum:
+          - on-premise
+          - iaas
+          - paas
+          - saas
+          - hybrid
+        disposition:
+          type: string
+          enum:
+          - tolerate
+          - invest
+          - migrate
+          - eliminate
+        vendor_product_id:
+          $ref: '#/components/schemas/EntityRef'
+          x-target-entity: VendorProduct
+        users_count:
+          type: integer
+        go_live_date:
+          type: string
+          format: date
+        retirement_date:
+          type: string
+          format: date
+        ict_asset_for_critical_function:
+          type: boolean
+      description: Attributes specific to Application Component (ENT-0035).
+    ApplicationComponentPage:
+      type: object
+      required:
+      - data
+      - page
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApplicationComponent'
+        page:
+          $ref: '#/components/schemas/PageInfo'
     Capability:
       description: 'Capability: A business capability at level 0 to 3 of the capability
         map, the anchor most questions are asked against.'

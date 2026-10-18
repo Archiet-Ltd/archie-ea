@@ -582,55 +582,42 @@ STRATEGY_ROUTES = [
     ("/api/v1/value-streams/<int:value_stream_id>", ["GET"], "api:read"),
 ]
 
-ALL_ROUTES = ELEMENT_ROUTES + STRATEGY_ROUTES
+APPLICATION_ROUTES = [
+    ("/api/v1/application-components", ["GET"], "api:read"),
+    ("/api/v1/application-components/<int:application_id>", ["GET"], "api:read"),
+]
+
+ALL_ROUTES = ELEMENT_ROUTES + STRATEGY_ROUTES + APPLICATION_ROUTES
+
+# Every read operation the committed subset lists besides the two element
+# reads that _minimal_contract already carries: (path, operationId, summary).
+_BUILT_READS = [
+    ("/capabilities", "listCapabilities", "List Capability records"),
+    ("/capabilities/{id}", "getCapability", "Get a Capability"),
+    ("/value-streams", "listValueStreams", "List Value Stream records"),
+    ("/value-streams/{id}", "getValueStream", "Get a Value Stream"),
+    ("/application-components", "listApplicationComponents", "List Application Component records"),
+    ("/application-components/{id}", "getApplicationComponent", "Get an Application Component"),
+]
 
 
 def _six_operation_contract() -> dict:
-    """The committed subset's six operations: the two element reads and the
-    four strategy reads this slice builds. The gate matches routes to
-    operations by path and method, so the fixture contract must list every
-    token-accepting route the real application registers."""
+    """The committed subset's operations: the two element reads and every
+    read a slice has built since. The gate matches routes to operations by
+    path and method, so the fixture contract must list every token-accepting
+    route the real application registers (the name is historical)."""
     contract = _minimal_contract()
-    contract["paths"]["/capabilities"] = {
-        "get": {
-            "operationId": "listCapabilities",
-            "summary": "List Capability records",
-            "tags": ["Strategy"],
-            "parameters": [],
-            "responses": {"200": {"description": "Success"}},
-            "security": [{"entelimOAuth": ["model:read"]}],
+    for path, operation_id, summary in _BUILT_READS:
+        contract["paths"][path] = {
+            "get": {
+                "operationId": operation_id,
+                "summary": summary,
+                "tags": ["Strategy"],
+                "parameters": [],
+                "responses": {"200": {"description": "Success"}},
+                "security": [{"entelimOAuth": ["model:read"]}],
+            }
         }
-    }
-    contract["paths"]["/capabilities/{id}"] = {
-        "get": {
-            "operationId": "getCapability",
-            "summary": "Get a Capability",
-            "tags": ["Strategy"],
-            "parameters": [],
-            "responses": {"200": {"description": "Success"}},
-            "security": [{"entelimOAuth": ["model:read"]}],
-        }
-    }
-    contract["paths"]["/value-streams"] = {
-        "get": {
-            "operationId": "listValueStreams",
-            "summary": "List Value Stream records",
-            "tags": ["Strategy"],
-            "parameters": [],
-            "responses": {"200": {"description": "Success"}},
-            "security": [{"entelimOAuth": ["model:read"]}],
-        }
-    }
-    contract["paths"]["/value-streams/{id}"] = {
-        "get": {
-            "operationId": "getValueStream",
-            "summary": "Get a Value Stream",
-            "tags": ["Strategy"],
-            "parameters": [],
-            "responses": {"200": {"description": "Success"}},
-            "security": [{"entelimOAuth": ["model:read"]}],
-        }
-    }
     return contract
 
 
