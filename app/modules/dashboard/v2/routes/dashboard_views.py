@@ -606,24 +606,62 @@ def overview():
     # ApplicationCapabilityMapping counts collected while building capability_health.
     capability_mapping_count = sum(c.get("app_count", 0) for c in capability_health)
     applications_count = metrics.get("applications") or 0
+    # What the workspace really holds, read once and used for BOTH the mode and
+    # the checklist, so the setup card can never call a populated workspace
+    # empty. Capabilities are counted from the store the "New Capability" dialog
+    # writes; elements from the ArchiMate repository.
+    capability_count = nav_stats.get("capabilities") or 0
+    element_count = nav_stats.get("elements") or 0
     dashboard_mode = (
-        "guided" if applications_count < 5 and capability_mapping_count == 0 else "data"
+        "guided"
+        if applications_count < 5
+        and capability_mapping_count == 0
+        and capability_count == 0
+        and element_count == 0
+        else "data"
     )
 
     guided_steps = []
     if dashboard_mode == "guided":
+        from app.template_helpers import safe_url_for_with_fallback
+        from app.utils.role_access import can_edit_capabilities
+
+        # A blueprint that failed to register leaves its step pointing here
+        # rather than raising BuildError and taking the dashboard down.
+        FALLBACK_HREF = "/dashboard/overview"
+
+        # Guided mode means no capabilities exist, so this step is about
+        # creating the first one -- or, for a role that cannot, who can.
+        if can_edit_capabilities(current_user):
+            capability_step = {
+                "description": "No capabilities yet. Add the first one, then connect applications to it.",
+                "href": safe_url_for_with_fallback("unified_low_priority.capability_map_capabilities", FALLBACK_HREF, new=1),
+                "cta": "Add a capability",
+            }
+        else:
+            capability_step = {
+                "description": "No capabilities yet. An architect or administrator adds them.",
+                "href": safe_url_for_with_fallback("unified_low_priority.capability_map_capabilities", FALLBACK_HREF),
+                "cta": "View capabilities",
+            }
         guided_steps = [
             {
                 "title": "Import applications",
-                "description": f"Bring your application portfolio into {current_app.config['APP_NAME']}.",
-                "href": "/applications/",
+                "description": (
+                    f"{applications_count} "
+                    f"{'application' if applications_count == 1 else 'applications'} "
+                    f"in the portfolio. Import more from a spreadsheet."
+                    if applications_count
+                    else f"Bring your application portfolio into {current_app.config['APP_NAME']}."
+                ),
+                "href": safe_url_for_with_fallback("unified_applications.application_list", FALLBACK_HREF, **{"import": 1}),
+                "cta": "Import",
                 "done": applications_count > 0,
             },
             {
                 "title": "Map capabilities",
-                "description": "Connect applications to the capabilities they support.",
-                "href": "/capability-map/",
                 "done": capability_mapping_count > 0,
+                **capability_step,
             },
         ]
         try:
