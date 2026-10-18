@@ -20,6 +20,7 @@ from app.models.transformation_execution import (
     CommandMaterialisation,
     OperationResult,
 )
+from app.middleware.tenant_decorators import is_platform_admin
 from app.models.user import User
 from app.modules.transformation_room.command_service import CommandService
 from app.modules.transformation_room.domain import (
@@ -54,7 +55,9 @@ _EVIDENCE_COLUMNS = {
 # Deliberately NOT the same set as _EVIDENCE_CAPTURE_ROLES in
 # arb_condition_evidence_service: authoring a submission is a design-authorship
 # authority, so every domain-specialist architect holds it, as does
-# `platform_admin`. Board membership alone (`arb_member`) does not — a board
+# a real platform admin (the `is_platform_admin` predicate, never the bare
+# `platform_admin` role value, which a user can save for themselves and which is
+# the column default). Board membership alone (`arb_member`) does not — a board
 # member reviews and attests rather than submits.
 #
 # Membership is governance policy, not a refactor target: changing it changes
@@ -71,7 +74,6 @@ _SUBJECT_SUBMIT_ROLES = frozenset(
         "technology_architect",
         "security_architect",
         "architect",
-        "platform_admin",
     }
 )
 
@@ -300,7 +302,11 @@ class TypedARBSubmissionService:
         ).scalar_one_or_none()
         if user is None:
             raise NotAuthorised("arb_submission_not_authorised")
-        if user.is_org_admin or user.is_platform_admin or user.enterprise_role in _SUBJECT_SUBMIT_ROLES:
+        if (
+            user.is_org_admin
+            or is_platform_admin(user)
+            or user.enterprise_role in _SUBJECT_SUBMIT_ROLES
+        ):
             return
         if subject_type == "solution":
             from app.models.solution_models import Solution
