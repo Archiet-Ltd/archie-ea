@@ -1,7 +1,7 @@
 # API Contract Subset — auto-generated
 # Source: api-model-v1.yaml
 # SHA256: f34b68f30dd7d8e52334a523eae0af7f025f379232f3280754811be6a74204fc
-# Body-SHA256: b66f27cd644397e674e162412c1d8041ba4c9322dcfc79dfeedc746b2c1b8856
+# Body-SHA256: a4487ff93859f41bbbca65f19a7e4328fc5f1bd0e47eeb0986fe662977d3b345
 # Do not edit by hand.
 openapi: 3.1.0
 info:
@@ -455,20 +455,10 @@ components:
       description: Strong entity tag of the returned version.
       schema:
         type: string
-    IdempotentReplayed:
-      description: true when this response is a replay of an earlier request with
-        the same Idempotency-Key.
-      schema:
-        type: boolean
     Link:
       description: 'RFC 8288 links: next, prev, first.'
       schema:
         type: string
-    Location:
-      description: URL of the created resource or job.
-      schema:
-        type: string
-        format: uri-reference
     RateLimit:
       description: Remaining quota for the current window (IETF RateLimit header fields).
       schema:
@@ -535,24 +525,6 @@ components:
       description: Resource identifier.
       schema:
         $ref: '#/components/schemas/Id'
-    IdempotencyKey:
-      name: Idempotency-Key
-      in: header
-      required: true
-      description: Unique key (UUID or ULID) for this request; retries with the same
-        key return the first response.
-      schema:
-        type: string
-        minLength: 16
-        maxLength: 255
-    IfMatch:
-      name: If-Match
-      in: header
-      required: true
-      description: ETag of the version being changed; a stale value is refused with
-        412.
-      schema:
-        type: string
     IfNoneMatch:
       name: If-None-Match
       in: header
@@ -635,26 +607,6 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
-    Conflict:
-      description: 'The request conflicts with current state: duplicate external identifier,
-        relationship not allowed by the ontology, or a job already running.'
-      headers:
-        Request-Id:
-          $ref: '#/components/headers/RequestId'
-      content:
-        application/problem+json:
-          schema:
-            $ref: '#/components/schemas/Problem'
-    ContentTooLarge:
-      description: The body exceeds the operation's size limit; use a bulk job or
-        an ingestion batch.
-      headers:
-        Request-Id:
-          $ref: '#/components/headers/RequestId'
-      content:
-        application/problem+json:
-          schema:
-            $ref: '#/components/schemas/Problem'
     Forbidden:
       description: The token lacks the scope, or the principal's role lacks the permission,
         for this operation.
@@ -695,24 +647,6 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
-    PreconditionFailed:
-      description: If-Match does not match the current version.
-      headers:
-        Request-Id:
-          $ref: '#/components/headers/RequestId'
-      content:
-        application/problem+json:
-          schema:
-            $ref: '#/components/schemas/Problem'
-    PreconditionRequired:
-      description: If-Match is required for this write.
-      headers:
-        Request-Id:
-          $ref: '#/components/headers/RequestId'
-      content:
-        application/problem+json:
-          schema:
-            $ref: '#/components/schemas/Problem'
     ServiceUnavailable:
       description: A dependency is unavailable (model provider, connector, search
         index). The problem names which; partial answers are never returned as complete.
@@ -746,26 +680,6 @@ components:
           $ref: '#/components/headers/RequestId'
         WWW-Authenticate:
           $ref: '#/components/headers/WWWAuthenticate'
-      content:
-        application/problem+json:
-          schema:
-            $ref: '#/components/schemas/Problem'
-    UnprocessableContent:
-      description: 'The body is well-formed but invalid: schema violation, unknown
-        field, ontology rule or policy rule broken, or idempotency key reused with
-        a different body.'
-      headers:
-        Request-Id:
-          $ref: '#/components/headers/RequestId'
-      content:
-        application/problem+json:
-          schema:
-            $ref: '#/components/schemas/Problem'
-    UnsupportedMediaType:
-      description: The content type is not accepted by this operation.
-      headers:
-        Request-Id:
-          $ref: '#/components/headers/RequestId'
       content:
         application/problem+json:
           schema:
@@ -826,15 +740,6 @@ components:
           - medium
           - high
       description: Attributes specific to Capability (ENT-0001).
-    CapabilityCreate:
-      allOf:
-      - $ref: '#/components/schemas/EntityWrite'
-      - $ref: '#/components/schemas/CapabilityAttributes'
-      required:
-      - name
-      - level
-      unevaluatedProperties: false
-      x-entity-id: ENT-0001
     CapabilityPage:
       type: object
       required:
@@ -847,13 +752,6 @@ components:
             $ref: '#/components/schemas/Capability'
         page:
           $ref: '#/components/schemas/PageInfo'
-    CapabilityPatch:
-      description: JSON Merge Patch (RFC 7396); null removes a value.
-      allOf:
-      - $ref: '#/components/schemas/EntityWrite'
-      - $ref: '#/components/schemas/CapabilityAttributes'
-      unevaluatedProperties: false
-      x-entity-id: ENT-0001
     ElementDetail:
       allOf:
       - $ref: '#/components/schemas/ElementSummary'
@@ -1310,68 +1208,6 @@ components:
       - viewpoint
       - vulnerability
       - work-package
-    EntityWrite:
-      type: object
-      properties:
-        name:
-          type: string
-          minLength: 1
-          maxLength: 500
-        description:
-          type:
-          - string
-          - 'null'
-          maxLength: 50000
-        valid_from:
-          type: string
-          format: date-time
-        valid_to:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        properties:
-          type: object
-          additionalProperties: true
-        tags:
-          type: array
-          items:
-            $ref: '#/components/schemas/EntityRef'
-        accountability:
-          type: array
-          items:
-            type: object
-            properties:
-              accountability_type:
-                type: string
-              holder_person_id:
-                $ref: '#/components/schemas/Id'
-              holder_unit_id:
-                $ref: '#/components/schemas/Id'
-            additionalProperties: false
-            required:
-            - accountability_type
-          description: Creates or replaces Accountability Assignments in the same
-            transaction.
-        external_identifiers:
-          type: array
-          items:
-            type: object
-            properties:
-              source_system_id:
-                $ref: '#/components/schemas/Id'
-              external_key:
-                type: string
-              key_type:
-                type: string
-            additionalProperties: false
-            required:
-            - source_system_id
-            - external_key
-        change_note:
-          type: string
-          maxLength: 2000
-          description: Why the change was made; kept in history and the audit trail.
     ExternalIdentifier:
       description: 'External Identifier: The identifier crosswalk row.'
       allOf:
@@ -1580,14 +1416,6 @@ components:
         customer_facing:
           type: boolean
       description: Attributes specific to Value Stream (ENT-0002).
-    ValueStreamCreate:
-      allOf:
-      - $ref: '#/components/schemas/EntityWrite'
-      - $ref: '#/components/schemas/ValueStreamAttributes'
-      required:
-      - name
-      unevaluatedProperties: false
-      x-entity-id: ENT-0002
     ValueStreamPage:
       type: object
       required:
@@ -1600,10 +1428,3 @@ components:
             $ref: '#/components/schemas/ValueStream'
         page:
           $ref: '#/components/schemas/PageInfo'
-    ValueStreamPatch:
-      description: JSON Merge Patch (RFC 7396); null removes a value.
-      allOf:
-      - $ref: '#/components/schemas/EntityWrite'
-      - $ref: '#/components/schemas/ValueStreamAttributes'
-      unevaluatedProperties: false
-      x-entity-id: ENT-0002

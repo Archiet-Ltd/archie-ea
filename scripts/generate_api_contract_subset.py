@@ -117,15 +117,19 @@ def _gather_referenced_components(
     (schemas, responses, parameters, etc.), each being an OrderedDict of
     name -> resolved component.
     """
-    # Collect all $refs from the operations and path-level items
+    # Collect all $refs from the kept operations and from genuinely
+    # path-level items (parameters, summary, description). Refs that live
+    # only on unbuilt operations of a published path must not be pulled in:
+    # the subset must be a fixed point of its own output.
     all_refs: set[str] = set()
     for _path, _method, operation in operations:
         _collect_refs(operation, all_refs)
 
-    # Also collect refs from path-level items (parameters, etc.)
     for path_key in subset_path_keys:
         path_item = source_paths.get(path_key, {})
-        _collect_refs(path_item, all_refs)
+        for key in ("parameters", "summary", "description"):
+            if key in path_item:
+                _collect_refs(path_item[key], all_refs)
 
     # Resolve refs and gather referenced component names
     # Track names per category in sets; the traversal order (set iteration)
