@@ -226,7 +226,14 @@ def get_simple_runs():
 @login_required
 @platform_admin_required
 def cleanup_stale_data():
-    """Clean up stale duplicate detection data (POST only)"""
+    """Clean up stale duplicate detection data (POST only).
+
+    D-03 (PR 430 round 3, lead review v2, 2026-10-08): see the matching v1
+    route's docstring (unified_duplicate_routes.py, same blueprint name) --
+    the service call is an unconditional, unscoped DELETE across every
+    organisation's detection data with no WHERE clause, and none of the
+    underlying tables carry an organization_id column to scope by.
+    """
     try:
         result = unified_service.cleanup_stale_data()
         if result["success"]:
