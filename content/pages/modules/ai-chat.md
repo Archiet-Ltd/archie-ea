@@ -8,6 +8,7 @@ answers_use_cases:
   - {id: UC-S3-10, segment: S3}
 cta: plans
 capture_status: live
+icon: message-square
 ---
 
 # AI Chat

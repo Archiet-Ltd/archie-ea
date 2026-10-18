@@ -1,0 +1,17 @@
+{# shell-ok: an error page has no section to title; the empty-state card is the whole page and carries its own heading #}
+{% extends 'layouts/admin_base.html' %}
+{% from 'components/empty_state.html' import empty_state %}
+{% block title %}{{ error_title }}{% endblock %}
+
+{% block content %}
+<div class="p-6 space-y-6" data-testid="plain-error" data-status="{{ error_status }}">
+    {{ empty_state(
+        icon=error_icon,
+        title=error_title,
+        description=error_message,
+        cta_text='Go to the dashboard',
+        cta_href='/dashboard/overview',
+        cta_icon='home'
+    ) }}
+</div>
+{% endblock %}

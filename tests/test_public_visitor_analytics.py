@@ -315,7 +315,7 @@ class TestNoCookieNoLocalStorage:
         "app/modules/account/routes/mail_views.py",
         "app/templates/public/page.html",
         "app/templates/main/index.html",
-        "app/templates/public/use_cases_index.html",
+        "app/templates/public/hub_index.html",
         "app/templates/public/vs_hub.html",
     ]
 

@@ -39,6 +39,19 @@ _TAG_RE = re.compile(r"<[^>]*>")
 _NAME_LIKE_ARG_KEYS = frozenset({"name", "title"})
 
 
+# The organisation a tool acts in is the caller's active one, resolved by the
+# server. A tool argument that names one is text the model was given by a user
+# or a document, so it is dropped here, at the one dispatch point, before any
+# handler can read it.
+_SCOPE_ARG_KEYS = frozenset({"organization_id", "organisation_id", "org_id", "tenant_id"})
+
+
+def _strip_scope_args(arguments: dict) -> dict:
+    if not isinstance(arguments, dict):
+        return arguments
+    return {k: v for k, v in arguments.items() if k not in _SCOPE_ARG_KEYS}
+
+
 def _strip_tags_from_name_args(arguments: dict) -> dict:
     if not isinstance(arguments, dict):
         return arguments
@@ -299,6 +312,9 @@ class ToolExecutor:
         self._org_id = None  # cached lazily
         self._persona = persona
         self._charter_checked = None  # cached result of the charter check
+        # One stored answer per identical question per turn (an executor lives
+        # for one turn): a repeated call returns the same address.
+        self._answers_this_turn: dict = {}
 
     @staticmethod
     def _coverage(rows, total, noun):
@@ -390,8 +406,13 @@ class ToolExecutor:
             return False
         return bool(user.can(Permission.GENERAL))
 
-    def execute(self, tool_call: ToolCall) -> dict:
+    def execute(self, tool_call: ToolCall, *, propagate_errors: bool = False) -> dict:
         """Dispatch one tool call. THE choke point for every agent write.
+
+        ``propagate_errors`` re-raises a handler's exception (after the rollback)
+        instead of returning its text. The assistant connector sets it so a
+        failing tool answers with its own generic error and never returns
+        exception text, which can carry SQL or another tenant's identifiers.
 
         Every write reaches the database through a handler on this class —
         called here directly for auto-tier tools (AgentRunner._run below) and
@@ -505,7 +526,7 @@ class ToolExecutor:
                 return _permission_denied_result(tool_call.name, user)
 
         try:
-            arguments = _strip_tags_from_name_args(tool_call.arguments)
+            arguments = _strip_scope_args(_strip_tags_from_name_args(tool_call.arguments))
             if tool_call.name == "submit_for_arb_review":
                 tool_call_digest = hashlib.sha256(str(tool_call.id).encode("utf-8")).hexdigest()
                 arguments["_trusted_command_key"] = f"ai-tool-{tool_call_digest}"
@@ -513,6 +534,8 @@ class ToolExecutor:
         except Exception as e:
             db.session.rollback()
             logger.exception("Tool %s failed", tool_call.name)
+            if propagate_errors:
+                raise
             return {"success": False, "error": str(e)}
 
     # ------------------------------------------------------------------ #
@@ -1517,21 +1540,114 @@ class ToolExecutor:
     # ------------------------------------------------------------------ #
 
     def _tool_simulate_impact(self, args: dict) -> dict:
+        # The assistant's blast radius is the canonical impact answer, not its
+        # own inference traversal: the Ask page, the Impact page and this tool
+        # return the same rows for the same element.
         elem_r = self._resolver.resolve_archimate_element(args["element_name"])
         if not elem_r["resolved"]:
             return self._clarify("ArchiMate element", elem_r)
-        from app.modules.architecture.services.inference_engine_service import ArchiMateInferenceEngine
-        engine = ArchiMateInferenceEngine(architecture_id=0)
-        result = engine.simulate_change_impact(elem_r["id"], scope="both")
-        affected = result.get("affected_count", 0)
-        return {
-            "success": True,
-            "result": result,
-            "message": (
-                f"Impact simulation for '{elem_r['name']}': "
-                f"{affected} downstream elements affected across all layers."
-            ),
-        }
+        out = self._canonical_answer("impact", {"element_id": elem_r["id"]})
+        if out.get("success"):
+            total = out["result"]["summary"].get("total", 0)
+            out["result"]["affected_count"] = total
+            out["message"] = (
+                f"Impact for '{elem_r['name']}': {total} downstream elements "
+                f"affected. Answer address {out['result']['address']}."
+            )
+        return out
+
+    # ------------------------------------------------------------------ #
+    # Tool: answer (read-only; the canonical answer service)             #
+    # ------------------------------------------------------------------ #
+
+    # Rows and citations handed to the model. The stored answer at its address
+    # holds all of them; the model is told how many it was shown.
+    ANSWER_TOOL_MAX_ROWS = 50
+    ANSWER_TOOL_MAX_CITATIONS = 100
+
+    def _canonical_answer(self, kind: str, params: dict) -> dict:
+        import json as _json
+
+        from app.modules.intelligence.services import answer_envelope as envelope
+
+        try:
+            cache_key = (kind, _json.dumps(envelope.normalise_params(kind, params), sort_keys=True))
+        except envelope.AnswerParamError as exc:
+            return {"success": False, "error": str(exc), "code": "INVALID_PARAMETER"}
+        cached = self._answers_this_turn.get(cache_key)
+        if cached is not None:
+            return _json.loads(_json.dumps(cached))
+        out = self._store_answer(kind, params)
+        if out.get("success"):
+            self._answers_this_turn[cache_key] = _json.loads(_json.dumps(out))
+        return out
+
+    def _store_answer(self, kind: str, params: dict) -> dict:
+        from app.modules.intelligence.services import answer_envelope as envelope
+
+        try:
+            record = envelope.ask_and_store(kind, params, user_id=self.user_id)
+        except envelope.AnswerParamError as exc:
+            return {"success": False, "error": str(exc), "code": "INVALID_PARAMETER"}
+        except envelope.AnswerNotAskable as exc:
+            # Not recorded, with the reason. An element that does not exist and
+            # one that belongs to another organisation are the same answer.
+            return {
+                "success": False,
+                "error": "Not recorded: the question cannot be answered.",
+                "code": "NOT_RECORDED",
+                "reason": exc.reason,
+            }
+        body = envelope.present(record)
+        # The records the question was about (its seeds), named, so an answer
+        # that says "if X fails" cites X from the same result.
+        try:
+            from app.middleware.tenant_context import current_org_id
+            from app.modules.intelligence.services.query_service import _resolve_elements_batch
+
+            params = body.get("params") or {}
+            seeds = list(params.get("element_ids") or [])
+            if params.get("element_id") is not None:
+                seeds.append(params["element_id"])
+            body["subject_elements"] = _resolve_elements_batch(seeds, current_org_id())
+        except Exception:
+            body["subject_elements"] = {}
+        rows = body.get("rows") or []
+        citations = body.get("citations") or []
+        shown = rows[: self.ANSWER_TOOL_MAX_ROWS]
+        body["rows"] = shown
+        body["citations"] = citations[: self.ANSWER_TOOL_MAX_CITATIONS]
+        body["rows_total"] = len(rows)
+        body["rows_shown"] = len(shown)
+        body["citations_total"] = len(citations)
+        total = body["summary"].get("total", len(rows))
+        if not rows:
+            message = (
+                "Nothing is recorded for this question"
+                + (f" ({', '.join(body['reasons'])})" if body.get("reasons") else "")
+                + ". Say it is not recorded; do not infer an answer."
+            )
+        else:
+            message = (
+                f"{total} row(s); showing {len(shown)}. Truth class: {body['truth_class']}. "
+                f"Answer address {body['address']} (open at {body['page_url']})."
+                + (" The list is partial: report the total, not the rows shown." if len(shown) < total else "")
+            )
+        return {"success": True, "result": body, "message": message}
+
+    def _tool_answer(self, args: dict) -> dict:
+        kind = args.get("question")
+        # Only the question and its parameters reach the service: the
+        # organisation is the caller's active one and is not an argument.
+        params = {k: v for k, v in args.items() if k != "question"}
+        from app.modules.intelligence.services.answer_envelope import as_whole_number
+
+        for key in ("element_id", "max_depth"):
+            if key in params:
+                params[key] = as_whole_number(params[key], key)
+        if isinstance(params.get("element_ids"), list):
+            params["element_ids"] = [as_whole_number(v, "element_ids") for v in params["element_ids"]]
+        return self._canonical_answer(kind if isinstance(kind, str) else "", params)
 
     # ------------------------------------------------------------------ #
     # Tool: get_solution_summary (read-only)                             #
@@ -3412,3 +3528,9 @@ def _install_archimate_element_tools() -> int:
 
 
 _ARCHIMATE_TOOLS_INSTALLED = _install_archimate_element_tools()
+
+
+# The connector's route-backed read tools are installed the same way.
+from .route_read_tools import install_route_read_tools  # noqa: E402
+
+_ROUTE_READ_TOOLS_INSTALLED = install_route_read_tools(ToolExecutor)

@@ -242,7 +242,8 @@
                   :aria-label="'Select ' + (wp.name || 'work package')">
               </td>
               <td class="px-4 py-3 align-top">
-                <p class="font-medium text-foreground" x-text="wp.name"></p>
+                <a :href="'/implementation/work-packages/' + wp.id" class="font-medium text-primary hover:underline"
+                   data-testid="roadmap-wp-link" x-text="wp.name"></a>
                 <p class="mt-0.5 text-xs text-muted-foreground" x-text="wp.element_type || 'WorkPackage'"></p>
               </td>
               <td class="px-4 py-3 align-top">
@@ -260,8 +261,12 @@
                 <span class="mx-1 text-muted-foreground/50">→</span>
                 <span x-text="formatDate(wp.end_date || wp.target_date)"></span>
               </td>
-              <td class="px-4 py-3 align-top text-xs text-muted-foreground"
-                x-text="gapNameForWp(wp.gap_id) || '—'"></td>
+              <td class="px-4 py-3 align-top text-xs text-muted-foreground" data-testid="roadmap-wp-gaps">
+                <template x-if="!wp.gaps || wp.gaps.length === 0"><span>—</span></template>
+                <template x-for="g in (wp.gaps || [])" :key="g.id">
+                  <div x-text="g.name"></div>
+                </template>
+              </td>
               <td class="px-4 py-3 align-top text-right">
                 <div class="inline-flex items-center gap-2">
                   <button type="button"
@@ -467,13 +472,21 @@
         </div>
         <div>
           <label class="mb-1 block text-sm font-medium text-foreground">Linked Gap</label>
-          <select x-model.number="form.gap_id"
-            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Linked Gap">
-            <option :value="null">— None —</option>
-            <template x-for="gap in $store.rdm.gaps" :key="gap.id">
-              <option :value="gap.id" x-text="gap.name"></option>
-            </template>
-          </select>
+          <div class="relative">
+            <input type="search" autocomplete="off" x-model="gapQuery" @input.debounce.300ms="searchGaps()"
+              placeholder="Search gaps by name"
+              class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Linked Gap" data-testid="wp-modal-gap-input">
+            <p class="mt-1 text-xs text-muted-foreground">
+              <span x-show="form.gap_id" x-cloak>Linked: <span x-text="gapName"></span></span>
+              <button type="button" x-show="form.gap_id" x-cloak class="ml-2 underline" @click="form.gap_id = null; gapName = ''; gapQuery = ''">Clear</button>
+            </p>
+            <ul x-show="gapResults.length > 0" x-cloak class="absolute z-20 mt-1 w-full rounded-md border border-border bg-background shadow-md">
+              <template x-for="g in gapResults" :key="g.id">
+                <li><button type="button" class="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                  @click="form.gap_id = g.id; gapName = g.name; gapQuery = ''; gapResults = []" x-text="g.name"></button></li>
+              </template>
+            </ul>
+          </div>
         </div>
         <div>
           <label class="mb-1 block text-sm font-medium text-foreground">Target Plateau</label>
@@ -636,12 +649,6 @@
 
       gapsForPlateau(plateauId) {
         return this.workPackages.filter(wp => wp.plateau_id === plateauId);
-      },
-
-      gapNameForWp(gapId) {
-        if (!gapId) return null;
-        const gap = this.gaps.find(g => g.id === gapId);
-        return gap ? gap.name : null;
       },
 
       async init() {
@@ -901,7 +908,20 @@
     return {
       isEditing: false,
       isSubmitting: false,
+      gapQuery: '',
+      gapResults: [],
+      gapName: '',
       form: { name: '', status: 'planned', priority: 'medium', start_date: '', target_date: '', description: '', gap_id: null, plateau_id: null },
+
+      async searchGaps() {
+        try {
+          const d = await Platform.fetch('/capability-map/api/roadmap/gaps/search?q=' + encodeURIComponent(this.gapQuery.trim()), { silent: true });
+          this.gapResults = (d && d.gaps) || [];
+        } catch (e) {
+          this.gapResults = [];
+          Platform.toast.error('Gaps could not be searched. Try again.');
+        }
+      },
 
       initFromGlobal() {
         this.$watch('$store.rdm.editingWp', (wp) => {
@@ -918,6 +938,8 @@
               gap_id: wp.gap_id || null,
               plateau_id: wp.plateau_id || null,
             };
+            this.gapName = (wp.gaps && wp.gaps[0] && wp.gaps[0].name) || '';
+            this.gapQuery = '';
           } else {
             this.isEditing = false;
             const pending = Alpine.store('rdm').pendingGapForWp;
@@ -931,6 +953,8 @@
               gap_id: pending?.id || null,
               plateau_id: null,
             };
+            this.gapName = pending ? pending.name : '';
+            this.gapQuery = '';
           }
         });
       },

@@ -1,13 +1,12 @@
-"""POST /integrations/api/connectors/<id>/sync used to always 500.
+"""POST /integrations/api/connectors/<id>/sync used to always 500, then
+always answer "sync is not available" after an interim honesty fix.
 
-The route built a fresh `ConnectorManager()` per request and called
-`manager.get_connector(connector_id)` -- a method that does not exist on
-`ConnectorManager` (only the module-level `get_connector_manager()` does),
-and no connector is ever registered with the manager anyway, so the call
-raised `AttributeError` before ever reaching a real connector. The broad
-`except Exception` then reported that as a generic "An internal error
-occurred" 500, which reads as a bug rather than as the missing feature it
-actually is.
+Both are now stale: PR 448 (M3, cloud-review-pr448-961a0c35-v1.md) wired
+jira/servicenow/abacus into the one connector framework, so a sync genuinely
+runs (queued for approval, or applied when delegated). This route now
+forwards onto the same propose_or_apply_connector_change path the newer
+/admin/connectors/<id>/sync uses, so the two URLs agree instead of this one
+still claiming nothing can sync.
 
 Follows tests/test_connector_config_tenant_scope.py's pattern: the shared
 db_session / make_org / login_as fixtures from tests/conftest.py, never a
@@ -89,10 +88,13 @@ def client(app):
 
 
 class TestConnectorSyncRouteIsHonest:
-    def test_sync_on_existing_connector_returns_a_clear_non_500_error(
+    def test_sync_on_existing_connector_now_actually_runs(
         self, db_session, org, admin, client, login_as
     ):
-        """The route must not 500, and must say plainly that sync cannot run."""
+        """The route must not 500, and a sync is genuinely queued (or run),
+        not answered with the old "nothing can sync" refusal."""
+        from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+
         cfg = _make_connector_config(db_session, org.id, "jira", "Org Jira")
         db_session.commit()
 
@@ -103,19 +105,20 @@ class TestConnectorSyncRouteIsHonest:
             f"sync must not 500 (the old AttributeError-via-broad-except bug), "
             f"got {resp.status_code}: {resp.get_data(as_text=True)}"
         )
-        assert resp.status_code not in (200, 201, 202), (
-            "a connector that cannot sync must not answer with a success status"
-        )
-
         payload = resp.get_json()
         assert payload is not None
-        assert payload.get("success") is False
-        message = (payload.get("error") or {}).get("message", "")
-        assert message, "error response must carry a human-readable message"
-        assert "internal error" not in message.lower(), (
-            "the message must explain that sync isn't available, not hide "
-            "behind a generic internal-error string"
+        assert payload.get("queued") is True, (
+            f"a jira connector is a real registered connector type, so a sync "
+            f"must queue for approval, not be refused: {payload}"
         )
+
+        proposal = AIChatCRUDApproval.query.filter_by(
+            organization_id=org.id,
+            entity_type="connectors",
+            operation_type="sync",
+            status=ApprovalStatus.PENDING,
+        ).first()
+        assert proposal is not None, "the sync must actually reach the approval queue"
 
     def test_sync_on_unknown_connector_still_reports_not_found(
         self, db_session, org, admin, client, login_as

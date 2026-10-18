@@ -109,21 +109,30 @@ class GovernanceNotifier:
     @classmethod
     def _create_notifications(cls, user_ids, message, url) -> int:
         from app.models.models import Notification
+        from app.services.notification_service import NotificationService
+        from flask import g
 
         cutoff = datetime.utcnow() - timedelta(hours=_DEDUPE_HOURS)
+        org_id = getattr(g, "current_org_id", None)
         created = 0
         for uid in user_ids:
             # dedupe: skip if an identical unread notification was made recently
-            recent = (
-                Notification.query
-                .filter(Notification.user_id == uid,
-                        Notification.message == message,
-                        Notification.created_at >= cutoff)
-                .first()
+            q = Notification.query.filter(
+                Notification.user_id == uid,
+                Notification.message == message,
+                Notification.created_at >= cutoff,
             )
+            if org_id is not None:
+                q = q.filter(Notification.organization_id == org_id)
+            recent = q.first()
             if recent:
                 continue
-            db.session.add(Notification(user_id=uid, message=message, url=url))
+            NotificationService.create(
+                user_id=uid,
+                message=message,
+                url=url,
+                organization_id=org_id,
+            )
             created += 1
         return created
 

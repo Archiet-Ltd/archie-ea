@@ -1,0 +1,11 @@
+<p>Dear {{ user.full_name() }},</p>
+
+<p>A new way to sign in was connected to your account: {{ provider_label }}, on {{ connected_at.strftime('%d %b %Y at %H:%M') }} UTC.</p>
+
+<p>You can now sign in with it as well as the way you signed in before.</p>
+
+<p>If this wasn't you, reset your password and contact your administrator.</p>
+
+<p>The {{ config.APP_NAME }} Team</p>
+
+<p><small>Note: replies to this email address are not monitored.</small></p>

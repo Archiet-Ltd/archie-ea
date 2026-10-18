@@ -8,7 +8,7 @@ api_delete_application, api_bulk_consolidate.
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import (
     current_app,
@@ -335,6 +335,34 @@ def application_create():
         return redirect(url_for("unified_applications.application_list"))
 
 
+@unified_applications_bp.route("/api/registration-check", methods=["GET"])
+@login_required
+@require_roles("admin", "architect")
+def api_registration_check():
+    """Existing applications a new registration may duplicate.
+
+    Read before the create call so the person can open an existing record
+    instead of adding a second one. A failure answers 500, never an empty list:
+    "no matches" must mean the check ran and found none.
+    """
+    from app.modules.applications.services.registration_check_service import (
+        find_registration_matches,
+    )
+
+    name = (request.args.get("name") or "").strip()[:255]
+    code = (request.args.get("application_code") or "").strip()[:50]
+    if not name and not code:
+        return jsonify({"success": True, "matches": []})
+    try:
+        matches = find_registration_matches(name, code)
+    except Exception:
+        current_app.logger.error("Registration duplicate check failed", exc_info=True)
+        return jsonify({"success": False, "error": "The duplicate check could not run."}), 500
+    for entry in matches:
+        entry["url"] = url_for("unified_applications.application_detail", id=entry["id"])
+    return jsonify({"success": True, "matches": matches})
+
+
 @unified_applications_bp.route("/<int:id>")
 @login_required
 def application_detail(id):
@@ -342,6 +370,89 @@ def application_detail(id):
     from app.application_mgmt.routes import render_application_detail
 
     return render_application_detail(id)
+
+
+_TERMINAL_LIFECYCLE_STATUSES = frozenset({"retired", "decommissioned", "end_of_life", "end of life"})
+
+
+@unified_applications_bp.route("/<int:id>/retire", methods=["POST"])
+@login_required
+@require_roles("admin", "architect")
+@audit_log("application_retire")
+def retire_application(id):
+    """Mark an application for retirement.
+
+    Creates exactly one decommission work package on the one work package
+    store through the one writer, linked to this application and carrying a
+    planned end date. Marking the application again returns the same single
+    row -- there is never a second decommission work package for one app.
+    The application's lifecycle status becomes "retiring" in the same
+    transaction, which is the one definition of a retiring application.
+    """
+    org_id = g.current_org_id
+    app_obj = _verify_app_in_org(id, org_id, raise_not_found=True)
+
+    from app.models.unified_work_package import UnifiedWorkPackage
+    from app.services.work_package_service import create_work_package
+
+    now_utc = datetime.utcnow()
+    planned_end = (now_utc.date() + timedelta(days=365)).isoformat()
+
+    # The recorded reason travels in both the visible description and the
+    # structured marker (queryable and idempotent). source_type stays on the
+    # store's own vocabulary ("application" -- there is no retirement type),
+    # with the kind recorded in source_data.
+    marker = json.dumps({
+        "kind": "retirement",
+        "requested_at": now_utc.isoformat(),
+    })
+    # An application already at a terminal lifecycle value is not moved back
+    # to "retiring" and gets no new decommission work package.
+    current_status = (app_obj.lifecycle_status or "").strip().lower()
+    if current_status in _TERMINAL_LIFECYCLE_STATUSES or current_status.startswith("5."):
+        flash(
+            f"{app_obj.name} is already {app_obj.lifecycle_status}; it cannot be marked for retirement.",
+            "warning",
+        )
+        return redirect(url_for("unified_applications.application_detail", id=id))
+
+    existing = (
+        UnifiedWorkPackage.query.filter(
+            UnifiedWorkPackage.organization_id == org_id,
+            UnifiedWorkPackage.application_component_id == id,
+            UnifiedWorkPackage.source_type == "application",
+            UnifiedWorkPackage.source_data.like('%"kind": "retirement"%'),
+        )
+        .first()
+    )
+    if existing is not None:
+        if app_obj.lifecycle_status != "retiring":
+            app_obj.lifecycle_status = "retiring"
+            db.session.commit()
+        flash(f"{app_obj.name} is already marked for retirement.", "info")
+        return redirect(url_for("unified_applications.application_detail", id=id))
+
+    create_work_package(
+        organization_id=org_id,
+        user_id=current_user.id,
+        name=f"Decommission {app_obj.name}",
+        description=(
+            f"Decommission work package: {app_obj.name} was marked for "
+            f"retirement from the application page on {now_utc.date().isoformat()} "
+            f"with a planned end date of {planned_end}."
+        ),
+        application_component_id=id,
+        end_date=planned_end,
+        status="planned",
+        priority="medium",
+        layer="implementation",
+        source_type="application",
+        source_data=marker,
+    )
+    app_obj.lifecycle_status = "retiring"
+    db.session.commit()
+    flash(f"{app_obj.name} marked for retirement.", "success")
+    return redirect(url_for("unified_applications.application_detail", id=id))
 
 
 @unified_applications_bp.route("/<int:id>/fact-sheet")
@@ -408,21 +519,11 @@ def generate_application_archimate(id):
             db.session.add(arch_model)
             db.session.flush()
 
-        if app_arch_element is None:
-            app_arch_element = ArchiMateElement(
-                name=app_obj.name,
-                type="ApplicationComponent",
-                layer="application",
-                description=app_obj.description or "",
-                architecture_id=arch_model.id,
-            )
+        from app.services.archimate_backbone import ensure_archimate_element
+        app_arch_element = app_arch_element or ensure_archimate_element(app_obj)
+        if app_arch_element is not None and not app_arch_element.architecture_id:
+            app_arch_element.architecture_id = arch_model.id
             db.session.add(app_arch_element)
-            db.session.flush()
-            app_obj.archimate_element_id = app_arch_element.id
-        else:
-            if not app_arch_element.architecture_id:
-                app_arch_element.architecture_id = arch_model.id
-                db.session.add(app_arch_element)
 
         requirement_lines = [
             f"Application: {app_obj.name}",

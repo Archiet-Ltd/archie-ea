@@ -41,7 +41,7 @@
                     <template x-if="loading">
                         {{ loading_inline(size='sm', text='Loading...') }}
                     </template>
-                    <template x-if="!loading">Show changes</template>
+                    <span x-show="!loading">Show changes</span>
                 </button>
                 <template x-if="lastLoaded">
                     <span class="text-sm text-muted-foreground" x-text="'Last loaded: ' + formatDateTime(lastLoaded)"></span>
@@ -270,7 +270,7 @@ function changesPage() {
                 this.changes = data.changes || [];
                 this.lastLoaded = new Date().toISOString();
             } catch (e) {
-                this.error = 'Could not load changes: ' + e.message;
+                this.error = 'We could not load the changes for that period. Check the dates and try again in a moment.';
             } finally {
                 this.loading = false;
                 this.$nextTick(() => lucide.createIcons());

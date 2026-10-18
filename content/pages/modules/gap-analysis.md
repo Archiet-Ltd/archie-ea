@@ -8,6 +8,7 @@ answers_use_cases:
   - {id: UC-S3-13, segment: S3}
 capture_status: live
 cta: plans
+icon: git-compare
 ---
 
 # Gap Analysis

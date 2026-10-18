@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from app import db
 from app.models.capability_gap_analysis import CapabilityGapAnalysis
-from app.models.implementation_migration import Gap, GAP_KIND_PLATEAU_TRANSITION
+from app.models.implementation_migration import Gap, GAP_KIND_PLATEAU_TRANSITION, Plateau
 
 log = logging.getLogger(__name__)
 
@@ -250,3 +250,157 @@ def create_gap(
     db.session.add(gap)
     db.session.flush()
     return gap, True
+
+
+def link_gap_to_plateau(
+    gap_id: int, plateau_id: int, organization_id: int
+) -> Gap:
+    """Link a gap to a plateau within the same organisation.
+
+    Both the gap and the plateau must belong to *organization_id*.
+    Raises ValueError if either does not, or if the link already exists.
+
+    Flushes but does not commit: the caller controls the transaction boundary.
+    """
+    gap = Gap.query.filter_by(id=gap_id, organization_id=organization_id).first()
+    if gap is None:
+        raise ValueError("Gap not found in this organisation")
+
+    plateau = Plateau.query.filter_by(id=plateau_id, organization_id=organization_id).first()
+    if plateau is None:
+        raise ValueError("Plateau not found in this organisation")
+
+    if plateau in gap.plateaus:
+        raise ValueError("Gap is already linked to this plateau")
+
+    gap.plateaus.append(plateau)
+    db.session.flush()
+    return gap
+
+
+def unlink_gap_from_plateau(
+    gap_id: int, plateau_id: int, organization_id: int
+) -> Gap:
+    """Remove the link between a gap and a plateau within the same organisation.
+
+    Raises ValueError if either the gap or the plateau does not belong to
+    the organisation, or if no link exists.
+    """
+    gap = Gap.query.filter_by(id=gap_id, organization_id=organization_id).first()
+    if gap is None:
+        raise ValueError("Gap not found in this organisation")
+
+    plateau = Plateau.query.filter_by(id=plateau_id, organization_id=organization_id).first()
+    if plateau is None:
+        raise ValueError("Plateau not found in this organisation")
+
+    if plateau not in gap.plateaus:
+        raise ValueError("Gap is not linked to this plateau")
+
+    gap.plateaus.remove(plateau)
+    db.session.flush()
+    return gap
+
+
+def get_plateau_gaps(plateau_id: int, organization_id: int) -> List[Gap]:
+    """Return all gaps linked to a plateau within the organisation.
+
+    Raises ValueError if the plateau does not belong to the organisation.
+    """
+    plateau = Plateau.query.filter_by(id=plateau_id, organization_id=organization_id).first()
+    if plateau is None:
+        raise ValueError("Plateau not found in this organisation")
+    return list(plateau.gaps)
+
+
+def get_gaps_not_addressed(organization_id: int) -> List[Gap]:
+    """Return gaps that have no work package addressing them.
+
+    A gap is "addressed" when at least one work package of the organisation in
+    the one work package store is linked to it; the link is read through
+    work_package_service (the one reader), not from the retired
+    gap_work_packages table.
+    """
+    from app.services import work_package_service
+
+    addressed = work_package_service.addressed_gap_ids(organization_id)
+    query = Gap.query.filter(
+        Gap.organization_id == organization_id,
+        Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
+    )
+    if addressed:
+        query = query.filter(~Gap.id.in_(addressed))
+    return query.all()
+
+
+def get_plateau_gap_rows(plateau_ids, organization_id: int) -> Dict[int, List[Dict[str, Any]]]:
+    """{plateau id: [{"id", "name", "via"}]} for the gaps each plateau lists.
+
+    A plateau lists the gaps linked to it directly (via "linked") and the gaps
+    that the work packages realising it are linked to (via "work package").
+    Another organisation's plateaus, gaps and work packages never appear.
+    """
+    from app.services import work_package_service
+
+    out: Dict[int, List[Dict[str, Any]]] = {pid: [] for pid in plateau_ids}
+    if not out:
+        return out
+    seen = {pid: set() for pid in out}
+    plateaus = Plateau.query.filter(
+        Plateau.id.in_(list(out)), Plateau.organization_id == organization_id).all()
+    for plateau in plateaus:
+        for gap in plateau.gaps:
+            if gap.organization_id == organization_id and gap.id not in seen[plateau.id]:
+                seen[plateau.id].add(gap.id)
+                out[plateau.id].append({"id": gap.id, "name": gap.name, "via": "linked"})
+    wp_ids_by_plateau = work_package_service.plateau_work_package_ids(
+        [p.id for p in plateaus], organization_id)
+    all_wp_ids = {wp_id for ids in wp_ids_by_plateau.values() for wp_id in ids}
+    if all_wp_ids:
+        wps = work_package_service.query_for(organization_id).filter(
+            work_package_service.UnifiedWorkPackage.id.in_(all_wp_ids)).all()
+        gaps_by_wp = work_package_service.gaps_for_work_packages(wps, organization_id)
+        for pid, ids in wp_ids_by_plateau.items():
+            for wp_id in sorted(ids):
+                for gap in gaps_by_wp.get(wp_id, []):
+                    if gap["id"] not in seen[pid]:
+                        seen[pid].add(gap["id"])
+                        out[pid].append(
+                            {"id": gap["id"], "name": gap["name"], "via": "work package"})
+    return out
+
+
+def count_gaps(
+    organization_id: int,
+    gap_type: Optional[str] = None,
+    has_work_package: Optional[bool] = None,
+) -> int:
+    """Return the number of gaps in the one gap register for an organisation.
+
+    Plateau-transition gaps are excluded from the count.  This is the single
+    canonical count used by both the roadmap and the gap analysis screen, so
+    they always agree.
+
+    The optional filters mirror the register list readers so a total can be
+    the count of the population listed:
+      gap_type:          only count gaps with this gap_type value
+                         (gap_archimate_service.get_gaps_for_roadmap).
+      has_work_package:  True counts gaps with at least one work package
+                         link in this organisation; False counts gaps with
+                         none (get_gaps_not_addressed). None counts all.
+    """
+    query = Gap.query.filter(
+        Gap.organization_id == organization_id,
+        Gap.gap_kind != GAP_KIND_PLATEAU_TRANSITION,
+    )
+    if gap_type:
+        query = query.filter(Gap.gap_type == gap_type)
+    if has_work_package is not None:
+        from app.services import work_package_service
+
+        addressed = work_package_service.addressed_gap_ids(organization_id)
+        if has_work_package:
+            query = query.filter(Gap.id.in_(addressed)) if addressed else query.filter(db.false())
+        elif addressed:
+            query = query.filter(~Gap.id.in_(addressed))
+    return query.count()

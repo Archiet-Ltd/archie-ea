@@ -180,7 +180,6 @@ def test_llms_summary_line_does_not_claim_website_address_intake(app):
         "website-first-look",
         "website-full-profile",
         "see-your-own-twin",
-        "set-up-in-an-afternoon",
     ],
 )
 def test_hold_pages_keep_their_waiting_list_framing(app, slug):

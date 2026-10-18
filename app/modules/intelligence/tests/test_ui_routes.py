@@ -162,6 +162,8 @@ def test_the_read_only_pages_are_the_only_routes_this_blueprint_serves(app):
         "/intelligence/api/history/as-of": ["GET"],
         "/intelligence/api/history/changes": ["GET"],
         "/intelligence/api/history/element/<int:element_id>": ["GET"],
+        "/intelligence/answers": ["GET"],
+        "/intelligence/answers/<address>": ["GET"],
     }
     assert not [r for r in rules if r.startswith("/api/")]
 

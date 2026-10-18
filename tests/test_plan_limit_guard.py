@@ -82,10 +82,13 @@ def test_a_fourth_person_on_community_is_refused_whatever_creates_them(db_sessio
 
 
 def test_sso_just_in_time_provisioning_at_the_limit_is_refused(db_session):
+    from app.models.sso_config import SSOConfig
     from app.models.user import User
     from app.services.sso_service import SSOService
 
     org = _org(db_session, "sso")
+    db_session.add(SSOConfig(organization_id=org.id, protocol="oidc", enabled=True,
+                             email_domain="example.com"))
     _fill(db_session, org, 3)
     email = f"sso-{uuid.uuid4().hex[:8]}@example.com"
 
@@ -102,7 +105,8 @@ def test_sso_callback_at_the_limit_tells_the_person_why(app, db_session, client,
 
     org = _org(db_session, "ssoroute")
     db_session.add(SSOConfig(organization_id=org.id, protocol="oidc", enabled=True,
-                             client_id="c", idp_metadata_url="https://idp.example/.well-known"))
+                             client_id="c", idp_metadata_url="https://idp.example/.well-known",
+                             email_domain="example.com"))
     _fill(db_session, org, 3)
     db_session.commit()
     email = f"sso-{uuid.uuid4().hex[:8]}@example.com"

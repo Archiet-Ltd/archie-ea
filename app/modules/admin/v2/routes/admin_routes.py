@@ -46,6 +46,13 @@ import hmac
 import hashlib
 import json
 from datetime import datetime, timedelta
+
+
+def _base_url_field_allowed(form) -> bool:
+    """Check a settings form's base_url with the outbound-URL guard before it is saved."""
+    from app.services.connector_framework import connector_url_field_allowed
+
+    return connector_url_field_allowed(form.base_url)
 from html import escape
 
 from werkzeug.exceptions import HTTPException
@@ -1567,7 +1574,7 @@ def abacus_settings():
 
     form = AbacusSettingsForm()
 
-    if form.validate_on_submit():
+    if form.validate_on_submit() and _base_url_field_allowed(form):
         import os
 
         credentials = {}
@@ -2453,7 +2460,7 @@ def jira_settings():
 
     form = JiraSettingsForm()
 
-    if form.validate_on_submit():
+    if form.validate_on_submit() and _base_url_field_allowed(form):
         credentials = {}
         if form.api_token.data and form.api_token.data.strip():
             credentials = {
@@ -3991,6 +3998,14 @@ def webhook_settings():
 
         if webhook_type not in ("generic", "teams", "slack"):
             webhook_type = "generic"
+
+        from app.services.webhook_service import WebhookTargetRefused, validate_webhook_url
+
+        try:
+            url = validate_webhook_url(url)
+        except WebhookTargetRefused as exc:
+            flash(f"Webhook URL refused: {exc}", "error")
+            return redirect(url_for("admin.webhook_settings"))
 
         if not selected_events:
             selected_events = ["*"]

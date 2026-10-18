@@ -30,7 +30,7 @@ from flask_login import current_user
 from app.decorators import admin_required
 from app.extensions import db
 from app.services.billing_plans import PlanLimitReached
-from app.services.sso_service import SSONotConfiguredError, SSOService
+from app.services.sso_service import SSODomainConflictError, SSONotConfiguredError, SSOService
 
 _log = logging.getLogger(__name__)
 
@@ -64,7 +64,10 @@ def sso_initiate():
     if not email:
         return jsonify({"error": "email parameter required"}), 400
 
-    config = _svc.get_config_for_email(email)
+    try:
+        config = _svc.get_config_for_email(email)
+    except SSODomainConflictError as exc:
+        return jsonify({"error": str(exc)}), 409
     if config is None or not config.enabled:
         return jsonify({"error": "No SSO configured for this email domain"}), 404
 
@@ -322,6 +325,22 @@ def admin_sso():
                 "error",
             )
             return redirect(url_for("sso.admin_sso"))
+        domain_problem = _svc.domain_claim_problem(org_id, email_domain)
+        if domain_problem:
+            flash(domain_problem, "error")
+            return redirect(url_for("sso.admin_sso"))
+
+        # SAML keeps this field for reference only (an issuer URI, an ADFS
+        # trust URL or a URN) and the server never fetches it.
+        if idp_metadata_url and protocol == "oidc":
+            from app.services.sso_service import check_idp_url
+            from app.utils.ssrf_guard import BlockedOutboundURL
+
+            try:
+                check_idp_url(idp_metadata_url)
+            except BlockedOutboundURL:
+                flash("That address is not allowed or could not be reached.", "error")
+                return redirect(url_for("sso.admin_sso"))
 
         if config is None:
             if not org_id:
