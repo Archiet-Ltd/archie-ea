@@ -2547,8 +2547,12 @@ def test_roles_and_connectors_hub_groups_and_extra_entries(app):
             < role_html.index("<h2>Owners</h2>")
             < role_html.index("<h2>More</h2>")
         )
-        # Empty groups are not rendered.
-        assert "<h2>Security, risk and compliance</h2>" not in role_html
+        # A group with no page in it is not rendered; one with a page is.
+        from app.services.public_pages import ROLE_GROUPS
+
+        used = {p.front_matter.get("role_group") for p in load_feed_pages() if p.family == "role"}
+        for key, label in ROLE_GROUPS:
+            assert (f"<h2>{label}</h2>" in role_html) == (key in used), label
 
         conn_html = client.get("/connectors").data.decode()
         assert conn_html.index("<h2>AI assistants</h2>") < conn_html.index("<h2>Collaboration</h2>")
