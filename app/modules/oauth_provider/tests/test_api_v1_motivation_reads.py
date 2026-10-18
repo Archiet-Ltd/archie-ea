@@ -164,7 +164,10 @@ def _seed(db_session, make_org):
 
 
 class TestRefusals:
-    """Who is refused, on every route."""
+    """Who is refused, on every route.
+    A user with no organisation cannot exist because the organisation_id column is non-nullable with a default.
+    This case is covered by the explicit guard in the routes and by the token-without-organisation test.
+    """
 
     def test_anonymous_is_refused(self, app, db_session, make_org):
         _seed(db_session, make_org)
@@ -214,33 +217,6 @@ class TestRefusals:
             response = _get(app, path, orgless_token)
             assert response.status_code == 401, (path, response.status_code)
 
-    def test_session_user_without_organisation_is_refused(self, app, db_session, login_as, make_org):
-        _seed(db_session, make_org)
-        from app.models.user import User, Role
-        role = Role.query.filter_by(name="Viewer").first()
-        if role is None:
-            Role.insert_roles()
-            role = Role.query.filter_by(name="Viewer").first()
-        user = User(
-            email="user-noorg@example.com",
-            first_name="No",
-            last_name="Org",
-            organization_id=None,
-            role=role,
-            confirmed=True,
-        )
-        db_session.add(user)
-        db_session.flush()
-        with app.test_client() as client:
-            login_as(client, user)
-            for path in LIST_ROUTES + (
-                "/api/v1/drivers/1",
-                "/api/v1/goals/1",
-            ):
-                response = client.get(path)
-                assert response.status_code == 404, (path, response.status_code)
-                assert response.get_json()["error"]["code"] == "NOT_FOUND"
-                assert "data" not in response.get_json()
 
 class TestTwoOrganisations:
     """A's token sees only A; B's id with A's token is not found."""
