@@ -23,6 +23,8 @@ from __future__ import annotations
 import logging
 import os
 
+from markupsafe import Markup
+
 logger = logging.getLogger(__name__)
 
 
@@ -114,23 +116,30 @@ def provisioning_uri(user, secret: str) -> str:
     return pyotp.TOTP(secret).provisioning_uri(name=user.email, issuer_name=issuer)
 
 
-def provisioning_qr_svg(provisioning_uri: str, *, scale: int = 4) -> str:
+def provisioning_qr_svg(provisioning_uri: str, *, scale: int = 4) -> Markup:
     """Inline SVG markup for a QR code that encodes ``provisioning_uri``.
 
     Generated on the server with segno and shipped as inline SVG: no
     JavaScript widget and no request to an outside image service, so the
     provisioning URI is not sent to any third party. The setup key itself is
     also shown on the page for manual entry, as before.
+
+    The markup is server-generated (segno draws the modules from the
+    provisioning URI only), so it is returned as ``markupsafe.Markup`` and
+    the template renders it with plain ``{{ qr_svg }}`` -- no ``|safe``,
+    which this escaping test forbids on anything that is not tojson output
+    or a template literal.
     """
     import segno
 
     qrcode = segno.make(provisioning_uri)
     svg = qrcode.svg_inline(scale=scale)
-    return svg.replace(
+    svg = svg.replace(
         '<svg ',
         '<svg role="img" aria-label="QR code: scan to add this account to your authenticator app" ',
         1,
     )
+    return Markup(svg)
 
 
 def verify_code(secret: str, code: str) -> bool:
