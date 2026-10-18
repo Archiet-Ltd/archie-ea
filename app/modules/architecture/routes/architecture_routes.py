@@ -649,6 +649,18 @@ def software_architecture_dashboard():
         )
 
 
+def _organisation_mapping_query(mapping_model):
+    """Mappings of the active organisation's applications only."""
+    from flask import g
+
+    from app.models.application_portfolio import ApplicationComponent
+
+    return mapping_model.query.join(
+        ApplicationComponent,
+        mapping_model.application_component_id == ApplicationComponent.id,
+    ).filter(ApplicationComponent.organization_id == getattr(g, "current_org_id", None))
+
+
 def _assemble_investment_priorities_context():
     """Assemble the Investment Priorities dashboard's real analysis data.
 
@@ -665,7 +677,10 @@ def _assemble_investment_priorities_context():
     """
     from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
 
-    mapping_count = UnifiedApplicationCapabilityMapping.query.count()
+    # The mapping table has no organisation column of its own: count only the
+    # mappings whose application belongs to the caller's organisation, so one
+    # organisation's mappings never clear another's "Setup Required".
+    mapping_count = _organisation_mapping_query(UnifiedApplicationCapabilityMapping).count()
     if mapping_count == 0:
         return None, mapping_count
 

@@ -13,6 +13,9 @@ import logging
 from datetime import datetime
 from typing import Dict, List
 
+from flask import g
+
+from app.models.application_portfolio import ApplicationComponent
 from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
 from app.models.unified_capability import UnifiedCapability
 from .decorators import transactional
@@ -58,7 +61,17 @@ class InvestmentPrioritizationService:
         # Batch-load all capability mappings to avoid N+1 queries
         mappings_by_cap = {}
         try:
-            all_mappings = UnifiedApplicationCapabilityMapping.query.all()
+            # Only the active organisation's applications' mappings: the
+            # mapping table has no organisation column of its own.
+            all_mappings = (
+                UnifiedApplicationCapabilityMapping.query.join(
+                    ApplicationComponent,
+                    UnifiedApplicationCapabilityMapping.application_component_id
+                    == ApplicationComponent.id,
+                )
+                .filter(ApplicationComponent.organization_id == getattr(g, "current_org_id", None))
+                .all()
+            )
             for m in all_mappings:
                 mappings_by_cap.setdefault(m.unified_capability_id, []).append(m)
         except Exception:
