@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from flask import g as flask_g
+
 from app import db
 from app.models.application_duplicate_detection import (
     DuplicateAnalysis,
@@ -518,14 +520,48 @@ class UnifiedDuplicateDetectionService:
     # === SIMPLIFIED METHODS (from SimpleDuplicateService) ===
 
     @staticmethod
+    def _delete_group_members_in_scope() -> None:
+        """Delete group memberships belonging to the active organisation's groups.
+
+        unified_group_members carries no organisation column, so membership is
+        scoped through its parent group. With no organisation in context (CLI)
+        every membership is removed.
+        """
+        org_id = getattr(flask_g, "current_org_id", None)
+        if org_id is None:
+            db.session.execute(db.text("DELETE FROM unified_group_members"))  # tenant-exempt: CLI path, no organisation in context
+            return
+        db.session.execute(
+            db.text(
+                "DELETE FROM unified_group_members WHERE group_id IN "
+                "(SELECT id FROM unified_duplicate_groups WHERE organization_id = :org)"
+            ),
+            {"org": org_id},
+        )
+
+    @staticmethod
     def cleanup_stale_data() -> Dict[str, Any]:
         """Clean up stale duplicate detection data"""
         try:
-            # Delete all existing groups and runs to start fresh
-            # tenant-exempt: system table (detection engine cleanup)
-            db.session.execute(db.text("DELETE FROM unified_group_members"))  # tenant-exempt: system table (detection engine cleanup)
-            db.session.execute(db.text("DELETE FROM unified_duplicate_groups"))  # tenant-exempt: system table (detection engine cleanup)
-            db.session.execute(db.text("DELETE FROM unified_detection_runs"))  # tenant-exempt: system table (detection engine cleanup)
+            # Delete the caller's organisation's groups and runs to start fresh.
+            # The three tables are shared across organisations, so each delete is
+            # bound to the active organisation; with no organisation in context
+            # (CLI) it clears everything, as before.
+            org_id = getattr(flask_g, "current_org_id", None)
+            if org_id is None:
+                db.session.execute(db.text("DELETE FROM unified_group_members"))  # tenant-exempt: CLI path, no organisation in context
+                db.session.execute(db.text("DELETE FROM unified_duplicate_groups"))  # tenant-exempt: CLI path, no organisation in context
+                db.session.execute(db.text("DELETE FROM unified_detection_runs"))  # tenant-exempt: CLI path, no organisation in context
+            else:
+                UnifiedDuplicateDetectionService._delete_group_members_in_scope()
+                db.session.execute(
+                    db.text("DELETE FROM unified_duplicate_groups WHERE organization_id = :org"),
+                    {"org": org_id},
+                )
+                db.session.execute(
+                    db.text("DELETE FROM unified_detection_runs WHERE organization_id = :org"),
+                    {"org": org_id},
+                )
             db.session.commit()
 
             return {"success": True, "message": "Stale data cleaned up successfully"}
@@ -548,7 +584,7 @@ class UnifiedDuplicateDetectionService:
             # Use a SAVEPOINT so failure doesn't poison the outer transaction
             try:
                 with db.session.begin_nested():
-                    db.session.execute(db.text("DELETE FROM unified_group_members"))  # tenant-exempt: system table (detection engine cleanup)
+                    self._delete_group_members_in_scope()
                     UnifiedDuplicateGroup.query.delete()
                 self.logger.info("Cleaned up previous detection groups")
             except Exception as cleanup_err:
@@ -713,7 +749,7 @@ class UnifiedDuplicateDetectionService:
             # Use a SAVEPOINT so failure doesn't poison the outer transaction
             try:
                 with db.session.begin_nested():
-                    db.session.execute(db.text("DELETE FROM unified_group_members"))  # tenant-exempt: system table (detection engine cleanup)
+                    self._delete_group_members_in_scope()
                     UnifiedDuplicateGroup.query.delete()
                 self.logger.info("Cleaned up previous detection groups")
             except Exception as cleanup_err:

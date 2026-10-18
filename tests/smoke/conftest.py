@@ -804,3 +804,33 @@ ARCHETYPES = [
     # R1-B36 (TB-0146): promoted from unassignable to assignable.
     "finance", "compliance", "risk", "operations", "non_technical_owner",
 ]
+
+
+@pytest.fixture(scope="module")
+def org_admin_email(seeded):
+    """Sign-in for an ordinary organisation administrator of the seeded
+    organisation: the Administrator role the account registration flow gives
+    a new organisation's first user, and not a platform admin."""
+    import uuid
+
+    from app import create_app, db
+    from app.models.org_role import OrgRole
+    from app.models.user import Role, User
+
+    app = create_app("testing")
+    email = "smoke.org-admin.%s@example.com" % uuid.uuid4().hex[:8]
+    with app.app_context():
+        role = Role.query.filter_by(name="Administrator").first()
+        user = User(
+            email=email, first_name="Smoke", last_name="OrgAdmin",
+            organization_id=seeded["ids"]["org"], enterprise_role="enterprise_architect",
+            confirmed=True,
+        )
+        user.role = role
+        user.is_platform_admin = False
+        user.password = PASSWORD
+        db.session.add(user)
+        db.session.flush()
+        db.session.add(OrgRole(organization_id=seeded["ids"]["org"], user_id=user.id, role="org_admin"))
+        db.session.commit()
+    return email
