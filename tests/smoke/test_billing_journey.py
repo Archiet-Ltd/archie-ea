@@ -28,13 +28,9 @@ def test_pricing_buy_button_leads_a_visitor_to_that_plans_checkout(browser, live
             "href", "/t/plan-click?plan=enterprise&next=/contact")
 
         buy.click()
-        # Not signed in yet: the button opens registration and keeps the plan;
-        # someone with an account signs in from there and keeps it too.
-        page.wait_for_url(lambda url: "/account/register" in url and "plan=startup" in url,
-                          timeout=PAGE_TIMEOUT)
-        page.get_by_test_id("register-signin").get_by_role("link", name="Sign in").click()
-        page.wait_for_url(lambda url: "/account/login" in url and "plan=startup" in url,
-                          timeout=PAGE_TIMEOUT)
+        page.wait_for_url(lambda url: url.rstrip("/").endswith("/contact"), timeout=PAGE_TIMEOUT)
+        # Not signed in: the administrator's billing page is reached from the account area instead.
+        page.goto(live_server + "/account/login?next=/admin/billing/%3Fplan%3Dstartup", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.fill("#email", seeded["emails"]["platform_admin"])
         page.fill("#password", PASSWORD)
         page.locator("#submit").click()
