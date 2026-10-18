@@ -259,7 +259,7 @@
 {% if app.monitoring_enabled or app.sla_availability_percentage %}
   {% set _ = tabs.append({'id': 'health', 'label': 'Health & Quality', 'count': none}) %}
 {% endif %}
-{% if app.total_cost_of_ownership or app.license_cost_annual %}
+{% if cost_breakdown and cost_breakdown.has_cost %}
   {% set _ = tabs.append({'id': 'cost', 'label': 'Cost', 'count': none}) %}
 {% endif %}
 
