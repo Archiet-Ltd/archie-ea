@@ -337,3 +337,4 @@ recheck.py
 docs/superpowers/evidence/
 route_verification.json
 route_verification.accum.json
+!scripts/check_public_page_screenshots.py

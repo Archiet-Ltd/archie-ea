@@ -949,6 +949,28 @@ def gate_background_mechanisms(baseline: int, instances_baseline: int) -> Result
                          "background_mechanisms_thread_instances": instances})
 
 
+def gate_public_page_screenshots() -> Result:
+    """Every live module, role and use-case page has a real screenshot. RATCHET on named pages.
+
+    Static (reads content/ and app/static/img/ through the same `load_feed_pages()` the
+    sitemap uses, so held pages are exempt exactly as they are from the sitemap). Known
+    offenders are listed by URL in scripts/public_page_screenshot_baseline.json; a live
+    page missing a screenshot that is not on the list fails, and an entry that is now
+    fine fails until removed, so the list only shrinks.
+    """
+    script = "scripts/check_public_page_screenshots.py"
+    proc = _run([sys.executable, script])
+    count_proc = _run([sys.executable, script, "--count"])
+    try:
+        count = int(count_proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("public-page-screenshots", FAIL,
+                      f"could not parse count: {count_proc.stdout!r} {count_proc.stderr[:300]}")
+    detail = "" if proc.returncode == 0 else proc.stdout[-1800:]
+    return Result("public-page-screenshots", PASS if proc.returncode == 0 else FAIL,
+                  detail, count)
+
+
 def gate_null_filters() -> Result:
     """No `|default(...)` feeds a filter that calls len(). Gated at ZERO.
 
@@ -2095,6 +2117,13 @@ def build_gates(baseline: dict) -> list[Gate]:
                          "(DELIVERY_CONTRACT.md Rule 2), or mark its first line "
                          "'unregistered-check-ok: <reason>'",
              tags=["static", "qa"]),
+        Gate("public-page-screenshots",
+             "every live module, role and use-case page has a real screenshot",
+             "ratchet", gate_public_page_screenshots,
+             remediation="run scripts/check_public_page_screenshots.py --strict; capture the "
+                         "screenshot (scripts/capture_screenshots.py --modules) or hold the page "
+                         "by moving its front-matter state off on_main",
+             tags=["static", "ui"]),
         Gate("null-filters", "default() never feeds a len()-calling filter", "zero",
              gate_null_filters,
              remediation="add the boolean argument: default('x', true) - plain "

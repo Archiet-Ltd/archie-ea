@@ -486,7 +486,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 72 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 73 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -563,6 +563,7 @@ to reconfirm the count before trusting it:**
 | `docs-drift` | CLAUDE.md/DELIVERY_CONTRACT.md gate claims disagreeing with build_gates() | must be 0 |
 | `public-repo-hygiene` | a docs/buckets/ directory or path reference in this public repository | must be 0 |
 | `background-mechanisms` | a background-work mechanism (rq, celery, apscheduler, thread, process pool, detached subprocess) missing from `docs/background-mechanisms.yml`, or a stale entry | ratchet @ 29 thread instances in 22 files; keyed on file, kind and function |
+| `public-page-screenshots` | a live (not held) module, role or use-case page with no real screenshot; known offenders are named by URL in `scripts/public_page_screenshot_baseline.json` and the list may only shrink | ratchet on named pages |
 | `unregistered-checks` | a scripts/check_\*.py with no Gate(...) entry (F500-008) | ratchet @ 33 |
 
 Per-line escape hatches, each of which makes the exception reviewable rather than
