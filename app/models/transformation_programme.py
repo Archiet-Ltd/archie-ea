@@ -242,10 +242,29 @@ class MeasureDefinition(TenantMixin, OptimisticLockMixin, db.Model):
     __tablename__ = "measure_definitions"
 
     id = db.Column(db.Integer, primary_key=True)
+    # Nullable since the key-result widening: a measure is bound to a
+    # programme outcome, or to any model element (subject_element_id), or both.
     outcome_commitment_id = db.Column(
         db.Integer,
         db.ForeignKey("programme_outcome_commitments.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    # Optional element subject. A goal element here makes the measure a key
+    # result of that objective. NULL for every programme-scoped measure.
+    subject_element_id = db.Column(
+        db.Integer,
+        db.ForeignKey("archimate_elements.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    # The canonical Benefit that carries this measure's measurements when the
+    # measure has no programme outcome, so OutcomeMeasurementService records
+    # them in the one outcome_measurements history.
+    benefit_id = db.Column(
+        db.Integer,
+        db.ForeignKey("benefits.id", ondelete="RESTRICT"),
+        nullable=True,
         index=True,
     )
     metric_name = db.Column(db.String(255), nullable=False)
@@ -270,8 +289,14 @@ class MeasureDefinition(TenantMixin, OptimisticLockMixin, db.Model):
         foreign_keys=[outcome_commitment_id],
         backref=db.backref("measure_definitions", lazy="dynamic", passive_deletes=True),
     )
+    subject_element = db.relationship("ArchiMateElement", foreign_keys=[subject_element_id])
+    benefit = db.relationship("Benefit", foreign_keys=[benefit_id])
 
     __table_args__ = (
+        db.CheckConstraint(
+            "outcome_commitment_id IS NOT NULL OR subject_element_id IS NOT NULL",
+            name="ck_measure_definition_subject",
+        ),
         db.CheckConstraint(
             f"aggregation IN ({_sql_values(MEASURE_AGGREGATIONS)})",
             name="ck_measure_definition_aggregation",
@@ -307,6 +332,7 @@ class MeasureDefinition(TenantMixin, OptimisticLockMixin, db.Model):
             "id": self.id,
             "organization_id": self.organization_id,
             "outcome_commitment_id": self.outcome_commitment_id,
+            "subject_element_id": self.subject_element_id,
             "metric_name": self.metric_name,
             "unit": self.unit,
             "currency": self.currency,
