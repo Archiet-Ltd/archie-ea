@@ -246,11 +246,29 @@ def cmd_run(args: argparse.Namespace) -> int:
         f"--junitxml={junit}",
         *plan["test_files"],
     ]
-    proc = subprocess.run(cmd, cwd=args.dest, check=False)  # noqa: S603 - fixed argv
+    proc = subprocess.run(cmd, cwd=args.dest, env=_unmeasured_env(), check=False)  # noqa: S603 - fixed argv
     print(
         f"pytest exited {proc.returncode} (failures are expected and are what this check looks for)"
     )
     return 0
+
+
+def _unmeasured_env() -> dict[str, str]:
+    """The environment for the base-worktree pytest run, with coverage switched off.
+
+    That run executes a different checkout (a temporary worktree). When this
+    script itself runs under ``pytest --cov`` (tests/test_check_failing_first.py
+    in a CI shard), pytest-cov exports ``COV_CORE_*`` so child interpreters
+    measure too, and ``.coveragerc`` makes the recorded paths relative. The child
+    then writes ``app/<file>`` rows for files that only exist in the deleted
+    worktree into the shard's data file, and the aggregate job's
+    ``coverage combine`` / ``coverage xml`` fails with "No source for code".
+    """
+    return {
+        k: v
+        for k, v in os.environ.items()
+        if not k.startswith(("COV_CORE_", "COVERAGE_"))
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -7,6 +7,8 @@
    The monthly/annual toggle is two radios and sibling selectors in css/public_pricing.css, so it
    needs no script. Every checklist line is something that works today. #}
 {% extends 'layouts/public_base.html' %}
+
+{% from 'components/public_faq.html' import faq_chevron %}
 {% block title %}{{ page.title }}{% endblock %}
 
 {% block meta_description %}
@@ -19,6 +21,8 @@
 {% block header %}
 {% include 'components/public_navbar.html' %}
 {% endblock %}
+
+{% block body_theme %}theme-marketing{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/public_pricing.css') }}">
@@ -47,12 +51,12 @@
 
       <div class="pp-plans">
         {# Community #}
-        <article class="pp-card" data-testid="plan-card-community">
-          <h3>Community</h3>
+        <article class="public-card" data-testid="plan-card-community">
+          <h3 class="public-card-title">Community</h3>
           <p class="pp-for">Evaluation, one-person companies and self-hosters.</p>
           <p class="pp-price">Free</p>
           <p class="pp-note">No trial clock. One organisation, up to three people.</p>
-          <a href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="pp-btn" data-testid="buy-community">Start free</a>
+          <a href="{{ url_for('main.track_plan_click', plan='community', next=url_for('account.register')) }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-community">Start free</a>
           <div class="pp-alt"></div>
           <ul class="pp-list">
             <li>Ask what breaks, what is at risk and who is accountable</li>
@@ -76,8 +80,8 @@
            '$290', '$29', '/editor/year', '/editor/month',
            ['Pay for editors only; everyone else asks for free', 'Single sign-on', 'The review-board workflow', 'Your own model key', 'Email support'])
         ] %}
-        <article class="pp-card" data-testid="plan-card-{{ key }}">
-          <h3>{{ name }}</h3>
+        <article class="public-card" data-testid="plan-card-{{ key }}">
+          <h3 class="public-card-title">{{ name }}</h3>
           <p class="pp-for">{{ for_whom }}</p>
           <p class="pp-price">
             <span data-interval="year">{{ price_year }}<small>{{ unit_year }}</small></span>
@@ -89,11 +93,11 @@
           </p>
           {% if _billing %}
           <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='year')) }}"
-             class="pp-btn pp-btn--primary" data-interval="year" data-testid="buy-{{ key }}">Buy {{ name }}, billed annually</a>
+             class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-interval="year" data-testid="buy-{{ key }}">Buy {{ name }}, billed annually</a>
           <a href="{{ url_for('main.track_plan_click', plan=key, next=url_for('account.register', plan=key, interval='month')) }}"
-             class="pp-btn pp-btn--primary" data-interval="month" data-testid="buy-{{ key }}-monthly">Buy {{ name }}, billed monthly</a>
+             class="public-btn public-btn--wrap public-btn--lg public-btn--primary" data-interval="month" data-testid="buy-{{ key }}-monthly">Buy {{ name }}, billed monthly</a>
           {% else %}
-          <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="pp-btn" data-testid="buy-{{ key }}">Contact us to buy {{ name }}</a>
+          <a href="{{ url_for('main.track_plan_click', plan=key, next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-{{ key }}">Contact us to buy {{ name }}</a>
           {% endif %}
           <div class="pp-alt"></div>
           <ul class="pp-list">
@@ -104,12 +108,12 @@
         {% endfor %}
 
         {# Enterprise #}
-        <article class="pp-card" data-testid="plan-card-enterprise">
-          <h3>Enterprise</h3>
+        <article class="public-card" data-testid="plan-card-enterprise">
+          <h3 class="public-card-title">Enterprise</h3>
           <p class="pp-for">Enterprise architecture teams.</p>
-          <p class="pp-price">From $24,000<small>/year</small></p>
+          <p class="pp-price"><span class="pp-from">From</span> $24,000<small>/year</small></p>
           <p class="pp-note">Annual contract from $24,000/year.</p>
-          <a href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="pp-btn" data-testid="buy-enterprise">Contact sales</a>
+          <a href="{{ url_for('main.track_plan_click', plan='enterprise', next='/contact') }}" class="public-btn public-btn--wrap public-btn--lg public-btn--outline" data-testid="buy-enterprise">Contact sales</a>
           <div class="pp-alt"></div>
           <ul class="pp-list">
             <li class="pp-lead-in">Everything in Team, plus</li>
@@ -127,8 +131,8 @@
     <section class="pp-section" aria-labelledby="compare-heading" data-testid="pricing-compare">
       <h2 id="compare-heading">Compare plans</h2>
       <p class="pp-sub">Every plan is priced per company, not per application. The same capabilities are in the model whichever plan you are on; the plans differ in who can edit, how people sign in and how you are supported.</p>
-      <div class="pp-table-wrap">
-        <table class="pp-table">
+      <div class="pp-frame rounded-2xl border border-border">
+        <table class="public-table public-table--fit">
           <caption class="sr-only">What each plan includes</caption>
           <thead>
             <tr>
@@ -142,7 +146,7 @@
           <tbody>
             {% set _rows = [
               ('Modelling', [
-                ('People included', ['3', '10', 'Editors you buy; askers free', 'Unlimited editors']),
+                ('People included', ['3', '10', 'Editors you buy; askers free', 'No limit']),
                 ('Business Model Canvas', [1, 1, 1, 1]),
                 ('Twin map of systems, suppliers and dependencies', [1, 1, 1, 1]),
                 ('Import from ArchiMate Open Exchange and spreadsheets', [1, 1, 1, 1]),
@@ -186,11 +190,23 @@
     <section class="pp-section" aria-labelledby="grow-heading" data-testid="pricing-grow">
       <h2 id="grow-heading">What every plan gains as the platform grows</h2>
       <p class="pp-sub">Each new capability reaches Startup and Team as it ships, at no extra charge, and nothing is taken away from anyone already subscribed.</p>
-      <ol class="pp-grow">
-        <li><time>Q4 2026</time><span>Save, share and export an answer, as a spreadsheet or a PDF.</span></li>
-        <li><time>Q1 2027</time><span>Connections to the tools you already use, a replay and event catalogue for webhooks, and AI assistants that query your model through the Model Context Protocol.</span></li>
-        <li><time>Q2 2027</time><span>Cost in one currency across the model.</span></li>
-        <li><time>Q3 2027</time><span>Scenarios and what-if forecasts on top of the model.</span></li>
+      <ol class="public-stepper">
+        <li>
+          <p class="home-eyebrow"><time>Q4 2026</time></p>
+          <p class="public-stepper__body">Save, share and export an answer, as a spreadsheet or a PDF.</p>
+        </li>
+        <li>
+          <p class="home-eyebrow"><time>Q1 2027</time></p>
+          <p class="public-stepper__body">Connections to the tools you already use, a replay and event catalogue for webhooks, and AI assistants that query your model through the Model Context Protocol.</p>
+        </li>
+        <li>
+          <p class="home-eyebrow"><time>Q2 2027</time></p>
+          <p class="public-stepper__body">Cost in one currency across the model.</p>
+        </li>
+        <li>
+          <p class="home-eyebrow"><time>Q3 2027</time></p>
+          <p class="public-stepper__body">Scenarios and what-if forecasts on top of the model.</p>
+        </li>
       </ol>
     </section>
   </div>
@@ -201,7 +217,7 @@
         <h2 id="selfhost-heading">Self-hosting is always free</h2>
         <p>Entelim is open source under AGPL-3.0. Run it on your own infrastructure, at any size, for as long as you like. That path is the product, not a trial. A commercial licence exists for organisations that want Entelim run for them or need different terms.</p>
       </div>
-      <a href="https://github.com/Archiet-Ltd/archie-ea" class="pp-btn pp-btn--primary" data-testid="selfhost-github">View on GitHub</a>
+      <a href="https://github.com/Archiet-Ltd/archie-ea" class="public-btn public-btn--lg public-btn--primary" data-testid="selfhost-github">View on GitHub</a>
     </div>
   </section>
 
@@ -209,50 +225,50 @@
     <section class="pp-section pp-section--first" aria-labelledby="services-heading" data-testid="pricing-services">
       <h2 id="services-heading">Fixed-price services</h2>
       <div class="pp-services">
-        <div class="pp-card">
-          <h3>Architecture health check</h3>
-          <p>We run Entelim over your own application data and deliver a written report within two weeks of kickoff.</p>
+        <div class="public-card">
+          <h3 class="public-card-title">Architecture health check</h3>
+          <p class="public-card-body">We run Entelim over your own application data and deliver a written report within two weeks of kickoff.</p>
           <p class="pp-price pp-price--sm">$4,500<small>one time</small></p>
-          <a href="/architecture-health-check" class="pp-btn">See what is included</a>
+          <a href="/architecture-health-check" class="public-btn public-btn--lg public-btn--outline">See what is included</a>
         </div>
-        <div class="pp-card">
-          <h3>Team annual plan with onboarding</h3>
-          <p>The Team plan billed annually, plus working sessions to build your first model and import your data.</p>
+        <div class="public-card">
+          <h3 class="public-card-title">Team annual plan with onboarding</h3>
+          <p class="public-card-body">The Team plan billed annually, plus working sessions to build your first model and import your data.</p>
           <p class="pp-price pp-price--sm">$1,500<small>one-time onboarding</small></p>
-          <a href="/team-annual-onboarding" class="pp-btn">See what is included</a>
+          <a href="/team-annual-onboarding" class="public-btn public-btn--lg public-btn--outline">See what is included</a>
         </div>
       </div>
     </section>
 
     <section class="pp-section" aria-labelledby="faq-heading" data-testid="pricing-faq">
       <h2 id="faq-heading">Billing questions</h2>
-      <div class="pp-faq">
+      <div class="public-faq max-w-3xl">
         <details>
-          <summary>Can I cancel at any time?</summary>
-          <p>Yes. An organisation administrator cancels from the billing page, or by <a href="/contact">contacting us</a>. Cancelling stops the subscription from renewing. You keep your plan until the end of the period you have paid for, and you can withdraw a scheduled cancellation before then.</p>
+          <summary>Can I cancel at any time?{{ faq_chevron() }}</summary>
+          <p>Yes. An organisation administrator cancels from the billing page, or by <a href="/contact" class="public-link">contacting us</a>. Cancelling stops the subscription from renewing. You keep your plan until the end of the period you have paid for, and you can withdraw a scheduled cancellation before then.</p>
         </details>
         <details>
-          <summary>What happens when I add or remove seats?</summary>
+          <summary>What happens when I add or remove seats?{{ faq_chevron() }}</summary>
           <p>On Team you pay for editors, and people who only ask questions are free. An organisation administrator changes the number of editor seats, or switches plan, from the billing page at any time.</p>
         </details>
         <details>
-          <summary>How are tax and VAT handled?</summary>
+          <summary>How are tax and VAT handled?{{ faq_chevron() }}</summary>
           <p>Any tax due is shown on the payment page before you pay. Add your tax number in the billing portal and it is printed on every invoice issued from then on.</p>
         </details>
         <details>
-          <summary>Where do I find my invoices?</summary>
+          <summary>Where do I find my invoices?{{ faq_chevron() }}</summary>
           <p>Each payment produces an invoice, listed on your organisation's billing page. The invoice e-mail address and billing details are yours to set there.</p>
         </details>
         <details>
-          <summary>What happens to my data if I move to a smaller plan?</summary>
+          <summary>What happens to my data if I move to a smaller plan?{{ faq_chevron() }}</summary>
           <p>If you have more people than the new plan admits, everyone keeps access, and no one new can be added until you are within the limit.</p>
         </details>
         <details>
-          <summary>Can I pay monthly instead of annually?</summary>
+          <summary>Can I pay monthly instead of annually?{{ faq_chevron() }}</summary>
           <p>Yes. Use the toggle above. Annual billing costs ten months for twelve: $490/year for Startup and $290/editor/year for Team.</p>
         </details>
         <details>
-          <summary>What if I already self-host Entelim?</summary>
+          <summary>What if I already self-host Entelim?{{ faq_chevron() }}</summary>
           <p>Move to a hosted plan whenever you want to stop running it yourself, and import your model from files. Keep self-hosting for as long as you like: it stays free. If you want Entelim run for you on dedicated infrastructure, talk to us about Enterprise.</p>
         </details>
       </div>

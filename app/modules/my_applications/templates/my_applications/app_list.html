@@ -105,6 +105,10 @@
         {% endfor %}
     </div>
 
+    {% elif owned_total == 0 and not search and not ownership_type %}
+    <div class="bg-card border border-border rounded-lg">
+        {% include 'my_applications/_no_owned_applications.html' %}
+    </div>
     {% else %}
     <div class="bg-card border border-border rounded-lg p-12 text-center">
         <div class="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">

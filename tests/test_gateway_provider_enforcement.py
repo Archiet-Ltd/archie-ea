@@ -9,6 +9,7 @@ Tests:
 
 from __future__ import annotations
 
+import uuid
 from unittest.mock import patch
 
 import pytest
@@ -460,13 +461,19 @@ class TestGatewayPersistenceUsesSavepoints:
         from app.models.organization import Organization
         from app.modules.ai_chat.services.llm_service_impl import LLMService, db as llm_db
 
-        slug = "savepoint-org-commit-check"
-        prompt = "savepoint-commit-check"
+        # Unique per run: a fixed slug collides (unique index) with any row a
+        # killed or retried earlier run left committed, and the failed flush then
+        # rolls the whole outer transaction back, which these tests read as a
+        # savepoint defect.
+        token = uuid.uuid4().hex[:12]
+        slug = f"savepoint-org-commit-{token}"
+        prompt = f"savepoint-commit-{token}"
 
         with app.app_context():
             session = Session(bind=db.engine)
             try:
-                session.add(Organization(name="Savepoint Commit Check", slug=slug))
+                caller_org = Organization(name="Savepoint Commit Check", slug=slug)
+                session.add(caller_org)
 
                 with patch.object(llm_db, "session", session):
                     with patch.object(LLMService, "_resolve_org_id", return_value=None):
@@ -506,13 +513,19 @@ class TestGatewayPersistenceUsesSavepoints:
         from app.models.organization import Organization
         from app.modules.ai_chat.services.llm_service_impl import LLMService, db as llm_db
 
-        slug = "savepoint-org-rollback-check"
-        prompt = "savepoint-rollback-check"
+        # Unique per run, see the commit-check test above.
+        token = uuid.uuid4().hex[:12]
+        slug = f"savepoint-org-rollback-{token}"
+        prompt = f"savepoint-rollback-{token}"
 
         with app.app_context():
             session = Session(bind=db.engine)
             try:
-                session.add(Organization(name="Savepoint Rollback Check", slug=slug))
+                # Hold a strong reference: once flushed, the session's identity map
+                # keeps the row only weakly, and an object nothing else references
+                # can be collected at an arbitrary point.
+                caller_org = Organization(name="Savepoint Rollback Check", slug=slug)
+                session.add(caller_org)
                 real_add = session.add
 
                 def add_with_failure(obj):

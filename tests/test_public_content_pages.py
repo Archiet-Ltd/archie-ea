@@ -2623,6 +2623,28 @@ def test_assistant_connector_page_is_held():
     )
 
 
+def test_features_page_shows_captured_module_screenshots(app):
+    """/features reuses the module pages' captured screenshots: every image it shows is a
+    registered, existing module capture with alt text, and the two headline capabilities
+    (architecture management, enterprise intelligence) each carry one."""
+    import re
+
+    from app.services.public_pages import IMG_MODULES_DIR, MODULE_CAPTURES
+
+    with app.test_client() as client:
+        html = client.get("/features").data.decode()
+    registered = {entry[0] for entry in MODULE_CAPTURES}
+    imgs = re.findall(r'<img src="/static/img/modules/([a-z-]+)\.webp" alt="([^"]+)"', html)
+    assert len(imgs) >= 2
+    for slug, alt in imgs:
+        assert slug in registered, f"/features shows an unregistered image {slug}"
+        assert (IMG_MODULES_DIR / f"{slug}.webp").is_file()
+        assert alt.strip()
+    shown = {slug for slug, _ in imgs}
+    assert {"architecture-model", "ai-chat"} <= shown
+    assert 'class="public-figure' in html
+
+
 def test_features_lists_every_feed_module_and_connector_page(app):
     files = {
         "modules/zzz-feat-module.md": _page_md("Zzz Feat Module"),

@@ -23,6 +23,9 @@ Usage (the app must already be running against the seeded database):
     DEMO_USER_PASSWORD=... python scripts/capture_proof_assets.py \
         --base http://127.0.0.1:5100
 
+The home page's product window (the whole /applications/ screen, sidebar and top bar
+included) is written to app/static/img/home/product-portfolio*.webp.
+
 Writes WebP files under app/static/img/ and prints their CSS width/height.
 """
 from __future__ import annotations
@@ -98,18 +101,29 @@ def _box(page, selector, nth=0):
     return box
 
 
-def capture_applications(browser, base, password, wide: bool) -> tuple[int, int]:
-    vw, vh = (1408, 1600) if wide else (390, 1400)
-    ctx = browser.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=DPR)
+def _open_applications(browser, base, password, viewport):
+    """A logged-in page on /applications/ with the onboarding prompt dismissed: (context, page)."""
+    ctx = browser.new_context(viewport=viewport, device_scale_factor=DPR)
     page = ctx.new_page()
     _login(page, base, DEMO_EMAIL, password)
     page.goto(base + "/applications/", wait_until="networkidle")
     page.wait_for_timeout(1500)
     _dismiss_onboarding(page)
-    _tidy(page)
+    return ctx, page
+
+
+def _require_seeded_portfolio(page, label) -> None:
+    """Stop when the demo portfolio is not seeded: empty vendor or capability columns make a poor capture."""
     text = page.inner_text("body")
     if re.search(r"(?<!\d)0 of \d+ applications in the portfolio have a vendor", text) or "Not mapped" in text:
-        raise SystemExit("applications: vendor or capability columns are empty; run seed-demo-company first")
+        raise SystemExit(f"{label}: vendor or capability columns are empty; run seed-demo-company first")
+
+
+def capture_applications(browser, base, password, wide: bool) -> tuple[int, int]:
+    vw, vh = (1408, 1600) if wide else (390, 1400)
+    ctx, page = _open_applications(browser, base, password, {"width": vw, "height": vh})
+    _tidy(page)
+    _require_seeded_portfolio(page, "applications")
     main = _box(page, "main")
     # A 1408px viewport leaves a 1104px content column: exactly the public page figure width
     # (72rem less padding), so the crop is shown 1:1 and never shrunk.
@@ -205,6 +219,71 @@ def capture_home_impact(browser, base, password, wide: bool) -> tuple[int, int]:
     ctx.close()
     return size
 
+
+def capture_home_product(browser, base, password, wide: bool) -> tuple[int, int]:
+    """The product window under the home hero: the real /applications/ screen.
+
+    Desktop: the whole 1280x800 viewport (sidebar, top bar, content).
+    Desktop: scrolled so the application rows show under the top bar.
+    Phone: the 358px content column from the page heading down to the last whole
+    block (tiles, banner, cards) that ends within 780 CSS px of crop height.
+    """
+    vw, vh = (1280, 800) if wide else (390, 844)
+    ctx, page = _open_applications(browser, base, password, {"width": vw, "height": vh})
+    if wide:
+        aside = page.locator("[data-testid='sidebar']")
+        if aside.bounding_box()["width"] > 200:
+            page.locator("button.sidebar-collapse-btn").click()
+            page.wait_for_timeout(600)
+    _tidy(page)
+    # The build stamp line in the sidebar footer is not part of the product shown.
+    page.evaluate(
+        """() => document.querySelectorAll("[data-testid='sidebar'] p[title^='Build identifier']")
+                 .forEach((e) => { e.style.display = 'none'; })"""
+    )
+    _require_seeded_portfolio(page, "home product")
+    for label in ("Active Portfolio", "Strategic", "Tactical", "Sunset/Decom Pipeline", "Decommissioned"):
+        tile = page.get_by_text(label, exact=True).first.locator(
+            "xpath=ancestor::*[contains(@class,'rounded')][1]"
+        ).inner_text()
+        figures = re.findall(r"(?<![\d.])\d[\d,]*(?![\d.])", tile)
+        if not figures or int(figures[0].replace(",", "")) == 0:
+            raise SystemExit(f"home product: headline tile {label!r} reads zero or empty; run seed-demo-company first")
+    if wide:
+        # The tiles, banner and filters fill the first 800px; scroll the content the way a
+        # user would until the list card sits under the top bar, so the rows show.
+        page.evaluate(
+            """() => {
+              const card = document.querySelector("[data-testid='filter-bar']").parentElement;
+              let el = card.parentElement;
+              while (el && !/(auto|scroll)/.test(getComputedStyle(el).overflowY)) el = el.parentElement;
+              (el || document.scrollingElement).scrollTop += card.getBoundingClientRect().top - 105;
+            }"""
+        )
+        page.wait_for_timeout(500)
+        rows = page.locator("[data-testid^='app-row-']")
+        visible = sum(1 for i in range(rows.count()) if (b := rows.nth(i).bounding_box()) and b["y"] >= 0 and b["y"] + b["height"] <= vh)
+        if visible < 5:
+            raise SystemExit(f"home product: only {visible} application rows visible in the window")
+        png = page.screenshot(clip={"x": 0, "y": 0, "width": vw, "height": vh})
+    else:
+        page.evaluate("window.scrollTo(0, 0)")
+        main = _box(page, "main")
+        top = _box(page, "h1")["y"] - 8
+        # Whole blocks only: the tiles, the data-quality banner, then the cards if they fit.
+        bottom = top
+        for sel in ("[role='region'][aria-label='Portfolio statistics'] > *", "[data-testid^='mobile-card-']"):
+            for i in range(page.locator(sel).count()):
+                box = page.locator(sel).nth(i).bounding_box()
+                if box and box["height"] > 0 and box["y"] + box["height"] + 8 <= vh and box["y"] + box["height"] + 8 - top <= 780:
+                    bottom = max(bottom, box["y"] + box["height"] + 8)
+        if bottom - top < 400:
+            raise SystemExit("home product: phone crop holds no whole tiles block")
+        png = _shoot(page, {"x": main["x"] + 16, "y": top, "width": 358, "height": bottom - top})
+    name = "product-portfolio.webp" if wide else "product-portfolio-mobile.webp"
+    size = _webp(png, IMG / "home" / name)
+    ctx.close()
+    return size
 
 def role_email(archetype: str) -> str:
     return "smoke.%s.proof@example.com" % archetype.replace("_", "-")
@@ -327,6 +406,7 @@ def main() -> int:
                 return 0
             for label, fn in (
                 ("home impact answer", capture_home_impact),
+                ("home product window", capture_home_product),
                 ("applications", capture_applications),
                 ("arb", capture_arb),
             ):

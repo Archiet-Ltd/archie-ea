@@ -7,7 +7,7 @@ icon, breadcrumb, H1, lead and two buttons; section bands; card grids; the
 closing action band. Every other page family keeps the document layout.
 
 B-03 (use-case question/answer layout, MP-B2): a use-case page's "The
-question" section renders as a left-ruled callout instead of a plain prose
+question" section renders as a callout instead of a plain prose
 band, and its "What Entelim answers" section renders beside the page's own
 screenshot/recording when one exists (text-only, unchanged from the default
 band, when none does yet) -- see the ``variant``-specific tests below and
@@ -441,7 +441,7 @@ class _Outline(HTMLParser):
         classes = (attrs.get("class") or "").split()
         if tag == "h1":
             self.h1_count += 1
-        if tag == "a" and "public-btn" in classes and "bg-primary" in classes:
+        if tag == "a" and "public-btn" in classes and "public-btn--primary" in classes:
             if self._inside(lambda t, a: a.get("data-testid") == "landing-hero"):
                 self.hero_primary += 1
         if tag == "a" and self._inside(lambda t, a: t == "ul" and a.get("role") == "list"):
@@ -627,7 +627,7 @@ def test_waiting_list_page_hero_points_at_the_form(app):
     with app.test_client() as client:
         html = client.get(page.url).data.decode()
     hero = html[html.index('data-testid="landing-hero"'):html.index('class="landing-bands"')]
-    assert re.search(r'<a href="#feature-interest" class="public-btn bg-primary[^"]*">Tell us you need this</a>', hero)
+    assert re.search(r'<a href="#feature-interest" class="public-btn public-btn--primary">Tell us you need this</a>', hero)
     assert 'id="feature-interest"' in html
     assert 'data-testid="feature-interest-form"' in html
     assert "Start free" not in hero
@@ -637,12 +637,17 @@ def test_live_page_hero_offers_start_free(app):
     with app.test_client() as client:
         html = client.get("/modules/arb").data.decode()
     hero = html[html.index('data-testid="landing-hero"'):html.index('class="landing-bands"')]
-    assert re.search(r'<a href="/account/register" class="public-btn bg-primary[^"]*">Start free</a>', hero)
-    assert ">See pricing</a>" in hero
-    assert 'aria-label="Breadcrumb"' in hero and 'href="/features"' in hero
+    assert re.search(r'<a href="/account/register" class="public-btn public-btn--primary">Start free</a>', hero)
+    assert re.search(r'class="public-btn public-btn--outline">See pricing</a>', hero)
+    nav = hero[hero.index('aria-label="Breadcrumb"'):hero.index("</nav>")]
+    assert re.search(r'<a href="/features" class="[^"]*rounded-full[^"]*border-border[^"]*px-4 py-1.5[^"]*">', nav)
+    assert hero.index("</nav>") < hero.index("<h1")
     closing = html[html.index('data-testid="landing-closing"'):]
     assert "Import your model and get a free, cited answer to what breaks if a system fails, in minutes." in closing
     assert 'href="/contact"' in closing
+    assert re.search(r'class="public-btn public-btn--outline">Get in touch</a>', closing)
+    assert "text-center" in html[html.index('data-testid="landing-closing"') - 10:][:140]
+    assert "bg-primary" not in html[html.index('data-testid="landing-closing"') - 10:][:140]
 
 
 def test_use_case_hero_names_its_segment(app):
@@ -675,17 +680,15 @@ def test_use_case_hero_names_its_segment(app):
         ),
     ],
 )
-def test_use_case_question_renders_as_a_left_ruled_callout(app, url, question_text):
+def test_use_case_question_renders_as_a_callout_card(app, url, question_text):
     with app.test_client() as client:
         html = client.get(url).data.decode()
     assert 'data-testid="usecase-question-callout"' in html
     marker = html.index('data-testid="usecase-question-callout"')
     open_tag_start = html.rindex("<div", 0, marker)
     open_tag = html[open_tag_start:html.index(">", open_tag_start) + 1]
-    assert "border-l-4" in open_tag
-    assert "border-warning" in open_tag
-    assert "bg-warning/5" in open_tag
-    assert "rounded-r-lg" in open_tag
+    assert 'class="public-callout"' in open_tag
+    assert "border-l-4" not in open_tag
     callout = html[open_tag_start:html.index("</div>", marker)]
     assert question_text in callout
     # The callout sits inside the "The question" section band, after its own heading.
@@ -842,8 +845,8 @@ def test_home_and_role_pages_open_with_the_one_shared_hero(app):
         for slug in ROLE_SLUGS:
             html = client.get(f"/roles/{slug}").data.decode()
             hero = html[html.index('data-testid="landing-hero"'): html.index('data-testid="landing-hero-figure"')]
-            assert "home-hero__grid" in html and "home-frame" in html, slug
-            assert hero.count("public-btn") == 1, slug
+            assert "home-display" in html and "home-frame" in html, slug
+            assert hero.count("public-btn--primary") == 1, slug
             figure = html[html.index('data-testid="landing-hero-figure"'):]
             figure = figure[: figure.index("</figure>")]
             assert f"/static/img/roles/{slug}.webp" in figure, slug
