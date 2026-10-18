@@ -301,20 +301,31 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         # ── Saved ArchiMate diagrams (archimate.diagrams_library) ───────────
         from app.models.archimate_core import SavedDiagram, SavedDiagramElement
 
-        diagram_names = [
-            "Calibration estate overview",
-            "Event backbone target state",
-            "Supplier integration landscape",
+        # Each diagram's elements are laid out in rows of four: a saved
+        # diagram whose elements all sit at the origin opens as one stacked box.
+        calibration_service = [
+            "Calibration Approver", "Evaluate calibration", "Compute drift trend",
+            "Generate calibration certificate", "Calibration Ledger", "Calibration Lookup",
+            "Calibration result", "Sensor reading",
         ]
-        element_ids = [el.id for el in list(elements.values())[:6]]
-        for name in diagram_names:
+        first_six = [el.id for el in list(elements.values())[:6]]
+        diagrams = {
+            "Calibration estate overview": [elements[n].id for n in calibration_service],
+            "Event backbone target state": first_six,
+            "Supplier integration landscape": first_six,
+        }
+        for name, element_ids in diagrams.items():
             if SavedDiagram.query.filter_by(name=name).first():
                 continue
             diagram = SavedDiagram(name=name, created_by_id=demo_user_id)
             db.session.add(diagram)
             db.session.flush()
-            for element_id in element_ids:
-                db.session.add(SavedDiagramElement(diagram_id=diagram.id, element_id=element_id))
+            for index, element_id in enumerate(element_ids):
+                db.session.add(SavedDiagramElement(
+                    diagram_id=diagram.id, element_id=element_id,
+                    position_x=40 + (index % 4) * 260, position_y=40 + (index // 4) * 190,
+                    width=200, height=130,
+                ))
         db.session.flush()
 
         # ── Duplicate detection: one real duplicate, then run it ───────────
@@ -697,10 +708,27 @@ def _prepare_ask_proof(page, base: str) -> None:
     page.evaluate("document.querySelectorAll('*').forEach(e => { if (e.scrollTop) e.scrollTop = 0; })")
 
 
+def _prepare_saved_diagram(page, base: str) -> None:
+    """Open a saved diagram from the library in the Composer.
+
+    The library page only lists diagram names; the page's promise is the
+    diagram itself, so this follows the library's Open link for one of the
+    diagrams _seed_module_screen_data() saves.
+    """
+    row = page.locator("tr", has_text="Calibration estate overview")
+    row.get_by_role("link", name="Open").click()
+    page.get_by_text("Loaded: Calibration estate overview").wait_for(timeout=60000)
+    page.wait_for_timeout(1500)
+    # The first-use tip toast is not part of the screen being shown.
+    page.get_by_role("button", name="Close").first.click(timeout=2000) if page.get_by_text("Drag from a blue port dot").count() else None
+    _dismiss_onboarding(page)
+
+
 # Slugs whose screen needs steps beyond loading the path; run after the page
 # has loaded and before it is photographed.
 PAGE_PREPARE = {
     "digital-twin": _prepare_ask_proof,
+    "diagrams": _prepare_saved_diagram,
 }
 
 

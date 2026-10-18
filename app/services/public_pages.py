@@ -125,6 +125,9 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("digital-twin", "/intelligence/ask", DEMO_PERSONA,
      "Ask answering what depends on Calibration Ledger, with the proof drawer open on a connection Entelim worked out: the recorded links it was built from.",
      "Screenshot of the Ask screen showing the impact answer for the Calibration Ledger application, with the proof drawer open on a worked-out connection and the two recorded relationships behind it."),
+    ("diagrams", "/archimate/diagrams", DEMO_PERSONA,
+     "The Composer with a saved diagram open: a role, three business functions, an application with its service and two data objects, and the relationships between them.",
+     "Screenshot of the ArchiMate Composer with the saved diagram Calibration estate overview open, showing a business role and three business functions above an application component, an application service and two data objects."),
     ("duplicate-detection", "/duplicate-detection/simple", DEMO_PERSONA,
      "The duplicate detection dashboard, flagging applications that may overlap in function.",
      "Screenshot of the Duplicate Detection module's dashboard."),
@@ -193,10 +196,6 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
         "captured screen was the module's hub page (three link cards), not the "
         "organisation chart itself -- needs actors/hierarchy seeded and the "
         "/organization/chart route captured instead"
-    ),
-    "diagrams": (
-        "captured screen was a list of diagram names, not a rendered diagram -- "
-        "needs a diagram actually open in the Composer"
     ),
     "industry-apqc": "0 processes shown on every seeded framework",
     "investment-analysis": "domain Unknown and 0 apps coverage on every capability row",
