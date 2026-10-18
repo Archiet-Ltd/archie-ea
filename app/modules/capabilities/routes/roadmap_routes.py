@@ -1178,7 +1178,9 @@ def api_roadmap_create_work_package(gap_id):
         from app.models.implementation_migration import Gap
         from app.services.gap_archimate_service import gap_archimate_service
 
-        gap = Gap.query.get(gap_id)
+        # A query, not .get(): .get() answers from the session's identity map
+        # without SQL, which would skip the organisation filter on a cache hit.
+        gap = Gap.query.filter_by(id=gap_id).first()
         if not gap:
             return jsonify({"success": False, "error": "Gap not found"}), 404
 
