@@ -1,0 +1,144 @@
+{% extends 'onboarding/_wizard_shell.html' %}
+{% from 'components/empty_state.html' import empty_state %}
+{% set step_title = 'Review' %}
+{% set step_number = 5 %}
+
+{% block wizard_content %}
+<div x-data="{
+        pending: {{ pending | tojson | forceescape }},
+        decided: {{ decided | tojson | forceescape }},
+        editingId: null,
+        editValue: '',
+        busyId: null,
+        errorMessage: '',
+        statusLabel(item) {
+            if (item.status === 'confirmed') { return 'Confirmed: ' + item.decided_value; }
+            if (item.status === 'edited') { return 'Confirmed (edited): ' + item.decided_value; }
+            if (item.status === 'dismissed') { return 'Dismissed'; }
+            return '';
+        },
+        startEdit(item) {
+            this.editingId = item.id;
+            this.editValue = item.value;
+            this.errorMessage = '';
+        },
+        cancelEdit() {
+            this.editingId = null;
+            this.editValue = '';
+        },
+        decide(item, action, value) {
+            this.busyId = item.id;
+            this.errorMessage = '';
+            const body = {action: action};
+            if (value !== undefined) { body.value = value; }
+            window.Platform.fetch(
+                '{{ url_for('onboarding.review_action', the_proposal_id='__ID__') }}'.replace('__ID__', encodeURIComponent(item.id)),
+                {method: 'POST', body: body, silent: true}
+            ).then(data => {
+                this.busyId = null;
+                if (data && data.success) {
+                    const proposal = data.data.proposal;
+                    this.pending = this.pending.filter(p => p.id !== item.id);
+                    item.status = proposal.status;
+                    item.decided_value = proposal.decided_value;
+                    this.decided.unshift(item);
+                    this.editingId = null;
+                    this.editValue = '';
+                } else {
+                    this.errorMessage = 'Something went wrong -- try again.';
+                }
+            }).catch(() => {
+                this.busyId = null;
+                this.errorMessage = 'Something went wrong -- try again.';
+            });
+        }
+    }"
+    class="p-8 space-y-6">
+    <div class="space-y-1">
+        <h1 class="text-lg font-bold text-foreground">Review</h1>
+        <p class="text-sm text-muted-foreground">
+            What we can already tell about your company, each with where it came from and how sure we are.
+            Nothing is added to your profile until you confirm it.
+        </p>
+    </div>
+
+    {% if not has_any %}
+    {{ empty_state(
+        icon='inbox',
+        title='Nothing to review yet',
+        description="When we read your website, what we find appears here for you to confirm.",
+        padding='py-10'
+    ) }}
+    {% else %}
+
+    <div x-show="pending.length" class="space-y-2">
+        <template x-for="item in pending" :key="item.id">
+            <div class="rounded-lg border border-border p-3 space-y-2">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                    <div class="space-y-1">
+                        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground" x-text="item.field_label"></p>
+                        <p class="text-sm font-medium text-foreground" x-text="item.value"></p>
+                        <p class="text-xs text-muted-foreground">
+                            <span x-text="item.source_label"></span>
+                            <span aria-hidden="true"> &middot; </span>
+                            <span x-text="item.confidence"></span>
+                        </p>
+                        <p class="text-xs text-muted-foreground" x-show="item.reason" x-text="item.reason"></p>
+                    </div>
+                    <div class="flex gap-2 shrink-0" x-show="editingId !== item.id">
+                        <button type="button" @click="decide(item, 'confirm')" :disabled="busyId === item.id"
+                                class="rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-3 disabled:opacity-50">
+                            Confirm
+                        </button>
+                        <button type="button" @click="startEdit(item)" :disabled="busyId === item.id"
+                                class="rounded-md text-xs font-medium border border-input bg-background hover:bg-accent h-8 px-3 disabled:opacity-50">
+                            Edit
+                        </button>
+                        <button type="button" @click="decide(item, 'dismiss')" :disabled="busyId === item.id"
+                                class="rounded-md text-xs font-medium text-muted-foreground hover:bg-accent h-8 px-3 disabled:opacity-50">
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+                <div x-show="editingId === item.id" x-cloak class="flex gap-2 pt-1">
+                    <input type="text" x-model="editValue"
+                           class="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-xs">
+                    <button type="button" @click="decide(item, 'edit', editValue)" :disabled="busyId === item.id"
+                            class="rounded-md text-xs font-medium bg-primary text-primary-foreground h-8 px-3 shrink-0 disabled:opacity-50">
+                        Save
+                    </button>
+                    <button type="button" @click="cancelEdit()"
+                            class="rounded-md text-xs font-medium border border-input bg-background hover:bg-accent h-8 px-3 shrink-0">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <p x-show="!pending.length" x-cloak class="text-sm text-muted-foreground">
+        Nothing waiting on you right now -- anything new we can tell will appear here.
+    </p>
+
+    <p x-show="errorMessage" x-cloak x-text="errorMessage" class="text-sm text-destructive" role="alert"></p>
+
+    <div x-show="decided.length" x-cloak class="border-t border-border pt-4 space-y-2">
+        <h2 class="text-sm font-semibold text-foreground">Already decided</h2>
+        <template x-for="item in decided" :key="item.id">
+            <div class="rounded-lg border border-border/60 p-3 opacity-70">
+                <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground" x-text="item.field_label"></p>
+                <p class="text-sm text-foreground" x-text="statusLabel(item)"></p>
+                <p class="text-xs text-muted-foreground" x-text="item.source_label"></p>
+            </div>
+        </template>
+    </div>
+
+    {% endif %}
+
+    <a href="{{ url_for('onboarding.twin') }}"
+       class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium
+              border border-input bg-background hover:bg-accent h-9 px-4 py-2">
+        Back to your twin
+    </a>
+</div>
+{% endblock %}
