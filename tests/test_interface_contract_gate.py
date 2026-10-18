@@ -575,6 +575,64 @@ ELEMENT_ROUTES = [
     ("/api/v1/elements/<int:element_id>", ["GET"], "api:read"),
 ]
 
+STRATEGY_ROUTES = [
+    ("/api/v1/capabilities", ["GET"], "api:read"),
+    ("/api/v1/capabilities/<int:capability_id>", ["GET"], "api:read"),
+    ("/api/v1/value-streams", ["GET"], "api:read"),
+    ("/api/v1/value-streams/<int:value_stream_id>", ["GET"], "api:read"),
+]
+
+ALL_ROUTES = ELEMENT_ROUTES + STRATEGY_ROUTES
+
+
+def _six_operation_contract() -> dict:
+    """The committed subset's six operations: the two element reads and the
+    four strategy reads this slice builds. The gate matches routes to
+    operations by path and method, so the fixture contract must list every
+    token-accepting route the real application registers."""
+    contract = _minimal_contract()
+    contract["paths"]["/capabilities"] = {
+        "get": {
+            "operationId": "listCapabilities",
+            "summary": "List Capability records",
+            "tags": ["Strategy"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/capabilities/{id}"] = {
+        "get": {
+            "operationId": "getCapability",
+            "summary": "Get a Capability",
+            "tags": ["Strategy"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/value-streams"] = {
+        "get": {
+            "operationId": "listValueStreams",
+            "summary": "List Value Stream records",
+            "tags": ["Strategy"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/value-streams/{id}"] = {
+        "get": {
+            "operationId": "getValueStream",
+            "summary": "Get a Value Stream",
+            "tags": ["Strategy"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    return contract
+
 
 class TestCheckInterfaceContract:
     """Tests for scripts/check_interface_contract.py."""
@@ -699,7 +757,7 @@ class TestCheckInterfaceContract:
         """A subset operation with no route is counted by check (ii) and does
         not fail while the count is at most the baseline."""
         gate = _gate_module()
-        subset = _minimal_contract()
+        subset = _six_operation_contract()
         subset["paths"]["/extra"] = {
             "get": {
                 "operationId": "listExtra",
@@ -709,7 +767,9 @@ class TestCheckInterfaceContract:
                 "security": [{"entelimOAuth": ["model:read"]}],
             }
         }
-        assert gate.count_unbuilt_operations(_app_with_routes(ELEMENT_ROUTES), subset) == 1
+        # The probe app must register every route the subset lists, or the
+        # listed-but-unbuilt operations would be counted too.
+        assert gate.count_unbuilt_operations(_app_with_routes(ALL_ROUTES), subset) == 1
 
         subset_path = tmp_path / "subset.yaml"
         _write_contract(subset_path, subset)
@@ -804,7 +864,7 @@ class TestZeroGateIsIndependentOfTheRatchet:
         """One unbuilt operation with the ratchet at 1: the zero gate PASSES
         (it used to fail with '[1 > 0]') and the ratchet gate passes."""
         verify = _verify_module()
-        subset = _minimal_contract()
+        subset = _six_operation_contract()
         subset["paths"]["/extra"] = EXTRA_OPERATION
         subset_path = tmp_path / "subset.yaml"
         _write_contract(subset_path, subset)
@@ -819,7 +879,7 @@ class TestZeroGateIsIndependentOfTheRatchet:
         measured count is the number of violations (one), not one more for the
         header line."""
         verify = _verify_module()
-        subset = _minimal_contract()
+        subset = _six_operation_contract()
         del subset["paths"]["/elements/{id}"]
         subset_path = tmp_path / "subset.yaml"
         _write_contract(subset_path, subset)
@@ -833,7 +893,7 @@ class TestZeroGateIsIndependentOfTheRatchet:
         assert results["interface-contract-unimplemented"].status == verify.PASS
 
     def test_unlisted_only_flag_skips_the_ratchet(self, tmp_path):
-        subset = _minimal_contract()
+        subset = _six_operation_contract()
         subset["paths"]["/extra"] = EXTRA_OPERATION
         subset_path = tmp_path / "subset.yaml"
         _write_contract(subset_path, subset)
