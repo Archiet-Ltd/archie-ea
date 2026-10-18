@@ -367,7 +367,13 @@ entries:
       - app/modules/dashboard/v2/services/executive_dashboard_service.py (_get_health_score, format_health_score)
       - app/modules/solutions_strategic/v2/services/gap_analysis_service.py (calculate_health_score)
       - app/modules/solutions_strategic/v2/services/execution_tracking_service.py (_calculate_health_score)
-    note: six computations of "health" with different inputs and scales; the product-manager picks the owner.
+    note: >
+      Read in full (Oct 2026). These answer different questions and are not one concept: capability health
+      (CapabilityHealthService), portfolio health (ExecutiveDashboardService._get_health_score) and delivery
+      RAG (ExecutionTrackingService) must stay apart. The ArchiMateMetricsService copy in
+      unified_archimate_services.py is a verbatim duplicate of archimate_metrics_service.py, and the gap
+      analysis calculate_health_score is unreferenced in two files. Split into per-question entries once the
+      product-manager confirms the dedupe.
 
   - id: search
     concept: Search across the model
@@ -377,16 +383,34 @@ entries:
       - app/services/apqc_hierarchy_service.py (search_processes)
       - app/services/conversation_history.py (search_conversations)
       - app/services/faiss_apqc_service.py and chromadb_apqc_service.py (similarity search)
-    note: only EnterpriseSearchService spans entity types, but it is wired to one route module, so it is not yet shown to be the product's search.
+    note: >
+      The product's search bar calls /api/sidebar/search, api_global_search in app/routes/sidebar_api_hardened.py,
+      which is not listed above. EnterpriseSearchService is reached only by /enterprise/search and no page
+      calls that route. The APQC and conversation searches are domain-specific. Split once the product-manager
+      decides whether EnterpriseSearchService is retired or folded into api_global_search.
 
-  - id: export
-    concept: Exporting a model or view (file formats)
-    status: undetermined
-    candidates:
-      - app/services/composer_export_formats.py (Mermaid, Lucid, Archi, canvas viewpoint export)
-      - app/services/archimate_export_service.py (saved viewpoint export)
-      - app/services/archimate_xml_export_service.py (export_to_xml)
-    note: three export services by format family; one dispatcher has not been chosen.
+  - id: viewpoint-export
+    concept: Exporting a diagram or viewpoint (saved or live canvas) to Mermaid, Lucid, Archi or ArchiMate Exchange XML
+    status: active
+    canonical:
+      path: app/services/composer_export_formats.py
+      symbols: [render_viewpoint, export_canvas_viewpoint]
+    reuse: >
+      Render a viewpoint dict through render_viewpoint(vp, fmt); canvas pages (business model canvas, business
+      case) go through export_canvas_viewpoint. ArchiMate Exchange XML for a viewpoint is produced by
+      app/services/archimate_export_service.py, which render_viewpoint already delegates to; do not write a
+      second per-format branch in a route.
+
+  - id: model-export
+    concept: Exporting a whole ArchiMate model (all elements and relationships, scoped by model id) to Open Exchange XML
+    status: active
+    canonical:
+      path: app/modules/architecture/services/archimate_xml_export_service.py
+      symbols: [export_to_xml, ArchiMateXMLExportService]
+    reuse: >
+      Use export_to_xml(model_id) from the architecture module. The app/services/archimate_xml_export_service.py
+      file is a flat, layer-less stub and is not the exporter the product uses; do not import or extend it.
+      Exporting a diagram (a viewpoint) is the separate viewpoint-export entry.
 
   - id: owner-record
     concept: The owner of an application, capability or element (the record itself, as opposed to its display rows)
