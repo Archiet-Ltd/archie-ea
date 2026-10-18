@@ -1,0 +1,955 @@
+{
+  "organization": "acme",
+  "responses": {
+    "orgs/acme/repos": [
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": "Card and bank payments",
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/payments-service",
+        "html_url": "https://github.com/acme/payments-service",
+        "id": 7001,
+        "is_template": false,
+        "language": "Python",
+        "name": "payments-service",
+        "node_id": "R_7001",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "private": true,
+        "pushed_at": "2026-10-10T09:15:00Z",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2026-10-10T09:15:00Z",
+        "visibility": "private"
+      },
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": "Customer web portal",
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/customer-portal",
+        "html_url": "https://github.com/acme/customer-portal",
+        "id": 7002,
+        "is_template": false,
+        "language": "TypeScript",
+        "name": "customer-portal",
+        "node_id": "R_7002",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "private": true,
+        "pushed_at": "2026-10-12T14:02:00Z",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2026-10-12T14:02:00Z",
+        "visibility": "private"
+      },
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": "Invoicing API",
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/billing-api",
+        "html_url": "https://github.com/acme/billing-api",
+        "id": 7003,
+        "is_template": false,
+        "language": "Java",
+        "name": "billing-api",
+        "node_id": "R_7003",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "private": true,
+        "pushed_at": "2026-09-30T08:00:00Z",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2026-09-30T08:00:00Z",
+        "visibility": "private"
+      },
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": null,
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/inventory-service",
+        "html_url": "https://github.com/acme/inventory-service",
+        "id": 7004,
+        "is_template": false,
+        "language": "Go",
+        "name": "inventory-service",
+        "node_id": "R_7004",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "private": true,
+        "pushed_at": "2026-10-01T11:30:00Z",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2026-10-01T11:30:00Z",
+        "visibility": "private"
+      },
+      {
+        "archived": true,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": null,
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/legacy-crm",
+        "html_url": "https://github.com/acme/legacy-crm",
+        "id": 7005,
+        "is_template": false,
+        "language": "PHP",
+        "name": "legacy-crm",
+        "node_id": "R_7005",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "private": true,
+        "pushed_at": "2024-03-02T10:00:00Z",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2024-03-02T10:00:00Z",
+        "visibility": "private"
+      },
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": null,
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/orders-worker",
+        "html_url": "https://github.com/acme/orders-worker",
+        "id": 7006,
+        "is_template": false,
+        "language": "Go",
+        "name": "orders-worker",
+        "node_id": "R_7006",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "private": true,
+        "pushed_at": "2026-10-14T16:45:00Z",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2026-10-14T16:45:00Z",
+        "visibility": "private"
+      },
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": null,
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/shared-utils",
+        "html_url": "https://github.com/acme/shared-utils",
+        "id": 7007,
+        "is_template": false,
+        "language": "Python",
+        "name": "shared-utils",
+        "node_id": "R_7007",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "private": true,
+        "pushed_at": "2026-08-20T07:10:00Z",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2026-08-20T07:10:00Z",
+        "visibility": "private"
+      },
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": null,
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/infra-terraform",
+        "html_url": "https://github.com/acme/infra-terraform",
+        "id": 7008,
+        "is_template": false,
+        "language": "HCL",
+        "name": "infra-terraform",
+        "node_id": "R_7008",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "private": true,
+        "pushed_at": "2026-10-05T12:00:00Z",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2026-10-05T12:00:00Z",
+        "visibility": "private"
+      },
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": null,
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/engineering-handbook",
+        "html_url": "https://github.com/acme/engineering-handbook",
+        "id": 7009,
+        "is_template": false,
+        "language": null,
+        "name": "engineering-handbook",
+        "node_id": "R_7009",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "private": true,
+        "pushed_at": "2026-07-11T10:00:00Z",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2026-07-11T10:00:00Z",
+        "visibility": "private"
+      },
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": null,
+        "disabled": false,
+        "fork": true,
+        "full_name": "acme/old-prototype",
+        "html_url": "https://github.com/acme/old-prototype",
+        "id": 7010,
+        "is_template": false,
+        "language": "JavaScript",
+        "name": "old-prototype",
+        "node_id": "R_7010",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "private": true,
+        "pushed_at": "2023-05-01T10:00:00Z",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2023-05-01T10:00:00Z",
+        "visibility": "private"
+      },
+      {
+        "archived": true,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": null,
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/archive-2019",
+        "html_url": "https://github.com/acme/archive-2019",
+        "id": 7011,
+        "is_template": false,
+        "language": "Java",
+        "name": "archive-2019",
+        "node_id": "R_7011",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "private": true,
+        "pushed_at": "2019-12-01T10:00:00Z",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2019-12-01T10:00:00Z",
+        "visibility": "private"
+      },
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": null,
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/mobile-app",
+        "html_url": "https://github.com/acme/mobile-app",
+        "id": 7012,
+        "is_template": false,
+        "language": "Kotlin",
+        "name": "mobile-app",
+        "node_id": "R_7012",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "private": true,
+        "pushed_at": "2026-10-09T13:20:00Z",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2026-10-09T13:20:00Z",
+        "visibility": "private"
+      }
+    ],
+    "orgs/acme/teams": [
+      {
+        "html_url": "https://github.com/orgs/acme/teams/payments-team",
+        "id": 101,
+        "name": "Payments team",
+        "node_id": "T_101",
+        "parent": null,
+        "privacy": "closed",
+        "slug": "payments-team"
+      },
+      {
+        "html_url": "https://github.com/orgs/acme/teams/web-team",
+        "id": 102,
+        "name": "Web team",
+        "node_id": "T_102",
+        "parent": null,
+        "privacy": "closed",
+        "slug": "web-team"
+      },
+      {
+        "html_url": "https://github.com/orgs/acme/teams/platform-team",
+        "id": 103,
+        "name": "Platform team",
+        "node_id": "T_103",
+        "parent": null,
+        "privacy": "closed",
+        "slug": "platform-team"
+      }
+    ],
+    "orgs/acme/teams/payments-team/repos": [
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": "Card and bank payments",
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/payments-service",
+        "html_url": "https://github.com/acme/payments-service",
+        "id": 7001,
+        "is_template": false,
+        "language": "Python",
+        "name": "payments-service",
+        "node_id": "R_7001",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "permissions": {
+          "admin": true,
+          "maintain": true,
+          "pull": true,
+          "push": true,
+          "triage": true
+        },
+        "private": true,
+        "pushed_at": "2026-10-10T09:15:00Z",
+        "role_name": "admin",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2026-10-10T09:15:00Z",
+        "visibility": "private"
+      },
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": null,
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/inventory-service",
+        "html_url": "https://github.com/acme/inventory-service",
+        "id": 7004,
+        "is_template": false,
+        "language": "Go",
+        "name": "inventory-service",
+        "node_id": "R_7004",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "permissions": {
+          "admin": false,
+          "maintain": false,
+          "pull": true,
+          "push": true,
+          "triage": true
+        },
+        "private": true,
+        "pushed_at": "2026-10-01T11:30:00Z",
+        "role_name": "push",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2026-10-01T11:30:00Z",
+        "visibility": "private"
+      }
+    ],
+    "orgs/acme/teams/platform-team/repos": [
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": "Invoicing API",
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/billing-api",
+        "html_url": "https://github.com/acme/billing-api",
+        "id": 7003,
+        "is_template": false,
+        "language": "Java",
+        "name": "billing-api",
+        "node_id": "R_7003",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "permissions": {
+          "admin": true,
+          "maintain": true,
+          "pull": true,
+          "push": true,
+          "triage": true
+        },
+        "private": true,
+        "pushed_at": "2026-09-30T08:00:00Z",
+        "role_name": "admin",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2026-09-30T08:00:00Z",
+        "visibility": "private"
+      },
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": null,
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/infra-terraform",
+        "html_url": "https://github.com/acme/infra-terraform",
+        "id": 7008,
+        "is_template": false,
+        "language": "HCL",
+        "name": "infra-terraform",
+        "node_id": "R_7008",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "permissions": {
+          "admin": true,
+          "maintain": true,
+          "pull": true,
+          "push": true,
+          "triage": true
+        },
+        "private": true,
+        "pushed_at": "2026-10-05T12:00:00Z",
+        "role_name": "admin",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2026-10-05T12:00:00Z",
+        "visibility": "private"
+      },
+      {
+        "archived": true,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": null,
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/legacy-crm",
+        "html_url": "https://github.com/acme/legacy-crm",
+        "id": 7005,
+        "is_template": false,
+        "language": "PHP",
+        "name": "legacy-crm",
+        "node_id": "R_7005",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "permissions": {
+          "admin": false,
+          "maintain": false,
+          "pull": true,
+          "push": true,
+          "triage": true
+        },
+        "private": true,
+        "pushed_at": "2024-03-02T10:00:00Z",
+        "role_name": "push",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2024-03-02T10:00:00Z",
+        "visibility": "private"
+      }
+    ],
+    "orgs/acme/teams/web-team/repos": [
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": "Customer web portal",
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/customer-portal",
+        "html_url": "https://github.com/acme/customer-portal",
+        "id": 7002,
+        "is_template": false,
+        "language": "TypeScript",
+        "name": "customer-portal",
+        "node_id": "R_7002",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "permissions": {
+          "admin": true,
+          "maintain": true,
+          "pull": true,
+          "push": true,
+          "triage": true
+        },
+        "private": true,
+        "pushed_at": "2026-10-12T14:02:00Z",
+        "role_name": "admin",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2026-10-12T14:02:00Z",
+        "visibility": "private"
+      },
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": null,
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/mobile-app",
+        "html_url": "https://github.com/acme/mobile-app",
+        "id": 7012,
+        "is_template": false,
+        "language": "Kotlin",
+        "name": "mobile-app",
+        "node_id": "R_7012",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "permissions": {
+          "admin": false,
+          "maintain": false,
+          "pull": true,
+          "push": true,
+          "triage": true
+        },
+        "private": true,
+        "pushed_at": "2026-10-09T13:20:00Z",
+        "role_name": "push",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2026-10-09T13:20:00Z",
+        "visibility": "private"
+      },
+      {
+        "archived": false,
+        "created_at": "2022-01-04T09:00:00Z",
+        "default_branch": "main",
+        "description": "Card and bank payments",
+        "disabled": false,
+        "fork": false,
+        "full_name": "acme/payments-service",
+        "html_url": "https://github.com/acme/payments-service",
+        "id": 7001,
+        "is_template": false,
+        "language": "Python",
+        "name": "payments-service",
+        "node_id": "R_7001",
+        "open_issues_count": 3,
+        "owner": {
+          "id": 1,
+          "login": "acme",
+          "type": "Organization"
+        },
+        "permissions": {
+          "admin": false,
+          "maintain": false,
+          "pull": true,
+          "push": false,
+          "triage": true
+        },
+        "private": true,
+        "pushed_at": "2026-10-10T09:15:00Z",
+        "role_name": "read",
+        "size": 1200,
+        "topics": [],
+        "updated_at": "2026-10-10T09:15:00Z",
+        "visibility": "private"
+      }
+    ],
+    "repos/acme/archive-2019/contents": [
+      {
+        "name": "pom.xml",
+        "path": "pom.xml",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      }
+    ],
+    "repos/acme/billing-api/contents": [
+      {
+        "name": "pom.xml",
+        "path": "pom.xml",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "src",
+        "path": "src",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "dir"
+      },
+      {
+        "name": "README.md",
+        "path": "README.md",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      }
+    ],
+    "repos/acme/customer-portal/contents": [
+      {
+        "name": "CODEOWNERS",
+        "path": "CODEOWNERS",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "src",
+        "path": "src",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "dir"
+      },
+      {
+        "name": "package.json",
+        "path": "package.json",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "Dockerfile",
+        "path": "Dockerfile",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "README.md",
+        "path": "README.md",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      }
+    ],
+    "repos/acme/customer-portal/contents/CODEOWNERS": {
+      "content": "KiBAYWNtZS93ZWItdGVhbQoqLmNzcyBAYWNtZS9kZXNpZ24K\n",
+      "encoding": "base64",
+      "name": "CODEOWNERS",
+      "path": "CODEOWNERS",
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "size": 36,
+      "type": "file"
+    },
+    "repos/acme/engineering-handbook/contents": [
+      {
+        "name": "README.md",
+        "path": "README.md",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "docs",
+        "path": "docs",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "dir"
+      },
+      {
+        "name": "mkdocs.yml",
+        "path": "mkdocs.yml",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      }
+    ],
+    "repos/acme/infra-terraform/contents": [
+      {
+        "name": "main.tf",
+        "path": "main.tf",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "variables.tf",
+        "path": "variables.tf",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "modules",
+        "path": "modules",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "dir"
+      },
+      {
+        "name": "README.md",
+        "path": "README.md",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      }
+    ],
+    "repos/acme/inventory-service/contents": [
+      {
+        "name": ".github",
+        "path": ".github",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "dir"
+      },
+      {
+        "name": "go.mod",
+        "path": "go.mod",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "main.go",
+        "path": "main.go",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "Dockerfile",
+        "path": "Dockerfile",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      }
+    ],
+    "repos/acme/inventory-service/contents/.github/CODEOWNERS": {
+      "content": "KiBwZXJzb24udHdvQGV4YW1wbGUudGVzdAo=\n",
+      "encoding": "base64",
+      "name": "CODEOWNERS",
+      "path": ".github/CODEOWNERS",
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "size": 26,
+      "type": "file"
+    },
+    "repos/acme/legacy-crm/contents": [
+      {
+        "name": "index.php",
+        "path": "index.php",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "README.md",
+        "path": "README.md",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      }
+    ],
+    "repos/acme/mobile-app/contents": [
+      {
+        "name": "build.gradle",
+        "path": "build.gradle",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "app",
+        "path": "app",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "dir"
+      },
+      {
+        "name": "gradle",
+        "path": "gradle",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "dir"
+      },
+      {
+        "name": "README.md",
+        "path": "README.md",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      }
+    ],
+    "repos/acme/old-prototype/contents": [
+      {
+        "name": "package.json",
+        "path": "package.json",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "index.js",
+        "path": "index.js",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      }
+    ],
+    "repos/acme/orders-worker/contents": [
+      {
+        "name": "Dockerfile",
+        "path": "Dockerfile",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "go.mod",
+        "path": "go.mod",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "cmd",
+        "path": "cmd",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "dir"
+      },
+      {
+        "name": "README.md",
+        "path": "README.md",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      }
+    ],
+    "repos/acme/payments-service/contents": [
+      {
+        "name": ".github",
+        "path": ".github",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "dir"
+      },
+      {
+        "name": "src",
+        "path": "src",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "dir"
+      },
+      {
+        "name": "tests",
+        "path": "tests",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "dir"
+      },
+      {
+        "name": "Dockerfile",
+        "path": "Dockerfile",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "pyproject.toml",
+        "path": "pyproject.toml",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "README.md",
+        "path": "README.md",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      }
+    ],
+    "repos/acme/payments-service/contents/.github/CODEOWNERS": {
+      "content": "IyBQYXltZW50cyBvd25lcnMKKiBAYWNtZS9wYXltZW50cy10ZWFtIG93bmVyLm9uZUBleGFtcGxl\nLnRlc3QKL2RvY3MvIEBhY21lL3RlY2gtd3JpdGVycwo=\n",
+      "encoding": "base64",
+      "name": "CODEOWNERS",
+      "path": ".github/CODEOWNERS",
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "size": 89,
+      "type": "file"
+    },
+    "repos/acme/shared-utils/contents": [
+      {
+        "name": "pyproject.toml",
+        "path": "pyproject.toml",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "setup.cfg",
+        "path": "setup.cfg",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      },
+      {
+        "name": "src",
+        "path": "src",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "dir"
+      },
+      {
+        "name": "tests",
+        "path": "tests",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "dir"
+      },
+      {
+        "name": "README.md",
+        "path": "README.md",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "type": "file"
+      }
+    ]
+  }
+}
