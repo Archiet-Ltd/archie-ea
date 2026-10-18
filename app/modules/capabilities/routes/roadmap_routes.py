@@ -2207,7 +2207,6 @@ def api_capability_traceability(capability_id):
 
 @capability_map.route("/api/roadmap/gaps/<int:gap_id>/link-plateau/<int:plateau_id>", methods=["POST"])
 @login_required
-@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @rate_limit(30, "1m")
 @require_roles(*_LINK_WRITE_ROLES)
 @audit_log("roadmap_gap_link_plateau")
@@ -2239,7 +2238,6 @@ def api_roadmap_gap_link_plateau(gap_id: int, plateau_id: int):
 
 @capability_map.route("/api/roadmap/gaps/<int:gap_id>/unlink-plateau/<int:plateau_id>", methods=["POST"])
 @login_required
-@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @rate_limit(30, "1m")
 @require_roles(*_LINK_WRITE_ROLES)
 @audit_log("roadmap_gap_unlink_plateau")
