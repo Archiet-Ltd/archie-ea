@@ -139,10 +139,21 @@ def test_each_permitted_type_passes(app, connector_type):
         assert assert_connector_permitted(connector_type) is None
 
 
-def test_permitted_set_has_exactly_the_expected_six_members():
+def test_permitted_set_has_exactly_the_expected_seven_members():
     assert PERMITTED_CONNECTOR_TYPES == frozenset(
-        {"servicenow", "jira", "m365", "devops", "lucidchart", "ea_tool"}
+        {"servicenow", "jira", "m365", "devops", "lucidchart", "ea_tool", "github"}
     )
+
+
+def test_github_justification_is_recorded_in_module_source():
+    """github's basis (repository metadata only, read-only token, a person recorded
+    as an owner only when their e-mail is a user of the same organisation) is a
+    plain code comment next to the allowlist, not left implicit."""
+    import inspect
+
+    source = inspect.getsource(gate_module)
+    assert "github" in source
+    assert "read-only token" in source
 
 
 def test_ea_tool_justification_is_recorded_in_module_source():
