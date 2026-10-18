@@ -333,12 +333,8 @@
 
         <!-- No Applications -->
         {% if not healthy and not at_risk and not critical and not unknown %}
-        <div class="bg-card border border-border rounded-lg p-12 text-center">
-            <div class="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
-                <i data-lucide="package" class="w-8 h-8 text-muted-foreground"></i>
-            </div>
-            <h3 class="text-lg font-medium mb-2">No applications found</h3>
-            <p class="text-muted-foreground">You don't have any applications assigned to you yet.</p>
+        <div class="bg-card border border-border rounded-lg">
+            {% include 'my_applications/_no_owned_applications.html' %}
         </div>
         {% endif %}
     </div>

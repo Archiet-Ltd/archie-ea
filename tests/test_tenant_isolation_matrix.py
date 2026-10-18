@@ -431,15 +431,11 @@ SHARED_MODELS = {
 # Leaks the sweep finds in code another open change owns. Each stays a strict
 # expected failure naming its owner (test_known_leak_is_still_open below), so it
 # turns red the moment the owner's fix lands and the entry must come out.
-_PR258 = "PR 258 (scoring/consolidation): consolidation entries are fenced through their application"
 KNOWN_LEAKS = {
     # PR 421 (one work package store) scoped the deliverable update and delete
     # through the organisation's own work packages; test_known_leak_is_still_open
     # went XPASS(strict) on both, so their entries come out.
     "DELETE /capability-map/api/archimate-mappings/<int:mapping_id>": "capability store brief",
-    "DELETE /consolidation-list/api/entry/<int:entry_id>": _PR258,
-    "PUT /consolidation-list/api/entry/<int:entry_id>": _PR258,
-    "GET /consolidation-list/api/entry/<int:entry_id>/detail": _PR258,
 }
 
 # Parameters whose record the codebase reading no longer finds, because the lookup moved

@@ -57,7 +57,8 @@ POLICY = {
     # (RegulatoryFramework/ComplianceControl, a different store from the
     # procurement compliance page above) -- every persona can reach it.
     "/dashboard/compliance":   set(ARCHETYPES),
-    # risk.risk_register is @login_required only.
+    # risk.risk_register and risk.risk_page (/risks/<id>, 404 for another
+    # organisation's risk, pinned in tests/test_risk_ranking.py) are @login_required only.
     "/risks/":                 set(ARCHETYPES),
     "/my-applications/":       {"application_manager"},
     "/my-applications/list":   {"application_manager"},
@@ -575,6 +576,41 @@ def test_data_entity_page_authorisation(archetype, page, live_server, seeded, se
 
 def test_data_entity_page_rejects_anonymous(page, live_server, seeded_data_entity):
     path = "/architecture/data-entities/%d" % seeded_data_entity
+    response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert "/account/login" in page.url or (response is not None and response.status >= 400), (
+        "%s was served without signing in" % path)
+
+
+@pytest.fixture(scope="module")
+def seeded_risk(seeded):
+    """A real Risk in the seeded org, for the risk page's <id> path."""
+    from app import create_app, db
+    from app.models.risk import Risk
+
+    app = create_app("testing")
+    with app.app_context():
+        org_id = seeded["ids"]["org"]
+        title = "Auth-matrix probe risk %s" % org_id
+        risk = Risk.query.filter_by(title=title, organization_id=org_id).first()
+        if risk is None:
+            risk = Risk(title=title, likelihood=3, impact=3, organization_id=org_id)
+            db.session.add(risk)
+            db.session.commit()
+        return risk.id
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_risk_page_authorisation(archetype, page, live_server, seeded, seeded_risk):
+    """GET /risks/<id> carries @login_required and no role gate, like the risk
+    register it is opened from; the risk is fenced to its organisation by the lookup."""
+    _login(page, live_server, seeded["emails"][archetype])
+    path = "/risks/%d" % seeded_risk
+    actual = _observe(page, live_server, path)
+    assert actual == ALLOWED, "%s could not reach %s: expected ALLOWED" % (archetype, path)
+
+
+def test_risk_page_rejects_anonymous(page, live_server, seeded_risk):
+    path = "/risks/%d" % seeded_risk
     response = page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert "/account/login" in page.url or (response is not None and response.status >= 400), (
         "%s was served without signing in" % path)
