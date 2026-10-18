@@ -18,6 +18,7 @@ from app.models.arb_submission_evidence import (
 )
 from app.models.solution_architect_models import SolutionAnalysisSession, SolutionRecommendation
 from app.models.solution_models import Solution
+from app.middleware.tenant_decorators import is_platform_admin
 from app.models.user import User
 from app.modules.solutions_strategic.v2.services.governance_gate_service import check_gate
 
@@ -343,11 +344,7 @@ class ARBSubmissionService:
     def _actor_can_access(actor, solution):
         if actor.id == solution.created_by_id:
             return True
-        if (
-            actor.is_org_admin
-            or actor.is_platform_admin
-            or actor.enterprise_role == "platform_admin"
-        ):
+        if actor.is_org_admin or is_platform_admin(actor):
             return True
         email = (actor.email or "").strip().lower()
         return bool(
