@@ -53,6 +53,9 @@ ROLE_PAGES = (
     ("cto-and-cio", "cto"),
     ("it-portfolio-managers", "portfolio_manager"),
     ("solution-architects", "solution_architect"),
+    ("business-architects", "business_architect"),
+    ("security-architects", "security_architect"),
+    ("data-architects", "data_architect"),
 )
 
 
@@ -319,6 +322,48 @@ def seed_role_users(password: str) -> None:
         db.session.commit()
 
 
+def _role_screen_path(slug: str) -> str:
+    """The screen ROLE_CAPTURES registers for this role page (Ask for the first four)."""
+    from app.services.public_pages import ROLE_CAPTURES
+
+    return next(path for entry_slug, path, *_ in ROLE_CAPTURES if entry_slug == slug)
+
+
+def capture_role_screen(browser, base, password, slug: str, archetype: str, path: str, wide: bool) -> tuple[bool, str]:
+    """The top of the role's own primary screen, as that role sees it.
+
+    Refuses an error response, an error banner or an empty screen, so a role page
+    never ships a picture of a broken or empty state.
+    """
+    vw, vh = (1408, 1600) if wide else (390, 1400)
+    ctx = browser.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=DPR)
+    page = ctx.new_page()
+    try:
+        _login(page, base, role_email(archetype), password)
+        response = page.goto(base + path, wait_until="networkidle")
+        page.wait_for_timeout(1500)
+        _dismiss_onboarding(page)
+        if response is None or response.status != 200:
+            return False, "%s answered HTTP %s for %s" % (path, response.status if response else "none", archetype)
+        text = page.inner_text("main")
+        for marker in ("could not load", "Something went wrong", "An internal error", "No capabilities yet"):
+            if marker.lower() in text.lower():
+                return False, "%s shows %r for %s" % (path, marker, archetype)
+        _tidy(page)
+        page.evaluate("window.scrollTo(0, 0)")
+        h1 = _box(page, "h1")
+        main = _box(page, "main")
+        pad = 24 if wide else 16
+        top = h1["y"] - 16
+        height = 760 if wide else 1000
+        clip = {"x": main["x"] + pad, "y": top, "width": main["width"] - 2 * pad, "height": height}
+        name = "%s.webp" % slug if wide else "%s-mobile.webp" % slug
+        _webp(_shoot(page, clip), IMG / "roles" / name)
+        return True, "captured"
+    finally:
+        ctx.close()
+
+
 def capture_role(browser, base, password, slug: str, archetype: str, wide: bool = True) -> tuple[bool, str]:
     """The role's workspace: Ask open on the impact question with one answer shown.
 
@@ -326,6 +371,9 @@ def capture_role(browser, base, password, slug: str, archetype: str, wide: bool 
     page stays held rather than shipping a bad image.
     """
     # 1408px leaves a 1104px crop, the public figure column, so the desktop crop is shown 1:1 (as capture_applications).
+    path = _role_screen_path(slug)
+    if path != "/intelligence/ask":
+        return capture_role_screen(browser, base, password, slug, archetype, path, wide)
     vw, vh = (1408, 1600) if wide else (390, 1400)
     ctx = browser.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=DPR)
     page = ctx.new_page()
