@@ -7,6 +7,7 @@ Generates baseline reports for Phase 0 triage decision-making.
 
 from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
+from app.middleware.tenant_decorators import platform_admin_required
 from app.models.usage_analytics import UsageAnalytics
 from app.utils.pagination import safe_int_arg
 
@@ -44,11 +45,26 @@ def analytics_dashboard():
         UsageAnalytics.timestamp.desc()
     )).limit(100).all()
 
+    from flask_login import current_user
+
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.services.funnel_events import funnel_counts
+
     return render_template(
         'usage_analytics/dashboard.html',
         summary=summary,
-        recent_events=recent_events
+        recent_events=recent_events,
+        funnel=funnel_counts() if is_platform_admin(current_user) else None,
     )
+
+
+@usage_analytics_bp.route('/api/funnel-counts', methods=['GET'])
+@platform_admin_required
+def api_funnel_counts():
+    """Launch funnel counts across all organisations; platform admins only."""
+    from app.services.funnel_events import funnel_counts
+
+    return jsonify(funnel_counts())
 
 
 @usage_analytics_bp.route('/api/summary', methods=['GET'])
