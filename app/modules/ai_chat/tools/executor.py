@@ -1420,26 +1420,11 @@ class ToolExecutor:
             from app.config.archimate_relationship_matrix import (
                 get_valid_relationships,
                 is_valid_relationship,
+                normalize_element_type,
             )
 
-            def _pascal(value: str) -> str:
-                """snake_case or kebab-case to PascalCase, leaving PascalCase alone.
-
-                str.capitalize() LOWERCASES the remainder, so a value already
-                stored as "ApplicationComponent" became "Applicationcomponent"
-                and matched nothing in the matrix. That refused
-                ApplicationComponent -realization-> ApplicationService, which is
-                legal -- a validator that blocks correct modelling is worse than
-                no validator, because it teaches the assistant that the
-                metamodel forbids things it permits.
-                """
-                text = str(value or "").replace("-", "_")
-                if "_" not in text and text[:1].isupper():
-                    return text  # already PascalCase
-                return "".join(part[:1].upper() + part[1:] for part in text.split("_") if part)
-
-            source_type = _pascal(src_r.get("type") or src_r.get("element_type"))
-            target_type = _pascal(tgt_r.get("type") or tgt_r.get("element_type"))
+            source_type = normalize_element_type(src_r.get("type") or src_r.get("element_type"))
+            target_type = normalize_element_type(tgt_r.get("type") or tgt_r.get("element_type"))
             wanted = args["relationship_type"]
             if source_type and target_type and not is_valid_relationship(
                 source_type, target_type, wanted

@@ -2257,19 +2257,6 @@ class ArchiMateChatAuthoring:
     relationship legality before persistence.
     """
 
-    # Valid ArchiMate 3.2 relationship types (subset of commonly used)
-    VALID_RELATIONSHIPS = {
-        ("ApplicationComponent", "ApplicationService"): ["serving", "composition"],
-        ("ApplicationComponent", "ApplicationComponent"): ["composition", "aggregation", "flow", "serving"],
-        ("BusinessProcess", "ApplicationService"): ["serving"],
-        ("BusinessProcess", "BusinessProcess"): ["composition", "triggering", "flow"],
-        ("Node", "ApplicationComponent"): ["assignment"],
-        ("Driver", "Goal"): ["influence"],
-        ("Goal", "Requirement"): ["realization"],
-        ("Requirement", "ApplicationComponent"): ["realization"],
-        ("Stakeholder", "Driver"): ["association"],
-    }
-
     def __init__(self, kernel: WorkbenchKernel, user_id: Optional[int] = None):
         self.kernel = kernel
         self.user_id = user_id
@@ -2377,16 +2364,6 @@ class ArchiMateChatAuthoring:
                 return {
                     "success": False,
                     "error": message,
-                }
-
-            # Also check local pair whitelist for stricter validation
-            pair = (source.type, target.type)
-            valid_types = self.VALID_RELATIONSHIPS.get(pair, [])
-            if valid_types and relationship_type not in valid_types:
-                return {
-                    "success": False,
-                    "error": f"Invalid relationship: {source.type} --{relationship_type}--> {target.type}. "
-                             f"Valid types: {', '.join(valid_types)}",
                 }
 
             rel = ArchiMateRelationship(
