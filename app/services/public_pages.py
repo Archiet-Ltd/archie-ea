@@ -1339,14 +1339,14 @@ def _jsonld_faq(page: PublicPage, site_url: str) -> dict[str, Any]:
     }
 
 
-# ── Landing layout (module, use-case and comparison pages) ──────────────────
-# These three families render as a landing page (hero, alternating section
+# ── Landing layout (module, use-case, comparison and role pages) ──────────────────
+# These four families render as a landing page (hero, alternating section
 # bands, link lists as cards, a closing action band) instead of one prose
 # column; every other family keeps the document layout. Keyed on
 # ``page.family`` (the content directory), never ``page.page_family``, so
 # front matter cannot switch a legal or site page into it.
 
-LANDING_FAMILIES: frozenset[str] = frozenset({"module", "function-per-segment", "comparison"})
+LANDING_FAMILIES: frozenset[str] = frozenset({"module", "function-per-segment", "comparison", "role"})
 
 # The one segment-label table: the /use-cases index groups by it and a
 # use-case page's hero names its segment from it.
