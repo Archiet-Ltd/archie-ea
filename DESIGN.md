@@ -119,11 +119,53 @@ dark-theme users. `--info` tracks blue in both.
 `.theme-marketing` and `.dark .theme-marketing` in `shadcn_tokens.css` hold a neutral palette for the
 public marketing pages, scoped as a class rather than a second token file. It is opt-in: set
 `{% block body_theme %}theme-marketing{% endblock %}` in a template that extends
-`layouts/public_base.html`. No template sets it yet; the marketing templates that will are filled in
-as that work lands. Login, registration, MFA, OAuth consent, shared artefacts and the demo page keep
+`layouts/public_base.html`. It is set by `main/index.html`, `public/page.html`, `public/hub_index.html`,
+`public/vs_hub.html` and `public/pricing.html`. Login, registration, MFA, OAuth consent, shared artefacts and the demo page keep
 the product palette (no `body_theme` override). No other CSS, SCSS or template file may declare
 `--background`, `--primary`, `--border` or any other core token — the `reuse-register` gate enforces
 this (`docs/reuse-register.yml`, entry `design-tokens`).
+
+### Public site
+
+Public pages (everything extending `layouts/public_base.html` and opted in to the marketing theme) use these
+classes and macro calls, defined in `app/static/css/public_site.css` and `components/badge.html`, rather than
+ad hoc utilities. The stylesheet is plain CSS, so a change to it needs no Tailwind rebuild; a utility class added
+to a template does.
+
+- **Pill:** `{% call badge(size='pill', href=url) %}…{% endcall %}` renders a link, `{% call badge(size='pill') %}…{% endcall %}`
+  a span. 30px tall, 12px/16px medium text, `px-4 py-1.5`, 1px border-colour border, transparent background; a
+  pill ignores `variant`. The default `badge(...)` call is unchanged.
+- **Buttons:** `public-btn` plus a fill (`public-btn--primary`, `public-btn--outline`) and optionally a size.
+  Default 40px tall, 24px inline padding, 14px radius, 14px/20px medium; `public-btn--sm` 36px, `public-btn--xs` 32px
+  with the 10px radius. Focus shows a 3px ring at half opacity; in dark the outline fill is the input token at 30%.
+- **Eyebrow:** `public-eyebrow`, 12px uppercase monospace with 0.2em tracking in the muted colour.
+- **Callout:** `public-callout`, a neutral card (16px radius, 1px border, 24px padding, 18px/32px text).
+- **Section rhythm:** `public-container` has 80px block padding at every width; landing bands are separated by a
+  1px border-colour line, never alternating tints; the hero has 80px above and 64px below.
+- **Type scale (marketing theme):** `public-h1` and page `h1`: 30px/36px, 48px/48px from 640px, weight 600, -0.025em;
+  `h2` 24px/32px, 30px/36px from 640px, 4rem above and 1rem below; `h3` 16px/24px; body and list text 16px/28px in the
+  muted colour; `public-lead` 18px/32px, 20px/32px from 640px; links inherit colour, underlined, foreground on hover.
+- **Tables** in page content are a bordered 16px-radius box with a muted header row; below 640px they scroll inside
+  themselves.
+
+### Public site: the homepage classes
+
+`app/static/css/public_site.css` is the one home for the homepage classes, all under `.public-site`, each carrying
+the reference home-page value named in its comment: `.public-btn--lg` / `--primary` / `--outline` (40px, 14px/20px
+500, radius `--radius` + 4px, 3px focus ring), `.home-display` (72/72, 700, -0.025em; 60 and 48 below),
+`.home-lead` (20/32, 18/32 on phones, 48rem), `.home-section` (80px block padding, 1px border-colour divider, 1px
+rails from 640px), `.home-eyebrow` (mono 12/16, 0.2em), `.home-h2` (48/48, 30/36 on phones, 600),
+`.home-section-lead` (18/32), `.public-card` (16px radius, 1px border, 28px padding) with `.public-card-title` (24/32, 600),
+`.public-card-body` (14/24) and `.public-card-eyebrow`, `.public-link` (underline, 4px offset), `.home-emphasis-list` and
+`.home-note` (2px left rules), `.public-stepper`, `.public-table` (16px cells, 48rem minimum), `.public-faq`
+(divider-separated, rotating chevron) and `.home-closing` (96px, centred). `.public-btn`, `.public-card`,
+`.public-table`, `.public-faq` and `.public-stepper` are the public site's one button, card, table, FAQ and stepper,
+used by `/` and `/pricing` and registered in `docs/reuse-register.yml`; the authenticated app's equivalents are the
+`components/button.html`, `card.html`, `table.html` and `stepper.html` macros, and neither side defines a copy of the
+other. The FAQ chevron is the `faq_chevron` macro in `components/public_faq.html`. A page adds only layout to these
+classes (the pricing page's plan-card columns and sticky comparison header). New marketing pages use these classes
+rather than defining their own. The product window is shown at its captured CSS width (the `<img>` keeps its
+width attribute; never set `width: auto` on it).
 
 ---
 

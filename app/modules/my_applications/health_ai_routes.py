@@ -17,7 +17,7 @@ import logging
 from flask import abort, jsonify
 from flask_login import current_user, login_required
 
-from app.decorators import requires_application_owner
+from app.decorators import requires_application_owner_or_org_admin
 from app.models.application_owner import ApplicationOwner
 from app.models.application_portfolio import ApplicationComponent
 from app.modules.my_applications.health_ai_service import (
@@ -49,7 +49,7 @@ def _owned_application_or_404(app_id):
 
 @my_applications_bp.route("/api/app/<int:app_id>/ai-health-assessment", methods=["POST"])
 @login_required
-@requires_application_owner
+@requires_application_owner_or_org_admin
 def ai_health_assessment(app_id):
     """POST /my-applications/api/app/<id>/ai-health-assessment
 

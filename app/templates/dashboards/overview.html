@@ -105,7 +105,7 @@
                     <p class="text-xs text-muted-foreground mt-0.5">{{ step.description }}</p>
                 </div>
                 <a href="{{ step.href }}" class="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
-                    {{ 'Done' if step.done else 'Start' }} <i data-lucide="arrow-right" class="h-3 w-3" aria-hidden="true"></i>
+                    {{ 'Done' if step.done else (step.cta|default('Start')) }} <i data-lucide="arrow-right" class="h-3 w-3" aria-hidden="true"></i>
                 </a>
             </li>
             {% endfor %}

@@ -7,7 +7,7 @@
    public_pages._sanitize_html(); nothing here marks HTML safe. Band and card classes match the
    home page (main/index.html); band tints alternate by position (public_site.css .landing-bands).
    B-03: a use-case section whose heading is "The question" (`s.variant == 'callout'`) renders as a
-   left-ruled attention box instead of a plain prose band; one whose heading is "What Entelim
+   neutral callout card instead of a plain prose band; one whose heading is "What Entelim
    answers" (`s.variant == 'figure_band'`) renders beside the page's own screenshot/recording when
    one exists (the same figure _page_media.html already renders for module pages, moved into this
    band instead of the page-top slot, but only for a function-per-segment page that actually has
@@ -15,27 +15,21 @@
    never an empty frame. A use-case page with no "What Entelim answers" heading has no figure_band
    section, so it keeps the page-top slot instead -- the figure always renders somewhere. -#}
 {% from 'macros/pricing_cta.html' import plan_buy_section %}
+{% from 'components/badge.html' import badge %}
 {% set primary_label, primary_url = landing.primary_action %}
 {% set secondary_label, secondary_url = landing.secondary_action %}
 <section data-testid="landing-hero" class="landing-hero bg-background border-b border-border">
   <div class="public-container">
-    <div class="flex items-center gap-3 text-sm font-medium text-muted-foreground">
-      <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-        <i data-lucide="{{ landing.icon }}" class="h-5 w-5" aria-hidden="true"></i>
-      </span>
-      {% if landing.breadcrumb %}
-      <nav aria-label="Breadcrumb">
-        <a href="{{ landing.breadcrumb[1] }}" class="text-muted-foreground hover:text-foreground">{{ landing.breadcrumb[0] }}</a>{% if landing.segment_label %} / {{ landing.segment_label }}{% endif %}
-      </nav>
-      {% endif %}
-    </div>
-    <h1 class="mt-6 max-w-3xl text-4xl sm:text-5xl font-bold tracking-tight text-foreground">{{ landing.title }}</h1>
+    <nav aria-label="Breadcrumb">
+      {% call badge(size='pill', href=(landing.breadcrumb[1] if landing.breadcrumb else None)) %}<i data-lucide="{{ landing.icon }}" aria-hidden="true"></i>{% if landing.breadcrumb %}{{ landing.breadcrumb[0] }}{% if landing.segment_label %} / {{ landing.segment_label }}{% endif %}{% else %}{{ page.family | replace('-', ' ') | capitalize }}{% endif %}{% endcall %}
+    </nav>
+    <h1 class="public-h1 mt-8 max-w-3xl">{{ landing.title }}</h1>
     {% if landing.lead_html %}
-    <p class="mt-6 max-w-2xl text-lg sm:text-xl text-muted-foreground">{{ landing.lead_html }}</p>
+    <p class="public-lead">{{ landing.lead_html }}</p>
     {% endif %}
-    <div class="mt-8 flex flex-col sm:flex-row gap-3 sm:items-center">
-      <a href="{{ primary_url }}" class="public-btn bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors">{{ primary_label }}</a>
-      <a href="{{ secondary_url }}" class="public-btn border border-border bg-card text-foreground font-medium hover:bg-muted transition-colors">{{ secondary_label }}</a>
+    <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+      <a href="{{ primary_url }}" class="public-btn public-btn--primary">{{ primary_label }}</a>
+      <a href="{{ secondary_url }}" class="public-btn public-btn--outline">{{ secondary_label }}</a>
     </div>
   </div>
 </section>
@@ -73,7 +67,7 @@
       {% if s.variant == 'callout' %}
       <div class="public-page-content prose max-w-none">
         <h2 id="{{ s.id }}">{{ s.heading_html }}</h2>
-        <div class="border-l-4 border-warning bg-warning/5 p-6 rounded-r-lg" data-testid="usecase-question-callout">{{ s.body_html }}</div>
+        <div class="public-callout" data-testid="usecase-question-callout">{{ s.body_html }}</div>
       </div>
       {% elif s.variant == 'figure_band' and (screenshot or recording) %}
       <div class="public-page-content prose max-w-none"><h2 id="{{ s.id }}">{{ s.heading_html }}</h2></div>
@@ -89,13 +83,13 @@
       <ul role="list" class="mt-8 grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {% for c in s.cards %}
         <li>
-          <a href="{{ c.url }}" class="group flex h-full flex-col gap-3 rounded-lg border border-border bg-card p-6 no-underline transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-            <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden="true">
+          <a href="{{ c.url }}" class="group flex h-full flex-col gap-3 rounded-2xl border border-border bg-card p-6 no-underline transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-foreground" aria-hidden="true">
               <i data-lucide="{{ c.icon }}" class="h-5 w-5" aria-hidden="true"></i>
             </span>
-            <span class="font-semibold text-foreground">{{ c.title_html }}</span>
+            <span class="text-xl font-semibold text-foreground">{{ c.title_html }}</span>
             {% if c.description %}
-            <span class="text-sm text-muted-foreground">{{ c.description }}</span>
+            <span class="text-sm leading-6 text-muted-foreground">{{ c.description }}</span>
             {% endif %}
             <i data-lucide="arrow-right" class="mt-auto h-4 w-4 text-primary transition-transform group-hover:translate-x-0.5" aria-hidden="true"></i>
           </a>
@@ -125,12 +119,12 @@
   {% endif %}
 </div>
 
-<section data-testid="landing-closing" class="bg-primary text-primary-foreground">
+<section data-testid="landing-closing" class="border-t border-border bg-background text-center">
   <div class="public-container">
-    <p class="max-w-3xl text-xl sm:text-2xl font-semibold tracking-tight">Import your model and get a free, cited answer to what breaks if a system fails, in minutes.</p>
-    <div class="mt-8 flex flex-col sm:flex-row gap-3 sm:items-center">
-      <a href="{{ primary_url }}" class="public-btn bg-background text-foreground font-medium hover:bg-background/90 transition-colors">{{ primary_label }}</a>
-      <a href="/contact" class="public-btn border border-primary-foreground/40 text-primary-foreground font-medium hover:bg-primary-foreground/10 transition-colors">Get in touch</a>
+    <p class="mx-auto max-w-3xl text-3xl font-semibold tracking-tight text-balance text-foreground md:text-5xl">Import your model and get a free, cited answer to what breaks if a system fails, in minutes.</p>
+    <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+      <a href="{{ primary_url }}" class="public-btn public-btn--primary">{{ primary_label }}</a>
+      <a href="/contact" class="public-btn public-btn--outline">Get in touch</a>
     </div>
   </div>
 </section>

@@ -374,6 +374,11 @@ async function deleteCap(id, name) {
     }
 }
 
+/* The setup checklist links here with ?new=1: open the create dialog. */
+if (new URLSearchParams(window.location.search).get('new') === '1' && document.getElementById('cap-dialog')) {
+    openCapCreate();
+}
+
 /* CSP-safe: delegate the page actions instead of inline onclick= (DESIGN.md). */
 document.addEventListener('click', function (e) {
     var el = e.target.closest('[data-action]');
