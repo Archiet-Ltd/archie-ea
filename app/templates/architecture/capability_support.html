@@ -1,0 +1,68 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+
+{% block title %}Capability support{% endblock %}
+
+{% block breadcrumb %}
+{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
+{{ breadcrumb_nav(items=[
+    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
+    {'text': 'Capability support', 'current': true}
+]) }}
+{% endblock %}
+
+{% block content %}
+<div class="p-6 space-y-6 mx-auto">
+
+  {{ page_shell(title='Capability support', subtitle='Capabilities that no application supports, and capabilities that more than ' ~ result.many_above ~ ' applications support') }}
+
+  <div class="grid gap-4 md:grid-cols-3">
+    <div class="rounded-lg border bg-card p-6">
+      <p class="text-sm font-medium text-muted-foreground">Capabilities</p>
+      <p class="text-2xl font-bold mt-3">{{ result.total }}</p>
+    </div>
+    <div class="rounded-lg border bg-card p-6">
+      <p class="text-sm font-medium text-muted-foreground">No supporting application</p>
+      <p class="text-2xl font-bold mt-3" data-support-none-count>{{ result.none|length }}</p>
+    </div>
+    <div class="rounded-lg border bg-card p-6">
+      <p class="text-sm font-medium text-muted-foreground">More than {{ result.many_above }} supporting applications</p>
+      <p class="text-2xl font-bold mt-3" data-support-many-count>{{ result.many|length }}</p>
+    </div>
+  </div>
+
+  <div class="rounded-lg border bg-card">
+    <div class="border-b px-6 py-4"><h2 class="text-xl font-semibold">No supporting application</h2></div>
+    {% if result.none %}
+    <ul class="divide-y" data-support-none>
+      {% for c in result.none %}
+      <li class="px-6 py-3" data-capability="{{ c.id }}">
+        <span class="font-medium">{{ c.name }}</span>
+        <span class="text-xs text-muted-foreground">Level {{ c.level if c.level is not none else '—' }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="px-6 py-6 text-sm text-muted-foreground" data-support-none-empty>
+      {% if result.total %}Every capability has at least one supporting application.{% else %}No capabilities are recorded yet.{% endif %}
+    </p>
+    {% endif %}
+  </div>
+
+  <div class="rounded-lg border bg-card">
+    <div class="border-b px-6 py-4"><h2 class="text-xl font-semibold">More than {{ result.many_above }} supporting applications</h2></div>
+    {% if result.many %}
+    <ul class="divide-y" data-support-many>
+      {% for c in result.many %}
+      <li class="px-6 py-3" data-capability="{{ c.id }}">
+        <p><span class="font-medium">{{ c.name }}</span> <span class="text-xs text-muted-foreground">{{ c.count }} applications</span></p>
+        <p class="text-sm text-muted-foreground mt-1">{{ c.supporters|join(', ') }}</p>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="px-6 py-6 text-sm text-muted-foreground" data-support-many-empty>No capability has more than {{ result.many_above }} supporting applications.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

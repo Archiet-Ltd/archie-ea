@@ -255,6 +255,13 @@ def _register_optional_standalone(app):
             "data_governance_bp",
             None,
         ),
+        # Capabilities with no supporting application, and with many. Tier-
+        # independent: the blueprint carries its own prefix.
+        (
+            "app.modules.architecture.routes.capability_support_routes",
+            "capability_support_bp",
+            None,
+        ),
         # R1-B56: agent owner/charter/lifecycle registry.
         (
             "app.modules.ai_chat.routes.agent_registry_routes",

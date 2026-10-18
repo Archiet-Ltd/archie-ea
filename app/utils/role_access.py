@@ -726,6 +726,7 @@ _MY_WORK_LINKS = {
         _link("Transformation programmes", "solution_design.programmes_list", "waypoints"),
         _link("Health Scorecard", "dashboard.health_scorecard", "heart-pulse"),
         _link("Rationalization", "unified_applications.rationalization_dashboard", "git-merge"),
+        _link("Capability support", "capability_support.index", "layers"),
         _link("Investment Analysis", "architecture.investment_priorities", "target"),
         # NAV-1 (27 Aug 2026, nav-coverage output 9 — KPI/metric dashboards).
         # /dashboard/rationalization/scorecard is a real executive KPI page
