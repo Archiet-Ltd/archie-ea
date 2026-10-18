@@ -157,7 +157,6 @@ def test_derived_edges_dashed_with_text_badge_never_colour_alone(page):
 
 def test_update_changes_only_what_changed(page):
     _banded(page)
-    ids = page.evaluate("() => { window.before = Object.fromEntries(R.graph.getCells().map(c => [c.id, 1])); return 0 }")
     out = page.evaluate("""() => {
       const idOf = k => R.graph.getLinks().find(l => l.get('edgeKey') === k).id;
       const nodeOf = e => R.graph.getElements().find(c => c.get('elementId') === e).id;
