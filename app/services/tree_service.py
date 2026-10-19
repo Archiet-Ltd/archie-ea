@@ -356,10 +356,23 @@ def _owned_by_caller(Model, tree_key, row):
 
 
 def _commit():
-    """Commit; a refused reference/cross-organisation write becomes FORBIDDEN."""
+    """Commit; a refused reference/cross-organisation write becomes FORBIDDEN.
+
+    Two distinct shapes land here for the same underlying reason -- a write
+    this caller may not make under row-level security or the hybrid write
+    policy -- and neither is a server defect worth a 500: ``PermissionError``,
+    raised by application code, and ``StaleDataError``, raised by the ORM's
+    own flush when an UPDATE/DELETE it expected to touch one row instead
+    matched zero, because row-level security silently excluded that row from
+    its own WHERE clause rather than raising (a shared reference row a
+    reparenting delete tried to write through, for instance -- see
+    ``delete_node``).
+    """
+    from sqlalchemy.orm.exc import StaleDataError
+
     try:
         db.session.commit()
-    except PermissionError as exc:
+    except (PermissionError, StaleDataError) as exc:
         db.session.rollback()
         return f"{FORBIDDEN}: {exc}"
     return None
@@ -539,7 +552,11 @@ def delete_node(tree_key, node_id):
         return f"{FORBIDDEN}: shared reference rows are read-only"
 
     parent_id = getattr(row, parent_fk, None)
-    children = Model.query.filter(getattr(Model, parent_fk) == node_id).all()
+    children_query = Model.query.filter(getattr(Model, parent_fk) == node_id)
+    visible = _visible(Model, tree_key)
+    if visible is not None:
+        children_query = children_query.filter(visible)
+    children = children_query.all()
     for child in children:
         setattr(child, parent_fk, parent_id)
 
