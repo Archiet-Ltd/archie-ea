@@ -5,12 +5,30 @@ application_collaborations and deliverables carried no organisation column, so
 the per-type pages served one organisation's rows to every other. They now carry
 ``organization_id`` (``TenantMixin``).
 
-Backfill fails closed. A row takes the organisation of the ArchiMate element it
-is linked to; failing that, of the application component or work package it
-belongs to; for a constraint, of the user who created it. A row with none of
-these has no derivable organisation: none is guessed, it stays NULL, matches no
-organisation's filter, and the column is only tightened to NOT NULL on a table
-where no NULL remains. The number of unattributed rows is printed.
+Backfill fails closed. A row takes the organisation of the ArchiMate element,
+architecture model or application component it is linked to, in that order,
+falling further back to the work package for a deliverable or the goal element
+for a constraint. A row with none of these has no derivable organisation: none
+is guessed, it stays NULL, matches no organisation's filter, and the column is
+only tightened to NOT NULL on a table where no NULL remains. The number of
+unattributed rows is printed.
+
+The deliverable parent-source list duplicates ``_DELIVERABLE_ORG_SOURCES`` in
+``app/models/implementation_migration.py`` (same four parents, used there by a
+``before_insert`` listener for new rows rather than this migration's one-time
+backfill of existing ones). Not imported: this file follows the same
+copied-not-imported convention as ``20261018_vendor_analysis_rls`` and
+``20261008_row_level_security`` before it, so a migration stays runnable
+unchanged even if the model's event-listener logic moves later. This backfill
+also does not go through ``flask backfill-layer-tenancy``
+(``app/commands/backfill_layer_tenancy.py``), the codebase's general mechanism
+for exactly this problem shape (TenantMixin added to an existing populated
+table) -- these six tables are not registered in that command's
+``_DERIVABLE_ORG``/``_PROVENANCE_ONLY``, the same way ``20261018_vendor_analysis_rls``
+took five tables out of that command's coverage, because this migration also
+tightens the column to NOT NULL and adds its index in the same pass, which
+that command's own docstring says is beyond what it does (ADR-0002: boot-time
+reconcile-schema can only add nullable columns).
 
 Idempotent: every step checks before it acts, so a second run is a no-op.
 
@@ -39,7 +57,14 @@ TABLES = (
 # (table, source table, join column on `table`) tried in order; each source
 # table is assumed to carry organization_id.
 SOURCES = {
-    "constraints": (("archimate_elements", "archimate_element_id"), ("users", "created_by_id")),
+    # constraints has no created_by_id column (checked against app/models/models.py's
+    # ConstraintElement) -- architecture_id and goal_id are its two real FK parents
+    # beyond archimate_element_id.
+    "constraints": (
+        ("archimate_elements", "archimate_element_id"),
+        ("architecture_models", "architecture_id"),
+        ("archimate_elements", "goal_id"),
+    ),
     "strategy_resources": (("archimate_elements", "archimate_element_id"),),
     "application_services": (
         ("archimate_elements", "archimate_element_id"),
@@ -49,12 +74,20 @@ SOURCES = {
         ("archimate_elements", "archimate_element_id"),
         ("application_components", "application_component_id"),
     ),
-    "application_collaborations": (("archimate_elements", "archimate_element_id"),),
+    # application_component_id was missing here: a row linked only through it
+    # (archimate_element_id NULL) backfilled to nothing and stayed invisible
+    # under RLS, including to the cascade delete that removes a parent
+    # application's collaborations.
+    "application_collaborations": (
+        ("archimate_elements", "archimate_element_id"),
+        ("application_components", "application_component_id"),
+    ),
     "deliverables": (
         ("archimate_elements", "archimate_element_id"),
         ("unified_work_packages", "unified_work_package_id"),
         ("work_packages", "work_package_id"),
         ("application_components", "application_component_id"),
+        ("architecture_models", "architecture_id"),
     ),
 }
 
@@ -73,6 +106,22 @@ def _has_column(bind, table, column):
             {"t": table, "c": column},
         ).scalar()
     )
+
+
+def _fk_name(bind, table, column):
+    """The name of whatever foreign key actually sits on `column`, detected by
+    column presence rather than by the name this migration expects -- the same
+    table can carry an auto-named foreign key created by ensure_baseline_schema
+    from today's models instead of this migration's own fk_{table}_{column}."""
+    return bind.execute(
+        text(
+            "SELECT con.conname FROM pg_constraint con "
+            "JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = ANY (con.conkey) "
+            "WHERE con.contype = 'f' AND con.conrelid = to_regclass(:t) "
+            "AND att.attname = :c"
+        ),
+        {"t": f"public.{table}", "c": column},
+    ).scalar()
 
 
 def upgrade():
@@ -110,16 +159,7 @@ def upgrade():
         # column arrives with its own, differently-named foreign key already in
         # place. Checking only for fk_{table}_organization_id missed that one and
         # created a second foreign key beside it on every one of the six tables.
-        has_fk = bind.execute(
-            text(
-                "SELECT 1 FROM pg_constraint con "
-                "JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = ANY (con.conkey) "
-                "WHERE con.contype = 'f' AND con.conrelid = to_regclass(:t) "
-                "AND att.attname = 'organization_id'"
-            ),
-            {"t": f"public.{table}"},
-        ).scalar()
-        if not has_fk:
+        if _fk_name(bind, table, "organization_id") is None:
             op.create_foreign_key(
                 f"fk_{table}_organization_id", table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE"
             )
@@ -130,8 +170,12 @@ def downgrade():
     for table in TABLES:
         if not _present(bind, table) or not _has_column(bind, table, "organization_id"):
             continue
-        fk = f"fk_{table}_organization_id"
-        if bind.execute(text("SELECT 1 FROM pg_constraint WHERE conname = :n"), {"n": fk}).scalar():
+        # Drop whatever foreign key actually exists on the column, not just the
+        # name this migration itself would have created (same reasoning as
+        # upgrade()'s _fk_name check) -- an auto-named one from ensure_baseline_schema
+        # would otherwise survive a downgrade silently.
+        fk = _fk_name(bind, table, "organization_id")
+        if fk:
             op.drop_constraint(fk, table, type_="foreignkey")
         op.drop_index(f"ix_{table}_organization_id", table_name=table, if_exists=True)
         op.drop_column(table, "organization_id")

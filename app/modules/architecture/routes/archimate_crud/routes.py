@@ -1608,6 +1608,7 @@ def export_elements(layer, element_type):
 
 @archimate_crud.route(f"/{_LAYER_URL_PATTERN}/<element_type>/ai-generate", methods=["POST"])
 @login_required
+@write_role_required
 def ai_generate(layer, element_type):
     """AI-powered element generation from documents/internet"""
     try:
@@ -1640,7 +1641,9 @@ def element_relationships(layer, element_type, element_id):
     if not model_class:
         return jsonify({"success": False, "error": "Element type not supported"}), 400
 
-    element = model_class.query.get_or_404(element_id)
+    # filter_by always emits SQL, so the tenant filter applies even when the row
+    # is already in the session identity map (Query.get would skip it).
+    element = model_class.query.filter_by(id=element_id).first_or_404()
     relationships = _get_element_relationships(element, element_id)
 
     return jsonify({"success": True, "relationships": relationships})
@@ -1653,7 +1656,9 @@ def api_element_detail(element_id):
 
     Returns element fields, outgoing/incoming relationships, and solution linkages.
     """
-    element = ArchiMateElement.query.get_or_404(element_id)
+    # filter_by always emits SQL, so the tenant filter applies even when the row
+    # is already in the session identity map (Query.get would skip it).
+    element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
 
     outgoing = []
     for rel in ArchiMateRelationship.query.filter_by(source_id=element_id).limit(50).all():
