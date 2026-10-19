@@ -12,7 +12,7 @@ import os
 from datetime import datetime
 from typing import Optional  # dead-code-ok: used by type hints
 
-from sqlalchemy import Index, Text, UniqueConstraint
+from sqlalchemy import Index, Text, UniqueConstraint, text as sql_text
 
 from app import db
 from app.models.mixins.core import TenantMixin
@@ -41,6 +41,12 @@ class VendorProductEmbedding(db.Model):
     """
     Vector embeddings for vendor products.
     Used for semantic similarity search and vendor discovery.
+
+    Deliberately global, not TenantMixin: vendor products are a shared
+    reference catalogue (see pgvector_embedding_service.py's
+    create_vendor_product_embedding, "shared reference data, no org"),
+    the same catalogue every organisation searches against. See
+    tests/test_tenant_isolation_matrix.py's INTENTIONALLY_GLOBAL.
     """
 
     __tablename__ = "vendor_product_embeddings"
@@ -50,6 +56,10 @@ class VendorProductEmbedding(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(
+        db.Integer, db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True, index=True,
+    )
     vendor_product_id = db.Column(db.Integer, db.ForeignKey("vendor_products.id"), nullable=False)
     embedding = db.Column(get_vector_column(384))  # all-MiniLM-L6-v2 uses 384 dimensions
     embedding_text = db.Column(Text)  # Original text used for embedding
@@ -71,15 +81,38 @@ class BusinessCapabilityEmbedding(db.Model):
     """
     Vector embeddings for business capabilities.
     Used for capability-based search and matching.
+
+    Tenant-scoped at the query layer, not via TenantMixin: organization_id
+    mirrors the parent BusinessCapability's own org (set explicitly in
+    pgvector_embedding_service.py's create_capability_embedding via
+    _parent_org_id_for_embedding) and matches
+    pgvector_embedding_service.py's own _TENANT_EMBEDDING_TABLES
+    classification (strict equality in scoped_embedding_query). Stays a
+    plain nullable column rather than TenantMixin: this PR's own
+    tests/test_embedding_org_scoping.py asserts the column is nullable
+    (TenantMixin's automatic organization_id auto-set/auto-filter would
+    also break create_capability_embedding's explicit cross-tenant-rewrite
+    refusal, which depends on setting a caller-independent org value).
+    See tests/test_tenant_isolation_matrix.py's INTENTIONALLY_GLOBAL.
     """
 
     __tablename__ = "business_capability_embeddings"
     __table_args__ = (
-        UniqueConstraint("business_capability_id", name="uq_capability_embedding"),
+        UniqueConstraint("business_capability_id", "organization_id", name="uq_capability_embedding"),
+        Index(
+            "uq_capability_embedding_null_org",
+            "business_capability_id",
+            unique=True,
+            postgresql_where=sql_text("organization_id IS NULL"),
+        ),
         Index("ix_capability_embedding_created", "created_at"),
     )
 
     id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(
+        db.Integer, db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True, index=True,
+    )
     business_capability_id = db.Column(
         db.Integer, db.ForeignKey("business_capability.id"), nullable=False
     )
@@ -104,6 +137,12 @@ class ProcessEmbedding(db.Model):
     """
     Vector embeddings for APQC processes and industry processes.
     Used for process discovery and mapping.
+
+    Deliberately global, not TenantMixin: APQC/industry processes are a
+    shared reference catalogue every organisation searches against --
+    pgvector_embedding_service.py's own _SHARED_EMBEDDING_TABLES set
+    (nullable-or-org, same treatment as vendor product/organisation).
+    See tests/test_tenant_isolation_matrix.py's INTENTIONALLY_GLOBAL.
     """
 
     __tablename__ = "process_embeddings"
@@ -113,6 +152,10 @@ class ProcessEmbedding(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(
+        db.Integer, db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True, index=True,
+    )
     process_id = db.Column(db.Integer, db.ForeignKey("industry_apqc_process.id"), nullable=False)
     embedding = db.Column(get_vector_column(384))
     embedding_text = db.Column(Text)
@@ -134,6 +177,15 @@ class ChatMessageEmbedding(db.Model):
     """
     Vector embeddings for chat messages.
     Used for semantic search, context retrieval, and conversation memory.
+
+    Tenant-scoped at the query layer, not via TenantMixin: always written
+    with an explicit organization_id (multi_domain_chat_service.py's
+    _persist_message uses require_current_org_id), matching
+    pgvector_embedding_service.py's own _TENANT_EMBEDDING_TABLES
+    classification (strict equality in scoped_embedding_query). Stays a
+    plain nullable column because this PR's own
+    tests/test_embedding_org_scoping.py asserts the column is nullable.
+    See tests/test_tenant_isolation_matrix.py's INTENTIONALLY_GLOBAL.
     """
 
     __tablename__ = "chat_message_embeddings"
@@ -144,6 +196,10 @@ class ChatMessageEmbedding(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(
+        db.Integer, db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True, index=True,
+    )
     chat_session_id = db.Column(db.String(255), nullable=False)  # Session identifier
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     message_text = db.Column(Text, nullable=False)
@@ -161,6 +217,13 @@ class SolutionEmbedding(db.Model):
     """
     Vector embeddings for solutions.
     Used for solution discovery and recommendation.
+
+    Tenant-scoped at the query layer, not via TenantMixin: matches
+    pgvector_embedding_service.py's own _TENANT_EMBEDDING_TABLES
+    classification (strict equality in scoped_embedding_query). Stays a
+    plain nullable column because this PR's own
+    tests/test_embedding_org_scoping.py asserts the column is nullable.
+    See tests/test_tenant_isolation_matrix.py's INTENTIONALLY_GLOBAL.
     """
 
     __tablename__ = "solution_embeddings"
@@ -170,6 +233,10 @@ class SolutionEmbedding(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(
+        db.Integer, db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True, index=True,
+    )
     solution_id = db.Column(db.Integer, db.ForeignKey("solutions.id"), nullable=False)
     embedding = db.Column(get_vector_column(384))
     embedding_text = db.Column(Text)
@@ -191,6 +258,12 @@ class VendorOrganizationEmbedding(db.Model):
     """
     Vector embeddings for vendor organizations.
     Used for vendor discovery and similarity matching.
+
+    Deliberately global, not TenantMixin: vendor organisations are a
+    shared reference catalogue (pgvector_embedding_service.py's own
+    mapping marks this "shared reference data, no org"), the same
+    catalogue every organisation searches against. See
+    tests/test_tenant_isolation_matrix.py's INTENTIONALLY_GLOBAL.
     """
 
     __tablename__ = "vendor_organization_embeddings"
@@ -200,6 +273,10 @@ class VendorOrganizationEmbedding(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(
+        db.Integer, db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True, index=True,
+    )
     vendor_organization_id = db.Column(
         db.Integer, db.ForeignKey("vendor_organizations.id"), nullable=False
     )
@@ -223,6 +300,13 @@ class ApplicationComponentEmbedding(db.Model):
     """
     Vector embeddings for application components.
     Used for application discovery and matching.
+
+    Tenant-scoped at the query layer, not via TenantMixin: matches
+    pgvector_embedding_service.py's own _TENANT_EMBEDDING_TABLES
+    classification (strict equality in scoped_embedding_query). Stays a
+    plain nullable column because this PR's own
+    tests/test_embedding_org_scoping.py asserts the column is nullable.
+    See tests/test_tenant_isolation_matrix.py's INTENTIONALLY_GLOBAL.
     """
 
     __tablename__ = "application_component_embeddings"
@@ -232,6 +316,10 @@ class ApplicationComponentEmbedding(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(
+        db.Integer, db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True, index=True,
+    )
     application_component_id = db.Column(
         db.Integer, db.ForeignKey("application_components.id"), nullable=False
     )

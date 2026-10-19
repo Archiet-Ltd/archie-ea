@@ -13,10 +13,11 @@ next caller finds it instead of writing a third.
 Semantics, deliberately identical to the ORM listener's:
 
 * Inside a tenant request, emit ``AND <prefix>organization_id = :org_id``.
+* Callers reading shared-reference rows can opt into
+  ``AND (<prefix>organization_id = :org_id OR <prefix>organization_id IS NULL)``.
 * With no tenant context — CLI, scheduler, importers, unauthenticated — emit
-  nothing, leaving the query global. That is what ``do_orm_execute`` does, and
-  a stricter rule here would silently return zero rows to every CLI command
-  rather than failing loudly.
+  nothing by default, leaving the query global. Callers that must fail closed
+  can opt into ``AND 1=0`` / ``WHERE 1=0``.
 
 Because system contexts are unscoped, a service that runs in one and handles
 more than one organisation must pass ``org_id`` explicitly rather than relying
@@ -54,6 +55,10 @@ def org_scope(
     prefix: str = "",
     keyword: str = "AND",
     org_id: Optional[int] = None,
+    *,
+    include_shared: bool = False,
+    fail_closed: bool = False,
+    param_name: str = "org_id",
 ) -> Tuple[str, Dict[str, Any]]:
     """Return ``(clause, params)`` scoping a raw-SQL statement to one tenant.
 
@@ -66,15 +71,27 @@ def org_scope(
         org_id: scope to this organisation instead of the request's. Callers
             that run outside a request, or that iterate over organisations, must
             pass it — see the module docstring.
+        include_shared: also include rows whose ``organization_id`` is NULL.
+        fail_closed: return ``1=0`` when no organisation is known.
+        param_name: bind-parameter name to use for the organisation id.
 
     Returns:
-        ``(" AND ae.organization_id = :org_id", {"org_id": 7})``, or ``("", {})``
-        when no organisation is known.
+        ``(" AND ae.organization_id = :org_id", {"org_id": 7})``, or
+        ``(" AND (ae.organization_id = :org_id OR ae.organization_id IS NULL)",
+        {"org_id": 7})``, or ``("", {})`` when no organisation is known.
     """
     org = org_id if org_id is not None else current_org_id()
     if org is None:
+        if fail_closed:
+            return f" {keyword} 1=0", {}
         return "", {}
-    return f" {keyword} {prefix}organization_id = :org_id", {"org_id": org}
+    column = f"{prefix}organization_id"
+    if include_shared:
+        return (
+            f" {keyword} ({column} = :{param_name} OR {column} IS NULL)",
+            {param_name: org},
+        )
+    return f" {keyword} {column} = :{param_name}", {param_name: org}
 
 
 def organization_id_of(row: Any) -> Optional[int]:
