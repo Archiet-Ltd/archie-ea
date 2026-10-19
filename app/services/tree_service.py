@@ -560,5 +560,20 @@ def delete_node(tree_key, node_id):
     for child in children:
         setattr(child, parent_fk, parent_id)
 
+    # Some models (ReferenceModelCapability is one) declare their
+    # self-referential children as an ORM relationship with
+    # cascade="all, delete-orphan". That cascade acts on the relationship's
+    # own in-memory collection, which setattr() on the raw foreign-key column
+    # above does not update -- row.children still lists every child it did
+    # before the reparenting, invisible children included, and
+    # session.delete(row) would cascade-delete all of them instead of
+    # leaving the reparented rows alone. Flushing the column updates first
+    # and expiring row's own cached state forces SQLAlchemy to re-read its
+    # relationships from the database, which now shows no more children,
+    # before the delete (and its cascade, now with nothing left to cascade
+    # to) is issued.
+    db.session.flush()
+    db.session.expire(row)
+
     db.session.delete(row)
     return _commit()
