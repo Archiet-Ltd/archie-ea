@@ -579,9 +579,12 @@ def main() -> None:
             organization_id=org_id,
             work_package_id=work_package.id,
             provider_key="probe-provider",
-            attempt_key=f"probe-attempt-{suffix}-1",
+            attempt_key=(suffix + "a" * 64)[:64],
             request_json={"probe": True},
             status="indeterminate",
+            completed_at=_utcnow(),
+            error_class="ProbeError",
+            error_message="probe",
             attempted_by_id=owner.id,
         )
         db.session.add(predecessor)
@@ -591,11 +594,13 @@ def main() -> None:
             organization_id=org_id,
             work_package_id=work_package.id,
             provider_key="probe-provider",
-            attempt_key=f"probe-attempt-{suffix}-2",
+            attempt_key=(suffix + "b" * 64)[:64],
             predecessor_attempt_id=predecessor.id,
             request_json={"probe": True},
             status="succeeded",
             external_key="probe-external-key",
+            completed_at=_utcnow(),
+            response_digest="c" * 64,
             attempted_by_id=owner.id,
         )
         db.session.add(successor)
