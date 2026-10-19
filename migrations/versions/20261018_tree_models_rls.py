@@ -1,4 +1,4 @@
-"""Row-level security on the seven tables the tree API now scopes to an organisation.
+"""Row-level security on the six tables the tree API now scopes to an organisation.
 
 A new fencing revision on top of the one that gives these tables their
 ``organization_id``. Same policy text as ``20261008_row_level_security``,
@@ -6,6 +6,11 @@ copied rather than imported so this revision runs on its own;
 ``tests/test_row_level_security.py`` unions every revision's ``TENANT_TABLES``.
 A row with a NULL organisation (one whose owner could not be derived) matches
 no organisation's session and is visible only under the platform scope.
+
+required_capabilities is deliberately not one of these six: it is already
+fenced by ``20261018_vendor_analysis_rls``, which this revision now chains
+after, and that revision is the only one entitled to drop or re-create
+policies on it.
 
 Revision ID: 20261018_tree_models_rls
 Revises: 20261018_tree_models_org_id
@@ -45,7 +50,6 @@ TENANT_TABLES = (
     "compliance_requirements",
     "vendor_capability_hierarchy",
     "vendor_process_hierarchy",
-    "required_capabilities",
 )
 HYBRID_TABLES = ()
 
@@ -109,14 +113,6 @@ def upgrade():
 def downgrade():
     bind = op.get_bind()
     for table in TENANT_TABLES:
-        if table == "required_capabilities":
-            # Also fenced by 20261018_vendor_analysis_rls, which now runs
-            # earlier in this chain and keeps its own policies and row-level
-            # security on this table regardless of this revision. Disabling
-            # them here on a partial rollback (downgrading past this revision
-            # but not past that one) would silently drop that revision's
-            # fencing too.
-            continue
         if _skip_reason(bind, table) is not None:
             continue
         for name in TENANT_POLICIES:
