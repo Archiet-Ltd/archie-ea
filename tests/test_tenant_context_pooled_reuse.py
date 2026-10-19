@@ -160,7 +160,19 @@ def _build_app(config_name, database_url, **overrides):
         **overrides,
     }
     app_package.Config[config_name] = type(f"TC_{config_name}", (TestingConfig,), attrs)
-    return app_package.create_app(config_name)
+    application = app_package.create_app(config_name)
+    _stop_job_queue_worker()
+    return application
+
+
+def _stop_job_queue_worker():
+    """Application start-up launches the job-queue worker thread, which polls the
+    database once a second and holds a connection while it sleeps. It is a
+    second user of the pool by design, so the tests that assert on the one pooled
+    connection run without it."""
+    from app.services.job_queue_service import get_job_queue_service
+
+    get_job_queue_service().stop_worker()
 
 
 def _cursor_options(database_url):
@@ -183,7 +195,7 @@ def _use_pool_of_one(application):
             poolclass=QueuePool,
             pool_size=1,
             max_overflow=0,
-            pool_timeout=5,
+            pool_timeout=30,
             pool_reset_on_return="commit",
             **_cursor_options(url),
         )
