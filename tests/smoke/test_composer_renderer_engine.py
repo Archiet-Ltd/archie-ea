@@ -364,3 +364,55 @@ def test_relationship_with_no_id_or_key_still_renders_and_is_stable_across_updat
     assert out["found2"] is True
     assert out["sameCell"] is True
     assert out["countAfterFirst"] == out["countAfterSecond"]
+
+
+# ---------------------------------------------------------------------------
+# Default-style golden output
+#
+# GOLDEN was captured from the engine as it stood on main before any
+# connectionStyle / rowAlign work (set COMPOSER_CAPTURE_GOLDEN=1 to re-capture,
+# which is only ever done deliberately). A caller that passes neither new option
+# must get this output exactly: graph JSON and the paper's SVG, with JointJS's
+# generated ids replaced by their order of first appearance.
+# ---------------------------------------------------------------------------
+import json
+import os
+
+GOLDEN = pathlib.Path(__file__).resolve().parent.parent / "composer_renderer" / "golden_default_style.json"
+
+_SERIALISE = r"""
+(() => {
+  const map = {};
+  let n = 0;
+  const norm = (s) => s.replace(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\bj_\d+\b|\bv-\d+\b/g,
+    (m) => (map[m] = map[m] || ('ID' + (++n))));
+  const graph = JSON.stringify(R.graph.toJSON(), null, 1);
+  const svg = R.paper.svg.outerHTML.replace(/></g, '>\n<');
+  const both = norm(graph + '\n=====SVG=====\n' + svg).split('\n=====SVG=====\n');
+  return {graph: both[0], svg: both[1]};
+})()
+"""
+
+
+def _default_style_snapshot(page):
+    page.evaluate(SETUP)
+    out = {}
+    page.evaluate("() => { mk({}); R.loadElements(EL, REL); }")
+    page.evaluate("() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
+    out["no_options"] = page.evaluate(_SERIALISE)
+    page.evaluate("""() => { mk({layout:'bands', bands:BANDS, nodeStyle:'compact', tokens:true});
+        R.loadElements(EL, REL); R.setCentre('c'); R.setSelected('a'); R.setHighlightedEdges(new Set(['k2'])); }""")
+    page.evaluate("() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
+    out["bands_compact_tokens_provenance"] = page.evaluate(_SERIALISE)
+    return out
+
+
+def test_default_style_output_matches_main_golden(page):
+    got = _default_style_snapshot(page)
+    if os.environ.get("COMPOSER_CAPTURE_GOLDEN") == "1":
+        GOLDEN.write_text(json.dumps(got, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    want = json.loads(GOLDEN.read_text(encoding="utf-8"))
+    for case in ("no_options", "bands_compact_tokens_provenance"):
+        assert got[case]["graph"] == want[case]["graph"], case + ": graph JSON differs from the golden"
+        assert got[case]["svg"] == want[case]["svg"], case + ": SVG differs from the golden"
