@@ -538,6 +538,13 @@ def main() -> None:
             policy_version="probe-r1",
             created_by_id=owner.id,
             content_hash="1" * 64,
+            canonical_document="{}",
+            submitted_by_id=owner.id,
+            submitter_authorized=True,
+            decision_authority_id=owner.id,
+            human_reviewed_ai=True,
+            blockers_cleared=True,
+            unknowns_acknowledged=True,
         )
         owner_session.add(brief_version)
         owner_session.commit()
