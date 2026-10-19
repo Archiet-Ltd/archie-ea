@@ -243,10 +243,10 @@ function llmRecommendationsComponent(dashboard) {
     <!-- Rating Modal -->
     <div x-show="ratingRecommendation !== null" x-cloak
          x-cloak
-         class="modal-root fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+         class="modal-root fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50"
          @click="ratingRecommendation = null; resetRatingForm()">
         
-        <div class="bg-background rounded-lg max-w-md w-full p-6"
+        <div class="bg-background rounded-lg max-w-md w-full p-6 border border-border"
              @click.stop>
             
             <h3 class="text-xl font-bold mb-4">Rate Recommendation</h3>

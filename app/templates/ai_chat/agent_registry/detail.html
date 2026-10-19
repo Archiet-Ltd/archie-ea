@@ -54,7 +54,7 @@
         <input type="text" x-model="term" @input.debounce.300ms="runSearch()"
                placeholder="Search this organisation's people by name or email..."
                data-testid="owner-search-input"
-               class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+               class="h-9 w-full rounded-md border border-border bg-background px-3 text-sm">
         <div class="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-border bg-card divide-y divide-border"
              x-show="results.length > 0" x-cloak>
           <template x-for="r in results" :key="r.id">
@@ -76,7 +76,7 @@
     <p class="text-sm text-foreground mb-2">{{ reg.delegated_limits.max_writes_per_day if reg.delegated_limits else 'Not set' }} writes/day</p>
     <form method="post" action="{{ url_for('agent_registry.set_limits', registration_id=reg.id) }}" class="flex gap-2">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="number" name="max_writes_per_day" placeholder="Max writes/day" required min="1" data-testid="max-writes-input" class="rounded-md border border-border bg-background px-3 py-2 text-sm flex-1">
+      <input type="number" name="max_writes_per_day" placeholder="Max writes/day" required min="1" data-testid="max-writes-input" class="h-9 rounded-md border border-border bg-background px-3 text-sm flex-1">
       <button type="submit" class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">Set limits</button>
     </form>
   </div>
@@ -86,10 +86,10 @@
     <p class="text-sm text-foreground mb-3">{{ reg.charter_persona or 'Not set' }}{% if reg.charter_version %} (v{{ reg.charter_version.version }}){% endif %}</p>
     <form method="post" action="{{ url_for('agent_registry.propose_charter', registration_id=reg.id) }}" class="space-y-2" data-testid="charter-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="text" name="persona" placeholder="Persona name" required data-testid="charter-persona-input" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+      <input type="text" name="persona" placeholder="Persona name" required data-testid="charter-persona-input" class="h-9 w-full rounded-md border border-border bg-background px-3 text-sm">
       <textarea name="charter_text" placeholder="Charter text" rows="3" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"></textarea>
-      <input type="text" name="proposable_actions" placeholder="Proposable actions (comma-separated)" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
-      <input type="text" name="forbidden_actions" placeholder="Forbidden actions (comma-separated)" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+      <input type="text" name="proposable_actions" placeholder="Proposable actions (comma-separated)" class="h-9 w-full rounded-md border border-border bg-background px-3 text-sm">
+      <input type="text" name="forbidden_actions" placeholder="Forbidden actions (comma-separated)" class="h-9 w-full rounded-md border border-border bg-background px-3 text-sm">
       <button type="submit" data-testid="propose-charter-button" class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">Propose charter change</button>
     </form>
     <p class="text-xs text-muted-foreground mt-2">A proposed change is reviewed in the <a href="{{ url_for('unified_ai_chat.approval_inbox') if 'unified_ai_chat.approval_inbox' in flask.current_app.view_functions else '#' }}" class="underline">approval inbox</a> before it takes effect.</p>

@@ -53,9 +53,9 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
                 <div>
-                    <label for="connector_type" class="block text-sm font-medium mb-1">Connector type</label>
+                    <label for="connector_type" class="block text-sm font-medium text-muted-foreground mb-1">Connector type</label>
                     <select id="connector_type" name="connector_type" required
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                         <option value="">Select a type…</option>
                         {% for type_key, type_label in connector_type_labels.items() %}
                             <option value="{{ type_key }}">{{ type_label }}</option>
@@ -64,14 +64,14 @@
                 </div>
 
                 <div>
-                    <label for="name" class="block text-sm font-medium mb-1">Display name</label>
+                    <label for="name" class="block text-sm font-medium text-muted-foreground mb-1">Display name</label>
                     <input type="text" id="name" name="name"
                         placeholder="Production ServiceNow"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                 </div>
 
                 <div>
-                    <label for="config_json" class="block text-sm font-medium mb-1">
+                    <label for="config_json" class="block text-sm font-medium text-muted-foreground mb-1">
                         Configuration (JSON, non-secret)
                     </label>
                     <textarea id="config_json" name="config_json" rows="5"
@@ -84,17 +84,17 @@
                 </div>
 
                 <div>
-                    <label for="credential" class="block text-sm font-medium mb-1">Credential</label>
+                    <label for="credential" class="block text-sm font-medium text-muted-foreground mb-1">Credential</label>
                     <input type="password" id="credential" name="credential"
                         autocomplete="new-password"
                         placeholder="API token or client secret"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
                 </div>
 
                 <div class="flex items-center gap-3">
                     <input type="checkbox" id="enabled" name="enabled" value="1" checked
                         class="h-4 w-4 rounded border-input text-primary focus:ring-ring">
-                    <label for="enabled" class="text-sm font-medium">Enable connector</label>
+                    <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">Enable connector</label>
                 </div>
 
                 <button type="submit"

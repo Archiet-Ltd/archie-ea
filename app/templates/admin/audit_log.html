@@ -18,27 +18,27 @@
 
     <!-- Filters -->
     <form method="get" action="{{ url_for('admin.audit_log_viewer') }}" class="mt-6 rounded-xl border bg-card p-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div class="grid grid-cols-1 grid-cols-1 grid-cols-1 grid-cols-1 gap-3">
             <div>
-                <label for="date_from" class="block text-xs font-medium text-muted-foreground mb-1">From Date</label>
+                <label for="date_from" class="block text-sm font-medium text-muted-foreground mb-1">From Date</label>
                 <input type="date" id="date_from" name="date_from" value="{{ date_from }}"
-                       class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
             </div>
             <div>
-                <label for="date_to" class="block text-xs font-medium text-muted-foreground mb-1">To Date</label>
+                <label for="date_to" class="block text-sm font-medium text-muted-foreground mb-1">To Date</label>
                 <input type="date" id="date_to" name="date_to" value="{{ date_to }}"
-                       class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
             </div>
             <div>
-                <label for="user_email" class="block text-xs font-medium text-muted-foreground mb-1">User Email</label>
+                <label for="user_email" class="block text-sm font-medium text-muted-foreground mb-1">User Email</label>
                 <!-- entity-picker-ok: search filter, not entity creation -->
                 <input type="text" id="user_email" name="user_email" value="{{ user_email }}" placeholder="Search by email"
-                       class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
             </div>
             <div>
-                <label for="action" class="block text-xs font-medium text-muted-foreground mb-1">Action</label>
+                <label for="action" class="block text-sm font-medium text-muted-foreground mb-1">Action</label>
                 <select id="action" name="action"
-                        class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                     <option value="">All Actions</option>
                     {% for a in action_types %}
                     <option value="{{ a }}" {{ 'selected' if action_filter == a else '' }}>{{ a }}</option>
@@ -46,9 +46,9 @@
                 </select>
             </div>
             <div>
-                <label for="entity_type" class="block text-xs font-medium text-muted-foreground mb-1">Entity Type</label>
+                <label for="entity_type" class="block text-sm font-medium text-muted-foreground mb-1">Entity Type</label>
                 <select id="entity_type" name="entity_type"
-                        class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                     <option value="">All Types</option>
                     {% for et in entity_types %}
                     <option value="{{ et }}" {{ 'selected' if entity_type_filter == et else '' }}>{{ et }}</option>
@@ -56,9 +56,9 @@
                 </select>
             </div>
             <div>
-                <label for="q" class="block text-xs font-medium text-muted-foreground mb-1">Search</label>
+                <label for="q" class="block text-sm font-medium text-muted-foreground mb-1">Search</label>
                 <input type="text" id="q" name="q" value="{{ search_q }}" placeholder="Search description..."
-                       class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
             </div>
         </div>
         <div class="flex items-center gap-3 mt-3">

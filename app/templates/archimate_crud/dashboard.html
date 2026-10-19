@@ -73,25 +73,25 @@
 
     <!-- Health panel slide-out -->
     <div x-cloak x-show="showHealthPanel" x-transition
-         class="fixed inset-y-0 right-0 z-40 w-full max-w-lg border-l border-border bg-background overflow-y-auto"
+         class="fixed inset-y-0 right-0 z-40 w-full max-w-lg border-l border-border bg-background overflow-y-auto border"
          @keydown.escape.window="showHealthPanel = false">
         <div class="flex items-center justify-between p-4 border-b">
             <h2 class="text-lg font-semibold">Repository Health</h2>
-            <button type="button" @click="showHealthPanel = false" class="text-muted-foreground hover:text-foreground" aria-label="Close">
+            <button type="button" @click="showHealthPanel = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
                 <i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>
             </button>
         </div>
         {% include 'archimate_crud/partials/_health_panel.html' %}
     </div>
-    <div x-cloak x-show="showHealthPanel" class="fixed inset-0 z-30 bg-background/60" @click="showHealthPanel = false"></div>
+    <div x-cloak x-show="showHealthPanel" class="fixed inset-0 z-30 bg-slate-900/50" @click="showHealthPanel = false"></div>
 
     <!-- ARC-006: Element detail slide-out panel -->
     <div x-cloak x-show="showDetailPanel"
-         class="fixed right-0 h-full top-0 z-40 w-full max-w-xl border-l border-border bg-background overflow-y-auto"
+         class="fixed right-0 h-full top-0 z-40 w-full max-w-xl border-l border-border bg-background overflow-y-auto border"
          @keydown.escape.window="closeDetailPanel()">
         <div class="flex items-center justify-between p-4 border-b">
             <h2 class="text-lg font-semibold" x-text="detailElement ? detailElement.name : 'Element Detail'"></h2>
-            <button type="button" @click="closeDetailPanel()" class="text-muted-foreground hover:text-foreground" aria-label="Close detail panel">
+            <button type="button" @click="closeDetailPanel()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close detail panel">
                 <i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>
             </button>
         </div>
@@ -253,30 +253,30 @@
             </div>
         </div>
     </div>
-    <div x-cloak x-show="showDetailPanel" class="fixed inset-0 z-30 bg-background/60" @click="closeDetailPanel()"></div>
+    <div x-cloak x-show="showDetailPanel" class="fixed inset-0 z-30 bg-slate-900/50" @click="closeDetailPanel()"></div>
 
     <!-- Create/Edit Modal -->
     <div id="archimate-form-modal"
          hidden
          @keydown.escape.window="Platform.modal.close('archimate-form-modal')"
          role="dialog" aria-modal="true"
-         class="modal-root hidden items-center justify-center bg-background/80 fixed inset-0 z-50" >
+         class="modal-root hidden items-center justify-center fixed inset-0 z-50 bg-slate-900/50" >
         {# F-18, Capgemini dry-run: typed-field forms (many optional fields per
            element type) overflowed the viewport with no way to reach Save on
            a laptop screen. #}
-        <div class="bg-background border rounded-lg w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto" @click.stop tabindex="-1">
+        <div class="bg-background border rounded-lg w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto border-border" @click.stop tabindex="-1">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-xl font-bold" x-text="editingElement ? 'Edit Element' : 'Create Element'"></h2>
-                <button type="button" @click="Platform.modal.close('archimate-form-modal')" aria-label="Close" class="text-muted-foreground hover:text-foreground">
+                <button type="button" @click="Platform.modal.close('archimate-form-modal')" aria-label="Close" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>
                 </button>
             </div>
             <div x-cloak x-show="formError" class="mb-4 px-3 py-2 bg-destructive/10 text-destructive-emphasis text-sm rounded-md" x-text="formError"></div>
             <form @submit.prevent="submitForm()" class="space-y-4">
                 <div x-cloak x-show="!editingElement">
-                    <label class="block text-sm font-medium mb-2">Element Type <span class="text-destructive-emphasis">*</span></label>
+                    <label class="block text-sm font-medium text-muted-foreground mb-1">Element Type <span class="text-destructive-emphasis">*</span></label>
                     <select x-model="formData.element_type" @change="resetTypedFields()"
-                        class="w-full px-3 py-2 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Element Type">
+                        class="h-9 w-full px-3 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring border-input" aria-label="Element Type">
                         <option value="">Select type...</option>
                         <template x-for="et in currentLayerTypes" :key="et">
                             <option :value="et" x-text="formatTypeName(et)"></option>
@@ -287,13 +287,13 @@
                     Type: <span class="font-medium text-foreground" x-text="formatTypeName(formData.element_type)"></span>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-2">Name <span class="text-destructive-emphasis">*</span></label>
+                    <label class="block text-sm font-medium text-muted-foreground mb-1">Name <span class="text-destructive-emphasis">*</span></label>
                     <input type="text" x-model="formData.name" required
-                        class="w-full px-3 py-2 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="h-9 w-full px-3 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring border-input"
                         placeholder="Element name" aria-label="Element name">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-2">Description</label>
+                    <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
                     <textarea x-model="formData.description" rows="3"
                         class="w-full px-3 py-2 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         placeholder="Optional description" aria-label="Description"></textarea>
@@ -302,10 +302,10 @@
                      Types with no config (currentTypeFields is empty) fall back to name+description only. -->
                 <template x-for="fld in currentTypeFields" :key="fld.name">
                     <div>
-                        <label class="block text-sm font-medium mb-2" x-text="fld.label + (fld.required ? ' *' : '')"></label>
+                        <label class="block text-sm font-medium text-muted-foreground mb-1" x-text="fld.label + (fld.required ? ' *' : '')"></label>
                         <template x-if="fld.type === 'select'">
                             <select x-model="formData[fld.name]"
-                                class="w-full px-3 py-2 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                class="h-9 w-full px-3 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring border-input"
                                 :aria-label="fld.label">
                                 <option value="">Select...</option>
                                 <template x-for="opt in fld.options" :key="opt.value">
@@ -320,7 +320,7 @@
                         </template>
                         <template x-if="fld.type !== 'select' && fld.type !== 'textarea'">
                             <input type="text" x-model="formData[fld.name]"
-                                class="w-full px-3 py-2 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                class="h-9 w-full px-3 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring border-input"
                                 :placeholder="fld.placeholder" :aria-label="fld.label">
                         </template>
                     </div>
@@ -331,7 +331,7 @@
                         <span x-text="saving ? 'Saving...' : (editingElement ? 'Update' : 'Create')"></span>
                     </button>
                     <button type="button" @click="Platform.modal.close('archimate-form-modal')"
-                        class="px-4 py-2 border rounded-md text-sm hover:bg-accent" aria-label="Close">Cancel</button>
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">Cancel</button>
                     {# x-if, not x-show — see the "Full Detail" anchor above. #}
                     <template x-if="editingElement">
                         <a :href="editPageUrl(editingElement)"
@@ -354,12 +354,12 @@
          hidden
          @keydown.escape.window="Platform.modal.close('ai-generate-modal')"
          role="dialog" aria-modal="true" aria-labelledby="ai-generate-modal-title"
-         class="modal-root hidden items-center justify-center bg-background/80 fixed inset-0 z-50"
+         class="modal-root hidden items-center justify-center fixed inset-0 z-50 bg-slate-900/50"
          data-testid="ai-generate-modal">
-        <div class="bg-background border rounded-lg w-full max-w-lg mx-4 p-6" @click.stop tabindex="-1">
+        <div class="bg-background border rounded-lg w-full max-w-lg mx-4 p-6 border-border" @click.stop tabindex="-1">
             <div class="flex items-center justify-between mb-4">
-                <h2 id="ai-generate-modal-title" class="text-xl font-bold">Generate Element with AI</h2>
-                <button type="button" @click="Platform.modal.close('ai-generate-modal')" aria-label="Close" class="text-muted-foreground hover:text-foreground">
+                <h2 id="ai-generate-modal-title" class="text-base font-semibold text-foreground">Generate Element with AI</h2>
+                <button type="button" @click="Platform.modal.close('ai-generate-modal')" aria-label="Close" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>
                 </button>
             </div>
@@ -425,15 +425,15 @@
                 <button type="button" x-show="aiGenerate.result" x-cloak @click="aiGenerate.result = null"
                     class="px-4 py-2 border rounded-md text-sm hover:bg-accent" aria-label="Generate again">Generate Again</button>
                 <button type="button" @click="Platform.modal.close('ai-generate-modal')"
-                    class="px-4 py-2 border rounded-md text-sm hover:bg-accent ml-auto" aria-label="Close">Cancel</button>
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">Cancel</button>
             </div>
         </div>
     </div>
 
     <!-- Delete Confirmation -->
     <div x-show="showDeleteConfirm && deletingElement && deletingElement.name" x-cloak
-         class="modal-root flex items-center justify-center bg-background/80 fixed inset-0 z-50" @keydown.escape.window="showDeleteConfirm = false">
-        <div class="bg-background border rounded-lg w-full max-w-md mx-4 p-6" @click.stop role="dialog" aria-modal="true" tabindex="-1">
+         class="modal-root flex items-center justify-center fixed inset-0 z-50 bg-slate-900/50" @keydown.escape.window="showDeleteConfirm = false">
+        <div class="bg-background border rounded-lg w-full max-w-md mx-4 p-6 border-border" @click.stop role="dialog" aria-modal="true" tabindex="-1">
             <div class="flex flex-col items-center gap-4 text-center">
                 <div class="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
                     <i data-lucide="alert-triangle" class="h-6 w-6 text-destructive" aria-hidden="true"></i>
@@ -458,14 +458,14 @@
 
     <!-- ARCH-016: Validation Results Panel -->
     <div x-show="showValidationPanel" x-cloak
-         class="modal-root flex items-center justify-center bg-background/80 fixed inset-0 z-50" @keydown.escape.window="showValidationPanel = false">
-        <div class="bg-background border rounded-lg w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto" @click.stop role="dialog" aria-modal="true" tabindex="-1">
+         class="modal-root flex items-center justify-center fixed inset-0 z-50 bg-slate-900/50" @keydown.escape.window="showValidationPanel = false">
+        <div class="bg-background border rounded-lg w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto border-border" @click.stop role="dialog" aria-modal="true" tabindex="-1">
             <div class="flex items-center justify-between p-6 border-b">
                 <h3 class="text-lg font-semibold flex items-center gap-2">
                     <i data-lucide="shield-check" class="h-5 w-5" aria-hidden="true"></i>
                     ArchiMate 3.2 Validation Results
                 </h3>
-                <button type="button" @click="showValidationPanel = false" class="text-muted-foreground hover:text-foreground" aria-label="Close">
+                <button type="button" @click="showValidationPanel = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
                     <i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>
                 </button>
             </div>

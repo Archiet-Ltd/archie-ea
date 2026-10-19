@@ -58,21 +58,21 @@
     <!-- TRC-011: direction toggle / TRC-015: pivot type selector -->
     <form method="get" action="{{ url_for('architect_ui.traceability_matrix') }}" class="rounded-lg border border-border bg-card p-3">
         <div class="flex flex-wrap items-center gap-3">
-            <label for="direction" class="text-sm font-medium text-foreground">Direction:</label>
+            <label for="direction" class="block text-sm font-medium text-muted-foreground mb-1">Direction:</label>
             <select
                 id="direction"
                 name="direction"
-                class="rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
             >
                 <option value="forward" {% if direction == 'forward' %}selected{% endif %}>Top-Down</option>
                 <option value="inverse" {% if direction == 'inverse' %}selected{% endif %}>Bottom-Up</option>
             </select>
             {% if direction == 'forward' and pivot_types %}
-            <label for="pivot_type" class="text-sm font-medium text-foreground">Pivot element:</label>
+            <label for="pivot_type" class="block text-sm font-medium text-muted-foreground mb-1">Pivot element:</label>
             <select
                 id="pivot_type"
                 name="pivot_type"
-                class="rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
             >
                 {% for pt in pivot_types %}
                 <option value="{{ pt.type }}" {% if pt.type == current_pivot_type %}selected{% endif %}>
@@ -103,11 +103,11 @@
                 name="search"
                 value="{{ current_search }}"
                 placeholder="Search by element name…"
-                class="w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                class="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
              aria-label="Search by element name…">
         </div>
         <select name="scope"
-                class="rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground" aria-label="Filter by scope">
+                class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground" aria-label="Filter by scope">
             <option value="" {% if not current_scope %}selected{% endif %}>All scopes</option>
             <option value="enterprise" {% if current_scope == 'enterprise' %}selected{% endif %}>Enterprise</option>
             <option value="application" {% if current_scope == 'application' %}selected{% endif %}>Application</option>

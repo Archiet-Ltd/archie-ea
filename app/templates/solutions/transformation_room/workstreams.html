@@ -19,41 +19,41 @@
   {% if room.form_error %}
   <p class="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis">{{ room.form_error }}</p>
   {% endif %}
-  <form method="POST" action="" class="mt-4 grid gap-4 sm:grid-cols-2">
+  <form method="POST" action="" class="mt-4 grid gap-4 grid-cols-1">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="sm:col-span-1">
-      <label for="ws-type" class="block text-xs font-medium text-muted-foreground">Type</label>
+      <label for="ws-type" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
       <select id="ws-type" name="workstream_type" required
-              class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+              class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
         {% for wt in room.workstream_types or [] %}
         <option value="{{ wt }}">{{ wt|replace('_', ' ')|title }}</option>
         {% endfor %}
       </select>
     </div>
     <div class="sm:col-span-1">
-      <label for="ws-lead" class="block text-xs font-medium text-muted-foreground">Lead</label>
+      <label for="ws-lead" class="block text-sm font-medium text-muted-foreground mb-1">Lead</label>
       <select id="ws-lead" name="lead_id" required
-              class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+              class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
         {% for opt in room.lead_options or [] %}
         <option value="{{ opt.id }}">{{ opt.label }}</option>
         {% endfor %}
       </select>
     </div>
     <div class="sm:col-span-2">
-      <label for="ws-objective" class="block text-xs font-medium text-muted-foreground">Objective</label>
+      <label for="ws-objective" class="block text-sm font-medium text-muted-foreground mb-1">Objective</label>
       <textarea id="ws-objective" name="objective" required rows="2"
                 class="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"></textarea>
     </div>
     <div class="sm:col-span-1">
-      <label for="ws-target-date" class="block text-xs font-medium text-muted-foreground">Target date</label>
+      <label for="ws-target-date" class="block text-sm font-medium text-muted-foreground mb-1">Target date</label>
       <input id="ws-target-date" name="target_date" type="date"
-             class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+             class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
     </div>
     <div class="sm:col-span-1">
-      <label for="ws-target-reason" class="block text-xs font-medium text-muted-foreground">Target date unavailable — reason</label>
+      <label for="ws-target-reason" class="block text-sm font-medium text-muted-foreground mb-1">Target date unavailable — reason</label>
       <input id="ws-target-reason" name="target_date_unavailable_reason" type="text"
              placeholder="Required if no target date"
-             class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+             class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
     </div>
     <div class="sm:col-span-2">
       <button type="submit"

@@ -76,7 +76,7 @@
                         <input type="hidden" name="key" value="{{ item.key }}">
                         <label for="assignee-{{ loop.index }}" class="sr-only">Search owner for {{ item.name }}</label>
                         <select id="assignee-{{ loop.index }}" name="assignee_id" required data-testid="dsr-assignee-{{ loop.index }}"
-                            class="flex h-8 rounded-md border border-input bg-transparent px-2 text-xs">
+                            class="h-9 flex rounded-md border border-input bg-transparent px-2 text-xs">
                             <option value="" selected disabled>Search owner…</option>
                             {% for p in people %}
                             <option value="{{ p.id }}" {% if p.id == item.assignee_id %}selected{% endif %}>{{ p.email }}</option>

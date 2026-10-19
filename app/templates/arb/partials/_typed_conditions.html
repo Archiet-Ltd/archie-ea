@@ -313,7 +313,7 @@
 
         <div x-show="mode === 'manual_attestation'" x-cloak class="space-y-3">
             <div>
-                <label for="arb-attestation-statement-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">
+                <label for="arb-attestation-statement-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">
                     Statement <span class="text-destructive" aria-hidden="true">*</span>
                 </label>
                 <textarea id="arb-attestation-statement-{{ _cid }}" name="statement" rows="3" maxlength="2000"
@@ -324,49 +324,49 @@
                 </p>
             </div>
             <div>
-                <label for="arb-attestation-observed-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">
+                <label for="arb-attestation-observed-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">
                     Observed at <span class="text-destructive" aria-hidden="true">*</span>
                 </label>
                 <input type="datetime-local" id="arb-attestation-observed-{{ _cid }}" name="observed_at"
-                       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             </div>
         </div>
 
         <div x-show="mode === 'source_backed'" x-cloak class="space-y-3">
             <div>
-                <label for="arb-source-identity-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">
+                <label for="arb-source-identity-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">
                     Source identity <span class="text-destructive" aria-hidden="true">*</span>
                 </label>
                 <input type="text" id="arb-source-identity-{{ _cid }}" name="source_identity" maxlength="255"
                        value="{{ _retained.get('source_identity') or '' }}"
-                       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             </div>
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div class="grid grid-cols-1 gap-3 grid-cols-1">
                 <div>
-                    <label for="arb-source-type-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">Source type</label>
+                    <label for="arb-source-type-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">Source type</label>
                     <input type="text" id="arb-source-type-{{ _cid }}" name="source_type" maxlength="120"
-                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 </div>
                 <div>
-                    <label for="arb-source-version-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">Source version</label>
+                    <label for="arb-source-version-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">Source version</label>
                     <input type="text" id="arb-source-version-{{ _cid }}" name="source_version" maxlength="120"
-                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 </div>
                 <div>
-                    <label for="arb-source-observed-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">Observed at</label>
+                    <label for="arb-source-observed-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">Observed at</label>
                     <input type="datetime-local" id="arb-source-observed-{{ _cid }}" name="observed_at"
-                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 </div>
                 <div>
-                    <label for="arb-source-expires-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">Expires at</label>
+                    <label for="arb-source-expires-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">Expires at</label>
                     <input type="datetime-local" id="arb-source-expires-{{ _cid }}" name="expires_at"
                            aria-describedby="arb-source-expires-help-{{ _cid }}"
-                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     <p id="arb-source-expires-help-{{ _cid }}" class="mt-1 text-xs text-muted-foreground">An already-expired record is rejected. Without JavaScript, a time entered here is read as UTC.</p>
                 </div>
             </div>
             <div>
-                <label for="arb-source-value-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">Recorded value</label>
+                <label for="arb-source-value-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">Recorded value</label>
                 <textarea id="arb-source-value-{{ _cid }}" name="value" rows="3"
                           class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
             </div>
@@ -378,7 +378,7 @@
 
         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button type="button" data-modal-close="arb-condition-evidence-{{ _cid }}"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
             <button type="submit"
                     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Submit evidence for condition {{ _number }}
@@ -417,7 +417,7 @@
         </p>
         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button type="button" data-modal-close="arb-condition-verify-{{ _cid }}"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
             <button type="submit"
                     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Verify evidence for condition {{ _number }}
@@ -441,7 +441,7 @@
             A waiver does not remove this condition. It expires automatically.
         </p>
         <div>
-            <label for="arb-waive-reason-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">
+            <label for="arb-waive-reason-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">
                 Reason <span class="text-destructive" aria-hidden="true">*</span>
             </label>
             <textarea id="arb-waive-reason-{{ _cid }}" name="reason" rows="3" required maxlength="2000"
@@ -450,19 +450,19 @@
             <p id="arb-waive-reason-help-{{ _cid }}" class="mt-1 text-xs text-muted-foreground">Required. Up to 2,000 characters.</p>
         </div>
         <div>
-            <label for="arb-waive-expires-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">
+            <label for="arb-waive-expires-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">
                 Expires at <span class="text-destructive" aria-hidden="true">*</span>
             </label>
             <input type="datetime-local" id="arb-waive-expires-{{ _cid }}" name="expires_at" required
                    aria-describedby="arb-waive-expires-help-{{ _cid }}"
-                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <p id="arb-waive-expires-help-{{ _cid }}" class="mt-1 text-xs text-muted-foreground">
                 Must be in the future and no more than 365 days away. A value outside that window is rejected.
                 Without JavaScript, a time entered here is read as UTC.
             </p>
         </div>
         <div>
-            <label for="arb-waive-scope-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">
+            <label for="arb-waive-scope-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">
                 Scope <span class="text-destructive" aria-hidden="true">*</span>
             </label>
             <textarea id="arb-waive-scope-{{ _cid }}" name="scope" rows="2" required maxlength="2000"
@@ -471,7 +471,7 @@
             <p id="arb-waive-scope-help-{{ _cid }}" class="mt-1 text-xs text-muted-foreground">Describe in plain words exactly what this waiver covers.</p>
         </div>
         <div>
-            <label for="arb-waive-control-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">
+            <label for="arb-waive-control-{{ _cid }}" class="block text-sm font-medium text-muted-foreground mb-1">
                 Compensating control <span class="text-destructive" aria-hidden="true">*</span>
             </label>
             <textarea id="arb-waive-control-{{ _cid }}" name="compensating_control" rows="2" required maxlength="2000"
@@ -481,7 +481,7 @@
         </div>
         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button type="button" data-modal-close="arb-condition-waive-{{ _cid }}"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
             <button type="submit"
                     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Grant waiver for condition {{ _number }}

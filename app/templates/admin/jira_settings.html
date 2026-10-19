@@ -258,7 +258,7 @@
                             <h4 class="text-sm font-medium mb-4">Connection Settings</h4>
                             <div class="space-y-4">
                                 <div>
-                                    <label for="base_url" class="block text-sm font-medium mb-2">
+                                    <label for="base_url" class="block text-sm font-medium text-muted-foreground mb-1">
                                         Jira Base URL <span class="text-destructive-emphasis">*</span>
                                     </label>
                                     <input type="text"
@@ -266,13 +266,13 @@
                                            name="base_url"
                                            value="{{ form.base_url.data or '' }}"
                                            placeholder="https://your-org.atlassian.net"
-                                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                            required>
                                     <p class="text-xs text-muted-foreground mt-1">Your Jira Cloud or Data Center URL</p>
                                 </div>
 
                                 <div>
-                                    <label for="username" class="block text-sm font-medium mb-2">
+                                    <label for="username" class="block text-sm font-medium text-muted-foreground mb-1">
                                         Username / Email <span class="text-destructive-emphasis">*</span>
                                     </label>
                                     <input type="text"
@@ -280,13 +280,13 @@
                                            name="username"
                                            value="{{ form.username.data or '' }}"
                                            placeholder="user@example.com"
-                                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                            required>
                                     <p class="text-xs text-muted-foreground mt-1">Jira account email used for API authentication</p>
                                 </div>
 
                                 <div>
-                                    <label for="api_token" class="block text-sm font-medium mb-2">
+                                    <label for="api_token" class="block text-sm font-medium text-muted-foreground mb-1">
                                         API Token {% if not jira_config %}<span class="text-destructive-emphasis">*</span>{% endif %}
                                     </label>
                                     <input type="password"
@@ -294,7 +294,7 @@
                                            name="api_token"
                                            value=""
                                            placeholder="{% if jira_config %}Leave blank to keep existing{% else %}Your Jira API token{% endif %}"
-                                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                            {% if not jira_config %}required{% endif %} autocomplete="new-password">
                                     <p class="text-xs text-muted-foreground mt-1">Generate at <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener" class="text-primary hover:underline">Atlassian API tokens</a></p>
                                 </div>
@@ -305,9 +305,9 @@
                         <div>
                             <h4 class="text-sm font-medium mb-4">Project Settings</h4>
                             <div class="space-y-4">
-                                <div class="grid grid-cols-2 gap-4">
+                                <div class="grid grid-cols-1 gap-4">
                                     <div>
-                                        <label for="project_key" class="block text-sm font-medium mb-2">
+                                        <label for="project_key" class="block text-sm font-medium text-muted-foreground mb-1">
                                             Project Key <span class="text-destructive-emphasis">*</span>
                                         </label>
                                         <input type="text"
@@ -315,12 +315,12 @@
                                                name="project_key"
                                                value="{{ form.project_key.data or '' }}"
                                                placeholder="EA"
-                                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                                required>
                                         <p class="text-xs text-muted-foreground mt-1">Jira project key to push issues to</p>
                                     </div>
                                     <div>
-                                        <label for="issue_type" class="block text-sm font-medium mb-2">
+                                        <label for="issue_type" class="block text-sm font-medium text-muted-foreground mb-1">
                                             Issue Type
                                         </label>
                                         <input type="text"
@@ -328,7 +328,7 @@
                                                name="issue_type"
                                                value="{{ form.issue_type.data or 'Task' }}"
                                                placeholder="Task"
-                                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                         <p class="text-xs text-muted-foreground mt-1">Jira issue type (default: Task)</p>
                                     </div>
                                 </div>
@@ -341,7 +341,7 @@
                             <div class="space-y-4">
                                 <div class="p-3 bg-accent/50 rounded-md space-y-3">
                                     <div>
-                                        <label for="filter_countries" class="text-sm font-medium">Country Filter</label>
+                                        <label for="filter_countries" class="block text-sm font-medium text-muted-foreground mb-1">Country Filter</label>
                                         <p class="text-xs text-muted-foreground">Comma-separated list of countries to include in push scope</p>
                                     </div>
                                     <input type="text"
@@ -349,7 +349,7 @@
                                            name="filter_countries"
                                            value="{{ form.filter_countries.data or '' }}"
                                            placeholder="United Kingdom, Ireland"
-                                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                                 </div>
                             </div>
                         </div>
@@ -358,7 +358,7 @@
                         <div>
                             <div class="flex items-center justify-between p-3 bg-accent/50 rounded-md">
                                 <div>
-                                    <label for="enabled" class="text-sm font-medium">Enable Integration</label>
+                                    <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">Enable Integration</label>
                                     <p class="text-xs text-muted-foreground">Allow pushing data to Jira</p>
                                 </div>
                                 <label class="relative inline-flex items-center cursor-pointer">

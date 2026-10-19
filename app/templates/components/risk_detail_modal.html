@@ -143,7 +143,7 @@
             <i data-lucide="alert-triangle" class="h-5 w-5 text-destructive"></i>
         </div>
         <div>
-            <h3 id="modal-risk-detail-title" class="text-lg font-semibold">Risk Details &amp; Mitigation</h3>
+            <h3 id="modal-risk-detail-title" class="text-base font-semibold text-foreground">Risk Details &amp; Mitigation</h3>
             <p class="text-sm text-muted-foreground" x-text="risk ? risk.capability_name : 'Loading...'"></p>
         </div>
     </div>
@@ -429,7 +429,7 @@
         </button>
         <button type="button"
             @click="Platform.modal.close('risk-detail')"
-            class="inline-flex items-center gap-2 px-4 py-2 bg-muted text-foreground font-medium rounded-lg hover:bg-muted/80 transition-colors"
+            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
          aria-label="Close">
             Close
         </button>

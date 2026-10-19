@@ -1,6 +1,6 @@
 {# Compare Options Modal — MCDA side-by-side comparison #}
 <div x-show="compareModalOpen" x-trap.inert="compareModalOpen" x-cloak
-  class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+  class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50"
   @keydown.escape.window="compareModalOpen = false">
   <div class="bg-background rounded-lg border border-border w-full max-w-4xl max-h-[80vh] overflow-auto p-6"
     @click.outside="compareModalOpen = false"
@@ -9,7 +9,7 @@
     <div class="flex items-center justify-between mb-4">
       <h2 id="compare-title" class="text-lg font-semibold">Compare Options (MCDA)</h2>
       <button type="button" @click="compareModalOpen = false"
-        class="rounded-md p-1 hover:bg-accent" aria-label="Close comparison">
+        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close comparison">
         <i data-lucide="x" class="h-5 w-5"></i>
       </button>
     </div>

@@ -20,15 +20,15 @@
 
     <section class="rounded-lg border border-border bg-card p-6">
         <form @submit.prevent="loadChanges" class="space-y-4">
-            <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-4 grid-cols-1">
                 <div>
-                    <label for="from-date" class="block text-sm font-medium text-foreground mb-1">From date</label>
+                    <label for="from-date" class="block text-sm font-medium text-muted-foreground mb-1">From date</label>
                     <input type="datetime-local" id="from-date" x-model="fromDate"
                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                            required>
                 </div>
                 <div>
-                    <label for="to-date" class="block text-sm font-medium text-foreground mb-1">To date</label>
+                    <label for="to-date" class="block text-sm font-medium text-muted-foreground mb-1">To date</label>
                     <input type="datetime-local" id="to-date" x-model="toDate"
                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                            required>

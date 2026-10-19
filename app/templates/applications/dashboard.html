@@ -288,7 +288,7 @@
     </div>
     {% endif %}
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 grid-cols-1 gap-6">
 
       {# Application Identity #}
       <div data-slot="card" class="rounded-lg border border-border bg-card">
@@ -307,9 +307,9 @@
 
           {% macro edit_row(label, name, value, maxlength=255) %}
           <div class="flex justify-between items-center gap-4">
-            <label for="edit-{{ name }}" class="text-muted-foreground shrink-0">{{ label }}</label>
+            <label for="edit-{{ name }}" class="block text-sm font-medium text-muted-foreground mb-1 shrink-0">{{ label }}</label>
             <input type="text" id="edit-{{ name }}" name="{{ name }}" value="{{ value or '' }}" maxlength="{{ maxlength }}"
-                   class="flex h-9 w-2/3 rounded-md border border-input bg-background px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                   class="flex h-9 w-2/3 rounded-md border border-input bg-background px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           {% endmacro %}
 
@@ -374,7 +374,7 @@
                 <button type="button" @click="Platform.fetch.post('/dashboard/api/archimate-elements/{{ archimate_info.id }}/correct', {action:'correct', name, type}).then(function () { correcting = false; confirmed = true; }).catch(function (e) { Platform.toast.error('Could not save the correction: ' + e.message); })"
                   class="text-xs bg-primary text-primary-foreground rounded px-2 py-1">Save</button>
                 <button type="button" @click="correcting=false"
-                  class="text-xs text-muted-foreground hover:text-foreground rounded px-2 py-1">Cancel</button>
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
               </div>
             </template>
             <span x-show="confirmed" class="inline-flex items-center gap-1 text-xs text-success-emphasis">
@@ -399,9 +399,9 @@
           {{ detail_row('Differentiation Level', app.differentiation_level | replace('_',' ') | title if app.differentiation_level else none) }}
           {{ detail_row('User Base Size', app.user_base_size | string if app.user_base_size else none) }}
           <div class="flex justify-between items-center gap-4">
-            <label for="edit-userCount" class="text-muted-foreground shrink-0">User Count</label>
+            <label for="edit-userCount" class="block text-sm font-medium text-muted-foreground mb-1 shrink-0">User Count</label>
             <input type="number" id="edit-userCount" name="userCount" value="{{ app.user_count or '' }}" min="0" max="10000000"
-                   class="flex h-9 w-2/3 rounded-md border border-input bg-background px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                   class="flex h-9 w-2/3 rounded-md border border-input bg-background px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           {{ detail_row('Avg Daily Users', app.average_daily_users | string if app.average_daily_users else none) }}
           {{ detail_row('Max Concurrent Users', app.concurrent_users_max | string if app.concurrent_users_max else none) }}
@@ -473,10 +473,10 @@
 
     {# Description & Notes #}
     {% if edit_mode or app.description or app.business_purpose or app.notes or app.assessment_notes %}
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 grid-cols-1 gap-6">
       {% if edit_mode %}
       <div data-slot="card" class="rounded-lg border border-border bg-card">
-        <div class="flex flex-col space-y-1.5 p-6 pb-3"><label for="edit-description" class="text-lg font-semibold">Description</label></div>
+        <div class="flex flex-col space-y-1.5 p-6 pb-3"><label for="edit-description" class="block text-sm font-medium text-muted-foreground mb-1 text-lg">Description</label></div>
         <div class="p-6 pt-0">
           <textarea id="edit-description" name="description" rows="4"
                     class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ app.description or '' }}</textarea>

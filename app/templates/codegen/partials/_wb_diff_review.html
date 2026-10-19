@@ -28,7 +28,7 @@
           :disabled="isApplying"
           x-text="isApplying ? 'Applying...' : `Accept All (${patches.length})`"
         ></button>
-        <button aria-label="Close diff review" type="button" @click="close()" class="text-[var(--color-muted)] hover:text-[var(--color-text)] p-1">
+        <button aria-label="Close diff review" type="button" @click="close()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>

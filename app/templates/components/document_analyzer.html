@@ -96,7 +96,7 @@
                 <div x-show="filePreview" x-cloak class="rounded-lg border bg-muted/50 p-4 max-h-64 overflow-auto">
                     <div class="flex items-center justify-between mb-2">
                         <h5 class="text-sm font-semibold">File Preview</h5>
-                        <button type="button" @click="filePreview = null" class="text-muted-foreground hover:text-foreground" aria-label="Close file preview">
+                        <button type="button" @click="filePreview = null" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close file preview">
                             <i data-lucide="x" class="h-4 w-4"></i>
                         </button>
                     </div>
@@ -507,7 +507,7 @@
                 <div class="rounded-md border border-primary/50 bg-primary/10 px-3 py-2">
                     <div class="flex items-center justify-between mb-3">
                         <h4 class="text-sm font-semibold">Changes Preview</h4>
-                        <button type="button" @click="showDiffPreview = false" class="text-muted-foreground hover:text-foreground" aria-label="Close changes preview">
+                        <button type="button" @click="showDiffPreview = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close changes preview">
                             <i data-lucide="x" class="h-4 w-4"></i>
                         </button>
                     </div>

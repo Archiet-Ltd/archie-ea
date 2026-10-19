@@ -46,15 +46,15 @@
             <span class="rounded-md border border-border bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">Auto-saved</span>
           </div>
 
-          <label for="journey-title" class="mt-5 block text-sm font-medium text-foreground">What are you trying to change?</label>
+          <label for="journey-title" class="block text-sm font-medium text-muted-foreground mb-1 mt-5">What are you trying to change?</label>
           <input id="journey-title" type="text" x-model.trim="title" required maxlength="255"
-            class="mt-2 flex h-11 w-full rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            class="h-9 mt-2 flex w-full rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             placeholder="For example: reduce customer onboarding from days to minutes">
         </div>
 
         <fieldset>
           <legend class="text-sm font-medium text-foreground">Purpose</legend>
-          <div class="mt-3 grid gap-3 md:grid-cols-2">
+          <div class="mt-3 grid gap-3 grid-cols-1">
             {% for value, label, description in intent_options %}
             <label class="cursor-pointer rounded-lg border p-4 transition-colors"
               :class="intent === '{{ value }}' ? 'border-primary bg-primary/5' : 'border-border bg-background hover:bg-muted/40'">
@@ -69,7 +69,7 @@
         <fieldset>
           <legend class="text-sm font-medium text-foreground">Architecture scope</legend>
           <p class="mt-1 text-xs text-muted-foreground">Select every perspective needed to make the decision—not every layer in the framework.</p>
-          <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div class="mt-3 grid grid-cols-1 gap-2 grid-cols-1">
             {% for value, label, description in layer_options %}
             <label class="cursor-pointer rounded-lg border p-3 transition-colors"
               :class="Array.isArray(layers) && layers.indexOf('{{ value }}') >= 0 ? 'border-primary bg-primary/5' : 'border-border bg-background hover:bg-muted/40'">
@@ -84,7 +84,7 @@
         <fieldset>
           <legend class="text-sm font-medium text-foreground">Useful deliverables</legend>
           <p class="mt-1 text-xs text-muted-foreground">These are working outputs within the journey, not disconnected destinations.</p>
-          <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div class="mt-3 grid gap-2 grid-cols-1 grid-cols-1">
             {% for value, label, icon in deliverable_options %}
             <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-background p-3 hover:bg-muted/40">
               <input type="checkbox" value="{{ value }}" x-model="deliverables" class="h-4 w-4 rounded border-input text-primary focus:ring-ring">
@@ -97,7 +97,7 @@
 
         <div class="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
           <div>
-            <label for="journey-outcome" class="block text-sm font-medium text-foreground">Likely outcome</label>
+            <label for="journey-outcome" class="block text-sm font-medium text-muted-foreground mb-1">Likely outcome</label>
             <select id="journey-outcome" x-model="outcomeType"
               class="mt-2 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
               <option value="undecided">Decide during the journey</option>
@@ -160,7 +160,7 @@
             data-testid="journey-filter-bar"
             class="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-muted/20 p-3">
         <div class="min-w-[10rem] flex-1">
-          <label for="filter-intent" class="text-xs font-medium text-muted-foreground">Purpose</label>
+          <label for="filter-intent" class="block text-sm font-medium text-muted-foreground mb-1">Purpose</label>
           <select id="filter-intent" name="intent_filter"
             class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <option value="">Any purpose</option>
@@ -170,7 +170,7 @@
           </select>
         </div>
         <div class="min-w-[9rem]">
-          <label for="filter-stage" class="text-xs font-medium text-muted-foreground">Stage</label>
+          <label for="filter-stage" class="block text-sm font-medium text-muted-foreground mb-1">Stage</label>
           <select id="filter-stage" name="stage"
             class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <option value="">Any stage</option>
@@ -180,7 +180,7 @@
           </select>
         </div>
         <div class="min-w-[9rem]">
-          <label for="filter-status" class="text-xs font-medium text-muted-foreground">Status</label>
+          <label for="filter-status" class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
           <select id="filter-status" name="status"
             class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             {% for value in journey_statuses %}

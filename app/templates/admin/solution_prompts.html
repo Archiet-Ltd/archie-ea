@@ -109,27 +109,27 @@
     <form id="edit-prompt-form">
         <!-- Prompt Name (read-only) -->
         <div class="mb-4">
-            <label for="edit-prompt-name" class="block text-sm font-medium text-foreground mb-1">Prompt Name</label>
+            <label for="edit-prompt-name" class="block text-sm font-medium text-muted-foreground mb-1">Prompt Name</label>
             <input type="text" id="edit-prompt-name" readonly
-                   class="w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground cursor-not-allowed">
+                   class="h-9 w-full rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground cursor-not-allowed">
         </div>
 
         <!-- Phase & Description -->
-        <div class="grid grid-cols-2 gap-4 mb-4">
+        <div class="grid grid-cols-1 gap-4 mb-4">
             <div>
-                <label for="edit-prompt-category" class="block text-sm font-medium text-foreground mb-1">ADM Phase</label>
+                <label for="edit-prompt-category" class="block text-sm font-medium text-muted-foreground mb-1">ADM Phase</label>
                 <input type="text" id="edit-prompt-category" readonly
-                       class="w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground cursor-not-allowed">
+                       class="h-9 w-full rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground cursor-not-allowed">
             </div>
             <div>
-                <label class="block text-sm font-medium text-foreground mb-1">Status</label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
                 <div id="edit-prompt-status" class="flex items-center h-9 px-3 text-sm"></div>
             </div>
         </div>
 
         <!-- Available Variables -->
         <div class="mb-4">
-            <label class="block text-sm font-medium text-foreground mb-1">Available Variables</label>
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Available Variables</label>
             <p class="text-xs text-muted-foreground mb-2">
                 Use these variables in your prompt with <code class="bg-muted px-1 rounded">{% raw %}{variable_name}{% endraw %}</code> syntax. Double braces <code class="bg-muted px-1 rounded">{% raw %}{{{% endraw %}</code> for literal braces in JSON schemas.
             </p>
@@ -139,7 +139,7 @@
         <!-- Prompt Text -->
         <div class="mb-4">
             <div class="flex items-center justify-between mb-1">
-                <label for="edit-prompt-text" class="block text-sm font-medium text-foreground">Prompt Text</label>
+                <label for="edit-prompt-text" class="block text-sm font-medium text-muted-foreground mb-1">Prompt Text</label>
                 <button type="button" id="btn-restore-default"
                         class="text-xs text-muted-foreground hover:text-foreground transition-colors">
                     Restore default text
@@ -160,7 +160,7 @@
         <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
             <button type="button"
                     data-modal-close="edit-prompt-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
                 Cancel
             </button>
             <button type="submit"

@@ -63,9 +63,9 @@
             {% if error %}
             <p role="alert" class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive" data-testid="metamodel-define-error">{{ error }}</p>
             {% endif %}
-            <div class="grid gap-4 md:grid-cols-2">
+            <div class="grid gap-4 grid-cols-1">
                 <div class="space-y-1">
-                    <label for="mm-type" class="text-sm font-medium text-foreground">Element type</label>
+                    <label for="mm-type" class="block text-sm font-medium text-muted-foreground mb-1">Element type</label>
                     <select id="mm-type" name="archimate_type" required class="{{ field_classes }}">
                         <option value="">Choose a type</option>
                         {% for t in element_types %}
@@ -74,13 +74,13 @@
                     </select>
                 </div>
                 <div class="space-y-1">
-                    <label for="mm-name" class="text-sm font-medium text-foreground">Property name</label>
+                    <label for="mm-name" class="block text-sm font-medium text-muted-foreground mb-1">Property name</label>
                     <input id="mm-name" name="display_name" type="text" maxlength="128" required
                            value="{{ form.get('display_name', '') }}" placeholder="For example: Recovery time objective (hours)"
                            class="{{ field_classes }}">
                 </div>
                 <div class="space-y-1">
-                    <label for="mm-value-type" class="text-sm font-medium text-foreground">Value</label>
+                    <label for="mm-value-type" class="block text-sm font-medium text-muted-foreground mb-1">Value</label>
                     <select id="mm-value-type" name="property_type" required class="{{ field_classes }}">
                         {% for key, label in value_types %}
                         <option value="{{ key }}" {% if form.get('property_type') == key %}selected{% endif %}>{{ label }}</option>
@@ -88,18 +88,18 @@
                     </select>
                 </div>
                 <div class="space-y-1">
-                    <label for="mm-allowed" class="text-sm font-medium text-foreground">Allowed values (for a list, one per line)</label>
+                    <label for="mm-allowed" class="block text-sm font-medium text-muted-foreground mb-1">Allowed values (for a list, one per line)</label>
                     <textarea id="mm-allowed" name="allowed_values" rows="3"
                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ form.get('allowed_values', '') }}</textarea>
                 </div>
                 <div class="space-y-1 md:col-span-2">
-                    <label for="mm-help" class="text-sm font-medium text-foreground">Guidance for whoever fills it in</label>
+                    <label for="mm-help" class="block text-sm font-medium text-muted-foreground mb-1">Guidance for whoever fills it in</label>
                     <input id="mm-help" name="help_text" type="text" value="{{ form.get('help_text', '') }}" class="{{ field_classes }}">
                 </div>
             </div>
             <div class="flex items-center gap-2">
                 <input type="checkbox" id="mm-mandatory" name="mandatory" {% if form.get('mandatory') %}checked{% endif %} class="rounded border-input">
-                <label for="mm-mandatory" class="text-sm text-foreground">Every element of this type must have a value</label>
+                <label for="mm-mandatory" class="block text-sm font-medium text-muted-foreground mb-1">Every element of this type must have a value</label>
             </div>
             <button type="submit"
                     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">

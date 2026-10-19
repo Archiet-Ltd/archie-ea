@@ -17,16 +17,16 @@
 
     <!-- Filters -->
     <form method="get" action="{{ url_for('admin.report_builder') }}" class="mt-6 rounded-xl border bg-card p-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+        <div class="grid grid-cols-1 grid-cols-1 grid-cols-1 grid-cols-1 gap-3">
             <div>
-                <label for="q" class="block text-xs font-medium text-muted-foreground mb-1">Search</label>
+                <label for="q" class="block text-sm font-medium text-muted-foreground mb-1">Search</label>
                 <input type="text" id="q" name="q" value="{{ search_q }}" placeholder="Name or description..."
-                       class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
             </div>
             <div>
-                <label for="lifecycle" class="block text-xs font-medium text-muted-foreground mb-1">Lifecycle Stage</label>
+                <label for="lifecycle" class="block text-sm font-medium text-muted-foreground mb-1">Lifecycle Stage</label>
                 <select id="lifecycle" name="lifecycle"
-                        class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                     <option value="">All Stages</option>
                     {% for lc in lifecycle_options %}
                     <option value="{{ lc }}" {{ 'selected' if lifecycle == lc else '' }}>{{ lc }}</option>
@@ -34,20 +34,20 @@
                 </select>
             </div>
             <div>
-                <label for="date_from" class="block text-xs font-medium text-muted-foreground mb-1">Created From</label>
+                <label for="date_from" class="block text-sm font-medium text-muted-foreground mb-1">Created From</label>
                 <input type="date" id="date_from" name="date_from" value="{{ date_from }}"
-                       class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
             </div>
             <div>
-                <label for="date_to" class="block text-xs font-medium text-muted-foreground mb-1">Created To</label>
+                <label for="date_to" class="block text-sm font-medium text-muted-foreground mb-1">Created To</label>
                 <input type="date" id="date_to" name="date_to" value="{{ date_to }}"
-                       class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
             </div>
             <div>
-                <label for="vendor" class="block text-xs font-medium text-muted-foreground mb-1">Vendor Name</label>
+                <label for="vendor" class="block text-sm font-medium text-muted-foreground mb-1">Vendor Name</label>
                 <!-- entity-picker-ok: search filter, not entity creation -->
                 <input type="text" id="vendor" name="vendor" value="{{ vendor_filter }}" placeholder="Filter by vendor..."
-                       class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
             </div>
         </div>
         <div class="flex items-center gap-3 mt-3">

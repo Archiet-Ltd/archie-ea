@@ -30,11 +30,11 @@
       <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Licence</h2>
 
       <div>
-        <label for="contract_id" class="block text-sm font-medium mb-1.5">
+        <label for="contract_id" class="block text-sm font-medium text-muted-foreground mb-1">
           Contract <span class="text-destructive-emphasis" aria-hidden="true">*</span>
         </label>
         <select id="contract_id" name="contract_id" required
-                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
           <option value="">Select a contract</option>
           {% for contract in contracts %}
           <option value="{{ contract.id }}"
@@ -50,17 +50,17 @@
         {% endif %}
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 grid-cols-1 gap-4">
         <div>
-          <label for="product_name" class="block text-sm font-medium mb-1.5">Product name</label>
+          <label for="product_name" class="block text-sm font-medium text-muted-foreground mb-1">Product name</label>
           <input type="text" id="product_name" name="product_name" maxlength="200"
                  value="{{ current('product_name', license.product_name if license else '') | trim }}"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
         <div>
-          <label for="license_type" class="block text-sm font-medium mb-1.5">Licence type</label>
+          <label for="license_type" class="block text-sm font-medium text-muted-foreground mb-1">Licence type</label>
           <select id="license_type" name="license_type"
-                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
             {% for value in license_types %}
             <option value="{{ value }}"
               {% if current('license_type', license.license_type if license else 'named_user') | trim == value %}selected{% endif %}>
@@ -72,41 +72,41 @@
       </div>
 
       <div>
-        <label for="license_metric" class="block text-sm font-medium mb-1.5">Metric</label>
+        <label for="license_metric" class="block text-sm font-medium text-muted-foreground mb-1">Metric</label>
         <input type="text" id="license_metric" name="license_metric" maxlength="50"
                value="{{ current('license_metric', license.license_metric if license else '') | trim }}"
-               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
         <p class="text-xs text-muted-foreground mt-1">How the vendor counts usage, e.g. per seat, per core.</p>
       </div>
     </div>
 
     <div class="bg-card border border-border rounded-lg p-6 space-y-4">
       <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Quantities</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 grid-cols-1 gap-4">
         <div>
-          <label for="quantity_entitled" class="block text-sm font-medium mb-1.5">Entitled</label>
+          <label for="quantity_entitled" class="block text-sm font-medium text-muted-foreground mb-1">Entitled</label>
           <input type="number" min="0" step="1" id="quantity_entitled" name="quantity_entitled"
                  value="{{ current('quantity_entitled', license.quantity_entitled if license else 0) | trim }}"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
         <div>
-          <label for="quantity_deployed" class="block text-sm font-medium mb-1.5">Deployed</label>
+          <label for="quantity_deployed" class="block text-sm font-medium text-muted-foreground mb-1">Deployed</label>
           <input type="number" min="0" step="1" id="quantity_deployed" name="quantity_deployed"
                  value="{{ current('quantity_deployed', license.quantity_deployed if license else '') | trim }}" placeholder="Not recorded"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
         <div>
-          <label for="quantity_used" class="block text-sm font-medium mb-1.5">Actually used</label>
+          <label for="quantity_used" class="block text-sm font-medium text-muted-foreground mb-1">Actually used</label>
           <input type="number" min="0" step="1" id="quantity_used" name="quantity_used"
                  value="{{ current('quantity_used', license.quantity_used if license else '') | trim }}" placeholder="Not recorded"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
       </div>
       <div>
-        <label for="unit_cost" class="block text-sm font-medium mb-1.5">Unit cost</label>
+        <label for="unit_cost" class="block text-sm font-medium text-muted-foreground mb-1">Unit cost</label>
         <input type="number" step="0.01" min="0" id="unit_cost" name="unit_cost"
                value="{{ current('unit_cost', license.unit_cost if license else '') | trim }}"
-               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
       </div>
       <p class="text-xs text-muted-foreground">
         Compliance status is calculated from these figures when you save — deployed above

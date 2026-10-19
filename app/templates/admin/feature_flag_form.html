@@ -19,7 +19,7 @@
             <div class="space-y-6">
                 <!-- Key -->
                 <div>
-                    <label for="{{ form.key.id }}" class="block text-sm font-medium mb-2">
+                    <label for="{{ form.key.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                         {{ form.key.label }}
                         <span class="text-destructive-emphasis">*</span>
                     </label>
@@ -34,7 +34,7 @@
 
                 <!-- Name -->
                 <div>
-                    <label for="{{ form.name.id }}" class="block text-sm font-medium mb-2">
+                    <label for="{{ form.name.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                         {{ form.name.label }}
                         <span class="text-destructive-emphasis">*</span>
                     </label>
@@ -46,16 +46,16 @@
 
                 <!-- Description -->
                 <div>
-                    <label for="{{ form.description.id }}" class="block text-sm font-medium mb-2">
+                    <label for="{{ form.description.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                         {{ form.description.label }}
                     </label>
                     {{ form.description(rows=3, class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50") }}
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 gap-4">
                     <!-- Feature Type -->
                     <div>
-                        <label for="{{ form.feature_type.id }}" class="block text-sm font-medium mb-2">
+                        <label for="{{ form.feature_type.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                             {{ form.feature_type.label }}
                             <span class="text-destructive-emphasis">*</span>
                         </label>
@@ -64,7 +64,7 @@
 
                     <!-- State -->
                     <div>
-                        <label for="{{ form.state.id }}" class="block text-sm font-medium mb-2">
+                        <label for="{{ form.state.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                             {{ form.state.label }}
                             <span class="text-destructive-emphasis">*</span>
                         </label>
@@ -75,15 +75,15 @@
                 <!-- Enabled -->
                 <div class="flex items-center space-x-2">
                     {{ form.enabled(class="h-4 w-4 rounded border-input") }}
-                    <label for="{{ form.enabled.id }}" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    <label for="{{ form.enabled.id }}" class="block text-sm font-medium text-muted-foreground mb-1 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                         {{ form.enabled.label }}
                     </label>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 gap-4">
                     <!-- Sidebar Label -->
                     <div>
-                        <label for="{{ form.sidebar_label.id }}" class="block text-sm font-medium mb-2">
+                        <label for="{{ form.sidebar_label.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                             {{ form.sidebar_label.label }}
                         </label>
                         {{ form.sidebar_label(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2") }}
@@ -94,7 +94,7 @@
 
                     <!-- Sidebar Icon -->
                     <div>
-                        <label for="{{ form.sidebar_icon.id }}" class="block text-sm font-medium mb-2">
+                        <label for="{{ form.sidebar_icon.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                             {{ form.sidebar_icon.label }}
                         </label>
                         {{ form.sidebar_icon(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", placeholder="package") }}
@@ -106,7 +106,7 @@
 
                 <!-- Routes -->
                 <div>
-                    <label for="{{ form.routes.id }}" class="block text-sm font-medium mb-2">
+                    <label for="{{ form.routes.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                         {{ form.routes.label }}
                     </label>
                     {{ form.routes(rows=4, class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", placeholder='["/solutions/*", "/solution-architect/*"]') }}
@@ -115,10 +115,10 @@
                     {% endif %}
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 gap-4">
                     <!-- Parent Key -->
                     <div>
-                        <label for="{{ form.parent_id.id }}" class="block text-sm font-medium mb-2">
+                        <label for="{{ form.parent_id.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                             {{ form.parent_id.label }}
                         </label>
                         {{ form.parent_id(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2") }}
@@ -129,7 +129,7 @@
 
                     <!-- Sort Order -->
                     <div>
-                        <label for="{{ form.sort_order.id }}" class="block text-sm font-medium mb-2">
+                        <label for="{{ form.sort_order.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                             {{ form.sort_order.label }}
                         </label>
                         {{ form.sort_order(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2") }}

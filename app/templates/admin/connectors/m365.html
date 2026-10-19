@@ -39,36 +39,36 @@
             </div>
             <div class="p-4 sm:p-6 space-y-4">
                 <div>
-                    <label for="tenant_id" class="block text-sm font-medium mb-1">Tenant ID</label>
+                    <label for="tenant_id" class="block text-sm font-medium text-muted-foreground mb-1">Tenant ID</label>
                     <input
                         type="text"
                         id="tenant_id"
                         name="tenant_id"
                         value="{{ cfg.get('tenant_id', '') }}"
                         placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
                     >
                 </div>
                 <div>
-                    <label for="client_id" class="block text-sm font-medium mb-1">Client ID (Application ID)</label>
+                    <label for="client_id" class="block text-sm font-medium text-muted-foreground mb-1">Client ID (Application ID)</label>
                     <input
                         type="text"
                         id="client_id"
                         name="client_id"
                         value="{{ cfg.get('client_id', '') }}"
                         placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
                     >
                 </div>
                 <div>
-                    <label for="client_secret" class="block text-sm font-medium mb-1">Client Secret</label>
+                    <label for="client_secret" class="block text-sm font-medium text-muted-foreground mb-1">Client Secret</label>
                     <input
                         type="password"
                         id="client_secret"
                         name="client_secret"
                         placeholder="{{ '••••••••' if has_secret else 'Enter client secret' }}"
                         autocomplete="new-password"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     >
                     {% if has_secret %}
                         <p class="text-xs text-muted-foreground mt-1">Leave blank to keep the existing secret.</p>
@@ -87,28 +87,28 @@
             </div>
             <div class="p-4 sm:p-6 space-y-4">
                 <div>
-                    <label for="sharepoint_site_id" class="block text-sm font-medium mb-1">SharePoint Site ID</label>
+                    <label for="sharepoint_site_id" class="block text-sm font-medium text-muted-foreground mb-1">SharePoint Site ID</label>
                     <input
                         type="text"
                         id="sharepoint_site_id"
                         name="sharepoint_site_id"
                         value="{{ cfg.get('site_id', '') }}"
                         placeholder="contoso.sharepoint.com,site-guid,web-guid"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
                     >
                     <p class="text-xs text-muted-foreground mt-1">
                         Find it at: <code class="font-mono">GET https://graph.microsoft.com/v1.0/sites/{hostname}:/sites/{sitename}</code>
                     </p>
                 </div>
                 <div>
-                    <label for="sharepoint_folder_path" class="block text-sm font-medium mb-1">Folder Path</label>
+                    <label for="sharepoint_folder_path" class="block text-sm font-medium text-muted-foreground mb-1">Folder Path</label>
                     <input
                         type="text"
                         id="sharepoint_folder_path"
                         name="sharepoint_folder_path"
                         value="{{ cfg.get('folder_path', 'Architecture Blueprints') }}"
                         placeholder="Architecture Blueprints"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     >
                 </div>
             </div>
@@ -123,14 +123,14 @@
                 </p>
             </div>
             <div class="p-4 sm:p-6">
-                <label for="teams_webhook_url" class="block text-sm font-medium mb-1">Incoming Webhook URL</label>
+                <label for="teams_webhook_url" class="block text-sm font-medium text-muted-foreground mb-1">Incoming Webhook URL</label>
                 <input
                     type="url"
                     id="teams_webhook_url"
                     name="teams_webhook_url"
                     value="{{ cfg.get('teams_webhook_url', '') }}"
                     placeholder="https://your-org.webhook.office.com/webhookb2/..."
-                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                    class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
                 >
                 <p class="text-xs text-muted-foreground mt-1">
                     In Teams: channel → ··· → Connectors → Incoming Webhook → Configure.

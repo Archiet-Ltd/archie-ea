@@ -8,14 +8,14 @@
   <section class="rounded-lg border border-border bg-card p-4 sm:p-6" aria-labelledby="standard-form-title">
     <h2 id="standard-form-title" class="text-base font-semibold">Publish a standard</h2>
     <p class="text-sm text-muted-foreground mt-0.5">The radar ring is recorded on the Tech Radar for the technology element you choose.</p>
-    <form method="POST" action="{{ url_for('governance.standards') }}" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="standard-form">
+    <form method="POST" action="{{ url_for('governance.standards') }}" class="mt-4 grid grid-cols-1 grid-cols-1 gap-4" data-testid="standard-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label class="block text-sm">
+      <label class="block text-sm font-medium text-muted-foreground mb-1">
         <span class="block font-medium mb-1">Technology <span class="text-destructive-emphasis" aria-hidden="true">*</span></span>
         <input type="text" name="technology_name" required maxlength="255" value="{{ form.get('technology_name', '') }}"
           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
       </label>
-      <label class="block text-sm">
+      <label class="block text-sm font-medium text-muted-foreground mb-1">
         <span class="block font-medium mb-1">Domain <span class="text-destructive-emphasis" aria-hidden="true">*</span></span>
         <input type="text" name="category" required maxlength="100" list="standard-domains" value="{{ form.get('category', '') }}"
           placeholder="e.g. Messaging, Database, Runtime"
@@ -24,7 +24,7 @@
           {% for domain in grouped.keys() if domain %}<option value="{{ domain }}"></option>{% endfor %}
         </datalist>
       </label>
-      <label class="block text-sm">
+      <label class="block text-sm font-medium text-muted-foreground mb-1">
         <span class="block font-medium mb-1">Status <span class="text-destructive-emphasis" aria-hidden="true">*</span></span>
         <select name="status" required class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
           <option value="">Select…</option>
@@ -33,13 +33,13 @@
           {% endfor %}
         </select>
       </label>
-      <label class="block text-sm">
+      <label class="block text-sm font-medium text-muted-foreground mb-1">
         <span class="block font-medium mb-1">Approved version</span>
         <input type="text" name="approved_version" maxlength="50" value="{{ form.get('approved_version', '') }}"
           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
       </label>
       <div class="relative text-sm" x-data="standardElementPicker()">
-        <label for="standard-element" class="block font-medium mb-1">Technology element</label>
+        <label for="standard-element" class="block text-sm font-medium text-muted-foreground mb-1">Technology element</label>
         <input type="hidden" name="archimate_element_id" :value="picked ? picked.id : ''">
         <input id="standard-element" type="text" autocomplete="off" role="combobox" aria-autocomplete="list"
           :aria-expanded="results.length > 0 ? 'true' : 'false'" aria-controls="standard-element-results"
@@ -59,7 +59,7 @@
         <p class="mt-1 text-xs" x-show="picked" x-cloak>Selected: <span class="font-medium" x-text="picked ? picked.name : ''"></span></p>
         <p class="mt-1 text-xs text-destructive-emphasis" x-show="error" x-cloak x-text="error"></p>
       </div>
-      <label class="block text-sm">
+      <label class="block text-sm font-medium text-muted-foreground mb-1">
         <span class="block font-medium mb-1">Radar ring</span>
         <select name="ring" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
           <option value="">Not placed on the radar</option>
@@ -68,17 +68,17 @@
           {% endfor %}
         </select>
       </label>
-      <label class="block text-sm">
+      <label class="block text-sm font-medium text-muted-foreground mb-1">
         <span class="block font-medium mb-1">Sunset date</span>
         <input type="date" name="sunset_date" value="{{ form.get('sunset_date', '') }}"
           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
       </label>
-      <label class="block text-sm">
+      <label class="block text-sm font-medium text-muted-foreground mb-1">
         <span class="block font-medium mb-1">Replacement technology</span>
         <input type="text" name="replacement_technology" maxlength="255" value="{{ form.get('replacement_technology', '') }}"
           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
       </label>
-      <label class="block text-sm md:col-span-2">
+      <label class="block text-sm font-medium text-muted-foreground mb-1 md:col-span-2">
         <span class="block font-medium mb-1">Rationale</span>
         <textarea name="rationale" rows="3" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">{{ form.get('rationale', '') }}</textarea>
       </label>

@@ -44,7 +44,7 @@
         <form method="GET" action="{{ request.path }}" class="flex flex-wrap gap-4">
             <div>
                 <label class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
-                <select name="status" class="rounded-md border border-input bg-background px-3 py-2 text-sm" @change="$el.form.submit()" aria-label="Status">
+                <select name="status" class="h-9 rounded-md border border-input bg-background px-3 text-sm" @change="$el.form.submit()" aria-label="Status">
                     <option value="all" {% if status == 'all' %}selected{% endif %}>All Statuses</option>
                     {% if is_reviews_view %}
                     <option value="submitted" {% if status == 'submitted' %}selected{% endif %}>Submitted</option>
@@ -64,7 +64,7 @@
             {% if is_reviews_view %}
             <div>
                 <label class="block text-sm font-medium text-muted-foreground mb-1">Review Type</label>
-                <select name="review_type" class="rounded-md border border-input bg-background px-3 py-2 text-sm" @change="$el.form.submit()" aria-label="Review Type">
+                <select name="review_type" class="h-9 rounded-md border border-input bg-background px-3 text-sm" @change="$el.form.submit()" aria-label="Review Type">
                     <option value="all" {% if review_type == 'all' %}selected{% endif %}>All Types</option>
                     <option value="solution" {% if review_type == 'solution' %}selected{% endif %}>Solution</option>
                     <option value="architecture" {% if review_type == 'architecture' %}selected{% endif %}>Architecture</option>
@@ -257,34 +257,34 @@
       @submit.prevent="submitCreateSession()" class="space-y-4" x-data="arbSessionModal()">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div>
-        <label for="cas-name" class="block text-sm font-medium mb-1">Session Name <span class="text-destructive-emphasis">*</span></label>
+        <label for="cas-name" class="block text-sm font-medium text-muted-foreground mb-1">Session Name <span class="text-destructive-emphasis">*</span></label>
         <input type="text" id="cas-name" name="name" x-model="formData.name" required
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                placeholder="e.g. ARB Session Q1 2026">
     </div>
     <div>
-        <label for="cas-description" class="block text-sm font-medium mb-1">Description</label>
+        <label for="cas-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
         <textarea id="cas-description" name="description" x-model="formData.description" rows="2"
                   class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   placeholder="Agenda and objectives for this session"></textarea>
     </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 grid-cols-1 gap-4">
         <div>
-            <label for="cas-date" class="block text-sm font-medium mb-1">Scheduled Date &amp; Time <span class="text-destructive-emphasis">*</span></label>
+            <label for="cas-date" class="block text-sm font-medium text-muted-foreground mb-1">Scheduled Date &amp; Time <span class="text-destructive-emphasis">*</span></label>
             <input type="datetime-local" id="cas-date" name="scheduled_date" x-model="formData.scheduled_date" required
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         </div>
         <div>
-            <label for="cas-duration" class="block text-sm font-medium mb-1">Duration (minutes)</label>
+            <label for="cas-duration" class="block text-sm font-medium text-muted-foreground mb-1">Duration (minutes)</label>
             <input type="number" id="cas-duration" name="duration_minutes" x-model="formData.duration_minutes" min="30" max="480" value="120"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         </div>
     </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 grid-cols-1 gap-4">
         <div>
-            <label for="cas-chair" class="block text-sm font-medium mb-1">Chair <span class="text-destructive-emphasis">*</span></label>
+            <label for="cas-chair" class="block text-sm font-medium text-muted-foreground mb-1">Chair <span class="text-destructive-emphasis">*</span></label>
             <select id="cas-chair" name="chair_id" x-model="formData.chair_id" required
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <option value="">Select chair...</option>
                 {% for user in users %}
                 <option value="{{ user.id }}">{{ user.full_name() }}</option>
@@ -292,9 +292,9 @@
             </select>
         </div>
         <div>
-            <label for="cas-secretary" class="block text-sm font-medium mb-1">Secretary (optional)</label>
+            <label for="cas-secretary" class="block text-sm font-medium text-muted-foreground mb-1">Secretary (optional)</label>
             <select id="cas-secretary" name="secretary_id" x-model="formData.secretary_id"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <option value="">Select secretary...</option>
                 {% for user in users %}
                 <option value="{{ user.id }}">{{ user.full_name() }}</option>
@@ -302,24 +302,24 @@
             </select>
         </div>
     </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 grid-cols-1 gap-4">
         <div>
-            <label for="cas-location" class="block text-sm font-medium mb-1">Location</label>
+            <label for="cas-location" class="block text-sm font-medium text-muted-foreground mb-1">Location</label>
             <input type="text" id="cas-location" name="location" x-model="formData.location"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                    placeholder="Room or building name">
         </div>
         <div>
-            <label for="cas-link" class="block text-sm font-medium mb-1">Meeting Link</label>
+            <label for="cas-link" class="block text-sm font-medium text-muted-foreground mb-1">Meeting Link</label>
             <input type="url" id="cas-link" name="meeting_link" x-model="formData.meeting_link"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                    placeholder="https://teams.microsoft.com/...">
         </div>
     </div>
     <div x-cloak x-show="errorMsg" class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
     <div class="flex justify-end gap-3 pt-2 border-t border-border">
         <button type="button" data-modal-close="create-arb-session"
-                class="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent" aria-label="Action">Cancel</button>
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" aria-label="Action">Cancel</button>
         <button type="submit" :disabled="submitting"
                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit">
             <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-cloak x-show="submitting"></i>

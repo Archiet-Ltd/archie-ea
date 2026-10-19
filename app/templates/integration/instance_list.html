@@ -26,8 +26,8 @@
         <div class="p-6">
             <form action="{{ url_for('integration.list_instances') }}" method="get" class="flex flex-col md:flex-row gap-4">
                 <div class="flex-1">
-                    <label for="status" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Status</label>
-                    <select name="status" id="status" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1">
+                    <label for="status" class="block text-sm font-medium text-muted-foreground mb-1 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Status</label>
+                    <select name="status" id="status" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1">
                         <option value="all" {% if selected_status == 'all' %}selected{% endif %}>All Statuses</option>
                         <option value="running" {% if selected_status == 'running' %}selected{% endif %}>Running</option>
                         <option value="completed" {% if selected_status == 'completed' %}selected{% endif %}>Completed</option>
@@ -37,8 +37,8 @@
                     </select>
                 </div>
                 <div class="flex-1">
-                    <label for="workflow_code" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Workflow Definition</label>
-                    <select name="workflow_code" id="workflow_code" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1">
+                    <label for="workflow_code" class="block text-sm font-medium text-muted-foreground mb-1 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Workflow Definition</label>
+                    <select name="workflow_code" id="workflow_code" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1">
                         <option value="">All Workflows</option>
                         {% for def in definitions %}
                         <option value="{{ def.workflow_code }}" {% if selected_workflow == def.workflow_code %}selected{% endif %}>

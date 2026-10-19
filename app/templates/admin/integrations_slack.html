@@ -45,41 +45,35 @@
         <!-- Credentials form -->
         <div class="px-6 py-5">
             <form method="POST" action="{{ url_for('admin.slack_integration') }}"
-                  class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  class="grid grid-cols-1 gap-5 grid-cols-1">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
 
                 <div class="flex flex-col gap-1.5">
-                    <label for="bot_token" class="text-sm font-medium">Bot Token</label>
+                    <label for="bot_token" class="block text-sm font-medium text-muted-foreground mb-1">Bot Token</label>
                     <input id="bot_token" name="bot_token" type="password"
                            value="{{ config.bot_token or '' }}"
                            placeholder="xoxb-..."
                            autocomplete="off"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm
- transition-colors placeholder:text-muted-foreground
- focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                     <p class="text-xs text-muted-foreground">From your Slack app's "OAuth &amp; Permissions" page.</p>
                 </div>
 
                 <div class="flex flex-col gap-1.5">
-                    <label for="signing_secret" class="text-sm font-medium">Signing Secret</label>
+                    <label for="signing_secret" class="block text-sm font-medium text-muted-foreground mb-1">Signing Secret</label>
                     <input id="signing_secret" name="signing_secret" type="password"
                            value="{{ config.signing_secret or '' }}"
                            placeholder="••••••••••••••••"
                            autocomplete="off"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm
- transition-colors placeholder:text-muted-foreground
- focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                     <p class="text-xs text-muted-foreground">From your Slack app's "Basic Information" page.</p>
                 </div>
 
                 <div class="sm:col-span-2 flex flex-col gap-1.5">
-                    <label for="monitored_channels" class="text-sm font-medium">Monitored Channels <span class="text-muted-foreground font-normal">(optional)</span></label>
+                    <label for="monitored_channels" class="block text-sm font-medium text-muted-foreground mb-1">Monitored Channels <span class="text-muted-foreground font-normal">(optional)</span></label>
                     <input id="monitored_channels" name="monitored_channels" type="text"
                            value="{{ config.monitored_channels or '' }}"
                            placeholder="C0123ABCDEF, C0456GHIJKL — leave blank to monitor all channels the bot is invited to"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm
- transition-colors placeholder:text-muted-foreground
- focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                     <p class="text-xs text-muted-foreground">Comma-separated channel IDs. The bot must be invited to each channel.</p>
                 </div>
 

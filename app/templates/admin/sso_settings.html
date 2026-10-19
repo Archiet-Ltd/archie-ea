@@ -43,25 +43,25 @@
                         <input type="hidden" name="action" value="add"/>
 
                         <div>
-                            <label for="sso_group_name" class="block text-sm font-medium mb-2">
+                            <label for="sso_group_name" class="block text-sm font-medium text-muted-foreground mb-1">
                                 IdP Group Name <span class="text-destructive-emphasis">*</span>
                             </label>
                             <input type="text"
                                    id="sso_group_name"
                                    name="sso_group_name"
                                    placeholder="e.g. EA-Architects"
-                                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                    required>
                             <p class="text-xs text-muted-foreground mt-1">Exact display name from your identity provider</p>
                         </div>
 
                         <div>
-                            <label for="role_name" class="block text-sm font-medium mb-2">
+                            <label for="role_name" class="block text-sm font-medium text-muted-foreground mb-1">
                                 Platform Role <span class="text-destructive-emphasis">*</span>
                             </label>
                             <select id="role_name"
                                     name="role_name"
-                                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     required>
                                 <option value="">Select a role…</option>
                                 {% for role in valid_roles %}
@@ -71,14 +71,14 @@
                         </div>
 
                         <div>
-                            <label for="description" class="block text-sm font-medium mb-2">
+                            <label for="description" class="block text-sm font-medium text-muted-foreground mb-1">
                                 Description <span class="text-muted-foreground">(optional)</span>
                             </label>
                             <input type="text"
                                    id="description"
                                    name="description"
                                    placeholder="e.g. Enterprise Architect team"
-                                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         </div>
 
                         <button type="submit"

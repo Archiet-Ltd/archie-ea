@@ -178,7 +178,7 @@ body:has([data-workbench]) #main-content > div {
     <div x-show="saveTemplateModal" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center p-4"
          @keydown.escape.window="saveTemplateModal = false">
-        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="saveTemplateModal = false"></div>
+        <div class="absolute inset-0 bg-slate-900/50" @click="saveTemplateModal = false"></div>
         <div class="relative z-10 w-full max-w-md rounded-lg border border-border bg-card p-6">
             <div class="flex items-center gap-3 mb-5">
                 <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -188,7 +188,7 @@ body:has([data-workbench]) #main-content > div {
                     <p class="text-sm font-semibold text-foreground">Save as Template</p>
                     <p class="text-2xs text-muted-foreground">Capture <span x-text="fileList.length"></span> generated files as a reusable template set</p>
                 </div>
-                <button aria-label="Close save template dialog" type="button" @click="saveTemplateModal = false" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 ml-auto w-7 items-center justify-center">
+                <button aria-label="Close save template dialog" type="button" @click="saveTemplateModal = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <svg class="w-3.5 h-3.5" viewBox="0 0 10 10" fill="currentColor"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                 </button>
             </div>
@@ -257,7 +257,7 @@ body:has([data-workbench]) #main-content > div {
          x-transition:enter="transition ease-out duration-100"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
-         class="fixed inset-0 z-[100] flex items-start justify-center pt-[12vh] px-4 bg-black/50"
+         class="fixed inset-0 z-[100] flex items-start justify-center pt-[12vh] px-4 bg-slate-900/50"
          @click.self="commandPaletteOpen = false"
          @keydown.escape.window="commandPaletteOpen = false">
         <div @click.stop

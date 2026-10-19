@@ -83,7 +83,7 @@
   </div>
 
   <!-- Resolution Modal -->
-  <div id="resolution-modal" class="modal-root items-center justify-center fixed inset-0 bg-black/50 overflow-y-auto z-50" hidden  role="dialog">
+  <div id="resolution-modal" class="modal-root items-center justify-center fixed inset-0 overflow-y-auto z-50 bg-slate-900/50" hidden  role="dialog">
     <div class="bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4">
       <h2 class="text-lg font-semibold mb-4">Resolve Conflict</h2>
       <div class="space-y-4">
@@ -125,7 +125,7 @@
         </div>
       </div>
       <div class="flex justify-end gap-3 mt-6">
-        <button type="button" @click="closeResolutionModal()" class="px-4 py-2 border rounded-md hover:bg-accent" aria-label="Close">Cancel</button>
+        <button type="button" @click="closeResolutionModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">Cancel</button>
         <button type="button" @click="confirmResolution()" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90" aria-label="Confirm">Confirm</button>
       </div>
     </div>

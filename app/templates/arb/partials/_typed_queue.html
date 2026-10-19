@@ -43,14 +43,14 @@
 <form method="get" action="{{ queue_action_url }}" class="mb-6" role="search" aria-label="Filter typed ARB reviews">
     <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <div class="min-w-0 flex-1 sm:max-w-xs">
-            <label for="arb-queue-q" class="mb-1.5 block text-sm font-medium text-foreground">Review number or subject title</label>
+            <label for="arb-queue-q" class="block text-sm font-medium text-muted-foreground mb-1">Review number or subject title</label>
             <input type="search" id="arb-queue-q" name="q" value="{{ _filters.get('q') or '' }}"
-                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
         </div>
         <div class="min-w-0 sm:w-48">
-            <label for="arb-queue-state" class="mb-1.5 block text-sm font-medium text-foreground">State</label>
+            <label for="arb-queue-state" class="block text-sm font-medium text-muted-foreground mb-1">State</label>
             <select id="arb-queue-state" name="state"
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 <option value="">All states</option>
                 {% for option in _options.get('state', []) %}
                 <option value="{{ option.value }}" {% if _filters.get('state') == option.value %}selected{% endif %}>{{ option.label }}</option>
@@ -58,9 +58,9 @@
             </select>
         </div>
         <div class="min-w-0 sm:w-56">
-            <label for="arb-queue-subject-type" class="mb-1.5 block text-sm font-medium text-foreground">Subject type</label>
+            <label for="arb-queue-subject-type" class="block text-sm font-medium text-muted-foreground mb-1">Subject type</label>
             <select id="arb-queue-subject-type" name="subject_type"
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 <option value="">All subject types</option>
                 {% for option in _options.get('subject_type', []) %}
                 <option value="{{ option.value }}" {% if _filters.get('subject_type') == option.value %}selected{% endif %}>{{ option.label }}</option>

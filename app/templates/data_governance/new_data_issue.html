@@ -14,17 +14,17 @@
   <form method="post" action="{{ url_for('data_governance.new_data_issue') }}" class="max-w-xl space-y-4 rounded-lg border border-border bg-card p-6">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div>
-      <label for="data_entity_id" class="block text-sm font-medium text-foreground">Data entity ID</label>
+      <label for="data_entity_id" class="block text-sm font-medium text-muted-foreground mb-1">Data entity ID</label>
       <input type="number" id="data_entity_id" name="data_entity_id" required value="{{ data_entity_id or '' }}"
-             class="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground">
+             class="h-9 mt-1 block w-full rounded-md border border-border bg-background px-3 text-sm text-foreground">
     </div>
     <div>
-      <label for="title" class="block text-sm font-medium text-foreground">Title</label>
+      <label for="title" class="block text-sm font-medium text-muted-foreground mb-1">Title</label>
       <input type="text" id="title" name="title" required
-             class="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground">
+             class="h-9 mt-1 block w-full rounded-md border border-border bg-background px-3 text-sm text-foreground">
     </div>
     <div>
-      <label for="description" class="block text-sm font-medium text-foreground">Description</label>
+      <label for="description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
       <textarea id="description" name="description" rows="3"
                 class="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"></textarea>
     </div>

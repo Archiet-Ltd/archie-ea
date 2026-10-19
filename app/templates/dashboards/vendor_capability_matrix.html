@@ -391,7 +391,7 @@ document.addEventListener('alpine:init', () => {
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0"
      @keydown.escape.window="$store.matrixModal.open = false"
-     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50"
      role="dialog" aria-modal="true" aria-labelledby="matrix-modal-title"
      style="display:none"> <!-- inline-style-ok -->
     <div @click.outside="$store.matrixModal.open = false"
@@ -405,7 +405,7 @@ document.addEventListener('alpine:init', () => {
             <div class="pr-4 min-w-0">
                 <p class="text-xs text-muted-foreground mb-0.5" x-text="$store.matrixModal.title"></p>
                 <h2 id="matrix-modal-title"
-                    class="text-base font-semibold text-foreground truncate"
+                    class="text-base font-semibold text-foreground text-foreground truncate"
                     x-text="$store.matrixModal.subtitle || ''"></h2>
                 <div class="flex items-center gap-2 mt-2" x-cloak x-show="$store.matrixModal.data" role="dialog">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border"
@@ -417,7 +417,7 @@ document.addEventListener('alpine:init', () => {
                 </div>
             </div>
             <button type="button" @click="$store.matrixModal.open = false" aria-label="Close"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 shrink-0 w-8 items-center justify-center">
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
             </button>
         </div>

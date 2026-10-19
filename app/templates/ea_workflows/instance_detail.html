@@ -2650,11 +2650,11 @@ function instancePage() {
 {% call modal(id='reject-workflow', title='Reject Workflow', description='Provide a reason for rejecting this workflow step.', size='sm') %}
 <form @submit.prevent="submitReject()">
     <div class="mb-4">
-        <label for="reject-reason-detail" class="block text-sm font-medium mb-2">Rejection Reason <span class="text-destructive-emphasis">*</span></label>
+        <label for="reject-reason-detail" class="block text-sm font-medium text-muted-foreground mb-1">Rejection Reason <span class="text-destructive-emphasis">*</span></label>
         <textarea id="reject-reason-detail" x-model="rejectReason" rows="3" required class="w-full rounded-md border-2 border-input p-3 text-sm bg-background focus:border-primary focus:outline-none" placeholder="Explain why this workflow step is being rejected..."></textarea>
     </div>
     <div class="flex justify-end gap-3">
-        <button type="button" data-modal-close="reject-workflow" class="px-4 py-2 rounded-lg border-2 border-input hover:bg-muted transition-colors text-sm">Cancel</button>
+        <button type="button" data-modal-close="reject-workflow" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
         <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" :disabled="!rejectReason.trim()">
             <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i> Reject Workflow
         </button>
@@ -2665,7 +2665,7 @@ function instancePage() {
 {% call modal(id='cancel-workflow', title='Cancel Workflow', description='This will stop the workflow execution. This action cannot be undone.', size='sm') %}
 <form @submit.prevent="submitCancel()">
     <div class="mb-4">
-        <label for="cancel-reason" class="block text-sm font-medium mb-2">Cancellation Reason <span class="text-destructive-emphasis">*</span></label>
+        <label for="cancel-reason" class="block text-sm font-medium text-muted-foreground mb-1">Cancellation Reason <span class="text-destructive-emphasis">*</span></label>
         <textarea id="cancel-reason" x-model="cancelReason" rows="3" required class="w-full rounded-md border-2 border-input p-3 text-sm bg-background focus:border-primary focus:outline-none" placeholder="Explain why this workflow is being cancelled..."></textarea>
     </div>
     <div class="flex justify-end gap-3">

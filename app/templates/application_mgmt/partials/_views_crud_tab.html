@@ -28,9 +28,9 @@
               class="space-y-4">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 grid-cols-1 gap-4">
                 <div>
-                    <label for="name" class="block text-sm font-medium text-foreground mb-1">
+                    <label for="name" class="block text-sm font-medium text-muted-foreground mb-1">
                         Application Name <span class="text-destructive-emphasis" aria-hidden="true">*</span>
                     </label>
                     <input type="text"
@@ -38,23 +38,23 @@
                            name="name"
                            value="{{ app.name }}"
                            required
-                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 </div>
 
                 <div>
-                    <label for="app_abbreviation" class="block text-sm font-medium text-foreground mb-1">Abbreviation</label>
+                    <label for="app_abbreviation" class="block text-sm font-medium text-muted-foreground mb-1">Abbreviation</label>
                     <input type="text"
                            id="app_abbreviation"
                            name="app_abbreviation"
                            value="{{ app.app_abbreviation or '' }}"
-                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 </div>
 
                 <div>
-                    <label for="deployment_status" class="block text-sm font-medium text-foreground mb-1">Deployment Status</label>
+                    <label for="deployment_status" class="block text-sm font-medium text-muted-foreground mb-1">Deployment Status</label>
                     <select id="deployment_status"
                             name="deployment_status"
-                            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                         {% for value, label in [
                             ('active', 'Active'),
                             ('inactive', 'Inactive'),
@@ -69,10 +69,10 @@
                 </div>
 
                 <div>
-                    <label for="business_criticality" class="block text-sm font-medium text-foreground mb-1">Business Criticality</label>
+                    <label for="business_criticality" class="block text-sm font-medium text-muted-foreground mb-1">Business Criticality</label>
                     <select id="business_criticality"
                             name="business_criticality"
-                            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                         <option value="">— Not set —</option>
                         {% for value, label in [
                             ('mission_critical', 'Mission Critical'),
@@ -87,26 +87,26 @@
                 </div>
 
                 <div>
-                    <label for="business_owner" class="block text-sm font-medium text-foreground mb-1">Business Owner</label>
+                    <label for="business_owner" class="block text-sm font-medium text-muted-foreground mb-1">Business Owner</label>
                     <input type="text"
                            id="business_owner"
                            name="business_owner"
                            value="{{ app.business_owner or '' }}"
-                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 </div>
 
                 <div>
-                    <label for="technical_owner" class="block text-sm font-medium text-foreground mb-1">Technical Owner</label>
+                    <label for="technical_owner" class="block text-sm font-medium text-muted-foreground mb-1">Technical Owner</label>
                     <input type="text"
                            id="technical_owner"
                            name="technical_owner"
                            value="{{ app.technical_owner or '' }}"
-                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 </div>
             </div>
 
             <div>
-                <label for="description" class="block text-sm font-medium text-foreground mb-1">Description</label>
+                <label for="description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
                 <textarea id="description"
                           name="description"
                           rows="3"

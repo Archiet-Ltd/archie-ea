@@ -5,17 +5,17 @@
 {% from 'components/modal.html' import modal %}
 {% call modal(id='create-arb-review', title='Create Review Item', description='Submit a new item for Architecture Review Board consideration. Link artifacts for governance traceability.', size='lg') %}
 <form @submit.prevent="submitCreateReview()" class="space-y-4" x-data="arbReviewCreateModal()">
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  <div class="grid grid-cols-1 grid-cols-1 gap-4">
     <div class="sm:col-span-2">
-      <label for="car-title" class="block text-sm font-medium mb-1">Title <span class="text-destructive-emphasis">*</span></label>
+      <label for="car-title" class="block text-sm font-medium text-muted-foreground mb-1">Title <span class="text-destructive-emphasis">*</span></label>
       <input type="text" id="car-title" x-model="formData.title" required maxlength="255"
-             class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+             class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
              placeholder="e.g. Cloud Migration Architecture Proposal">
     </div>
     <div>
-      <label for="car-type" class="block text-sm font-medium mb-1">Review Type <span class="text-destructive-emphasis">*</span></label>
+      <label for="car-type" class="block text-sm font-medium text-muted-foreground mb-1">Review Type <span class="text-destructive-emphasis">*</span></label>
       <select id="car-type" x-model="formData.review_type"
-              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <option value="">Select type...</option>
         <template x-for="rt in formOptions.review_types" :key="rt.value">
           <option :value="rt.value" x-text="rt.label"></option>
@@ -23,9 +23,9 @@
       </select>
     </div>
     <div>
-      <label for="car-decision-sought" class="block text-sm font-medium mb-1">Decision Sought <span class="text-destructive-emphasis">*</span></label>
+      <label for="car-decision-sought" class="block text-sm font-medium text-muted-foreground mb-1">Decision Sought <span class="text-destructive-emphasis">*</span></label>
       <select id="car-decision-sought" x-model="formData.decision_sought" required
-              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <option value="">What is the board being asked to approve?</option>
         <template x-for="d in formOptions.decision_types" :key="d.value">
           <option :value="d.value" x-text="d.label"></option>
@@ -43,9 +43,9 @@
          and G/H are not shown as "failing" on the blueprint because they are out
          of that checklist's scope, not incomplete. Do not truncate this list to
          A-F to "match" the blueprint. #}
-      <label for="car-togaf" class="block text-sm font-medium mb-1">TOGAF ADM Phase (A-H)</label>
+      <label for="car-togaf" class="block text-sm font-medium text-muted-foreground mb-1">TOGAF ADM Phase (A-H)</label>
       <select id="car-togaf" x-model="formData.togaf_phase"
-              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <option value="">—</option>
         <option value="phase_a_vision">Phase A: Vision</option>
         <option value="phase_b_business">Phase B: Business</option>
@@ -58,9 +58,9 @@
       </select>
     </div>
     <div>
-      <label for="car-archimate" class="block text-sm font-medium mb-1">ArchiMate Layer</label>
+      <label for="car-archimate" class="block text-sm font-medium text-muted-foreground mb-1">ArchiMate Layer</label>
       <select id="car-archimate" x-model="formData.archimate_layer"
-              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <option value="">—</option>
         <option value="motivation">Motivation</option>
         <option value="strategy">Strategy</option>
@@ -71,9 +71,9 @@
       </select>
     </div>
     <div>
-      <label for="car-priority" class="block text-sm font-medium mb-1">Priority</label>
+      <label for="car-priority" class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
       <select id="car-priority" x-model="formData.priority"
-              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <option value="low">Low</option>
         <option value="medium" selected>Medium</option>
         <option value="high">High</option>
@@ -81,9 +81,9 @@
       </select>
     </div>
     <div>
-      <label for="car-impact" class="block text-sm font-medium mb-1">Business Impact</label>
+      <label for="car-impact" class="block text-sm font-medium text-muted-foreground mb-1">Business Impact</label>
       <select id="car-impact" x-model="formData.business_impact"
-              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <option value="low">Low</option>
         <option value="medium" selected>Medium</option>
         <option value="high">High</option>
@@ -91,22 +91,22 @@
       </select>
     </div>
     <div>
-      <label for="car-effort" class="block text-sm font-medium mb-1">Estimated Effort</label>
+      <label for="car-effort" class="block text-sm font-medium text-muted-foreground mb-1">Estimated Effort</label>
       <select id="car-effort" x-model="formData.estimated_effort"
-              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <option value="low">Low</option>
         <option value="medium" selected>Medium</option>
         <option value="high">High</option>
       </select>
     </div>
     <div class="sm:col-span-2">
-      <label for="car-description" class="block text-sm font-medium mb-1">Description</label>
+      <label for="car-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
       <textarea id="car-description" x-model="formData.description" rows="3"
                 class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 placeholder="Describe the architecture change or decision being reviewed"></textarea>
     </div>
     <div class="sm:col-span-2">
-      <label for="car-alternatives" class="block text-sm font-medium mb-1">Alternatives Considered</label>
+      <label for="car-alternatives" class="block text-sm font-medium text-muted-foreground mb-1">Alternatives Considered</label>
       <textarea id="car-alternatives" x-model="formData.alternatives_considered" rows="2"
                 class="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 placeholder="Options evaluated and why this approach was chosen (required for major decisions)"></textarea>
@@ -115,11 +115,11 @@
   <details class="rounded-md border border-border bg-muted/20" open>
     <summary class="cursor-pointer px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50">Link artifacts — capabilities required for Solution Design, Capability Implementation, Technology Selection</summary>
     <div class="px-3 py-3 space-y-3 border-t border-border">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div class="grid grid-cols-1 grid-cols-1 gap-3">
         <div class="sm:col-span-2">
-          <label for="car-applications" class="block text-sm font-medium mb-1">Applications Affected</label>
+          <label for="car-applications" class="block text-sm font-medium text-muted-foreground mb-1">Applications Affected</label>
           <select id="car-applications" x-model="formData.application_ids" multiple
-                  class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  class="h-9 flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <template x-for="a in formOptions.applications" :key="a.id">
               <option :value="a.id" x-text="a.name"></option>
             </template>
@@ -135,7 +135,7 @@
              flow can build, which this generic modal cannot collect. Offering
              a control that can never succeed is a dead end, not a shortcut —
              point the user at the real path instead of a guaranteed error. #}
-          <label class="block text-sm font-medium mb-1">Solution</label>
+          <label class="block text-sm font-medium text-muted-foreground mb-1">Solution</label>
           <div class="rounded-md border border-input bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
             Reviewing a Solution? Submit it from the solution's own page — open
             the solution, then use <span class="font-medium text-foreground">Submit for ARB</span>.
@@ -144,9 +144,9 @@
           </div>
         </div>
         <div>
-          <label for="car-adr" class="block text-sm font-medium mb-1">ADR</label>
+          <label for="car-adr" class="block text-sm font-medium text-muted-foreground mb-1">ADR</label>
           <select id="car-adr" x-model="formData.adr_id"
-                  class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <option value="">—</option>
             <template x-for="a in formOptions.adrs" :key="a.id">
               <option :value="a.id" x-text="(a.adr_number || '') + ' ' + (a.title || '')"></option>
@@ -154,9 +154,9 @@
           </select>
         </div>
         <div>
-          <label for="car-arch-model" class="block text-sm font-medium mb-1">Architecture Model</label>
+          <label for="car-arch-model" class="block text-sm font-medium text-muted-foreground mb-1">Architecture Model</label>
           <select id="car-arch-model" x-model="formData.architecture_model_id"
-                  class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <option value="">—</option>
             <template x-for="m in formOptions.architecture_models" :key="m.id">
               <option :value="m.id" x-text="m.name"></option>
@@ -182,18 +182,18 @@
           </div>
         </div>
         <div>
-          <label for="car-cap-impact-type" class="block text-sm font-medium mb-1">Capability Impact Type</label>
+          <label for="car-cap-impact-type" class="block text-sm font-medium text-muted-foreground mb-1">Capability Impact Type</label>
           <select id="car-cap-impact-type" x-model="formData.capability_impact_type"
-                  class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <template x-for="t in formOptions.impact_types" :key="t.value">
               <option :value="t.value" x-text="t.label"></option>
             </template>
           </select>
         </div>
         <div class="sm:col-span-2">
-          <label for="car-capabilities" class="block text-sm font-medium mb-1">Capabilities <span class="text-destructive-emphasis" x-cloak x-show="isCapabilityRequired()">*</span></label>
+          <label for="car-capabilities" class="block text-sm font-medium text-muted-foreground mb-1">Capabilities <span class="text-destructive-emphasis" x-cloak x-show="isCapabilityRequired()">*</span></label>
           <select id="car-capabilities" x-model="formData.capability_ids" multiple
-                  class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  class="h-9 flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <template x-for="c in formOptions.capabilities" :key="c.id">
               <option :value="c.id" x-text="(c.name || '') + (c.level ? ' (L' + c.level + ')' : '')"></option>
             </template>
@@ -206,7 +206,7 @@
   <div x-cloak x-show="errorMsg" class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
   <div class="flex justify-end gap-3 pt-2 border-t border-border">
     <button type="button" data-modal-close="create-arb-review"
-            class="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent">Cancel</button>
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
     <button type="submit" :disabled="submitting"
             class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
       <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-cloak x-show="submitting"></i>

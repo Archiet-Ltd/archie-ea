@@ -282,16 +282,16 @@
       <form @submit.prevent="submitCreateVendor()" class="space-y-4">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>
-          <label for="cv-name" class="block text-sm font-medium mb-1">Vendor Name <span class="text-destructive-emphasis">*</span></label>
+          <label for="cv-name" class="block text-sm font-medium text-muted-foreground mb-1">Vendor Name <span class="text-destructive-emphasis">*</span></label>
           <input type="text" id="cv-name" name="name" x-model="formData.name" required maxlength="200"
-                 class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                 class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                  placeholder="Enter vendor name">
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 grid-cols-1 gap-4">
           <div>
-            <label for="cv-type" class="block text-sm font-medium mb-1">Vendor Type</label>
+            <label for="cv-type" class="block text-sm font-medium text-muted-foreground mb-1">Vendor Type</label>
             <select id="cv-type" name="vendor_type" x-model="formData.vendor_type"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <option value="">Select type...</option>
               <option value="software_vendor">Software Vendor</option>
               <option value="saas_platform">SaaS Platform</option>
@@ -302,20 +302,20 @@
             </select>
           </div>
           <div>
-            <label for="cv-country" class="block text-sm font-medium mb-1">Country</label>
+            <label for="cv-country" class="block text-sm font-medium text-muted-foreground mb-1">Country</label>
             <input type="text" id="cv-country" name="country" x-model="formData.country"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                    placeholder="e.g. United Kingdom">
           </div>
         </div>
         <div>
-          <label for="cv-website" class="block text-sm font-medium mb-1">Website</label>
+          <label for="cv-website" class="block text-sm font-medium text-muted-foreground mb-1">Website</label>
           <input type="url" id="cv-website" name="website" x-model="formData.website"
-                 class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                 class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                  placeholder="https://example.com">
         </div>
         <div>
-          <label for="cv-description" class="block text-sm font-medium mb-1">Description</label>
+          <label for="cv-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
           <textarea id="cv-description" name="description" x-model="formData.description" rows="3"
                     class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     placeholder="Brief description of the vendor"></textarea>
@@ -323,7 +323,7 @@
         <div x-show="errorMsg" x-cloak class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
         <div class="flex justify-end gap-3 pt-2 border-t border-border">
           <button type="button" @click="Platform.modal.close('create-vendor')"
-                  class="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent">Cancel</button>
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
           <button type="submit" :disabled="submitting"
                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak></i>

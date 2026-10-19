@@ -29,24 +29,24 @@
                 <h2 class="text-xl font-bold text-foreground mb-4">Basic Information</h2>
                 <div class="space-y-4">
                     <div>
-                        <label for="edit-solution-name" class="block text-sm font-medium text-foreground/80 mb-1">Solution Name *</label>
+                        <label for="edit-solution-name" class="block text-sm font-medium text-muted-foreground mb-1">Solution Name *</label>
                         <input type="text" name="name" id="edit-solution-name" value="{{ solution.name }}" required
-                               class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                               class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                                placeholder="e.g., Customer Data Platform" autofocus>
                     </div>
 
                     <div>
-                        <label for="edit-solution-description" class="block text-sm font-medium text-foreground/80 mb-1">Description *</label>
+                        <label for="edit-solution-description" class="block text-sm font-medium text-muted-foreground mb-1">Description *</label>
                         <textarea name="description" id="edit-solution-description" required rows="3"
                                   class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                                   placeholder="Describe the solution and its purpose...">{{ solution.description }}</textarea>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 grid-cols-1 gap-4">
                         <div>
-                            <label for="edit-solution-type" class="block text-sm font-medium text-foreground/80 mb-1">Solution Type *</label>
+                            <label for="edit-solution-type" class="block text-sm font-medium text-muted-foreground mb-1">Solution Type *</label>
                             <select name="solution_type" id="edit-solution-type" required
-                                    class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                                    class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
                                 <option value="">Select Type</option>
                                 <option value="Technology" {% if solution.solution_type == 'Technology' %}selected{% endif %}>Technology</option>
                                 <option value="Process" {% if solution.solution_type == 'Process' %}selected{% endif %}>Process</option>
@@ -56,16 +56,16 @@
                         </div>
 
                         <div>
-                            <label for="edit-business-domain" class="block text-sm font-medium text-foreground/80 mb-1">Business Domain *</label>
+                            <label for="edit-business-domain" class="block text-sm font-medium text-muted-foreground mb-1">Business Domain *</label>
                             <input type="text" name="business_domain" id="edit-business-domain" value="{{ solution.business_domain }}" required
-                                   class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                                   class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                                    placeholder="e.g., Customer Management">
                         </div>
 
                         <div>
-                            <label for="edit-complexity-level" class="block text-sm font-medium text-foreground/80 mb-1">Complexity Level *</label>
+                            <label for="edit-complexity-level" class="block text-sm font-medium text-muted-foreground mb-1">Complexity Level *</label>
                             <select name="complexity_level" id="edit-complexity-level" required
-                                    class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                                    class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
                                 <option value="">Select Level</option>
                                 <option value="Low" {% if solution.complexity_level == 'Low' %}selected{% endif %}>Low</option>
                                 <option value="Medium" {% if solution.complexity_level == 'Medium' %}selected{% endif %}>Medium</option>
@@ -82,21 +82,21 @@
                 <h2 class="text-xl font-bold text-foreground mb-4">Business Value</h2>
                 <div class="space-y-4">
                     <div>
-                        <label for="edit-value-proposition" class="block text-sm font-medium text-foreground/80 mb-1">Value Proposition *</label>
+                        <label for="edit-value-proposition" class="block text-sm font-medium text-muted-foreground mb-1">Value Proposition *</label>
                         <textarea name="value_proposition" id="edit-value-proposition" required rows="2"
                                   class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                                   placeholder="Describe the key value and benefits...">{{ solution.business_value or '' }}</textarea>
                     </div>
 
                     <div>
-                        <label for="edit-target-outcomes" class="block text-sm font-medium text-foreground/80 mb-1">Target Outcomes (comma-separated)</label>
+                        <label for="edit-target-outcomes" class="block text-sm font-medium text-muted-foreground mb-1">Target Outcomes (comma-separated)</label>
                         <textarea name="target_outcomes" id="edit-target-outcomes" rows="2"
                                   class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                                   placeholder="e.g., Reduce cost by 30%, Improve efficiency, Better customer experience">{%- if solution.target_outcomes is string -%}{{ solution.target_outcomes }}{%- elif solution.target_outcomes -%}{{ solution.target_outcomes|join(', ') }}{%- endif -%}</textarea>
                     </div>
 
                     <div>
-                        <label for="edit-success-metrics" class="block text-sm font-medium text-foreground/80 mb-1">Success Metrics (comma-separated)</label>
+                        <label for="edit-success-metrics" class="block text-sm font-medium text-muted-foreground mb-1">Success Metrics (comma-separated)</label>
                         <textarea name="success_metrics" id="edit-success-metrics" rows="2"
                                   class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                                   placeholder="e.g., ROI 2.5x, Deployment time 6 months, Adoption 80%">{%- if solution.success_metrics is string -%}{{ solution.success_metrics }}{%- elif solution.success_metrics -%}{{ solution.success_metrics|join(', ') }}{%- endif -%}</textarea>
@@ -109,19 +109,19 @@
                 <h2 class="text-xl font-bold text-foreground mb-4">Scope and Boundaries</h2>
                 <div class="space-y-4">
                     <div>
-                        <label for="edit-scope-description" class="block text-sm font-medium text-foreground/80 mb-1">Scope Description</label>
+                        <label for="edit-scope-description" class="block text-sm font-medium text-muted-foreground mb-1">Scope Description</label>
                         <textarea name="scope_description" id="edit-scope-description" rows="2"
                                   class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                                   placeholder="Describe what the solution covers...">{{ solution.scope_description or '' }}</textarea>
                     </div>
                     <div>
-                        <label for="edit-in-scope" class="block text-sm font-medium text-foreground/80 mb-1">In Scope (comma-separated)</label>
+                        <label for="edit-in-scope" class="block text-sm font-medium text-muted-foreground mb-1">In Scope (comma-separated)</label>
                         <textarea name="in_scope_applications" id="edit-in-scope" rows="2"
                                   class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                                   placeholder="Comma-separated items in scope">{%- if solution.in_scope_applications -%}{{ solution.in_scope_applications|join(', ') if solution.in_scope_applications is not string else solution.in_scope_applications }}{%- endif -%}</textarea>
                     </div>
                     <div>
-                        <label for="edit-out-of-scope" class="block text-sm font-medium text-foreground/80 mb-1">Out of Scope (comma-separated)</label>
+                        <label for="edit-out-of-scope" class="block text-sm font-medium text-muted-foreground mb-1">Out of Scope (comma-separated)</label>
                         <textarea name="out_of_scope_applications" id="edit-out-of-scope" rows="2"
                                   class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                                   placeholder="Comma-separated items out of scope">{%- if solution.out_of_scope_applications -%}{{ solution.out_of_scope_applications|join(', ') if solution.out_of_scope_applications is not string else solution.out_of_scope_applications }}{%- endif -%}</textarea>
@@ -132,7 +132,7 @@
             <!-- Governance -->
             <div class="bg-card rounded-lg border border-border p-6">
                 <h2 class="text-xl font-bold text-foreground mb-4">Governance &amp; Ownership</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 grid-cols-1 gap-4">
                     {% for field_name, field_label in [
                         ('solution_owner', 'Solution Owner'),
                         ('business_sponsor', 'Business Sponsor'),
@@ -182,7 +182,7 @@
                             this.results = [];
                         }
                     }" @click.outside="showDropdown = false">
-                        <label for="edit-{{ field_name|replace('_', '-') }}" class="block text-sm font-medium text-foreground/80 mb-1">{{ field_label }}</label>
+                        <label for="edit-{{ field_name|replace('_', '-') }}" class="block text-sm font-medium text-muted-foreground mb-1">{{ field_label }}</label>
                         <div class="relative">
                             <input type="text" name="{{ field_name }}" id="edit-{{ field_name|replace('_', '-') }}" x-model="query"
                                    @input.debounce.300ms="search()"
@@ -202,9 +202,9 @@
                     {% endfor %}
 
                     <div>
-                        <label for="edit-solution-status" class="block text-sm font-medium text-foreground/80 mb-1">Status *</label>
+                        <label for="edit-solution-status" class="block text-sm font-medium text-muted-foreground mb-1">Status *</label>
                         <select name="status" id="edit-solution-status" required
-                                class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                                class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
                             <option value="">Select Status</option>
                             <option value="Planning" {% if solution.status == 'Planning' %}selected{% endif %}>Planning</option>
                             <option value="In Progress" {% if solution.status == 'In Progress' %}selected{% endif %}>In Progress</option>
@@ -214,10 +214,10 @@
                     </div>
 
                     <div>
-                        <label for="edit-expected-delivery-date" class="block text-sm font-medium text-foreground/80 mb-1">Expected Delivery Date</label>
+                        <label for="edit-expected-delivery-date" class="block text-sm font-medium text-muted-foreground mb-1">Expected Delivery Date</label>
                         <input type="date" name="expected_delivery_date" id="edit-expected-delivery-date"
                                value="{{ solution.expected_delivery_date.strftime('%Y-%m-%d') if solution.expected_delivery_date else '' }}"
-                               class="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
+                               class="h-9 w-full px-3 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring">
                     </div>
                 </div>
             </div>

@@ -64,7 +64,7 @@
             <form method="POST" action="{{ url_for('interface_register.raise_gap', element_id=element.id) }}" data-testid="raise-gap-{{ element.id }}" class="flex items-center gap-2">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="initiative_id" value="{{ initiative.id }}">
-              <select name="gap_type" required class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              <select name="gap_type" required class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 <option value="">Select gap type</option>
                 {% for gap_type in gap_types %}
                 <option value="{{ gap_type }}">{{ gap_type.replace('_', ' ').title() }}</option>
@@ -125,15 +125,15 @@
             <input type="hidden" name="initiative_id" value="{{ initiative.id }}">
             <div class="flex flex-col">
               <label for="wp-name-{{ gap.id }}" class="sr-only">Work package name</label>
-              <input id="wp-name-{{ gap.id }}" type="text" name="name" placeholder="Work package name" class="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              <input id="wp-name-{{ gap.id }}" type="text" name="name" placeholder="Work package name" class="flex h-9 rounded-md border border-input bg-transparent px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             </div>
             <div class="flex flex-col">
               <label for="wp-cost-{{ gap.id }}" class="sr-only">Estimated cost</label>
-              <input id="wp-cost-{{ gap.id }}" type="number" name="estimated_cost" placeholder="Estimated cost" step="0.01" min="0" class="flex h-9 w-32 rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              <input id="wp-cost-{{ gap.id }}" type="number" name="estimated_cost" placeholder="Estimated cost" step="0.01" min="0" class="flex h-9 w-32 rounded-md border border-input bg-transparent px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             </div>
             <div class="flex flex-col">
               <label for="wp-hours-{{ gap.id }}" class="sr-only">Estimated hours</label>
-              <input id="wp-hours-{{ gap.id }}" type="number" name="estimated_effort_hours" placeholder="Estimated hours" step="1" min="0" max="2147483647" class="flex h-9 w-32 rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              <input id="wp-hours-{{ gap.id }}" type="number" name="estimated_effort_hours" placeholder="Estimated hours" step="1" min="0" max="2147483647" class="flex h-9 w-32 rounded-md border border-input bg-transparent px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             </div>
             <button type="submit" :disabled="submitting" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
               <span x-show="!submitting">Attach work package</span>

@@ -38,13 +38,13 @@
 
     <!-- Load from .env Modal -->
     <div id="env-modal" hidden role="dialog" aria-modal="true" aria-labelledby="env-modal-title" class="modal-root fixed inset-0 z-50">
-        <div class="modal-backdrop fixed inset-0 bg-black/50" id="env-modal-backdrop" aria-hidden="true"></div>
+        <div class="modal-backdrop fixed inset-0 bg-slate-900/50" id="env-modal-backdrop" aria-hidden="true"></div>
         <div class="flex items-center justify-center p-4 fixed inset-0" >
             <div class="bg-card rounded-lg border border-border w-full max-w-lg max-h-[80vh] overflow-auto">
                 <div class="p-6 border-b">
                     <div class="flex items-center justify-between">
                         <h3 class="text-lg font-semibold">Import API Keys from .env</h3>
-                        <button type="button" id="env-modal-close" class="p-1 rounded-md hover:bg-accent" aria-label="Close environment import dialog">
+                        <button type="button" id="env-modal-close" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close environment import dialog">
                             <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
                         </button>
                     </div>
@@ -78,13 +78,13 @@
 
     <!-- OpenRouter Model Browser Modal (standalone, accessible from sidebar) -->
     <div id="or-modal" hidden role="dialog" aria-modal="true" aria-labelledby="or-modal-title" class="modal-root fixed inset-0 z-50">
-        <div class="modal-backdrop fixed inset-0 bg-black/50" id="or-modal-backdrop" aria-hidden="true"></div>
+        <div class="modal-backdrop fixed inset-0 bg-slate-900/50" id="or-modal-backdrop" aria-hidden="true"></div>
         <div class="flex items-center justify-center p-4 fixed inset-0" >
             <div class="bg-card rounded-lg border border-border w-full max-w-xl max-h-[85vh] flex flex-col">
                 <div class="p-6 border-b shrink-0">
                     <div class="flex items-center justify-between">
                         <h3 class="text-lg font-semibold">OpenRouter Model Browser</h3>
-                        <button type="button" id="or-modal-close" class="p-1 rounded-md hover:bg-accent" aria-label="Close OpenRouter model browser dialog">
+                        <button type="button" id="or-modal-close" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close OpenRouter model browser dialog">
                             <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
                         </button>
                     </div>
@@ -290,7 +290,7 @@
                             </div>
 
                             <!-- Max Tokens and Temperature -->
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 gap-4">
                                 <div>
                                     {{ form.max_tokens.label(class="block text-sm font-medium mb-2") }}
                                     {{ form.max_tokens(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2") }}
@@ -368,7 +368,7 @@
                                     </div>
                                     <div class="relative mb-2">
                                         <input type="text" id="or-search" placeholder="Search models (e.g. llama, gemini, gpt)..."
-                                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" aria-label="Search models (e.g. llama, gemini, gpt)...">
+                                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Search models (e.g. llama, gemini, gpt)...">
                                     </div>
                                     <div id="or-models-list" class="max-h-48 overflow-y-auto space-y-1 hidden">
                                     </div>

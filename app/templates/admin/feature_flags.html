@@ -23,15 +23,15 @@
         <form method="GET" action="{{ url_for('admin.feature_flags') }}" class="flex flex-wrap gap-3 items-end">
             <!-- Search -->
             <div class="flex-1 min-w-[200px]">
-                <label for="ff-search" class="block text-sm font-medium mb-1">Search</label>
+                <label for="ff-search" class="block text-sm font-medium text-muted-foreground mb-1">Search</label>
                 <input type="text" name="search" id="ff-search" value="{{ search }}" placeholder="Search features..." aria-label="Search features"
-                       class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm" autofocus>
+                       class="h-9 w-full px-3 border border-border rounded-md bg-background text-sm" autofocus>
             </div>
 
             <!-- Type Filter -->
             <div class="min-w-[180px]">
-                <label for="ff-type" class="block text-sm font-medium mb-1">Type</label>
-                <select name="type" id="ff-type" class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm" aria-label="Filter by type">
+                <label for="ff-type" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
+                <select name="type" id="ff-type" class="h-9 w-full px-3 border border-border rounded-md bg-background text-sm" aria-label="Filter by type">
                     <option value="">All Types</option>
                     {% for ftype in FeatureType %}
                     <option value="{{ ftype.value }}" {% if filter_type == ftype.value %}selected{% endif %}>
@@ -43,8 +43,8 @@
 
             <!-- State Filter -->
             <div class="min-w-[180px]">
-                <label for="ff-state" class="block text-sm font-medium mb-1">State</label>
-                <select name="state" id="ff-state" class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm" aria-label="Filter by state">
+                <label for="ff-state" class="block text-sm font-medium text-muted-foreground mb-1">State</label>
+                <select name="state" id="ff-state" class="h-9 w-full px-3 border border-border rounded-md bg-background text-sm" aria-label="Filter by state">
                     <option value="">All States</option>
                     {% for fstate in FeatureState %}
                     <option value="{{ fstate.value }}" {% if filter_state == fstate.value %}selected{% endif %}>
@@ -56,8 +56,8 @@
 
             <!-- Status Filter -->
             <div class="min-w-[150px]">
-                <label for="ff-status" class="block text-sm font-medium mb-1">Status</label>
-                <select name="status" id="ff-status" class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm" aria-label="Filter by status">
+                <label for="ff-status" class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
+                <select name="status" id="ff-status" class="h-9 w-full px-3 border border-border rounded-md bg-background text-sm" aria-label="Filter by status">
                     <option value="">All</option>
                     <option value="enabled" {% if filter_status == 'enabled' %}selected{% endif %}>Enabled</option>
                     <option value="disabled" {% if filter_status == 'disabled' %}selected{% endif %}>Disabled</option>
@@ -66,8 +66,8 @@
 
             <!-- Hierarchy Filter -->
             <div class="min-w-[180px]">
-                <label for="ff-hierarchy" class="block text-sm font-medium mb-1">Hierarchy</label>
-                <select name="hierarchy" id="ff-hierarchy" class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm" aria-label="Filter by hierarchy">
+                <label for="ff-hierarchy" class="block text-sm font-medium text-muted-foreground mb-1">Hierarchy</label>
+                <select name="hierarchy" id="ff-hierarchy" class="h-9 w-full px-3 border border-border rounded-md bg-background text-sm" aria-label="Filter by hierarchy">
                     <option value="">All Levels</option>
                     <option value="parent" {% if filter_hierarchy == 'parent' %}selected{% endif %}>Parents Only</option>
                     <option value="child" {% if filter_hierarchy == 'child' %}selected{% endif %}>Children Only</option>

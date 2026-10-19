@@ -186,14 +186,14 @@
     <!-- ── Link-to-capability modal (AP-9: data-modal-close, hidden) ────────────────────────────────────── -->
     <div id="requirements-link-capability-modal"
          hidden
-         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50"
          aria-modal="true" role="dialog" aria-labelledby="trc-modal-title">
         <div class="bg-card rounded-lg border border-border w-full max-w-md"
              @click.stop>
             <div class="flex items-center justify-between px-5 py-4 border-b">
-                <h2 id="trc-modal-title" class="font-semibold text-base">Link Capability</h2>
+                <h2 id="trc-modal-title" class="text-base font-semibold text-foreground">Link Capability</h2>
                 <button type="button" data-modal-close="requirements-link-capability-modal"
-                        class="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         aria-label="Close">
                     <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
                 </button>

@@ -59,11 +59,11 @@
     >
         <h2 class="text-base font-semibold text-foreground mb-4">New Communication Entry</h2>
         <form @submit.prevent="submitEntry" class="space-y-4">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 grid-cols-1 gap-4">
                 <div>
-                    <label for="new-type" class="block text-sm font-medium text-foreground mb-1">Type <span aria-hidden="true">*</span></label>
+                    <label for="new-type" class="block text-sm font-medium text-muted-foreground mb-1">Type <span aria-hidden="true">*</span></label>
                     <select id="new-type" x-model="form.comm_type" required
-                        class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary"
+                        class="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus:ring-2 focus:ring-primary"
                         aria-required="true">
                         <option value="">Select type…</option>
                         <option value="meeting">Meeting</option>
@@ -74,26 +74,26 @@
                     </select>
                 </div>
                 <div>
-                    <label for="new-stakeholder" class="block text-sm font-medium text-foreground mb-1">Stakeholder ID</label>
+                    <label for="new-stakeholder" class="block text-sm font-medium text-muted-foreground mb-1">Stakeholder ID</label>
                     <input id="new-stakeholder" type="number" x-model="form.stakeholder_id"
-                        class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary"
+                        class="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus:ring-2 focus:ring-primary"
                         placeholder="Optional" />
                 </div>
             </div>
             <div>
-                <label for="new-subject" class="block text-sm font-medium text-foreground mb-1">Subject <span aria-hidden="true">*</span></label>
+                <label for="new-subject" class="block text-sm font-medium text-muted-foreground mb-1">Subject <span aria-hidden="true">*</span></label>
                 <input id="new-subject" type="text" x-model="form.subject" required
-                    class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary"
+                    class="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus:ring-2 focus:ring-primary"
                     placeholder="e.g. Q3 alignment meeting" aria-required="true" />
             </div>
             <div>
-                <label for="new-summary" class="block text-sm font-medium text-foreground mb-1">Summary</label>
+                <label for="new-summary" class="block text-sm font-medium text-muted-foreground mb-1">Summary</label>
                 <textarea id="new-summary" x-model="form.summary" rows="3"
                     class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary"
                     placeholder="Key discussion points…"></textarea>
             </div>
             <div>
-                <label for="new-outcome" class="block text-sm font-medium text-foreground mb-1">Outcome</label>
+                <label for="new-outcome" class="block text-sm font-medium text-muted-foreground mb-1">Outcome</label>
                 <textarea id="new-outcome" x-model="form.outcome" rows="2"
                     class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary"
                     placeholder="Decisions made, next steps…"></textarea>
@@ -107,7 +107,7 @@
                     Save Entry
                 </button>
                 <button type="button" @click="showForm = false"
-                    class="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted focus:ring-2 focus:ring-primary">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
                     Cancel
                 </button>
             </div>

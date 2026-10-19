@@ -39,7 +39,7 @@
             </div>
             <div class="p-4 sm:p-6 space-y-4">
                 <div>
-                    <label for="instance_url" class="block text-sm font-medium mb-1">Jira Instance URL</label>
+                    <label for="instance_url" class="block text-sm font-medium text-muted-foreground mb-1">Jira Instance URL</label>
                     <input
                         type="url"
                         id="instance_url"
@@ -47,11 +47,11 @@
                         value="{{ cfg.get('instance_url', '') }}"
                         placeholder="https://yourcompany.atlassian.net"
                         required
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
                     >
                 </div>
                 <div>
-                    <label for="email" class="block text-sm font-medium mb-1">Jira Account Email</label>
+                    <label for="email" class="block text-sm font-medium text-muted-foreground mb-1">Jira Account Email</label>
                     <input
                         type="email"
                         id="email"
@@ -59,39 +59,39 @@
                         value="{{ cfg.get('email', '') }}"
                         placeholder="your.name@company.com"
                         required
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     >
                 </div>
                 <div>
-                    <label for="api_token" class="block text-sm font-medium mb-1">API Token</label>
+                    <label for="api_token" class="block text-sm font-medium text-muted-foreground mb-1">API Token</label>
                     <input
                         type="password"
                         id="api_token"
                         name="api_token"
                         autocomplete="off"
                         placeholder="Leave blank to keep existing token"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
                     >
                     {% if has_secret %}
                     <p class="text-xs text-muted-foreground mt-1">✓ Token stored (encrypted). Enter a new value to replace it.</p>
                     {% endif %}
                 </div>
                 <div>
-                    <label for="default_project_key" class="block text-sm font-medium mb-1">Default Project Key</label>
+                    <label for="default_project_key" class="block text-sm font-medium text-muted-foreground mb-1">Default Project Key</label>
                     <input
                         type="text"
                         id="default_project_key"
                         name="default_project_key"
                         value="{{ cfg.get('default_project_key', 'ARCH') }}"
                         placeholder="ARCH"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono uppercase"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono uppercase"
                     >
                     <p class="text-xs text-muted-foreground mt-1">ARB decisions will create epics in this project.</p>
                 </div>
                 <div class="flex items-center gap-3">
                     <input type="checkbox" id="enabled" name="enabled" {% if cfg.get('enabled') %}checked{% endif %}
                         class="h-4 w-4 rounded border-input text-primary focus:ring-ring">
-                    <label for="enabled" class="text-sm font-medium">Enable Jira integration</label>
+                    <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">Enable Jira integration</label>
                 </div>
             </div>
         </div>

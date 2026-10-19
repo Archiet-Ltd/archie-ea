@@ -1499,7 +1499,7 @@
                             <h3 id="heatmap-detail-name" class="text-base font-bold text-foreground"></h3>
                             <p id="heatmap-detail-domain" class="text-xs text-muted-foreground"></p>
                         </div>
-                        <button aria-label="Close capability details" type="button" @click="document.getElementById('heatmap-detail').classList.add('hidden')" class="text-muted-foreground hover:text-foreground p-1">
+                        <button aria-label="Close capability details" type="button" @click="document.getElementById('heatmap-detail').classList.add('hidden')" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <i data-lucide="x" class="w-4 h-4"></i>
                         </button>
                     </div>
@@ -1724,7 +1724,7 @@
         </div>
 
         <!-- Convert to Roadmap Modal - Standardized Design -->
-        <div id="convert-modal" hidden role="dialog" aria-modal="true" aria-labelledby="convert-modal-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
+        <div id="convert-modal" hidden role="dialog" aria-modal="true" aria-labelledby="convert-modal-title" class="modal-root fixed inset-0 overflow-y-auto z-50 bg-slate-900/50">
             <div class="relative top-20 mx-auto p-0 w-full max-w-2xl">
                 <div class="bg-card rounded-lg">
                     <!-- Header -->
@@ -1736,7 +1736,7 @@
                                 <p class="text-sm text-primary-foreground/70">Transform auto-detected gaps into trackable roadmap items</p>
                             </div>
                         </div>
-                        <button type="button" @click="closeConvertModal()" class="text-primary-foreground hover:text-muted-foreground/50" aria-label="Close convert gaps modal">
+                        <button type="button" @click="closeConvertModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close convert gaps modal">
                             <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
                         </button>
                     </div>
@@ -1874,7 +1874,7 @@
         </div>
 
         <!-- Edit Gap Modal -->
-        <div id="edit-gap-modal" hidden role="dialog" aria-modal="true" aria-labelledby="edit-gap-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
+        <div id="edit-gap-modal" hidden role="dialog" aria-modal="true" aria-labelledby="edit-gap-title" class="modal-root fixed inset-0 overflow-y-auto z-50 bg-slate-900/50">
             <div class="relative top-10 mx-auto p-0 w-full max-w-3xl">
                 <div class="bg-card rounded-lg">
                     <!-- Header -->
@@ -1883,7 +1883,7 @@
                             <i data-lucide="edit-3" class="w-6 h-6 text-primary-foreground" aria-hidden="true"></i>
                             <h3 class="text-lg font-semibold text-primary-foreground" id="edit-gap-title">Edit Gap</h3>
                         </div>
-                        <button type="button" @click="closeEditGapModal()" class="text-primary-foreground hover:text-muted-foreground/50" aria-label="Close edit gap modal">
+                        <button type="button" @click="closeEditGapModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close edit gap modal">
                             <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
                         </button>
                     </div>
@@ -2014,7 +2014,7 @@
         </div>
 
         <!-- Edit Work Package Modal - Standardized Design -->
-        <div id="edit-wp-modal" hidden role="dialog" aria-modal="true" aria-labelledby="edit-wp-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
+        <div id="edit-wp-modal" hidden role="dialog" aria-modal="true" aria-labelledby="edit-wp-title" class="modal-root fixed inset-0 overflow-y-auto z-50 bg-slate-900/50">
             <div class="relative top-10 mx-auto p-0 w-full max-w-4xl">
                 <div class="bg-card rounded-lg">
                     <!-- Header -->
@@ -2026,7 +2026,7 @@
                                 <p class="text-sm text-primary-foreground/70" id="edit-wp-subtitle">Manage work package details and children</p>
                             </div>
                         </div>
-                        <button type="button" @click="closeEditWPModal()" class="text-primary-foreground hover:text-muted-foreground/50" aria-label="Close edit work package modal">
+                        <button type="button" @click="closeEditWPModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close edit work package modal">
                             <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
                         </button>
                     </div>
@@ -2316,7 +2316,7 @@
         </div>
 
         <!-- Delete Confirmation Modal -->
-        <div id="delete-confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="delete-confirm-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
+        <div id="delete-confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="delete-confirm-title" class="modal-root fixed inset-0 overflow-y-auto z-50 bg-slate-900/50">
             <div class="relative top-20 mx-auto p-0 w-full max-w-md">
                 <div class="bg-card rounded-lg">
                     <!-- Header -->
@@ -2325,7 +2325,7 @@
                             <i data-lucide="alert-triangle" class="w-6 h-6 text-primary-foreground" aria-hidden="true"></i>
                             <h3 class="text-lg font-semibold text-primary-foreground">Confirm Delete</h3>
                         </div>
-                        <button type="button" @click="closeDeleteConfirmModal()" class="text-primary-foreground hover:text-muted-foreground/50" aria-label="Close delete confirmation">
+                        <button type="button" @click="closeDeleteConfirmModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close delete confirmation">
                             <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
                         </button>
                     </div>
@@ -2372,14 +2372,14 @@
         </div>
 
         <!-- Add to Roadmap Modal -->
-        <div id="add-roadmap-modal" hidden role="dialog" aria-modal="true" aria-labelledby="add-roadmap-modal-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
+        <div id="add-roadmap-modal" hidden role="dialog" aria-modal="true" aria-labelledby="add-roadmap-modal-title" class="modal-root fixed inset-0 overflow-y-auto z-50 bg-slate-900/50">
             <div class="relative top-20 mx-auto p-5 border border-border w-full max-w-lg rounded-md bg-card">
                 <div class="flex justify-between items-center mb-4 pb-3 border-b">
                     <h3 class="text-lg font-bold text-foreground flex items-center">
                         <i data-lucide="map" class="w-5 h-5 mr-2 text-primary" aria-hidden="true"></i>
                         Add to Roadmap
                     </h3>
-                    <button type="button" @click="closeAddRoadmapModal()" class="text-muted-foreground hover:text-muted-foreground" aria-label="Close">
+                    <button type="button" @click="closeAddRoadmapModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
                         <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
                     </button>
                 </div>
@@ -2469,14 +2469,14 @@
         </div>
 
         <!-- Quick Add to Roadmap Modal -->
-        <div id="quick-add-modal" hidden role="dialog" aria-modal="true" aria-labelledby="quick-add-modal-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
+        <div id="quick-add-modal" hidden role="dialog" aria-modal="true" aria-labelledby="quick-add-modal-title" class="modal-root fixed inset-0 overflow-y-auto z-50 bg-slate-900/50">
             <div class="relative top-20 mx-auto p-5 border border-border w-full max-w-2xl rounded-md bg-card">
                 <div class="flex justify-between items-center mb-4 pb-3 border-b">
                     <h3 class="text-lg font-bold text-foreground flex items-center">
                         <i data-lucide="search" class="w-5 h-5 mr-2 text-primary" aria-hidden="true"></i>
                         Quick Add to Roadmap
                     </h3>
-                    <button type="button" @click="closeQuickAddModal()" class="text-muted-foreground hover:text-muted-foreground" aria-label="Close quick add modal">
+                    <button type="button" @click="closeQuickAddModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close quick add modal">
                         <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
                     </button>
                 </div>
@@ -2525,7 +2525,7 @@
 
                 <!-- Footer -->
                 <div class="flex justify-end pt-4 border-t">
-                    <button type="button" @click="closeQuickAddModal()" class="px-4 py-2 text-muted-foreground bg-muted rounded-md hover:bg-accent" aria-label="Close quick add dialog">
+                    <button type="button" @click="closeQuickAddModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close quick add dialog">
                         Close
                     </button>
                 </div>

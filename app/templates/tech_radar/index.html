@@ -93,7 +93,7 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="archimate_element_id" value="{{ row.element.id }}">
             <select name="ring" aria-label="Reclassify {{ row.element.name }}"
-              class="h-8 rounded-md border border-input bg-transparent px-2 text-xs">
+              class="h-9 rounded-md border border-input bg-transparent px-2 text-xs">
               {% for r in rings %}
               <option value="{{ r }}" {% if r == ring %}selected{% endif %}>{{ ring_labels[r] }}</option>
               {% endfor %}
@@ -133,18 +133,18 @@
             <details class="rounded-md border border-border px-3 py-2 text-xs">
               <summary class="cursor-pointer font-medium">Rationale, review date and requesting initiative</summary>
               <div class="mt-2 space-y-2">
-                <label class="block">
+                <label class="block text-sm font-medium text-muted-foreground mb-1">
                   <span class="block text-muted-foreground mb-1">Rationale</span>
                   <textarea name="rationale" rows="2" maxlength="2000"
                     class="w-full rounded-md border border-input bg-transparent px-2 py-1 text-xs"></textarea>
                 </label>
-                <label class="block">
+                <label class="block text-sm font-medium text-muted-foreground mb-1">
                   <span class="block text-muted-foreground mb-1">Review by</span>
                   <input type="date" name="review_date"
-                    class="h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs">
+                    class="h-9 w-full rounded-md border border-input bg-transparent px-2 text-xs">
                 </label>
                 <div x-data="radarInitiativePicker()" class="relative">
-                  <label class="block text-muted-foreground mb-1" for="radar-initiative-{{ element.id }}">Requesting initiative</label>
+                  <label class="block text-sm font-medium text-muted-foreground mb-1" for="radar-initiative-{{ element.id }}">Requesting initiative</label>
                   <input type="hidden" name="requesting_initiative_id" :value="picked ? picked.id : ''">
                   <input id="radar-initiative-{{ element.id }}" type="text" autocomplete="off"
                     role="combobox" aria-autocomplete="list" :aria-expanded="results.length > 0 ? 'true' : 'false'"
@@ -167,7 +167,7 @@
             </details>
             <div class="flex items-center justify-end gap-2">
               <select name="ring" required aria-label="Classify {{ element.name }}"
-                class="h-8 rounded-md border border-input bg-transparent px-2 text-xs">
+                class="h-9 rounded-md border border-input bg-transparent px-2 text-xs">
                 <option value="" selected disabled>Classify…</option>
                 {% for r in rings %}
                 <option value="{{ r }}">{{ ring_labels[r] }}</option>

@@ -45,12 +45,12 @@
             <h2 class="text-lg font-semibold">Record a lineage flow</h2>
             <p class="text-xs text-muted-foreground mt-1">Both endpoints must be existing data objects — this cannot create a lineage row against a system that isn't modelled.</p>
         </div>
-        <form method="POST" action="{{ url_for('data_architecture.create_data_lineage') }}" class="p-4 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end" data-testid="lineage-create-form">
+        <form method="POST" action="{{ url_for('data_architecture.create_data_lineage') }}" class="p-4 grid grid-cols-1 grid-cols-1 gap-3 items-end" data-testid="lineage-create-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
-                <label for="lineage-source" class="block text-sm font-medium mb-1">Source data object</label>
+                <label for="lineage-source" class="block text-sm font-medium text-muted-foreground mb-1">Source data object</label>
                 <select id="lineage-source" name="source_id" required
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
                     <option value="" selected disabled>Select…</option>
                     {% for o in data_objects %}
                     <option value="{{ o.id }}">{{ o.name }}</option>
@@ -58,9 +58,9 @@
                 </select>
             </div>
             <div>
-                <label for="lineage-target" class="block text-sm font-medium mb-1">Target data object</label>
+                <label for="lineage-target" class="block text-sm font-medium text-muted-foreground mb-1">Target data object</label>
                 <select id="lineage-target" name="target_id" required
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
                     <option value="" selected disabled>Select…</option>
                     {% for o in data_objects %}
                     <option value="{{ o.id }}">{{ o.name }}</option>
@@ -68,9 +68,9 @@
                 </select>
             </div>
             <div>
-                <label for="lineage-type" class="block text-sm font-medium mb-1">Flow type</label>
+                <label for="lineage-type" class="block text-sm font-medium text-muted-foreground mb-1">Flow type</label>
                 <select id="lineage-type" name="lineage_type"
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
                     <option value="">Not set</option>
                     <option value="ETL">ETL</option>
                     <option value="ELT">ELT</option>

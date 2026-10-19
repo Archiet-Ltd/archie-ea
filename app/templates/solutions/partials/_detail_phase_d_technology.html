@@ -2,7 +2,7 @@
             <div id="phase-d" class="bg-card rounded-lg border border-border p-6 transition-all relative"
                  x-show="isSectionActive('D')" x-cloak
                  :class="isSectionActive('D') ? 'ring-1 ring-primary/10' : ''">
-                <div x-show="isSectionFuture('D')" x-cloak class="absolute inset-0 bg-background/60 z-10 flex items-center justify-center rounded-xl">
+                <div x-show="isSectionFuture('D')" x-cloak class="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-slate-900/50">
                     <p class="text-sm text-muted-foreground font-medium">Complete Phase <span x-text="currentPhase"></span> to unlock</p>
                 </div>
 

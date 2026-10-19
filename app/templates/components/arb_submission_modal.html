@@ -73,7 +73,7 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
             <i data-lucide="shield-check" class="h-6 w-6 text-primary"></i>
         </div>
         <div>
-            <h3 id="modal-arb-submission-title" class="text-xl font-semibold">Submit to Architecture Review Board</h3>
+            <h3 id="modal-arb-submission-title" class="text-base font-semibold text-foreground">Submit to Architecture Review Board</h3>
             <p class="text-sm text-muted-foreground mt-1" x-text="`Capability: ${capability.name || 'Unknown'}`"></p>
         </div>
     </div>
@@ -182,7 +182,7 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
         <button type="button"
             @click="Platform.modal.close('arb-submission')"
             :disabled="loading"
-            class="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-input rounded-lg hover:bg-accent transition-colors disabled:opacity-50"
+            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
          aria-label="Close">
             Cancel
         </button>

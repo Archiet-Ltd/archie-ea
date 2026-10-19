@@ -58,13 +58,11 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
 
                 <div class="flex flex-col gap-1.5">
-                    <label for="notification_url" class="text-sm font-medium">Notification URL</label>
+                    <label for="notification_url" class="block text-sm font-medium text-muted-foreground mb-1">Notification URL</label>
                     <input id="notification_url" name="notification_url" type="url"
                            value="{{ config.notification_url or '' }}"
                            placeholder="https://your-public-url.com/api/webhooks/teams/notifications"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm
- transition-colors placeholder:text-muted-foreground
- focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                     <p class="text-xs text-muted-foreground">
                         Must be a publicly reachable HTTPS URL. Microsoft Graph will POST to this URL when a meeting ends.
                         Point it at <code class="font-mono">/api/webhooks/teams/notifications</code> on your production host.

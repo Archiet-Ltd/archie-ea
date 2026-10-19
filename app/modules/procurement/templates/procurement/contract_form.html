@@ -168,25 +168,25 @@
       <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Identity</h2>
 
       <div>
-        <label for="contract_name" class="block text-sm font-medium mb-1.5">
+        <label for="contract_name" class="block text-sm font-medium text-muted-foreground mb-1">
           Contract name <span class="text-destructive-emphasis" aria-hidden="true">*</span>
         </label>
         <input type="text" id="contract_name" name="contract_name" required maxlength="256"
                value="{{ current('contract_name', contract.contract_name if contract else '') | trim }}"
-               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 grid-cols-1 gap-4">
         <div>
-          <label for="contract_number" class="block text-sm font-medium mb-1.5">Contract number</label>
+          <label for="contract_number" class="block text-sm font-medium text-muted-foreground mb-1">Contract number</label>
           <input type="text" id="contract_number" name="contract_number" maxlength="100"
                  value="{{ current('contract_number', contract.contract_number if contract else '') | trim }}"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
         <div>
-          <label for="vendor_id" class="block text-sm font-medium mb-1.5">Vendor</label>
+          <label for="vendor_id" class="block text-sm font-medium text-muted-foreground mb-1">Vendor</label>
           <select id="vendor_id" name="vendor_id"
-                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
             <option value="">Not specified</option>
             {% for vendor in vendors %}
             <option value="{{ vendor.id }}"
@@ -204,7 +204,7 @@
       </div>
 
       <div>
-        <label for="contract_description" class="block text-sm font-medium mb-1.5">Description</label>
+        <label for="contract_description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
         <textarea id="contract_description" name="contract_description" rows="3"
                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none">{{ current('contract_description', contract.contract_description if contract else '') | trim }}</textarea>
       </div>
@@ -212,11 +212,11 @@
 
     <div class="bg-card border border-border rounded-lg p-6 space-y-4">
       <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Classification</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 grid-cols-1 gap-4">
         <div>
-          <label for="contract_type" class="block text-sm font-medium mb-1.5">Type</label>
+          <label for="contract_type" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
           <select id="contract_type" name="contract_type"
-                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
             <option value="">Not specified</option>
             {% for value in contract_types %}
             <option value="{{ value }}" {% if current('contract_type', contract.contract_type if contract else '') | trim == value %}selected{% endif %}>
@@ -226,9 +226,9 @@
           </select>
         </div>
         <div>
-          <label for="contract_category" class="block text-sm font-medium mb-1.5">Category</label>
+          <label for="contract_category" class="block text-sm font-medium text-muted-foreground mb-1">Category</label>
           <select id="contract_category" name="contract_category"
-                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
             <option value="">Not specified</option>
             {% for value in contract_categories %}
             <option value="{{ value }}" {% if current('contract_category', contract.contract_category if contract else '') | trim == value %}selected{% endif %}>
@@ -238,9 +238,9 @@
           </select>
         </div>
         <div>
-          <label for="status" class="block text-sm font-medium mb-1.5">Status</label>
+          <label for="status" class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
           <select id="status" name="status"
-                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
             <option value="">Not specified</option>
             {% for value in contract_statuses %}
             <option value="{{ value }}" {% if current('status', contract.status if contract else '') | trim == value %}selected{% endif %}>
@@ -254,50 +254,50 @@
 
     <div class="bg-card border border-border rounded-lg p-6 space-y-4">
       <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Commercials</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 grid-cols-1 gap-4">
         <div>
-          <label for="contract_value" class="block text-sm font-medium mb-1.5">Total value</label>
+          <label for="contract_value" class="block text-sm font-medium text-muted-foreground mb-1">Total value</label>
           <input type="number" step="0.01" min="0" id="contract_value" name="contract_value"
                  value="{{ current('contract_value', contract.contract_value if contract else '') | trim }}"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
         <div>
-          <label for="annual_cost" class="block text-sm font-medium mb-1.5">Annual cost</label>
+          <label for="annual_cost" class="block text-sm font-medium text-muted-foreground mb-1">Annual cost</label>
           <input type="number" step="0.01" min="0" id="annual_cost" name="annual_cost"
                  value="{{ current('annual_cost', contract.annual_cost if contract else '') | trim }}"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
         <div>
-          <label for="currency" class="block text-sm font-medium mb-1.5">Currency</label>
+          <label for="currency" class="block text-sm font-medium text-muted-foreground mb-1">Currency</label>
           <input type="text" id="currency" name="currency" maxlength="10"
                  value="{{ current('currency', contract.currency if contract else 'USD') | trim }}"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
       </div>
     </div>
 
     <div class="bg-card border border-border rounded-lg p-6 space-y-4">
       <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Term</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 grid-cols-1 gap-4">
         <div>
-          <label for="start_date" class="block text-sm font-medium mb-1.5">Start date</label>
+          <label for="start_date" class="block text-sm font-medium text-muted-foreground mb-1">Start date</label>
           <input type="date" id="start_date" name="start_date"
                  value="{{ current('start_date', contract.start_date.isoformat() if contract and contract.start_date else '') | trim }}"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
           <p class="text-xs text-muted-foreground mt-1">Defaults to today if left blank.</p>
         </div>
         <div>
-          <label for="end_date" class="block text-sm font-medium mb-1.5">End date</label>
+          <label for="end_date" class="block text-sm font-medium text-muted-foreground mb-1">End date</label>
           <input type="date" id="end_date" name="end_date"
                  value="{{ current('end_date', contract.end_date.isoformat() if contract and contract.end_date else '') | trim }}"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
           <p class="text-xs text-muted-foreground mt-1">Drives the renewals dashboard.</p>
         </div>
         <div>
-          <label for="renewal_date" class="block text-sm font-medium mb-1.5">Renewal date</label>
+          <label for="renewal_date" class="block text-sm font-medium text-muted-foreground mb-1">Renewal date</label>
           <input type="date" id="renewal_date" name="renewal_date"
                  value="{{ current('renewal_date', contract.renewal_date.isoformat() if contract and contract.renewal_date else '') | trim }}"
-                 class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
       </div>
       <div class="flex items-center gap-2">
@@ -308,7 +308,7 @@
                  checked
                {% endif %}
                class="rounded border-input">
-        <label for="auto_renewal" class="text-sm">Renews automatically</label>
+        <label for="auto_renewal" class="block text-sm font-medium text-muted-foreground mb-1">Renews automatically</label>
       </div>
       {# Live-search picker against /api/users (DESIGN.md entity picker rule) — the
          "contract owner" field previously took free text, so any name (typo,
@@ -351,7 +351,7 @@
               this.results = [];
           }
       }" @click.outside="showDropdown = false" class="relative">
-        <label for="contract_owner" class="block text-sm font-medium mb-1.5">Contract owner</label>
+        <label for="contract_owner" class="block text-sm font-medium text-muted-foreground mb-1">Contract owner</label>
         <input type="text" id="contract_owner" name="contract_owner" maxlength="100"
                x-model="query"
                @input.debounce.300ms="search()"

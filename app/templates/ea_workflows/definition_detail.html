@@ -134,15 +134,15 @@
                         <p class="text-sm text-muted-foreground mt-1">
                             Launch the section-based TOGAF Vision editor with canonical prefills, traceability, readiness checks, and downstream ADM handoff guidance.
                         </p>
-                        <form method="get" action="{{ url_for('main.ea_workflow_vision_deliverable_editor') }}" class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <form method="get" action="{{ url_for('main.ea_workflow_vision_deliverable_editor') }}" class="mt-5 grid grid-cols-1 grid-cols-1 gap-4">
                             <input type="hidden" name="workflow_code" value="{{ definition.workflow_code }}">
                             <div>
-                                <label for="project_name" class="block text-sm font-medium mb-1">Project or initiative name</label>
-                                <input id="project_name" name="project_name" type="text" required value="{{ definition.workflow_name }}" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                <label for="project_name" class="block text-sm font-medium text-muted-foreground mb-1">Project or initiative name</label>
+                                <input id="project_name" name="project_name" type="text" required value="{{ definition.workflow_name }}" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                             </div>
                             <div>
-                                <label for="application_id" class="block text-sm font-medium mb-1">Application context (optional)</label>
-                                <select id="application_id" name="application_id" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                <label for="application_id" class="block text-sm font-medium text-muted-foreground mb-1">Application context (optional)</label>
+                                <select id="application_id" name="application_id" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                                     <option value="">Use workflow definition only</option>
                                     {% for application in applications %}
                                     <option value="{{ application.id }}">{{ application.name }}</option>
