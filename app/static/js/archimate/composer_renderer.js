@@ -1478,13 +1478,27 @@ let ComposerRenderer = (function() {
             if (kind === 'derived') {
                 link.attr('line/strokeDasharray', plain ? '5,5' : '4,4');
                 let text = rel.stale === true ? '◷ Worked out, may be out of date' : 'Worked out';
-                let ink = plain ? plainInk() : null;
+                if (plain) {
+                    let ink = plainInk();
+                    /* Its own markup, so the standard label's reference-sized rect does not
+                       apply: the chip has a fixed size and is centred on its point. */
+                    let w = text.length * 7.6 + 16;
+                    link.appendLabel({
+                        markup: [{ tagName: 'rect', selector: 'chip' }, { tagName: 'text', selector: 'text' }],
+                        attrs: {
+                            chip: { x: -w / 2, y: -10, width: w, height: 20, rx: 6, ry: 6, fill: ink.badgeFill, stroke: ink.stroke, strokeWidth: 1 },
+                            text: { text: text, fontSize: 11, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif', fill: ink.text, textAnchor: 'middle', textVerticalAnchor: 'middle', style: { textTransform: 'uppercase' }, pointerEvents: 'none' },
+                        },
+                        position: { distance: 0.5, offset: 0 },
+                    });
+                    return;
+                }
                 link.appendLabel({
                     attrs: {
-                        text: Object.assign({ text: text, fontSize: plain ? 11 : 10, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif', fill: plain ? ink.text : '#1a1a1a' }, plain ? { style: { textTransform: 'uppercase' } } : {}),
-                        rect: Object.assign({ fill: plain ? ink.badgeFill : '#fff', stroke: plain ? ink.stroke : '#1a1a1a', strokeWidth: plain ? 1 : 0.5, strokeDasharray: plain ? '' : '3,2', rx: plain ? 6 : 3, ry: plain ? 6 : 3 }, plain ? { x: -(text.length * 7.6 + 16) / 2, y: -10, width: text.length * 7.6 + 16, height: 20 } : { ref: 'text', refWidth: 8, refHeight: 4, refX: -4, refY: -2 }),
+                        text: { text: text, fontSize: 10, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif', fill: '#1a1a1a' },
+                        rect: { fill: '#fff', stroke: '#1a1a1a', strokeWidth: 0.5, strokeDasharray: '3,2', rx: 3, ry: 3, ref: 'text', refWidth: 8, refHeight: 4, refX: -4, refY: -2 },
                     },
-                    position: { distance: 0.5, offset: plain ? 0 : 14 },
+                    position: { distance: 0.5, offset: 14 },
                 });
             }
         }
