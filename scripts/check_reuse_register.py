@@ -205,6 +205,9 @@ def missing_symbols(root: Path, canonical_path: str, symbols) -> tuple[bool, lis
     if path.suffix == ".css":
         uncommented = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
         return True, [s for s in symbols if not _css_symbol_defined(uncommented, s)]
+    if path.suffix == ".js":
+        return True, [s for s in symbols
+                      if not re.search(r"(?m)^\s*(?:let|const|var|function|class)\s+" + re.escape(s) + r"\b", text)]
     return True, [s for s in symbols if not re.search(MACRO.replace("NAME", re.escape(s)), text)]
 
 
