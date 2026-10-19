@@ -31,7 +31,10 @@ def _org_component(db_session, make_org):
 def _group(db_session, *, name, applications=()):
     from app.models.unified_duplicate_detection import UnifiedDuplicateGroup
 
-    group = UnifiedDuplicateGroup(name=name, similarity_score=0.9, estimated_savings=999999)
+    group = UnifiedDuplicateGroup(
+        name=name, similarity_score=0.9, estimated_savings=999999,
+        organization_id=applications[0].organization_id if applications else None,
+    )
     db_session.add(group)
     db_session.flush()
     for app in applications:
