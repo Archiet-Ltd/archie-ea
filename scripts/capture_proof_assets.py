@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Capture the proof screenshots the public site shows: home hero, Applications, ARB.
+"""Capture the proof screenshots the public site shows: home hero, Applications.
 
 Why this exists (marketing visual design review v1, S3 / P-03 / P-06): nine of the
 eleven revenue pages showed no product at all, and the two that did showed a
@@ -136,38 +136,6 @@ def capture_applications(browser, base, password, wide: bool) -> tuple[int, int]
     return size
 
 
-def capture_arb(browser, base, password, wide: bool) -> tuple[int, int]:
-    vw, vh = (1280, 1400) if wide else (390, 2000)
-    ctx = browser.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=DPR)
-    page = ctx.new_page()
-    _login(page, base, DEMO_EMAIL, password)
-    page.goto(base + "/arb/", wait_until="networkidle")
-    page.wait_for_timeout(2500)
-    _dismiss_onboarding(page)
-    _tidy(page)
-    text = page.inner_text("body")
-    if re.search(r"Cycle time\s*—", text):
-        raise SystemExit("arb: cycle time reads an em dash; run seed-demo-company first")
-    main = _box(page, "main")
-    if wide:
-        h1 = _box(page, "h1")
-        chart = _card(page, "Review status")
-        x = h1["x"]
-        width = (main["x"] + main["width"]) - x - 24
-        top, bottom = h1["y"] - 16, chart["y"] + chart["height"] + 4
-    else:
-        first = _card(page, "Total reviews")
-        last = _card(page, "Cycle time")
-        x = first["x"] - 4
-        width = first["width"] + 8
-        top, bottom = first["y"] - 8, last["y"] + last["height"] + 8
-    clip = {"x": x, "y": top, "width": width, "height": bottom - top}
-    name = "arb.webp" if wide else "arb-mobile.webp"
-    size = _webp(_shoot(page, clip), IMG / "modules" / name)
-    ctx.close()
-    return size
-
-
 def capture_home_impact(browser, base, password, wide: bool) -> tuple[int, int]:
     """The 'what breaks if this fails' answer: the twin map centred on one system.
 
@@ -297,7 +265,6 @@ def main() -> int:
                 ("home impact answer", capture_home_impact),
                 ("home product window", capture_home_product),
                 ("applications", capture_applications),
-                ("arb", capture_arb),
             ):
                 for wide in (True, False):
                     w, h = fn(browser, args.base, password, wide)

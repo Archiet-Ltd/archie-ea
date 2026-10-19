@@ -24,6 +24,7 @@ from app.models.application_rationalization import (
     ScoringConfiguration,
     TIME_TO_DISPOSITION,
 )
+from app.config.abacus_field_mapping import LIFECYCLE_STATUS_MAP, normalize_lifecycle_status
 from app.models.cost_intelligence import CapabilityCostAllocation
 
 # Correct association table name (application ↔ vendor products)
@@ -458,32 +459,16 @@ class RationalizationScoringService:
             "missing_critical": missing_critical,
         }
 
-    # ── RATA-001: Abacus lifecycle_status → canonical lifecycle mapping ──
-    # Actual Abacus values: "2.1 STRATEGIC" (283), "5. DECOMMISSIONED" (361),
-    # "2.2 TACTICAL" (106), "1. UNDETERMINED" (29), "3. SUNSET" (28),
-    # "4.1 DECOM DECIDED" (21), "4.2 DECOM PLANNED" (7), "4.3 READ-ONLY" (7),
-    # "4.4 STOPPED" (2). All 844 apps have lifecycle_status set.
-    ABACUS_LIFECYCLE_MAP = {
-        "2.1 STRATEGIC": "operational",
-        "2.2 TACTICAL": "operational",
-        "1. UNDETERMINED": "operational",
-        "3. SUNSET": "deprecated",
-        "4.1 DECOM DECIDED": "deprecated",
-        "4.2 DECOM PLANNED": "deprecated",
-        "4.3 READ-ONLY": "deprecated",
-        "4.4 STOPPED": "deprecated",
-        "5. DECOMMISSIONED": "deprecated",
-    }
-
-    # All Abacus lifecycle values that should be included in scoring
-    SCOREABLE_LIFECYCLE_VALUES = [
-        # Canonical values (normalized by Abacus connector)
-        "operational", "testing", "development", "deprecated", "retired", "planning",
-        # Abacus raw values (before normalization)
-        "2.1 STRATEGIC", "2.2 TACTICAL", "1. UNDETERMINED",
-        "3. SUNSET", "4.1 DECOM DECIDED", "4.2 DECOM PLANNED",
-        "4.3 READ-ONLY", "4.4 STOPPED", "5. DECOMMISSIONED",
-    ]
+    # All lifecycle_status values that should be included in scoring, lower-
+    # cased for use with db.func.lower(...).in_(...) SQL filters against
+    # ApplicationComponent.lifecycle_status: the column holds a mix of upper-
+    # and lower-case Abacus codes ("2.1 STRATEGIC" and "2.1 strategic" both
+    # occur), so an exact-case filter silently excludes whichever case
+    # convention it doesn't list. Derived from the one canonical mapping in
+    # app.config.abacus_field_mapping (LIFECYCLE_STATUS_MAP /
+    # normalize_lifecycle_status) rather than kept as a second, independent
+    # list that can drift out of agreement with it.
+    SCOREABLE_LIFECYCLE_VALUES = frozenset(LIFECYCLE_STATUS_MAP.keys())
 
     DEPLOYMENT_TO_LIFECYCLE = {
         "Production": "operational",
@@ -501,17 +486,21 @@ class RationalizationScoringService:
             lifecycle: str — the canonical lifecycle status
             data_quality_flag: bool — True if the mapping is uncertain
         """
-        # Check lifecycle_status first (may be Abacus code or canonical value)
+        # Check lifecycle_status first (may be an Abacus code in either case
+        # convention -- "2.1 STRATEGIC" and "2.1 strategic" both occur -- or
+        # an already-canonical value). normalize_lifecycle_status lower-cases
+        # before the lookup, so both conventions resolve the same way;
+        # data_quality_flag is derived independently, from whether the value
+        # is actually a recognized key rather than from
+        # normalize_lifecycle_status's own silent "operational" default for
+        # anything unrecognized.
         ls = (app.lifecycle_status or "").strip()
         if ls:
-            abacus_map = RationalizationScoringService.ABACUS_LIFECYCLE_MAP
-            if ls in abacus_map:
-                return {"lifecycle": abacus_map[ls], "data_quality_flag": False}
-            # Already a canonical value
-            if ls in ("operational", "testing", "development", "deprecated", "retired", "planning"):
-                return {"lifecycle": ls, "data_quality_flag": False}
-            # Unknown lifecycle value — treat as operational with flag
-            return {"lifecycle": "operational", "data_quality_flag": True}
+            recognized = ls.lower() in LIFECYCLE_STATUS_MAP
+            return {
+                "lifecycle": normalize_lifecycle_status(ls),
+                "data_quality_flag": not recognized,
+            }
 
         # Fall back to deployment_status mapping
         ds = (app.deployment_status or "").strip()
@@ -1660,11 +1649,11 @@ class RationalizationScoringService:
             "operational": 20, "testing": 15, "development": 10,
             "planning": 5, "deprecated": -15, "retired": -30,
         }
-        # Normalise Abacus codes → canonical lifecycle before scoring.
-        # ABACUS_LIFECYCLE_MAP handles "2.1 STRATEGIC" → "operational",
-        # "5. DECOMMISSIONED" → "deprecated", etc. Without this, all Abacus
-        # apps get 0 lifecycle delta because the raw codes don't match the
-        # lifecycle_scores keys.
+        # Normalise Abacus codes → canonical lifecycle before scoring, via
+        # the canonical LIFECYCLE_STATUS_MAP ("2.1 STRATEGIC" → "operational",
+        # "5. DECOMMISSIONED" → "retired", etc., in _map_deployment_to_lifecycle
+        # below). Without this, all Abacus apps get 0 lifecycle delta because
+        # the raw codes don't match the lifecycle_scores keys.
         lifecycle_info = RationalizationScoringService._map_deployment_to_lifecycle(app)
         canonical_lifecycle = lifecycle_info["lifecycle"]
         lifecycle_delta = lifecycle_scores.get(canonical_lifecycle, 0)
@@ -3102,14 +3091,15 @@ class RationalizationScoringService:
             Summary statistics and processing results
         """
         try:
-            # Get all active applications — RATA-001: include Abacus lifecycle codes
-            # Production data uses codes like "2.1 STRATEGIC", "5. DECOMMISSIONED"
+            # Get all active applications — include Abacus lifecycle codes
+            # regardless of case ("2.1 STRATEGIC" and "2.1 strategic" both
+            # occur in production data; see SCOREABLE_LIFECYCLE_VALUES).
             scoreable = RationalizationScoringService.SCOREABLE_LIFECYCLE_VALUES
             apps = ApplicationComponent.query.options(
                 joinedload(ApplicationComponent.vendor_products)
             ).filter(
                 db.or_(
-                    ApplicationComponent.lifecycle_status.in_(scoreable),
+                    db.func.lower(ApplicationComponent.lifecycle_status).in_(scoreable),
                     db.and_(
                         ApplicationComponent.lifecycle_status.is_(None),
                         ApplicationComponent.deployment_status.isnot(None),
@@ -3244,8 +3234,8 @@ class RationalizationScoringService:
                         ApplicationRationalizationScore.rationalization_action == "ELIMINATE",
                         ApplicationRationalizationScore.overall_health_score < min_score_threshold,
                     ),
-                    # RATA-001: include Abacus lifecycle codes for active apps
-                    ApplicationComponent.lifecycle_status.in_(
+                    # Include Abacus lifecycle codes for active apps, regardless of case
+                    db.func.lower(ApplicationComponent.lifecycle_status).in_(
                         RationalizationScoringService.SCOREABLE_LIFECYCLE_VALUES
                     ),
                 )
