@@ -1508,6 +1508,33 @@ class MultiDomainChatService:
                 }
         return None
 
+    def _refuse_chat_write(self, action_name: str, message: str = ""):
+        """Write-permission gate for the chat paths that write directly.
+
+        Returns None when the acting user may write; otherwise the refusal
+        (already recorded in the audit log) to return in place of the write.
+        """
+        from app.modules.ai_chat.tools.executor import refuse_unless_can_write
+
+        user_id = self.user_id
+        if user_id is None:
+            # Some callers build the service without a user; the signed-in
+            # person is still the one writing. No user at all fails closed.
+            from flask_login import current_user
+
+            user_id = getattr(current_user, "id", None) if current_user else None
+        refused = refuse_unless_can_write(
+            user_id, action_name, {"message": message or ""}, via="chat_nl"
+        )
+        if refused is None:
+            return None
+        return {
+            "success": False,
+            "response": refused["error"],
+            "permission_denied": True,
+            "code": refused["code"],
+        }
+
     def detect_and_handle_crud_operation(
         self, message: str, domain: str, context: Dict, user_id: Optional[int] = None
     ) -> Optional[Dict[str, Any]]:
@@ -1907,6 +1934,9 @@ class MultiDomainChatService:
             "link capabilities to", "add capabilities to",
         ]
         if any(pattern in message_lower for pattern in _CAP_LINK_TRIGGERS):
+            refusal = self._refuse_chat_write("link_capability_to_solution", message)
+            if refusal:
+                return refusal
             resolved = self._resolve_entities_from_message(message)
             found_caps = resolved.get("capabilities", [])
             # Try to extract solution name — look for "to <solution>"
@@ -2014,6 +2044,9 @@ class MultiDomainChatService:
                 confidence = llm_result["confidence"]
                 action = llm_result.get("action", "none")
                 if confidence >= 0.7 and action == "link":
+                    refusal = self._refuse_chat_write("link_capability_to_solution", message)
+                    if refusal:
+                        return refusal
                     # Resolve entities and create mapping (same logic as keyword path)
                     from app.models.solution_models import Solution, SolutionCapabilityMapping
                     resolved = self._resolve_entities_from_message(message)
@@ -8468,6 +8501,11 @@ End with: "Type **'next'** to complete the design workflow."
                         "- **'cancel'** to exit"
                     ),
                 }
+
+            refusal = self._refuse_chat_write("link_capability_to_solution", message)
+            if refusal:
+                flask_session.pop("_cap_design_workflow_state", None)
+                return refusal
 
             # Create mappings
             from app.models.solution_models import SolutionCapabilityMapping

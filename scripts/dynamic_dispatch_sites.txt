@@ -1,0 +1,26 @@
+# Reviewed dynamic-dispatch model reads: file:line, one per line, reason after '#'.
+# Checked by scripts/check_untenanted_reads.py and scripts/check_tenant_scoping.py (shared list).
+# A read whose model is chosen at runtime (REGISTRY[key].query, session.get(cls, id) with
+# cls = _import_model(...), getattr(mod, name).query) is a finding unless listed here or
+# marked `tenant-scoping-ok: <reason>` on the statement. Listing a site is a decision that
+# every model it can reach is fenced (TenantMixin), global reference data, or reached only
+# after the caller has checked tenancy. Line numbers move with edits: re-list a site you move.
+#
+# --- Accepted: every model the site can reach is fenced or global -----------------------
+app/services/portfolio_search_service.py:377  # _MODEL_MAP is five models: ApplicationComponent, BusinessCapability, ArchiMateElement, Solution (all fenced) and VendorOrganization (global catalogue). session.get is tenant-scoped on an identity-map miss only; entity_id is caller-supplied, so callers must still validate it (see the sweep report).
+app/services/architecture_assistant_service.py:1773  # three candidate modules, all resolving to ApplicationComponent (fenced); looks the referenced application up by id to confirm it exists.
+app/modules/ai_chat/services/context_aware_ai_helper.py:375  # selects a column of the model passed by the caller; both callers pass ApplicationComponent or UnifiedCapability (fenced); column is resolved with getattr, not the model.
+app/services/query_optimization_service.py:254  # optimize_count_queries(model, column): model is a parameter, there is no caller in the tree; the model is whatever a future caller passes and is fenced at execution if it inherits TenantMixin.
+app/services/query_optimization_service.py:183  # BatchQueryExecutor.execute: models come from add_query(); no caller in the tree.
+app/modules/admin/v2/services/seed_management_service_v2.py:135  # record counts of the seeded reference catalogues; reached from a platform-admin route (admin_routes seed management).
+app/services/seed_management_service.py:139  # same seed-category count as the v2 service; counts only, no rows returned. Called from the older admin routes, whose role guard was not re-checked here.
+#
+# --- Open: reaches an unfenced model. Listed so the gate can go live; NOT accepted. -----
+# Each needs a fix or a written decision; do not copy these as precedent.
+app/services/solution_archimate_sync_service.py:196  # OPEN: SYNC_MAP reaches ConstraintElement, which has no TenantMixin and no organisation column, and the lookup matches by name, so a same-named constraint of another organisation can be returned as the existing element.
+app/services/tree_service.py:301  # OPEN: TREE_REGISTRY reaches ComplianceRequirement, PortfolioInitiative, SystemBoundary, Task, VendorCapabilityHierarchy, VendorProcessHierarchy, ProductTaxonomy and RequiredCapability, none fenced; fix is the tree-service urgent brief.
+app/services/tree_service.py:336  # OPEN: as above (get_node).
+app/services/tree_service.py:365  # OPEN: as above (create_node).
+app/services/tree_service.py:388  # OPEN: as above (update_node).
+app/services/tree_service.py:415  # OPEN: as above (delete_node).
+app/services/tree_service.py:420  # OPEN: as above (delete_node query).

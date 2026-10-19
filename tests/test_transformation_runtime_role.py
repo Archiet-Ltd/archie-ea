@@ -2219,7 +2219,7 @@ def test_role_bootstrap_after_guards_preserves_exact_runtime_acl(
         "command_idempotency_records": (True, False, False, False, False),
         "command_materialisations": (True, False, False, False, False),
         "operation_results": (True, False, False, False, False),
-        "transformation_outbox_events": (True, False, False, False, False),
+        "transformation_outbox_events": (True, True, False, False, False),
         "candidate_overlap_dispositions": (True, False, False, False, False),
         "evidence_records": (True, True, False, False, False),
         "evidence_claim_heads": (True, True, False, False, False),
