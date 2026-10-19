@@ -1481,8 +1481,8 @@ let ComposerRenderer = (function() {
                 let ink = plain ? plainInk() : null;
                 link.appendLabel({
                     attrs: {
-                        text: Object.assign({ text: text, fontSize: plain ? 11 : 10, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif', fill: plain ? ink.text : '#1a1a1a' }, plain ? { textTransform: 'uppercase' } : {}),
-                        rect: { fill: plain ? ink.badgeFill : '#fff', stroke: plain ? ink.stroke : '#1a1a1a', strokeWidth: plain ? 1 : 0.5, strokeDasharray: plain ? '' : '3,2', rx: plain ? 6 : 3, ry: plain ? 6 : 3, ref: 'text', refWidth: 8, refHeight: 4, refX: -4, refY: -2 },
+                        text: Object.assign({ text: text, fontSize: plain ? 11 : 10, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif', fill: plain ? ink.text : '#1a1a1a' }, plain ? { style: { textTransform: 'uppercase' } } : {}),
+                        rect: Object.assign({ fill: plain ? ink.badgeFill : '#fff', stroke: plain ? ink.stroke : '#1a1a1a', strokeWidth: plain ? 1 : 0.5, strokeDasharray: plain ? '' : '3,2', rx: plain ? 6 : 3, ry: plain ? 6 : 3 }, plain ? { x: -(text.length * 7.6 + 16) / 2, y: -10, width: text.length * 7.6 + 16, height: 20 } : { ref: 'text', refWidth: 8, refHeight: 4, refX: -4, refY: -2 }),
                     },
                     position: { distance: 0.5, offset: plain ? 0 : 14 },
                 });
@@ -1624,6 +1624,7 @@ let ComposerRenderer = (function() {
             zone.attr('label/fontSize', 10);
             zone.attr('label/fontWeight', 600);
             zone.attr('label/letterSpacing', '0.08em');
+            zone.attr('label/style', { textTransform: 'uppercase' });
         }
 
         function paintPlainNode(node, ringed) {
@@ -1671,7 +1672,7 @@ let ComposerRenderer = (function() {
             let labels = link.labels();
             if (!labels.length) return;
             let text = labels[0].attrs && labels[0].attrs.text ? String(labels[0].attrs.text.text) : '';
-            let bw = text.length * 7.4 + 12, bh = 20;
+            let bw = text.length * 7.6 + 16, bh = 20;
             let pts = plan.line;
             let lens = [0];
             for (let i = 1; i < pts.length; i++) lens.push(lens[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
