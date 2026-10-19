@@ -75,6 +75,11 @@ def _config(response):
     return keys, values
 
 
+def _stable(response):
+    """The page body with per-request tokens (CSRF, nonces, request ids) masked out."""
+    return re.sub(r"[A-Za-z0-9_.\-]{20,}", "X", response.get_data(as_text=True))
+
+
 def test_own_element_renders_with_focus_config(world):
     response = world["get"]("?element=%s" % world["own"])
     assert response.status_code == 200
@@ -91,7 +96,7 @@ def test_other_organisation_and_missing_ids_are_the_same_404(world):
     missing = world["get"]("?element=%s" % world["missing"])
     assert foreign.status_code == 404
     assert missing.status_code == 404
-    assert foreign.get_data() == missing.get_data()
+    assert _stable(foreign) == _stable(missing)
 
 
 @pytest.mark.parametrize(
