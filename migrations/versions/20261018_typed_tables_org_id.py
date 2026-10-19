@@ -104,9 +104,25 @@ def upgrade():
         else:
             op.alter_column(table, "organization_id", existing_type=sa.Integer(), nullable=False)
         op.create_index(f"ix_{table}_organization_id", table, ["organization_id"], if_not_exists=True)
-        fk = f"fk_{table}_organization_id"
-        if not bind.execute(text("SELECT 1 FROM pg_constraint WHERE conname = :n"), {"n": fk}).scalar():
-            op.create_foreign_key(fk, table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE")
+        # Detect by column, not by name: on a database where ensure_baseline_schema
+        # (migrations/versions/20260926_baseline.py) already built this table from
+        # today's models -- which now carry TenantMixin for these six tables -- the
+        # column arrives with its own, differently-named foreign key already in
+        # place. Checking only for fk_{table}_organization_id missed that one and
+        # created a second foreign key beside it on every one of the six tables.
+        has_fk = bind.execute(
+            text(
+                "SELECT 1 FROM pg_constraint con "
+                "JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = ANY (con.conkey) "
+                "WHERE con.contype = 'f' AND con.conrelid = to_regclass(:t) "
+                "AND att.attname = 'organization_id'"
+            ),
+            {"t": f"public.{table}"},
+        ).scalar()
+        if not has_fk:
+            op.create_foreign_key(
+                f"fk_{table}_organization_id", table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE"
+            )
 
 
 def downgrade():
