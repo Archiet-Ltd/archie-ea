@@ -47,7 +47,7 @@
                 <div id="approval-modal" hidden role="dialog" aria-modal="true" aria-labelledby="approval-modal-title" class="modal-root fixed inset-0 z-50 items-center justify-center p-4">
                     <div data-modal-backdrop="approval-modal" class="absolute inset-0 bg-slate-900/50" aria-hidden="true"></div>
                     <div data-modal-panel class="relative w-full max-w-md bg-background border border-border rounded-lg p-6">
-                        <h3 id="approval-modal-title" class="text-base font-semibold text-foreground mb-2">Approve Workflow Step</h3>
+                        <h3 id="approval-modal-title" class="text-base font-semibold text-foreground text-foreground mb-2">Approve Workflow Step</h3>
                         <p class="text-sm text-muted-foreground mb-4">Provide optional comments for this approval.</p>
                         <form action="{{ url_for('integration.approve_workflow_step', instance_id=instance.id) }}" method="post">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

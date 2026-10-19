@@ -731,16 +731,16 @@
 
   {# AI Map modal — inside the appPortfolio() x-data scope, which owns aiMap state #}
   <div id="ai-map-modal" hidden role="dialog" aria-modal="true" aria-labelledby="ai-map-modal-title"
-    class="modal-root fixed inset-0 z-[1000] bg-black/50 items-center justify-center p-4" data-modal-backdrop="ai-map-modal" aria-hidden="true"
+    class="modal-root fixed inset-0 z-[1000] items-center justify-center p-4 bg-slate-900/50" data-modal-backdrop="ai-map-modal" aria-hidden="true"
     data-testid="ai-map-modal">
-    <div class="bg-card rounded-xl  w-full max-w-lg border flex flex-col max-h-[90vh]">
+    <div class="bg-card rounded-lg w-full max-w-lg border flex flex-col max-h-[90vh] border-border">
       <div class="flex items-center justify-between p-6 border-b shrink-0">
         <div>
-          <h2 id="ai-map-modal-title" class="text-xl font-semibold tracking-[-0.01em]">AI Map Applications</h2>
+          <h2 id="ai-map-modal-title" class="text-base font-semibold text-foreground">AI Map Applications</h2>
           <p class="text-sm text-muted-foreground mt-0.5">Analyze existing applications with AI and propose capability, process and ArchiMate mappings.</p>
         </div>
         <!-- inline-event-ok --><button type="button" @click="closeAiMapModal()" aria-label="Close"
-          class="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center">
+          class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
         </button>
       </div>
@@ -797,7 +797,7 @@
       </div>
       <div class="flex justify-end gap-3 p-6 border-t shrink-0">
         <button type="button" @click="closeAiMapModal()"
-          class="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent" aria-label="Close">Close</button>
+          class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">Close</button>
         <button type="button" x-show="!aiMap.result" x-cloak @click="runAiMap()" :disabled="aiMap.loading"
           class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           data-testid="btn-ai-map-run" aria-label="Run AI analysis">
@@ -820,27 +820,27 @@
 
 {# ─ Create Application Modal ─ #}
 <div id="modal-create" hidden role="dialog" aria-modal="true" aria-labelledby="modal-create-title"
-  class="modal-root fixed inset-0 z-[1000] bg-black/50 items-center justify-center p-4" data-modal-backdrop="modal-create" aria-hidden="true">
-  <div class="bg-card rounded-xl  w-full max-w-lg border flex flex-col max-h-[90vh]">
+  class="modal-root fixed inset-0 z-[1000] items-center justify-center p-4 bg-slate-900/50" data-modal-backdrop="modal-create" aria-hidden="true">
+  <div class="bg-card rounded-lg w-full max-w-lg border flex flex-col max-h-[90vh] border-border">
     <div class="flex items-center justify-between p-6 border-b shrink-0">
       <div>
-        <h2 id="modal-create-title" class="text-xl font-semibold tracking-[-0.01em]">New Application</h2>
+        <h2 id="modal-create-title" class="text-base font-semibold text-foreground">New Application</h2>
         <p class="text-sm text-muted-foreground mt-0.5">Register a new application in the portfolio.</p>
       </div>
       <!-- inline-event-ok --><button type="button" @click="Platform.modal.close('modal-create')" aria-label="Close"
-        class="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center">
+        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
       </button>
     </div>
     <div class="p-6 overflow-y-auto flex-1" x-data="applicationCreateForm()">
       <form @submit.prevent="submit()" class="space-y-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 grid-cols-1 gap-4">
           <div class="sm:col-span-2">
-            <label for="ca-name" class="block text-sm font-medium mb-1">Application Name <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
+            <label for="ca-name" class="block text-sm font-medium text-muted-foreground mb-1">Application Name <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
             <input id="ca-name" type="text" x-model="form.name" @input="scheduleCheck()" required maxlength="255" placeholder="e.g. Customer Portal"
               :aria-invalid="fieldInvalid('name') ? 'true' : 'false'"
               :aria-describedby="fieldInvalid('name') ? 'ca-name-error' : null"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <p x-show="fieldInvalid('name')" x-cloak id="ca-name-error" role="alert" class="mt-1 text-sm text-destructive-emphasis" x-text="fieldErrors.name"></p>
           </div>
           <div class="sm:col-span-2" id="ca-duplicate-check" aria-live="polite">
@@ -856,14 +856,14 @@
             </div></template>
           </div>
           <div>
-            <label for="ca-code" class="block text-sm font-medium mb-1">Application Code</label>
+            <label for="ca-code" class="block text-sm font-medium text-muted-foreground mb-1">Application Code</label>
             <input id="ca-code" type="text" x-model="form.application_code" @input="scheduleCheck()" maxlength="50" placeholder="e.g. CUST-PORTAL"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           </div>
           <div>
-            <label for="ca-type" class="block text-sm font-medium mb-1">Application Type</label>
+            <label for="ca-type" class="block text-sm font-medium text-muted-foreground mb-1">Application Type</label>
             <select id="ca-type" x-model="form.application_type"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <option value="">Select type...</option>
               <option value="application">Application</option>
               <option value="service">Service</option>
@@ -875,9 +875,9 @@
             </select>
           </div>
           <div>
-            <label for="ca-criticality" class="block text-sm font-medium mb-1">Business Criticality</label>
+            <label for="ca-criticality" class="block text-sm font-medium text-muted-foreground mb-1">Business Criticality</label>
             <select id="ca-criticality" x-model="form.business_criticality"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               {#- Values MUST stay inside VALID_CRITICALITY in
                   app/schemas/api_schemas.py. They previously read
                   mission_critical / business_critical / important / standard,
@@ -893,9 +893,9 @@
             </select>
           </div>
           <div>
-            <label for="ca-status" class="block text-sm font-medium mb-1">Deployment Status</label>
+            <label for="ca-status" class="block text-sm font-medium text-muted-foreground mb-1">Deployment Status</label>
             <select id="ca-status" x-model="form.deployment_status"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <option value="">Select...</option>
               <option value="production">Production</option>
               <option value="staging">Staging</option>
@@ -909,9 +909,9 @@
              above, shown on the detail page/filter/Workbench facet, but
              could previously only be set in bulk. #}
           <div>
-            <label for="ca-lifecycle" class="block text-sm font-medium mb-1">Lifecycle Status</label>
+            <label for="ca-lifecycle" class="block text-sm font-medium text-muted-foreground mb-1">Lifecycle Status</label>
             <select id="ca-lifecycle" x-model="form.lifecycle_status"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <option value="">Select...</option>
               {% for opt in filter_options.lifecycle_statuses %}
               <option value="{{ opt.value }}">{{ opt.label }}</option>
@@ -919,10 +919,10 @@
             </select>
           </div>
           <div x-data="userSearchWidget(() => form.business_owner, v => { form.business_owner = v; })" @click.outside="ushow = false">
-            <label for="ca-owner" class="block text-sm font-medium mb-1">Business Owner</label>
+            <label for="ca-owner" class="block text-sm font-medium text-muted-foreground mb-1">Business Owner</label>
             <div class="relative">
               <input id="ca-owner" type="text" x-model="form.business_owner" @input.debounce.300ms="usearch()" maxlength="255" placeholder="Search by name or email..."
-                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" autocomplete="off">
+                class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" autocomplete="off">
               <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md  max-h-40 overflow-y-auto">
                 <template x-for="u in ures" :key="u.id">
                   <button type="button" @click="uselect(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
@@ -934,7 +934,7 @@
             </div>
           </div>
           <div class="sm:col-span-2">
-            <label for="ca-description" class="block text-sm font-medium mb-1">Description</label>
+            <label for="ca-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
             <textarea id="ca-description" x-model="form.description" rows="2" maxlength="2000" placeholder="Brief description"
               class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"></textarea>
           </div>
@@ -942,7 +942,7 @@
         <div x-show="errorMsg" x-cloak class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg" role="alert"></div>
         <div class="flex justify-end gap-3 pt-2 border-t">
           <!-- inline-event-ok --><button type="button" @click="Platform.modal.close('modal-create')"
-            class="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent">Cancel</button>
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
           <button type="submit" :disabled="submitting"
             class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
             <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak aria-hidden="true"></i>
