@@ -31,6 +31,7 @@ from .services.field_configs import (
     get_element_config,
     get_element_field_names,
 )
+from app.services.archimate_backbone import sync_archimate_element
 
 # Application Layer imports
 from app.models.application_layer import (
@@ -1056,26 +1057,17 @@ def create_element(layer, element_type):
             # Set layer-specific fields based on model
             _set_model_fields(element, data, model_class, element_type)
 
-            # Auto-create ArchiMateElement if not provided
-            if not element.archimate_element_id:
-                archimate_element = ArchiMateElement(
-                    name=element.name
-                    if hasattr(element, "name")
-                    else element.title,  # model-safety-ok: polymorphic ArchiMate elements
-                    type=element_type,
-                    layer=_canonical_layer_for_type(element_type, layer).capitalize(),
-                    description=getattr(
-                        element, "description", ""
-                    ),  # model-safety-ok: polymorphic ArchiMate elements
-                )
-                db.session.add(archimate_element)
-                db.session.flush()
-                element.archimate_element_id = archimate_element.id
+            # Create the ArchiMate element via the canonical writer
+            # (app/services/archimate_backbone.py) so organisation, layer and
+            # provenance are set in one place instead of inline here.
+            db.session.add(element)
+            sync_archimate_element(element)
 
             # As-is / to-be state (ArchiMateElement.plateau), if the form set it.
+            # Runs after sync so element.archimate_element_id is populated and the
+            # linked backbone row can be updated.
             _apply_architecture_state(element, data)
 
-            db.session.add(element)
             db.session.commit()
 
             if request.is_json:
@@ -1104,8 +1096,10 @@ def create_element(layer, element_type):
             )
 
             if request.is_json:
+                # Name the missing or invalid field so the caller can fix it,
+                # instead of a generic "invalid parameters" message.
                 return jsonify(
-                    {"success": False, "error": "Invalid request parameters"}
+                    {"success": False, "error": str(e)}
                 ), 400
 
             # f-prefix was missing, so the user was shown the literal text
