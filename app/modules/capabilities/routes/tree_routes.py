@@ -15,7 +15,29 @@ Routes:
 from flask import jsonify, render_template, request
 from flask_login import login_required
 
+from app.decorators import require_roles
+
 from . import capability_map
+
+# One write-role gate for every mutating tree route, matching the generic
+# Elements page (architecture_crud_routes.py): admin or architect. Reads stay
+# open to any signed-in user.
+write_role_required = require_roles("admin", "architect")
+
+
+def _error_status(error, default=400):
+    """Map a tree_service error string to an HTTP status."""
+    from app.services.tree_service import CONFLICT, FORBIDDEN, INVALID
+
+    if error.startswith(FORBIDDEN):
+        return 403
+    if error.startswith(CONFLICT):
+        return 409
+    if error.startswith(INVALID):
+        return 400
+    if error == "Not found":
+        return 404
+    return default
 
 
 @capability_map.route("/trees")
@@ -98,6 +120,7 @@ def api_generic_tree_get_node(key, node_id):
 
 @capability_map.route("/api/trees/<key>", methods=["POST"])
 @login_required
+@write_role_required
 def api_generic_tree_create_node(key):
     """Create a new node in a tree."""
     from app.services.tree_service import TREE_REGISTRY, create_node
@@ -107,12 +130,13 @@ def api_generic_tree_create_node(key):
     data = request.get_json(silent=True) or {}
     node, error = create_node(key, data)
     if error:
-        return jsonify({"error": error}), 400
+        return jsonify({"error": error}), _error_status(error)
     return jsonify(node), 201
 
 
 @capability_map.route("/api/trees/<key>/<int:node_id>", methods=["PATCH"])
 @login_required
+@write_role_required
 def api_generic_tree_update_node(key, node_id):
     """Update a tree node."""
     from app.services.tree_service import TREE_REGISTRY, update_node
@@ -122,13 +146,13 @@ def api_generic_tree_update_node(key, node_id):
     data = request.get_json(silent=True) or {}
     node, error = update_node(key, node_id, data)
     if error:
-        status = 404 if error == "Not found" else 400
-        return jsonify({"error": error}), status
+        return jsonify({"error": error}), _error_status(error)
     return jsonify(node)
 
 
 @capability_map.route("/api/trees/<key>/<int:node_id>", methods=["DELETE"])
 @login_required
+@write_role_required
 def api_generic_tree_delete_node(key, node_id):
     """Delete a tree node (reparents children)."""
     from app.services.tree_service import TREE_REGISTRY, delete_node
@@ -137,7 +161,7 @@ def api_generic_tree_delete_node(key, node_id):
         return jsonify({"error": f"Unknown tree: {key}"}), 404
     error = delete_node(key, node_id)
     if error:
-        return jsonify({"error": error}), 404
+        return jsonify({"error": error}), _error_status(error, 404)
     return jsonify({"success": True})
 
 
