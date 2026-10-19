@@ -48,3 +48,39 @@ def test_reuse_register_names_the_one_drawing_engine():
     assert entry["status"] == "active"
     assert entry["canonical"]["path"] == "app/static/js/archimate/composer_renderer.js"
     assert entry["must_not_create"]
+
+
+def test_connection_style_and_row_alignment_are_opt_in():
+    """Both options are read from the options object behind an exact match, so a caller that
+    passes neither keeps the old routing, labels, dashes, colours and left-aligned rows."""
+    assert "opts.connectionStyle === 'plain'" in RENDERER
+    assert "opts.rowAlign === 'centre'" in RENDERER
+    # every plain-only branch hangs off the one flag
+    assert "let plain = opts.connectionStyle === 'plain';" in RENDERER
+    for fragment in ("if (plain) stylePlainLink(link);", "if (plain) paintPlainLink(l, on);", "if (!plain) return;"):
+        assert fragment in RENDERER, fragment
+    # computeBandLayout's fifth argument is optional and defaults to today's values
+    assert re.search(r"function computeBandLayout\(elements, bands, width, compact, layoutOpts\)", RENDERER)
+    assert "let colGap = lo.colGap != null ? lo.colGap : BAND_GAP;" in RENDERER
+    assert "let header = lo.header != null ? lo.header : BAND_HEADER;" in RENDERER
+
+
+def test_plain_style_does_not_change_the_default_link_builder():
+    """createLink and REL_STYLES are untouched: the plain style restyles a link after it is built."""
+    assert "router: { name: 'manhattan', args: { step: 12, padding: 36 } }" in RENDERER
+    assert "connector: { name: 'rounded', args: { radius: 8 } }" in RENDERER
+    assert re.search(r"function createLink\(sourceCell, targetCell, relType, relId\) \{", RENDERER)
+    assert "humanizeRelType(relType)" in RENDERER
+    assert "'8,4'" in RENDERER  # realization stays dashed in the default style
+
+
+def test_plain_style_names_no_hex_colour_and_no_page():
+    start = RENDERER.index("function plainInk()")
+    end = RENDERER.index("/* Banded layout: draws the zones")
+    block = RENDERER[start:end]
+    assert not re.search(r"#[0-9a-fA-F]{3,8}\b|rgb\(", block)
+    assert "currentColor" in block
+    for token in ("--muted-foreground", "--primary", "--foreground", "--background"):
+        assert token in block
+    assert not re.search(r"twin", RENDERER, re.I)
+    assert "d3." not in RENDERER
