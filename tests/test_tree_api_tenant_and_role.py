@@ -383,8 +383,13 @@ def test_delete_refuses_a_node_whose_child_belongs_to_another_organisation(
     must hold for a plain tenant tree too: a child in another organisation
     is never loaded at all (TenantMixin's own session filter sees to that),
     so without this guard it is silently never reparented and the real
-    foreign key it still carries blocks the delete with an unhandled
-    IntegrityError (500) instead of a handled refusal.
+    foreign key it still carries blocks the delete.
+
+    That real foreign key is a referential conflict, not an authorization
+    refusal -- this caller never even saw the other organisation's child --
+    so the response is a generic 409 with no database text in it, never the
+    403 an explicit tenancy refusal elsewhere in this module uses, and never
+    an unhandled 500 with the database's own exception message attached.
     """
     from flask import g
 
@@ -400,7 +405,15 @@ def test_delete_refuses_a_node_whose_child_belongs_to_another_organisation(
 
     login_as(client, architect_a)
     resp = client.delete(f"{BASE}/{key}/{parent_id}")
-    assert resp.status_code in (400, 403), resp.get_json()
+    assert resp.status_code == 409, resp.get_json()
+
+    error_text = resp.get_json().get("error", "")
+    assert "Key (" not in error_text
+    assert "DETAIL" not in error_text
+    assert "constraint" not in error_text.lower()
+    assert Model.__tablename__ not in error_text
+    assert str(parent_id) not in error_text
+    assert str(child_id) not in error_text
 
     db_session.expire_all()
     g.current_org_id = org_a.id
@@ -558,6 +571,12 @@ class TestReferenceCapabilityTree:
         caller's organisation must refuse the whole delete instead of
         reparenting what it can see and destroying or mutating what it
         cannot.
+
+        This refusal is an explicit, genuine tenancy check (``delete_node``
+        counts the child before any write is attempted), not a database
+        exception -- it stays 403, and its message was always a static
+        string with nothing of the database's own in it; asserted here too
+        so a future change cannot quietly start interpolating one.
         """
         from app.models.reference_models import ReferenceModelCapability
 
@@ -571,6 +590,14 @@ class TestReferenceCapabilityTree:
         login_as(client, architect_a)
         resp = client.delete(f"{BASE}/reference_capability/{parent.id}")
         assert resp.status_code == 403
+
+        error_text = resp.get_json().get("error", "")
+        assert "Key (" not in error_text
+        assert "DETAIL" not in error_text
+        assert "constraint" not in error_text.lower()
+        assert ReferenceModelCapability.__tablename__ not in error_text
+        assert str(parent.id) not in error_text
+        assert str(other_org_child.id) not in error_text
 
         db_session.expire_all()
         assert db_session.get(ReferenceModelCapability, parent.id) is not None
@@ -702,3 +729,75 @@ def test_created_node_belongs_to_the_callers_organisation(
 
     g.current_org_id = org_a.id
     assert _model(key).query.get(node_id).organization_id == org_a.id
+
+
+# --------------------------------------------------------------------- #
+# A refused write never echoes the database's own exception text, and is  #
+# classified by its real cause rather than blanket-mapped to FORBIDDEN.   #
+# --------------------------------------------------------------------- #
+
+
+class _FakeDiag:
+    def __init__(self, sqlstate):
+        self.sqlstate = sqlstate
+
+
+class _FakeOrig(Exception):
+    """Stands in for psycopg2's own exception, which exposes the Postgres
+    SQLSTATE as ``.sqlstate``/``.pgcode``/``.diag.sqlstate`` depending on
+    version -- the same three-way fallback already used in
+    app/modules/transformation_room/command_service.py."""
+
+    def __init__(self, sqlstate, detail):
+        super().__init__(detail)
+        self.pgcode = sqlstate
+        self.diag = _FakeDiag(sqlstate)
+
+
+class _FakeIntegrityError(Exception):
+    def __init__(self, sqlstate, detail):
+        super().__init__(detail)
+        self.orig = _FakeOrig(sqlstate, detail)
+
+
+_LEAKY_DETAIL = (
+    'Key (id)=(42) is still referenced from table "widgets".\n'
+    "DETAIL:  constraint widgets_parent_id_fkey"
+)
+
+
+@pytest.mark.parametrize(
+    "sqlstate,expected_prefix",
+    [
+        ("23503", "Conflict"),  # foreign_key_violation
+        ("23505", "Conflict"),  # unique_violation
+        ("23502", "Invalid"),  # not_null_violation
+        ("23514", "Invalid"),  # check_violation
+        ("99999", "Conflict"),  # unrecognised -- generic conflict, never FORBIDDEN
+    ],
+)
+def test_integrity_error_is_classified_and_never_echoes_the_exception(
+    sqlstate, expected_prefix
+):
+    from app.services.tree_service import FORBIDDEN, _integrity_error_message
+
+    message = _integrity_error_message(_FakeIntegrityError(sqlstate, _LEAKY_DETAIL))
+
+    assert message.startswith(expected_prefix)
+    assert not message.startswith(FORBIDDEN)
+    assert "Key (" not in message
+    assert "DETAIL" not in message
+    assert "widgets" not in message
+    assert "42" not in message
+
+
+def test_integrity_error_status_mapping_matches_classification():
+    """_error_status (tree_routes.py) must map CONFLICT/INVALID the same way
+    delete_node/create_node/update_node produce them."""
+    from app.modules.capabilities.routes.tree_routes import _error_status
+    from app.services.tree_service import _integrity_error_message
+
+    assert _error_status(_integrity_error_message(_FakeIntegrityError("23503", _LEAKY_DETAIL))) == 409
+    assert _error_status(_integrity_error_message(_FakeIntegrityError("23505", _LEAKY_DETAIL))) == 409
+    assert _error_status(_integrity_error_message(_FakeIntegrityError("23502", _LEAKY_DETAIL))) == 400
+    assert _error_status(_integrity_error_message(_FakeIntegrityError("23514", _LEAKY_DETAIL))) == 400

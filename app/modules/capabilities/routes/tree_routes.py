@@ -27,10 +27,14 @@ write_role_required = require_roles("admin", "architect")
 
 def _error_status(error, default=400):
     """Map a tree_service error string to an HTTP status."""
-    from app.services.tree_service import FORBIDDEN
+    from app.services.tree_service import CONFLICT, FORBIDDEN, INVALID
 
     if error.startswith(FORBIDDEN):
         return 403
+    if error.startswith(CONFLICT):
+        return 409
+    if error.startswith(INVALID):
+        return 400
     if error == "Not found":
         return 404
     return default

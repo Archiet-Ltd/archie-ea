@@ -9,11 +9,15 @@ Usage:
     # Returns: {"name": "Capabilities", "children": [{id, name, children, ...}, ...]}
 """
 
+import logging
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import StaleDataError
 
 from app import db
 from app.middleware.tenant_context import current_org_id
+
+logger = logging.getLogger(__name__)
 
 
 # ─── Tree Registry ────────────────────────────────────────────────────────────
@@ -293,6 +297,21 @@ HYBRID_TREES = {"capability", "reference_capability"}
 PLATFORM_TREES = {"apqc", "product_taxonomy"}
 
 FORBIDDEN = "Forbidden"
+# A referential or data conflict -- a real foreign key still pointing at the
+# row being removed, or a duplicate value -- as opposed to FORBIDDEN, which is
+# reserved for a genuine authorization/tenancy refusal.
+CONFLICT = "Conflict"
+# The caller's own request data was invalid (a required field missing, or a
+# value a check constraint rejects) -- the caller's mistake, not a refusal.
+INVALID = "Invalid"
+
+# Postgres SQLSTATEs this module classifies a refused IntegrityError by. Uses
+# the same exc.orig / diag.sqlstate extraction already used to classify a
+# database error in app/modules/transformation_room/command_service.py.
+_PG_NOT_NULL_VIOLATION = "23502"
+_PG_FOREIGN_KEY_VIOLATION = "23503"
+_PG_UNIQUE_VIOLATION = "23505"
+_PG_CHECK_VIOLATION = "23514"
 
 
 def tree_scope(tree_key):
@@ -382,51 +401,98 @@ def _optimistic_lock_aware(Model):
     ``StaleDataError`` for a reason that has nothing to do with tenancy.
 
     ``_commit()``/``delete_node`` otherwise treat ``StaleDataError`` as proof
-    a write was silently refused by row-level security (zero rows matched an
-    UPDATE/DELETE that targeted exactly one by primary key) and report it as
-    FORBIDDEN. A model mapped with ``version_id_col`` (``OptimisticLockMixin``)
+    that the row a flush expected to touch (zero rows matched an UPDATE/
+    DELETE that targeted exactly one by primary key) is no longer there to
+    write -- this caller's own load already proved tenancy and ownership, so
+    what changed since is someone else's concurrent write, not a refusal of
+    this one. A model mapped with ``version_id_col`` (``OptimisticLockMixin``)
     raises the identical exception shape for an ordinary lost-update race
-    with no RLS involved at all, so that reason must not be assumed here.
+    with no row disappearing at all, so that reason must not be assumed here.
     """
     from app.models.mixins import OptimisticLockMixin
 
     return issubclass(Model, OptimisticLockMixin)
 
 
+def _integrity_error_message(exc):
+    """Classify a refused ``IntegrityError`` by its real Postgres cause.
+
+    Never put ``exc`` itself, or anything derived from its DETAIL text, in
+    the message returned here -- it is raw server-side content (table and
+    column names, the row ids involved) that must not reach an API client.
+    The caller already logs the real exception before calling this.
+
+    A foreign key still pointing at the row this write is removing -- the
+    cross-organisation-child-still-exists case ``delete_node`` guards -- is a
+    referential conflict, not an authorization refusal, so it is reported as
+    CONFLICT rather than FORBIDDEN; so is a duplicate value. A missing
+    required field or a rejected check constraint is the caller's own bad
+    input (INVALID), not a conflict with existing data.
+    """
+    orig = getattr(exc, "orig", None)
+    sqlstate = (
+        getattr(orig, "sqlstate", None)
+        or getattr(orig, "pgcode", None)
+        or getattr(getattr(orig, "diag", None), "sqlstate", None)
+    )
+    if sqlstate in (_PG_NOT_NULL_VIOLATION, _PG_CHECK_VIOLATION):
+        return f"{INVALID}: a required field is missing or not allowed"
+    if sqlstate == _PG_FOREIGN_KEY_VIOLATION:
+        return f"{CONFLICT}: this node still has something referencing it"
+    if sqlstate == _PG_UNIQUE_VIOLATION:
+        return f"{CONFLICT}: a conflicting record already exists"
+    return f"{CONFLICT}: this write could not be completed"
+
+
 def _commit(Model=None):
-    """Commit; a refused reference/cross-organisation write becomes FORBIDDEN.
+    """Commit; a refused reference/cross-organisation write is reported as
+    FORBIDDEN, CONFLICT or INVALID depending on its real cause -- never as a
+    server defect worth a 500, and never by repeating the database's own
+    exception text back to the caller.
 
-    Three distinct shapes land here for the same underlying reason -- a
-    write this caller may not make -- and none is a server defect worth a
-    500: ``PermissionError``, raised by application code;
-    ``StaleDataError``, raised by the ORM's own flush when an UPDATE/DELETE
-    it expected to touch one row instead matched zero, because row-level
-    security silently excluded that row from its own WHERE clause rather
-    than raising (a shared reference row a reparenting delete tried to write
-    through, for instance); and ``IntegrityError``, raised by a real foreign
-    key still pointing at the row this delete is removing -- a child in
-    another organisation (or, under TenantMixin's own session filter, simply
-    not loaded at all to be reparented in the first place) that this
-    caller's session could not see to reparent, let alone exclude from the
-    delete it is now blocking. See ``delete_node``.
+    Three distinct shapes land here for the same broad reason -- a write
+    this caller may not make, or may not make right now: ``PermissionError``,
+    raised by application code with its own safe, static message (FORBIDDEN);
+    ``IntegrityError``, raised by a real constraint this write violated --
+    classified by ``_integrity_error_message`` rather than blanket-mapped to
+    FORBIDDEN, because most of what lands here is a foreign key still
+    pointing at the row this delete is removing (a child in another
+    organisation, or, under TenantMixin's own session filter, simply not
+    loaded at all to be reparented in the first place) that this caller's
+    session could not see to reparent, let alone exclude from the delete it
+    is now blocking -- a referential conflict, not an authorization refusal
+    (see ``delete_node``); and ``StaleDataError``, raised by the ORM's own
+    flush when an UPDATE/DELETE it expected to touch one row instead matched
+    zero. This caller's own ``_load()`` already proved it may see and own
+    that row, so a ``StaleDataError`` reaching here -- for a model that is
+    not ``_optimistic_lock_aware`` -- means the row was removed by someone
+    else between that load and this commit, reported as "Not found" (404),
+    not a refusal of this caller's own write.
 
-    A ``StaleDataError`` is only ever treated as one of those three when
-    ``Model`` is not ``_optimistic_lock_aware`` -- UnifiedCapability (the
-    ``capability`` tree) carries its own version column, and a genuine lost
-    update there must reach the app-wide ``StaleDataError`` handler
-    (``app/_bootstrap/extensions.py``, which answers 409 Conflict with a
-    reload-and-retry message) rather than being mislabelled a 403 here.
+    A ``StaleDataError`` is only ever treated that way when ``Model`` is not
+    ``_optimistic_lock_aware`` -- UnifiedCapability (the ``capability`` tree)
+    carries its own version column, and a genuine lost update there must
+    reach the app-wide ``StaleDataError`` handler (``app/_bootstrap/
+    extensions.py``, which answers 409 Conflict with a reload-and-retry
+    message) rather than being mislabelled here.
     """
     try:
         db.session.commit()
-    except (PermissionError, IntegrityError) as exc:
+    except PermissionError as exc:
         db.session.rollback()
         return f"{FORBIDDEN}: {exc}"
-    except StaleDataError as exc:
+    except IntegrityError as exc:
+        db.session.rollback()
+        logger.exception("Tree write refused: database integrity error")
+        return _integrity_error_message(exc)
+    except StaleDataError:
         db.session.rollback()
         if Model is not None and _optimistic_lock_aware(Model):
             raise
-        return f"{FORBIDDEN}: {exc}"
+        logger.exception(
+            "Tree write refused: row no longer matches what this request loaded"
+        )
+        return "Not found"
     return None
 
 
@@ -650,19 +716,29 @@ def delete_node(tree_key, node_id):
         # and expiring row's own cached state forces SQLAlchemy to re-read
         # its relationships from the database, which now shows no
         # children left, before the delete (and its now-empty cascade) is
-        # issued. Any row-level-security rejection of this flush, or a real
-        # foreign key a child outside this session's visibility still
-        # holds, is handled the same way _commit() below handles one at the
+        # issued. Any rejection of this flush -- a real foreign key a child
+        # outside this session's visibility still holds, or that child
+        # having been removed by someone else since it was loaded above --
+        # is classified the same way _commit() below classifies one at the
         # final commit.
         db.session.flush()
-    except (PermissionError, IntegrityError) as exc:
+    except PermissionError as exc:
         db.session.rollback()
         return f"{FORBIDDEN}: {exc}"
-    except StaleDataError as exc:
+    except IntegrityError as exc:
+        db.session.rollback()
+        logger.exception(
+            "Tree delete refused: database integrity error while reparenting children"
+        )
+        return _integrity_error_message(exc)
+    except StaleDataError:
         db.session.rollback()
         if _optimistic_lock_aware(Model):
             raise
-        return f"{FORBIDDEN}: {exc}"
+        logger.exception(
+            "Tree delete refused: a child row no longer matches what this request loaded"
+        )
+        return "Not found"
     db.session.expire(row)
 
     db.session.delete(row)
