@@ -21,6 +21,7 @@ from flask_login import login_required
 from sqlalchemy import or_
 
 from app import db
+from app.decorators import require_roles
 from app.utils.tenant_users import escape_like_literal
 from . import archimate_crud
 from .services.ai_generation_service import AIGenerationService
@@ -112,6 +113,11 @@ import logging
 from app.utils.pagination import safe_int_arg
 
 logger = logging.getLogger(__name__)
+
+# One write-role gate for every mutating route in this module, matching the
+# generic Elements page (architecture_crud_routes.py): admin or architect.
+# Reads stay open to any signed-in user.
+write_role_required = require_roles("admin", "architect")
 
 # Model registry mapping element types to model classes
 MODEL_REGISTRY = {
@@ -1016,6 +1022,7 @@ def _selected_layer_for(layer):
 
 @archimate_crud.route(f"/{_LAYER_URL_PATTERN}/<element_type>/new", methods=["GET", "POST"])
 @login_required
+@write_role_required
 def create_element(layer, element_type):
     """Create a new element"""
     model_class = MODEL_REGISTRY.get(element_type)
@@ -1137,13 +1144,15 @@ def detail_element(layer, element_type, element_id):
         abort(404)
     model_class = MODEL_REGISTRY.get(element_type)
 
+    # filter_by always emits SQL, so the tenant filter applies even when the row
+    # is already in the session identity map (Query.get would skip it).
     element = None
     if model_class:
-        element = model_class.query.get(element_id)
+        element = model_class.query.filter_by(id=element_id).first()
 
     # Fall back to archimate_elements table (native ArchiMate elements)
     if element is None:
-        element = ArchiMateElement.query.get_or_404(element_id)
+        element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
         model_class = ArchiMateElement
 
     # Get relationships
@@ -1179,6 +1188,7 @@ def detail_element(layer, element_type, element_id):
     f"/{_LAYER_URL_PATTERN}/<element_type>/<int:element_id>/edit", methods=["GET", "POST"]
 )
 @login_required
+@write_role_required
 def update_element(layer, element_type, element_id):
     """Update an element"""
     model_class = MODEL_REGISTRY.get(element_type)
@@ -1187,11 +1197,11 @@ def update_element(layer, element_type, element_id):
         flash(f"Element type {element_type} is not yet supported", "warning")
         return redirect(url_for("archimate_crud.dashboard"))
 
-    element = model_class.query.get(element_id)
+    element = model_class.query.filter_by(id=element_id).first()
     # Fall back to archimate_elements for elements stored there directly
     _from_ae = False
     if element is None:
-        element = ArchiMateElement.query.get(element_id)
+        element = ArchiMateElement.query.filter_by(id=element_id).first()
         _from_ae = True
     if element is None:
         if request.is_json:
@@ -1335,6 +1345,7 @@ def _record_element_update(before, after):
     f"/{_LAYER_URL_PATTERN}/<element_type>/<int:element_id>/delete", methods=["POST"]
 )
 @login_required
+@write_role_required
 def delete_element(layer, element_type, element_id):
     """Delete an element"""
     model_class = MODEL_REGISTRY.get(element_type)
@@ -1347,11 +1358,11 @@ def delete_element(layer, element_type, element_id):
         flash(f"Element type {element_type} is not yet supported", "warning")
         return redirect(url_for("archimate_crud.dashboard"))
 
-    element = model_class.query.get(element_id)
+    element = model_class.query.filter_by(id=element_id).first()
     # Fall back to archimate_elements for elements stored there directly
     _from_ae = False
     if element is None:
-        element = ArchiMateElement.query.get(element_id)
+        element = ArchiMateElement.query.filter_by(id=element_id).first()
         _from_ae = True
     if element is None:
         if request.is_json:
@@ -1470,7 +1481,7 @@ def validate_archimate_model():
 def validate_archimate_element(element_id):
     """Validate a single ArchiMate element against ArchiMate 3.2 metamodel rules."""
     from app.modules.architecture.services.archimate_validation_service import ArchiMateValidationService
-    element = ArchiMateElement.query.get_or_404(element_id)
+    element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
     service = ArchiMateValidationService()
     issues = service.validate_element(element)
     return jsonify({'issues': issues, 'valid': len(issues) == 0})
@@ -1478,6 +1489,7 @@ def validate_archimate_element(element_id):
 
 @archimate_crud.route(f"/{_LAYER_URL_PATTERN}/<element_type>/bulk-delete", methods=["POST"])
 @login_required
+@write_role_required
 def bulk_delete(layer, element_type):
     """Bulk delete elements"""
     model_class = MODEL_REGISTRY.get(element_type)
@@ -1494,7 +1506,7 @@ def bulk_delete(layer, element_type):
     try:
         deleted_count = 0
         for element_id in element_ids:
-            element = model_class.query.get(element_id)
+            element = model_class.query.filter_by(id=element_id).first()
             if element:
                 # Delete linked ArchiMateElement
                 if element.archimate_element_id:
@@ -1596,6 +1608,7 @@ def export_elements(layer, element_type):
 
 @archimate_crud.route(f"/{_LAYER_URL_PATTERN}/<element_type>/ai-generate", methods=["POST"])
 @login_required
+@write_role_required
 def ai_generate(layer, element_type):
     """AI-powered element generation from documents/internet"""
     try:
@@ -1628,7 +1641,9 @@ def element_relationships(layer, element_type, element_id):
     if not model_class:
         return jsonify({"success": False, "error": "Element type not supported"}), 400
 
-    element = model_class.query.get_or_404(element_id)
+    # filter_by always emits SQL, so the tenant filter applies even when the row
+    # is already in the session identity map (Query.get would skip it).
+    element = model_class.query.filter_by(id=element_id).first_or_404()
     relationships = _get_element_relationships(element, element_id)
 
     return jsonify({"success": True, "relationships": relationships})
@@ -1641,7 +1656,9 @@ def api_element_detail(element_id):
 
     Returns element fields, outgoing/incoming relationships, and solution linkages.
     """
-    element = ArchiMateElement.query.get_or_404(element_id)
+    # filter_by always emits SQL, so the tenant filter applies even when the row
+    # is already in the session identity map (Query.get would skip it).
+    element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
 
     outgoing = []
     for rel in ArchiMateRelationship.query.filter_by(source_id=element_id).limit(50).all():
@@ -1697,9 +1714,10 @@ def api_element_detail(element_id):
 
 @archimate_crud.route("/api/elements/<int:element_id>", methods=["PATCH"])
 @login_required
+@write_role_required
 def api_element_patch(element_id):
     """ARC-006: Partial update of an ArchiMate element's core fields."""
-    element = ArchiMateElement.query.get_or_404(element_id)
+    element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
     data = request.get_json() or {}
 
     allowed = {"name", "type", "layer", "description", "element_type"}
@@ -2472,6 +2490,7 @@ def api_health_scorecard():
 
 @archimate_crud.route("/api/health-scorecard/repair", methods=["POST"])
 @login_required
+@write_role_required
 def api_health_scorecard_repair():
     """Run inference engine repair for a specific health test failure.
 
