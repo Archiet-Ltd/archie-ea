@@ -234,10 +234,9 @@ button:not(:disabled):active {
     transition-duration: 150ms;
 }
 
-/* Improved Modal/Dialog Backdrop */
+/* Modal/Dialog backdrop (design/patterns.json: dialog). Slate-900 at 50%, no blur. */
 .modal-backdrop {
-    background-color: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
+    background-color: rgb(15 23 42 / 0.5);
 }
 
 /* Better Tooltip Styling */
