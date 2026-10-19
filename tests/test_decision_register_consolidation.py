@@ -183,6 +183,16 @@ def _user_for(db_session, org):
     return user
 
 
+def _architect_for(db_session, org):
+    """A user holding write access: the chat decision record needs one."""
+    from app.models.user import Role
+
+    user = _user_for(db_session, org)
+    user.role = Role.query.filter_by(name="Architect").first()
+    db_session.flush()
+    return user
+
+
 def test_multi_domain_chat_decision_writes_only_the_canonical_row(db_session, make_org, tenant_ctx):
     """architecture_decisions is the only writer: the AI chat
     decision-recording path must create a canonical row directly and
@@ -191,10 +201,12 @@ def test_multi_domain_chat_decision_writes_only_the_canonical_row(db_session, ma
 
     org_a = make_org("chat-decision-a")
     org_b = make_org("chat-decision-b")
+    architect_a = _architect_for(db_session, org_a)
+    architect_b = _architect_for(db_session, org_b)
     before = _legacy_record_count()
 
     with tenant_ctx(org_a.id):
-        svc = MultiDomainChatService(user_id=None)
+        svc = MultiDomainChatService(user_id=architect_a.id)
         svc._detect_and_handle_decision(
             "record this decision: use one message bus for all services",
             "Acknowledged.",
@@ -211,7 +223,7 @@ def test_multi_domain_chat_decision_writes_only_the_canonical_row(db_session, ma
     assert _legacy_record_count() == before, "no row should ever land in the superseded store"
 
     with tenant_ctx(org_b.id):
-        svc_b = MultiDomainChatService(user_id=None)
+        svc_b = MultiDomainChatService(user_id=architect_b.id)
         svc_b._detect_and_handle_decision(
             "record this decision: use one message bus for all services", "Acknowledged.", {},
         )
