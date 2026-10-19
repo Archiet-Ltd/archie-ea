@@ -13,7 +13,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "20261002_dd_tenancy"
-down_revision = "20261019_reference_number_counters"
+down_revision = "20261019_reference_counters"
 branch_labels = None
 depends_on = None
 
