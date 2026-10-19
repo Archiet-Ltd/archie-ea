@@ -104,11 +104,11 @@ def graph(seeded):
 @pytest.mark.smoke
 def test_canvas_matches_the_impact_answer(browser, live_server, seeded, graph):
     centre = graph["service"]
-    context, page = _open(browser, live_server, seeded, "?element=%s&depth=1&derived=1" % centre)
+    context, page = _open(browser, live_server, seeded, "?element=%s&depth=2&derived=1" % centre)
     try:
         _wait_loaded(page)
         canvas = _canvas(page)
-        answer = _answer(page, centre, 1, True)
+        answer = _answer(page, centre, 2, True)
         # Every connection in the answer is drawn, and nothing else; the same for elements.
         assert canvas["linkKeys"] == answer["keys"]
         assert canvas["nodeIds"] == answer["ids"]
@@ -118,23 +118,41 @@ def test_canvas_matches_the_impact_answer(browser, live_server, seeded, graph):
         assert canvas["focused"] is True
         assert page.locator("g.highlighted").count() > 0
         # Worked-out links are marked and badged; recorded links are not.
-        derived = page.locator('g.joint-link[data-kind="derived"]')
-        recorded = page.locator('g.joint-link[data-kind="recorded"]')
+        derived = page.locator('[data-kind="derived"]')
+        recorded = page.locator('[data-kind="recorded"]')
         assert derived.count() >= 1
         assert recorded.count() >= 1
         assert derived.first.locator("text", has_text="Worked out").count() >= 1
         assert recorded.first.locator("text", has_text="Worked out").count() == 0
-        # The banner names the centre and the hop count (singular for one).
+        # The banner names the centre and the hop count .
         banner = page.locator("#composer-focus-banner")
         expect(banner).to_be_visible()
         expect(page.locator("#composer-focus-title")).to_have_text(
-            "Unsaved view: %s, 1 hop" % graph["names"]["service"]
+            "Unsaved view: %s, 2 hops" % graph["names"]["service"]
         )
+        expect(page.locator("#composer-focus-derived-note")).to_be_visible()
         expect(page.locator("#composer-focus-save")).to_be_visible()
         expect(page.locator("#composer-focus-discard")).to_be_visible()
         # The editor treats it as unsaved.
         assert page.evaluate("(s) => Alpine.$data(document.querySelector(s)).viewpointDirty", APP) is True
         assert page.evaluate("(s) => Alpine.$data(document.querySelector(s)).currentSavedVpId", APP) is None
+    finally:
+        context.close()
+
+
+@pytest.mark.smoke
+def test_one_hop_reads_singular_and_matches_the_answer(browser, live_server, seeded, graph):
+    centre = graph["service"]
+    context, page = _open(browser, live_server, seeded, "?element=%s&depth=1&derived=1" % centre)
+    try:
+        _wait_loaded(page)
+        canvas = _canvas(page)
+        answer = _answer(page, centre, 1, True)
+        assert canvas["linkKeys"] == answer["keys"]
+        assert canvas["nodeIds"] == answer["ids"]
+        expect(page.locator("#composer-focus-title")).to_have_text(
+            "Unsaved view: %s, 1 hop" % graph["names"]["service"]
+        )
     finally:
         context.close()
 
@@ -149,12 +167,13 @@ def test_derived_off_drops_the_worked_out_link(browser, live_server, seeded, gra
         answer = _answer(page, centre, 3, False)
         assert canvas["linkKeys"] == answer["keys"]
         assert canvas["nodeIds"] == answer["ids"]
-        assert page.locator('g.joint-link[data-kind="derived"]').count() == 0
-        assert page.locator('g.joint-link[data-kind="recorded"]').count() >= 1
+        assert page.locator('[data-kind="derived"]').count() == 0
+        assert page.locator('[data-kind="recorded"]').count() >= 1
         expect(page.locator("#composer-focus-title")).to_have_text(
             "Unsaved view: %s, 3 hops" % graph["names"]["service"]
         )
-        expect(page.locator("#composer-focus-banner")).not_to_contain_text("Worked-out connections are shown")
+        expect(page.locator("#composer-focus-derived-note")).to_be_hidden()
+        expect(page.locator("#composer-focus-empty-note")).to_be_hidden()
     finally:
         context.close()
 

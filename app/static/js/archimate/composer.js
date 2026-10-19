@@ -3088,7 +3088,6 @@ function composerApp() {
                 self.focusView = null;
                 self.statusText = 'Failed to load the neighbourhood of ' + (centreName || 'this element');
                 _toast('error', 'Could not load the neighbourhood of ' + (centreName || 'this element'));
-                if (window.console && console.error) console.error('composer focus mode', err);
             };
             if (!window.Intelligence) { fail(new Error('Intelligence core not loaded')); return; }
             Intelligence.fetchImpact(elementId, { maxDepth: depth, includeDerived: includeDerived })
@@ -3176,7 +3175,6 @@ function composerApp() {
                 fv.saving = false;
                 self.statusText = 'Failed to save the diagram';
                 _toast('error', 'Could not save the diagram');
-                if (window.console && console.error) console.error('composer focus save', err);
             });
         },
 
