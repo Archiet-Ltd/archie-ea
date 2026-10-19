@@ -313,8 +313,7 @@ def pytest_sessionfinish(session, exitstatus):
         return
     reused = {pid: n for pid, n in _POOL_PIDS.items() if n > 1}
     print(
-        f"
-pool-of-one: {len(_POOL_PIDS)} backend process ids seen at checkout, "
+        f"\npool-of-one: {len(_POOL_PIDS)} backend process ids seen at checkout, "
         f"{len(reused)} seen more than once, most reused {max(_POOL_PIDS.values(), default=0)} times"
     )
     if not reused:

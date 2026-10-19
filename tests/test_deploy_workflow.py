@@ -223,7 +223,7 @@ def test_every_ci_job_is_required_or_deliberately_excluded():
 
 
 def test_the_only_exclusion_is_the_image_build_and_it_says_why():
-    assert len(dw.EXCLUDED_CHECKS) == 13
+    assert len(dw.EXCLUDED_CHECKS) == 14
     assert "Build immutable release image" in dw.EXCLUDED_CHECKS
     reason = dw.EXCLUDED_CHECKS["Build immutable release image"]
     assert "GHCR" in reason and "bind-mounted" in reason
