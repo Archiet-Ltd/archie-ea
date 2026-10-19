@@ -102,6 +102,10 @@ ALLOW_LIST: dict[str, str] = {}
 
 _PLACEHOLDER_STRING = "rbac-sweep-probe"
 
+# URL arguments whose converter only accepts a fixed vocabulary (the per-type
+# ArchiMate routes), so the generic placeholder string cannot build a URL.
+_VOCABULARY_ARGS = {"layer": "application", "element_type": "ApplicationService"}
+
 
 def _placeholder_value(converter):
     if isinstance(converter, UUIDConverter):
@@ -139,7 +143,9 @@ def _build_url(app, rule, real_entities=None):
     converters = getattr(rule, "_converters", {}) or {}
     real_entities = real_entities or {}
     values = {
-        arg: real_entities[arg] if arg in real_entities else _placeholder_value(converters.get(arg))
+        arg: real_entities[arg]
+        if arg in real_entities
+        else _VOCABULARY_ARGS.get(arg, _placeholder_value(converters.get(arg)))
         for arg in rule.arguments
     }
     adapter = app.url_map.bind("sweep.test")

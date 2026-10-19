@@ -1189,6 +1189,55 @@ def test_application_technology_links_refuse_a_read_only_account(
     assert response.status == 403, "a Viewer wrote a technology link: %s" % response.status
 
 
+# Chat workflow routes: write-gated (Permission.GENERAL) and, for the step routes,
+# scoped to the caller's own workspace. Every seeded archetype holds the Architect
+# role, so each reaches the handler: the start routes answer 400 for the empty body
+# used here, the step routes 404 for a workspace id that does not exist. A Viewer
+# is answered 403 before either. The cross-user case with real workspaces is pinned
+# in tests/test_chat_workflow_route_gate.py.
+CHAT_WORKFLOW_POST_EXPECTED = {
+    "/ai-chat/workflow/greenfield/start": 400,
+    "/ai-chat/workflow/brownfield/start": 400,
+    "/ai-chat/workflow/greenfield/step/BRIEF/confirm": 404,
+    "/ai-chat/workflow/greenfield/step/BRIEF/skip": 404,
+    "/ai-chat/workflow/brownfield/step/CONTEXT_LOAD/confirm": 404,
+    "/ai-chat/workflow/brownfield/step/CONTEXT_LOAD/skip": 404,
+}
+
+
+def _post_chat_workflow(page, live_server, path):
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf_token = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    return page.request.post(
+        live_server + path,
+        data={"workspace_id": 2147483000} if "/step/" in path else {},
+        headers={"X-CSRFToken": csrf_token},
+        max_redirects=0,
+    )
+
+
+@pytest.mark.parametrize("path,expected_status", CHAT_WORKFLOW_POST_EXPECTED.items())
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_chat_workflow_post_route_authorisation(
+    archetype, path, expected_status, page, live_server, seeded
+):
+    _login(page, live_server, seeded["emails"][archetype])
+    response = _post_chat_workflow(page, live_server, path)
+    assert response.status == expected_status, (
+        "%s posting %s: expected %s (gate passed), got %s"
+        % (archetype, path, expected_status, response.status)
+    )
+
+
+@pytest.mark.parametrize("path", CHAT_WORKFLOW_POST_EXPECTED)
+def test_chat_workflow_post_routes_refuse_a_read_only_account(
+    path, page, live_server, technology_links_viewer
+):
+    _login(page, live_server, technology_links_viewer)
+    response = _post_chat_workflow(page, live_server, path)
+    assert response.status == 403, "a Viewer reached %s: %s" % (path, response.status)
+
+
 OVERSIGHT_CLASSIFICATION_PERMITTED = {
     "platform_admin",
 }
@@ -1592,3 +1641,33 @@ def test_approval_impact_route_authorisation(archetype, page, live_server, seede
         assert response.json()["impact"]["state"] == "not_in_model"
     else:
         assert response.status == 403, "%s reached the impact route (%s)" % (archetype, response.status)
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_ai_chat_entity_matching_write_permission(archetype, page, live_server, seeded):
+    """POST /ai-chat/entity-matching carries @login_required and no enterprise-
+    role gate, but the chat writes it can reach (linking a capability to a
+    solution) are refused to a user without write access. Every canonical
+    archetype holds a write-capable role, so none is refused (403); the
+    read-only Viewer refusal, with its audit row, is pinned in
+    tests/test_ai_chat_write_gate.py."""
+    _login(page, live_server, seeded["emails"][archetype])
+    response = page.request.post(
+        live_server + "/ai-chat/entity-matching",
+        data={"document_text": "Attach the Customer Management capability to a solution."},
+        headers={"X-CSRFToken": _csrf_token(page)},
+        max_redirects=0,
+    )
+    assert response.status not in (401, 403), (
+        "%s was refused on /ai-chat/entity-matching (got %s) despite holding write access"
+        % (archetype, response.status)
+    )
+
+
+def test_ai_chat_entity_matching_rejects_anonymous(page, live_server):
+    response = page.request.post(
+        live_server + "/ai-chat/entity-matching",
+        data={"document_text": "x"},
+        max_redirects=0,
+    )
+    assert response.status in (302, 401)

@@ -1230,15 +1230,20 @@ def _merge_roadmap_deliverables(conn, stats, dry_run=False):
                 ("created_by", created_by), ("updated_by", updated_by))
             if _column_exists(conn, "deliverables", c)
         }
+        # The copy belongs to the organisation of the work package it joins.
+        has_org = _column_exists(conn, "deliverables", "organization_id")
         new_id = conn.execute(text(
             "INSERT INTO deliverables (name, description, unified_work_package_id, delivery_status, "  # nosec B608 -- extra columns are fixed names filtered by a catalogue check; values are bound
             "deliverable_type, target_date, delivered_date, review_date, approval_criteria, "
             "quality_score, approval_status, related_task_ids, application_component_id, "
-            "created_at, updated_at" + "".join(", " + c for c in provenance) + ") "
+            "created_at, updated_at" + "".join(", " + c for c in provenance)
+            + (", organization_id" if has_org else "") + ") "
             "VALUES (:name, :description, :uid, :status, :dtype, CAST(:due AS date), "
             "CAST(:delivered AS date), :review, :criteria, :quality, :approval, :tasks, :application, "
             "COALESCE(:created, CURRENT_TIMESTAMP), COALESCE(:updated, CURRENT_TIMESTAMP)"
-            + "".join(", :p_" + c for c in provenance) + ") "
+            + "".join(", :p_" + c for c in provenance)
+            + (", (SELECT organization_id FROM unified_work_packages WHERE id = :uid)" if has_org else "")  # tenancy-ok: one-shot deploy data step run by the schema owner with no request context; the organisation is read from the parent work package by its own key
+            + ") "
             "RETURNING id"
         ), {
             **{"p_" + c: v for c, v in provenance.items()},
