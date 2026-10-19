@@ -81,6 +81,8 @@ EXPECTED_OK_KEYS = (
     "decision_service.require_version_for_tenant",
     "execution_service.await_or_recover_export_attempt",
     "cross_tenant_rows_stay_hidden",
+    "archimate_cleanup_other_org_leaves_rows",
+    "archimate_cleanup_deletes_own_org_rows",
 )
 
 

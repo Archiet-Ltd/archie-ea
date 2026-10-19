@@ -44,6 +44,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+from app.middleware.tenant_isolation import set_database_tenant_context
 from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload  # dead-code-ok
 from werkzeug.exceptions import HTTPException
@@ -4999,10 +5000,24 @@ def _engine_archimate_cleanup(solution_ids):
     sids = [int(i) for i in solution_ids]
     sids_str = ",".join(str(i) for i in sids)
 
+    organization_id = getattr(g, "current_org_id", None)
+    if organization_id is None:
+        # Every table below is row-level-security fenced: with no organisation
+        # the deletes would match nothing. Say so instead of doing nothing.
+        logger.warning(
+            "archimate cleanup skipped for solutions %s: no active organisation",
+            sids,
+        )
+        return
+
     with db.engine.begin() as conn:
         # Prevent indefinite lock waits that block worker threads.
         conn.execute(text("SET LOCAL lock_timeout = '10s'"))
         conn.execute(text("SET LOCAL statement_timeout = '60s'"))
+        # This connection is opened on db.engine, not db.session, so the
+        # tenant-context listeners never run for it; without this every
+        # statement below sees zero rows under the restricted runtime role.
+        set_database_tenant_context(conn, organization_id)
 
         def _sp_exe(sql):
             sp = conn.begin_nested()
@@ -5011,7 +5026,11 @@ def _engine_archimate_cleanup(solution_ids):
                 sp.commit()
             except Exception as _e:
                 sp.rollback()
-                logger.debug("archimate cleanup skip: %s … %s", sql[:80], _e)
+                logger.warning(
+                    "archimate cleanup statement failed for organisation %s, "
+                    "solutions %s: %s … %s",
+                    organization_id, sids, sql[:80], _e,
+                )
 
         # ── Collect target architecture_model and element IDs ──────────────
         # tenancy-ok: sids come from Solution.query.get_or_404() /
@@ -5024,6 +5043,15 @@ def _engine_archimate_cleanup(solution_ids):
             text(f"SELECT id FROM architecture_models WHERE solution_id IN ({sids_str})")
         ).fetchall()]
         if not mids:
+            visible = conn.execute(
+                text(f"SELECT count(*) FROM solutions WHERE id IN ({sids_str})")
+            ).scalar()
+            if visible != len(set(sids)):
+                logger.warning(
+                    "archimate cleanup matched nothing: organisation %s can see "
+                    "%s of %s requested solutions %s",
+                    organization_id, visible, len(set(sids)), sids,
+                )
             return
         mids_str = ",".join(str(i) for i in mids)
 

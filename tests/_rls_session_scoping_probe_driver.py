@@ -609,6 +609,59 @@ def main() -> None:
 
         check("cross_tenant_rows_stay_hidden", _cross_tenant_hidden)
 
+        # --- solution_design_routes._engine_archimate_cleanup: runs on
+        # db.engine.begin(), so it needs the tenant context set explicitly.
+        from app.models.archimate_core import ArchiMateElement, ArchitectureModel
+        from app.models.solution_models import Solution
+        from app.modules.solutions_strategic.v2.routes.solution_design_routes import (
+            _engine_archimate_cleanup,
+        )
+
+        g.current_org_id = org_id
+        solution = Solution(organization_id=org_id, name="Cleanup probe solution")
+        db.session.add(solution)
+        db.session.flush()
+        arch_model = ArchitectureModel(
+            organization_id=org_id, name="Cleanup probe model", solution_id=solution.id
+        )
+        db.session.add(arch_model)
+        db.session.flush()
+        element = ArchiMateElement(
+            organization_id=org_id,
+            name="Cleanup probe element",
+            type="ApplicationComponent",
+            layer="Application",
+            architecture_id=arch_model.id,
+        )
+        db.session.add(element)
+        db.session.commit()
+        element_id = element.id
+        solution_id_value = solution.id
+
+        def _element_exists():
+            with db.engine.connect() as connection:
+                set_database_tenant_context(connection, org_id)
+                return (
+                    connection.execute(
+                        db.text("SELECT 1 FROM archimate_elements WHERE id = :id"),
+                        {"id": element_id},
+                    ).first()
+                    is not None
+                )
+
+        def _other_org_cannot_clean():
+            g.current_org_id = other_org_id
+            _engine_archimate_cleanup([solution_id_value])
+            return _element_exists()
+
+        def _own_org_cleans():
+            g.current_org_id = org_id
+            _engine_archimate_cleanup([solution_id_value])
+            return not _element_exists()
+
+        check("archimate_cleanup_other_org_leaves_rows", _other_org_cannot_clean)
+        check("archimate_cleanup_deletes_own_org_rows", _own_org_cleans)
+
     print("RESULT " + json.dumps(results))
 
 
