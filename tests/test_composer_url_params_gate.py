@@ -34,7 +34,7 @@ def tmp_html():
 
 def test_flags_unknown_param_name(tmp_html):
     with open(tmp_html, "w", encoding="utf-8") as fh:
-        fh.write('<a href="/archimate/composer?element=42">Open</a>\n')
+        fh.write('<a href="/archimate/composer?elem=42">Open</a>\n')
     result = _run(tmp_html)
     assert result.stdout.strip().splitlines()[-1] == "1"
 
