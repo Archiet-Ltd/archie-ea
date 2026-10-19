@@ -37,19 +37,27 @@ audit_logger = logging.getLogger("import_audit")
 # ---------------------------------------------------------------------------
 # Import Idempotency Cache
 # ---------------------------------------------------------------------------
-# In-memory cache keyed by SHA-256(file_content + user_id).  Prevents the
-# same file from being processed twice within IDEMPOTENCY_TTL seconds when a
-# user accidentally double-clicks or retries an import.
+# In-memory cache keyed by SHA-256(organisation id, user id, file content).
+# Prevents the same file from being processed twice within IDEMPOTENCY_TTL
+# seconds when a user accidentally double-clicks or retries an import.
 # ---------------------------------------------------------------------------
 
-_import_idempotency_cache: Dict[str, Dict[str, Any]] = {}  # cache-tenancy-ok: key is a hash of the file content and the user id, so an entry is only ever found by the user who made it
+_import_idempotency_cache: Dict[str, Dict[str, Any]] = {}  # cache-tenancy-ok: the key hashes the active organisation id, the user id and the file content, so an entry is only found for the same file imported by the same user into the same organisation
 _idempotency_lock = threading.Lock()
 IDEMPOTENCY_TTL = 300  # fabricated-ok: config constant (idempotency window seconds), not measured data
 
 
 def _make_idempotency_key(file_content: bytes, user_id: int) -> str:
-    """Generate a SHA-256 idempotency key from file content and user ID."""
-    return hashlib.sha256(file_content + str(user_id).encode("utf-8")).hexdigest()
+    """Generate a SHA-256 idempotency key from organisation, user and file content.
+
+    The organisation is part of the key: the same file imported into a second
+    organisation is a different import. The identifiers come first, each ended by
+    a NUL byte, so no file content can shift into them.
+    """
+    from app.middleware.tenant_context import current_org_id
+
+    prefix = f"org:{current_org_id()}\x00user:{user_id}\x00".encode("utf-8")
+    return hashlib.sha256(prefix + file_content).hexdigest()
 
 
 def _cleanup_expired_entries() -> None:

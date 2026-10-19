@@ -44,3 +44,24 @@ def test_unkeyed_fstring_cache_in_an_orm_module_is_reported(tmp_path):
 def test_the_same_cache_keyed_by_organisation_is_clean(tmp_path):
     keyed = MODULE.replace('f"typeahead:{q}:{page}"', 'f"org{org_id}:typeahead:{q}:{page}"')
     assert _count(tmp_path, keyed) == 0
+
+
+QUERY_ONLY = '''
+_catalog_cache = {}
+
+
+def typeahead(q):
+    cache_key = f"typeahead:{q}"
+    rows = Thing.query.filter_by(name=q).all()
+    _catalog_cache[cache_key] = rows
+    return rows
+'''
+
+
+def test_a_module_that_only_uses_dot_query_is_still_checked(tmp_path):
+    assert _count(tmp_path, QUERY_ONLY) == 1
+
+
+def test_a_module_with_no_database_access_is_not_checked(tmp_path):
+    assert _count(tmp_path, QUERY_ONLY.replace("Thing.query.filter_by(name=q).all()", "[q]")) == 0
+

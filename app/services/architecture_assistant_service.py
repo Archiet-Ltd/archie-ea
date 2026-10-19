@@ -38,7 +38,9 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from flask import current_app, g, has_app_context
+from flask import current_app
+
+from app.extensions.cache import org_scoped_cache_key
 
 from .. import db
 from ..models.ai_recommendations import AIRecommendation
@@ -50,7 +52,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # ENH-010: Capability and application catalog cache (TTL-based, in-process)
 # ---------------------------------------------------------------------------
-_capability_cache: dict = {}  # {organisation id: {"ts", "by_id", "by_name"}}
+_capability_cache: dict = {}  # {organisation-scoped key: {"ts", "by_id", "by_name"}}
 _CAPABILITY_CACHE_TTL = 300  # 5 minutes
 
 
@@ -82,9 +84,9 @@ def _capability_index():
     handed another's capabilities. With no organisation in context the index is
     built for this call only and nothing is kept.
     """
-    org_id = getattr(g, "current_org_id", None) if has_app_context() else None
+    org_key = org_scoped_cache_key("capability_index")
     now = _time.time()
-    entry = _capability_cache.get(org_id) if org_id is not None else None
+    entry = _capability_cache.get(org_key) if org_key is not None else None
     if entry and entry.get("ts") and now - entry["ts"] < _CAPABILITY_CACHE_TTL:
         return entry
 
@@ -97,8 +99,8 @@ def _capability_index():
             "by_name": {c.name.strip().lower(): c for c in caps if c.name},
             "ts": now,
         }
-        if org_id is not None:
-            _capability_cache[org_id] = entry
+        if org_key is not None:
+            _capability_cache[org_key] = entry
         logger.debug("ENH-010: Capability cache refreshed — %d entries", len(caps))
         return entry
     except Exception as exc:

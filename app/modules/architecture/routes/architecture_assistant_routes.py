@@ -25,10 +25,11 @@ from collections import OrderedDict
 from datetime import datetime
 from xml.sax.saxutils import escape
 
-from flask import Blueprint, Response, current_app, g, has_app_context, jsonify, render_template, request, session
+from flask import Blueprint, Response, current_app, jsonify, render_template, request, session
 from flask_login import current_user, login_required
 
 from app.decorators import require_roles
+from app.extensions.cache import org_scoped_cache_key
 from app.models.archimate_motivation import (
     MotivationAssessment,
     MotivationConstraint,
@@ -138,19 +139,6 @@ def _populate_junction_tables_from_options(solution, solution_options_result):
     logger.info("ENH-018: Junction tables populated for solution_id=%s", solution.id)
 
 
-def _org_scoped_cache_key(key):
-    """Prefix ``key`` with the active organisation, or return None when there is none.
-
-    A cache hit runs no query, so row-level security and the ORM tenant filter
-    cannot protect it: the organisation has to be part of the key. With no
-    organisation (anonymous or system context) nothing may be cached.
-    """
-    org_id = getattr(g, "current_org_id", None) if has_app_context() else None
-    if org_id is None:
-        return None
-    return "org%s:%s" % (org_id, key)
-
-
 def _get_cached(key, query_fn, ttl=300, scoped=True):
     """Return cached data if fresh, otherwise call query_fn and cache result.
 
@@ -164,7 +152,7 @@ def _get_cached(key, query_fn, ttl=300, scoped=True):
             every organisation.
     """
     if scoped:
-        key = _org_scoped_cache_key(key)
+        key = org_scoped_cache_key(key)
         if key is None:
             return query_fn()
     entry = _catalog_cache.get(key)
@@ -4519,7 +4507,7 @@ def paginated_capabilities():
 
     # Keyed by organisation (None when there is no organisation: then nothing is
     # read from or written to the cache).
-    cache_key = _org_scoped_cache_key(f"aa_capabilities:p{page}:pp{per_page}:s{search}")
+    cache_key = org_scoped_cache_key(f"aa_capabilities:p{page}:pp{per_page}:s{search}")
     # Read-only cache check (the result is computed and stored below). Calling
     # _get_cached with query_fn=None would invoke None() on a miss.
     entry = _catalog_cache.get(cache_key) if cache_key else None

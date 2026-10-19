@@ -63,7 +63,10 @@ def test_each_organisation_is_cached_under_its_own_key(tenant_ctx, world):
         svc._get_capability_by_id(world.cap_a.id)
     with tenant_ctx(world.org_b.id):
         svc._get_capability_by_id(world.cap_b.id)
-    assert set(svc._capability_cache) == {world.org_a.id, world.org_b.id}
+    assert set(svc._capability_cache) == {
+        f"org{world.org_a.id}:capability_index",
+        f"org{world.org_b.id}:capability_index",
+    }
 
 
 def test_nothing_is_cached_without_an_organisation(app, world):

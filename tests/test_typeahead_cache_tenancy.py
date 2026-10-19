@@ -115,17 +115,27 @@ def test_one_organisation_still_gets_a_cached_answer(client, login_as, world, db
     assert [r["type"] for r in again.get_json()["elements"]] == ["Goal"] * 3
 
 
-def test_anonymous_caller_gets_no_cached_data(client, world):
-    from app.modules.architecture.routes import architecture_assistant_routes as routes
+def test_switching_the_active_organisation_does_not_reuse_the_first_answer(
+    client, login_as, world, db_session
+):
+    from app.models.org_role import OrgRole
 
-    # Seed what a signed-in organisation would have left behind.
-    routes._catalog_cache["motivation_typeahead:%s::::50" % world.tag] = {
-        "data": {"elements": [{"name": "LEAK"}]},
-        "ts": routes._time.time(),
-    }
-    resp = client.get(f"{URL}?q={world.tag}&per_page=50")
-    assert resp.status_code in (301, 302, 401, 403)
-    assert b"LEAK" not in resp.get_data()
+    db_session.add(OrgRole(organization_id=world.org_b.id, user_id=world.user_a.id, role="member"))
+    db_session.commit()
+    url = f"{URL}?q={world.tag}&per_page=50"
+    login_as(client, world.user_a)
+    with client.session_transaction() as sess:
+        sess["current_org_id"] = world.org_a.id
+    assert _names(client.get(url)) == set(world.a_names)
+    with client.session_transaction() as sess:
+        sess["current_org_id"] = world.org_b.id
+    # The test holds one app context open, so the first request's cached
+    # organisation would outlive the switch; a real request starts clean.
+    from flask import g
+
+    g.pop("current_org_id", None)
+    g.pop("current_org", None)
+    assert _names(client.get(url)) == set(world.b_names)
 
 
 def test_no_organisation_means_nothing_is_cached(app, world):
