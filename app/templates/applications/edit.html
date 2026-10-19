@@ -38,7 +38,7 @@
                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">{{ application.description or '' }}</textarea>
       </div>
 
-      <div class="grid grid-cols-1 grid-cols-1 gap-4">
+      <div class="grid grid-cols-1 gap-4">
         <div>
           <label for="application_code" class="block text-sm font-medium text-muted-foreground mb-1">Application Code</label>
           <!-- entity-picker-ok: readonly, Abacus-managed ID -->
@@ -61,7 +61,7 @@
       <p class="text-sm text-muted-foreground">Assign owner records below. Legacy text fields are read-only.</p>
 
       {# Legacy text columns — read-only, migrated to application_owners #}
-      <div class="grid grid-cols-1 grid-cols-1 gap-4 mb-4">
+      <div class="grid grid-cols-1 gap-4 mb-4">
         <div>
           <label for="business_owner" class="block text-sm font-medium text-muted-foreground mb-1">Business Owner (legacy)</label>
           <input type="text" id="business_owner" name="business_owner" value="{{ application.business_owner or '' }}"
@@ -95,7 +95,7 @@
       </div>
 
       {# Add owner form #}
-      <div class="grid grid-cols-1 grid-cols-1 gap-4 items-end">
+      <div class="grid grid-cols-1 gap-4 items-end">
         <div>
           <label for="owner_picker_search" class="block text-sm font-medium text-muted-foreground mb-1">Search user</label>
           <input type="text" id="owner_picker_search"
@@ -127,7 +127,7 @@
     <section class="rounded-lg border border-border bg-card p-6 space-y-4">
       <h2 class="text-lg font-semibold">Classification</h2>
 
-      <div class="grid grid-cols-1 grid-cols-1 gap-4">
+      <div class="grid grid-cols-1 gap-4">
         <div>
           <label for="criticality" class="block text-sm font-medium text-muted-foreground mb-1">Business Criticality</label>
           <select id="criticality" name="criticality"
@@ -215,7 +215,7 @@
     <section class="rounded-lg border border-border bg-card p-6 space-y-4">
       <h2 class="text-lg font-semibold">Technical profile</h2>
 
-      <div class="grid grid-cols-1 grid-cols-1 gap-4">
+      <div class="grid grid-cols-1 gap-4">
         <div>
           <label for="cloud_provider" class="block text-sm font-medium text-muted-foreground mb-1">Cloud Provider</label>
           <input type="text" id="cloud_provider" name="cloud_provider" value="{{ application.cloud_provider or '' }}"
@@ -275,7 +275,7 @@
     <section class="rounded-lg border border-border bg-card p-6 space-y-4">
       <h2 class="text-lg font-semibold">Compliance and notes</h2>
 
-      <div class="grid grid-cols-1 grid-cols-1 gap-4">
+      <div class="grid grid-cols-1 gap-4">
         <div>
           <label for="compliance_requirements" class="block text-sm font-medium text-muted-foreground mb-1">Compliance Requirements</label>
           <input type="text" id="compliance_requirements" name="compliance_requirements" value="{{ application.compliance_requirements or '' }}"

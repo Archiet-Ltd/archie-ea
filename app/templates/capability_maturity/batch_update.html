@@ -132,7 +132,7 @@
             <form method="POST" action="{{ url_for('maturity_management.batch_update_maturity') }}" class="space-y-6">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <!-- Filter Configuration -->
-                <div class="grid grid-cols-1 grid-cols-1 gap-6">
+                <div class="grid grid-cols-1 gap-6">
                     <div>
                         <label for="domain" class="block text-sm font-medium text-muted-foreground mb-1">
                             Filter by Domain <span class="text-muted-foreground">(Optional)</span>
@@ -168,7 +168,7 @@
                 </div>
 
                 <!-- Maturity Level Updates -->
-                <div class="grid grid-cols-1 grid-cols-1 gap-6">
+                <div class="grid grid-cols-1 gap-6">
                     <div>
                         <label for="current_maturity_level" class="block text-sm font-medium text-muted-foreground mb-1">
                             Set Current Maturity Level <span class="text-muted-foreground">(Optional)</span>

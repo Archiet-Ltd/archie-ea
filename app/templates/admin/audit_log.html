@@ -18,7 +18,7 @@
 
     <!-- Filters -->
     <form method="get" action="{{ url_for('admin.audit_log_viewer') }}" class="mt-6 rounded-xl border bg-card p-4">
-        <div class="grid grid-cols-1 grid-cols-1 grid-cols-1 grid-cols-1 gap-3">
+        <div class="grid grid-cols-1 gap-3">
             <div>
                 <label for="date_from" class="block text-sm font-medium text-muted-foreground mb-1">From Date</label>
                 <input type="date" id="date_from" name="date_from" value="{{ date_from }}"

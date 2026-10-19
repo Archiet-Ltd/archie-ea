@@ -370,7 +370,7 @@
                                     Fetching from Abacus API...
                                 </div>
                                 <div x-show="typesLoaded" x-cloak>
-                                    <div class="grid grid-cols-1 grid-cols-1 gap-2">
+                                    <div class="grid grid-cols-1 gap-2">
                                         <template x-for="t in availableTypes" :key="t.name">
                                             <label class="flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer text-sm border border-transparent" :class="selectedTypes.includes(t.name) ? 'bg-primary/5 border-primary/20' : ''">
                                                 <input type="checkbox" :value="t.name" :checked="selectedTypes.includes(t.name)"

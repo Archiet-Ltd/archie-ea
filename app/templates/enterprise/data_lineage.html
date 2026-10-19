@@ -45,7 +45,7 @@
             <h2 class="text-lg font-semibold">Record a lineage flow</h2>
             <p class="text-xs text-muted-foreground mt-1">Both endpoints must be existing data objects — this cannot create a lineage row against a system that isn't modelled.</p>
         </div>
-        <form method="POST" action="{{ url_for('data_architecture.create_data_lineage') }}" class="p-4 grid grid-cols-1 grid-cols-1 gap-3 items-end" data-testid="lineage-create-form">
+        <form method="POST" action="{{ url_for('data_architecture.create_data_lineage') }}" class="p-4 grid grid-cols-1 gap-3 items-end" data-testid="lineage-create-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
                 <label for="lineage-source" class="block text-sm font-medium text-muted-foreground mb-1">Source data object</label>

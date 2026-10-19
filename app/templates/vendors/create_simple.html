@@ -21,7 +21,7 @@
             <form method="POST" action="{{ url_for('unified_applications.vendors_create') }}" class="space-y-6">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
-                <div class="grid grid-cols-1 grid-cols-1 gap-6">
+                <div class="grid grid-cols-1 gap-6">
                     <div class="space-y-2">
                         {% call label(for='name', required=true) %}Vendor Name{% endcall %}
                         <input type="text" id="name" name="name" required
@@ -50,7 +50,7 @@
                               placeholder="Describe the vendor and their offerings" aria-label="Describe the vendor and their offerings"></textarea>
                 </div>
 
-                <div class="grid grid-cols-1 grid-cols-1 gap-6">
+                <div class="grid grid-cols-1 gap-6">
                     <div class="space-y-2">
                         {% call label(for='website') %}Website{% endcall %}
                         <input type="url" id="website" name="website"

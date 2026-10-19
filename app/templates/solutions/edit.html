@@ -42,7 +42,7 @@
                                   placeholder="Describe the solution and its purpose...">{{ solution.description }}</textarea>
                     </div>
 
-                    <div class="grid grid-cols-1 grid-cols-1 gap-4">
+                    <div class="grid grid-cols-1 gap-4">
                         <div>
                             <label for="edit-solution-type" class="block text-sm font-medium text-muted-foreground mb-1">Solution Type *</label>
                             <select name="solution_type" id="edit-solution-type" required
@@ -132,7 +132,7 @@
             <!-- Governance -->
             <div class="bg-card rounded-lg border border-border p-6">
                 <h2 class="text-xl font-bold text-foreground mb-4">Governance &amp; Ownership</h2>
-                <div class="grid grid-cols-1 grid-cols-1 gap-4">
+                <div class="grid grid-cols-1 gap-4">
                     {% for field_name, field_label in [
                         ('solution_owner', 'Solution Owner'),
                         ('business_sponsor', 'Business Sponsor'),

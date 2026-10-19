@@ -240,7 +240,7 @@
         {% elif details_error %}
             <p class="text-sm text-destructive-emphasis">Billing details could not be read: {{ details_error }}</p>
         {% else %}
-            <form method="post" action="{{ url_for('billing.billing_details') }}" class="grid grid-cols-1 grid-cols-1 gap-4 max-w-2xl" data-testid="billing-details-form">
+            <form method="post" action="{{ url_for('billing.billing_details') }}" class="grid grid-cols-1 gap-4 max-w-2xl" data-testid="billing-details-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="space-y-2">
                     <label for="billing_email" class="block text-sm font-medium text-muted-foreground mb-1 leading-none">Invoice e-mail</label>

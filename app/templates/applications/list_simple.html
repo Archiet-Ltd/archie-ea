@@ -834,7 +834,7 @@
     </div>
     <div class="p-6 overflow-y-auto flex-1" x-data="applicationCreateForm()">
       <form @submit.prevent="submit()" class="space-y-4">
-        <div class="grid grid-cols-1 grid-cols-1 gap-4">
+        <div class="grid grid-cols-1 gap-4">
           <div class="sm:col-span-2">
             <label for="ca-name" class="block text-sm font-medium text-muted-foreground mb-1">Application Name <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
             <input id="ca-name" type="text" x-model="form.name" @input="scheduleCheck()" required maxlength="255" placeholder="e.g. Customer Portal"

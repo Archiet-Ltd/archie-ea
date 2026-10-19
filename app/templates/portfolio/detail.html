@@ -406,7 +406,7 @@
     {% endfor %}
 
     <form method="post" action="{{ url_for('portfolio.assumption_create', initiative_id=initiative.id) }}"
-          class="border-t px-6 py-4 grid gap-3 grid-cols-1 grid-cols-1 items-end">
+          class="border-t px-6 py-4 grid gap-3 grid-cols-1 items-end">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="lg:col-span-2">
         <label for="a-stmt" class="block text-sm font-medium text-muted-foreground mb-1">Assumption</label>

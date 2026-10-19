@@ -21,7 +21,7 @@
             <h2 class="text-lg font-semibold">New request</h2>
             <p class="text-xs text-muted-foreground mt-1">Choose a person in your organisation for access or erasure of what this platform holds about them, or name an outside data subject to scope the search of your own systems.</p>
         </div>
-        <form method="POST" action="{{ url_for('gdpr_bp.dsr_create') }}" class="p-4 grid grid-cols-1 grid-cols-1 gap-4" data-testid="dsr-create-form">
+        <form method="POST" action="{{ url_for('gdpr_bp.dsr_create') }}" class="p-4 grid grid-cols-1 gap-4" data-testid="dsr-create-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
                 <label for="dsr-type" class="block text-sm font-medium text-muted-foreground mb-1">Request type</label>

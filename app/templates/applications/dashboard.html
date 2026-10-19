@@ -288,7 +288,7 @@
     </div>
     {% endif %}
 
-    <div class="grid grid-cols-1 grid-cols-1 gap-6">
+    <div class="grid grid-cols-1 gap-6">
 
       {# Application Identity #}
       <div data-slot="card" class="rounded-lg border border-border bg-card">
@@ -473,7 +473,7 @@
 
     {# Description & Notes #}
     {% if edit_mode or app.description or app.business_purpose or app.notes or app.assessment_notes %}
-    <div class="grid grid-cols-1 grid-cols-1 gap-6">
+    <div class="grid grid-cols-1 gap-6">
       {% if edit_mode %}
       <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3"><label for="edit-description" class="block text-sm font-medium text-muted-foreground mb-1 text-lg">Description</label></div>

@@ -59,7 +59,7 @@
     >
         <h2 class="text-base font-semibold text-foreground mb-4">New Communication Entry</h2>
         <form @submit.prevent="submitEntry" class="space-y-4">
-            <div class="grid grid-cols-1 grid-cols-1 gap-4">
+            <div class="grid grid-cols-1 gap-4">
                 <div>
                     <label for="new-type" class="block text-sm font-medium text-muted-foreground mb-1">Type <span aria-hidden="true">*</span></label>
                     <select id="new-type" x-model="form.comm_type" required
