@@ -109,6 +109,14 @@ def upgrade():
 def downgrade():
     bind = op.get_bind()
     for table in TENANT_TABLES:
+        if table == "required_capabilities":
+            # Also fenced by 20261018_vendor_analysis_rls, which now runs
+            # earlier in this chain and keeps its own policies and row-level
+            # security on this table regardless of this revision. Disabling
+            # them here on a partial rollback (downgrading past this revision
+            # but not past that one) would silently drop that revision's
+            # fencing too.
+            continue
         if _skip_reason(bind, table) is not None:
             continue
         for name in TENANT_POLICIES:

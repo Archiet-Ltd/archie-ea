@@ -17,7 +17,7 @@ is printed.
 Idempotent: every step checks before it acts, so a second run is a no-op.
 
 Revision ID: 20261018_tree_models_org_id
-Revises: 20261016_compliance_org_rls
+Revises: 20261018_vendor_analysis_rls
 Create Date: 2026-10-18
 """
 import sqlalchemy as sa
@@ -25,7 +25,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "20261018_tree_models_org_id"
-down_revision = "20261016_compliance_org_rls"
+down_revision = "20261018_vendor_analysis_rls"
 branch_labels = None
 depends_on = None
 
@@ -114,15 +114,35 @@ def upgrade():
         else:
             op.alter_column(table, "organization_id", existing_type=sa.Integer(), nullable=False)
         op.create_index(f"ix_{table}_organization_id", table, ["organization_id"], if_not_exists=True)
-        fk = f"fk_{table}_organization_id"
-        if not bind.execute(text("SELECT 1 FROM pg_constraint WHERE conname = :n"), {"n": fk}).scalar():
-            op.create_foreign_key(fk, table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE")
+        # Detect by column, not by name: a foreign key already on organization_id
+        # under any other name (e.g. one created by another revision sharing this
+        # table) must not get a second one beside it.
+        has_fk = bind.execute(
+            text(
+                "SELECT 1 FROM pg_constraint con "
+                "JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = ANY (con.conkey) "
+                "WHERE con.contype = 'f' AND con.conrelid = to_regclass(:t) "
+                "AND att.attname = 'organization_id'"
+            ),
+            {"t": f"public.{table}"},
+        ).scalar()
+        if not has_fk:
+            op.create_foreign_key(
+                f"fk_{table}_organization_id", table, "organizations", ["organization_id"], ["id"], ondelete="CASCADE"
+            )
 
 
 def downgrade():
     bind = op.get_bind()
     for table in TABLES:
         if not _present(bind, table) or not _has_column(bind, table, "organization_id"):
+            continue
+        if table == "required_capabilities":
+            # organization_id on this table is also owned by
+            # 20261018_vendor_analysis_rls, which now runs earlier in this
+            # chain and keeps its own column, index and foreign key in place
+            # on downgrade for the same reason: dropping them here would
+            # discard that revision's attribution too, not just this one's.
             continue
         fk = f"fk_{table}_organization_id"
         if bind.execute(text("SELECT 1 FROM pg_constraint WHERE conname = :n"), {"n": fk}).scalar():
