@@ -24,22 +24,36 @@
    a vertical hairline for siblings, an SVG elbow from the parent column for
    children. The 6px source pin sits right of the name; its tooltip is an
    Alpine x-show. No shadows anywhere. #}
-{% macro answer_cascade(id, question, rows, ask=None, save=None, row_attrs='') %}
-<section id="{{ id }}" class="cascade" x-data="{ tip: null, selected: null, shared: false, saved: false }" data-cascade>
+{% macro answer_cascade(id, question, rows, ask=None, save=None, row_attrs='', root=None) %}
+<section id="{{ id }}" class="cascade" data-cascade
+         x-data="{ tip: null, selected: null, shared: false, saved: false,
+                   continues(i, list) { var d = list[i].depth || 0; for (var j = i + 1; j < list.length; j++) { var dj = list[j].depth || 0; if (dj < d) { return false; } if (dj === d) { return true; } } return false; } }">
     <p class="question-line mb-6 max-w-[640px]" x-text="{{ question }}"></p>
     <ol class="relative space-y-2 py-6" role="list">
+        {% if root %}
+        {# Root node: the element the question was asked about. #}
+        <li class="relative" data-depth="0" data-root>
+            <div class="flex h-10 items-center gap-2 rounded-md border border-border bg-card px-4">
+                <span class="h-2 w-2 shrink-0 rounded-full bg-foreground" aria-hidden="true"></span>
+                <span class="truncate text-sm font-semibold text-foreground" x-text="{{ root }}"></span>
+                <span class="ml-auto shrink-0 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">Asked about</span>
+            </div>
+        </li>
+        {% endif %}
         <template x-for="(node, i) in ({{ rows }})" :key="node.key || i">
             <li class="relative" {{ row_attrs }}
                 :style="'margin-left:' + (20 * (node.depth || 0)) + 'px'"
                 :data-kind="node.derived ? 'derived' : 'explicit'"
                 :data-depth="node.depth || 0">
-                {# Sibling connector: 1px hairline through the 8px gap above the card. #}
-                <span x-show="i > 0 && !(node.depth || 0)" x-cloak
+                {# Sibling connector at depth 0: hairline through the 8px gap above the card. #}
+                <span x-show="(i > 0 || {{ 'true' if root else 'false' }}) && !(node.depth || 0)" x-cloak
                       class="absolute left-5 -top-2 h-2 w-px bg-slate-300 dark:bg-slate-700" aria-hidden="true"></span>
-                {# Branch connector: elbow from the parent column into this card. #}
+                {# Branch connector: the parent column runs through the gap and down
+                   the card; an elbow turns into the card at its middle. The vertical
+                   stops at the middle on the last sibling. #}
                 <svg x-show="(node.depth || 0) > 0" x-cloak
-                     class="absolute -left-5 -top-2 h-7 w-5 text-slate-300 dark:text-slate-700" viewBox="0 0 20 28" fill="none" aria-hidden="true">
-                    <path d="M1 0 V20 H20" stroke="currentColor" stroke-width="1" />
+                     class="absolute -left-5 -top-2 h-12 w-5 text-slate-300 dark:text-slate-700" viewBox="0 0 20 48" fill="none" aria-hidden="true">
+                    <path :d="'M1 0 V' + (continues(i, {{ rows }}) ? 48 : 28) + ' M1 28 H20'" stroke="currentColor" stroke-width="1" />
                 </svg>
                 <div class="flex h-10 items-center gap-2 rounded-md border bg-card px-4 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
                      :class="selected && selected.key === node.key ? 'border-ring' : 'border-border'"

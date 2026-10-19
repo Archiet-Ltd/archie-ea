@@ -97,7 +97,7 @@
         <h2 id="ask-results-heading" x-ref="resultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none">Results</h2>
         {{ impact_states("state === 'loading'") }}
         <div x-show="state === 'ready'" x-cloak>
-            {% call answer_cascade('ask-cascade', question="'What breaks if ' + (centreName || '…') + ' fails or is under-resourced?'", rows='rows', ask='load(node.elementId)', save="Platform.fetch('/api/v1/intelligence/answers', { method: 'POST', body: { question: 'impact', element_id: centreId }, silent: true }).catch(function () {})", row_attrs='data-ask-row') %}
+            {% call answer_cascade('ask-cascade', question="'What breaks if ' + (centreName || '…') + ' fails or is under-resourced?'", rows='rows', ask='load(node.elementId)', save="Platform.fetch('/api/v1/intelligence/answers', { method: 'POST', body: { question: 'impact', element_id: centreId }, silent: true }).catch(function () {})", row_attrs='data-ask-row', root='centreName') %}
                 {{ derived_note('node.derived') }}
                 {{ why_button('node.key') }}
                 <a :href="twinMapHref(node)" class="inline-flex h-8 items-center justify-center rounded-md px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-slate-50 hover:text-info dark:hover:bg-slate-800">Map</a>
