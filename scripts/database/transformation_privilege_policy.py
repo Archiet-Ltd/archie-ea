@@ -26,7 +26,7 @@ RUNTIME_SEQUENCE_ALLOWLIST = frozenset()
 PROTECTED_RUNTIME_TABLE_PRIVILEGES = {
     "command_materialisations": ("SELECT",),
     "operation_results": ("SELECT",),
-    "transformation_outbox_events": ("SELECT",),
+    "transformation_outbox_events": ("SELECT", "INSERT"),
     "candidate_signals": ("SELECT", "INSERT"),
     "candidate_overlap_dispositions": ("SELECT",),
     "evidence_records": ("SELECT", "INSERT"),
