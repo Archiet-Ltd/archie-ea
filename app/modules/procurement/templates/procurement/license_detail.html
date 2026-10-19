@@ -52,7 +52,7 @@
                     <p class="text-sm text-muted-foreground">Utilization unavailable until deployment is recorded.</p>
                     {% endif %}
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center" data-testid="license-position">
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-center" data-testid="license-position">
                     <div class="p-3 bg-muted/50 rounded-lg">
                         <div class="text-2xl font-bold">{{ license.quantity_entitled if license.quantity_entitled is not none else '—' }}</div>
                         <div class="text-sm text-muted-foreground">Entitled</div>
@@ -63,7 +63,13 @@
                     </div>
                     <div class="p-3 bg-muted/50 rounded-lg">
                         <div class="text-2xl font-bold">{{ license.quantity_used if license.quantity_used is not none else '—' }}</div>
-                        <div class="text-sm text-muted-foreground">Used</div>
+                        <div class="text-sm text-muted-foreground">Used (typed)</div>
+                    </div>
+                    {% set measured = license.latest_measurement %}
+                    <div class="p-3 bg-muted/50 rounded-lg border border-border" data-testid="measured-usage">
+                        <div class="text-2xl font-bold">{{ measured.seats_used if measured else '—' }}</div>
+                        <div class="text-sm text-muted-foreground">Measured</div>
+                        {% if measured %}<div class="text-xs text-muted-foreground">{{ measured.source_label }}, {{ measured.fetched_at.strftime('%Y-%m-%d %H:%M') }}</div>{% endif %}
                     </div>
                     <div class="p-3 bg-muted/50 rounded-lg">
                         <div class="text-2xl font-bold {{ 'text-success-emphasis' if license.available_quantity is not none }}">{{ license.available_quantity if license.available_quantity is not none else '—' }}</div>

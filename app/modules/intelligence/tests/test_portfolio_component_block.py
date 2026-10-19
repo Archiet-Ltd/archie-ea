@@ -437,7 +437,7 @@ def test_component_block_key_shapes(app, db_session, make_org):
     assert set(component.keys()) == {"name", "health", "cost", "cost_by_period", "licences", "licences_reason"}
     assert len(component["cost"]) == 11
     assert len(component["cost_by_period"]) == 7
-    assert len(component["licences"][0]) == 11
+    assert len(component["licences"][0]) == 14
 
 
 def test_early_branches_all_return_component_none(app, db_session, make_org):
@@ -653,3 +653,24 @@ def test_portfolio_route_does_not_redact_for_cto(app, db_session, make_org, clie
     assert component["cost"]["access_reason"] is None
     assert component["cost_by_period"]["total_cost"] == 6000.0
     assert component["licences"][0]["unit_cost"] == 12.5
+
+
+def test_measured_seats_decide_under_use_and_typed_is_kept_apart(app, db_session, make_org):
+    import datetime as _dt
+
+    from app.models.license_usage_measurement import LicenseUsageMeasurement
+
+    org = make_org("component-measured")
+    a = _element(db_session, org.id, "A")
+    comp = _component(db_session, org.id, a)
+    contract = _contract(db_session, org.id)
+    lic = _licence(db_session, comp, org.id, contract, quantity_entitled=100, quantity_used=100,
+                   last_usage_sync=_dt.datetime.utcnow())
+    db_session.add(LicenseUsageMeasurement(organization_id=org.id, entitlement_id=lic.id, seats_used=40,
+                                           source="m365", fetched_at=_dt.datetime(2026, 10, 1, 9, 0)))
+    db_session.commit()
+
+    entry = _resolve(app, org.id, a.id)["component"]["licences"][0]
+    assert entry["quantity_used"] == 100  # typed, unchanged
+    assert entry["measured_seats_used"] == 40 and entry["measured_source"] == "m365"
+    assert entry["under_used"] is True

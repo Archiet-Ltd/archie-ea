@@ -159,6 +159,7 @@ else:
     from .application_owner import ApplicationOwner  # noqa - Application Manager persona filtering
     # VendorContract already defined in application_portfolio.py - reuse existing
     from .license_entitlement import LicenseEntitlement  # noqa - Procurement license tracking
+    from .license_usage_measurement import LicenseUsageMeasurement  # noqa - measured licence seats
     from .contract_application import ContractApplication  # noqa - Contract-to-application allocation
 
     # Restore vendor stack template to fix missing VendorStackTemplate
