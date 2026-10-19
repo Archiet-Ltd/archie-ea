@@ -13,6 +13,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app import db
+from app.middleware.tenant_isolation import set_database_tenant_context
 from app.models.strategic import StrategicInitiative
 from app.models.transformation_programme import (
     IMPROVEMENT_DIRECTIONS,
@@ -126,6 +127,7 @@ class TransformationProgrammeService:
         cannot become an authorisation bypass.
         """
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             user = cls._load_runtime_user(session, actor)
             server_roles = cls._server_roles(user)
             statement = select(StrategicInitiative.id).where(
@@ -423,6 +425,7 @@ class TransformationProgrammeService:
     @classmethod
     def load_assignment_scope(cls, *, actor, programme_id, workstream_id, user_id):
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             programme = cls._programme_query(session, actor, programme_id).scalar_one_or_none()
             if programme is None:
                 raise NotFound("programme_not_found")
@@ -448,6 +451,7 @@ class TransformationProgrammeService:
     @classmethod
     def authorise_role_assignment(cls, actor, programme, workstream, role) -> None:
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             cls._require_programme_authority(
                 session,
                 actor,
@@ -900,6 +904,7 @@ class TransformationProgrammeService:
     @classmethod
     def load_programme_for_tenant(cls, actor, programme_id):
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             programme = cls._programme_query(session, actor, programme_id).scalar_one_or_none()
             if programme is None:
                 raise NotFound("programme_not_found")
@@ -909,6 +914,7 @@ class TransformationProgrammeService:
     @classmethod
     def load_workstreams_for_tenant(cls, actor, programme_id):
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             rows = session.scalars(
                 select(ProgrammeWorkstream)
                 .where(
@@ -923,6 +929,7 @@ class TransformationProgrammeService:
     @classmethod
     def authorise_read(cls, actor, programme):
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             persisted = cls._programme_query(session, actor, programme.id).scalar_one_or_none()
             if persisted is None:
                 raise NotFound("programme_not_found")

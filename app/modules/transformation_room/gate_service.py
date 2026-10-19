@@ -12,6 +12,7 @@ from sqlalchemy import select, tuple_
 from sqlalchemy.orm import Session
 
 from app import db
+from app.middleware.tenant_isolation import set_database_tenant_context
 from app.models.application_portfolio import ApplicationComponent
 from app.models.benefit import Benefit
 from app.models.implementation_migration import WorkPackage
@@ -264,6 +265,7 @@ class TransformationGateService:
     @classmethod
     def load_policy_snapshot(cls, *, actor: ActorContext, workstream_id: int) -> PolicySnapshot:
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             snapshot = cls._load_policy_snapshot(
                 session=session, actor=actor, workstream_id=workstream_id, lock=False
             )

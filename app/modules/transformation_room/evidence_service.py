@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.orm import Session
 
 from app import db
+from app.middleware.tenant_isolation import set_database_tenant_context
 from app.models.application_portfolio import (
     APPLICATION_LIFECYCLE_STAGES,
     APPLICATION_RISK_LEVELS,
@@ -276,6 +277,8 @@ def load_application_for_tenant(
     owns_session = active_session is None
     session = active_session or Session(db.engine)
     try:
+        if owns_session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
         application = session.scalar(
             select(ApplicationComponent).where(
                 ApplicationComponent.id == application_id,
@@ -1127,6 +1130,7 @@ class TransformationEvidenceService:
         command_key = cls._require_command_key(command_key)
         adapter_name, adapter = cls._adapter(adapter_key)
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             with _adapter_context(session, actor):
                 resolution = adapter.resolve(source_key, actor)
         source_identity = canonical_source_identity(
@@ -1329,6 +1333,7 @@ class TransformationEvidenceService:
     @classmethod
     def load_assigned_request(cls, actor, request_id):
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             request, _candidate, workstream, programme = cls._load_request_scope(
                 session, actor, request_id, lock=False
             )
@@ -2373,6 +2378,7 @@ class TransformationEvidenceService:
         if not subject_type:
             raise ValueError("subject_type is required")
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             candidate_ids = session.scalars(
                 select(TransformationCandidate.id)
                 .join(
