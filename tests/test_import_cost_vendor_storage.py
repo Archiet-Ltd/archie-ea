@@ -179,3 +179,67 @@ def test_imported_cost_in_one_organisation_is_invisible_to_another(
         from app.models.cost_fact import CostFact
 
         assert CostFact.query.filter_by(organization_id=org_b.id).count() == 0
+
+
+def _xlsx_bytes(rows):
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    for row in rows:
+        ws.append(row)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_xlsx_mapped_import_stores_owner_vendor_and_cost_where_screens_read_them(
+    app, db_session, make_org, client, login_as, tenant_ctx
+):
+    """The import dialog's mapping on an .xlsx file keeps owner, vendor AND cost."""
+    from app.services.application_cost_accessor import get_annual_cost_with_source
+
+    org = make_org("xlsx-map")
+    user = _user(db_session, org.id, "xlsx-map")
+    login = lambda: login_as(client, user)  # noqa: E731
+    mappings = {
+        "Application": "name",
+        "Owner": "application_owner",
+        "Business Sponsor": "business_owner",
+        "Supplier": "vendor_name",
+        "Yearly Spend": "total_cost_of_ownership",
+    }
+    content = _xlsx_bytes(
+        [
+            ["Application", "Owner", "Business Sponsor", "Supplier", "Yearly Spend"],
+            ["Xl Alpha", "Ola Owner", "Bea Sponsor", "Acme Corp", 12000],
+            ["Xl Beta", "Olu Owner", "Bo Sponsor", "Globex Ltd", "3,400.50"],
+        ]
+    )
+    with tenant_ctx(org.id):
+        login()
+        resp = client.post(
+            "/applications/upload-excel",
+            data={
+                "file": (io.BytesIO(content), f"apps-{uuid.uuid4().hex[:6]}.xlsx"),
+                "duplicate_mode": "merge",
+                "field_mappings": json.dumps(mappings),
+            },
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        db_session.expire_all()
+        apps = _apps(org.id)
+        alpha, beta = apps["Xl Alpha"], apps["Xl Beta"]
+        assert (alpha.application_owner, alpha.business_owner, alpha.vendor_name) == (
+            "Ola Owner", "Bea Sponsor", "Acme Corp")
+        assert (beta.application_owner, beta.vendor_name) == ("Olu Owner", "Globex Ltd")
+        assert get_annual_cost_with_source(alpha)[0] == 12000.0
+        assert get_annual_cost_with_source(beta)[0] == 3400.5
+        assert {f.category: float(f.amount) for f in _facts(org.id, alpha.id)} == {"total": 12000.0}
+
+        # Visible where the screens read them: the fact sheet.
+        login()
+        sheet = client.get(f"/applications/{alpha.id}/fact-sheet").get_data(as_text=True)
+        assert "Acme Corp" in sheet and "Bea Sponsor" in sheet
+        assert "12,000" in sheet or "12000" in sheet
