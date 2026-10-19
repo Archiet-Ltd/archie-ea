@@ -70,6 +70,51 @@ ELEMENT_TYPES: Dict[str, tuple] = {
     "DataEntity": ("DataObject", "application"),
 }
 
+# Domain-backed element types a generic "create any ArchiMate element" tool
+# must route through their own domain model instead of constructing a bare
+# ArchiMateElement -- see domain_model_for_element_type() below.
+#
+# Found dogfooding entelim.org: the AI chat's generic element-creation tools
+# (app/modules/ai_chat/tools/executor.py::_tool_create_archimate_element and
+# app/modules/ai_chat/services/workbench_kernel.py::create_archimate_element_from_chat)
+# accepted type="ApplicationComponent" like any other ArchiMate type and built
+# only a bare ArchiMateElement, with no application_components row. The
+# Applications portfolio screen reads application_components directly
+# (app/modules/applications/routes/list_views.py) and never sees a bare
+# element, so an application the agent "created" was visible in the
+# architecture model (26 such elements in the affected organisation) and
+# invisible on the one screen a person checks for it (0). Every other domain
+# writer in this codebase goes the other way -- create the domain row, then
+# sync_archimate_element() mirrors it onto archimate_elements (see
+# _tool_create_driver / _tool_create_goal in executor.py for the established
+# pattern) -- these two tools are the only ones that skipped the domain row.
+#
+# Scoped to the one type this gap was found on; extend deliberately, one row
+# at a time, only for a model safely constructible from name/description/
+# organization_id alone. A type that needs more (a VendorContract's
+# start_date, a BusinessCapability's level, ...) keeps its own dedicated tool
+# or form rather than being added here.
+GENERIC_TOOL_DOMAIN_MODELS: Dict[str, str] = {
+    "ApplicationComponent": "app.models.application_portfolio.ApplicationComponent",
+}
+
+
+def domain_model_for_element_type(element_type: str):
+    """The domain model class a generic element-creation call must use for
+    ``element_type``, instead of constructing a bare ArchiMateElement.
+
+    Returns None when ``element_type`` has no such model, or needs more than
+    name/description/organization_id to construct safely -- call
+    create_backbone_element directly for those.
+    """
+    path = GENERIC_TOOL_DOMAIN_MODELS.get(element_type)
+    if path is None:
+        return None
+    module_path, class_name = path.rsplit(".", 1)
+    module = __import__(module_path, fromlist=[class_name])
+    return getattr(module, class_name)
+
+
 # Per-type description templates for the five domain types.  These preserve
 # the same description format the per-model raw-insert listeners used, so a
 # backfilled element and a listener-created element are identical.

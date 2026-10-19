@@ -8,7 +8,10 @@ Design decisions:
   - Exceptions roll back and surface as {"success": False, "error": "..."}.
 """
 
-from app.services.archimate_backbone import sync_archimate_element
+from app.services.archimate_backbone import (
+    domain_model_for_element_type,
+    sync_archimate_element,
+)
 import hashlib
 import logging
 import re
@@ -822,15 +825,32 @@ class ToolExecutor:
             extra_filters=[ArchiMateElement.type == args["type"]],
         )
 
-        elem = ArchiMateElement(
-            name=args["name"],
-            type=args["type"],
-            layer=args["layer"],
-            description=args.get("description", ""),
-            organization_id=org_id,
-        )
-        db.session.add(elem)
-        db.session.flush()  # get elem.id before linking
+        # See app.services.archimate_backbone.domain_model_for_element_type: a
+        # domain-backed type (ApplicationComponent today) must create its own
+        # domain row, not a bare ArchiMateElement -- the Applications
+        # portfolio screen (and anything else that reads the domain table
+        # directly) never sees a bare element. sync_archimate_element mirrors
+        # the new row onto archimate_elements, the same path
+        # _tool_create_driver/_tool_create_goal below already use.
+        domain_model = domain_model_for_element_type(args["type"])
+        if domain_model is not None:
+            domain_row = domain_model(
+                name=args["name"],
+                description=args.get("description", ""),
+                organization_id=org_id,
+            )
+            db.session.add(domain_row)
+            elem = sync_archimate_element(domain_row)
+        else:
+            elem = ArchiMateElement(
+                name=args["name"],
+                type=args["type"],
+                layer=args["layer"],
+                description=args.get("description", ""),
+                organization_id=org_id,
+            )
+            db.session.add(elem)
+            db.session.flush()  # get elem.id before linking
 
         # Optionally link to a solution
         solution_name = args.get("solution_name")

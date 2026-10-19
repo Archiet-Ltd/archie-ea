@@ -568,14 +568,49 @@ class WorkbenchKernel:
             }
         try:
             from app.models.models import ArchiMateElement
-            element = ArchiMateElement(
-                name=element_name[:100],
-                type=element_type,
-                layer=layer,
-                description=description or f"{element_type}: {element_name}",
+            from app.services.archimate_backbone import (
+                domain_model_for_element_type,
+                sync_archimate_element,
             )
-            db.session.add(element)
-            db.session.flush()
+
+            # See archimate_backbone.domain_model_for_element_type: a
+            # domain-backed type (ApplicationComponent today) must create its
+            # own domain row, not a bare ArchiMateElement -- the Applications
+            # portfolio screen (and anything else that reads the domain
+            # table directly) never sees a bare element.
+            # sync_archimate_element mirrors the new row onto
+            # archimate_elements, same as every other domain writer.
+            domain_model = domain_model_for_element_type(element_type)
+            if domain_model is not None:
+                from app.models.solution_architect_models import (
+                    SolutionAnalysisSession,
+                )
+
+                # Not .query.get(): an identity-map hit on a warm session
+                # returns the cached row with no SQL, bypassing the tenant
+                # filter (same guard record_architecture_decision uses above).
+                workspace_session = SolutionAnalysisSession.query.filter_by(
+                    id=workspace_id
+                ).first()
+                org_id = (
+                    workspace_session.organization_id if workspace_session else None
+                )
+                domain_row = domain_model(
+                    name=element_name[:100],
+                    description=description or f"{element_type}: {element_name}",
+                    organization_id=org_id,
+                )
+                db.session.add(domain_row)
+                element = sync_archimate_element(domain_row)
+            else:
+                element = ArchiMateElement(
+                    name=element_name[:100],
+                    type=element_type,
+                    layer=layer,
+                    description=description or f"{element_type}: {element_name}",
+                )
+                db.session.add(element)
+                db.session.flush()
             if solution_id:
                 try:
                     from app.modules.solutions_strategic.v2.routes.solution_phase_routes import (
