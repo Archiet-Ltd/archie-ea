@@ -36,7 +36,7 @@
   OLD: window.modalManager.open('X')                  → Platform.modal.open('X')
   OLD: Modal.open('X')                                → Platform.modal.open('X')
 #}
-{% macro modal(id='modal', title='', description='', size='default', closable=true, labelledby='', help_text='') %}
+{% macro modal(id='modal', title='', description='', size='default', closable=true, labelledby='', help_text='', attrs='') %}
 {# Resolve which element ID to reference for aria-labelledby.
    Priority: explicit labelledby arg > title-derived id > omitted (if neither supplied). #}
 {% set _lby = labelledby if labelledby else (id ~ '-title' if title else '') %}
@@ -63,6 +63,7 @@
     {% if _lby %}aria-labelledby="{{ _lby }}"{% endif %}
     class="modal-root fixed inset-0 items-center justify-center p-4"
     style="z-index: var(--modal-z, 1000);"
+    {% if attrs %}{{ attrs|safe }}{% endif %}
 >
     <!-- Backdrop -->
     <div
