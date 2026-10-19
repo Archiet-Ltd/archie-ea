@@ -8,9 +8,11 @@ A row with a NULL organisation (one whose owner could not be derived) matches
 no organisation's session and is visible only under the platform scope.
 
 required_capabilities is deliberately not one of these six: it is already
-fenced by ``20261018_vendor_analysis_rls``, which this revision now chains
-after, and that revision is the only one entitled to drop or re-create
-policies on it.
+fenced by ``20261018_vendor_analysis_rls``, which sits lower in this same
+chain (``20261018_tree_models_org_id`` now chains after
+``20261018_typed_tables_rls``, which itself chains after
+``20261018_vendor_analysis_rls``), and that revision is the only one
+entitled to drop or re-create policies on required_capabilities.
 
 Revision ID: 20261018_tree_models_rls
 Revises: 20261018_tree_models_org_id

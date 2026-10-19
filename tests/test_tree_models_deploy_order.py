@@ -205,6 +205,19 @@ def scratch(request):
                 text(f"INSERT INTO {table} (created_by_id, note) VALUES (1, 'c')")  # nosec B608
             )
             connection.execute(text(f"INSERT INTO {table} (note) VALUES ('n')"))  # nosec B608
+            # 'root2' is itself a root (no parent) resolvable only through
+            # its own creator; 'leaf2' has nothing of its own at all -- no
+            # hangs-off source, no creator -- and can only ever resolve by
+            # inheriting from 'root2' once root2's creator fallback has run,
+            # which needs the parent walk to repeat after that, not stop
+            # after one pass each.
+            root2_id = connection.execute(
+                text(f"INSERT INTO {table} (created_by_id, note) VALUES (1, 'root2') RETURNING id")  # nosec B608
+            ).scalar()
+            connection.execute(
+                text(f"INSERT INTO {table} ({parent_col}, note) VALUES (:p, 'leaf2')"),  # nosec B608
+                {"p": root2_id},
+            )
 
         connection.execute(
             text(
@@ -228,6 +241,13 @@ def scratch(request):
             text("INSERT INTO compliance_requirements (created_by_id, note) VALUES (1, 'c')")
         )
         connection.execute(text("INSERT INTO compliance_requirements (note) VALUES ('n')"))
+        root2_cr = connection.execute(
+            text("INSERT INTO compliance_requirements (created_by_id, note) VALUES (1, 'root2') RETURNING id")
+        ).scalar()
+        connection.execute(
+            text("INSERT INTO compliance_requirements (parent_requirement_id, note) VALUES (:p, 'leaf2')"),
+            {"p": root2_cr},
+        )
 
         for table in ("vendor_capability_hierarchy", "vendor_process_hierarchy"):
             connection.execute(
@@ -320,6 +340,22 @@ def test_creating_user_is_the_last_resort(scratch, table):
     assert orgs["c"] == 2
 
 
+@pytest.mark.parametrize("table", CREATOR_FALLBACK_TABLES)
+def test_a_child_inherits_from_a_parent_that_only_resolved_via_creator(scratch, table):
+    """'root2' is itself a root with no hangs-off source of its own --
+    only a creating user -- and 'leaf2' has nothing at all of its own, only
+    a parent link to 'root2'. The creator fallback must apply to a root
+    before the parent walk runs (or the parent walk must repeat after it),
+    or 'leaf2' is left NULL and hidden even though it could resolve through
+    'root2' the moment root2's own creator fallback gives it an
+    organisation.
+    """
+    _upgrade_org_id(scratch)
+    orgs = _org_by_note(scratch, table)
+    assert orgs["root2"] == 2, "a true root with only a creator must still resolve through it"
+    assert orgs["leaf2"] == 2, "a child must inherit from a parent resolved only by the parent's own creator fallback"
+
+
 @pytest.mark.parametrize("table", TABLES)
 def test_unresolved_rows_stay_null(scratch, table):
     _upgrade_org_id(scratch)
@@ -397,6 +433,48 @@ def test_policies_are_actually_active_after_both_revisions(scratch, table):
             )
         }
         assert names == POLICIES
+
+
+@pytest.mark.parametrize("table", TABLES)
+def test_a_non_owner_role_sees_only_its_organisations_rows(scratch, table):
+    """Policies existing (the test above) is not the same as them actually
+    restricting a real, non-owning application role -- the migration role
+    that applies them typically owns the table, and Postgres exempts an
+    owner from its own table's row-level security by default. Modeled on
+    ``test_vendor_analysis_rls_deploy_order.py``'s own
+    ``test_a_non_owner_role_sees_only_its_organisations_rows``. Inserts its
+    own two rows with a known, already-resolved organisation rather than
+    relying on which organisation the backfill happened to give any of the
+    fixture's own rows (several of this fixture's tables never resolve a
+    row to organisation 2 at all), so this test is the same shape regardless
+    of table.
+    """
+    _upgrade_both(scratch)
+    with scratch.begin() as connection:
+        connection.execute(
+            text(f"INSERT INTO {table} (organization_id, note) VALUES (1, 'rls-a'), (2, 'rls-b')")  # nosec B608
+        )
+
+    role = f"tree_org_rt_{uuid.uuid4().hex[:8]}"
+    with scratch.begin() as connection:
+        connection.execute(text(f"CREATE ROLE {role} NOSUPERUSER NOBYPASSRLS"))  # nosec B608 - generated name
+        connection.execute(text(f"GRANT SELECT ON {table} TO {role}"))  # nosec B608 - generated name
+    try:
+        with scratch.connect() as connection:
+            connection.execute(text(f"SET ROLE {role}"))  # nosec B608 - generated name
+            connection.execute(text("SELECT set_config('archie.organization_id', '1', false)"))
+            seen = {r[0] for r in connection.execute(text(f"SELECT note FROM {table} WHERE note LIKE 'rls-%'"))}  # nosec B608
+            assert seen == {"rls-a"}
+            connection.execute(text("SELECT set_config('archie.organization_id', '2', false)"))
+            seen = {r[0] for r in connection.execute(text(f"SELECT note FROM {table} WHERE note LIKE 'rls-%'"))}  # nosec B608
+            assert seen == {"rls-b"}
+            connection.execute(text("SELECT set_config('archie.organization_id', '', false)"))
+            seen = list(connection.execute(text(f"SELECT note FROM {table} WHERE note LIKE 'rls-%'")))  # nosec B608
+            assert seen == [], "a NULL-organisation session must see nothing, not every unattributed row"
+    finally:
+        with scratch.begin() as connection:
+            connection.execute(text(f"REVOKE ALL ON {table} FROM {role}"))  # nosec B608 - generated name
+            connection.execute(text(f"DROP ROLE {role}"))  # nosec B608 - generated name
 
 
 def test_unresolved_rows_are_reported_not_fatal(scratch, capsys):

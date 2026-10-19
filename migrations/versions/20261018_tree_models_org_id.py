@@ -17,14 +17,19 @@ revision does not expect anyone else to touch -- is exactly the duplication
 independent feature.
 
 Backfill fails closed. A row takes the organisation of the record it hangs
-off (its project, vendor stack template or ArchiMate element), then of its
-parent row in the same hierarchy, then, last, of the user who created it --
-parent-derivation before the creating-user fallback, the same order
-``app/commands/backfill_layer_tenancy.py`` uses elsewhere in this codebase.
-A row with none of these has no derivable organisation: none is guessed, it
-stays NULL, matches no organisation's filter, and the column is only
-tightened to NOT NULL on a table where no NULL remains. The number of
-unattributed rows is printed.
+off (its project, vendor stack template or ArchiMate element), else, if it
+is a root with no parent to trust instead, of the user who created it, else
+of its parent row in the same hierarchy -- parent-derivation before the
+creating-user fallback, the same order ``app/commands/backfill_layer_tenancy.py``
+uses elsewhere in this codebase, and never from a row's own creator when it
+has a parent to inherit from instead, however many steps that parent itself
+needed to resolve (including the parent's own creator fallback, if it is
+the root). The parent walk repeats to a fixed point -- not a single pass --
+so a chain resolved only partly through creator fallbacks at its root still
+reaches every descendant. A row with none of these has no derivable
+organisation: none is guessed, it stays NULL, matches no organisation's
+filter, and the column is only tightened to NOT NULL on a table where no
+NULL remains. The number of unattributed rows is printed.
 
 Idempotent: every step checks before it acts, so a second run is a no-op.
 
@@ -44,10 +49,10 @@ depends_on = None
 # table -> (parent column in the same table, ((source table, join column), ...),
 #           creating-user column or None)
 # Each source table is assumed to carry organization_id; a missing one is
-# skipped. The creating-user fallback, when present, always runs last --
-# after every other source and after the parent-chain walk below -- never
-# before the row's own parent, matching backfill_layer_tenancy.py's
-# COALESCE ordering (parent/linked-entity derivation first, creator last).
+# skipped. The creating-user fallback, when present, applies only to a row
+# with no parent at all (a true root) -- never to a row that has a parent to
+# inherit from instead, matching backfill_layer_tenancy.py's COALESCE
+# ordering (parent/linked-entity derivation before the creator, never after).
 TABLES = {
     "tasks": ("parent_task_id", (("projects", "project_id"), ("requirements", "requirement_id")), None),
     "portfolio_initiatives": (
@@ -114,10 +119,31 @@ def upgrade():
                 )
             )
 
-        # 2. A child with nothing else to go on takes its parent's
-        # organisation. Repeat until stable so a chain of any depth
-        # resolves; each pass only fills NULLs.
-        if _has_column(bind, table, parent_col):
+        has_parent_col = _has_column(bind, table, parent_col)
+
+        # 2. The user who created it -- but only for a true root (no parent
+        # at all). A row with a parent must never guess from its own
+        # creator ahead of its parent's own resolution, even one that is
+        # still NULL at this point and only resolves (via step 3 below)
+        # once this step has given a parent-less ancestor its own
+        # creator-derived organisation.
+        if creator_col and _has_column(bind, table, creator_col) and _has_column(bind, "users", "organization_id"):
+            root_clause = f"t.{parent_col} IS NULL" if has_parent_col else "TRUE"
+            bind.execute(
+                text(
+                    f"UPDATE {table} AS t SET organization_id = u.organization_id "  # nosec B608 - literal names
+                    f"FROM users AS u WHERE t.{creator_col} = u.id "
+                    f"AND t.organization_id IS NULL AND u.organization_id IS NOT NULL AND ({root_clause})"
+                )
+            )
+
+        # 3. A child with nothing else to go on takes its parent's
+        # organisation -- including a parent that only resolved through its
+        # own creator fallback in step 2 above. Repeat until stable (a
+        # fixed point, not a single pass) so a chain of any depth resolves,
+        # however many of its links needed step 2 to get there; each pass
+        # only fills NULLs.
+        if has_parent_col:
             for _ in range(32):
                 filled = bind.execute(
                     text(
@@ -128,17 +154,6 @@ def upgrade():
                 ).rowcount
                 if not filled:
                     break
-
-        # 3. Last resort: the user who created it. Only reached once
-        # neither the row's own linked entity nor its parent resolved it.
-        if creator_col and _has_column(bind, table, creator_col) and _has_column(bind, "users", "organization_id"):
-            bind.execute(
-                text(
-                    f"UPDATE {table} AS t SET organization_id = u.organization_id "  # nosec B608 - literal names
-                    f"FROM users AS u WHERE t.{creator_col} = u.id "
-                    "AND t.organization_id IS NULL AND u.organization_id IS NOT NULL"
-                )
-            )
 
         remaining = bind.execute(text(f"SELECT COUNT(*) FROM {table} WHERE organization_id IS NULL")).scalar()  # nosec B608 - literal names
         if remaining:

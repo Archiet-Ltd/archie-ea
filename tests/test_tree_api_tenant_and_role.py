@@ -354,6 +354,48 @@ class TestCrossOrganisationRefused:
         assert resp.status_code == 400
 
 
+# Tenant trees with a genuine self-referential parent, reachable by an
+# integer node route (task is UUID-keyed and excluded the same way the
+# class above excludes it).
+_REPARENTING_TENANT_KEYS = [
+    "portfolio_initiative", "system_boundary", "compliance", "vendor_capability", "vendor_process",
+]
+
+
+@pytest.mark.parametrize("key", _REPARENTING_TENANT_KEYS)
+def test_delete_refuses_a_node_whose_child_belongs_to_another_organisation(
+    client, login_as, db_session, org_a, org_b, architect_a, architect_b, key
+):
+    """The same guard TestReferenceCapabilityTree proves for the hybrid tree
+    must hold for a plain tenant tree too: a child in another organisation
+    is never loaded at all (TenantMixin's own session filter sees to that),
+    so without this guard it is silently never reparented and the real
+    foreign key it still carries blocks the delete with an unhandled
+    IntegrityError (500) instead of a handled refusal.
+    """
+    from flask import g
+
+    parent_id = _seed(db_session, key, architect_a, f"A parent {key}")
+    child_id = _seed(db_session, key, architect_b, f"B child {key}")
+    parent_fk = _registry()[key]["parent_fk"]
+    Model = _model(key)
+
+    g.current_org_id = org_b.id
+    child = Model.query.get(child_id)
+    setattr(child, parent_fk, parent_id)
+    db_session.commit()
+
+    login_as(client, architect_a)
+    resp = client.delete(f"{BASE}/{key}/{parent_id}")
+    assert resp.status_code in (400, 403), resp.get_json()
+
+    db_session.expire_all()
+    g.current_org_id = org_a.id
+    assert Model.query.get(parent_id) is not None
+    g.current_org_id = org_b.id
+    assert getattr(Model.query.get(child_id), parent_fk) == parent_id
+
+
 def _flatten(tree):
     names = []
     for node in tree.get("children", []):
@@ -522,12 +564,16 @@ class TestReferenceCapabilityTree:
         assert db_session.get(ReferenceModelCapability, own_child.id).parent_capability_id == parent.id
         assert db_session.get(ReferenceModelCapability, other_org_child.id).parent_capability_id == parent.id
 
-    def test_delete_with_only_visible_children_still_reparents_them(
+    def test_delete_refuses_a_shared_child_instead_of_reparenting_it(
         self, client, login_as, db_session, reference_model, org_a, architect_a
     ):
-        """The refusal above must not block the ordinary case: every child
-        visible to the caller still gets reparented and the delete still
-        succeeds when there is no invisible child in the way."""
+        """A shared row (organization_id IS NULL) is visible to every
+        organisation but owned by none -- _visible() includes it for reads,
+        but nobody's write may touch it. Reparenting it anyway would be a
+        tenant silently rewriting (or, through cascade="all, delete-orphan",
+        silently deleting) the platform's own shared catalogue row; refuse
+        the whole delete the same way a foreign organisation's child does.
+        """
         from app.models.reference_models import ReferenceModelCapability
 
         parent = _owned_reference_capability(db_session, reference_model, org_a.id, "A parent")
@@ -535,6 +581,28 @@ class TestReferenceCapabilityTree:
         own_child.parent_capability_id = parent.id
         shared_child = _shared_reference_capability(db_session, reference_model)
         shared_child.parent_capability_id = parent.id
+        db_session.commit()
+
+        login_as(client, architect_a)
+        resp = client.delete(f"{BASE}/reference_capability/{parent.id}")
+        assert resp.status_code == 403
+
+        db_session.expire_all()
+        assert db_session.get(ReferenceModelCapability, parent.id) is not None
+        assert db_session.get(ReferenceModelCapability, own_child.id).parent_capability_id == parent.id
+        assert db_session.get(ReferenceModelCapability, shared_child.id).parent_capability_id == parent.id
+
+    def test_delete_with_only_owned_children_still_reparents_them(
+        self, client, login_as, db_session, reference_model, org_a, architect_a
+    ):
+        """The refusals above must not block the ordinary case: a child the
+        caller actually owns still gets reparented and the delete still
+        succeeds when there is no foreign or shared child in the way."""
+        from app.models.reference_models import ReferenceModelCapability
+
+        parent = _owned_reference_capability(db_session, reference_model, org_a.id, "A parent")
+        own_child = _owned_reference_capability(db_session, reference_model, org_a.id, "A child")
+        own_child.parent_capability_id = parent.id
         db_session.commit()
 
         login_as(client, architect_a)

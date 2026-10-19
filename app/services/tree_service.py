@@ -9,6 +9,7 @@ Usage:
     # Returns: {"name": "Capabilities", "children": [{id, name, children, ...}, ...]}
 """
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import StaleDataError
 
 from app import db
@@ -357,22 +358,45 @@ def _owned_by_caller(Model, tree_key, row):
     return org_id is not None and row.organization_id == org_id
 
 
+def _reparentable(Model, tree_key):
+    """Criteria for a child this caller may actually write to during a
+    reparenting delete -- stricter than ``_visible()``: a hybrid tree's
+    shared row (``organization_id IS NULL``) is visible to read but owned by
+    no tenant, so it is excluded here even though ``_visible()`` includes it
+    for reads. ``None`` for a plain tenant tree: TenantMixin's own session
+    filter already means nothing not this caller's own was ever loaded, so
+    there is nothing further to exclude here.
+    """
+    if tree_key != "reference_capability":
+        return None
+    from sqlalchemy import false
+
+    org_id = current_org_id()
+    if org_id is None:
+        return false()
+    return Model.organization_id == org_id
+
+
 def _commit():
     """Commit; a refused reference/cross-organisation write becomes FORBIDDEN.
 
-    Two distinct shapes land here for the same underlying reason -- a write
-    this caller may not make under row-level security or the hybrid write
-    policy -- and neither is a server defect worth a 500: ``PermissionError``,
-    raised by application code, and ``StaleDataError``, raised by the ORM's
-    own flush when an UPDATE/DELETE it expected to touch one row instead
-    matched zero, because row-level security silently excluded that row from
-    its own WHERE clause rather than raising (a shared reference row a
-    reparenting delete tried to write through, for instance -- see
-    ``delete_node``).
+    Three distinct shapes land here for the same underlying reason -- a
+    write this caller may not make -- and none is a server defect worth a
+    500: ``PermissionError``, raised by application code;
+    ``StaleDataError``, raised by the ORM's own flush when an UPDATE/DELETE
+    it expected to touch one row instead matched zero, because row-level
+    security silently excluded that row from its own WHERE clause rather
+    than raising (a shared reference row a reparenting delete tried to write
+    through, for instance); and ``IntegrityError``, raised by a real foreign
+    key still pointing at the row this delete is removing -- a child in
+    another organisation (or, under TenantMixin's own session filter, simply
+    not loaded at all to be reparented in the first place) that this
+    caller's session could not see to reparent, let alone exclude from the
+    delete it is now blocking. See ``delete_node``.
     """
     try:
         db.session.commit()
-    except (PermissionError, StaleDataError) as exc:
+    except (PermissionError, StaleDataError, IntegrityError) as exc:
         db.session.rollback()
         return f"{FORBIDDEN}: {exc}"
     return None
@@ -553,20 +577,35 @@ def delete_node(tree_key, node_id):
 
     parent_id = getattr(row, parent_fk, None)
     all_children = Model.query.filter(getattr(Model, parent_fk) == node_id)
-    visible = _visible(Model, tree_key)
-    if visible is not None:
-        children = all_children.filter(visible).all()
-        # A child this caller cannot see (another organisation's private
-        # row under a hybrid tree) can be neither reparented nor safely left
-        # alone: some models (ReferenceModelCapability is one) declare their
+    reparentable = _reparentable(Model, tree_key)
+    if reparentable is not None:
+        children = all_children.filter(reparentable).all()
+        # A child this caller may not write to -- another organisation's
+        # private row, or a hybrid tree's shared row, which belongs to no
+        # tenant -- can be neither reparented nor safely left alone: some
+        # models (ReferenceModelCapability is one) declare their
         # self-referential children as an ORM relationship with
         # cascade="all, delete-orphan", which would delete an unreparented
-        # child along with its parent -- another organisation's row, gone,
-        # with nothing in this request that organisation could ever see or
-        # consent to. Refuse the whole delete instead.
+        # child along with its parent -- another organisation's row, or a
+        # shared one, gone, with nothing in this request that owns it or
+        # could consent to that. Refuse the whole delete instead.
+        #
+        # This count only ever differs under a database role this caller's
+        # own write would not actually have: a genuinely tenant-scoped
+        # Postgres role has row-level security hide a foreign private row
+        # from both queries identically (the count can never catch what
+        # neither query can see), which is exactly why the flush below is
+        # still wrapped and _commit() below still catches IntegrityError --
+        # the real, final backstop for whatever this count cannot.
         if all_children.count() != len(children):
             return f"{FORBIDDEN}: this node has a child outside this organisation"
     else:
+        # A plain tenant tree: TenantMixin's own session filter already
+        # means every row Model.query can return here is this caller's own,
+        # so there is nothing left to exclude. A child in another
+        # organisation was never loaded and is never reparented -- its real
+        # foreign key still points at this row, and the delete below raises
+        # IntegrityError, caught the same way as every other refused write.
         children = all_children.all()
 
     for child in children:
@@ -583,11 +622,12 @@ def delete_node(tree_key, node_id):
         # and expiring row's own cached state forces SQLAlchemy to re-read
         # its relationships from the database, which now shows no
         # children left, before the delete (and its now-empty cascade) is
-        # issued. Any row-level-security rejection of this flush (a write
-        # the caller may not make) is handled the same way _commit() below
-        # handles one at the final commit.
+        # issued. Any row-level-security rejection of this flush, or a real
+        # foreign key a child outside this session's visibility still
+        # holds, is handled the same way _commit() below handles one at the
+        # final commit.
         db.session.flush()
-    except (PermissionError, StaleDataError) as exc:
+    except (PermissionError, StaleDataError, IntegrityError) as exc:
         db.session.rollback()
         return f"{FORBIDDEN}: {exc}"
     db.session.expire(row)
