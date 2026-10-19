@@ -37,8 +37,11 @@
     --card-foreground: 210 40% 98%;
     --popover: 217.2 32.6% 17.5%;
     --popover-foreground: 210 40% 98%;
-    --primary: 243.4 75.4% 58.6%;
-    --primary-foreground: 0 0% 100%;
+    /* Dark accent is indigo-400 with navy text on fills: 6.0:1 both as text
+       on slate-900 and as a fill under navy, so the many existing text-primary
+       links and badges stay legible without touching their templates. */
+    --primary: 234.5 89.5% 73.9%;
+    --primary-foreground: 222.2 47.4% 11.2%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
