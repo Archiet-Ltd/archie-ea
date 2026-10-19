@@ -639,7 +639,11 @@ def test_defect_authenticated_request_writes_the_tenant_once_per_transaction(ctx
     user_id, org_id = user.id, user.organization_id
     db.session.remove()
     sid = mint_test_sid(user_id, org_id, app=application)
-    db.session.remove()
+    # The request must not inherit the sign-up's cached user (it shares this
+    # application context's ``g``); it signs in from the session cookie below.
+    from app.middleware.tenant_context import clear_tenant_context_cache
+
+    clear_tenant_context_cache()
     client = application.test_client()
     with client.session_transaction() as session:
         session["_user_id"] = str(user_id)
