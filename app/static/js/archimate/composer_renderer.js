@@ -1305,6 +1305,7 @@ let ComposerRenderer = (function() {
        corridor is how many earlier ones already took a route round the nodes, so a
        later one takes the next-nearest gap. Returns anchors, vertices and the polyline. */
     function planPlainRoute(S, T, rows, width, height, slot, arcMax) {
+        let tOff = slot.tOff || 0;
         let sc = { x: S.x + S.w / 2, y: S.y + S.h / 2 }, tc = { x: T.x + T.w / 2, y: T.y + T.h / 2 };
         let off = slot.index * PLAIN_PAIR_OFFSET;
         let clampV = function(v) {
@@ -1318,7 +1319,7 @@ let ComposerRenderer = (function() {
         let A, B, line = null, vertices = [], srcSide, tgtSide, corridor = false;
         if (S === T || iS === iT) {
             /* Same row: both ends on the top edge, an arc over the row between them. */
-            let sx = sc.x + (S === T ? -12 : off), tx = tc.x + (S === T ? 12 : off);
+            let sx = sc.x + (S === T ? -12 : off), tx = tc.x + (S === T ? 12 : off + tOff);
             A = { x: sx, y: S.y }; B = { x: tx, y: T.y };
             srcSide = tgtSide = 'top';
             let span = Math.abs(tx - sx);
@@ -1329,7 +1330,7 @@ let ComposerRenderer = (function() {
             let down = iT > iS, step = down ? 1 : -1;
             srcSide = down ? 'bottom' : 'top'; tgtSide = down ? 'top' : 'bottom';
             A = { x: sc.x + off, y: down ? S.y + S.h : S.y };
-            B = { x: tc.x + off, y: down ? T.y : T.y + T.h };
+            B = { x: tc.x + off + tOff, y: down ? T.y : T.y + T.h };
             let others = [];
             rows.forEach(function(row) { row.rects.forEach(function(r) { if (r !== S && r !== T) others.push(r); }); });
             /* A straight line is kept only when it is steep enough not to graze the
@@ -1376,7 +1377,7 @@ let ComposerRenderer = (function() {
             }
         }
         if (line && line.length > 2) vertices = plainSmoothVertices(line, PLAIN_CORNER, PLAIN_STEP);
-        return { A: A, B: B, line: line || [A, B], srcSide: srcSide, tgtSide: tgtSide, off: off, vertices: vertices, corridor: corridor };
+        return { A: A, B: B, line: line || [A, B], srcSide: srcSide, tgtSide: tgtSide, off: off, tOff: tOff, vertices: vertices, corridor: corridor };
     }
 
     /* ── Public factory: create a renderer bound to a container element ── */
@@ -1560,9 +1561,10 @@ let ComposerRenderer = (function() {
         function plainInk() {
             return {
                 stroke: tokenColour('--border') || 'currentColor',
+                line: tokenColour('--muted-foreground') || 'currentColor',
                 highlight: tokenColour('--ring') || 'currentColor',
                 text: tokenColour('--muted-foreground') || 'currentColor',
-                badgeFill: tokenColour('--card') || 'none',
+                badgeFill: tokenColour('--card') || 'Canvas',
                 foreground: tokenColour('--foreground') || 'currentColor',
                 accent: tokenColour('--accent') || tokenColour('--muted') || 'none',
             };
@@ -1596,6 +1598,11 @@ let ComposerRenderer = (function() {
             node.attr('body/ry', 6);
             node.attr('body/opacity', 1);
             node.attr('body/style', { transition: 'fill 150ms ease-out' });
+            let markup = node.get('markup') || node.markup;
+            if (Array.isArray(markup) && !markup.some(function(m) { return m.selector === 'ring'; })) {
+                node.set('markup', markup.concat([{ tagName: 'rect', selector: 'ring' }]));
+            }
+            node.attr('ring', { x: -3, y: -3, refWidth: 6, refHeight: 6, rx: 9, ry: 9, fill: 'none', strokeWidth: 2, pointerEvents: 'none', display: 'none' });
             node.attr('nameLabel/fill', ink.foreground);
             node.attr('nameLabel/fontSize', 14);
             node.attr('nameLabel/fontWeight', 600);
@@ -1620,14 +1627,14 @@ let ComposerRenderer = (function() {
         }
 
         function paintPlainNode(node, ringed) {
-            let ring = ringed ? { outline: '2px solid ' + plainInk().highlight, outlineOffset: '2px', transition: 'fill 150ms ease-out' }
-                              : { transition: 'fill 150ms ease-out' };
-            if (!sameJson(node.attr('body/style'), ring)) node.attr('body/style', ring);
+            if (ringed) node.attr('ring/stroke', plainInk().highlight);
+            let display = ringed ? 'block' : 'none';
+            if (node.attr('ring/display') !== display) node.attr('ring/display', display);
         }
 
         function paintPlainLink(link, on) {
             let ink = plainInk();
-            let c = on ? ink.highlight : ink.stroke;
+            let c = on ? ink.highlight : ink.line;
             if (link.attr('line/stroke') !== c) link.attr('line/stroke', c);
             let m = link.attr('line/targetMarker');
             if (!m || m.fill !== c || m.stroke !== c) {
@@ -1660,7 +1667,7 @@ let ComposerRenderer = (function() {
         /* Put the "Worked out" badge where it sits clear of every node: the point
            along the drawn polyline nearest the middle whose badge-sized box touches
            no node and stays inside the drawing. */
-        function placePlainBadge(link, plan, rects, width, taken) {
+        function placePlainBadge(link, plan, rects, width, taken, others) {
             let labels = link.labels();
             if (!labels.length) return;
             let text = labels[0].attrs && labels[0].attrs.text ? String(labels[0].attrs.text.text) : '';
@@ -1687,7 +1694,12 @@ let ComposerRenderer = (function() {
                 let hits = function(r) {
                     return box.x < r.x + r.w && box.x + box.w > r.x && box.y < r.y + r.h && box.y + box.h > r.y;
                 };
-                if (box.x >= 0 && box.x + box.w <= width && !rects.some(hits) && !taken.some(hits)) { best = tries[k]; chosen = box; break; }
+                let onOther = others.some(function(o) {
+                    if (o.link === link) return false;
+                    for (let i = 1; i < o.line.length; i++) { if (plainSegmentHitsRect(o.line[i - 1], o.line[i], { x: box.x, y: box.y, w: box.w, h: box.h }, 0)) return true; }
+                    return false;
+                });
+                if (box.x >= 0 && box.x + box.w <= width && !rects.some(hits) && !taken.some(hits) && !onOther) { best = tries[k]; chosen = box; break; }
             }
             if (chosen) taken.push({ x: chosen.x, y: chosen.y, w: chosen.w, h: chosen.h });
             let pos = { distance: best, offset: 0 };
@@ -1717,6 +1729,10 @@ let ComposerRenderer = (function() {
                 let g = [s, t].sort().join('|');
                 (groups[g] = groups[g] || []).push(l);
             });
+            /* Pass 1 plans every link; connections that arrive on the same side of the same
+               node are then spread (recorded first, each later one 13px further along) and
+               planned again, so no two arrivals share a stretch of line. */
+            let items = [];
             Object.keys(groups).forEach(function(g) {
                 let list = groups[g].slice().sort(function(a, b) {
                     let ra = a.get('provenance') === 'derived' ? 1 : 0, rb = b.get('provenance') === 'derived' ? 1 : 0;
@@ -1725,22 +1741,42 @@ let ComposerRenderer = (function() {
                 let corridors = 0;
                 list.forEach(function(link, index) {
                     let sId = link.source().id, tId = link.target().id;
-                    let plan = planPlainRoute(byId[sId], byId[tId], rows, size.width, size.height,
-                        { index: index, corridor: corridors }, banded ? 8 : 24);
+                    let slot = { index: index, corridor: corridors, tOff: 0 };
+                    let plan = planPlainRoute(byId[sId], byId[tId], rows, size.width, size.height, slot, banded ? 8 : 24);
                     if (plan.corridor) corridors++;
-                    /* Measure from the node's own body when it has one, so a resize handle or port
-                       sticking out of the box does not hold the connection off the visible border. */
-                    let src = { id: sId, anchor: { name: plan.srcSide, args: { dx: plan.off } }, connectionPoint: { name: 'boundary' } };
-                    let tgt = { id: tId, anchor: { name: plan.tgtSide, args: { dx: plan.off } }, connectionPoint: { name: 'boundary' } };
-                    if (sId === tId) { src.anchor.args.dx = -12; tgt.anchor.args.dx = 12; }
-                    if (graph.getCell(sId).attr('body')) src.selector = 'body';
-                    if (graph.getCell(tId).attr('body')) tgt.selector = 'body';
-                    if (!sameJson(link.source(), src)) link.source(src);
-                    if (!sameJson(link.target(), tgt)) link.target(tgt);
-                    if (!sameJson(link.vertices(), plan.vertices)) link.vertices(plan.vertices);
-                    placePlainBadge(link, plan, rects, size.width, taken);
+                    items.push({ link: link, sId: sId, tId: tId, slot: slot, plan: plan });
                 });
             });
+            let arrivals = {};
+            items.slice().sort(function(a, b) {
+                let ra = a.link.get('provenance') === 'derived' ? 1 : 0, rb = b.link.get('provenance') === 'derived' ? 1 : 0;
+                return (ra - rb) || String(linkKey(a.link)).localeCompare(String(linkKey(b.link)));
+            }).forEach(function(it) {
+                if (it.sId === it.tId) return;
+                let k = it.tId + '|' + it.plan.tgtSide;
+                let n = arrivals[k] = (arrivals[k] || 0);
+                arrivals[k]++;
+                let want = n * PLAIN_PAIR_OFFSET - it.plan.off;
+                if (want > 0) {
+                    it.slot.tOff = want;
+                    it.plan = planPlainRoute(byId[it.sId], byId[it.tId], rows, size.width, size.height, it.slot, banded ? 8 : 24);
+                }
+            });
+            items.forEach(function(it) {
+                let plan = it.plan, link = it.link;
+                /* Measure from the node's own body when it has one, so a resize handle or port
+                   sticking out of the box does not hold the connection off the visible border. */
+                let src = { id: it.sId, anchor: { name: plan.srcSide, args: { dx: plan.off } }, connectionPoint: { name: 'boundary' } };
+                let tgt = { id: it.tId, anchor: { name: plan.tgtSide, args: { dx: plan.off + plan.tOff } }, connectionPoint: { name: 'boundary' } };
+                if (it.sId === it.tId) { src.anchor.args.dx = -12; tgt.anchor.args.dx = 12; }
+                if (graph.getCell(it.sId).attr('body')) src.selector = 'body';
+                if (graph.getCell(it.tId).attr('body')) tgt.selector = 'body';
+                if (!sameJson(link.source(), src)) link.source(src);
+                if (!sameJson(link.target(), tgt)) link.target(tgt);
+                if (!sameJson(link.vertices(), plan.vertices)) link.vertices(plan.vertices);
+            });
+            let drawn = items.map(function(it) { return { link: it.link, line: it.plan.line }; });
+            items.forEach(function(it) { placePlainBadge(it.link, it.plan, rects, size.width, taken, drawn); });
         }
 
         /* Banded layout: draws the zones and positions every node. Returns nothing. */
