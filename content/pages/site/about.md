@@ -78,9 +78,10 @@ capabilities.
 ## Where Entelim is today, and where it goes
 
 Entelim's company brain grows in five stages. Today it is **modelled**: import an existing
-architecture model and ask cited questions about it. **Synchronised** (Q1 2027) connects it to the
-systems you already use, and an outside assistant can also be connected, with read-only access to your own model. **Operational** (Q2 2027)
-brings in operations and finance. **Predictive** (Q3 2027) adds forecasting and the first scenarios.
+architecture model and ask cited questions about it, and an outside assistant can read it, with
+read-only access to your own model.
+**Synchronised** (Q1 2027) connects it to the systems you already use.
+**Operational** (Q2 2027) brings in operations and finance. **Predictive** (Q3 2027) adds forecasting and the first scenarios.
 **Self-maintaining** (Q1 2028) lets it keep itself current within limits you set. See
 [all eighteen capabilities](/features) for what each one delivers today and what quarter adds to it
 next.
