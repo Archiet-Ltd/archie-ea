@@ -1924,9 +1924,8 @@ TOOL_SCHEMAS.extend([
     _route_read_tool(
         "ask_accountability",
         "GET /api/v1/intelligence/accountability/<element_id>",
-        "Ask who is accountable for an element. "
-        "Currently returns an honest empty state — the ownership "
-        "reader is not yet built.",
+        "Ask who is accountable for an element, from the owners recorded in the model. "
+        "Returns an empty answer when no owner is recorded.",
         _ELEMENT_ID_PARAMETERS,
     ),
     _route_read_tool(
