@@ -83,18 +83,34 @@
     {% endcall %}
     {% else %}
 
-    {# KPI band: four cards, 16px padding, label 11px uppercase, value 28px tabular, no icons. #}
+    {# KPI band: four cards, 16px padding, label 11px uppercase, value 28px tabular,
+       optional 12px line beneath, no icons. The Solutions card carries the
+       pipeline sentence (one phase, no phase, or phases active). #}
+    {% set sp = solution_pipeline if solution_pipeline else [] %}
+    {% set sp_total = sp|map(attribute='count')|sum %}
+    {% set sp_phases = sp|selectattr('count', 'gt', 0)|list %}
+    {% if sp_total > 0 and sp_phases|length == 1 and sp_phases[0].phase is none %}
+    {% set sp_line = sp_total ~ ' without a recorded ADM phase' %}
+    {% elif sp_total > 0 and sp_phases|length == 1 %}
+    {% set sp_letter, sp_name = sp_phases[0].label.split(': ', 1) %}
+    {% set sp_line = 'Nothing past ' ~ sp_name ~ ' yet — all ' ~ sp_total ~ ' in phase ' ~ sp_letter %}
+    {% elif sp_total > 0 %}
+    {% set sp_line = sp_phases|length ~ ' of ' ~ sp|length ~ ' ADM phases active' %}
+    {% else %}
+    {% set sp_line = none %}
+    {% endif %}
     <section aria-label="Key figures" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {% set kpis = [
-            ('Applications', metrics.applications|default(0), 'health-kpi-applications'),
-            ('Vendors', metrics.vendors|default(0), 'health-kpi-vendors'),
-            ('ArchiMate elements', nav_stats.elements|default(0), 'health-kpi-elements'),
-            ('Health score', health_score_text|default('—'), 'health-score-value')
+            ('Applications', metrics.applications|default(0), 'health-kpi-applications', none),
+            ('Solutions', nav_stats.solutions|default(0), 'health-kpi-solutions', sp_line),
+            ('ArchiMate elements', nav_stats.elements|default(0), 'health-kpi-elements', none),
+            ('Health score', health_score_text|default('—'), 'health-score-value', none)
         ] %}
-        {% for label, value, testid in kpis %}
+        {% for label, value, testid, line in kpis %}
         <div class="rounded-lg border border-border bg-card p-4">
             <p class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
             <p class="mt-1 text-[28px] font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
+            {% if line %}<p class="mt-1 truncate text-xs text-muted-foreground tabular-nums" title="{{ line }}">{{ line }}</p>{% endif %}
         </div>
         {% endfor %}
     </section>
