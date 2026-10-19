@@ -133,7 +133,7 @@ def test_constraint_falls_back_through_sources_in_priority_order(app, two_orgs):
     """constraints: archimate_element_id, then architecture_id, then goal_id (the
     migration's own SOURCES order). A row with only the third source set must
     still backfill -- proves the fallback actually reaches past the first two."""
-    org_a, org_b = two_orgs["a"], two_orgs["b"]
+    org_a = two_orgs["a"]
     suffix = two_orgs["suffix"]
     goal_element = _make_archimate_element(app, org_a, f"goal-{suffix}")
     constraint_id = _insert(
