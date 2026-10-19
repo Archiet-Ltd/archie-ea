@@ -42,10 +42,13 @@ SETUP = """
     {id:'d', name:'Orphan', type:'Node', layer:'mystery', depth:2},
     {id:'e', name:'No layer', type:'Node', layer:'', depth:2},
   ];
+  // provenance/kind use the real platform vocabulary (derived_relationship.py,
+  // intelligence/services/query_service.py): 'explicit' is a genuinely recorded fact,
+  // 'derivation' (or kind 'derived') is worked out.
   window.REL = [
-    {id:'r1', key:'k1', source_id:'c', target_id:'a', type:'serving', provenance:'recorded'},
-    {id:'r2', key:'k2', source_id:'c', target_id:'b', type:'serving', provenance:'derived', stale:false},
-    {id:'r3', key:'k3', source_id:'a', target_id:'d', type:'flow', provenance:'derived', stale:true},
+    {id:'r1', key:'k1', source_id:'c', target_id:'a', type:'serving', provenance:'explicit', kind:'explicit'},
+    {id:'r2', key:'k2', source_id:'c', target_id:'b', type:'serving', provenance:'derivation', kind:'derived', stale:false},
+    {id:'r3', key:'k3', source_id:'a', target_id:'d', type:'flow', provenance:'derivation', kind:'derived', stale:true},
   ];
   window.mk = (o) => {
     const host = document.getElementById('host');
@@ -137,6 +140,33 @@ def test_derived_edges_dashed_with_text_badge_never_colour_alone(page):
     assert sorted(attrs) == [["k1", "recorded"], ["k2", "derived"], ["k3", "derived"]]
     text = page.evaluate("() => document.querySelector('[data-edge=\"k2\"]').textContent")
     assert "Worked\xa0out" in text or "Worked out" in text
+
+
+def test_provenance_vocabulary_matches_the_real_api_shapes(page):
+    """derived_relationship.py / query_service.py send provenance 'derivation' (or kind
+    'derived') for a worked-out fact and provenance 'explicit' for a recorded one. An
+    unrecognised provenance value must never fall through to the confident "recorded"
+    styling -- it renders as worked-out (dashed) instead, the safer default."""
+    page.evaluate(SETUP)
+    r = page.evaluate("""() => {
+      mk({});
+      const el = ['x', 'y', 'z', 'w'].map(id => ({id, name: id, type: 'Node', layer: 'application', depth: 0}));
+      const rel = [
+        {id:'p1', source_id:'x', target_id:'y', type:'association', provenance:'derivation'},
+        {id:'p2', source_id:'y', target_id:'z', type:'association', provenance:'something-else', kind:'derived'},
+        {id:'p3', source_id:'z', target_id:'w', type:'association', provenance:'something-else'},
+        {id:'p4', source_id:'x', target_id:'w', type:'association', provenance:'explicit'},
+      ];
+      R.loadElements(el, rel);
+      return R.graph.getLinks().map(l => ({relId: l.get('relId'), kind: l.get('provenance'), dash: l.attr('line/strokeDasharray')}));
+    }""")
+    by = {i["relId"]: i for i in r}
+    assert by["p1"]["kind"] == "derived" and by["p1"]["dash"]
+    assert by["p2"]["kind"] == "derived" and by["p2"]["dash"]
+    # unrecognised provenance alone (no kind:'derived' either) must still default to
+    # "derived" (worked-out styling), never silently render as a recorded fact
+    assert by["p3"]["kind"] == "derived" and by["p3"]["dash"]
+    assert by["p4"]["kind"] == "recorded" and by["p4"]["dash"] == ""
 
 
 def test_update_changes_only_what_changed(page):
@@ -240,8 +270,16 @@ def test_token_colours_resolve_at_draw_time(page):
 
 
 def test_without_options_output_is_the_old_output(page):
+    """No layout/tokens/compact options AND no provenance on the relationships: the
+    true pre-existing baseline, undecorated. (Decoration is a separate opt-in proven by
+    test_provenance_alone_turns_on_decoration_without_other_options below -- REL here
+    must carry no provenance field at all, or this test would pass even if decorateEdge
+    always ran.)"""
     page.evaluate(SETUP)
-    r = page.evaluate("""() => { mk({}); R.loadElements(EL, REL);
+    r = page.evaluate("""() => {
+        mk({});
+        const relNoProvenance = REL.map(({id, key, source_id, target_id, type}) => ({id, key, source_id, target_id, type}));
+        R.loadElements(EL, relNoProvenance);
         const link = R.graph.getLinks()[0];
         return {zones: R.graph.getElements().filter(c => c.get('isLayerZone')).length,
                 dash: link.attr('line/strokeDasharray'), labels: link.labels().length,
@@ -249,3 +287,80 @@ def test_without_options_output_is_the_old_output(page):
                 ports: R.graph.getElements()[0].getPorts().length, h: R.graph.getElements()[0].size().height}; }""")
     assert r["zones"] == 0 and r["labels"] == 1
     assert r["h"] == 130 and r["ports"] == 12
+    assert r["dash"] == ""
+    assert r["dataEdge"] == 0
+
+
+def test_provenance_alone_turns_on_decoration_without_other_options(page):
+    """The real positive-path counterpart to the baseline above: with no layout/tokens/
+    compact option at all, relationships that DO carry provenance still get decorated
+    (decorateEdge is not gated on layout:'bands')."""
+    page.evaluate(SETUP)
+    r = page.evaluate("""() => { mk({}); R.loadElements(EL, REL);
+        return {
+            dataEdge: document.querySelectorAll('[data-edge],[data-kind]').length,
+            kinds: Array.from(document.querySelectorAll('.joint-link')).map(e => e.getAttribute('data-kind')).sort(),
+        }; }""")
+    assert r["dataEdge"] > 0
+    assert r["kinds"] == ["derived", "derived", "recorded"]
+
+
+def test_update_after_a_default_loadElements_replaces_a_changed_relationship(page):
+    """update() is not gated on banded mode, so loadElements() in the plain/default
+    (non-banded) mode must still leave every link with a real signature -- otherwise a
+    relationship whose visual state changes (here: from an explicit/recorded fact to a
+    worked-out one) is never actually replaced on the next update(), and the stale,
+    wrongly-confident "recorded" rendering survives."""
+    page.evaluate(SETUP)
+    out = page.evaluate("""() => {
+      mk({});
+      R.loadElements(EL, REL);
+      const before = R.graph.getLinks().find(l => l.get('edgeKey') === 'k1');
+      const beforeKind = before.get('provenance'), beforeDash = before.attr('line/strokeDasharray');
+      const changed = REL.map(r => r.key === 'k1'
+          ? Object.assign({}, r, {provenance: 'derivation', kind: 'derived', stale: false})
+          : r);
+      R.update({elements: EL, relationships: changed});
+      const after = R.graph.getLinks().find(l => l.get('edgeKey') === 'k1');
+      return {
+        beforeKind: beforeKind, beforeDash: beforeDash,
+        afterKind: after ? after.get('provenance') : null,
+        afterDash: after ? after.attr('line/strokeDasharray') : null,
+      };
+    }""")
+    assert out["beforeKind"] == "recorded" and out["beforeDash"] == ""
+    assert out["afterKind"] == "derived"
+    assert out["afterDash"]
+
+
+def test_relationship_with_no_id_or_key_still_renders_and_is_stable_across_updates(page):
+    """A relationship that the API sends without a key or an id (both null/absent) must
+    still render -- a synthetic key derived from (source, target, type) stands in for
+    it -- and must not be dropped or recreated as a brand-new cell on a later update()
+    with the exact same (still id-less) relationship."""
+    _banded(page)
+    out = page.evaluate("""() => {
+      const noKeyRel = {source_id: 'a', target_id: 'b', type: 'association'};
+      R.update({elements: EL, relationships: REL.concat([noKeyRel])});
+      const find = () => R.graph.getLinks().find(l => {
+          const src = R.graph.getCell(l.get('source').id), tgt = R.graph.getCell(l.get('target').id);
+          return l.get('relType') === 'association' && src && tgt
+              && src.get('elementId') === 'a' && tgt.get('elementId') === 'b';
+      });
+      const link1 = find();
+      const id1 = link1 ? link1.id : null;
+      const countAfterFirst = R.getRelCount();
+      // same id-less relationship again: must be recognised as already present, not
+      // dropped-then-recreated (which would change its JointJS cell id) or duplicated.
+      R.update({elements: EL, relationships: REL.concat([noKeyRel])});
+      const link2 = find();
+      return {
+        found1: !!link1, found2: !!link2,
+        sameCell: !!link1 && !!link2 && id1 === link2.id,
+        countAfterFirst: countAfterFirst, countAfterSecond: R.getRelCount(),
+      };
+    }""")
+    assert out["found1"] is True
+    assert out["found2"] is True
+    assert out["sameCell"] is True
+    assert out["countAfterFirst"] == out["countAfterSecond"]
