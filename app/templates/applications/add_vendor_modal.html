@@ -1,3 +1,4 @@
+{% from 'components/form_field.html' import form_group, form_footer %}
 {% from 'components/modal_form.html' import modal_form %}
 
 {% call modal_form(
@@ -13,8 +14,7 @@
 <input type="hidden" name="action" value="add">
 
 <div class="space-y-4">
-    <div>
-        <label for="vp-select" class="block text-sm font-medium mb-1.5">Vendor Product <span class="text-destructive-emphasis">*</span></label>
+    {% call form_group(id='vp-select', label='Vendor Product', required=true) %}
         <select id="vp-select" name="vendor_product_id" required
                 class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <option value="">Select a vendor product...</option>
@@ -22,10 +22,9 @@
             <option value="{{ opt.id }}">{{ opt.label }}</option>
             {% endfor %}
         </select>
-    </div>
+    {% endcall %}
 
-    <div>
-        <label for="vp-deployment" class="block text-sm font-medium mb-1.5">Deployment Type</label>
+    {% call form_group(id='vp-deployment', label='Deployment Type') %}
         <select id="vp-deployment" name="deployment_type"
                 class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <option value="">Select...</option>
@@ -33,11 +32,10 @@
             <option value="{{ val }}">{{ label }}</option>
             {% endfor %}
         </select>
-    </div>
+    {% endcall %}
 
     <div class="grid grid-cols-2 gap-4">
-        <div>
-            <label for="vp-criticality" class="block text-sm font-medium mb-1.5">Criticality</label>
+        {% call form_group(id='vp-criticality', label='Criticality') %}
             <select id="vp-criticality" name="criticality"
                     class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 <option value="">Select...</option>
@@ -45,9 +43,8 @@
                 <option value="{{ val }}">{{ label }}</option>
                 {% endfor %}
             </select>
-        </div>
-        <div>
-            <label for="vp-hosting" class="block text-sm font-medium mb-1.5">Hosting Model</label>
+        {% endcall %}
+        {% call form_group(id='vp-hosting', label='Hosting Model') %}
             <select id="vp-hosting" name="hosting_model"
                     class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 <option value="">Select...</option>
@@ -55,7 +52,7 @@
                 <option value="{{ val }}">{{ label }}</option>
                 {% endfor %}
             </select>
-        </div>
+        {% endcall %}
     </div>
 </div>
 {% endcall %}

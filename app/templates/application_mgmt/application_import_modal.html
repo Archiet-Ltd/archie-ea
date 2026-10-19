@@ -1,29 +1,8 @@
+{% from 'components/modal.html' import modal %}
 {% from 'components/form_field.html' import form_group, form_footer %}
 {% from 'components/dense_table.html' import dense_table %}
 <!-- Application Import Modal with Tabs -->
-<div id="application-import-modal"
-     data-modal-id="application-import-modal"
-     class="modal-root fixed inset-0 items-center justify-center p-4"
-     style="z-index: var(--modal-z, 1000);"
-     hidden
-     role="dialog"
-     aria-modal="true"
-     aria-labelledby="import-modal-title">
-  <!-- Backdrop -->
-  <div data-modal-backdrop="application-import-modal" aria-hidden="true"
-       class="modal-backdrop absolute inset-0 transition-opacity duration-200 bg-overlay/50"></div>
-  <div data-modal-panel
-       class="modal-panel relative bg-card rounded-lg w-full max-w-6xl max-h-[90vh] flex flex-col border border-border"
-       style="z-index: calc(var(--modal-z, 1000) + 1);">
-      <!-- Modal Header -->
-      <div class="flex items-center justify-between p-6 border-b">
-        <h2 id="import-modal-title" class="text-base font-semibold text-foreground text-foreground">Import Applications</h2>
-        <button type="button" data-modal-close="application-import-modal" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
+{% call modal(id='application-import-modal', title='Import Applications', size='2xl') %}
 
       <!-- Tabs -->
       <div class="border-b">
@@ -270,8 +249,8 @@
         </div>
       </div>
     </div>
-  </div>
-</div>
+  
+{% endcall %}
 
 <!-- Include APQC Tree Browser Component -->
 {% include 'components/apqc_tree_browser.html' %}

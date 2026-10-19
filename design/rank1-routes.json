@@ -1,0 +1,17 @@
+[
+ {"route": "/dashboard/overview", "templates": ["dashboards/overview.html"]},
+ {"route": "/applications/", "templates": ["applications/list_simple.html", "application_mgmt/application_import_modal.html", "components/unified_mapping_modal.html"]},
+ {"route": "/applications/<id>", "templates": ["applications/dashboard.html", "applications/add_capability_modal.html", "applications/add_vendor_modal.html", "applications/add_archimate_link_modal.html"]},
+ {"route": "/applications/<id>/edit", "templates": ["applications/edit.html"]},
+ {"route": "/applications/create", "templates": ["applications/create.html"]},
+ {"route": "/intelligence/ask", "templates": ["intelligence/ask.html", "components/answer_cascade.html"]},
+ {"route": "/ai-chat/", "templates": ["ai_chat/index.html"]},
+ {"route": "/capability-map", "templates": ["capability_map/index.html"]},
+ {"route": "/capability-map/hierarchy", "templates": ["capability_map/hierarchy.html"]},
+ {"route": "/architecture/traceability", "templates": ["archimate_views/traceability.html"]},
+ {"route": "/applications/vendors/", "templates": ["vendors/list.html", "vendors/create_simple.html"]},
+ {"route": "/architecture/import/oef", "templates": ["archimate_crud/import_oef.html"]},
+ {"route": "/risks/", "templates": ["governance/risk_register.html"]},
+ {"route": "/enterprise/implementation/gap-analysis", "templates": ["enterprise/gap_analysis.html"]},
+ {"route": "/capability-roadmap", "templates": ["capability_roadmap/capability_roadmap.html"]}
+]

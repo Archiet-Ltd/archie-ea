@@ -119,8 +119,7 @@
       <h2 class="text-lg font-semibold">Classification</h2>
 
       <div class="grid grid-cols-1 gap-4">
-        <div>
-          <label for="criticality" class="block text-sm font-medium text-muted-foreground mb-1">Business Criticality</label>
+        {% call form_group(id='criticality', label='Business Criticality') %}
           <select id="criticality" name="criticality"
                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             {% set current_crit = application.business_criticality %}
@@ -135,14 +134,13 @@
             <option value="{{ current_crit }}" selected>{{ current_crit | capitalize }}</option>
             {% endif %}
           </select>
-        </div>
+        {% endcall %}
         {% call form_group(id='business_purpose', label='Business Purpose') %}
           <input type="text" id="business_purpose" name="business_purpose" value="{{ application.business_purpose or '' }}"
                  placeholder="e.g. Core business function, compliance reporting"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         {% endcall %}
-        <div>
-          <label for="deployment_status" class="block text-sm font-medium text-muted-foreground mb-1">Deployment Status</label>
+        {% call form_group(id='deployment_status', label='Deployment Status') %}
           <select id="deployment_status" name="deployment_status"
                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             <option value="" {% if not application.deployment_status %}selected{% endif %}>Not set</option>
@@ -153,14 +151,13 @@
             <option value="{{ application.deployment_status }}" selected>{{ application.deployment_status | title }}</option>
             {% endif %}
           </select>
-        </div>
+        {% endcall %}
         {# F-09, Capgemini dry-run: Lifecycle Status is shown on the detail
            page, in the list filter and the Workbench facet — a genuinely
            separate field from Deployment Status above — but no create or
            edit form ever exposed it, so it could only be set in bulk via
            /api/bulk-lifecycle, never per-application. #}
-        <div>
-          <label for="lifecycle_status" class="block text-sm font-medium text-muted-foreground mb-1">Lifecycle Status</label>
+        {% call form_group(id='lifecycle_status', label='Lifecycle Status') %}
           <select id="lifecycle_status" name="lifecycle_status"
                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             <option value="" {% if not application.lifecycle_status %}selected{% endif %}>Not set</option>
@@ -171,7 +168,7 @@
             <option value="{{ application.lifecycle_status }}" selected>{{ application.lifecycle_status | title }}</option>
             {% endif %}
           </select>
-        </div>
+        {% endcall %}
         {% call form_group(id='business_domain', label='Business Domain') %}
           <input type="text" id="business_domain" name="business_domain" value="{{ application.business_domain or '' }}"
                  placeholder="e.g. Manufacturing, Finance, HR"
@@ -186,8 +183,7 @@
            they sit in the baseline/target architecture — the Traceability
            Matrix's plateau filters had nothing to find for ApplicationComponent
            rows as a direct result. #}
-        <div>
-          <label for="architecture_state" class="block text-sm font-medium text-muted-foreground mb-1">Architecture state</label>
+        {% call form_group(id='architecture_state', label='Architecture state') %}
           <select id="architecture_state" name="architecture_state"
                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             <option value="" {% if not architecture_state %}selected{% endif %}>Unspecified</option>
@@ -195,7 +191,7 @@
             <option value="Target" {% if architecture_state == 'Target' %}selected{% endif %}>To-Be (target)</option>
             <option value="Transition" {% if architecture_state == 'Transition' %}selected{% endif %}>Transition</option>
           </select>
-        </div>
+        {% endcall %}
       </div>
     </section>
 

@@ -289,8 +289,7 @@
                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
             {% endcall %}
         </div>
-        <div>
-            <label for="raid-programme" class="block text-sm font-medium mb-1">Programme</label>
+        {% call form_group(id='raid-programme', label='Programme') %}
             <select id="raid-programme" x-model="raidForm.strategic_initiative_id"
                     class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                 <option value="">— Not linked to a programme —</option>
@@ -298,7 +297,7 @@
                 <option value="{{ p.id }}">{{ p.name }}</option>
                 {% endfor %}
             </select>
-        </div>
+        {% endcall %}
         <p x-show="raidError" x-cloak class="text-sm text-destructive-emphasis" x-text="raidError"></p>
     </div>
     <div class="flex justify-end gap-2 mt-4">

@@ -1,3 +1,5 @@
+{% from 'components/modal.html' import modal %}
+{% from 'components/form_field.html' import form_group, form_footer %}
 {# Unified Mapping Modal Component
    smoke-coverage-ok: CSP inline style fix; the z-index scale is set by a
    nonce'd <style> block (same mechanism as layouts/admin_base.html and
@@ -18,22 +20,8 @@
 #unified-mapping-modal { z-index: var(--modal-z, 1000); }
 #unified-mapping-modal [data-modal-panel] { z-index: calc(var(--modal-z, 1000) + 1); }
 </style>
-<div id="unified-mapping-modal" hidden aria-hidden="true" class="modal-root fixed inset-0 items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="unified-modal-heading">
-    <!-- Backdrop -->
-    <div data-modal-backdrop="unified-mapping-modal" aria-hidden="true"
-         class="modal-backdrop absolute inset-0 transition-opacity duration-200 bg-overlay/50"></div>
-    <div data-modal-panel
-         class="modal-panel relative w-full max-w-5xl p-6 border border-border rounded-lg bg-card text-card-foreground max-h-[90vh] overflow-y-auto">
-        <!-- Header -->
-        <div class="flex justify-between items-center mb-4">
-            <h3 id="unified-modal-heading" class="text-lg font-bold">
-                <span id="unified-modal-title">Map Applications to:</span>
-                <span id="unified-modal-target-name" class="text-primary"></span>
-            </h3>
-            <button type="button" @click="Platform.modal.close('unified-mapping-modal')" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close modal">
-                <i data-lucide="x" class="w-6 h-6"></i>
-            </button>
-        </div>
+{% call modal(id='unified-mapping-modal', size='2xl', labelledby='unified-modal-heading') %}
+<h3 id="unified-modal-heading" class="text-base font-semibold text-foreground mb-4">Map Applications to:</h3>
 
         <!-- Context Indicator Badge -->
         <div id="unified-context-badge" class="mb-4">
@@ -53,8 +41,7 @@
         <div id="unified-step-target-selection" class="hidden">
             <!-- Search for targets -->
             <div class="mb-4">
-                <div class="relative">
-                    <label for="unified-target-search" class="block text-sm font-medium text-muted-foreground mb-1">Search mapping targets</label>
+                {% call form_group(id='unified-target-search', label='Search mapping targets', class='relative') %}
     <input
                         type="text"
                         id="unified-target-search"
@@ -63,7 +50,7 @@
                         @input="filterUnifiedTargets()"
                     />
                     <i data-lucide="search" class="absolute left-3 top-3 w-4 h-4 text-muted-foreground"></i>
-                </div>
+                {% endcall %}
             </div>
 
             <!-- Filter Row for Targets -->
@@ -221,13 +208,13 @@
                     of <span id="unified-target-page-total">0</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button type="button" @click="changeTargetPage(-1)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9" aria-label="Previous page">
+                    <button type="button" @click="changeTargetPage(-1)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9" aria-label="Previous page">
                         <i data-lucide="chevron-left" class="h-4 w-4"></i>
                     </button>
                     <span class="text-sm text-muted-foreground">
                         Page <span id="unified-target-current-page">1</span> of <span id="unified-target-total-pages">1</span>
                     </span>
-                    <button type="button" @click="changeTargetPage(1)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9" aria-label="Next page">
+                    <button type="button" @click="changeTargetPage(1)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9" aria-label="Next page">
                         <i data-lucide="chevron-right" class="h-4 w-4"></i>
                     </button>
                 </div>
@@ -259,8 +246,7 @@
 
             <!-- Search and Filter Bar -->
             <div class="mb-4 space-y-3">
-                <div class="relative">
-                    <label for="unified-search" class="block text-sm font-medium text-muted-foreground mb-1">Search applications</label>
+                {% call form_group(id='unified-search', label='Search applications', class='relative') %}
     <input
                         type="text"
                         id="unified-search"
@@ -269,7 +255,7 @@
                         @input="filterUnifiedApplications()"
                     />
                     <i data-lucide="search" class="absolute left-3 top-3 w-4 h-4 text-muted-foreground"></i>
-                </div>
+                {% endcall %}
 
                 <!-- Filter Row -->
                 <div class="flex flex-wrap gap-3 items-center">
@@ -332,13 +318,13 @@
                     of <span id="unified-app-page-total">0</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button type="button" @click="changeAppPage(-1)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9" aria-label="Previous page">
+                    <button type="button" @click="changeAppPage(-1)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9" aria-label="Previous page">
                         <i data-lucide="chevron-left" class="h-4 w-4"></i>
                     </button>
                     <span class="text-sm text-muted-foreground">
                         Page <span id="unified-app-current-page">1</span> of <span id="unified-app-total-pages">1</span>
                     </span>
-                    <button type="button" @click="changeAppPage(1)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9" aria-label="Next page">
+                    <button type="button" @click="changeAppPage(1)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9" aria-label="Next page">
                         <i data-lucide="chevron-right" class="h-4 w-4"></i>
                     </button>
                 </div>
@@ -360,8 +346,8 @@
                 </div>
             </div>
         </div>
-    </div>
-</div>
+    
+{% endcall %}
 
 <script>
   window.__APP_CONFIG__ = window.__APP_CONFIG__ || {};

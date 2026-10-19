@@ -13,8 +13,7 @@
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
 <div class="space-y-4">
-    <div>
-        <label for="cap-select" class="block text-sm font-medium mb-1.5">Capability <span class="text-destructive-emphasis">*</span></label>
+    {% call form_group(id='cap-select', label='Capability', required=true) %}
         <select id="cap-select" name="capability_id" required
                 class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <option value="">Select a capability...</option>
@@ -22,10 +21,9 @@
             <option value="{{ opt.id }}"{% if opt.disabled %} disabled{% endif %}>{{ opt.label }}</option>
             {% endfor %}
         </select>
-    </div>
+    {% endcall %}
 
-    <div>
-        <label for="cap-support" class="block text-sm font-medium mb-1.5">Support Level</label>
+    {% call form_group(id='cap-support', label='Support Level') %}
         <select id="cap-support" name="support_level"
                 class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <option value="">Select...</option>
@@ -33,15 +31,14 @@
             <option value="{{ val }}">{{ label }}</option>
             {% endfor %}
         </select>
-    </div>
+    {% endcall %}
 
     <div class="grid grid-cols-2 gap-4">
         {% call form_group(id='cap-coverage', label='Coverage %') %}
             <input type="number" id="cap-coverage" name="coverage_percentage" min="0" max="100" placeholder="0-100"
                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
         {% endcall %}
-        <div>
-            <label for="cap-maturity" class="block text-sm font-medium mb-1.5">Maturity Level</label>
+        {% call form_group(id='cap-maturity', label='Maturity Level') %}
             <select id="cap-maturity" name="maturity_level"
                     class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 <option value="">Select...</option>
@@ -49,7 +46,7 @@
                 <option value="{{ val }}">{{ label }}</option>
                 {% endfor %}
             </select>
-        </div>
+        {% endcall %}
     </div>
 
     <div class="flex items-center gap-2">
