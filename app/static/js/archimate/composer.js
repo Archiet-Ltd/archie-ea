@@ -3115,7 +3115,14 @@ function composerApp() {
                 });
                 self.elementCount = elements.length;
                 self.relCount = relationships.length;
-                self.layoutDagre('TB');
+                /* Layer bands (Motivation and Strategy on top, Technology below): the same
+                   top-down order the Twin Map reads, so a chain from the centre up to a
+                   Strategy or Goal element can be followed along the drawn connections. */
+                applyLayerBanding(self.graph);
+                self.paper.scaleContentToFit({ padding: 40, maxScale: 1 });
+                self.zoomPercent = Math.round(self.paper.scale().sx * 100);
+                self._scheduleMiniMapUpdate();
+                self.componentsPanelOpen = false;
                 UndoStack.resume();
                 UndoStack.clear();
 
@@ -3140,12 +3147,7 @@ function composerApp() {
                     self._selectedCells = [centre];
                     if (view) self._highlightCell(view);
                     self.selectedEdge = null;
-                    self.selectedNode = {
-                        elementId: elementId, label: centre.get('elName') || '(unnamed)',
-                        elType: centre.get('elType') || '', layer: centre.get('elLayer') || '',
-                        description: '', status: '', relationshipCount: 0, viewpointCount: 0,
-                        solutionCount: 0, _zoneType: 'default'
-                    };
+                    self.selectedNode = null;
                     self._currentSelectedCell = centre;
                     self._applyNeighborFocus(centre);
                 }
