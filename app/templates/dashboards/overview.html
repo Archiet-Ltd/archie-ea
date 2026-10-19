@@ -116,6 +116,32 @@
         {% endfor %}
     </section>
 
+    {# What the health score was weighted from. A component that was not
+       measured reads as an em dash, never as a confident zero. #}
+    <section aria-labelledby="architecture-health-heading" class="rounded-lg border border-border bg-card" data-testid="architecture-health">
+        <div class="flex items-center justify-between border-b border-border px-4 py-2">
+            <h2 id="architecture-health-heading" class="text-base font-semibold text-foreground">Architecture health</h2>
+            <span class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">What the score is weighted from</span>
+        </div>
+        <div class="grid grid-cols-2 gap-px bg-border md:grid-cols-4">
+            {% for key, label in [
+                ('phase_maturity', 'Phase Maturity'),
+                ('risk_health', 'Risk Posture'),
+                ('capability_coverage', 'Capability Coverage'),
+                ('governance', 'Governance'),
+            ] %}
+            {% set val = (health_components or {}).get(key) %}
+            <div class="bg-card px-4 py-3">
+                <p class="text-xs text-muted-foreground">{{ label }}</p>
+                <p class="mt-1 text-lg font-semibold tabular-nums text-foreground">{{ (val ~ "%") if val is not none else "—" }}</p>
+                {% if key == 'phase_maturity' %}
+                <p class="mt-1 text-xs text-muted-foreground">Share of solutions with a recorded ADM phase that are in phase C or later</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
     {# Chart: application lifecycle, one series, hairline container, no vertical grid. #}
     <section aria-labelledby="lifecycle-chart-heading" class="rounded-lg border border-border bg-card" data-testid="lifecycle-distribution">
         <div class="flex items-center justify-between border-b border-border px-4 py-2">

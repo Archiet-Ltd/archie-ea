@@ -1,12 +1,54 @@
+{# shadcn/ui Alert Component #}
+{% macro alert(variant='default', icon=none, dismissible=false, class='') %}
+    {% set variants = {
+        'default': 'bg-background text-foreground',
+        'destructive': 'border-destructive/50 text-destructive [&>svg]:text-destructive'
+    } %}
+    
+    <div 
+        {% if dismissible %}
+        x-data="{ isVisible: true }" 
+        x-show="isVisible" x-cloak
+        x-transition
+        {% endif %}
+        class="relative w-full rounded-lg border p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground {{ variants[variant] }} {{ class }}" 
+        role="alert"
+    >
+        {% if icon %}
+            <i data-lucide="{{ icon }}" class="h-4 w-4"></i>
+        {% endif %}
+        <div>
+            {{ caller() }}
+        </div>
+        {% if dismissible %}
+            <button type="button" @click="isVisible = false" class="absolute top-4 right-4 rounded-md p-1 hover:bg-accent transition-colors" aria-label="Dismiss alert">
+                <i data-lucide="x" class="h-4 w-4"></i>
+            </button>
+        {% endif %}
+    </div>
+{% endmacro %}
+
+{% macro alert_title(class='') %}
+    <h5 class="mb-1 font-medium leading-none tracking-tight {{ class }}">
+        {{ caller() }}
+    </h5>
+{% endmacro %}
+
+{% macro alert_description(class='') %}
+    <div class="text-sm [&_p]:leading-relaxed {{ class }}">
+        {{ caller() }}
+    </div>
+{% endmacro %}
+
 {# Quiet inline alert (design/patterns.json: quiet-alert).
    One line, tinted hairline box, 12px text, optional link on the right.
    Call shapes:
-     {% call alert('warning', title='Data quality') %}20 of 20 have an owner{% endcall %}
-     {{ alert('success', text='Saved.') }}
+     {% call inline_alert('warning', title='Data quality') %}20 of 20 have an owner{% endcall %}
+     {{ inline_alert('success', text='Saved.') }}
    kind: info | success | warning | danger | neutral
    link_href / link_text: an action on the right edge.
    Never a full-width block: it sits in the header area of the thing it is about. #}
-{% macro alert(kind='info', title=None, text=None, link_href=None, link_text=None, class='', testid=None) %}
+{% macro inline_alert(kind='info', title=None, text=None, link_href=None, link_text=None, class='', testid=None) %}
     {% set kinds = {
         'info': 'border-info/40 bg-info/10',
         'success': 'border-success/40 bg-success/10',
