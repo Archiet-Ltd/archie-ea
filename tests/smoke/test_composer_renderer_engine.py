@@ -464,7 +464,7 @@ def test_plain_style_switches_label_dash_arrow_and_colour(page):
       const hi = inspect(plain);
       const plainRouters = plain.graph.getLinks().map(l => [l.get('router').name, l.get('connector').name]);
       const def = make({});
-      return {before, hi, plainRouters, def: inspect(def), muted: resolved('--border'), primary: resolved('--ring'), card: resolved('--card'), fg: resolved('--foreground'), mfg: resolved('--muted-foreground'),
+      return {before, hi, plainRouters, def: inspect(def), muted: resolved('--muted-foreground'), primary: resolved('--ring'), card: resolved('--card'), fg: resolved('--foreground'), mfg: resolved('--muted-foreground'),
               chrome: (() => { const nodes = plain.graph.getElements(); return nodes.map(n => JSON.stringify(n.attributes.attrs)); })(),
               defRouters: def.graph.getLinks().map(l => [l.get('router').name, l.get('connector').name])};
     }""")
@@ -677,3 +677,25 @@ def test_plain_layout_gaps_are_at_least_sixteen_pixels(page):
       return {col, row};
     }""")
     assert gaps["col"] >= 16 and gaps["row"] >= 16, gaps
+
+
+def test_arrivals_on_one_node_side_stay_apart_and_chip_and_ring_are_drawn_from_tokens(page):
+    page.evaluate(ROUTE_SETUP)
+    page.evaluate("() => mkRoute()")
+    rows = {r["key"]: r for r in page.evaluate("() => measure()")}
+    # e1 (recorded) and e12 (worked out) both arrive on the bottom of g1
+    a, b = rows["e1"]["points"][-1], rows["e12"]["points"][-1]
+    assert abs(a["x"] - b["x"]) >= 12, (a, b)
+    chips = page.evaluate("""() => {
+      const out = [];
+      R.graph.getLinks().forEach(l => { (l.labels() || []).forEach(x => out.push([x.attrs.rect.fill, x.attrs.rect.stroke, x.attrs.rect.strokeDasharray])); });
+      return {chips: out, card: resolved('--card'), border: resolved('--border')};
+    }""".replace("resolved(", "((n) => 'hsl(' + getComputedStyle(document.getElementById('host')).getPropertyValue(n).trim() + ')')("))
+    assert chips["chips"]
+    for fill, stroke, dash in chips["chips"]:
+        assert fill == chips["card"] and stroke == chips["border"] and not dash
+    ring = page.evaluate("""() => { R.setCentre('b0'); const n = R.graph.getElements().find(c => c.get('elementId') === 'b0');
+        return [n.attr('ring/display'), n.attr('ring/rx'), n.attr('ring/strokeWidth'), n.attr('ring/fill')]; }""")
+    assert ring == ["block", 9, 2, "none"]
+    off = page.evaluate("""() => { R.setCentre(null); return R.graph.getElements().filter(c => c.get('elementId')).every(n => n.attr('ring/display') === 'none'); }""")
+    assert off is True
