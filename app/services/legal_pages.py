@@ -1,7 +1,8 @@
 """The legal pages a buyer can read before paying, and which of them are live.
 
-Terms and Privacy are always published. The data processing agreement,
-cookie policy, refund policy and commercial licence are written but held back
+Terms, Privacy, the data processing agreement, the sub-processor list and the
+acceptable use page are always published. The cookie policy, refund policy and
+commercial licence are written but held back
 until ``LEGAL_PAGES_ENABLED`` is switched on, so their text can be approved
 before anyone can read it as a binding promise.
 
@@ -15,13 +16,15 @@ from __future__ import annotations
 LEGAL_PAGES_FLAG = "LEGAL_PAGES_ENABLED"
 
 # (slug, link label) — the slug is the top-level URL and the file name under
-# content/pages/legal/ (Terms and Privacy live under content/pages/site/).
+# content/pages/legal/ (the always-published pages live under content/pages/site/).
 ALWAYS_PUBLISHED = (
     ("terms", "Terms"),
     ("privacy", "Privacy"),
+    ("data-processing-agreement", "Data processing agreement"),
+    ("sub-processors", "Sub-processors"),
+    ("acceptable-use", "Acceptable use"),
 )
 AWAITING_APPROVAL = (
-    ("data-processing-agreement", "Data processing agreement"),
     ("cookie-policy", "Cookie policy"),
     ("refund-policy", "Refund policy"),
     ("commercial-licence", "Commercial licence"),
