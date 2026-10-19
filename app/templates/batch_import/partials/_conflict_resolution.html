@@ -2,7 +2,7 @@
 {# Included in job_detail.html when show_preview is True #}
 
 <!-- Conflict Resolution Section -->
-<div x-show="previewData && (previewData?.duplicates?.length || 0) > 0" x-cloak class="rounded-lg border bg-card text-card-foreground shadow-sm">
+<div x-show="previewData && (previewData?.duplicates?.length || 0) > 0" x-cloak class="rounded-lg border bg-card text-card-foreground">
     <div class="p-6">
         <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-3">
@@ -19,7 +19,7 @@
             <div class="flex items-center gap-2">
                 <button type="button"
                     @click="resolveAllAsNew()"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 py-1 transition-colors"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                  aria-label="Action">
                     Resolve All as New
                 </button>
@@ -40,7 +40,7 @@
                 <div class="rounded-lg border p-4">
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <!-- Import Row (Left) -->
-                        <div class="rounded-md bg-primary/5 p-3">
+                        <div class="rounded-md bg-primary/10 px-3 py-2">
                             <div class="flex items-center gap-2 mb-2">
                                 <span class="inline-flex items-center rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium">Import</span>
                                 <span class="text-xs text-muted-foreground">Row #<span x-text="conflict.import_row"></span></span>
@@ -53,7 +53,7 @@
                         </div>
 
                         <!-- Best Match (Right) -->
-                        <div class="rounded-md bg-warning/5 p-3">
+                        <div class="rounded-md bg-warning/10 px-3 py-2">
                             <div class="flex items-center gap-2 mb-2">
                                 <span class="inline-flex items-center rounded-full bg-warning/10 text-warning-emphasis px-2 py-0.5 text-xs font-medium">Existing</span>
                                 <span
@@ -122,7 +122,7 @@
 
 <!-- No Conflicts State -->
 <div x-show="previewData && (previewData?.duplicates?.length || 0) === 0 && !previewLoading" x-cloak
-     class="rounded-lg border bg-card text-card-foreground shadow-sm">
+     class="rounded-lg border border-border bg-card text-card-foreground">
     <div class="p-6 text-center">
         <div class="flex h-12 w-12 mx-auto items-center justify-center rounded-full bg-success/10">
             <i data-lucide="check-circle" class="h-6 w-6 text-success"></i>

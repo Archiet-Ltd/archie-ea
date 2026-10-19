@@ -26,7 +26,7 @@
     <input type="hidden" name="command_key" value="{{ programme_command_key }}">
 
     {% if programme_form_errors %}
-    <div class="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-emphasis"
+    <div class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis"
          role="alert" data-testid="programme-form-errors">
       <ul class="grid gap-1">
         {% for error in programme_form_errors %}<li>{{ error }}</li>{% endfor %}
@@ -41,12 +41,12 @@
     {% include 'solutions/programme_wizard/_measure_step.html' %}
     {% include 'solutions/programme_wizard/_review_step.html' %}
 
-    <div class="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-emphasis"
+    <div class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis"
          x-show="error" x-cloak role="alert" x-text="error" data-testid="programme-error"></div>
 
     <div class="flex flex-wrap items-center justify-between gap-3">
       <button type="button" data-testid="wizard-back"
-              class="inline-flex h-9 items-center justify-center rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
               :disabled="currentStep === 0" @click="back()">Back</button>
 
       <p class="text-xs text-muted-foreground" x-show="!stepValid(currentStep) && currentStep !== steps.length - 1" x-cloak
@@ -54,12 +54,12 @@
 
       <button type="button" data-testid="wizard-next"
               x-show="currentStep !== steps.length - 1" x-cloak
-              class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
               :disabled="!stepValid(currentStep)" @click="next()">Continue</button>
 
       <button type="submit" data-testid="wizard-submit"
               x-show="currentStep === steps.length - 1" x-cloak
-              class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
               :disabled="submitting || incompleteSteps.length > 0">
         <span x-text="submitting ? 'Creating programme…' : 'Create programme'"></span>
       </button>

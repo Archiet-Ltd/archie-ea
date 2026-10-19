@@ -94,13 +94,13 @@
             <div class="flex flex-wrap items-center gap-2 shrink-0">
                 {% if definition.workflow_code == 'ADM_PHASE_A_VISION' %}
                 <a href="#vision-deliverable-launcher"
-                   class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-input bg-background hover:bg-accent transition-colors font-medium">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="file-pen-line" class="h-4 w-4" aria-hidden="true"></i>
                     Create Vision Deliverable
                 </a>
                 {% endif %}
                 <a href="{{ url_for('main.ea_workflows_dashboard') }}?start={{ definition.workflow_code }}"
-                   class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="play" class="h-4 w-4" aria-hidden="true"></i>
                     Start Workflow
                 </a>
@@ -114,7 +114,7 @@
 
             <!-- Before You Start -->
             {% if prereqs_map.get(definition.workflow_code) %}
-            <div class="rounded-xl border-2 border-primary/20 bg-primary/5 p-5">
+            <div class="border rounded-md border-2 border-primary/40 bg-primary/10 px-3 py-2">
                 <div class="flex items-start gap-3">
                     <i data-lucide="info" class="h-5 w-5 text-primary shrink-0 mt-0.5" aria-hidden="true"></i>
                     <div>
@@ -126,7 +126,7 @@
             {% endif %}
 
             {% if definition.workflow_code == 'ADM_PHASE_A_VISION' %}
-            <div id="vision-deliverable-launcher" class="rounded-xl border-2 border-primary/20 bg-primary/5 p-6" data-testid="vision-deliverable-launcher">
+            <div id="vision-deliverable-launcher" class="border rounded-md border-2 border-primary/40 bg-primary/10 px-3 py-2" data-testid="vision-deliverable-launcher">
                 <div class="flex items-start gap-3">
                     <i data-lucide="file-pen-line" class="h-5 w-5 text-primary shrink-0 mt-0.5" aria-hidden="true"></i>
                     <div class="w-full">
@@ -138,11 +138,11 @@
                             <input type="hidden" name="workflow_code" value="{{ definition.workflow_code }}">
                             <div>
                                 <label for="project_name" class="block text-sm font-medium mb-1">Project or initiative name</label>
-                                <input id="project_name" name="project_name" type="text" required value="{{ definition.workflow_name }}" class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
+                                <input id="project_name" name="project_name" type="text" required value="{{ definition.workflow_name }}" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                             </div>
                             <div>
                                 <label for="application_id" class="block text-sm font-medium mb-1">Application context (optional)</label>
-                                <select id="application_id" name="application_id" class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
+                                <select id="application_id" name="application_id" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                                     <option value="">Use workflow definition only</option>
                                     {% for application in applications %}
                                     <option value="{{ application.id }}">{{ application.name }}</option>
@@ -151,7 +151,7 @@
                             </div>
                             <div class="md:col-span-2 flex items-center justify-between gap-3">
                                 <p class="text-xs text-muted-foreground">Vision launches now include source-backed content, traceability, readiness gating, and handoff planning.</p>
-                                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium">
+                                <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                     <i data-lucide="arrow-right" class="h-4 w-4" aria-hidden="true"></i>
                                     Open Vision Editor
                                 </button>
@@ -432,7 +432,7 @@
             </div>
         </div>
         <div class="overflow-x-auto">
-            <table class="w-full">
+            <table class="dense-table w-full">
                 <thead>
                     <tr class="border-b">
                         <th class="w-10 py-3 px-2 text-center">

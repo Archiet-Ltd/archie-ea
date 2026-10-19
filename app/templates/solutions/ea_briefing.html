@@ -25,28 +25,28 @@
             {% endif %}
         </div>
         <button type="button" @click="generate()" :disabled="busy"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="refresh-cw" class="h-4 w-4" :class="busy && 'animate-spin'"></i>
             <span x-text="busy ? 'Generating…' : 'Generate briefing'"></span>
         </button>
     </div>
 
     {% if not latest %}
-    <div class="border border-border rounded-xl bg-card p-10 text-center">
+    <div class="border border-border rounded-lg bg-card p-10 text-center">
         <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary mb-3">
             <i data-lucide="newspaper" class="h-6 w-6"></i>
         </span>
         <p class="text-sm font-medium text-foreground">No briefing yet</p>
         <p class="text-xs text-muted-foreground mt-1 mb-4">Generate the first Enterprise Architecture briefing to see what needs attention across the estate.</p>
         <button type="button" @click="generate()" :disabled="busy"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <span x-text="busy ? 'Generating…' : 'Generate first briefing'"></span>
         </button>
     </div>
     {% else %}
 
     {# ── Executive summary ─────────────────────────────────────────── #}
-    <div class="border border-border rounded-xl bg-card p-6 mb-6">
+    <div class="border border-border rounded-lg bg-card p-6 mb-6">
         <div class="flex items-start gap-3">
             <span class="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-lg
                 {% if latest.flagged_count %}bg-warning/10 text-warning-emphasis{% else %}bg-success/10 text-success-emphasis{% endif %}">
@@ -72,7 +72,7 @@
     {# ── Findings ──────────────────────────────────────────────────── #}
     <div class="space-y-3 mb-8">
         {% for f in latest.findings %}
-        <div class="border border-border rounded-xl bg-card p-4 flex items-start gap-3">
+        <div class="border border-border rounded-lg bg-card p-4 flex items-start gap-3">
             <span class="shrink-0 mt-0.5 inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold uppercase tracking-wide
                 {% if f.severity == 'critical' %}bg-destructive/10 text-destructive-emphasis border border-destructive/30
                 {% elif f.severity == 'high' %}bg-warning/10 text-warning-emphasis border border-warning/30
@@ -104,9 +104,9 @@
 
     {# ── History ───────────────────────────────────────────────────── #}
     {% if history and history|length > 0 %}
-    <div class="border border-border rounded-xl bg-card overflow-hidden">
+    <div class="border border-border rounded-lg bg-card overflow-hidden">
         <div class="px-5 py-3 border-b border-border"><h2 class="text-sm font-semibold text-foreground">Past Briefings</h2></div>
-        <table class="min-w-full divide-y divide-border text-sm">
+        <table class="dense-table min-w-full divide-y divide-border text-sm">
             <thead class="bg-muted/30">
                 <tr>
                     <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Generated</th>

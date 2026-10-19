@@ -92,8 +92,8 @@
     <div
         data-modal-panel
         class="modal-panel relative w-full {{ size_classes.get(size, 'max-w-2xl') }}
-               bg-card text-card-foreground border border-border rounded-lg shadow-lg
-               max-h-[90vh] overflow-hidden flex flex-col"
+ bg-card text-card-foreground border border-border rounded-lg 
+ max-h-[90vh] overflow-hidden flex flex-col"
         style="z-index: calc(var(--modal-z, 1000) + 1);"
     >
         <!-- Header -->
@@ -131,16 +131,12 @@
             </div>
 
             <!-- Footer -->
-            <div class="flex items-center justify-end gap-3 p-6 border-t border-border bg-muted/10 flex-shrink-0">
+            <div class="border flex items-center justify-end gap-3 px-3 py-2 border-t border-border bg-muted/10 flex-shrink-0">
                 {% if cancel_text %}
                 <button
                     type="button"
                     data-modal-close="{{ id }}"
-                    class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium
-                           ring-offset-background transition-colors focus-visible:outline-none
-                           focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
-                           border border-input bg-background hover:bg-accent hover:text-accent-foreground
-                           h-10 px-4 py-2"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap"
                  aria-label="{{ cancel_text }}">
                     {{ cancel_text }}
                 </button>

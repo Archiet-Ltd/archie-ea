@@ -11,11 +11,7 @@
 <div class="flex items-center gap-2">
             <span x-show="loading" x-cloak class="text-sm text-muted-foreground">Loading...</span>
             <button type="button" @click="loadPrompts()"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium
- ring-offset-background transition-colors
- focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
- border border-input bg-background hover:bg-accent hover:text-accent-foreground
- h-9 px-3">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 <i data-lucide="refresh-cw" class="h-4 w-4 mr-2"></i>
                 Refresh
             </button>
@@ -25,22 +21,22 @@
 
     <!-- Error banner -->
     <div x-show="errorMsg" x-cloak
-         class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive-emphasis"
+         class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis"
          role="alert">
         <span x-text="errorMsg"></span>
     </div>
 
     <!-- Success banner -->
     <div x-show="successMsg" x-cloak
-         class="mb-4 rounded-md border border-success/50 bg-success/10 p-3 text-sm text-success-emphasis"
+         class="mb-4 rounded-md border border-success/50 bg-success/10 px-3 py-2 text-sm text-success-emphasis"
          role="status">
         <span x-text="successMsg"></span>
     </div>
 
     <!-- Prompts Table -->
-    <div class="rounded-xl border border-border bg-card text-card-foreground shadow-sm overflow-hidden">
+    <div class="rounded-lg border border-border bg-card text-card-foreground overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
                 <thead>
                     <tr class="border-b border-border bg-muted/50">
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground">Prompt</th>
@@ -76,11 +72,7 @@
                             <td class="px-4 py-3 text-right">
                                 <div class="flex items-center justify-end gap-2">
                                     <button type="button" @click="openEdit(prompt)"
-                                            class="inline-flex items-center justify-center rounded-md text-sm font-medium
- ring-offset-background transition-colors
- focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
- border border-input bg-background hover:bg-accent hover:text-accent-foreground
- h-8 px-3">
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                                         <i data-lucide="pencil" class="h-3.5 w-3.5 mr-1.5"></i>
                                         Edit
                                     </button>
@@ -168,20 +160,12 @@
         <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
             <button type="button"
                     data-modal-close="edit-prompt-modal"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium
- ring-offset-background transition-colors
- focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
- border border-input bg-background hover:bg-accent hover:text-accent-foreground
- h-9 px-4">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Cancel
             </button>
             <button type="submit"
                     id="btn-save-prompt"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium
- ring-offset-background transition-colors
- focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
- bg-primary text-primary-foreground hover:bg-primary/90
- h-9 px-4">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 <i data-lucide="save" class="h-3.5 w-3.5 mr-1.5"></i>
                 Save Changes
             </button>
@@ -200,20 +184,12 @@
     <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
         <button type="button"
                 data-modal-close="reset-prompt-modal"
-                class="inline-flex items-center justify-center rounded-md text-sm font-medium
- ring-offset-background transition-colors
- focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
- border border-input bg-background hover:bg-accent hover:text-accent-foreground
- h-9 px-4">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             Cancel
         </button>
         <button type="button"
                 id="btn-confirm-reset"
-                class="inline-flex items-center justify-center rounded-md text-sm font-medium
- ring-offset-background transition-colors
- focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
- bg-destructive text-destructive-foreground hover:bg-destructive/90
- h-9 px-4">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             Reset to Default
         </button>
     </div>

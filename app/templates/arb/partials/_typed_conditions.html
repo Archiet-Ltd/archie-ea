@@ -166,7 +166,7 @@
 
         {# ---- Waiver ---- #}
         {% if condition.waiver %}
-        <div class="rounded-lg border border-warning/30 bg-warning/10 p-3">
+        <div class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2">
             <h3 class="text-xs font-medium uppercase tracking-wide text-warning-emphasis">Waiver</h3>
             <p class="mt-1 text-xs text-warning-emphasis">A waiver does not remove this condition. It expires automatically.</p>
             <dl class="mt-2 space-y-2">
@@ -222,7 +222,7 @@
 
         {# ---- Captured-but-not-submitted recovery state (see header note) ---- #}
         <div data-arb-captured-region hidden
-             class="rounded-lg border border-warning/30 bg-warning/10 p-3"
+             class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2"
              role="status" aria-live="polite">
             <p class="text-sm font-medium text-warning-emphasis">Evidence captured, not submitted</p>
             <p class="mt-1 text-xs text-warning-emphasis">
@@ -235,13 +235,13 @@
             <button type="button"
                     data-arb-retry-submit
                     data-submit-url-template="/arb/api/conditions/{{ _cid }}/evidence/__EVIDENCE_ID__/submit"
-                    class="mt-3 inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-3 items-center justify-center"
                     aria-label="Retry submitting captured evidence for condition {{ _number }}">
                 Retry submission
             </button>
         </div>
 
-        <div data-arb-error hidden role="alert" class="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-emphasis"></div>
+        <div data-arb-error hidden role="alert" class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis"></div>
 
         {# ---- Actions ---- #}
         <div class="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:flex-wrap">
@@ -249,7 +249,7 @@
             <button type="button"
                     data-arb-capture-trigger
                     data-modal-open="arb-condition-evidence-{{ _cid }}"
-                    class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                     aria-label="Submit evidence for condition {{ _number }}">
                 Submit evidence
             </button>
@@ -257,7 +257,7 @@
             {% if _act.get('can_verify') %}
             <button type="button"
                     data-modal-open="arb-condition-verify-{{ _cid }}"
-                    class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                     aria-label="Verify evidence for condition {{ _number }}">
                 Verify evidence
             </button>
@@ -265,7 +265,7 @@
             {% if _act.get('can_waive') %}
             <button type="button"
                     data-modal-open="arb-condition-waive-{{ _cid }}"
-                    class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                     aria-label="Grant waiver for condition {{ _number }}">
                 Grant waiver
             </button>
@@ -318,7 +318,7 @@
                 </label>
                 <textarea id="arb-attestation-statement-{{ _cid }}" name="statement" rows="3" maxlength="2000"
                           aria-describedby="arb-attestation-help-{{ _cid }}"
-                          class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ _retained.get('statement') or '' }}</textarea>
+                          class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ _retained.get('statement') or '' }}</textarea>
                 <p id="arb-attestation-help-{{ _cid }}" class="mt-1 text-xs text-muted-foreground">
                     Up to 2,000 characters. Without JavaScript, a time entered here is read as UTC.
                 </p>
@@ -328,7 +328,7 @@
                     Observed at <span class="text-destructive" aria-hidden="true">*</span>
                 </label>
                 <input type="datetime-local" id="arb-attestation-observed-{{ _cid }}" name="observed_at"
-                       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             </div>
         </div>
 
@@ -339,36 +339,36 @@
                 </label>
                 <input type="text" id="arb-source-identity-{{ _cid }}" name="source_identity" maxlength="255"
                        value="{{ _retained.get('source_identity') or '' }}"
-                       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             </div>
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                     <label for="arb-source-type-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">Source type</label>
                     <input type="text" id="arb-source-type-{{ _cid }}" name="source_type" maxlength="120"
-                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 </div>
                 <div>
                     <label for="arb-source-version-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">Source version</label>
                     <input type="text" id="arb-source-version-{{ _cid }}" name="source_version" maxlength="120"
-                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 </div>
                 <div>
                     <label for="arb-source-observed-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">Observed at</label>
                     <input type="datetime-local" id="arb-source-observed-{{ _cid }}" name="observed_at"
-                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 </div>
                 <div>
                     <label for="arb-source-expires-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">Expires at</label>
                     <input type="datetime-local" id="arb-source-expires-{{ _cid }}" name="expires_at"
                            aria-describedby="arb-source-expires-help-{{ _cid }}"
-                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                           class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     <p id="arb-source-expires-help-{{ _cid }}" class="mt-1 text-xs text-muted-foreground">An already-expired record is rejected. Without JavaScript, a time entered here is read as UTC.</p>
                 </div>
             </div>
             <div>
                 <label for="arb-source-value-{{ _cid }}" class="mb-1.5 block text-sm font-medium text-foreground">Recorded value</label>
                 <textarea id="arb-source-value-{{ _cid }}" name="value" rows="3"
-                          class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                          class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
             </div>
         </div>
 
@@ -378,9 +378,9 @@
 
         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button type="button" data-modal-close="arb-condition-evidence-{{ _cid }}"
-                    class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Cancel</button>
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
             <button type="submit"
-                    class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Submit evidence for condition {{ _number }}
             </button>
         </div>
@@ -417,9 +417,9 @@
         </p>
         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button type="button" data-modal-close="arb-condition-verify-{{ _cid }}"
-                    class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Cancel</button>
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
             <button type="submit"
-                    class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Verify evidence for condition {{ _number }}
             </button>
         </div>
@@ -446,7 +446,7 @@
             </label>
             <textarea id="arb-waive-reason-{{ _cid }}" name="reason" rows="3" required maxlength="2000"
                       aria-describedby="arb-waive-reason-help-{{ _cid }}"
-                      class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ _retained.get('reason') or '' }}</textarea>
+                      class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ _retained.get('reason') or '' }}</textarea>
             <p id="arb-waive-reason-help-{{ _cid }}" class="mt-1 text-xs text-muted-foreground">Required. Up to 2,000 characters.</p>
         </div>
         <div>
@@ -455,7 +455,7 @@
             </label>
             <input type="datetime-local" id="arb-waive-expires-{{ _cid }}" name="expires_at" required
                    aria-describedby="arb-waive-expires-help-{{ _cid }}"
-                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <p id="arb-waive-expires-help-{{ _cid }}" class="mt-1 text-xs text-muted-foreground">
                 Must be in the future and no more than 365 days away. A value outside that window is rejected.
                 Without JavaScript, a time entered here is read as UTC.
@@ -467,7 +467,7 @@
             </label>
             <textarea id="arb-waive-scope-{{ _cid }}" name="scope" rows="2" required maxlength="2000"
                       aria-describedby="arb-waive-scope-help-{{ _cid }}"
-                      class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ _retained.get('scope') or '' }}</textarea>
+                      class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ _retained.get('scope') or '' }}</textarea>
             <p id="arb-waive-scope-help-{{ _cid }}" class="mt-1 text-xs text-muted-foreground">Describe in plain words exactly what this waiver covers.</p>
         </div>
         <div>
@@ -476,14 +476,14 @@
             </label>
             <textarea id="arb-waive-control-{{ _cid }}" name="compensating_control" rows="2" required maxlength="2000"
                       aria-describedby="arb-waive-control-help-{{ _cid }}"
-                      class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ _retained.get('compensating_control') or '' }}</textarea>
+                      class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ _retained.get('compensating_control') or '' }}</textarea>
             <p id="arb-waive-control-help-{{ _cid }}" class="mt-1 text-xs text-muted-foreground">Required. Up to 2,000 characters.</p>
         </div>
         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button type="button" data-modal-close="arb-condition-waive-{{ _cid }}"
-                    class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Cancel</button>
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
             <button type="submit"
-                    class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Grant waiver for condition {{ _number }}
             </button>
         </div>

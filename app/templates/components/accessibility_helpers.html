@@ -9,7 +9,7 @@
    this link out of DOM order and pushes every other focusable element on the page
    behind it - the exact opposite of what a skip link is for. #}
 <a href="#main-content"
-   class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:rounded-md focus:shadow-lg">
+   class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:rounded-md">
   Skip to main content
 </a>
 {% endmacro %}
@@ -51,7 +51,7 @@
 
 {# Keyboard shortcut hint #}
 {% macro keyboard_hint(keys, description) %}
-<kbd class="inline-flex items-center gap-1 px-2 py-1 text-xs font-mono bg-muted border border-border rounded shadow-sm">
+<kbd class="inline-flex items-center gap-1 px-2 py-1 text-xs font-mono bg-muted border border-border rounded">
   {% for key in keys.split('+') %}
     {% if not loop.first %}<span class="text-muted-foreground">+</span>{% endif %}
     <span>{{ key }}</span>

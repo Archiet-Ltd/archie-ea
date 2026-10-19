@@ -17,11 +17,11 @@
   Platform.fetch('/governance/api/principles',{headers:{'Accept':'application/json'}, silent: true})
     .then(function(items){
       if(!items || !items.length){
-        el.innerHTML='<div class="col-span-full rounded-xl border bg-card shadow-sm p-10 text-center text-muted-foreground">No architecture principles defined yet.</div>';
+        el.innerHTML='<div class="col-span-full rounded-lg border border-border bg-card p-10 text-center text-muted-foreground">No architecture principles defined yet.</div>';
         return;
       }
       el.innerHTML=items.map(function(p){
-        return '<div data-slot="card" class="rounded-xl border bg-card shadow-sm p-5">'
+        return '<div data-slot="card" class="rounded-lg border border-border bg-card p-5">'
           +'<div class="flex justify-between items-start mb-1"><h3 class="font-medium text-foreground leading-snug">'+esc(p.name)+'</h3>'
           +(p.priority?'<span class="ml-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">'+esc(p.priority)+'</span>':'')
           +'</div>'
@@ -30,7 +30,7 @@
       }).join('');
     })
     .catch(function(){
-      el.innerHTML='<div class="col-span-full rounded-xl border border-destructive/30 bg-destructive/10 shadow-sm p-10 text-center text-destructive-emphasis">Could not load architecture principles — the request failed.</div>';
+      el.innerHTML='<div class="col-span-full rounded-xl border border-destructive/30 bg-destructive/10 p-10 text-center text-destructive-emphasis">Could not load architecture principles — the request failed.</div>';
     });
 })();
 </script>

@@ -210,7 +210,7 @@ if (!window._dataTableEngine) {
             {% for filter in filters %}
             <div class="relative" x-data="facetFilterDropdown()" @click.outside="open = false" @keydown.escape.window="open = false">
                 <button type="button" @click="open = !open"
-                        class="inline-flex items-center gap-1.5 rounded-md border border-dashed border-input px-3 h-8 text-xs font-medium text-foreground hover:bg-accent transition-colors">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="plus-circle" class="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true"></i>
                     {{ filter.label }}
                     {# Selected count badge #}
@@ -225,7 +225,7 @@ if (!window._dataTableEngine) {
                 {# Filter dropdown — Command-style #}
                 <!-- modal-a11y-ok -->
                 <div x-show="open" x-cloak x-transition
-                     class="absolute left-0 top-full mt-1 z-50 w-52 rounded-md border border-border bg-popover shadow-lg">
+                     class="absolute left-0 top-full mt-1 z-50 w-52 rounded-md border border-border bg-popover">
                     <div class="p-1.5">
                         <input aria-label="{{ filter.label }}" type="text" placeholder="{{ filter.label }}..."
                                class="flex h-8 w-full rounded-md bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground outline-none">
@@ -262,7 +262,7 @@ if (!window._dataTableEngine) {
             {# Reset all filters #}
             <template x-if="hasActiveFilters">
                 <button type="button" @click="clearFilters()"
-                        class="inline-flex items-center gap-1 rounded-md px-2.5 h-8 text-xs font-medium text-foreground hover:bg-accent transition-colors">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                     Reset
                     <i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i>
                 </button>
@@ -275,7 +275,7 @@ if (!window._dataTableEngine) {
     {# TABLE                                                         #}
     {# ══════════════════════════════════════════════════════════════ #}
     <div class="overflow-auto max-h-[70vh] rounded-md border border-border">
-        <table class="w-full caption-bottom text-sm" role="table">
+        <table class="dense-table w-full caption-bottom text-sm" role="table">
             <thead class="[&_tr]:border-b sticky top-0 z-20">
                 <tr class="border-b border-border bg-muted/50">
                     {% if row_selection %}
@@ -291,7 +291,7 @@ if (!window._dataTableEngine) {
                     <th class="h-10 px-3 text-left align-middle font-medium text-muted-foreground text-xs bg-card {{ col.get('class', '') }}">
                         {% if sortable and col.get('sortable', false) %}
                         <button type="button" @click="sortBy('{{ col.key }}')"
-                                class="inline-flex items-center gap-1.5 -ml-2 h-8 px-2 rounded-md hover:bg-accent transition-colors data-[state=open]:bg-accent"
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center data-[state=open]:bg-accent"
                                 :data-state="sortKey === '{{ col.key }}' ? 'open' : ''">
                             <span>{{ col.label }}</span>
                             <template x-if="sortKey === '{{ col.key }}' && sortOrder === 'asc'">
@@ -417,13 +417,13 @@ if (!window._dataTableEngine) {
                         <td class="w-10 px-3 py-2 align-middle text-right">
                             <div x-data="{ menuOpen: false }" @click.outside="menuOpen = false" class="relative inline-block">
                                 <button type="button" @click="menuOpen = !menuOpen"
-                                        class="inline-flex items-center justify-center rounded-md h-8 w-8 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
                                         aria-label="Row actions">
                                     <i data-lucide="more-horizontal" class="h-4 w-4" aria-hidden="true"></i>
                                 </button>
                                 <!-- modal-a11y-ok -->
                                 <div x-show="menuOpen" x-cloak x-transition
-                                     class="absolute right-0 z-50 mt-1 w-40 rounded-md border border-border bg-popover shadow-lg p-1 text-sm">
+                                     class="absolute right-0 z-50 mt-1 w-40 rounded-md border border-border bg-popover p-1 text-sm">
                                     {% if on_view %}
                                     <button type="button" @click="{{ on_view }}; menuOpen = false"
                                             class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-foreground hover:bg-accent transition-colors">
@@ -500,7 +500,7 @@ if (!window._dataTableEngine) {
                 </button>
                 <button type="button" @click="previousPage()" :disabled="currentPage <= 1"
                         aria-label="Go to previous page"
-                        class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent transition-colors disabled:opacity-50 disabled:pointer-events-none">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8">
                     <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>
                 </button>
                 <button type="button" @click="nextPage()" :disabled="currentPage >= totalPages"

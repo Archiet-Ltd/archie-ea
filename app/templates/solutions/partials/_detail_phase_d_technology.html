@@ -1,5 +1,5 @@
             {# Phase D — Technology Architecture (ArchiMate Technology Layer) #}
-            <div id="phase-d" class="bg-card rounded-xl border border-border shadow-sm p-6 transition-all relative"
+            <div id="phase-d" class="bg-card rounded-lg border border-border p-6 transition-all relative"
                  x-show="isSectionActive('D')" x-cloak
                  :class="isSectionActive('D') ? 'ring-1 ring-primary/10' : ''">
                 <div x-show="isSectionFuture('D')" x-cloak class="absolute inset-0 bg-background/60 z-10 flex items-center justify-center rounded-xl">
@@ -17,7 +17,7 @@
                     <div class="flex items-center gap-2">
                         <span class="text-xs text-muted-foreground" x-text="(technologyElements || []).length + ' elements'"></span>
                         <button type="button" @click="$dispatch('open-archimate-picker', {elementType: 'Technology', linkEndpoint: '/api/solutions/{{ solution.id }}/elements'})"
-                            class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <i data-lucide="plus" class="w-3 h-3" aria-hidden="true"></i> Link Element
                         </button>
                         <button type="button" @click="generatePhase('D')"
@@ -33,7 +33,7 @@
 
                 {# Generate Missing Preview Panel (BPP-014) #}
                 <template x-if="generatePreview && generatePreview.phase === 'D'">
-                    <div class="mt-3 rounded-lg border border-warning/30 bg-warning/5 p-4 space-y-3">
+                    <div class="mt-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 space-y-3">
                         <div class="flex items-center justify-between">
                             <h4 class="text-sm font-medium text-warning-emphasis">
                                 Would create <span x-text="generatePreview.count"></span> elements
@@ -100,7 +100,7 @@
                 {# Technology elements table #}
                 <template x-if="technologyElements && technologyElements.length > 0">
                     <div class="overflow-x-auto border border-border rounded-lg">
-                        <table class="w-full text-sm">
+                        <table class="dense-table w-full text-sm">
                             <thead class="bg-muted/50 border-b border-border">
                                 <tr>
                                     <th class="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Element</th>
@@ -281,7 +281,7 @@
 
                         <template x-if="depLoaded && deployables.length > 0 && techNodes.length > 0">
                             <div class="overflow-x-auto border border-border rounded-lg">
-                                <table class="w-full text-sm">
+                                <table class="dense-table w-full text-sm">
                                     <thead class="bg-muted/50 border-b border-border">
                                         <tr>
                                             <th class="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Component / Artifact</th>

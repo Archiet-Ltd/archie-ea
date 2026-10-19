@@ -28,7 +28,7 @@
     {% endwith %}
 
     <!-- Upload Section -->
-    <div class="rounded-xl border-2 border-input bg-card mb-6">
+    <div class="rounded-lg border border-input bg-card mb-6">
         <div class="p-4 sm:p-6 border-b border-border">
             <h3 class="text-lg font-semibold">Upload Pricing Data</h3>
             <p class="text-sm text-muted-foreground mt-1">
@@ -53,11 +53,7 @@
                                       file:transition-colors" aria-label="Select file">
                     </div>
                     <button type="submit"
-                            class="inline-flex items-center justify-center rounded-md text-sm font-medium
-                                   ring-offset-background transition-colors
-                                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
-                                   bg-primary text-primary-foreground hover:bg-primary/90
-                                   h-9 px-4">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         <i data-lucide="upload" class="h-4 w-4 mr-2"></i>
                         Upload &amp; Parse
                     </button>
@@ -79,7 +75,7 @@
 
     <!-- Upload Error -->
     {% if upload_error %}
-    <div class="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive-emphasis mb-6">
+    <div class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis mb-6">
         <div class="flex items-center gap-2">
             <i data-lucide="alert-circle" class="h-4 w-4 flex-shrink-0"></i>
             <span>{{ upload_error }}</span>
@@ -89,7 +85,7 @@
 
     <!-- Staging Review Table -->
     {% if staging_items %}
-    <div class="rounded-xl border-2 border-input bg-card mb-6">
+    <div class="rounded-lg border border-input bg-card mb-6">
         <div class="p-4 sm:p-6 border-b border-border">
             <div class="flex items-center justify-between">
                 <div>
@@ -112,11 +108,7 @@
                     </button>
                     <button type="button" @click="confirmAll()"
                             :disabled="confirming"
-                            class="inline-flex items-center justify-center rounded-md text-sm font-medium
-                                   ring-offset-background transition-colors
-                                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
-                                   bg-primary text-primary-foreground hover:bg-primary/90
-                                   h-9 px-4 disabled:opacity-50 disabled:cursor-not-allowed">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         <i data-lucide="check-circle" class="h-4 w-4 mr-1.5"></i>
                         <span x-text="confirming ? 'Saving...' : 'Confirm All'">Confirm All</span>
                     </button>
@@ -125,7 +117,7 @@
         </div>
 
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
                 <thead>
                     <tr class="border-b border-border bg-muted/50">
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground">Vendor</th>
@@ -205,7 +197,7 @@
     {% endif %}
 
     <!-- CSV Template Help -->
-    <div class="rounded-xl border-2 border-input bg-card">
+    <div class="rounded-lg border border-input bg-card">
         <div class="p-4 sm:p-6 border-b border-border">
             <h3 class="text-sm font-semibold">CSV Template</h3>
             <p class="text-xs text-muted-foreground mt-1">

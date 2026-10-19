@@ -22,7 +22,7 @@
 
   {# -- LLM Banner -- #}
   <div x-show="!llmAvailable" x-cloak
-    class="rounded-md border border-warning/30 bg-warning/5 p-3 text-sm text-warning-emphasis mb-6">
+    class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-emphasis mb-6">
     <i data-lucide="alert-triangle" class="h-4 w-4 inline mr-1"></i>
     AI features limited — manual entry available for all sections.
   </div>
@@ -112,19 +112,19 @@
     <button type="button"
       @click="currentStep === 1 && step1Phase === 'quality_baseline' ? backToScope() : goToStep(currentStep - 1)"
       :disabled="currentStep === 1 && step1Phase === 'scope'"
-      class="inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent disabled:opacity-50 disabled:pointer-events-none">
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
       <i data-lucide="chevron-left" class="h-4 w-4"></i> Back
     </button>
     <div class="flex items-center gap-2">
       <button type="button"
         @click="saveDraft()"
-        class="inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         Save Draft
       </button>
       <button type="button"
         @click="nextStep()"
         :disabled="!canProceed()"
-        class="inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <span x-text="currentStep === 1 && step1Phase === 'scope' ? 'Quality Baseline' : currentStep === 6 ? (arbDraft && arbDraft.ai_generated && arbDraft.approval_status === 'pending_review' ? 'Approve Draft First' : 'Submit to ARB') : 'Next'"></span>
         <i data-lucide="chevron-right" class="h-4 w-4"></i>
       </button>
@@ -176,7 +176,7 @@
           'border-warning/30 bg-warning/10 text-warning-emphasis': toast.type === 'warning',
           'border-border bg-background text-foreground': toast.type === 'info',
         }"
-        class="flex items-center gap-2 rounded-md border px-4 py-3 text-sm shadow-lg max-w-sm">
+        class="flex items-center gap-2 rounded-md border px-4 py-3 text-sm max-w-sm">
         <span x-text="toast.message" class="flex-1"></span>
         <button aria-label="Dismiss notification" type="button" @click="removeToast(toast.id)" class="shrink-0 opacity-60 hover:opacity-100">
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>

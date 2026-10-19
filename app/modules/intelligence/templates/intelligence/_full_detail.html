@@ -19,7 +19,7 @@
 {% macro full_detail(entry) %}
 <div class="mt-3 flex flex-col items-end" x-data="{ open: false }">
     <button type="button" data-full-detail-toggle
-            class="inline-flex h-8 items-center gap-1 rounded-md px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center"
             aria-expanded="false"
             :aria-expanded="open ? 'true' : 'false'"
             :aria-controls="'full-detail-' + {{ entry.uid }}"

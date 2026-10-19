@@ -50,7 +50,7 @@
                                     x-model="form.name"
                                     placeholder="e.g., Q1 2024 Application Import"
                                     required
-                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
+                                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
                                 />
                                 <p class="text-xs text-muted-foreground mt-1">A descriptive name to identify this import job</p>
                             </div>
@@ -92,7 +92,7 @@
                             <div>
                                 <label for="programme-target" class="text-sm font-medium">Transformation Programme <span class="text-muted-foreground font-normal">(optional)</span></label>
                                 <select id="programme-target" x-model="form.programme_initiative_id"
-                                        class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1">
+                                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1">
                                     <option value="">— None — import without programme linkage —</option>
                                     {# DEF-042, Capgemini dry-run: p.initiative_type is nullable
                                        (StrategicInitiative), and this always interpolated it
@@ -210,13 +210,13 @@
                                                 x-model="appSearchQuery"
                                                 @input="searchApplications()"
                                                 placeholder="Search applications..."
-                                                class="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                class="flex h-9 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                              aria-label="Search applications..."/>
                                         </div>
                                         <button
                                             type="button"
                                             @click="selectAllApplications()"
-                                            class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-10 px-4 py-2 transition-colors"
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                                          aria-label="Action">
                                             Select All
                                         </button>
@@ -278,7 +278,7 @@
                                         min="5"
                                         max="50"
                                         step="5"
-                                        class="flex-1 h-2 bg-secondary rounded-lg appearance-none cursor-pointer"
+                                        class="flex-1 h-2 bg-secondary rounded-md appearance-none cursor-pointer"
                                      aria-label="Range field"/>
                                     <span class="text-sm font-medium w-16 text-right" x-text="form.batch_size + ' apps'"></span>
                                 </div>
@@ -307,7 +307,7 @@
                                             min="1"
                                             step="1"
                                             placeholder="10.00"
-                                            class="flex h-10 w-full rounded-md border border-input bg-background pl-8 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                            class="flex h-9 w-full rounded-md border border-input bg-background pl-8 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                          aria-label="10.00"/>
                                     </div>
                                     <p class="text-xs text-muted-foreground mt-1">
@@ -332,7 +332,7 @@
                                  aria-label="Action">
                                     <span
                                         :class="form.ai_generation ? 'translate-x-5' : 'translate-x-0'"
-                                        class="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform translate-y-0.5 ml-0.5"
+                                        class="pointer-events-none block h-5 w-5 rounded-full bg-background ring-0 transition-transform translate-y-0.5 ml-0.5"
                                     ></span>
                                 </button>
                             </div>
@@ -353,7 +353,7 @@
                                  aria-label="Action">
                                     <span
                                         :class="form.auto_commit ? 'translate-x-5' : 'translate-x-0'"
-                                        class="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform translate-y-0.5 ml-0.5"
+                                        class="pointer-events-none block h-5 w-5 rounded-full bg-background ring-0 transition-transform translate-y-0.5 ml-0.5"
                                     ></span>
                                 </button>
                             </div>
@@ -462,7 +462,7 @@
                                 </div>
 
                                 <template x-if="form.budget_limit && estimatedCost > form.budget_limit">
-                                    <div class="rounded-lg bg-warning/5 border border-warning/20 p-3">
+                                    <div class="rounded-md bg-warning/10 border border-warning/40 px-3 py-2">
                                         <div class="flex items-start gap-2">
                                             <i data-lucide="alert-triangle" class="h-4 w-4 text-warning mt-0.5" aria-hidden="true"></i>
                                             <p class="text-xs text-warning-emphasis">

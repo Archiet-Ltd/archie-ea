@@ -54,7 +54,7 @@
                 <div class="flex items-center gap-2">
                     <button type="button"
                         @click="refreshJob()"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 transition-colors"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                      aria-label="Refresh">
                         <i data-lucide="refresh-cw" class="mr-2 h-4 w-4" :class="{ 'animate-spin': refreshing }"></i>
                         Refresh
@@ -94,7 +94,7 @@
                     <button type="button"
                         x-show="['pending', 'processing', 'paused'].includes(_normStatus(job?.status))"
                         @click="showCancelModal = true"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 h-10 px-4 py-2 transition-colors"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                      aria-label="Cancel">
                         <i data-lucide="x-circle" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Cancel
@@ -330,7 +330,7 @@
             </div>
 
             <div class="overflow-x-auto rounded-md border">
-                <table class="w-full caption-bottom text-sm">
+                <table class="dense-table w-full caption-bottom text-sm">
                     <thead class="[&_tr]:border-b">
                         <tr class="border-b transition-colors hover:bg-muted/50">
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Batch #</th>
@@ -392,7 +392,7 @@
                                 <td class="p-4 align-middle text-right">
                                     <a
                                         :href="'/batch-import/batches/' + batch.id + '/review'"
-                                        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 transition-colors"
+                                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                                         x-show="['ready_for_review', 'approved'].includes(_normStatus(batch.status))"
                                     >
                                         <i data-lucide="eye" class="mr-2 h-4 w-4" aria-hidden="true"></i>
@@ -427,7 +427,7 @@
                     <i data-lucide="alert-triangle" class="h-5 w-5 text-destructive" aria-hidden="true"></i>
                     <h3 class="text-lg font-semibold text-destructive-emphasis">Error Log</h3>
                 </div>
-                <div class="rounded-lg bg-destructive/10 p-4 max-h-64 overflow-y-auto">
+                <div class="rounded-md bg-destructive/10 px-3 py-2 max-h-64 overflow-y-auto">
                     <template x-for="(error, index) in job.error_log" :key="index">
                         <div class="flex items-start gap-2 py-2 border-b border-destructive/20 last:border-0">
                             <span class="text-xs text-muted-foreground" x-text="error.timestamp"></span>
@@ -448,7 +448,7 @@
         x-cloak
      role="dialog">
         <div class="modal-root bg-background/80 fixed inset-0" @click="showCancelModal = false"></div>
-        <div class="relative z-50 w-full max-w-md rounded-lg border bg-background p-6 shadow-lg" role="alertdialog" aria-modal="true" tabindex="-1">
+        <div class="relative z-50 w-full max-w-md rounded-lg border bg-background p-6" role="alertdialog" aria-modal="true" tabindex="-1">
             <button type="button" @click="showCancelModal = false" class="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100" aria-label="Cancel">
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
             </button>
@@ -468,13 +468,13 @@
             <div class="flex justify-end gap-2">
                 <button type="button"
                     @click="showCancelModal = false"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-10 px-4 py-2"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                  aria-label="Cancel">
                     Keep Job
                 </button>
                 <button type="button"
                     @click="cancelJob()"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 h-10 px-4 py-2"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                  aria-label="Cancel">
                     Cancel Job
                 </button>

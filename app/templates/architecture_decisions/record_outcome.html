@@ -105,9 +105,9 @@
 
         <div class="flex justify-end gap-3 pt-2">
             <a href="{{ url_for('arch_decisions.view_decision', decision_id=decision.id) }}"
-               class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium border border-input hover:bg-accent">Cancel</a>
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Cancel</a>
             <button type="submit"
-                    class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Record Outcome
             </button>
         </div>

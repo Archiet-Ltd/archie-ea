@@ -20,7 +20,7 @@
          class="mb-6 rounded-md border p-4 text-sm" x-text="alert.message"></div>
 
     <!-- Credentials card -->
-    <div class="rounded-lg border border-border bg-card text-card-foreground shadow-sm mb-6">
+    <div class="rounded-lg border border-border bg-card text-card-foreground mb-6">
         <div class="flex items-center justify-between px-6 py-4 border-b border-border">
             <div>
                 <h2 class="text-base font-semibold">Connected App Credentials</h2>
@@ -43,41 +43,41 @@
                 <label for="sf-instance" class="block text-sm font-medium mb-1">Instance URL</label>
                 <input type="url" id="sf-instance" x-model="creds.instance_url"
                        placeholder="https://yourorg.my.salesforce.com"
-                       class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
             </div>
             <div>
                 <label for="sf-client-id" class="block text-sm font-medium mb-1">Consumer Key (Client ID)</label>
                 <input type="text" id="sf-client-id" x-model="creds.client_id"
-                       class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" autocomplete="off">
+                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" autocomplete="off">
             </div>
             <div>
                 <label for="sf-client-secret" class="block text-sm font-medium mb-1">Consumer Secret</label>
                 <input type="password" id="sf-client-secret" x-model="creds.client_secret"
                        placeholder="{{ '••••••••  (saved)' if sf_config.configured else '' }}"
-                       class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" autocomplete="new-password">
+                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" autocomplete="new-password">
             </div>
         </div>
         <div class="px-6 pb-5 flex items-center gap-3">
             <button type="button" @click="saveCredentials()" :disabled="busy"
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Save Credentials
             </button>
             <button type="button" @click="testConnection()" :disabled="busy"
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent disabled:opacity-50">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Test Connection
             </button>
         </div>
     </div>
 
     <!-- Discovery card -->
-    <div class="rounded-lg border border-border bg-card text-card-foreground shadow-sm">
+    <div class="rounded-lg border border-border bg-card text-card-foreground">
         <div class="flex items-center justify-between px-6 py-4 border-b border-border">
             <div>
                 <h2 class="text-base font-semibold">Org Discovery</h2>
                 <p class="text-sm text-muted-foreground mt-0.5">Lightning apps + installed AppExchange packages.</p>
             </div>
             <button type="button" @click="discover()" :disabled="busy"
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <span x-text="busy ? 'Working…' : 'Discover'"></span>
             </button>
         </div>
@@ -89,7 +89,7 @@
         </div>
 
         <div x-cloak x-show="discovered.length">
-            <table class="min-w-full divide-y divide-border text-sm">
+            <table class="dense-table min-w-full divide-y divide-border text-sm">
                 <thead class="bg-muted/30">
                     <tr>
                         <th class="px-4 py-2 w-8"><input type="checkbox" @change="toggleAll($event.target.checked)" aria-label="Select all"></th>
@@ -125,7 +125,7 @@
                     {% endfor %}
                 </select>
                 <button type="button" @click="importSelected()" :disabled="busy || !selected.length"
-                        class="ml-auto inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 ml-auto items-center">
                     <span x-text="'Import ' + selected.length + ' selected'"></span>
                 </button>
             </div>

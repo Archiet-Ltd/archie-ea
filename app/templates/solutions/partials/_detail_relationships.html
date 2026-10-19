@@ -305,7 +305,7 @@
         }
     }"
     x-init="load()"
-    class="bg-card rounded-xl border border-border shadow-sm p-6 mt-6"
+    class="bg-card rounded-xl border border-border p-6 mt-6"
 >
     {# Header #}
     <div class="flex items-center justify-between mb-4">
@@ -328,7 +328,7 @@
             <button type="button"
                 @click="generateRelationships()"
                 :disabled="generating"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-input bg-background text-foreground hover:bg-accent disabled:opacity-50 transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                 x-cloak
             >
                 <template x-if="generating">
@@ -341,7 +341,7 @@
             </button>
             <button type="button"
                 @click="$dispatch('launch-composition-wizard')"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-input bg-background text-foreground hover:bg-accent transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                 x-cloak
             >
                 <i data-lucide="wand-2" class="w-4 h-4" aria-hidden="true"></i>
@@ -349,7 +349,7 @@
             </button>
             <button type="button"
                 @click="showAddRow = !showAddRow"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                 x-cloak
             >
                 <i data-lucide="plus" class="w-4 h-4" aria-hidden="true"></i>
@@ -368,7 +368,7 @@
 
     {# Error #}
     <template x-if="relError">
-        <div class="mb-4 p-3 rounded-md bg-destructive/10 text-destructive-emphasis text-sm" x-text="relError"></div>
+        <div class="mb-4 px-3 py-2 rounded-md bg-destructive/10 text-destructive-emphasis text-sm" x-text="relError"></div>
     </template>
 
     {# Filters (shown when there are rows) #}
@@ -419,7 +419,7 @@
                     <button type="button"
                         @click="generateRelationships()"
                         :disabled="generating"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-input bg-background text-foreground hover:bg-accent disabled:opacity-50 transition-colors"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                     >
                         Regenerate
                     </button>
@@ -433,7 +433,7 @@
                 </div>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <thead>
                         <tr class="border-b border-border">
                             <th class="text-left py-2 px-2 w-8"><input aria-label="Select all proposals" type="checkbox" @change="proposals.forEach(p => p.checked = $event.target.checked)" class="rounded border-input"></th>
@@ -469,7 +469,7 @@
 
     {# Add Row Form #}
     <template x-if="showAddRow">
-        <div class="mb-4 p-4 rounded-lg border border-dashed border-primary/40 bg-primary/5" x-cloak>
+        <div class="mb-4 px-3 py-2 rounded-md border border-dashed border-primary/40 bg-primary/10" x-cloak>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                 {# Source Picker #}
                 <div class="relative">
@@ -483,7 +483,7 @@
                         class="w-full text-sm rounded-md border border-input bg-background px-3 py-1.5"
                     >
                     <template x-if="sourceDropOpen && sourceResults.length > 0">
-                        <div class="absolute z-20 w-full mt-1 bg-popover border border-border rounded-md shadow-md max-h-48 overflow-y-auto" x-cloak>
+                        <div class="absolute z-20 w-full mt-1 bg-popover border border-border rounded-md max-h-48 overflow-y-auto" x-cloak>
                             <template x-for="elem in sourceResults" :key="elem.id">
                                 <button type="button"
                                     @click="selectSource(elem)"
@@ -536,7 +536,7 @@
                         class="w-full text-sm rounded-md border border-input bg-background px-3 py-1.5"
                     >
                     <template x-if="targetDropOpen && targetResults.length > 0">
-                        <div class="absolute z-20 w-full mt-1 bg-popover border border-border rounded-md shadow-md max-h-48 overflow-y-auto" x-cloak>
+                        <div class="absolute z-20 w-full mt-1 bg-popover border border-border rounded-md max-h-48 overflow-y-auto" x-cloak>
                             <template x-for="elem in targetResults" :key="elem.id">
                                 <button type="button"
                                     @click="selectTarget(elem)"
@@ -554,7 +554,7 @@
                 <button type="button"
                     @click="addRelationship()"
                     :disabled="relSaving || !newSource || !newTarget || !newType"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                 >
                     <template x-if="relSaving">
                         <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-primary-foreground"></div>
@@ -563,7 +563,7 @@
                 </button>
                 <button type="button"
                     @click="resetNewRow()"
-                    class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md border border-input bg-background text-foreground hover:bg-accent transition-colors"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                 >
                     Cancel
                 </button>
@@ -574,7 +574,7 @@
     {# Relationship Table #}
     <template x-if="relLoaded && filteredRows.length > 0">
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
                 <thead>
                     <tr class="border-b border-border">
                         <th class="text-left py-2 px-3 font-medium text-muted-foreground">Source</th>
@@ -633,7 +633,7 @@
             <p class="text-sm text-muted-foreground mb-3">No relationships defined yet</p>
             <button type="button"
                 @click="showAddRow = true"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
             >
                 <i data-lucide="plus" class="w-4 h-4" aria-hidden="true"></i>
                 Add Relationship
@@ -682,7 +682,7 @@
                                     </div>
                                     <div class="flex flex-wrap gap-2">
                                         <template x-for="el in (traceData.layers[layerName] || [])" :key="el.id">
-                                            <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-card border border-border shadow-sm">
+                                            <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-card border border-border">
                                                 <span class="text-foreground" x-text="el.name"></span>
                                                 <span class="text-muted-foreground text-xs" x-text="el.type"></span>
                                             </div>

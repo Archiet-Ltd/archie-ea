@@ -19,7 +19,7 @@
 
     {% if features or sections %}
     <!-- Filters -->
-    <div class="bg-card rounded-lg border border-border shadow-sm p-4 mb-4">
+    <div class="bg-card rounded-lg border border-border p-4 mb-4">
         <form method="GET" action="{{ url_for('admin.feature_flags') }}" class="flex flex-wrap gap-3 items-end">
             <!-- Search -->
             <div class="flex-1 min-w-[200px]">
@@ -80,7 +80,7 @@
                 {% call button(type='submit', variant='default', icon='filter') %}
                     Apply Filters
                 {% endcall %}
-                <a href="{{ url_for('admin.feature_flags') }}" class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors border border-border hover:bg-accent h-10 px-4">
+                <a href="{{ url_for('admin.feature_flags') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <i data-lucide="x" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                     Clear
                 </a>
@@ -95,13 +95,13 @@
         <div class="flex justify-end mb-4">
             <div class="inline-flex items-center rounded-lg border border-border bg-muted p-1">
                 <button type="button" @click="viewMode = 'grouped'; $nextTick(() => { if (window.lucide) lucide.createIcons(); })"
-                    :class="viewMode === 'grouped' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+                    :class="viewMode === 'grouped' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'"
                     class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all" aria-label="Sections view">
                     <i data-lucide="layout-grid" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
                     Sections
                 </button>
                 <button type="button" @click="viewMode = 'list'; $nextTick(() => { if (window.lucide) lucide.createIcons(); })"
-                    :class="viewMode === 'list' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+                    :class="viewMode === 'list' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'"
                     class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all" aria-label="List view">
                     <i data-lucide="list" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
                     List
@@ -112,7 +112,7 @@
         <!-- ====== GROUPED (SECTIONS) VIEW ====== -->
         <div x-show="viewMode === 'grouped'" x-cloak class="space-y-4">
             {% for group in sections %}
-            <div class="bg-card rounded-lg border border-border shadow-sm overflow-hidden"
+            <div class="bg-card rounded-lg border border-border overflow-hidden"
                  x-data="{ expanded: true }">
                 <!-- Section Header -->
                 <div class="flex items-center justify-between px-5 py-3.5 bg-muted/30 cursor-pointer select-none"
@@ -138,7 +138,7 @@
                             <span x-text="(toggleStates[{{ group.section.id }}]?.enabled ?? {{ 'true' if group.section.enabled else 'false' }}) ? 'Active' : 'Disabled'"></span>
                         </button>
                         <a href="{{ url_for('admin.feature_flag_edit', id=group.section.id) }}"
-                           class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-7 w-7"
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-7"
                            title="Edit section">
                             <i data-lucide="edit" class="w-3.5 h-3.5" aria-hidden="true"></i>
                         </a>
@@ -174,7 +174,7 @@
                                     <span x-text="(toggleStates[{{ child.id }}]?.enabled ?? {{ 'true' if child.enabled else 'false' }}) ? 'Enabled' : 'Disabled'"></span>
                                 </button>
                                 <a href="{{ url_for('admin.feature_flag_edit', id=child.id) }}"
-                                   class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-7 w-7"
+                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-7"
                                    title="Edit">
                                     <i data-lucide="edit" class="w-3.5 h-3.5" aria-hidden="true"></i>
                                 </a>
@@ -193,8 +193,8 @@
         <!-- ====== LABS SECTION ====== -->
         {% set labs_features = features|selectattr('state', 'equalto', FeatureState.LABS)|list if features else [] %}
         {% if labs_features %}
-        <div class="bg-card rounded-lg border border-info/30 shadow-sm overflow-hidden mb-4">
-            <div class="flex items-center gap-2 px-5 py-3 bg-info/5 border-b border-info/20">
+        <div class="bg-card rounded-lg border border-info/30 overflow-hidden mb-4">
+            <div class="border flex items-center gap-2 px-5 py-2 bg-info/10 border-b border-info/40">
                 <i data-lucide="flask-conical" class="w-4 h-4 text-info" aria-hidden="true"></i>
                 <span class="text-sm font-semibold">Labs</span>
                 <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-info/10 text-info-emphasis">Experimental</span>
@@ -226,7 +226,7 @@
                             <span x-text="(toggleStates[{{ feature.id }}]?.enabled ?? {{ 'true' if feature.enabled else 'false' }}) ? 'Enabled' : 'Disabled'"></span>
                         </button>
                         <a href="{{ url_for('admin.feature_flag_edit', id=feature.id) }}"
-                           class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-7 w-7"
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-7"
                            title="Edit">
                             <i data-lucide="edit" class="w-3.5 h-3.5" aria-hidden="true"></i>
                         </a>
@@ -239,9 +239,9 @@
 
         <!-- ====== LIST VIEW ====== -->
         <div x-show="viewMode === 'list'" x-cloak>
-            <div class="bg-card rounded-lg border border-border shadow-sm">
+            <div class="bg-card rounded-lg border border-border">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-border">
+                    <table class="dense-table min-w-full divide-y divide-border">
                         <thead class="bg-muted/50">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -336,7 +336,7 @@
                                         </button>
 
                                         <a href="{{ url_for('admin.feature_flag_edit', id=feature.id) }}"
-                                           class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
                                            title="Edit">
                                             <i data-lucide="edit" class="w-4 h-4" aria-hidden="true"></i>
                                         </a>
@@ -364,7 +364,7 @@
                     <div class="flex gap-1">
                         {% if pagination.has_prev %}
                         <a href="{{ url_for('admin.feature_flags', page=pagination.prev_num, search=search, type=filter_type, state=filter_state, status=filter_status) }}"
-                           class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-9 px-3">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                             <i data-lucide="chevron-left" class="w-4 h-4" aria-hidden="true"></i>
                             Previous
                         </a>
@@ -376,7 +376,7 @@
                                 <span class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground h-9 w-9">{{ page_num }}</span>
                                 {% else %}
                                 <a href="{{ url_for('admin.feature_flags', page=page_num, search=search, type=filter_type, state=filter_state, status=filter_status) }}"
-                                   class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-9 w-9">{{ page_num }}</a>
+                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9">{{ page_num }}</a>
                                 {% endif %}
                             {% else %}
                             <span class="inline-flex items-center justify-center h-9 w-9">...</span>
@@ -385,7 +385,7 @@
 
                         {% if pagination.has_next %}
                         <a href="{{ url_for('admin.feature_flags', page=pagination.next_num, search=search, type=filter_type, state=filter_state, status=filter_status) }}"
-                           class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-9 px-3">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                             Next
                             <i data-lucide="chevron-right" class="w-4 h-4 ml-1" aria-hidden="true"></i>
                         </a>
@@ -404,7 +404,7 @@
         <h3 class="text-lg font-semibold mb-2">No feature flags yet</h3>
         <p class="text-muted-foreground mb-4">Create your first feature flag to control application features</p>
         <a href="{{ url_for('admin.feature_flag_new') }}"
-           class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground hover:bg-primary/90 h-10 py-2 px-4">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <i data-lucide="plus" class="w-4 h-4 mr-2" aria-hidden="true"></i>
             Create Feature Flag
         </a>

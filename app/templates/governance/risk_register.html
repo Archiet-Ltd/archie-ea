@@ -29,7 +29,7 @@
 <div class="p-6 space-y-6 mx-auto" x-data="riskRegister()" x-cloak>
     {% macro _ps_actions() %}
         <button type="button" @click="openCreate()"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Add Risk
         </button>
     {% endmacro %}
@@ -105,7 +105,7 @@
         <h2 class="text-sm font-semibold text-foreground mb-3">All risks</h2>
 
         {# Migrated onto the shared data_table component (components/data_table.html)
-           instead of a hand-rolled <table> — it already had search, sort, a
+           instead of a hand-rolled <table class="dense-table"> — it already had search, sort, a
            correct overflow-auto wrapper and a consistent empty state, but had
            no adopters anywhere in the app, so every list page (including this
            one's clipped STATUS column, E2E-O) reinvented the same layout with
@@ -189,14 +189,14 @@
                     </template>
                 </div>
                 <button type="button" @click="openCreate()"
-                        class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="plus" class="h-3.5 w-3.5" aria-hidden="true"></i> Add item
                 </button>
             </div>
         </div>
         {% if raid_items %}
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
                 <thead>
                     <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                         <th class="px-4 py-2 font-medium">Kind</th>
@@ -249,7 +249,7 @@
                             <button type="button"
                                     @click='setStatus({{ item.id }}, {{ ("resolved" if item.status.value == "open" else "closed")|tojson }})'
                                     :disabled="updatingId === {{ item.id }}"
-                                    class="inline-flex items-center rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent hover:text-accent-foreground disabled:opacity-50">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 {{ 'Resolve' if item.status.value == 'open' else 'Close' }}
                             </button>
                             {% else %}
@@ -321,11 +321,11 @@
     </div>
     <div class="flex justify-end gap-2 mt-4">
         <button type="button" data-modal-close="create-raid-modal"
-                class="inline-flex items-center h-9 px-4 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             Cancel
         </button>
         <button type="button" @click="submitRaid()" :disabled="raidSaving"
-                class="inline-flex items-center h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <span x-show="raidSaving" x-cloak class="mr-1.5 h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
             Save
         </button>
@@ -390,9 +390,9 @@
     </div>
     <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
         <button type="button" data-modal-close="create-risk-modal"
-                class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent transition-colors">Cancel</button>
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
         <button type="button" @click="submit()" :disabled="saving"
-                class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:pointer-events-none">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <span x-text="saving ? 'Saving' : (editingId ? 'Save Changes' : 'Add Risk')"></span>
         </button>
     </div>
@@ -420,7 +420,7 @@
              x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
-             class="fixed right-0 top-0 h-full w-full sm:w-[28rem] bg-background border-l border-border shadow-xl z-50 flex flex-col">
+             class="fixed right-0 top-0 h-full w-full sm:w-[28rem] bg-background border-l border-border z-50 flex flex-col">
 
             <div class="flex items-center justify-between px-4 py-3 border-b border-border">
                 <h2 class="text-sm font-semibold text-foreground truncate" x-text="selectedRisk ? selectedRisk.title : 'Risk detail'"></h2>
@@ -488,10 +488,10 @@
             </div>
 
             <div class="flex items-center gap-2 px-4 py-3 border-t border-border" x-show="selectedRisk">
-                <button type="button" @click="openEdit(selectedRisk)" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent transition-colors">
+                <button type="button" @click="openEdit(selectedRisk)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="pencil" class="h-3.5 w-3.5" aria-hidden="true"></i> Edit
                 </button>
-                <button type="button" @click="confirmDelete(selectedRisk)" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-destructive/30 bg-background px-3 text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 transition-colors">
+                <button type="button" @click="confirmDelete(selectedRisk)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i> Delete
                 </button>
             </div>

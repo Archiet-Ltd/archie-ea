@@ -70,17 +70,17 @@
   <div>
     <label for="bmc-name" class="block text-sm font-medium mb-1">Name <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
     <input id="bmc-name" name="name" type="text" required maxlength="256" placeholder="e.g. Core Retail Business"
-      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
   </div>
   <div>
     <label for="bmc-description" class="block text-sm font-medium mb-1">Description</label>
     <textarea id="bmc-description" name="description" rows="2" maxlength="2000" placeholder="Optional context for this canvas"
-      class="flex min-h-[64px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+      class="flex min-h-[64px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
   </div>
   <div>
     <label for="bmc-operating-model" class="block text-sm font-medium mb-1">Operating Model Archetype</label>
     <select id="bmc-operating-model" name="operating_model_type"
-      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
       <option value="">Not set</option>
       {% for t in operating_model_types %}
       <option value="{{ t }}">{{ t | capitalize }}</option>
@@ -89,11 +89,11 @@
   </div>
   <div class="flex justify-end gap-3 pt-2 border-t">
     <button type="button" data-modal-close="bmc-create-modal"
-      class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 py-2">
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
       Cancel
     </button>
     <button type="submit" data-testid="bmc-create-submit"
-      class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
       Create Canvas
     </button>
   </div>

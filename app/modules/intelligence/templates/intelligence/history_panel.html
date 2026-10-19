@@ -8,7 +8,7 @@
             <button type="button"
                     @click="refresh()"
                     :disabled="loading"
-                    class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:pointer-events-none">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 <i data-lucide="refresh-cw" class="h-4 w-4 mr-2" aria-hidden="true"></i>Refresh
             </button>
         </div>
@@ -19,7 +19,7 @@
     </template>
 
     <template x-if="error">
-        <div class="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive" x-text="error"></div>
+        <div class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive" x-text="error"></div>
     </template>
 
     <template x-if="!loading && !error && versions.length === 0">

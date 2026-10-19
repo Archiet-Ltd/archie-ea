@@ -27,7 +27,7 @@
 
 {% macro _journey_actions() %}
   <a href="{{ url_for('architecture_journey.index') }}"
-     class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground">
+     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
     All journeys
   </a>
 {% endmacro %}
@@ -54,7 +54,7 @@
     {% if home.degraded %}
     {# Said plainly, at the top, before any number the reader might trust. #}
     <div data-testid="journey-degraded" role="alert"
-         class="rounded-lg border border-warning/30 bg-warning/10 p-4">
+         class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2">
       <p class="text-sm font-medium text-warning-emphasis">Some of this journey could not be loaded</p>
       <p class="mt-1 text-sm text-warning-emphasis">
         Participants, decisions, risks and linked records are shown as &mdash; because they
@@ -64,7 +64,7 @@
     {% endif %}
 
     {# ── purpose, stage, next action ─────────────────────────────────────── #}
-    <section class="rounded-xl border border-border bg-card p-5 sm:p-6" aria-labelledby="journey-progress-title">
+    <section class="rounded-lg border border-border bg-card p-5 sm:p-6" aria-labelledby="journey-progress-title">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="min-w-0">
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current stage</p>
@@ -87,14 +87,14 @@
            to ever mark it done. It now switches to a real closing action. #}
         <template x-if="currentStage !== 'deliver'">
           <button type="button" @click="advance" :disabled="saving"
-            class="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-6 text-base font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center justify-center">
             <span>Complete this stage</span>
             <i data-lucide="arrow-right" class="h-4 w-4" aria-hidden="true"></i>
           </button>
         </template>
         <template x-if="currentStage === 'deliver'">
           <button type="button" @click="closeJourney" :disabled="closingJourney || journeyStatus === 'completed'"
-            class="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-6 text-base font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center justify-center">
             <span x-text="journeyStatus === 'completed' ? 'Journey completed' : (closingJourney ? 'Closing…' : 'Mark journey complete')"></span>
             <i data-lucide="check" class="h-4 w-4" aria-hidden="true"></i>
           </button>
@@ -113,7 +113,7 @@
 
       {# The next action carries its reason. An instruction without a reason is a
          demand, and the architect cannot tell whether it applies to them. #}
-      <div data-testid="journey-next-action" class="mt-6 rounded-lg border border-primary/30 bg-primary/5 p-4">
+      <div data-testid="journey-next-action" class="mt-6 rounded-md border border-primary/40 bg-primary/10 px-3 py-2">
         <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Next</p>
         <p class="mt-1 text-sm font-semibold text-foreground">{{ home.next_action.label }}</p>
         <p class="mt-1 text-sm text-muted-foreground">{{ home.next_action.reason }}</p>
@@ -134,7 +134,7 @@
           <p class="mt-1 text-sm text-muted-foreground">Capture trade-offs, assurance and the chosen direction in the Decision Register.</p>
         </div>
         <a href="{{ url_for('arch_decisions.create_decision') }}"
-           class="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center">
           <i data-lucide="gavel" class="h-4 w-4" aria-hidden="true"></i>Record a decision
         </a>
       </div>
@@ -175,7 +175,7 @@
       <div class="space-y-6">
 
         {# ── participants ────────────────────────────────────────────────── #}
-        <section class="rounded-xl border border-border bg-card p-5 sm:p-6" aria-labelledby="participants-title">
+        <section class="rounded-lg border border-border bg-card p-5 sm:p-6" aria-labelledby="participants-title">
           <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 id="participants-title" class="text-lg font-semibold text-foreground">Journey team</h2>
@@ -215,11 +215,11 @@
                   role="combobox" aria-autocomplete="list" aria-controls="journey-member-results"
                   :aria-expanded="memberPickerOpen.toString()" :aria-activedescendant="activeMemberResultId"
                   autocomplete="off" placeholder="Search by name or email"
-                  class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                  class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 <input type="hidden" name="journey_member_user_id" :value="selectedMember ? selectedMember.id : ''">
 
                 <div id="journey-member-results" x-show="memberPickerOpen" x-cloak role="listbox"
-                     class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg">
+                     class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover p-1">
                   <template x-for="(person, index) in memberResults" :key="person.id">
                     <button type="button" role="option" :id="`journey-member-option-${person.id}`"
                       :aria-selected="(index === activeMemberIndex).toString()"
@@ -240,7 +240,7 @@
               <div>
                 <label for="journey-member-role" class="text-xs font-medium text-foreground">Journey role</label>
                 <select id="journey-member-role" x-model="memberRole"
-                  class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                  class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                   <option value="chief_architect">Chief architect</option>
                   <option value="enterprise_architect">Enterprise architect</option>
                   <option value="business_architect">Business architect</option>
@@ -258,7 +258,7 @@
               </div>
 
               <button type="submit" :disabled="savingMember || !selectedMember"
-                class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 <i data-lucide="user-plus" class="h-4 w-4" aria-hidden="true"></i>
                 <span x-text="savingMember ? 'Adding…' : 'Add'"></span>
               </button>
@@ -268,7 +268,7 @@
         </section>
 
         {# ── linked records ──────────────────────────────────────────────── #}
-        <section data-testid="journey-linked-records" class="rounded-xl border border-border bg-card p-5 sm:p-6" aria-labelledby="linked-records-title">
+        <section data-testid="journey-linked-records" class="rounded-lg border border-border bg-card p-5 sm:p-6" aria-labelledby="linked-records-title">
           <h2 id="linked-records-title" class="text-lg font-semibold text-foreground">Linked records</h2>
           <p class="mt-1 text-sm text-muted-foreground">Governed records this journey uses, produces or affects.</p>
 
@@ -299,7 +299,7 @@
                     {% if link.note %}<p class="mt-1 text-xs text-muted-foreground">{{ link.note }}</p>{% endif %}
                   </div>
                   <button type="button" @click="unlinkLink({{ link.id }})" :disabled="unlinkingLinkId === {{ link.id }}"
-                    class="inline-flex h-8 shrink-0 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-xs font-medium text-foreground hover:bg-accent hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center justify-center"
                     aria-label="Unlink {{ target_label or (entity_type|replace('_', ' ')) }}">
                     <i data-lucide="unlink" class="h-4 w-4" aria-hidden="true"></i>
                     <span x-text="unlinkingLinkId === {{ link.id }} ? 'Unlinking…' : 'Unlink'"></span>
@@ -316,7 +316,7 @@
         </section>
 
         {# ── scope ────────────────────────────────────────────────────────── #}
-        <section class="rounded-xl border border-border bg-card p-5 sm:p-6" aria-labelledby="scope-title">
+        <section class="rounded-lg border border-border bg-card p-5 sm:p-6" aria-labelledby="scope-title">
           <h2 id="scope-title" class="text-lg font-semibold text-foreground">Architecture scope</h2>
           <p class="mt-1 text-sm text-muted-foreground">The perspectives this journey must reconcile.</p>
           <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -330,7 +330,7 @@
         </section>
 
         {# ── deliverables ─────────────────────────────────────────────────── #}
-        <section class="rounded-xl border border-border bg-card p-5 sm:p-6" aria-labelledby="deliverables-title">
+        <section class="rounded-lg border border-border bg-card p-5 sm:p-6" aria-labelledby="deliverables-title">
           <h2 id="deliverables-title" class="text-lg font-semibold text-foreground">Working outputs</h2>
           <p class="mt-1 text-sm text-muted-foreground">Use the right modelling tool when the journey needs it. Outputs stay governed by this purpose.</p>
           <div class="mt-4 divide-y divide-border rounded-lg border border-border">
@@ -347,7 +347,7 @@
               </div>
               {% if deliverable_tool_urls.get(value) %}
               <a href="{{ deliverable_tool_urls[value] }}"
-                 class="inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium text-foreground hover:bg-accent">Open tool</a>
+                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center justify-center">Open tool</a>
               {% else %}
               {# The tool's blueprint did not register. Say so: silently omitting the
                  link would leave the user believing the deliverable has no tool. #}
@@ -368,7 +368,7 @@
       <aside class="space-y-6">
 
         {# ── evidence ─────────────────────────────────────────────────────── #}
-        <section class="rounded-xl border border-border bg-card p-5" aria-labelledby="evidence-title">
+        <section class="rounded-lg border border-border bg-card p-5" aria-labelledby="evidence-title">
           <h2 id="evidence-title" class="text-sm font-semibold text-foreground">Evidence register</h2>
           <p class="mt-1 text-xs leading-5 text-muted-foreground">
             Register the document, model, link or observation that supports this journey.
@@ -379,13 +379,13 @@
             <div>
               <label for="evidence-name" class="text-xs font-medium text-foreground">Evidence name</label>
               <input id="evidence-name" type="text" x-model.trim="evidenceName" required maxlength="255"
-                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 placeholder="Operating model v3">
             </div>
             <div>
               <label for="evidence-reference" class="text-xs font-medium text-foreground">Document or reference</label>
               <input id="evidence-reference" type="text" x-model.trim="evidenceReference" required maxlength="1000"
-                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 placeholder="File name, repository path or URL">
             </div>
             <button type="submit" :disabled="savingEvidence || !evidenceName || !evidenceReference"
@@ -397,7 +397,7 @@
 
           <ul class="mt-4 space-y-2" aria-live="polite">
             <template x-for="(item, index) in evidence" :key="index">
-              <li class="rounded-lg border border-border bg-muted/20 p-3">
+              <li class="rounded-md border border-border bg-muted/20 px-3 py-2">
                 <p class="break-words text-xs font-medium text-foreground" x-text="item.name"></p>
                 <p class="mt-1 break-words text-xs text-muted-foreground" x-text="item.reference"></p>
               </li>
@@ -407,7 +407,7 @@
         </section>
 
         {# ── link a verified catalog record ──────────────────────────────── #}
-        <section data-testid="journey-link-form" class="rounded-xl border border-border bg-card p-5"
+        <section data-testid="journey-link-form" class="rounded-lg border border-border bg-card p-5"
                  aria-labelledby="journey-link-title">
           <h2 id="journey-link-title" class="text-sm font-semibold text-foreground">Add a linked record</h2>
           <p class="mt-1 text-xs leading-5 text-muted-foreground">
@@ -418,7 +418,7 @@
             <div>
               <label for="link-entity-type" class="text-xs font-medium text-foreground">Record type</label>
               <select id="link-entity-type" x-model="linkEntityType" @change="resetRecordPicker"
-                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 <option value="application">Application</option>
                 <option value="archimate_element">ArchiMate element</option>
               </select>
@@ -426,7 +426,7 @@
             <div>
               <label for="link-relation" class="text-xs font-medium text-foreground">Relation</label>
               <select id="link-relation" x-model="linkRelation"
-                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 {% for value in link_relations %}
                 <option value="{{ value }}">{{ value|title }}</option>
                 {% endfor %}
@@ -441,10 +441,10 @@
                 role="combobox" aria-autocomplete="list" aria-controls="journey-record-results"
                 :aria-expanded="recordPickerOpen.toString()" :aria-activedescendant="activeRecordResultId"
                 autocomplete="off" placeholder="Search the catalog"
-                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
               <div id="journey-record-results" x-show="recordPickerOpen" x-cloak role="listbox"
-                   class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg">
+                   class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover p-1">
                 <template x-for="(record, index) in recordResults" :key="record.id">
                   <button type="button" role="option" :id="`journey-record-option-${record.id}`"
                     :aria-selected="(index === activeRecordIndex).toString()"
@@ -488,7 +488,7 @@
 
         {# ── programme ────────────────────────────────────────────────────── #}
         {% if journey.programme_id %}
-        <section class="rounded-xl border border-border bg-card p-5">
+        <section class="rounded-lg border border-border bg-card p-5">
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Programme</p>
           <a href="{{ url_for('solution_design.programmes_list') }}"
              class="mt-2 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
@@ -500,7 +500,7 @@
     </div>
 
     <p x-show="error" x-cloak role="alert"
-       class="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-emphasis"
+       class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis"
        x-text="error"></p>
   </div>
 </div>

@@ -7,8 +7,8 @@
         <h3 class="text-sm font-semibold text-foreground flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-success inline-block"></span>Benefits &amp; Organization Impact</h3>
         <div class="sad-actions">
             <div class="flex gap-2">
-                <button type="button" @click="openEntityModal('benefit_realization')" class="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">+ Benefit</button>
-                <button type="button" @click="openEntityModal('org_impact')" class="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">+ Org Impact</button>
+                <button type="button" @click="openEntityModal('benefit_realization')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">+ Benefit</button>
+                <button type="button" @click="openEntityModal('org_impact')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">+ Org Impact</button>
             </div>
         </div>
     </div>
@@ -17,7 +17,7 @@
         <div class="mb-4">
             <h3 class="text-sm font-semibold text-foreground mb-2">Benefit Realization</h3>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <thead><tr class="border-b border-border">
                         <th class="text-left py-2 px-3 text-muted-foreground font-medium">Benefit</th>
                         <th class="text-left py-2 px-3 text-muted-foreground font-medium">Type</th>

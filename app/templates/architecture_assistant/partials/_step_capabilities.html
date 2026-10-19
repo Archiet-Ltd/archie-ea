@@ -15,15 +15,15 @@
     <label class="block text-sm font-medium text-foreground mb-1.5">Add Capabilities</label>
     <div class="flex gap-2">
       <input type="text" x-model="capabilitySearch" @input.debounce.300ms="searchCapabilities()"
-        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="Search business capabilities..." aria-label="Add Capabilities">
       <button @click="openCapabilityModal()" type="button"
-        class="inline-flex items-center gap-1 h-9 px-3 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent whitespace-nowrap">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center whitespace-nowrap">
         <i data-lucide="layout-grid" class="h-4 w-4"></i> Browse
       </button>
     </div>
     <div x-show="capabilitySearchResults.length > 0" x-cloak
-      class="mt-1 rounded-md border border-border bg-background shadow-lg max-h-48 overflow-y-auto">
+      class="mt-1 rounded-md border border-border bg-background max-h-48 overflow-y-auto">
       <template x-for="cap in capabilitySearchResults" :key="cap.id">
         <button @click="addCapability(cap)" type="button"
           class="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors">
@@ -43,7 +43,7 @@
     {# Filter input for large capability lists #}
     <div x-show="capabilities.length > 10" x-cloak class="mb-3">
       <input type="text" x-model="capFilter" placeholder="Filter selected capabilities..."
-        class="flex h-8 w-full max-w-xs rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="flex h-8 w-full max-w-xs rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         aria-label="Filter selected capabilities">
     </div>
 
@@ -66,14 +66,14 @@
             <label class="text-xs text-muted-foreground whitespace-nowrap w-28">Current Maturity</label>
             <input type="range" min="1" max="5" x-model.number="cap.maturity_current"
               :aria-label="cap.name + ' current maturity'"
-              class="w-full h-2 rounded-lg appearance-none bg-muted">
+              class="w-full h-2 rounded-md appearance-none bg-muted">
             <span x-text="cap.maturity_current" class="text-sm font-medium w-4 text-center"></span>
           </div>
           <div class="flex items-center gap-4 mt-1">
             <label class="text-xs text-muted-foreground whitespace-nowrap w-28">Target Maturity</label>
             <input type="range" min="1" max="5" x-model.number="cap.maturity_target"
               :aria-label="cap.name + ' target maturity'"
-              class="w-full h-2 rounded-lg appearance-none bg-muted">
+              class="w-full h-2 rounded-md appearance-none bg-muted">
             <span x-text="cap.maturity_target" class="text-sm font-medium w-4 text-center"></span>
           </div>
         </div>
@@ -84,7 +84,7 @@
     <div x-show="capabilities.filter(function(c) { return !capFilter || c.name.toLowerCase().indexOf(capFilter.toLowerCase()) !== -1; }).length > capShowCount" x-cloak
          x-cloak class="mt-4 text-center">
       <button @click="capShowCount += capPageSize" type="button"
-        class="inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium border border-input bg-background hover:bg-accent transition-colors">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="chevrons-down" class="h-4 w-4"></i>
         Load More
         <span class="text-muted-foreground text-xs"

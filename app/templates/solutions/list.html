@@ -100,7 +100,7 @@
 
     {% if solutions %}
     {# Solutions Table Card #}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
         {# Filter Section #}
         {% set status_options = [] %}
         {% for status in statuses or [] %}
@@ -125,7 +125,7 @@
             ]
         ) }}
         {# Date range filter #}
-        <div class="px-4 sm:px-6 py-3 border-b bg-muted/20 flex flex-wrap items-center gap-3">
+        <div class="border px-4 sm:px-6 py-2 border-b bg-muted/20 flex flex-wrap items-center gap-3">
           <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider shrink-0">Created:</span>
           <div class="flex items-center gap-2">
             <label for="createdAfterFilter" class="text-xs text-muted-foreground">From</label>
@@ -180,7 +180,7 @@
         {% endif %}
 
         {# Bulk Actions Bar #}
-        <div data-bulk-actions="solution-table" class="hidden sticky top-0 z-20 px-5 py-3 border-b border-border/50 bg-primary/5 flex items-center gap-3">
+        <div data-bulk-actions="solution-table" class="border hidden sticky top-0 z-20 px-5 py-2 border-b border-border/50 bg-primary/10 flex items-center gap-3">
           <span class="text-sm font-medium text-foreground" data-selected-count="solution-table"></span>
           {# Select-all-pages banner — shown when user checks the header checkbox on a filtered/paginated view #}
           {% if total_count is defined %}
@@ -208,7 +208,7 @@
 
         {# Table #}
         <div class="overflow-x-auto">
-            <table class="min-w-full solutions-table">
+            <table class="dense-table min-w-full solutions-table">
                 <thead>
                     <tr class="border-b border-border/50 bg-muted/30">
                         <th class="px-5 py-3.5 w-10"><input type="checkbox" data-select-all="solution-table" class="h-4 w-4 rounded border-input" aria-label="Select all solutions"></th>
@@ -367,7 +367,7 @@
         </div>
 
         <!-- ENT-010: Comparison panel (2-3 solutions) -->
-        <div id="solutionComparePanel" class="hidden border-t border-border/50 p-4 bg-muted/20">
+        <div id="solutionComparePanel" class="border hidden border-t border-border/50 px-3 py-2 bg-muted/20">
                 <div class="flex items-center justify-between mb-3">
                     <h3 class="text-sm font-semibold text-foreground">Solution comparison</h3>
                     <button id="btn-close-compare" type="button" class="text-muted-foreground hover:text-foreground p-1 rounded" aria-label="Close comparison">
@@ -375,7 +375,7 @@
                     </button>
                 </div>
                 <div id="solutionCompareTableWrap" class="overflow-x-auto">
-                    <table class="w-full border-collapse text-sm" id="solutionCompareTable">
+                    <table class="dense-table w-full border-collapse text-sm" id="solutionCompareTable">
                         <thead>
                             <tr class="border-b border-border">
                                 <th class="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Attribute</th>
@@ -391,7 +391,7 @@
             <div class="flex items-center gap-2">
               <div class="flex items-center gap-2 mr-4">
                 <label class="text-xs text-muted-foreground">Per page:</label>
-                <select @change="changeSolPerPage($event.target.value)" class="h-8 w-16 rounded-lg border border-border/50 bg-card px-2 py-1 text-xs font-medium" aria-label="Per page">
+                <select @change="changeSolPerPage($event.target.value)" class="h-8 w-16 rounded-md border border-border/50 bg-card px-2 py-1 text-xs font-medium" aria-label="Per page">
                   {% for size in [10, 20, 50, 100] %}
                   <option value="{{ size }}" {{ 'selected' if (per_page|default(20)) == size else '' }}>{{ size }}</option>
                   {% endfor %}
@@ -418,7 +418,7 @@
                 {% endfor %}
                   {% if pagination.has_next %}
                   <a href="?page={{ pagination.next_num }}&per_page={{ per_page|default(20) }}&search={{ search|default('') }}&status={{ selected_status|default('') }}&domain={{ selected_domain|default('') }}&type={{ selected_type|default('') }}&created_after={{ created_after|default('') }}&created_before={{ created_before|default('') }}"
-                     class="inline-flex items-center justify-center h-8 px-3 rounded-md border border-input bg-background hover:bg-muted text-sm font-medium transition-colors">
+                     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Next<i data-lucide="chevron-right" class="h-4 w-4 ml-1"></i>
                   </a>
                   {% endif %}
@@ -437,7 +437,7 @@
        A genuine server error (load_error) is its own distinct case, never
        silently rendered as "no solutions found". #}
     {% if load_error %}
-    <div data-slot="card" class="rounded-xl border border-destructive/30 bg-destructive/5 shadow-sm" data-testid="solutions-load-error">
+    <div data-slot="card" class="rounded-xl border border-destructive/30 bg-destructive/5" data-testid="solutions-load-error">
         <div class="text-center py-16 px-4">
             <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
                 <i data-lucide="alert-triangle" class="h-8 w-8 text-destructive" aria-hidden="true"></i>
@@ -445,7 +445,7 @@
             <h2 class="mt-4 text-lg font-medium">Could not load solutions</h2>
             <p class="mt-2 text-sm text-muted-foreground max-w-md mx-auto">{{ load_error }}</p>
             <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
-                <a href="{{ url_for('solution_design.list_solutions') }}" class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium">
+                <a href="{{ url_for('solution_design.list_solutions') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Try again
                 </a>
             </div>
@@ -455,7 +455,7 @@
     {% set _hidden_total = (hidden_by_role_filter or 0) + (hidden_by_filters or 0) %}
     {% if _hidden_total > 0 %}
     {# Solutions exist but are hidden by role or filters #}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm" data-testid="solutions-empty-state">
+    <div data-slot="card" class="rounded-lg border border-border bg-card" data-testid="solutions-empty-state">
         <div class="text-center py-16 px-4">
             <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted">
                 <i data-lucide="eye-off" class="h-8 w-8 text-muted-foreground" aria-hidden="true"></i>
@@ -512,7 +512,7 @@
     {% else %}
     {# Truly empty: no solutions in the org at all #}
     {% from 'components/empty_state.html' import empty_state %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm" data-testid="solutions-empty-state">
+    <div data-slot="card" class="rounded-lg border border-border bg-card" data-testid="solutions-empty-state">
         {{ empty_state(
             icon='puzzle',
             title='No solutions yet',
@@ -532,7 +532,7 @@
 
   {# ENT-010: Sticky comparison bar #}
   <div :class="($data.compareIds || []).length > 1 ? '' : 'hidden'"
-       class="fixed bottom-0 left-0 right-0 bg-background border-t border-border shadow-lg p-4 z-40">
+       class="fixed bottom-0 left-0 right-0 bg-background border-t border-border p-4 z-40">
     <div class="max-w-7xl mx-auto flex items-center gap-4">
       <span class="text-sm font-medium text-foreground" x-text="`Comparing ${($data.compareIds || []).length} solutions`"></span>
       <div class="flex gap-2 flex-1">
@@ -711,7 +711,7 @@
                 '<p class="text-xs text-muted-foreground mt-0.5">' + (t.description || '').slice(0, 120) + (t.description && t.description.length > 120 ? '…' : '') + '</p>' +
                 '<span class="inline-flex items-center mt-1 px-2 py-0.5 rounded text-xs bg-muted text-muted-foreground">' + (t.domain || 'General') + '</span>' +
                 ' <span class="text-xs text-muted-foreground">· used ' + (t.usage_count || 0) + '×</span></div>' +
-                '<button type="button" data-tid="' + t.id + '" class="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90">Use Template</button></div>';
+                '<button type="button" data-tid="' + t.id + '" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center">Use Template</button></div>';
             }).join('');
       })
       .catch(function(err) {
@@ -824,11 +824,11 @@
   <p id="sol-bulk-delete-msg" class="text-sm text-muted-foreground">You are about to permanently delete the selected solutions. This action cannot be undone.</p>
   <div class="flex justify-end gap-2">
     <button type="button" data-modal-close="sol-bulk-delete-confirm"
-            class="inline-flex items-center justify-center h-9 px-4 rounded-lg border border-border bg-background text-sm font-medium hover:bg-accent transition-colors" aria-label="Cancel">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Cancel">
       Cancel
     </button>
     <button type="button" data-action="execute-bulk-delete" id="sol-bulk-delete-btn"
-            class="inline-flex items-center justify-center h-9 px-4 rounded-lg bg-destructive text-destructive-foreground text-sm font-medium hover:bg-destructive/90 transition-colors" aria-label="Confirm delete">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Confirm delete">
       Delete
     </button>
   </div>

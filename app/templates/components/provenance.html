@@ -109,7 +109,7 @@
    unavailable (query failed), empty (nothing modelled — a measured answer),
    measured, and partial (measured but with missing-information rows, which is
    the normal case on a real tenant rather than an edge case). #}
-<section class="rounded-xl border border-border bg-card text-card-foreground" aria-labelledby="lens-{{ lens.key }}-heading">
+<section class="rounded-lg border border-border bg-card text-card-foreground" aria-labelledby="lens-{{ lens.key }}-heading">
     <div class="flex items-start justify-between gap-4 border-b border-border p-5">
         <div class="flex items-start gap-3 min-w-0">
             <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
@@ -128,7 +128,7 @@
         {{ provenance_badge('unavailable') }}
         {% elif lens.href %}
         <a href="{{ lens.href }}"
-           class="inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center justify-center">
             Open
             <i data-lucide="arrow-right" class="ml-1.5 h-3 w-3" aria-hidden="true"></i>
         </a>

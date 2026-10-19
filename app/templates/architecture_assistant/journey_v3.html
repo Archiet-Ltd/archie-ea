@@ -168,14 +168,14 @@
     </div>
 
     {# ── Error Banner ── #}
-    <div x-show="error" x-cloak class="rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-3 flex items-center justify-between">
+    <div x-show="error" x-cloak class="rounded-md border border-destructive/40 bg-destructive/10 px-5 py-2 flex items-center justify-between">
         <p class="text-sm text-destructive-emphasis" x-text="error"></p>
         <button type="button" @click="error = null" class="text-xs text-destructive-emphasis/70 hover:text-destructive-emphasis font-medium ml-4 shrink-0">Dismiss</button>
     </div>
 
     {# ── Blocker warnings — only shown on Step 2 where user can action them ── #}
     <template x-if="currentStep === 2 && domainBlockers.filter(b => b.type === 'domain_not_confirmed').length > 0">
-        <div class="rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-3 space-y-1">
+        <div class="rounded-md border border-destructive/40 bg-destructive/10 px-5 py-2 space-y-1">
             <p class="text-xs font-medium text-destructive-emphasis">Cannot proceed:</p>
             <template x-for="b in domainBlockers.filter(b => b.type === 'domain_not_confirmed').slice(0, 4)" :key="b.domain + b.type">
                 <p class="text-xs text-destructive-emphasis/70 pl-2" x-text="'— ' + b.reason"></p>
@@ -233,7 +233,7 @@
             </template>
             <button type="button" @click="nextStep()" x-show="currentStep < 8" x-cloak
                     :disabled="!canProceed()"
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Next Step
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
             </button>
@@ -276,7 +276,7 @@
         x-transition:leave="transition ease-in duration-200"
         x-transition:leave-start="translate-x-0"
         x-transition:leave-end="translate-x-full"
-        class="fixed inset-y-0 right-0 w-full sm:w-[420px] bg-card border-l border-border shadow-2xl z-50 flex flex-col"
+        class="fixed inset-y-0 right-0 w-full sm:w-[420px] bg-card border-l border-border z-50 flex flex-col"
         style="display:none"
         aria-label="Entelim Architecture Assistant">
 
@@ -401,7 +401,7 @@
                     @keydown.enter.prevent="if (!$event.shiftKey) sendMessage()"
                     rows="2"
                     placeholder="Describe your problem, goals, constraints… or ask anything."
-                    class="flex-1 text-xs rounded-lg border border-input bg-background px-3 py-2.5 resize-none focus:outline-none focus:ring-1 focus:ring-ring text-foreground placeholder:text-muted-foreground leading-relaxed"
+                    class="flex-1 text-xs rounded-md border border-input bg-background px-3 py-2.5 resize-none focus:outline-none focus:ring-1 focus:ring-ring text-foreground placeholder:text-muted-foreground leading-relaxed"
                  aria-label="Describe your problem, goals, constraints… or ask anything."></textarea>
                 <button aria-label="Send message" type="button" @click="sendMessage()"
                         :disabled="loading || !inputText.trim()"

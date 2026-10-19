@@ -5,7 +5,7 @@
    no dark-mode toggle exists yet to reach the branch where the two differ #}
 {% macro dialog(trigger_text='Open', title='', description='') %}
     <div x-data="{ dialogOpen: false }">
-        <button type="button" @click="dialogOpen = true" class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2" aria-label="Open">
+        <button type="button" @click="dialogOpen = true" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Open">
             {{ trigger_text }}
         </button>
         
@@ -17,7 +17,7 @@
             <div
                 @click.away="dialogOpen = false"
                 x-transition
-                class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg sm:rounded-lg hidden" >
+                class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 sm:rounded-lg hidden" >
                 <div class="flex flex-col space-y-1.5 text-center sm:text-left">
                     <h2 class="text-lg font-semibold leading-none tracking-tight">{{ title }}</h2>
                     {% if description %}

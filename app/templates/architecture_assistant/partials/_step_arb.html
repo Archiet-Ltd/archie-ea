@@ -15,12 +15,12 @@
         <span x-text="arbDraftSaving ? 'Saving...' : 'Save Edits'"></span>
       </button>
       <button @click="downloadDraft()" type="button"
-        class="inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="download" class="h-4 w-4"></i> Download PDF
       </button>
       <button @click="generateARBDraft()" type="button"
         :disabled="arbLoading"
-        class="inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="sparkles" class="h-4 w-4" x-show="!arbLoading" x-cloak></i>
         <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="arbLoading" x-cloak></i>
         <span x-text="arbLoading ? 'Generating...' : 'Generate Draft'"></span>
@@ -36,7 +36,7 @@
 
   {# ENH-005: Approval banner — shown when AI-generated draft needs approval before submission #}
   <div x-show="arbDraft && arbDraft.ai_generated && arbDraft.approval_status === 'pending_review' && !arbLoading" x-cloak
-    class="rounded-md border border-warning/30 bg-warning/5 p-3">
+    class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2">
     <div class="flex items-start gap-2">
       <i data-lucide="shield-alert" class="h-4 w-4 text-warning mt-0.5 shrink-0"></i>
       <div class="flex-1">
@@ -53,7 +53,7 @@
 
   {# ENH-005: Approved badge #}
   <div x-show="arbDraft && arbDraft.approval_status === 'approved' && arbDraft.ai_generated && !arbLoading" x-cloak
-    class="rounded-md border border-success/30 bg-success/5 p-3">
+    class="rounded-md border border-success/40 bg-success/10 px-3 py-2">
     <div class="flex items-center gap-2">
       <i data-lucide="check-circle-2" class="h-4 w-4 text-success"></i>
       <p class="text-sm font-medium text-success-emphasis">Draft approved — ready for ARB submission</p>
@@ -81,7 +81,7 @@
         </div>
       </div>
       <textarea x-model="arbDraft.business_justification" rows="4"
-        class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="Business justification for this solution..." aria-label="Business justification for this solution..."></textarea>
     </div>
 
@@ -101,7 +101,7 @@
         </div>
       </div>
       <textarea x-model="arbDraft.technical_assessment" rows="4"
-        class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="Technical architecture assessment..." aria-label="Technical architecture assessment..."></textarea>
     </div>
 
@@ -121,7 +121,7 @@
         </div>
       </div>
       <textarea x-model="arbDraft.risk_analysis" rows="3"
-        class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="Risk factors and mitigation strategies..." aria-label="Risk factors and mitigation strategies..."></textarea>
     </div>
 
@@ -141,7 +141,7 @@
         </div>
       </div>
       <textarea x-model="arbDraft.implementation_approach" rows="3"
-        class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="Implementation strategy, phases, and deployment approach..." aria-label="Implementation strategy, phases, and deployment approach..."></textarea>
     </div>
 
@@ -161,7 +161,7 @@
         </div>
       </div>
       <textarea x-model="arbDraft.cost_summary" rows="2"
-        class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="Total cost of ownership summary..." aria-label="Total cost of ownership summary..."></textarea>
     </div>
 

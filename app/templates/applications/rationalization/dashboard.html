@@ -80,7 +80,7 @@
     {% endif %}
 
     {# ── 1b. First-Run Wizard (RATA-016) ─────────────────────────── #}
-    <div x-show="showWizard" x-cloak class="rounded-xl border-2 border-primary/30 bg-primary/5 p-6 mb-8"
+    <div x-show="showWizard" x-cloak class="border rounded-md border-2 border-primary/40 bg-primary/10 px-3 py-2 mb-8"
          x-transition>
         <div class="flex items-start gap-4 mb-6">
             <div class="flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 text-primary shrink-0">
@@ -92,40 +92,40 @@
             </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="rounded-lg border bg-card p-4 flex flex-col items-center text-center">
+            <div class="rounded-lg border border-border bg-card p-4 flex flex-col items-center text-center">
                 <div class="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-bold mb-3">1</div>
                 <p class="text-sm font-medium text-foreground mb-1">Score Your Portfolio</p>
                 <p class="text-xs text-muted-foreground mb-3">You have {{ stats.total_applications|dash }} apps. Score them using the TIME framework.</p>
                 <button type="button" @click="scorePortfolio()" :disabled="isScoring"
-                        class="inline-flex items-center justify-center rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-4 disabled:opacity-50">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <span x-show="isScoring" x-cloak class="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full inline-block mr-1.5"></span>
                     Score Portfolio
                 </button>
             </div>
-            <div class="rounded-lg border bg-card p-4 flex flex-col items-center text-center">
+            <div class="rounded-lg border border-border bg-card p-4 flex flex-col items-center text-center">
                 <div class="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground text-sm font-bold mb-3">2</div>
                 <p class="text-sm font-medium text-foreground mb-1">Review Duplicates</p>
                 <p class="text-xs text-muted-foreground mb-3">{{ stats.duplicate_groups|dash }} duplicate groups detected. Review them.</p>
                 <a href="{{ url_for('unified_applications.rationalization_workbench') }}"
-                   class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-background hover:bg-accent h-8 px-4">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Open Workbench
                 </a>
             </div>
-            <div class="rounded-lg border bg-card p-4 flex flex-col items-center text-center">
+            <div class="rounded-lg border border-border bg-card p-4 flex flex-col items-center text-center">
                 <div class="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground text-sm font-bold mb-3">3</div>
                 <p class="text-sm font-medium text-foreground mb-1">Add Dependencies</p>
                 <p class="text-xs text-muted-foreground mb-3">Import dependency data to plan retirements safely.</p>
                 <a href="{{ url_for('unified_applications.rationalization_tracking') }}#dependencies"
-                   class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-background hover:bg-accent h-8 px-4">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Import Dependencies
                 </a>
             </div>
-            <div class="rounded-lg border bg-card p-4 flex flex-col items-center text-center">
+            <div class="rounded-lg border border-border bg-card p-4 flex flex-col items-center text-center">
                 <div class="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground text-sm font-bold mb-3">4</div>
                 <p class="text-sm font-medium text-foreground mb-1">Plan Consolidations</p>
                 <p class="text-xs text-muted-foreground mb-3">Create consolidation plans to realize savings.</p>
                 <a href="/consolidation-list"
-                   class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-background hover:bg-accent h-8 px-4">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Consolidation List
                 </a>
             </div>
@@ -134,7 +134,7 @@
 
     {# ── 2. Stat Cards ────────────────────────────────────────────── #}
     <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-        <div class="rounded-xl border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="flex items-center gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-info/10">
                     <i data-lucide="layers" class="h-5 w-5 text-primary"></i>
@@ -147,7 +147,7 @@
             <a href="/applications" class="text-xs text-primary hover:underline mt-2 inline-block">View portfolio &rarr;</a>
         </div>
 
-        <div class="rounded-xl border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="flex items-center gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-warning/10">
                     <i data-lucide="briefcase" class="h-5 w-5 text-warning"></i>
@@ -161,7 +161,7 @@
             <a href="/applications" class="text-xs text-primary hover:underline mt-2 inline-block">View active apps &rarr;</a>
         </div>
 
-        <div class="rounded-xl border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="flex items-center gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-warning/10">
                     <i data-lucide="clock" class="h-5 w-5 text-warning"></i>
@@ -173,7 +173,7 @@
             </div>
         </div>
 
-        <div class="rounded-xl border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="flex items-center gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-success/10">
                     <i data-lucide="check-circle-2" class="h-5 w-5 text-success"></i>
@@ -185,7 +185,7 @@
             </div>
         </div>
 
-        <div class="rounded-xl border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="flex items-center gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-success/10">
                     <i data-lucide="piggy-bank" class="h-5 w-5 text-success"></i>
@@ -197,7 +197,7 @@
             </div>
         </div>
 
-        <div class="rounded-xl border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="flex items-center gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-info/10">
                     <i data-lucide="shield-check" class="h-5 w-5 text-info"></i>
@@ -228,7 +228,7 @@
 
     {# ── 3. Health & Disposition Charts (RATA-005: empty states) ──── #}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <div class="rounded-xl border bg-card p-5">
+        <div class="rounded-lg border border-border bg-card p-5">
             <h3 class="text-sm font-semibold text-foreground mb-3">Health Distribution</h3>
             <template x-if="execSummary.loaded && hasScores">
                 <div class="space-y-2">
@@ -250,7 +250,7 @@
                     <i data-lucide="bar-chart" class="h-10 w-10 text-muted-foreground/40 mb-3"></i>
                     <p class="text-sm text-muted-foreground mb-3">No applications scored yet. Score your portfolio to see health distribution.</p>
                     <button type="button" @click="scorePortfolio()" :disabled="isScoring"
-                            class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 disabled:opacity-50">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         <span x-show="isScoring" x-cloak class="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block mr-2"></span>
                         Score Portfolio
                     </button>
@@ -272,7 +272,7 @@
             </template>
         </div>
 
-        <div class="rounded-xl border bg-card p-5">
+        <div class="rounded-lg border border-border bg-card p-5">
             <h3 class="text-sm font-semibold text-foreground mb-3">Disposition Breakdown</h3>
             <template x-if="execSummary.loaded && hasScores">
                 <div class="space-y-2">
@@ -295,7 +295,7 @@
                     <i data-lucide="pie-chart" class="h-10 w-10 text-muted-foreground/40 mb-3"></i>
                     <p class="text-sm text-muted-foreground mb-3">Score your portfolio to see disposition breakdown.</p>
                     <button type="button" @click="scorePortfolio()" :disabled="isScoring"
-                            class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 disabled:opacity-50">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Score Portfolio
                     </button>
                 </div>
@@ -318,7 +318,7 @@
     </div>
 
     {# ── 3b. TIME Quadrant Chart (RATA-010) ────────────────────────── #}
-    <div class="rounded-xl border bg-card text-card-foreground shadow-sm p-6 mb-8" data-slot="card">
+    <div class="rounded-lg border border-border bg-card text-card-foreground p-6 mb-8" data-slot="card">
         <h3 class="text-base font-semibold text-foreground mb-4">TIME Quadrant — Portfolio View</h3>
         <template x-if="hasScores">
             <div class="relative h-[400px]">
@@ -330,7 +330,7 @@
                 <i data-lucide="scatter-chart" class="h-12 w-12 text-muted-foreground/40 mb-4"></i>
                 <p class="text-sm text-muted-foreground mb-3">Score your portfolio to see the TIME quadrant visualization.</p>
                 <button type="button" @click="scorePortfolio()" :disabled="isScoring"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 disabled:opacity-50">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Score Portfolio
                 </button>
             </div>
@@ -349,7 +349,7 @@
        that as 0% drew a full-width red bar telling the user their vendor data
        was absent when every application had a vendor. None -> em dash. #}
     {% set vendor_pct = (fc or {}).get('vendor') %}
-    <div class="rounded-xl border bg-card text-card-foreground shadow-sm p-6 mb-8" data-slot="card">
+    <div class="rounded-lg border border-border bg-card text-card-foreground p-6 mb-8" data-slot="card">
         <div class="flex items-start gap-3 mb-5">
             <div class="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <i data-lucide="activity" class="h-5 w-5 text-primary"></i>
@@ -426,7 +426,7 @@
 
     {# ── 4. Detection & Consolidation Summaries ───────────────────── #}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <div class="rounded-xl border bg-card p-5">
+        <div class="rounded-lg border border-border bg-card p-5">
             <h3 class="text-sm font-semibold text-foreground mb-2">Detection Summary</h3>
             {# RATA-005: Use latest_run model object instead of runs[0] dict #}
             {% if latest_run %}
@@ -445,7 +445,7 @@
             <a href="{{ url_for('unified_duplicate.duplicate_dashboard') }}" class="text-xs text-primary hover:underline mt-3 inline-block">View all detection results &rarr;</a>
         </div>
 
-        <div class="rounded-xl border bg-card p-5">
+        <div class="rounded-lg border border-border bg-card p-5">
             <h3 class="text-sm font-semibold text-foreground mb-2">Consolidation Summary</h3>
             {% if stats.consolidation_count|default(0) > 0 %}
             <div class="text-sm text-muted-foreground space-y-1">
@@ -469,7 +469,7 @@
         {# RATA-004: Score Portfolio button #}
         <button type="button" @click="scorePortfolio()"
                 :disabled="isScoring"
-                class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 hover:shadow-sm transition-all group">
+                class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group">
             <div class="flex items-start gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
                     <template x-if="isScoring">
@@ -491,7 +491,7 @@
         </button>
 
         <button type="button" @click="showDetectionModal = true"
-                class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 hover:shadow-sm transition-all group">
+                class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group">
             <div class="flex items-start gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
                     <i data-lucide="search" class="h-5 w-5"></i>
@@ -505,7 +505,7 @@
 
         <button type="button" @click="autoResolveExact()"
                 :disabled="autoResolveLoading"
-                class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 hover:shadow-sm transition-all group">
+                class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group">
             <div class="flex items-start gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-success/10 text-success-emphasis group-hover:bg-success/20 transition-colors">
                     <i data-lucide="check-check" class="h-5 w-5"></i>
@@ -518,7 +518,7 @@
         </button>
 
         <a href="/consolidation-list"
-           class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 hover:shadow-sm transition-all group no-underline">
+           class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group no-underline">
             <div class="flex items-start gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-info/10 text-primary group-hover:bg-info/20 transition-colors">
                     <i data-lucide="list-checks" class="h-5 w-5"></i>
@@ -531,7 +531,7 @@
         </a>
 
         <a href="{{ url_for('unified_duplicate.duplicate_dashboard') }}"
-           class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 hover:shadow-sm transition-all group no-underline">
+           class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group no-underline">
             <div class="flex items-start gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-warning/10 text-warning-emphasis group-hover:bg-warning/20 transition-colors">
                     <i data-lucide="eye" class="h-5 w-5"></i>
@@ -544,7 +544,7 @@
         </a>
 
         <a href="/applications"
-           class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 hover:shadow-sm transition-all group no-underline">
+           class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group no-underline">
             <div class="flex items-start gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-info/10 text-info group-hover:bg-info/20 transition-colors">
                     <i data-lucide="layout-grid" class="h-5 w-5"></i>
@@ -558,7 +558,7 @@
 
         {# RATA-018: Export Business Case button #}
         <button type="button" @click="showExportModal = true" x-show="hasScores" x-cloak
-                class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 hover:shadow-sm transition-all group">
+                class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group">
             <div class="flex items-start gap-3">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
                     <i data-lucide="download" class="h-5 w-5"></i>
@@ -576,7 +576,7 @@
          @keydown.escape.window="showExportModal = false"
          role="dialog" aria-modal="true" aria-labelledby="export-title">
         <div class="absolute inset-0 bg-black/30" @click="showExportModal = false"></div>
-        <div class="relative bg-card rounded-xl border shadow-xl w-full max-w-sm mx-4 p-6">
+        <div class="relative bg-card rounded-lg border border-border w-full max-w-sm mx-4 p-6">
             <h3 id="export-title" class="text-base font-semibold text-foreground mb-4">Export Business Case</h3>
             <div class="space-y-3">
                 <label class="block text-xs font-medium text-muted-foreground mb-1">Format</label>
@@ -612,7 +612,7 @@
          data-critical-gaps-url="/api/ai-gap-detection/critical-gaps"
          data-rationalization-url="/api/ai-gap-detection/rationalization"
          data-vendor-lifecycle-url="/api/ai-gap-detection/vendor-lifecycle"
-         class="rounded-xl border bg-card text-card-foreground shadow-sm p-6 mb-8" data-slot="card">
+         class="rounded-lg border border-border bg-card text-card-foreground p-6 mb-8" data-slot="card">
         <div class="flex items-start gap-3 mb-5">
             <div class="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <i data-lucide="sparkles" class="h-4 w-4 text-primary"></i>

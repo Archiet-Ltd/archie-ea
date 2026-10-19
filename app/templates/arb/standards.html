@@ -17,7 +17,7 @@
     ) }}
 
     <!-- Standards List -->
-    <div data-slot="card" class="rounded-xl border bg-card">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
         {% if standards %}
         <div class="divide-y">
             {% for standard in standards %}
@@ -51,7 +51,7 @@
                         </div>
                     </div>
                     <a href="{{ url_for('arb.standard_detail', id=standard.id) }}"
-                       class="inline-flex items-center h-9 px-4 rounded-lg text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         View
                     </a>
                 </div>

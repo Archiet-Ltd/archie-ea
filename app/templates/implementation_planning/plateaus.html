@@ -22,19 +22,19 @@
     {% set in_progress = plateaus|selectattr('status', 'equalto', 'in_progress')|list|length %}
     {% set completed = plateaus|selectattr('status', 'equalto', 'completed')|list|length %}
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm px-6 py-4">
+        <div data-slot="card" class="rounded-lg border border-border bg-card px-6 py-4">
             <p class="text-xs text-muted-foreground uppercase tracking-wide">Total</p>
             <p class="text-2xl font-bold text-foreground mt-1">{{ total }}</p>
         </div>
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm px-6 py-4">
+        <div data-slot="card" class="rounded-lg border border-border bg-card px-6 py-4">
             <p class="text-xs text-muted-foreground uppercase tracking-wide">Planned</p>
             <p class="text-2xl font-bold text-primary mt-1">{{ planned }}</p>
         </div>
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm px-6 py-4">
+        <div data-slot="card" class="rounded-lg border border-border bg-card px-6 py-4">
             <p class="text-xs text-muted-foreground uppercase tracking-wide">In Progress</p>
             <p class="text-2xl font-bold text-warning mt-1">{{ in_progress }}</p>
         </div>
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm px-6 py-4">
+        <div data-slot="card" class="rounded-lg border border-border bg-card px-6 py-4">
             <p class="text-xs text-muted-foreground uppercase tracking-wide">Completed</p>
             <p class="text-2xl font-bold text-success mt-1">{{ completed }}</p>
         </div>
@@ -45,7 +45,7 @@
         {% for plateau in plateaus %}
         {% set gaps_count = plateau.gaps|length if plateau.gaps else 0 %}
         {% set wp_count = plateau.work_packages|length if plateau.work_packages else 0 %}
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-5 hover:bg-muted/20 transition-colors">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-5 hover:bg-muted/20 transition-colors">
             <div class="flex justify-between items-start gap-4">
                 <div class="flex-1 min-w-0">
                     <h2 class="font-semibold text-foreground">{{ plateau.name }}</h2>
@@ -103,7 +103,7 @@
         {% endfor %}
     </div>
     {% else %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-12 text-center text-muted-foreground">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-12 text-center text-muted-foreground">
         <svg class="w-10 h-10 mx-auto mb-3 text-muted-foreground/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
         </svg>

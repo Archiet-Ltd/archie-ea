@@ -9,7 +9,7 @@
 
   {% macro _ps_actions() %}
 <a href="/architecture-journey/"
-       class="inline-flex items-center px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium rounded-lg">
+       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
       + New Solution
     </a>
   {% endmacro %}
@@ -18,12 +18,12 @@
   <!-- ENH-022: Filters with group-by toggle -->
   <div class="flex flex-wrap gap-3 mb-6">
     <select x-model="groupBy" @change="applyFilters()"
-            class="block rounded-md border-border shadow-sm text-sm focus:ring-ring focus:border-ring bg-background text-foreground" aria-label="Group By">
+            class="block rounded-md border-border text-sm focus:ring-ring focus:border-ring bg-background text-foreground" aria-label="Group By">
       <option value="domain" {% if group_by != 'roadmap' %}selected{% endif %}>Group by Domain</option>
       <option value="roadmap" {% if group_by == 'roadmap' %}selected{% endif %}>Group by Roadmap Initiative</option>
     </select>
     <select x-model="domainFilter" @change="applyFilters()"
-            class="block rounded-md border-border shadow-sm text-sm focus:ring-ring focus:border-ring bg-background text-foreground"
+            class="block rounded-md border-border text-sm focus:ring-ring focus:border-ring bg-background text-foreground"
             x-show="groupBy === 'domain'" x-cloak aria-label="Filter by Domain">
       <option value="">All Domains</option>
       {% for d in all_domains %}
@@ -31,7 +31,7 @@
       {% endfor %}
     </select>
     <select x-model="statusFilter" @change="applyFilters()"
-            class="block rounded-md border-border shadow-sm text-sm focus:ring-ring focus:border-ring bg-background text-foreground" aria-label="Filter by Status">
+            class="block rounded-md border-border text-sm focus:ring-ring focus:border-ring bg-background text-foreground" aria-label="Filter by Status">
       <option value="">All Statuses</option>
       {% for s in all_statuses %}
       <option value="{{ s }}" {% if s == selected_status %}selected{% endif %}>{{ s|replace('_',' ')|title }}</option>
@@ -51,7 +51,7 @@
     </h2>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {% for sol in domain_solutions %}
-      <div class="bg-background rounded-xl shadow border border-border p-4 hover:shadow-md transition-shadow"
+      <div class="bg-background rounded-xl border border-border p-4 transition-shadow"
            x-show="statusFilter === '' || statusFilter === '{{ sol.status }}'" x-cloak>
         <div class="flex items-start justify-between mb-2">
           <a href="{{ url_for('solution_design.view_solution', solution_id=sol.id) }}"

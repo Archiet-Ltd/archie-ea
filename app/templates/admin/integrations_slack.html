@@ -18,7 +18,7 @@
     <div id="slack-alert" hidden class="mb-6 rounded-md border p-4 text-sm"></div>
 
     <!-- Status strip -->
-    <div class="rounded-lg border border-border bg-card text-card-foreground shadow-sm mb-6">
+    <div class="rounded-lg border border-border bg-card text-card-foreground mb-6">
         <div class="flex items-center justify-between px-6 py-4 border-b border-border">
             <div>
                 <h2 class="text-base font-semibold">Bot Status</h2>
@@ -55,8 +55,8 @@
                            placeholder="xoxb-..."
                            autocomplete="off"
                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm
-                                  shadow-sm transition-colors placeholder:text-muted-foreground
-                                  focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+ transition-colors placeholder:text-muted-foreground
+ focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                     <p class="text-xs text-muted-foreground">From your Slack app's "OAuth &amp; Permissions" page.</p>
                 </div>
 
@@ -67,8 +67,8 @@
                            placeholder="••••••••••••••••"
                            autocomplete="off"
                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm
-                                  shadow-sm transition-colors placeholder:text-muted-foreground
-                                  focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+ transition-colors placeholder:text-muted-foreground
+ focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                     <p class="text-xs text-muted-foreground">From your Slack app's "Basic Information" page.</p>
                 </div>
 
@@ -78,8 +78,8 @@
                            value="{{ config.monitored_channels or '' }}"
                            placeholder="C0123ABCDEF, C0456GHIJKL — leave blank to monitor all channels the bot is invited to"
                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm
-                                  shadow-sm transition-colors placeholder:text-muted-foreground
-                                  focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+ transition-colors placeholder:text-muted-foreground
+ focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                     <p class="text-xs text-muted-foreground">Comma-separated channel IDs. The bot must be invited to each channel.</p>
                 </div>
 
@@ -108,15 +108,11 @@
 
                 <div class="sm:col-span-2 flex items-center gap-3">
                     <button type="submit"
-                            class="inline-flex items-center justify-center rounded-md text-sm font-medium
-                                   bg-primary text-primary-foreground shadow hover:bg-primary/90
-                                   h-9 px-4 py-2 transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Save configuration
                     </button>
                     <button type="button" id="test-btn"
-                            class="inline-flex items-center justify-center rounded-md text-sm font-medium
-                                   border border-input bg-background shadow-sm hover:bg-accent
-                                   h-9 px-4 py-2 transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Test connection
                     </button>
                 </div>
@@ -125,7 +121,7 @@
     </div>
 
     <!-- Events API setup guide -->
-    <div class="rounded-lg border border-border bg-card text-card-foreground shadow-sm mb-6">
+    <div class="rounded-lg border border-border bg-card text-card-foreground mb-6">
         <div class="px-6 py-4 border-b border-border">
             <h2 class="text-base font-semibold">Events API Setup</h2>
             <p class="text-sm text-muted-foreground mt-0.5">Point your Slack app's Event Subscriptions URL at this endpoint.</p>
@@ -138,8 +134,7 @@
                         http://127.0.0.1/api/webhooks/slack/events
                     </code>
                     <button type="button" data-copy-text="http://127.0.0.1/api/webhooks/slack/events"
-                            class="shrink-0 inline-flex items-center justify-center rounded-md border border-input bg-background
-                                   shadow-sm hover:bg-accent h-8 px-3 text-xs transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center justify-center">
                         Copy
                     </button>
                 </div>

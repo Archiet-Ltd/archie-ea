@@ -36,7 +36,7 @@
        </td>
        <td class="px-4 py-3 text-right" @click.stop>
          <button type="button" @click="window.location.href='/items/'+row.id"
-                 class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium border border-input bg-background hover:bg-accent transition-colors">
+                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
            <i data-lucide="eye" class="h-3 w-3"></i> View
          </button>
        </td>
@@ -67,7 +67,7 @@
 ) %}
 {% set col_count = columns|length + (1 if selectable else 0) %}
 {% set _scroll_id = 'wbt-scroll-' ~ range(1000000)|random %}
-<div data-slot="card" class="rounded-xl border bg-card shadow-sm {{ class }}">
+<div data-slot="card" class="rounded-xl border bg-card {{ class }}">
 
     {# ── Toolbar ──────────────────────────────────────────────────────── #}
     <div class="flex flex-col gap-3 p-4 border-b sm:flex-row sm:items-center sm:justify-between">
@@ -142,7 +142,7 @@
 
     {# ── Table ────────────────────────────────────────────────────────── #}
     <div id="{{ _scroll_id }}" class="overflow-x-auto workbench-table-scroll" aria-live="polite" aria-atomic="false">
-        <table class="w-full caption-bottom text-sm" role="grid">
+        <table class="dense-table w-full caption-bottom text-sm" role="grid">
             <thead class="border-b bg-muted/40">
                 <tr>
                     {% if selectable %}
@@ -225,7 +225,7 @@
             of <span class="font-medium text-foreground" x-text="totalItems"></span> items
         </p>
         <nav class="flex items-center gap-1" aria-label="Pagination">
-            <button type="button" class="inline-flex items-center justify-center h-8 px-2.5 rounded-md border border-input bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                     :disabled="!hasPrev" @click="prevPage()" aria-label="Previous page">
                 <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>
             </button>
@@ -239,7 +239,7 @@
                           class="min-w-[2rem] h-8 inline-flex items-center justify-center text-sm text-muted-foreground">&hellip;</span>
                 </span>
             </template>
-            <button type="button" class="inline-flex items-center justify-center h-8 px-2.5 rounded-md border border-input bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                     :disabled="!hasNext" @click="nextPage()" aria-label="Next page">
                 <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>
             </button>

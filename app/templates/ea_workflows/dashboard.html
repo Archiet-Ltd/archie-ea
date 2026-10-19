@@ -9,11 +9,11 @@
 
 {% macro _ea_workflows_actions() %}
 <div class="flex flex-wrap items-center gap-2" data-testid="page-actions">
-    <button type="button" @click="seedWorkflows()" class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg border-2 border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200 text-sm font-medium" aria-label="Seed default workflows">
+    <button type="button" @click="seedWorkflows()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Seed default workflows">
         <i data-lucide="database" class="h-4 w-4" aria-hidden="true"></i>
         <span class="hidden sm:inline">Seed Defaults</span>
     </button>
-    <a href="{{ url_for('main.ea_workflows_approvals') }}" class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg border-2 border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200 text-sm font-medium">
+    <a href="{{ url_for('main.ea_workflows_approvals') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
         <i data-lucide="check-square" class="h-4 w-4" aria-hidden="true"></i>
         <span class="hidden sm:inline">Pending Approvals</span>
         {% if status_counts.waiting_approval %}
@@ -22,7 +22,7 @@
         </span>
         {% endif %}
     </a>
-    <a href="{{ url_for('main.ea_workflows_definitions') }}" class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium">
+    <a href="{{ url_for('main.ea_workflows_definitions') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
         <i data-lucide="list" class="h-4 w-4" aria-hidden="true"></i>
         <span class="hidden sm:inline">All Workflows</span>
     </a>
@@ -46,7 +46,7 @@
     ) }}
 
     {% if error %}
-    <div class="rounded-xl border-2 border-destructive/50 bg-destructive/10 p-4 mb-6">
+    <div class="border rounded-md border-2 border-destructive/50 bg-destructive/10 px-3 py-2 mb-6">
         <div class="flex items-center gap-2 text-destructive-emphasis">
             <i data-lucide="alert-circle" class="h-5 w-5" aria-hidden="true"></i>
             <span class="font-medium">Error: {{ error }}</span>
@@ -92,7 +92,7 @@
                 <a href="{{ url_for('main.ea_workflows_definitions') }}" class="text-sm text-primary hover:underline">All runs →</a>
             </div>
             <div class="rounded-xl border-2 border-input bg-background overflow-hidden">
-                <table class="w-full text-sm" aria-label="ADM Phase Coverage Matrix">
+                <table class="dense-table w-full text-sm" aria-label="ADM Phase Coverage Matrix">
                     <thead>
                         <tr class="border-b border-input bg-muted/40">
                             <th class="text-left px-4 py-3 font-semibold text-foreground">Workflow</th>
@@ -159,7 +159,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                 {% for wf_code, icon, color, name, scenario, phases, summary in COVERAGE_MATRIX %}
                 {% set defn = definitions | selectattr('workflow_code', 'equalto', wf_code) | first | default(None) %}
-                <div class="rounded-xl border-2 border-input bg-background hover:border-primary/40 hover:shadow-md transition-all duration-200 p-4 flex flex-col gap-3 scenario-card" data-scenario-card="{{ wf_code }}">
+                <div class="rounded-xl border-2 border-input bg-background hover:border-primary/40 transition-all duration-200 p-4 flex flex-col gap-3 scenario-card" data-scenario-card="{{ wf_code }}">
                     <div class="flex items-center gap-3">
                         <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg {{ color }}">
                             <i data-lucide="{{ icon }}" class="h-4 w-4 text-primary-foreground" aria-hidden="true"></i>
@@ -178,7 +178,7 @@
                         </div>
                         {% if defn %}
                         <button type="button" @click="startWorkflow('{{ wf_code }}')"
-                                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-xs font-medium"
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                 aria-label="Start {{ name }}">
                             <i data-lucide="play" class="h-3 w-3" aria-hidden="true"></i>
                             Start
@@ -209,7 +209,7 @@
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" id="adm-phase-cards">
             <!-- TD-004: Phase D Technology Architecture -->
-            <div class="rounded-xl border-2 border-input bg-background hover:border-primary/40 hover:shadow-md transition-all duration-200 p-5 flex flex-col gap-4">
+            <div class="rounded-xl border-2 border-input bg-background hover:border-primary/40 transition-all duration-200 p-5 flex flex-col gap-4">
                 <div class="flex items-start gap-4">
                     <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-info">
                         <i data-lucide="cpu" class="h-5 w-5 text-primary-foreground" aria-hidden="true"></i>
@@ -244,7 +244,7 @@
                     {% set _phase_url = (phase_links|default({})).get('phase_d') %}
                     {% if _phase_url %}
                     <a href="{{ _phase_url }}"
-                       class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="arrow-right" class="h-3.5 w-3.5" aria-hidden="true"></i>
                         Open
                     </a>
@@ -254,7 +254,7 @@
                 </div>
             </div>
             <!-- AG-004: Phase G Implementation Governance -->
-            <div class="rounded-xl border-2 border-input bg-background hover:border-primary/40 hover:shadow-md transition-all duration-200 p-5 flex flex-col gap-4">
+            <div class="rounded-xl border-2 border-input bg-background hover:border-primary/40 transition-all duration-200 p-5 flex flex-col gap-4">
                 <div class="flex items-start gap-4">
                     <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-warning">
                         <i data-lucide="shield-check" class="h-5 w-5 text-primary-foreground" aria-hidden="true"></i>
@@ -289,7 +289,7 @@
                     {% set _phase_url = (phase_links|default({})).get('phase_g') %}
                     {% if _phase_url %}
                     <a href="{{ _phase_url }}"
-                       class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="arrow-right" class="h-3.5 w-3.5" aria-hidden="true"></i>
                         Open
                     </a>
@@ -299,7 +299,7 @@
                 </div>
             </div>
             <!-- OA-004: Phase E Opportunities & Solutions -->
-            <div class="rounded-xl border-2 border-input bg-background hover:border-primary/40 hover:shadow-md transition-all duration-200 p-5 flex flex-col gap-4">
+            <div class="rounded-xl border-2 border-input bg-background hover:border-primary/40 transition-all duration-200 p-5 flex flex-col gap-4">
                 <div class="flex items-start gap-4">
                     <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-success">
                         <i data-lucide="lightbulb" class="h-5 w-5 text-primary-foreground" aria-hidden="true"></i>
@@ -334,7 +334,7 @@
                     {% set _phase_url = (phase_links|default({})).get('phase_e') %}
                     {% if _phase_url %}
                     <a href="{{ _phase_url }}"
-                       class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="arrow-right" class="h-3.5 w-3.5" aria-hidden="true"></i>
                         Open
                     </a>
@@ -344,7 +344,7 @@
                 </div>
             </div>
             <!-- MP-004: Phase F Migration Planning -->
-            <div class="rounded-xl border-2 border-input bg-background hover:border-primary/40 hover:shadow-md transition-all duration-200 p-5 flex flex-col gap-4">
+            <div class="rounded-xl border-2 border-input bg-background hover:border-primary/40 transition-all duration-200 p-5 flex flex-col gap-4">
                 <div class="flex items-start gap-4">
                     <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-violet-600">{# design-tokens-ok: ADM phase card legend, info is already Phase D so Phase F keeps a distinct hue #}
                         <i data-lucide="git-branch" class="h-5 w-5 text-primary-foreground" aria-hidden="true"></i>
@@ -379,7 +379,7 @@
                     {% set _phase_url = (phase_links|default({})).get('phase_f') %}
                     {% if _phase_url %}
                     <a href="{{ _phase_url }}"
-                       class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="arrow-right" class="h-3.5 w-3.5" aria-hidden="true"></i>
                         Open
                     </a>
@@ -389,7 +389,7 @@
                 </div>
             </div>
             <!-- CM-004: Phase H Architecture Change Management -->
-            <div class="rounded-xl border-2 border-input bg-background hover:border-primary/40 hover:shadow-md transition-all duration-200 p-5 flex flex-col gap-4">
+            <div class="rounded-xl border-2 border-input bg-background hover:border-primary/40 transition-all duration-200 p-5 flex flex-col gap-4">
                 <div class="flex items-start gap-4">
                     <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-destructive">
                         <i data-lucide="git-merge" class="h-5 w-5 text-primary-foreground" aria-hidden="true"></i>
@@ -424,7 +424,7 @@
                     {% set _phase_url = (phase_links|default({})).get('phase_h') %}
                     {% if _phase_url %}
                     <a href="{{ _phase_url }}"
-                       class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="arrow-right" class="h-3.5 w-3.5" aria-hidden="true"></i>
                         Open
                     </a>
@@ -614,7 +614,7 @@
 <div id="startWorkflowModal" class="modal-root hidden fixed inset-0 z-50"
      role="dialog" aria-modal="true" aria-labelledby="startWorkflowTitle">
     <div class="modal-backdrop fixed inset-0 bg-black/50" @click="closeWorkflowModal()" aria-hidden="true" role="dialog"></div>
-    <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] bg-background rounded-xl border-2 border-input shadow-lg overflow-hidden">
+    <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] bg-background rounded-xl border-2 border-input overflow-hidden">
         <div class="flex items-center justify-between px-6 py-4 border-b border-input">
             <div>
                 <h3 class="text-lg font-semibold" id="startWorkflowTitle">Start Workflow</h3>
@@ -636,11 +636,11 @@
                     <div class="mb-5">
                         <label for="workflowNotes" class="block text-sm font-medium mb-2">Notes <span class="text-muted-foreground font-normal">(optional)</span></label>
                         <textarea id="workflowNotes" rows="2"
-                                  class="w-full rounded-lg border-2 border-input p-3 text-sm bg-background focus:border-primary focus:outline-none"
+                                  class="w-full rounded-md border-2 border-input p-3 text-sm bg-background focus:border-primary focus:outline-none"
                                   placeholder="Reason for running this workflow..."></textarea>
                     </div>
 
-                    <div id="workflowFormError" class="hidden mb-4 rounded-lg bg-destructive/10 text-destructive-emphasis text-sm p-3"></div>
+                    <div id="workflowFormError" class="hidden mb-4 rounded-md bg-destructive/10 text-destructive-emphasis text-sm px-3 py-2"></div>
 
                     <div class="flex gap-2">
                         <button type="button" @click="closeWorkflowModal()"
@@ -648,7 +648,7 @@
                             Cancel
                         </button>
                         <button type="submit" id="startWorkflowBtn"
-                                class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium" aria-label="Submit">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 flex-1 items-center justify-center" aria-label="Submit">
                             <i data-lucide="play" class="h-4 w-4" aria-hidden="true"></i>
                             Start Workflow
                         </button>

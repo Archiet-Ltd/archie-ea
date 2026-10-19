@@ -38,29 +38,29 @@
             <label class="block text-sm font-medium mb-1.5">Problem / Requirement <span class="text-destructive-emphasis">*</span></label>
             <textarea x-model="form.problem" rows="4"
                 placeholder="e.g. We need a document management platform to replace SharePoint 2013, supporting 3,000 users, integrating with SAP ECC and meeting UK GDPR requirements..."
-                class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" aria-label="Problem / Requirement"></textarea>
+                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" aria-label="Problem / Requirement"></textarea>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
                 <label class="block text-sm font-medium mb-1.5">Budget Min (£)</label>
                 <input x-model="form.budget_min" type="number" placeholder="e.g. 50000"
-                    class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Budget Min (£)">
+                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Budget Min (£)">
             </div>
             <div>
                 <label class="block text-sm font-medium mb-1.5">Budget Max (£)</label>
                 <input x-model="form.budget_max" type="number" placeholder="e.g. 500000"
-                    class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Budget Max (£)">
+                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Budget Max (£)">
             </div>
             <div>
                 <label class="block text-sm font-medium mb-1.5">Timeline (months)</label>
                 <input x-model="form.timeline_months" type="number" placeholder="e.g. 12"
-                    class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Timeline (months)">
+                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Timeline (months)">
             </div>
             <div>
                 <label class="block text-sm font-medium mb-1.5">Number of Users</label>
                 <input x-model="form.user_count" type="number" placeholder="e.g. 500"
-                    class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Number of Users">
+                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Number of Users">
             </div>
         </div>
 
@@ -81,7 +81,7 @@
                 <label class="block text-sm font-medium mb-1.5">Integration Constraints</label>
                 <input x-model="form.constraints" type="text"
                     placeholder="e.g. Must integrate with SAP ECC 6.0, Azure AD"
-                    class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Integration Constraints">
+                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Integration Constraints">
             </div>
         </div>
 
@@ -93,7 +93,7 @@
             </label>
             <button type="button" @click="runAnalysis()"
                 :disabled="!form.problem.trim() || loading"
-                class="inline-flex items-center gap-2 h-10 px-6 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <template x-if="loading">
                     <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -107,7 +107,7 @@
             </button>
         </div>
 
-        <div x-show="loading" x-cloak x-transition class="flex items-center gap-3 p-4 rounded-lg bg-primary/5 border border-primary/20">
+        <div x-show="loading" x-cloak x-transition class="flex items-center gap-3 px-3 py-2 rounded-md bg-primary/10 border border-primary/40">
             <svg class="animate-spin h-5 w-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -118,7 +118,7 @@
             </div>
         </div>
 
-        <div x-show="error" x-cloak x-transition class="flex items-start gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+        <div x-show="error" x-cloak x-transition class="flex items-start gap-3 px-3 py-2 rounded-md bg-destructive/10 border border-destructive/40">
             <i data-lucide="alert-circle" class="h-5 w-5 text-destructive shrink-0 mt-0.5"></i>
             <p class="text-sm text-destructive-emphasis" x-text="error"></p>
         </div>
@@ -126,7 +126,7 @@
 
     <!-- ANALYSIS RESULTS -->
     <div x-show="results" x-cloak x-transition.opacity>
-        <div x-show="topRec" x-cloak class="flex items-center gap-4 p-4 rounded-xl border-2 border-primary/40 bg-primary/5 mb-4">
+        <div x-show="topRec" x-cloak class="border flex items-center gap-4 px-3 py-2 rounded-md border-2 border-primary/40 bg-primary/10 mb-4">
             <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary">
                 <i data-lucide="award" class="h-5 w-5 text-primary-foreground"></i>
             </div>
@@ -141,7 +141,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <template x-for="(rec, idx) in (results ? results.recommendations : [])" :key="rec.option_type">
                 <div class="rounded-xl border-2 bg-background p-5 space-y-4"
-                     :class="idx === 0 ? 'border-primary/50 shadow-sm' : 'border-input'">
+                     :class="idx === 0 ? 'border-primary/50 ' : 'border-input'">
                     <div class="flex items-start justify-between gap-3">
                         <div class="flex items-center gap-2.5">
                             <span class="inline-flex items-center justify-center h-8 px-3 rounded-full text-primary-foreground text-xs font-bold uppercase tracking-wide"
@@ -219,7 +219,7 @@
                         <template x-if="!savedSolutions[rec.option_type]">
                             <button type="button" @click="saveAsSolution(rec)"
                                 :disabled="savingOption === rec.option_type"
-                                class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-input bg-background text-sm font-medium hover:border-primary/50 hover:bg-muted/30 transition-colors disabled:opacity-50">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 <template x-if="savingOption === rec.option_type">
                                     <svg class="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -248,7 +248,7 @@
                     </div>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left">
+                    <table class="dense-table w-full text-sm text-left">
                         <thead class="bg-muted/50 text-muted-foreground text-xs font-medium border-b border-input">
                             <tr>
                                 <th class="px-5 py-3">Application</th>
@@ -296,7 +296,7 @@
             <span class="inline-flex items-center justify-center h-6 min-w-6 px-2 rounded-full bg-muted text-muted-foreground text-xs font-medium">{{ solution_count|dash }}</span>
         </div>
         <div class="overflow-x-auto">
-            <table class="w-full text-sm text-left">
+            <table class="dense-table w-full text-sm text-left">
                 <thead class="bg-muted/50 text-muted-foreground font-medium border-b border-input text-xs uppercase tracking-wide">
                     <tr>
                         <th class="px-6 py-3">Solution</th>

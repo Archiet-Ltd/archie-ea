@@ -9,7 +9,7 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {% for model in models %}
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-5 hover:bg-muted/30">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-5 hover:bg-muted/30">
             <h3 class="font-medium text-foreground">{{ model.name }}</h3>
             <p class="text-sm text-muted-foreground mt-1">{{ model.description|default('No description', true)|truncate(100) }}</p>
             <div class="mt-3">

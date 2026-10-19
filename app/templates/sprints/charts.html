@@ -219,7 +219,7 @@
 
     <!-- Burndown chart -->
     <section aria-labelledby="burndown-heading">
-        <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
+        <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground p-6">
             <div class="flex items-center justify-between mb-4">
                 <h2 id="burndown-heading" class="text-lg font-semibold">Burndown Chart</h2>
 
@@ -247,7 +247,7 @@
             </div>
 
             <!-- Error state -->
-            <div x-show="error" class="rounded-md bg-destructive/10 text-destructive-emphasis text-sm p-3" x-cloak x-text="error"></div>
+            <div x-show="error" class="rounded-md bg-destructive/10 text-destructive-emphasis text-sm px-3 py-2" x-cloak x-text="error"></div>
 
             <!-- Empty state -->
             <div x-show="!loading && !error && (!burndownData || !burndownData.ideal_line || burndownData.ideal_line.length === 0)" x-cloak
@@ -270,7 +270,7 @@
 
     <!-- Velocity chart -->
     <section aria-labelledby="velocity-heading">
-        <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
+        <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground p-6">
             <h2 id="velocity-heading" class="text-lg font-semibold mb-4">Velocity Chart</h2>
 
             <!-- Empty state -->

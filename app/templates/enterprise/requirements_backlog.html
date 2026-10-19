@@ -24,18 +24,18 @@
     ) }}
 
     <!-- Filters bar -->
-    <div data-slot="card" class="rounded-xl border bg-card p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
         <div class="flex flex-wrap gap-3 items-center">
             <input
                 type="search"
                 placeholder="Search requirements…"
-                class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring w-60"
+                class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring w-60"
                 x-model="filters.search"
                 @input.debounce.300ms="applyFilters()"
                 aria-label="Search requirements"
             >
             <select
-                class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 x-model="filters.status"
                 @change="applyFilters()"
                 aria-label="Filter by status"
@@ -47,7 +47,7 @@
                 <option value="Implemented">Implemented</option>
             </select>
             <select
-                class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 x-model="filters.moscow"
                 @change="applyFilters()"
                 aria-label="Filter by MoSCoW priority"
@@ -59,7 +59,7 @@
                 <option value="WONT">WONT</option>
             </select>
             <select
-                class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 x-model="filters.capability_id"
                 @change="applyFilters()"
                 aria-label="Filter by capability"
@@ -71,7 +71,7 @@
             </select>
             <span class="ml-auto text-sm text-muted-foreground" x-text="filtered.length + ' requirements'"></span>
             <button type="button"
-                class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                 @click="showCreateModal = true"
                 aria-label="Add requirement"
             >
@@ -79,7 +79,7 @@
                 Add Requirement
             </button>
             <button type="button"
-                class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border border-input bg-background hover:bg-accent transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                 @click="window.location.href='/api/enterprise/requirements/export'"
                 aria-label="Export requirements as CSV"
             >
@@ -87,7 +87,7 @@
                 Export CSV
             </button>
             <button type="button" @click="showEpicTree=!showEpicTree; if(showEpicTree) loadEpics()"
-                    class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border border-input bg-background hover:bg-accent transition-colors"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                     :aria-pressed="showEpicTree.toString()">
                 <i data-lucide="git-branch" class="h-4 w-4" aria-hidden="true"></i>
                 Epic View
@@ -136,9 +136,9 @@
     </div>
 
     <!-- Requirements table -->
-    <div data-slot="card" class="rounded-xl border bg-card overflow-hidden">
+    <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
                 <thead>
                     <tr class="border-b bg-muted/50 text-muted-foreground">
                         <th class="px-4 py-3 text-left font-medium">Requirement</th>
@@ -241,7 +241,7 @@
                             </td>
                             <td class="px-4 py-3">
                                 <button type="button"
-                                    class="inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center"
                                     @click.stop="openDetail(req)"
                                     :aria-label="'Edit requirement ' + req.name"
                                     title="Edit"
@@ -269,7 +269,7 @@
     >
         <div
             data-slot="card"
-            class="rounded-xl border bg-card w-full max-w-lg max-h-[90vh] overflow-y-auto p-6"
+            class="rounded-lg border border-border bg-card w-full max-w-lg max-h-[90vh] overflow-y-auto p-6"
             @click.stop
         >
             <div class="flex items-start justify-between mb-5">
@@ -336,7 +336,7 @@
                         type="text"
                         x-model="newReq.requirement_name"
                         placeholder="As a user, I need…"
-                        class="w-full flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        class="w-full flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     >
                 </div>
                 <div>
@@ -346,7 +346,7 @@
                         x-model="newReq.description"
                         rows="2"
                         placeholder="Optional details…"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
                     ></textarea>
                 </div>
                 <div class="grid grid-cols-2 gap-4">
@@ -355,7 +355,7 @@
                         <select
                             id="new-req-type"
                             x-model="newReq.requirement_type"
-                            class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                         >
                             <option value="functional">Functional</option>
                             <option value="non-functional">Non-functional</option>
@@ -367,7 +367,7 @@
                         <select
                             id="new-req-moscow"
                             x-model="newReq.moscow_priority"
-                            class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                         >
                             <option value="MUST">MUST</option>
                             <option value="SHOULD">SHOULD</option>
@@ -381,7 +381,7 @@
                     <select
                         id="new-req-priority"
                         x-model="newReq.priority"
-                        class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     >
                         <option value="high">High</option>
                         <option value="medium">Medium</option>
@@ -398,7 +398,7 @@
                             max="89"
                             x-model.number="newReq.story_points"
                             placeholder="e.g. 3"
-                            class="w-full flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            class="w-full flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                         >
                     </div>
                     <div>
@@ -408,7 +408,7 @@
                             type="number"
                             x-model.number="newReq.epic_parent_id"
                             placeholder="Parent Epic ID (optional)"
-                            class="w-full flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            class="w-full flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                         >
                     </div>
                 </div>
@@ -416,11 +416,11 @@
 
             <div class="flex justify-end gap-3 mt-6">
                 <button type="button"
-                    class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium border border-input bg-background hover:bg-muted transition-colors"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                     @click="showCreateModal = false"
                 >Cancel</button>
                 <button type="button"
-                    class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                     @click="createRequirement()"
                     :disabled="creating || !newReq.requirement_name.trim()"
                 >
@@ -446,7 +446,7 @@
     >
         <div
             data-slot="card"
-            class="rounded-xl border bg-card w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
+            class="rounded-lg border border-border bg-card w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
             @click.stop
         >
             <template x-if="activeReq">
@@ -471,7 +471,7 @@
                                 :id="'req-name-' + activeReq.id"
                                 x-model="activeReq.name"
                                 rows="2"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
                              aria-label="Name"></textarea>
                         </div>
 
@@ -482,7 +482,7 @@
                                 :id="'req-desc-' + activeReq.id"
                                 x-model="activeReq.description"
                                 rows="3"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
                              aria-label="Description"></textarea>
                         </div>
 
@@ -493,7 +493,7 @@
                                 <select
                                     :id="'req-moscow-' + activeReq.id"
                                     x-model="activeReq.moscow_priority"
-                                    class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                    class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                  aria-label="select">
                                     <option value="">— select —</option>
                                     <option value="MUST">MUST</option>
@@ -507,7 +507,7 @@
                                 <select
                                     :id="'req-status-' + activeReq.id"
                                     x-model="activeReq.status"
-                                    class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                    class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                  aria-label="Status">
                                     <option value="Draft">Draft</option>
                                     <option value="Refined">Refined</option>
@@ -523,7 +523,7 @@
                             <select
                                 :id="'req-owner-' + activeReq.id"
                                 x-model="activeReq.owner"
-                                class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                 aria-label="Requirement owner"
                             >
                                 <option value="">— no owner —</option>
@@ -539,7 +539,7 @@
                                 <label class="block text-sm font-medium" :for="'req-ac-' + activeReq.id">Acceptance Criteria</label>
                                 <button
                                     type="button"
-                                    class="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium border border-input bg-background hover:bg-muted transition-colors disabled:opacity-50"
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                     @click="generateAC()"
                                     :disabled="acGenerating"
                                     title="Auto-generate BDD acceptance criteria with AI"
@@ -557,7 +557,7 @@
                                 x-model="activeReq.acceptance_criteria"
                                 rows="3"
                                 placeholder="Given… When… Then…"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
                              aria-label="Given… When… Then…"></textarea>
                         </div>
 
@@ -567,7 +567,7 @@
                                 <label class="block text-sm font-medium">BDD Test Cases</label>
                                 <button
                                     type="button"
-                                    class="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium border border-input bg-background hover:bg-muted transition-colors disabled:opacity-50"
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                     @click="generateTestCases()"
                                     :disabled="tcGenerating"
                                     title="Generate BDD test cases from acceptance criteria"
@@ -596,7 +596,7 @@
                                 x-model="activeReq.assumptions"
                                 rows="2"
                                 placeholder="Key assumptions this requirement depends on…"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
                              aria-label="Key assumptions this requirement depends on…"></textarea>
                         </div>
 
@@ -608,7 +608,7 @@
                                 x-model="activeReq.dependencies_text"
                                 rows="2"
                                 placeholder="Other requirements or systems this depends on…"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
                              aria-label="Other requirements or systems this depends on…"></textarea>
                         </div>
 
@@ -635,7 +635,7 @@
                                     <select
                                         :id="'req-driver-' + activeReq.id"
                                         x-model="activeReq.driver_id"
-                                        class="w-full flex h-8 rounded-md border border-input bg-background px-3 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                        class="w-full flex h-8 rounded-md border border-input bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                      aria-label="Driver id">
                                         <option :value="null">— no driver linked —</option>
                                         <template x-for="d in motivationData.drivers" :key="d.id">
@@ -648,7 +648,7 @@
                                     <select
                                         :id="'req-goal-' + activeReq.id"
                                         x-model="activeReq.goal_id"
-                                        class="w-full flex h-8 rounded-md border border-input bg-background px-3 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                        class="w-full flex h-8 rounded-md border border-input bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                      aria-label="Goal id">
                                         <option :value="null">— no goal linked —</option>
                                         <template x-for="g in motivationData.goals" :key="g.id">
@@ -661,7 +661,7 @@
                                     <select
                                         :id="'req-stakeholder-' + activeReq.id"
                                         x-model="activeReq.stakeholder_id"
-                                        class="w-full flex h-8 rounded-md border border-input bg-background px-3 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                        class="w-full flex h-8 rounded-md border border-input bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                      aria-label="Stakeholder id">
                                         <option :value="null">— no stakeholder linked —</option>
                                         <template x-for="s in motivationData.stakeholders" :key="s.id">
@@ -674,9 +674,9 @@
                                 <div>
                                     <label class="block text-xs font-medium mb-1" :for="'req-archimate-req-' + activeReq.id">ArchiMate Requirement <span class="text-muted-foreground font-normal">(formal requirement element)</span></label>
                                     <div class="relative">
-                                        <input type="text" :id="'req-archimate-req-' + activeReq.id" x-model="archiReqSearch" @input.debounce.300ms="searchArchiReqs()" @focus="archiReqDropdownOpen = true" :placeholder="activeReq.archimate_requirement_name || 'Search ArchiMate requirements…'" class="w-full flex h-8 rounded-md border border-input bg-background px-3 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Search ArchiMate requirements">
-                                        <div x-show="archiReqDropdownOpen && archiReqError" x-cloak class="absolute z-50 w-full mt-1 rounded-md border bg-popover shadow-md px-3 py-1.5 text-xs text-destructive-emphasis" x-text="archiReqError" @click.outside="archiReqDropdownOpen = false"></div>
-                                        <div x-show="archiReqDropdownOpen && !archiReqError && archiReqResults.length > 0" x-cloak class="absolute z-50 w-full mt-1 max-h-40 overflow-y-auto rounded-md border bg-popover shadow-md" @click.outside="archiReqDropdownOpen = false">
+                                        <input type="text" :id="'req-archimate-req-' + activeReq.id" x-model="archiReqSearch" @input.debounce.300ms="searchArchiReqs()" @focus="archiReqDropdownOpen = true" :placeholder="activeReq.archimate_requirement_name || 'Search ArchiMate requirements…'" class="w-full flex h-8 rounded-md border border-input bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Search ArchiMate requirements">
+                                        <div x-show="archiReqDropdownOpen && archiReqError" x-cloak class="absolute z-50 w-full mt-1 rounded-md border border-border bg-popover px-3 py-1.5 text-xs text-destructive-emphasis" x-text="archiReqError" @click.outside="archiReqDropdownOpen = false"></div>
+                                        <div x-show="archiReqDropdownOpen && !archiReqError && archiReqResults.length > 0" x-cloak class="absolute z-50 w-full mt-1 max-h-40 overflow-y-auto rounded-md border bg-popover" @click.outside="archiReqDropdownOpen = false">
                                             <template x-for="elem in archiReqResults" :key="elem.id">
                                                 <button type="button" class="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors" @click="activeReq.archimate_requirement_id = elem.id; activeReq.archimate_requirement_name = elem.title; archiReqSearch = elem.title; archiReqDropdownOpen = false" x-text="elem.title"></button>
                                             </template>
@@ -714,17 +714,17 @@
                                     min="1"
                                     placeholder="Work package ID"
                                     x-model.number="activeReq.work_package_id"
-                                    class="flex h-8 w-40 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                    class="flex h-8 w-40 rounded-md border border-input bg-background px-3 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                     :id="'req-wp-' + activeReq.id"
                                     aria-label="Work package ID"
                                 >
                                 <button type="button"
-                                    class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                                     @click="linkWorkPackage(activeReq)"
                                 >Link</button>
                                 <button type="button"
                                     x-show="activeReq.work_package_id"
-                                    class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium border border-input bg-background hover:bg-muted transition-colors"
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                                     @click="activeReq.work_package_id = null; linkWorkPackage(activeReq)"
                                 >Unlink</button>
                             </div>
@@ -747,7 +747,7 @@
                                     max="89"
                                     x-model.number="activeReq.story_points"
                                     placeholder="e.g. 3"
-                                    class="w-full flex h-8 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                    class="w-full flex h-8 rounded-md border border-input bg-background px-3 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                 >
                             </div>
                             <div>
@@ -757,7 +757,7 @@
                                     type="number"
                                     x-model.number="activeReq.epic_parent_id"
                                     placeholder="Parent Epic ID (optional)"
-                                    class="w-full flex h-8 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                    class="w-full flex h-8 rounded-md border border-input bg-background px-3 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                  aria-label="Parent Epic ID (optional)">
                             </div>
                         </div>
@@ -873,7 +873,7 @@
                         </div>
                         <button @click="saveScore()"
                                 type="button"
-                                class="mt-2 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-2 items-center">
                             Save Scores
                         </button>
                     </details>
@@ -899,14 +899,14 @@
                         <div class="flex flex-wrap items-center gap-2">
                             <button
                                 type="button"
-                                class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium border border-input bg-background hover:bg-muted transition-colors disabled:opacity-50"
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                 :disabled="jiraPushing"
                                 @click="pushToJira()"
                                 x-text="activeReq.jira_push_status === 'pushed' ? 'Re-push to JIRA' : 'Push to JIRA'"
                             ></button>
                             <button
                                 type="button"
-                                class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium border border-input bg-background hover:bg-muted transition-colors disabled:opacity-50"
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                 :disabled="jiraSyncing"
                                 @click="syncFromJira()"
                             >Sync from JIRA</button>
@@ -930,11 +930,11 @@
                     <!-- Actions -->
                     <div class="flex justify-end gap-3 mt-6">
                         <button type="button"
-                            class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium border border-input bg-background hover:bg-muted transition-colors"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                             @click="activeReq = null"
                         >Cancel</button>
                         <button type="button"
-                            class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                             @click="saveDetail()"
                             :disabled="saving"
                         >

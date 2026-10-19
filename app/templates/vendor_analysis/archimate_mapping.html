@@ -105,7 +105,7 @@
 
     <!-- Critical Issues Alert -->
     {% if (orphaned_elements or 0) > 0 or (without_archimate or 0) > 0 %}
-    <div class="bg-destructive/5 border border-destructive/20 rounded-lg p-4 mb-6">
+    <div class="bg-destructive/10 border border-destructive/40 rounded-md px-3 py-2 mb-6">
         <div class="flex items-start gap-3">
             <div class="flex-shrink-0">
                 <i data-lucide="alert-triangle" class="h-6 w-6 text-destructive" aria-hidden="true"></i>
@@ -140,7 +140,7 @@
                 {% if orphaned_details %}
                 <div class="space-y-2 max-h-96 overflow-y-auto">
                     {% for element in orphaned_details %}
-                    <div class="p-3 border border-destructive/20 rounded-lg bg-destructive/5">
+                    <div class="px-3 py-2 border border-destructive/40 rounded-md bg-destructive/10">
                         <div class="flex items-start justify-between">
                             <div>
                                 <h4 class="font-medium text-destructive-emphasis">{{ element.name }}</h4>
@@ -172,7 +172,7 @@
                 {% if unmapped_products %}
                 <div class="space-y-2 max-h-96 overflow-y-auto">
                     {% for product in unmapped_products %}
-                    <div class="p-3 border border-warning/20 rounded-lg bg-warning/5">
+                    <div class="px-3 py-2 border border-warning/40 rounded-md bg-warning/10">
                         <div class="flex items-start justify-between">
                             <div>
                                 <h4 class="font-medium text-warning-emphasis">{{ product.name }}</h4>

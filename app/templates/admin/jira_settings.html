@@ -25,7 +25,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Status Panel -->
         <div class="lg:col-span-1">
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Connection Status</h3>
                 </div>
@@ -59,7 +59,7 @@
                         </div>
 
                         {% if jira_config.last_error %}
-                            <div class="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                            <div class="px-3 py-2 bg-destructive/10 border border-destructive/40 rounded-md">
                                 <p class="text-sm text-destructive-emphasis font-medium mb-1">Last Error:</p>
                                 <p class="text-xs text-destructive-emphasis/80">{{ jira_config.last_error }}</p>
                             </div>
@@ -89,7 +89,7 @@
                                 <span class="font-medium text-foreground">Configured via .env</span>
                             </div>
                         </div>
-                        <div class="p-3 bg-warning/10 border border-warning/20 rounded-md">
+                        <div class="px-3 py-2 bg-warning/10 border border-warning/40 rounded-md">
                             <p class="text-xs text-warning-emphasis">Credentials loaded from environment variables. Save settings to persist to database for full management.</p>
                         </div>
                         <!-- Save to Database -->
@@ -117,7 +117,7 @@
             </div>
 
             <!-- Push Status Summary -->
-            <div data-slot="card" class="mt-6 rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Push Status</h3>
                 </div>
@@ -160,7 +160,7 @@
             </div>
 
             <!-- Job Status -->
-            <div data-slot="card" class="mt-6 rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Latest Job</h3>
                 </div>
@@ -176,7 +176,7 @@
             </div>
 
             <!-- Kanban Tasks Push Status -->
-            <div data-slot="card" class="mt-6 rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Kanban Tasks</h3>
                 </div>
@@ -224,7 +224,7 @@
             </div>
 
             <!-- Application Components Section -->
-            <div data-slot="card" class="mt-6 rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Application Components</h3>
                     <p class="text-sm text-muted-foreground mt-1">ArchiMate Application Layer — Phase C/D</p>
@@ -245,7 +245,7 @@
 
         <!-- Configuration Form -->
         <div class="lg:col-span-2">
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Configuration</h3>
                 </div>
@@ -375,11 +375,11 @@
 
                         <!-- Submit -->
                         <div class="flex items-center gap-3 pt-4 border-t">
-                            <button type="submit" class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors" aria-label="Save settings">
+                            <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Save settings">
                                 <i data-lucide="save" class="w-4 h-4" aria-hidden="true"></i>
                                 Save Settings
                             </button>
-                            <a href="{{ url_for('admin.index') }}" class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors">
+                            <a href="{{ url_for('admin.index') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 Cancel
                             </a>
                         </div>
@@ -388,14 +388,14 @@
             </div>
 
             <!-- Field Mapping Reference -->
-            <div data-slot="card" class="mt-6 rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Field Mapping</h3>
                     <p class="text-sm text-muted-foreground mt-1">How A.R.C.I.E fields map to Jira issue fields</p>
                 </div>
                 <div class="p-4 sm:p-6">
                     <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
+                        <table class="dense-table w-full text-sm">
                             <thead>
                                 <tr class="border-b">
                                     <th class="text-left py-2 px-3 font-medium text-muted-foreground">A.R.C.I.E Field</th>
@@ -417,7 +417,7 @@
                     </div>
                     <div class="mt-4">
                         <button type="button" id="discover-fields-btn"
-                                class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                 aria-label="Discover Jira fields">
                             <i data-lucide="search" class="w-4 h-4" aria-hidden="true"></i>
                             Discover Jira Custom Fields
@@ -431,18 +431,18 @@
 
     <!-- 3-System Authority Info -->
     <div class="mt-8">
-        <div data-slot="card" class="rounded-xl border-2 border-input bg-card p-4 sm:p-6">
+        <div data-slot="card" class="rounded-lg border border-input bg-card p-4 sm:p-6">
             <h3 class="text-lg font-semibold mb-4">3-System Authority Model</h3>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="p-4 rounded-md bg-primary/5 border border-primary/20">
+                <div class="px-3 py-2 rounded-md bg-primary/10 border border-primary/40">
                     <h4 class="font-medium text-primary mb-2">Abacus Wins</h4>
                     <p class="text-sm text-muted-foreground">Asset identity: name, description, lifecycle, owners, country, business domain</p>
                 </div>
-                <div class="p-4 rounded-md bg-primary/5 border border-primary/20">
+                <div class="px-3 py-2 rounded-md bg-primary/10 border border-primary/40">
                     <h4 class="font-medium text-primary mb-2">A.R.C.I.E Wins</h4>
                     <p class="text-sm text-muted-foreground">Enrichment: criticality, TCO, rationalization score, vendor, technology stack</p>
                 </div>
-                <div class="p-4 rounded-md bg-warning/5 border border-warning/20">
+                <div class="px-3 py-2 rounded-md bg-warning/10 border border-warning/40">
                     <h4 class="font-medium text-warning-emphasis mb-2">Jira Wins</h4>
                     <p class="text-sm text-muted-foreground">Workflow: status, assignee, sprint, resolution (never overwritten by push)</p>
                 </div>

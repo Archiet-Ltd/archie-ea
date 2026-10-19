@@ -31,17 +31,17 @@
         {% macro _ps_actions() %}
 <div class="flex space-x-3">
                 <a href="{{ url_for('capability_map.simple_view') }}"
-                   class="inline-flex items-center px-4 py-2 border border-input text-sm font-medium rounded-md text-foreground bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="layers" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                     View Groupings
                 </a>
                 <a href="{{ url_for('capability_map.simple_view') }}"
-                   class="inline-flex items-center px-4 py-2 border border-input text-sm font-medium rounded-md text-foreground bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="clipboard" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                     Taxonomy
                 </a>
                 <a href="{{ url_for('capability_map.simple_view') }}"
-                   class="inline-flex items-center px-4 py-2 border border-input text-sm font-medium rounded-md text-foreground bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="bar-chart-2" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                     Analytics
                 </a>
@@ -99,9 +99,9 @@
 
     <!-- Statistics Overview -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="bg-card rounded-lg shadow border border-border p-6">
+        <div class="bg-card rounded-lg border border-border p-6">
             <div class="flex items-center">
-                <div class="flex-shrink-0 bg-primary/10 rounded-lg p-3">
+                <div class="flex-shrink-0 bg-primary/10 rounded-md px-3 py-2">
                     <i data-lucide="clipboard" class="w-6 h-6 text-primary" aria-hidden="true"></i>
                 </div>
                 <div class="ml-4">
@@ -111,9 +111,9 @@
             </div>
         </div>
 
-        <div class="bg-card rounded-lg shadow border border-border p-6">
+        <div class="bg-card rounded-lg border border-border p-6">
             <div class="flex items-center">
-                <div class="flex-shrink-0 bg-primary/10 rounded-lg p-3">
+                <div class="flex-shrink-0 bg-primary/10 rounded-md px-3 py-2">
                     <i data-lucide="layers" class="w-6 h-6 text-primary" aria-hidden="true"></i>
                 </div>
                 <div class="ml-4">
@@ -123,7 +123,7 @@
             </div>
         </div>
 
-        <div class="bg-card rounded-lg shadow border border-border p-6">
+        <div class="bg-card rounded-lg border border-border p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0 bg-secondary/50 rounded-lg p-3">
                     <i data-lucide="tag" class="w-6 h-6 text-foreground" aria-hidden="true"></i>
@@ -135,7 +135,7 @@
             </div>
         </div>
 
-        <div class="bg-card rounded-lg shadow border border-border p-6">
+        <div class="bg-card rounded-lg border border-border p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0 bg-muted rounded-lg p-3">
                     <i data-lucide="trending-up" class="w-6 h-6 text-muted-foreground" aria-hidden="true"></i>
@@ -150,7 +150,7 @@
 
     <!-- Business Groupings Grid -->
     {% if classified_capabilities %}
-    <div class="bg-card rounded-lg shadow border border-border mb-8">
+    <div class="bg-card rounded-lg border border-border mb-8">
         <div class="px-6 py-4 border-b border-border">
             <h2 class="text-lg font-semibold text-foreground">Business Groupings</h2>
             <p class="text-sm text-muted-foreground">Capabilities organized by business area</p>
@@ -162,7 +162,7 @@
                 {# Was <a href="#"> wrapping the whole card: there is no
                    per-grouping page to open, so the card is not a link. #}
                 <div class="block">
-                    <div class="border border-border rounded-lg p-6 hover:shadow-lg transition-shadow duration-200 hover:bg-accent/20">
+                    <div class="border border-border rounded-lg p-6 transition-shadow duration-200 hover:bg-accent/20">
                         <div class="flex items-center mb-4">
                             <div class="flex-shrink-0 w-10 h-10 rounded-lg {{ gc.icon_bg }} flex items-center justify-center">
                                 <i data-lucide="{{ grouping_data.info.icon }}" class="w-5 h-5 {{ gc.icon_text }}" aria-hidden="true"></i>
@@ -211,13 +211,13 @@
     {% endif %}
 
     <!-- Recent Capabilities -->
-    <div class="bg-card rounded-lg shadow border border-border">
+    <div class="bg-card rounded-lg border border-border">
         <div class="px-6 py-4 border-b border-border">
             <h2 class="text-lg font-semibold text-foreground">Recent Capabilities</h2>
             <p class="text-sm text-muted-foreground">Recently added or updated capabilities</p>
         </div>
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-border">
+            <table class="dense-table min-w-full divide-y divide-border">
                 <thead class="bg-muted/50">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Capability</th>

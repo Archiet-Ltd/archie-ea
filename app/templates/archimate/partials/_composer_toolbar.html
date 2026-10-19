@@ -157,8 +157,8 @@
             <template x-if="mode === 'edit'">
                 <button type="button" class="px-2.5 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5"
                         :class="layerZonesActive
-                            ? 'bg-background shadow-sm border border-border text-foreground'
-                            : 'text-muted-foreground hover:text-foreground'"
+ ? 'bg-background border border-border text-foreground'
+ : 'text-muted-foreground hover:text-foreground'"
                         style="background: layerZonesActive ? hsl(var(--card)) : ''; border-color: layerZonesActive ? hsl(var(--border)) : '';"
                         @click="toggleLayerZones()"
                         title="Toggle layer swimlanes">
@@ -177,8 +177,8 @@
             {# GAP-INT-003: Annotation card toggle #}
             <button type="button" class="px-2.5 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5"
                     :class="showAnnotations
-                        ? 'bg-background shadow-sm border border-border text-foreground'
-                        : 'text-muted-foreground hover:text-foreground'"
+ ? 'bg-background border border-border text-foreground'
+ : 'text-muted-foreground hover:text-foreground'"
                     @click="toggleAnnotations()"
                     title="Show/Hide connection annotations">
                 <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
@@ -188,8 +188,8 @@
             <div class="vp-dropdown" @click.outside="vpDropdownOpen = false">
                 <button type="button" class="px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1"
                         :class="activeViewpoint
-                            ? 'bg-background shadow-sm border border-border text-foreground'
-                            : 'text-muted-foreground hover:text-foreground'"
+ ? 'bg-background border border-border text-foreground'
+ : 'text-muted-foreground hover:text-foreground'"
                         @click="vpDropdownOpen = !vpDropdownOpen">
                     <i data-lucide="layers" class="w-3 h-3"></i>
                     <span x-text="activeViewpointName || 'Viewpoints'"></span>

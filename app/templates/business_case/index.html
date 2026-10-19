@@ -32,7 +32,7 @@
     {% call card.card() %}
       {% call card.card_content(class='p-0') %}
         <div class="overflow-x-auto">
-          <table class="w-full text-sm" data-testid="bc-table">
+          <table class="dense-table w-full text-sm" data-testid="bc-table">
             <thead>
               <tr class="border-b border-border text-left">
                 <th class="px-4 py-3 font-medium text-muted-foreground">Title</th>
@@ -93,9 +93,9 @@
     </label>
     <textarea id="bc-seed-description" x-model="seedDescription" rows="2" maxlength="2000"
       placeholder="Describe the problem in a sentence or two — e.g. we run four regional CRM instances with duplicate licence costs and no shared customer view"
-      class="flex min-h-[52px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+      class="flex min-h-[52px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
     <button type="button" data-testid="bc-seed-generate"
-      class="inline-flex h-8 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
       :disabled="loading || !seedDescription.trim()" @click="generateSeed()">
       <span x-text="loading ? 'Generating…' : 'Generate'"></span>
     </button>
@@ -105,20 +105,20 @@
   <div>
     <label for="bc-title" class="block text-sm font-medium mb-1">Title <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
     <input id="bc-title" x-ref="bcTitle" name="title" type="text" required maxlength="256" placeholder="e.g. Consolidate Regional CRM Instances"
-      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
   </div>
   <div>
     <label for="bc-description" class="block text-sm font-medium mb-1">Description</label>
     <textarea id="bc-description" x-ref="bcDescription" name="description" rows="2" maxlength="2000" placeholder="Optional context for this business case"
-      class="flex min-h-[64px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+      class="flex min-h-[64px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
   </div>
   <div class="flex justify-end gap-3 pt-2 border-t">
     <button type="button" data-modal-close="bc-create-modal"
-      class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 py-2">
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
       Cancel
     </button>
     <button type="submit" data-testid="bc-create-submit"
-      class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
       Create Business Case
     </button>
   </div>

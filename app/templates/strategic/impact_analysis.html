@@ -45,7 +45,7 @@
     <!-- Main Grid -->
     <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <!-- Selector Card -->
-        <div data-slot="card" class="lg:col-span-1 rounded-xl border bg-card text-card-foreground shadow">
+        <div data-slot="card" class="lg:col-span-1 rounded-lg border border-border bg-card text-card-foreground">
             <div class="flex flex-col space-y-1.5 p-6 border-b">
                 <h3 class="font-semibold leading-none tracking-tight">Select Element</h3>
                 <p class="text-sm text-muted-foreground">Select an architecture element to perform impact analysis.</p>
@@ -55,7 +55,7 @@
                     <div class="space-y-2">
                         <label class="text-sm font-medium">Architecture Layer</label>
                         <select x-model="selectedType" @change="layerChanged()" aria-describedby="impact-layer-help"
-                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Architecture Layer">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Architecture Layer">
                             <option value="">All layers</option>
                             <option value="Application">Application Layer</option>
                             <option value="Business">Business Layer</option>
@@ -70,7 +70,7 @@
                         <div class="relative">
                             <input type="text" x-model="searchQuery" @input.debounce="searchElements"
                                 placeholder="Type to search..."
-                                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Type to search...">
+                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Type to search...">
                         </div>
                         <div x-show="searchResults.length > 0" x-cloak
                             class="mt-2 border rounded-md max-h-48 overflow-y-auto bg-popover text-popover-foreground">
@@ -99,7 +99,7 @@
                     <div class="space-y-2">
                         <label class="text-sm font-medium">Change Type</label>
                         <select x-model="changeType"
-                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Change Type">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Change Type">
                             <option value="REPLACE">Full Replacement</option>
                             <option value="UPGRADE">Upgrade / Version Change</option>
                             <option value="RETIRE">Decommission / Retirement</option>
@@ -118,7 +118,7 @@
         </div>
 
         <!-- Analysis Results -->
-        <div data-slot="card" class="lg:col-span-2 rounded-xl border bg-card text-card-foreground shadow min-h-[400px]">
+        <div data-slot="card" class="lg:col-span-2 rounded-lg border border-border bg-card text-card-foreground min-h-[400px]">
             <div class="flex flex-col space-y-1.5 p-6 border-b">
                 <h3 class="font-semibold leading-none tracking-tight">Analysis Report</h3>
                 <p class="text-sm text-muted-foreground"
@@ -199,7 +199,7 @@
                         </template>
                     </div>
                     <div class="overflow-x-auto rounded-md border border-border">
-                        <table class="w-full caption-bottom text-sm" role="table">
+                        <table class="dense-table w-full caption-bottom text-sm" role="table">
                             <thead class="[&_tr]:border-b sticky top-0 z-20">
                                 <tr class="border-b border-border bg-muted/50">
                                     <th class="h-10 px-3 text-left align-middle font-medium text-muted-foreground text-xs bg-card">Name</th>
@@ -254,7 +254,7 @@
                     <div class="flex items-center justify-between px-2 py-4">
                         <div class="flex items-center gap-2">
                             <button type="button" @click="prevPage()" :disabled="pagination.cursor === 0"
-                                    class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
                                     aria-label="Previous page">
                                 <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>
                             </button>
@@ -262,7 +262,7 @@
                                 Page <span x-text="pagination.currentPage"></span> of <span x-text="Math.ceil(analysisResult.total / pagination.pageSize)"></span>
                             </span>
                             <button type="button" @click="nextPage()" :disabled="pagination.nextCursor === null"
-                                    class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
                                     aria-label="Next page">
                                 <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>
                             </button>
@@ -334,7 +334,7 @@
     </div>
 
     <!-- Analysis History Panel -->
-    <div x-show="history.length > 0" x-cloak class="rounded-xl border bg-card text-card-foreground shadow">
+    <div x-show="history.length > 0" x-cloak class="rounded-xl border bg-card text-card-foreground">
         <button type="button" @click="historyOpen = !historyOpen"
                 class="w-full flex items-center justify-between p-4 text-left hover:bg-accent/30 transition-colors rounded-xl">
             <div class="flex items-center gap-2">
@@ -346,7 +346,7 @@
         </button>
         <div x-show="historyOpen" x-cloak @keydown.escape.window="historyOpen = false" class="px-4 pb-4">
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <thead>
                         <tr class="border-b text-xs text-muted-foreground uppercase tracking-wider">
                             <th class="py-2 text-left font-medium">Element ID</th>

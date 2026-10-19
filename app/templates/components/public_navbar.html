@@ -26,7 +26,7 @@
             <div class="relative" id="userMenuContainer">
                 <button type="button" 
                     id="userMenuBtn"
-                    class="flex items-center gap-2 rounded-lg hover:bg-accent px-2 py-1.5 transition-colors"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center"
                  aria-label="Action">
                     <div class="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
                         <span class="text-sm font-medium">{{ current_user.first_name[0] if current_user.first_name else 'U' }}</span>
@@ -37,16 +37,16 @@
                 <!-- Dropdown -->
                 <div 
                     id="userMenuDropdown"
-                    class="absolute right-0 mt-2 w-56 rounded-md border bg-popover shadow-lg z-50 hidden"
+                    class="absolute right-0 mt-2 w-56 rounded-md border border-border bg-popover z-50 hidden"
                 >
                     <div class="p-2">
                         <div class="px-2 py-1.5 text-sm text-muted-foreground">{{ current_user.email }}</div>
                         <div class="h-px bg-border my-1"></div>
-                        <a href="{{ url_for('account.manage') }}" class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors">
+                        <a href="{{ url_for('account.manage') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                             <svg data-lucide="user" class="h-4 w-4"></svg>
                             Profile
                         </a>
-                        <a href="{{ url_for('admin.index') }}" class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors">
+                        <a href="{{ url_for('admin.index') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                             <svg data-lucide="layout-dashboard" class="h-4 w-4"></svg>
                             Dashboard
                         </a>

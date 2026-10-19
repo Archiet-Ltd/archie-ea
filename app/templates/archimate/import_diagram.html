@@ -29,7 +29,7 @@
     </div>
 
     {# ── Step 1: the file and how to read it ─────────────────────────────── #}
-    <div class="rounded-xl border border-border bg-card p-6 mb-6">
+    <div class="rounded-lg border border-border bg-card p-6 mb-6">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
                 <label for="diagram-file" class="block text-sm font-medium text-foreground mb-1.5">
@@ -89,7 +89,7 @@
             </div>
         </div>
 
-        <div class="mt-4 rounded-lg border border-border bg-muted/20 p-4">
+        <div class="mt-4 rounded-md border border-border bg-muted/20 px-3 py-2">
             <label class="flex items-start gap-2 text-sm text-foreground">
                 <input type="checkbox" x-model="aiAssist" class="mt-0.5 rounded border-input">
                 <span>
@@ -107,23 +107,19 @@
 
         <div class="mt-6 flex flex-wrap items-center gap-3">
             <button type="button" @click="preview()" :disabled="!file || busy"
-                    class="inline-flex items-center gap-2 rounded-md border border-input bg-background
-                           px-4 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50 transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <span x-show="!busy || mode !== 'preview'">Preview</span>
                 <span x-show="busy && mode === 'preview'" x-cloak>Reading…</span>
             </button>
             <button type="button" @click="commit()" :disabled="!report || busy || committed"
-                    class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm
-                           font-medium text-primary-foreground hover:bg-primary/90
-                           disabled:opacity-50 transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <span x-show="!busy || mode !== 'commit'">Import</span>
                 <span x-show="busy && mode === 'commit'" x-cloak>Importing…</span>
             </button>
             <span x-show="error" x-cloak class="text-sm text-destructive-emphasis" x-text="error"></span>
             <template x-if="committed && report && report.composer_url">
                 <a :href="report.composer_url"
-                   class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm
-                          font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     Open in composer →
                 </a>
             </template>
@@ -138,7 +134,7 @@
     <div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <template x-for="card in summaryCards" :key="card.label">
-                <div class="rounded-xl border border-border bg-card p-4">
+                <div class="rounded-lg border border-border bg-card p-4">
                     <p class="text-2xl font-bold text-foreground" x-text="card.value"></p>
                     <p class="text-xs text-muted-foreground mt-1" x-text="card.label"></p>
                 </div>
@@ -185,7 +181,7 @@
                         Untyped shapes — propose a type
                         (<span x-text="report.suggestions.retype.length"></span>)
                     </p>
-                    <table class="w-full text-sm">
+                    <table class="dense-table w-full text-sm">
                         <tbody>
                             <template x-for="(s, i) in report.suggestions.retype" :key="'rt'+i">
                                 <tr class="border-t border-border/60">
@@ -208,7 +204,7 @@
                         Recovered relationships
                         (<span x-text="report.suggestions.relationships.length"></span>)
                     </p>
-                    <table class="w-full text-sm">
+                    <table class="dense-table w-full text-sm">
                         <tbody>
                             <template x-for="(s, i) in report.suggestions.relationships" :key="'rl'+i">
                                 <tr class="border-t border-border/60">
@@ -237,13 +233,13 @@
         </div>
         </template>
 
-        <div class="rounded-xl border border-border bg-card overflow-hidden mt-4">
+        <div class="rounded-lg border border-border bg-card overflow-hidden mt-4">
             <div class="bg-muted/40 px-5 py-2 border-b border-border flex items-center gap-4">
                 <span class="text-xs font-medium text-muted-foreground">Elements</span>
                 <template x-for="v in ['created','changed','linked','skipped']" :key="v">
                     <button type="button" @click="filter = (filter === v ? '' : v)"
                             :class="filter === v ? 'ring-1 ring-primary' : ''"
-                            class="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-2xs text-muted-foreground hover:bg-accent">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                         <span class="verdict-dot" :class="'verdict-' + v"></span>
                         <span x-text="v"></span>
                         <span class="opacity-60" x-text="countOf(v)"></span>
@@ -251,7 +247,7 @@
                 </template>
             </div>
             <div class="overflow-x-auto max-h-96 overflow-y-auto">
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <tbody>
                         <template x-for="(row, i) in shownElements" :key="i">
                             <tr class="border-t border-border">

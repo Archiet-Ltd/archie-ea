@@ -63,7 +63,7 @@
     </div>
 
     {# ── Jobs Table (canonical batchJobsTable pattern) ──────────────────── #}
-    <div x-data="batchJobsTable()" data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div x-data="batchJobsTable()" data-slot="card" class="rounded-lg border border-border bg-card">
 
         {# Toolbar #}
         <div class="flex flex-col gap-3 p-4 border-b sm:flex-row sm:items-center sm:justify-between">
@@ -132,7 +132,7 @@
 
         {# Table #}
         <div class="overflow-x-auto" aria-live="polite" aria-atomic="false">
-            <table class="w-full caption-bottom text-sm" role="grid" aria-label="Batch import jobs table">
+            <table class="dense-table w-full caption-bottom text-sm" role="grid" aria-label="Batch import jobs table">
                 <thead class="border-b bg-muted/40">
                     <tr>
                         <th class="w-10 h-12 px-3 align-middle" scope="col">
@@ -169,7 +169,7 @@
                                 <i data-lucide="inbox" class="h-8 w-8 text-muted-foreground/40" aria-hidden="true"></i>
                                 <p class="text-sm text-muted-foreground">No import jobs found</p>
                                 <a href="{{ url_for('batch_import_view.new_import') }}"
-                                   class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 mt-2 transition-colors">
+                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center mt-2">
                                     <i data-lucide="plus" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                                     Create First Import
                                 </a>
@@ -213,7 +213,7 @@
                             <td class="px-4 py-3 align-middle text-sm text-muted-foreground" x-text="item.started_at || '—'"></td>
                             <td class="px-4 py-3 align-middle text-right" @click.stop>
                                 <a :href="'/batch-import/jobs/' + item.id"
-                                   class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                    :aria-label="'View job ' + (item.name || item.file_name)">
                                     <i data-lucide="eye" class="h-3 w-3" aria-hidden="true"></i>
                                     View
@@ -233,7 +233,7 @@
             </p>
             {# duplicate-breadcrumb-ok: table-pagination nav, not a breadcrumb -- flagged only because its Prev/Next buttons use chevron icons, the same shape heuristic keys on; real breadcrumb is page_header() above. #}
             <nav class="flex items-center gap-1" aria-label="Pagination">
-                <button type="button" class="inline-flex items-center justify-center h-8 px-2.5 rounded-md border border-input bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                         :disabled="!hasPrev" @click="prevPage()" aria-label="Previous page">
                     <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>
                 </button>
@@ -246,7 +246,7 @@
                         <span x-show="pg === '...'" x-cloak class="min-w-[2rem] h-8 inline-flex items-center justify-center text-sm text-muted-foreground">&hellip;</span>
                     </span>
                 </template>
-                <button type="button" class="inline-flex items-center justify-center h-8 px-2.5 rounded-md border border-input bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                         :disabled="!hasNext" @click="nextPage()" aria-label="Next page">
                     <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>
                 </button>
@@ -268,13 +268,13 @@
             <div class="flex justify-end gap-3">
                 <button type="button"
                         data-modal-close="bulk-delete-confirm-modal"
-                        class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent transition-colors">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Cancel
                 </button>
                 <button type="button"
                         @click="executeBulkDelete()"
                         :disabled="deleteConfirmText !== 'DELETE' || deleteInProgress"
-                        class="inline-flex h-9 items-center justify-center rounded-md bg-destructive px-4 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:pointer-events-none">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" x-show="deleteInProgress" x-cloak aria-hidden="true"></i>
                     <span x-text="deleteInProgress ? 'Deleting…' : 'Delete'"></span>
                 </button>
@@ -292,13 +292,13 @@
         <div class="flex justify-end gap-2">
             <button type="button"
                 @click="Platform.modal.close('cancel-import-job')"
-                class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-10 px-4 py-2 transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                 aria-label="Keep import job">
                 Keep Job
             </button>
             <button type="button"
                 @click="cancelJob(cancelJobData?.id)"
-                class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 h-10 px-4 py-2 transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                 aria-label="Confirm cancel import job">
                 Cancel Job
             </button>

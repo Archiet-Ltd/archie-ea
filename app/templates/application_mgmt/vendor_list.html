@@ -20,7 +20,7 @@
         <span class="hidden sm:inline">Vendor Analysis</span>
         <span class="sm:hidden">Analysis</span>
       </button>
-      <a href="{{ url_for('application_mgmt.create_vendor') }}" class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium">
+      <a href="{{ url_for('application_mgmt.create_vendor') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
         <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
         <span class="hidden sm:inline">Add Vendor</span>
         <span class="sm:hidden">Add</span>
@@ -67,7 +67,7 @@
   </div>
 
   <!-- Data Quality Banner -->
-  <div class="rounded-lg border border-warning/30 bg-warning/5 p-3 mb-4 flex items-center gap-4 text-xs text-muted-foreground">
+  <div class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 mb-4 flex items-center gap-4 text-xs text-muted-foreground">
       <i data-lucide="alert-triangle" class="h-4 w-4 text-warning shrink-0"></i>
       <span class="font-medium text-warning-emphasis">Data Quality</span>
       <span>Contract data: limited</span>
@@ -75,7 +75,7 @@
   </div>
 
   <!-- Vendors Table Card -->
-  <div data-slot="card" class="rounded-xl border bg-card shadow-sm mb-6">
+  <div data-slot="card" class="rounded-lg border border-border bg-card mb-6">
     <!-- Table Header -->
     <div class="p-4 sm:p-6 border-b">
       <h2 class="text-xl font-semibold mb-2">Vendor Portfolio</h2>
@@ -90,13 +90,13 @@
           <div class="relative">
             <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" aria-hidden="true"></i>
             <input type="text" x-model="search" @input.debounce.400ms="applyFilters()" placeholder="Search by name..."
-              class="flex h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              class="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Search vendors">
           </div>
         </div>
         <div>
           <label for="vendor-type-filter" class="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Filter by Type</label>
-          <select id="vendor-type-filter" x-model="vendorType" @change="applyFilters()" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <select id="vendor-type-filter" x-model="vendorType" @change="applyFilters()" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <option value="all">All Types</option>
             <option value="saas_provider">SaaS Provider</option>
             <option value="enterprise_software">Enterprise Software</option>
@@ -107,7 +107,7 @@
         </div>
         <div>
           <label for="contract-status-filter" class="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Contract Status</label>
-          <select id="contract-status-filter" x-model="contractStatus" @change="applyFilters()" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <select id="contract-status-filter" x-model="contractStatus" @change="applyFilters()" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <option value="all">All Statuses</option>
             <option value="catalog">Catalog</option>
             <option value="contracted">Contracted</option>
@@ -121,7 +121,7 @@
     {% if vendors %}
     <!-- Desktop Table (hidden on mobile) -->
     <div class="hidden lg:block overflow-x-auto">
-      <table class="w-full border-collapse">
+      <table class="dense-table w-full border-collapse">
         <thead class="bg-muted/50 border-b">
           <tr>
             <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[200px]">Vendor</th>
@@ -224,8 +224,8 @@
             </td>
             <td class="px-4 py-3 text-right">
               <div class="flex gap-2 justify-end min-w-[120px]">
-                <a href="{{ url_for('application_mgmt.vendor_detail', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center h-8 px-3 rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors whitespace-nowrap">View</a>
-                <a href="{{ url_for('application_mgmt.edit_vendor', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center h-8 px-3 rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors whitespace-nowrap">Edit</a>
+                <a href="{{ url_for('application_mgmt.vendor_detail', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap">View</a>
+                <a href="{{ url_for('application_mgmt.edit_vendor', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap">Edit</a>
               </div>
             </td>
           </tr>
@@ -246,7 +246,7 @@
             {% endif %}
           </div>
           <div class="flex gap-2">
-            <a href="{{ url_for('application_mgmt.vendor_detail', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center h-8 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90">
+            <a href="{{ url_for('application_mgmt.vendor_detail', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
               <i data-lucide="eye" class="h-4 w-4" aria-hidden="true"></i>
             </a>
           </div>
@@ -367,11 +367,11 @@
       <h3 class="text-lg font-semibold mb-2">No vendors found</h3>
       <p class="text-sm text-muted-foreground mb-6 max-w-md mx-auto">Add vendors manually or sync from Abacus to build your vendor portfolio. Vendors link to applications, products, and capability mappings.</p>
       <div class="flex items-center justify-center gap-3">
-        <a href="{{ url_for('application_mgmt.create_vendor') }}" class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium">
+        <a href="{{ url_for('application_mgmt.create_vendor') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
           <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
           Add Vendor
         </a>
-        <a href="{{ url_for('admin.abacus_settings') }}" class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors text-sm font-medium">
+        <a href="{{ url_for('admin.abacus_settings') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
           <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i>
           Sync from Abacus
         </a>

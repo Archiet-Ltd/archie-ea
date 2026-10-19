@@ -10,7 +10,7 @@
 
 {% macro map_table() %}
 <div class="overflow-x-auto rounded-lg border border-border bg-card">
-    <table class="w-full text-left text-sm" data-map-table>
+    <table class="dense-table w-full text-left text-sm" data-map-table>
         <caption class="px-4 py-3 text-left text-sm font-medium text-foreground" x-text="caption"></caption>
         <thead class="bg-muted/50 text-muted-foreground">
             <tr>
@@ -36,7 +36,7 @@
                         <div class="flex flex-wrap items-center gap-2">
                             {{ why_button('row.key') }}
                             <button type="button" @click="recentre(row)"
-                                    class="inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">Centre on this</button>
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 min-w-8 items-center justify-center">Centre on this</button>
                         </div>
                     </td>
                 </tr>

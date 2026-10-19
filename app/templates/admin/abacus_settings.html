@@ -30,7 +30,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Status Panel -->
         <div class="lg:col-span-1">
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Connection Status</h3>
                 </div>
@@ -96,7 +96,7 @@
 
                         <!-- Error Message -->
                         {% if abacus_config and abacus_config.last_error %}
-                            <div class="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                            <div class="px-3 py-2 bg-destructive/10 border border-destructive/40 rounded-md">
                                 <p class="text-sm text-destructive-emphasis font-medium mb-1">Last Error:</p>
                                 <p class="text-xs text-destructive-emphasis/80">{{ abacus_config.last_error }}</p>
                             </div>
@@ -136,7 +136,7 @@
             </div>
 
             <!-- Sync Job Status -->
-            <div data-slot="card" class="mt-6 rounded-xl border-2 border-input bg-card" x-data="syncStatusPanel()">
+            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card" x-data="syncStatusPanel()">
                 <div class="p-4 sm:p-6 border-b flex items-center justify-between">
                     <h3 class="text-lg font-semibold">Sync Job Status</h3>
                     <button type="button" x-show="isStale" @click="clearStaleJobs()" x-cloak
@@ -168,7 +168,7 @@
             <!-- Imported Data Summary -->
             <!-- Updated: 2026-02-03 04:10 - Added imported data tracking -->
             {% if abacus_config or env_config %}
-            <div data-slot="card" class="mt-6 rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b flex items-center justify-between">
                     <h3 class="text-lg font-semibold flex items-center gap-2"><i data-lucide="bar-chart-3" class="w-4 h-4 text-muted-foreground"></i>Imported Data</h3>
                     <span class="text-xs text-muted-foreground">From Abacus</span>
@@ -214,7 +214,7 @@
 
         <!-- Configuration Form -->
         <div class="lg:col-span-2">
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Configuration</h3>
                 </div>
@@ -361,7 +361,7 @@
                                 <div x-show="!typesLoaded && !typesLoading" class="p-3 bg-accent/50 rounded-md">
                                     <p class="text-sm text-muted-foreground mb-2">Discover which entity types are available in your Abacus instance.</p>
                                     <button type="button" @click="discoverTypes()"
-                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-background border border-input hover:bg-accent transition-colors">
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                                         Discover Entity Types
                                     </button>
@@ -419,11 +419,11 @@
                                 <input type="hidden" id="active-filters-data" value="{{ abacus_config.config_json|default('{}', true)|e if abacus_config else '{}' }}">
                                 <input type="hidden" id="dynamic_filters" name="dynamic_filters" value="">
                                 {% if not filter_dimensions %}
-                                <div class="p-3 bg-warning/10 border border-warning/30 rounded-md text-sm text-warning-emphasis">
+                                <div class="px-3 py-2 bg-warning/10 border border-warning/40 rounded-md text-sm text-warning-emphasis">
                                     <p class="font-medium">No filter dimensions available yet</p>
                                     <p class="text-xs mt-1">Click the button below to discover filter options from Abacus. They'll be saved and available on next page load.</p>
                                     <button type="button" id="btn-discover-now"
-                                            class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-background border border-input hover:bg-accent transition-colors">
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-2 items-center">
                                         Fetch Filter Options Now
                                     </button>
                                 </div>
@@ -506,11 +506,11 @@
 
                         <!-- Submit Buttons -->
                         <div class="flex items-center gap-3 pt-4 border-t">
-                            <button type="submit" class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors" aria-label="Save Abacus configuration settings">
+                            <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Save Abacus configuration settings">
                                 <i data-lucide="save" class="w-4 h-4" aria-hidden="true"></i>
                                 Save Settings
                             </button>
-                            <a href="{{ url_for('admin.index') }}" class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors">
+                            <a href="{{ url_for('admin.index') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 Cancel
                             </a>
                         </div>
@@ -522,7 +522,7 @@
 
     <!-- Documentation Section -->
     <div class="mt-8">
-        <div data-slot="card" class="rounded-xl border-2 border-input bg-card p-4 sm:p-6">
+        <div data-slot="card" class="rounded-lg border border-input bg-card p-4 sm:p-6">
             <h3 class="text-lg font-semibold mb-4">Setup Instructions</h3>
             <div class="prose prose-sm max-w-none">
                 <ol class="space-y-2">
@@ -549,7 +549,7 @@
 
 <!-- Relationship Import Configuration (BPP-011) -->
 <div class="mt-6" x-data="relationshipMappings()">
-    <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+    <div data-slot="card" class="rounded-lg border border-input bg-card">
         <div class="p-4 sm:p-6 border-b cursor-pointer flex items-center justify-between"
              @click="expanded = !expanded">
             <div>
@@ -569,7 +569,7 @@
             <template x-if="!loading && !loadError && Object.keys(mappings).length > 0">
                 <div>
                     <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
+                        <table class="dense-table w-full text-sm">
                             <thead>
                                 <tr class="border-b">
                                     <th class="text-left py-2 px-3 font-medium">OutConnection Type</th>
@@ -631,7 +631,7 @@
                     <div class="flex items-center gap-3 mt-4 pt-4 border-t">
                         <button type="button" @click="saveMappings()"
                                 :disabled="saving"
-                                class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <span x-show="!saving">Save Mappings</span>
                             <span x-show="saving">Saving...</span>
                         </button>

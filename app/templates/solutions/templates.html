@@ -20,7 +20,7 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-6" id="template-grid">
         {% for tpl in templates %}
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm flex flex-col">
+        <div data-slot="card" class="rounded-lg border border-border bg-card flex flex-col">
             <div class="p-6 flex-1">
                 <div class="flex items-start justify-between mb-3">
                     <h3 class="text-base font-semibold leading-tight">{{ tpl.name }}</h3>
@@ -33,7 +33,7 @@
             <div class="px-6 pb-6">
                 <button
                     type="button"
-                    class="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
+                    class="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
                     @click="selectTemplate('{{ tpl.id }}', '{{ tpl.name | e }}')"
                     aria-label="Use template: {{ tpl.name | e }}"
                 >
@@ -61,17 +61,17 @@
         <div>
             <label for="solution-name-input" class="block text-sm font-medium mb-1">Solution name</label>
             <input id="solution-name-input" type="text" x-model="solutionName"
-                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                    placeholder="e.g. My Microservices Platform" />
         </div>
         <div class="flex justify-end gap-3 pt-2">
             <button type="button"
                     data-modal-close="template-name-modal"
-                    class="inline-flex items-center justify-center rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Cancel
             </button>
             <button type="button"
-                    class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                     @click="doCreate()"
                     :disabled="!solutionName.trim()">
                 Create Solution

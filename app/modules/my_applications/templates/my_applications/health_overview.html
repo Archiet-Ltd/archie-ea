@@ -12,7 +12,7 @@
     </div>
     {% macro _ps_actions() %}
 <a href="{{ url_for('my_applications.dashboard') }}"
-           class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border hover:bg-accent transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
             <i data-lucide="arrow-left" class="w-4 h-4"></i>
             Back to Dashboard
         </a>
@@ -117,7 +117,7 @@
                             "
                             :disabled="loading['{{ item.id }}']"
                             :class="{ 'opacity-50': loading['{{ item.id }}'] }"
-                            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-border hover:bg-accent transition-colors text-sm">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                         <i data-lucide="sparkles" class="w-4 h-4"></i>
                         <span x-show="!loading['{{ item.id }}']" x-cloak>Generate</span>
                         <span x-show="loading['{{ item.id }}']" x-cloak>Generating…</span>
@@ -184,7 +184,7 @@
         <!-- Critical Applications -->
         {% if critical %}
         <div class="bg-card border border-destructive/50 rounded-lg overflow-hidden">
-            <div class="bg-destructive/10 px-6 py-4 border-b border-destructive/30">
+            <div class="border bg-destructive/10 px-6 py-2 border-b border-destructive/40">
                 <div class="flex items-center gap-3">
                     <i data-lucide="alert-circle" class="w-5 h-5 text-destructive-emphasis"></i>
                     <h2 class="text-lg font-semibold text-destructive-emphasis">Critical ({{ critical|length }})</h2>
@@ -221,7 +221,7 @@
         <!-- At Risk Applications -->
         {% if at_risk %}
         <div class="bg-card border border-warning/50 rounded-lg overflow-hidden">
-            <div class="bg-warning/10 px-6 py-4 border-b border-warning/30">
+            <div class="border bg-warning/10 px-6 py-2 border-b border-warning/40">
                 <div class="flex items-center gap-3">
                     <i data-lucide="alert-triangle" class="w-5 h-5 text-warning-emphasis"></i>
                     <h2 class="text-lg font-semibold text-warning-emphasis">At Risk ({{ at_risk|length }})</h2>
@@ -258,7 +258,7 @@
         <!-- Healthy Applications -->
         {% if healthy %}
         <div class="bg-card border border-success/50 rounded-lg overflow-hidden">
-            <div class="bg-success/10 px-6 py-4 border-b border-success/30">
+            <div class="border bg-success/10 px-6 py-2 border-b border-success/40">
                 <div class="flex items-center gap-3">
                     <i data-lucide="check-circle" class="w-5 h-5 text-success"></i>
                     <h2 class="text-lg font-semibold text-success-emphasis">Healthy ({{ healthy|length }})</h2>

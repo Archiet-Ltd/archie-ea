@@ -32,7 +32,7 @@
                 <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">AI-suggested summary</span>
             </div>
             <button type="button" @click="generate()" :disabled="loading"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                 aria-label="Generate AI executive briefing">
                 <svg x-show="loading" x-cloak class="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -197,7 +197,7 @@
             {% call card.card_content() %}
                 {% set layer_colors = {'motivation': 'bg-violet-100', 'strategy': 'bg-primary/10', 'business': 'bg-amber-500/10', 'application': 'bg-emerald-500/10', 'technology': 'bg-cyan-100', 'implementation': 'bg-orange-100', 'other': 'bg-muted'} %}{# design-tokens-ok: 6-tier ArchiMate layer legend needs one distinct hue per layer; only 4 semantic tokens exist, so mapping any two layers onto the same token would collapse the legend — kept raw per the layer colours in DESIGN.md's ArchiMate Layer Colors table #}
                 <div class="rounded-lg border border-border overflow-hidden">
-                    <table class="w-full text-sm">
+                    <table class="dense-table w-full text-sm">
                         <thead class="bg-muted/50">
                             <tr>
                                 <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Layer</th>

@@ -12,7 +12,7 @@
      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
      @keydown.escape.window="if (!$store.qualityGate.isHardBlock) $store.qualityGate.dismiss()">
 
-  <div class="bg-card border border-border rounded-lg shadow-xl w-full max-w-xl mx-4 max-h-[85vh] overflow-y-auto"
+  <div class="bg-card border border-border rounded-lg w-full max-w-xl mx-4 max-h-[85vh] overflow-y-auto"
        @click.outside="if (!$store.qualityGate.isHardBlock) $store.qualityGate.dismiss()">
 
     {# Header #}

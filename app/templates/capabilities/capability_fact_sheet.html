@@ -15,7 +15,7 @@
 {% endmacro %}
 
 {% macro panel(title, icon) %}
-<section data-slot="card" class="rounded-xl border border-border bg-card shadow-sm">
+<section data-slot="card" class="rounded-lg border border-border bg-card">
   <header class="flex items-center gap-2 px-6 py-4 border-b border-border">
     <i data-lucide="{{ icon }}" class="h-4 w-4 text-primary" aria-hidden="true"></i>
     <h2 class="text-sm font-semibold text-foreground tracking-tight">{{ title }}</h2>
@@ -41,7 +41,7 @@
   <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
 
     {# Completeness ring #}
-    <div data-slot="card" class="rounded-xl border border-border bg-card shadow-sm p-6 flex items-center gap-5">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 flex items-center gap-5">
       {% set ring = 'text-success' if completeness.band == 'good' else 'text-warning' if completeness.band == 'warn' else 'text-destructive' %}
       <div class="relative shrink-0" style="width:76px;height:76px"> {# inline-style-ok: fixed ring geometry #}
         <svg viewBox="0 0 36 36" class="w-full h-full -rotate-90">
@@ -60,8 +60,8 @@
     </div>
 
     {# Maturity current -> target #}
-    <div data-slot="card" class="rounded-xl border shadow-sm p-6
-        {{ 'border-destructive/40 bg-destructive/5' if maturity.tone == 'crit' else 'border-warning/40 bg-warning/5' if maturity.tone == 'warn' else 'border-border bg-card' }}">
+    <div data-slot="card" class="rounded-xl border p-6
+ {{ 'border-destructive/40 bg-destructive/5' if maturity.tone == 'crit' else 'border-warning/40 bg-warning/5' if maturity.tone == 'warn' else 'border-border bg-card' }}">
       <p class="text-sm font-medium text-foreground">Maturity</p>
       <p class="text-2xl font-bold text-foreground mt-2">
         {{ maturity.current if maturity.current is not none else '—' }}<span class="text-base text-muted-foreground"> / {{ maturity.target if maturity.target is not none else '—' }}</span>
@@ -94,7 +94,7 @@
 
   {# ── Gaps ────────────────────────────────────────────────────────────── #}
   {% if completeness.missing %}
-  <div class="rounded-xl border border-warning/40 bg-warning/5 px-5 py-4 mb-6 flex items-start gap-3">
+  <div class="rounded-md border border-warning/40 bg-warning/10 px-5 py-2 mb-6 flex items-start gap-3">
     <i data-lucide="clipboard-list" class="h-4 w-4 text-warning shrink-0 mt-0.5" aria-hidden="true"></i>
     <div>
       <p class="text-sm font-medium text-foreground">Missing to reach a complete record</p>
@@ -157,7 +157,7 @@
   {% if archimate_element_id %}
   <div class="mt-4">
     <a href="{{ url_for('archimate.element_impact_graph_page', element_id=archimate_element_id) }}"
-       class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent transition-colors">
+       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
       <i data-lucide="git-fork" class="h-4 w-4 text-primary" aria-hidden="true"></i>
       View impact graph — what depends on this capability
     </a>

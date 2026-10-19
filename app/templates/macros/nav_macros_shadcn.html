@@ -95,7 +95,7 @@
                 <div class="flex items-center space-x-4">
                     {{ header_items(current_user, mobile=True) }}
                 </div>
-                <button @click="mobileMenuOpen = !mobileMenuOpen" @keydown.escape.window="mobileMenuOpen = false" type="button" class="inline-flex items-center justify-center p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors" aria-label="Open">
+                <button @click="mobileMenuOpen = !mobileMenuOpen" @keydown.escape.window="mobileMenuOpen = false" type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center" aria-label="Open">
                     <span class="sr-only">Open main menu</span>
                     <!-- Hamburger icon -->
                     <i data-lucide="menu" class="h-5 w-5" x-show="!mobileMenuOpen" x-cloak></i>
@@ -114,7 +114,7 @@
              x-transition:leave-start="opacity-100 translate-y-0"
              x-transition:leave-end="opacity-0 -translate-y-1"
              @click.away="mobileMenuOpen = false"
-             class="fixed top-[57px] left-0 right-0 z-40 bg-card border-b border-border shadow-lg hidden" >
+             class="fixed top-[57px] left-0 right-0 z-40 bg-card border-b border-border hidden" >
             <div class="px-2 pt-2 pb-3 space-y-1">
                 {{ menu_items(current_user, mobile=True) }}
                 {{ account_items(current_user, mobile=True) }}
@@ -142,7 +142,7 @@
              x-transition:leave="transition ease-in duration-75"
              x-transition:leave-start="transform opacity-100 scale-100"
              x-transition:leave-end="transform opacity-0 scale-95"
-             class="{% if mobile %}ml-4 mt-1{% else %}absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-popover border border-border ring-1 ring-black/5 focus-visible:outline-none z-50{% endif %} hidden" >
+             class="{% if mobile %}ml-4 mt-1{% else %}absolute right-0 mt-2 w-48 rounded-md bg-popover border border-border ring-1 ring-black/5 focus-visible:outline-none z-50{% endif %} hidden" >
           <div class="{% if not mobile %}py-1{% endif %}">
             {{ create_dropdown(item[1], mobile) }}
           </div>

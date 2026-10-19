@@ -1,7 +1,7 @@
 {% from 'components/skeleton.html' import skeleton_table %}
 
 {% macro repository_metric(label, value_expression, hint_expression, icon) %}
-<div class="rounded-xl border border-border bg-card p-5 text-card-foreground" data-slot="metric-card">
+<div class="rounded-lg border border-border bg-card p-5 text-card-foreground" data-slot="metric-card">
     <div class="flex items-start gap-3">
         <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
             <i data-lucide="{{ icon }}" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
@@ -76,7 +76,7 @@
     {{ repository_metric('Validation posture', "validationSummary.value", "validationSummary.hint", 'shield-check') }}
 </section>
 
-<section class="overflow-hidden rounded-xl border border-border bg-card shadow-sm" aria-label="Architecture elements" data-testid="architecture-data-card">
+<section class="overflow-hidden rounded-lg border border-border bg-card" aria-label="Architecture elements" data-testid="architecture-data-card">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div>
             <h2 class="text-base font-semibold text-foreground">{{ selected_layer.short_name }} elements</h2>
@@ -86,7 +86,7 @@
               x-text="layerTotalKnown ? layerTotal + ' total' : '— total'">&mdash; total</span>
     </div>
 
-    <div class="border-b border-border bg-muted/20 px-4 py-3" data-testid="architecture-filter-bar">
+    <div class="border border-b border-border bg-muted/20 px-4 py-2" data-testid="architecture-filter-bar">
         <div class="flex flex-wrap items-end gap-3">
             <div class="min-w-[180px] flex-1 lg:max-w-sm">
                 <label for="architecture-search" class="mb-1 block text-xs font-medium text-muted-foreground">Search</label>
@@ -128,32 +128,32 @@
             </div>
             <button type="button" data-testid="advanced-toggle" @click="showAdvanced = !showAdvanced"
                     :aria-expanded="showAdvanced.toString()" aria-controls="architecture-advanced-filters"
-                    class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                     aria-label="Toggle advanced architecture filters">
                 <i data-lucide="sliders-horizontal" class="h-4 w-4" aria-hidden="true"></i>Advanced
             </button>
             <div class="ml-auto flex flex-wrap items-center gap-2">
                 <button type="button" @click="groupByType = !groupByType; collapsedTypes = {}"
                         :aria-pressed="groupByType.toString()"
-                        class="inline-flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                         aria-label="Toggle grouping architecture elements by type">
                     <i data-lucide="rows-3" class="h-3.5 w-3.5" aria-hidden="true"></i>
                     <span x-text="groupByType ? 'Table' : 'Group'">Group</span>
                 </button>
                 <button type="button" x-cloak x-show="hasAltView" @click="toggleViewMode()"
-                        class="inline-flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                         :aria-label="currentViewMode === 'table' ? 'Open layer-specific architecture view' : 'Return to architecture table'">
                     <i :data-lucide="currentViewMode === 'table' ? 'layout-grid' : 'list'" class="h-3.5 w-3.5" aria-hidden="true"></i>
                     <span x-text="currentViewMode === 'table' ? 'Rich view' : 'Table'">Rich view</span>
                 </button>
                 <button type="button" @click="bulkMode = !bulkMode; if (!bulkMode) { selectedIds = []; selectAll = false; }"
                         :aria-pressed="bulkMode.toString()"
-                        class="inline-flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                         aria-label="Toggle bulk selection">
                     <i data-lucide="check-square" class="h-3.5 w-3.5" aria-hidden="true"></i>Bulk
                 </button>
                 <button type="button" x-cloak x-show="hasActiveFilters()" @click="clearAllFilters()"
-                        class="inline-flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                         aria-label="Clear architecture filters">
                     <i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i>Clear
                 </button>
@@ -200,13 +200,13 @@
 
     <div x-cloak x-show="bulkMode && selectedIds.length" class="flex flex-wrap items-center gap-2 border-b border-border bg-primary/5 px-4 py-2.5" role="toolbar" aria-label="Selected architecture element actions">
         <span class="text-sm font-medium text-foreground" x-text="selectedIds.length + ' selected'"></span>
-        <button type="button" @click="bulkExportSelected()" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50" aria-label="Export selected architecture elements">
+        <button type="button" @click="bulkExportSelected()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Export selected architecture elements">
             <i data-lucide="download" class="h-3.5 w-3.5" aria-hidden="true"></i>Export
         </button>
-        <button type="button" @click="bulkDeleteSelected()" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-destructive/30 bg-background px-3 text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50" aria-label="Delete selected architecture elements">
+        <button type="button" @click="bulkDeleteSelected()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Delete selected architecture elements">
             <i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i>Delete
         </button>
-        <button type="button" @click="selectedIds = []; selectAll = false" class="ml-auto inline-flex h-8 items-center rounded-md px-3 text-xs font-medium text-muted-foreground hover:bg-accent disabled:pointer-events-none disabled:opacity-50" aria-label="Clear selected architecture elements">Clear selection</button>
+        <button type="button" @click="selectedIds = []; selectAll = false" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 ml-auto items-center" aria-label="Clear selected architecture elements">Clear selection</button>
     </div>
 
     <div x-cloak x-show="loading" class="p-6" data-testid="architecture-loading-state" role="status" aria-label="Loading architecture elements">
@@ -221,7 +221,7 @@
             <h3 class="font-semibold text-foreground">Architecture elements could not be loaded</h3>
             <p class="mt-1 max-w-md text-sm text-muted-foreground" x-text="loadError"></p>
         </div>
-        <button type="button" @click="loadElements()" class="inline-flex h-9 items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50" aria-label="Retry loading architecture elements">
+        <button type="button" @click="loadElements()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Retry loading architecture elements">
             <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i>Retry
         </button>
     </div>
@@ -230,7 +230,7 @@
         <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted"><i data-lucide="layers" class="h-7 w-7 text-muted-foreground" aria-hidden="true"></i></div>
         <h3 class="mt-4 font-semibold text-foreground">No {{ selected_layer.short_name|lower }} elements yet</h3>
         <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Create the first element to begin this layer of the enterprise repository.</p>
-        <button type="button" @click="openCreateModal()" class="mt-5 inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50" aria-label="Create element in {{ selected_layer.title }}">
+        <button type="button" @click="openCreateModal()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-5 items-center" aria-label="Create element in {{ selected_layer.title }}">
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Create element
         </button>
     </div>
@@ -239,13 +239,13 @@
         <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted"><i data-lucide="search-x" class="h-7 w-7 text-muted-foreground" aria-hidden="true"></i></div>
         <h3 class="mt-4 font-semibold text-foreground">No elements match these filters</h3>
         <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Clear the filters to return to the full {{ selected_layer.short_name|lower }} layer.</p>
-        <button type="button" @click="clearAllFilters()" class="mt-5 inline-flex h-9 items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50" aria-label="Clear filters">
+        <button type="button" @click="clearAllFilters()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-5 items-center" aria-label="Clear filters">
             <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>Clear filters
         </button>
     </div>
 
     <div x-cloak x-show="currentViewMode === 'table' && !loading && !loadError && visibleElements.length" class="hidden overflow-x-auto lg:block">
-        <table class="w-full border-collapse" data-testid="architecture-elements-table">
+        <table class="dense-table w-full border-collapse" data-testid="architecture-elements-table">
             <caption class="sr-only">{{ selected_layer.title }} elements</caption>
             <thead>
                 <tr class="border-b border-border bg-muted/40">
@@ -282,8 +282,8 @@
                             <td class="px-4 py-3 text-center" data-field="element-relationships"><span class="text-sm tabular-nums text-muted-foreground" x-text="el.rel_count === null || el.rel_count === undefined ? '—' : el.rel_count"></span></td>
                             <td class="px-4 py-3" data-field="element-actions">
                                 <div class="flex items-center justify-end gap-1">
-                                    <a :href="detailUrl(el)" class="inline-flex h-8 items-center rounded-md px-3 text-xs font-medium hover:bg-accent" :aria-label="'Open full detail for ' + el.name">View</a>
-                                    <button type="button" @click="openEditModal(el)" class="inline-flex h-8 items-center rounded-md px-3 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50" :aria-label="'Edit ' + el.name">Edit</button>
+                                    <a :href="detailUrl(el)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" :aria-label="'Open full detail for ' + el.name">View</a>
+                                    <button type="button" @click="openEditModal(el)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" :aria-label="'Edit ' + el.name">Edit</button>
                                     <button type="button" @click="confirmDelete(el)" class="inline-flex h-8 items-center rounded-md px-3 text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50" :aria-label="'Delete ' + el.name">Delete</button>
                                 </div>
                             </td>
@@ -309,9 +309,9 @@
                            different things (a quick-peek side panel vs. navigating to the full page)
                            with names that read as synonyms. Labelled to match what each actually
                            does — the aria-labels already said this; the visible text didn't. #}
-                        <button type="button" @click="openDetailPanel(el)" class="inline-flex h-8 items-center rounded-md px-3 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50" :aria-label="'Open details for ' + el.name">Quick View</button>
-                        <a :href="detailUrl(el)" class="inline-flex h-8 items-center rounded-md px-3 text-xs font-medium hover:bg-accent" :aria-label="'Open full detail for ' + el.name">Full Detail</a>
-                        <button type="button" @click="openEditModal(el)" class="inline-flex h-8 items-center rounded-md px-3 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50" :aria-label="'Edit ' + el.name">Edit</button>
+                        <button type="button" @click="openDetailPanel(el)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" :aria-label="'Open details for ' + el.name">Quick View</button>
+                        <a :href="detailUrl(el)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" :aria-label="'Open full detail for ' + el.name">Full Detail</a>
+                        <button type="button" @click="openEditModal(el)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" :aria-label="'Edit ' + el.name">Edit</button>
                         <button type="button" @click="confirmDelete(el)" class="inline-flex h-8 items-center rounded-md px-3 text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50" :aria-label="'Delete ' + el.name">Delete</button>
                     </div>
                 </div>
@@ -327,9 +327,9 @@
                 <select id="architecture-page-size" x-model.number="perPage" @change="currentPage = 1; loadElements()" class="h-8 rounded-md border border-input bg-background px-2 text-sm">
                     <option value="25">25</option><option value="50">50</option><option value="100">100</option>
                 </select>
-                <button type="button" @click="goToPage(pagination.page - 1)" :disabled="!pagination.has_prev" class="inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50" aria-label="Previous architecture elements page">Previous</button>
+                <button type="button" @click="goToPage(pagination.page - 1)" :disabled="!pagination.has_prev" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Previous architecture elements page">Previous</button>
                 <span class="min-w-[80px] text-center text-sm text-muted-foreground" x-text="'Page ' + pagination.page + ' of ' + Math.max(pagination.pages, 1)"></span>
-                <button type="button" @click="goToPage(pagination.page + 1)" :disabled="!pagination.has_next" class="inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50" aria-label="Next architecture elements page">Next</button>
+                <button type="button" @click="goToPage(pagination.page + 1)" :disabled="!pagination.has_next" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Next architecture elements page">Next</button>
             </div>
         </div>
     </div>

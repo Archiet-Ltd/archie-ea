@@ -31,7 +31,7 @@
           #e5e7eb calc(${score}% * 3.6deg)
         )`"
       >
-        <div class="w-28 h-28 bg-background rounded-full flex flex-col items-center justify-center shadow-inner">
+        <div class="w-28 h-28 bg-background rounded-full flex flex-col items-center justify-center">
           <span class="text-3xl font-bold" x-text="score"></span>
           <span class="text-xs text-muted-foreground">/ 100</span>
         </div>
@@ -54,7 +54,7 @@
     <button type="button"
       @click="recheck()"
       :disabled="loading"
-      class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-border bg-background hover:bg-muted/30 disabled:opacity-50 transition"
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
     >
       <svg x-show="!loading" x-cloak class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><!-- alpine-scope-ok -->
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -72,7 +72,7 @@
   {# ── Dimension cards ─────────────────────────────────────────────────── #}
   <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
     <template x-for="dim in dimensions" :key="dim.name">
-      <div class="bg-background rounded-lg shadow p-4 space-y-3">
+      <div class="bg-background rounded-lg p-4 space-y-3">
         <div class="flex items-center justify-between">
           <span class="font-semibold text-sm text-foreground" x-text="dim.name"></span>
           <span class="text-sm text-muted-foreground" x-text="`${dim.score} / ${dim.max_score}`"></span>
@@ -115,7 +115,7 @@
   </div>
 
   {# ── Recommendations ─────────────────────────────────────────────────── #}
-  <div class="bg-background rounded-lg shadow p-6" x-show="recommendations && recommendations.length" x-cloak><!-- alpine-scope-ok -->
+  <div class="bg-background rounded-lg p-6" x-show="recommendations && recommendations.length" x-cloak><!-- alpine-scope-ok -->
     <h2 class="text-base font-semibold text-foreground mb-3">Top Recommendations</h2>
     <ol class="list-decimal list-inside space-y-2">
       <template x-for="(rec, idx) in recommendations" :key="idx">

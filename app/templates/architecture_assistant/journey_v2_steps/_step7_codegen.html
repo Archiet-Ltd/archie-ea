@@ -46,7 +46,7 @@
                 <p class="text-sm text-muted-foreground mt-1">Click below to generate a complete, deterministic project scaffold from your approved architecture.</p>
             </div>
             <button type="button" @click="generateCode()"
-                    class="inline-flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 <i data-lucide="zap" class="w-4 h-4" aria-hidden="true"></i>
                 Generate Code
             </button>
@@ -339,7 +339,7 @@
 
             {# Error banner #}
             <div x-show="codegenError" x-cloak
-                 class="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+                 class="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2">
                 <i data-lucide="alert-triangle" class="w-4 h-4 text-destructive shrink-0 mt-0.5" aria-hidden="true"></i>
                 <p class="text-sm text-destructive-emphasis" x-text="codegenError"></p>
             </div>
@@ -470,7 +470,7 @@
                     {# Download + Regenerate row #}
                     <div class="flex items-center gap-2 pt-1">
                         <button type="button" @click="downloadCode()"
-                                class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium border border-input rounded-md hover:bg-accent transition-colors">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 flex-1 items-center justify-center">
                             <i data-lucide="download" class="w-4 h-4" aria-hidden="true"></i>
                             Download ZIP
                         </button>
@@ -517,7 +517,7 @@
                         Launch your application with a live URL, API documentation, and a PostgreSQL database — no setup required.
                     </p>
                     <button type="button" @click="deployToCloud()"
-                            class="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="rocket" class="w-4 h-4" aria-hidden="true"></i>
                         Deploy
                     </button>
@@ -545,7 +545,7 @@
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <a :href="deployUrl" target="_blank" rel="noopener"
-                           class="flex items-center gap-2 p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                             <i data-lucide="globe" class="w-4 h-4 text-primary" aria-hidden="true"></i>
                             <div>
                                 <p class="text-xs font-medium text-foreground">Your App</p>
@@ -553,7 +553,7 @@
                             </div>
                         </a>
                         <a :href="deployUrl + '/docs'" target="_blank" rel="noopener"
-                           class="flex items-center gap-2 p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                             <i data-lucide="book-open" class="w-4 h-4 text-primary" aria-hidden="true"></i>
                             <div>
                                 <p class="text-xs font-medium text-foreground">API Docs</p>
@@ -561,7 +561,7 @@
                             </div>
                         </a>
                         <a :href="deployUrl ? deployUrl + '/admin' : '#'" target="_blank" rel="noopener"
-                           class="flex items-center gap-2 p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                             <i data-lucide="settings" class="w-4 h-4 text-primary" aria-hidden="true"></i>
                             <div>
                                 <p class="text-xs font-medium text-foreground">Admin Panel</p>
@@ -587,7 +587,7 @@
                     <p class="text-sm text-muted-foreground" x-text="deployError"></p>
                     <div class="flex gap-2 justify-center">
                         <button type="button" @click="deployToCloud()"
-                                class="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <i data-lucide="refresh-cw" class="w-3.5 h-3.5" aria-hidden="true"></i>
                             Retry
                         </button>

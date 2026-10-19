@@ -23,7 +23,7 @@
     <div data-modal-backdrop="unified-mapping-modal" aria-hidden="true"
          class="modal-backdrop absolute inset-0 bg-background/80 transition-opacity duration-200"></div>
     <div data-modal-panel
-         class="modal-panel relative w-full max-w-5xl p-6 border border-border shadow-lg rounded-lg bg-card text-card-foreground max-h-[90vh] overflow-y-auto">
+         class="modal-panel relative w-full max-w-5xl p-6 border border-border rounded-lg bg-card text-card-foreground max-h-[90vh] overflow-y-auto">
         <!-- Header -->
         <div class="flex justify-between items-center mb-4">
             <h3 id="unified-modal-heading" class="text-lg font-bold">
@@ -221,13 +221,13 @@
                     of <span id="unified-target-page-total">0</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button type="button" @click="changeTargetPage(-1)" class="inline-flex items-center justify-center h-9 w-9 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent disabled:pointer-events-none disabled:opacity-50 transition-colors" aria-label="Previous page">
+                    <button type="button" @click="changeTargetPage(-1)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9" aria-label="Previous page">
                         <i data-lucide="chevron-left" class="h-4 w-4"></i>
                     </button>
                     <span class="text-sm text-muted-foreground">
                         Page <span id="unified-target-current-page">1</span> of <span id="unified-target-total-pages">1</span>
                     </span>
-                    <button type="button" @click="changeTargetPage(1)" class="inline-flex items-center justify-center h-9 w-9 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent disabled:pointer-events-none disabled:opacity-50 transition-colors" aria-label="Next page">
+                    <button type="button" @click="changeTargetPage(1)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9" aria-label="Next page">
                         <i data-lucide="chevron-right" class="h-4 w-4"></i>
                     </button>
                 </div>
@@ -332,13 +332,13 @@
                     of <span id="unified-app-page-total">0</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button type="button" @click="changeAppPage(-1)" class="inline-flex items-center justify-center h-9 w-9 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent disabled:pointer-events-none disabled:opacity-50 transition-colors" aria-label="Previous page">
+                    <button type="button" @click="changeAppPage(-1)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9" aria-label="Previous page">
                         <i data-lucide="chevron-left" class="h-4 w-4"></i>
                     </button>
                     <span class="text-sm text-muted-foreground">
                         Page <span id="unified-app-current-page">1</span> of <span id="unified-app-total-pages">1</span>
                     </span>
-                    <button type="button" @click="changeAppPage(1)" class="inline-flex items-center justify-center h-9 w-9 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent disabled:pointer-events-none disabled:opacity-50 transition-colors" aria-label="Next page">
+                    <button type="button" @click="changeAppPage(1)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9" aria-label="Next page">
                         <i data-lucide="chevron-right" class="h-4 w-4"></i>
                     </button>
                 </div>

@@ -19,7 +19,7 @@
     {{ page_shell(title='ArchiMate Roadmap', subtitle='Strategic ArchiMate capability evolution and work package planning') }}
 
     <!-- Filters Section -->
-    <div class="bg-background rounded-lg shadow-md p-6 mb-8">
+    <div class="bg-background rounded-lg p-6 mb-8">
         <h2 class="text-xl font-semibold mb-4">Filters</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <!-- Capability Level Filter -->
@@ -105,26 +105,26 @@
 
     <!-- Statistics Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="bg-background rounded-lg shadow-md p-6">
+        <div class="bg-background rounded-lg p-6">
             <h3 class="text-lg font-semibold text-foreground/80">Total Work Packages</h3>
             <p class="text-3xl font-bold" :class="statistics.totalWorkPackages == null ? 'text-muted-foreground' : 'text-primary'" x-text="statistics.totalWorkPackages ?? '—'"></p>
         </div>
-        <div class="bg-background rounded-lg shadow-md p-6">
+        <div class="bg-background rounded-lg p-6">
             <h3 class="text-lg font-semibold text-foreground/80">Active Initiatives</h3>
             <p class="text-3xl font-bold" :class="statistics.activeInitiatives == null ? 'text-muted-foreground' : 'text-success'" x-text="statistics.activeInitiatives ?? '—'"></p>
         </div>
-        <div class="bg-background rounded-lg shadow-md p-6">
+        <div class="bg-background rounded-lg p-6">
             <h3 class="text-lg font-semibold text-foreground/80">Total Investment</h3>
             <p class="text-2xl font-bold" :class="statistics.totalInvestment == null ? 'text-muted-foreground' : 'text-primary'" x-text="statistics.totalInvestment == null ? '—' : '$' + statistics.totalInvestment.toLocaleString() + 'K'"></p>
         </div>
-        <div class="bg-background rounded-lg shadow-md p-6">
+        <div class="bg-background rounded-lg p-6">
             <h3 class="text-lg font-semibold text-foreground/80">Completion Rate</h3>
             <p class="text-3xl font-bold" :class="statistics.completionRate == null ? 'text-muted-foreground' : 'text-warning'" x-text="statistics.completionRate == null ? '—' : statistics.completionRate + '%'"></p>
         </div>
     </div>
 
     <!-- Timeline View -->
-    <div class="bg-background rounded-lg shadow-md p-6 mb-8">
+    <div class="bg-background rounded-lg p-6 mb-8">
         <h2 class="text-xl font-semibold mb-4">Timeline View</h2>
         <div id="timeline-container" class="overflow-x-auto">
             <!-- Timeline will be rendered here -->
@@ -132,10 +132,10 @@
     </div>
 
     <!-- Work Packages Table -->
-    <div class="bg-background rounded-lg shadow-md p-6">
+    <div class="bg-background rounded-lg p-6">
         <h2 class="text-xl font-semibold mb-4">Work Packages</h2>
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-border">
+            <table class="dense-table min-w-full divide-y divide-border">
                 <thead class="bg-muted">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
@@ -186,7 +186,7 @@
     <!-- Gap Analysis & Architecture Plateaus Summary -->
     <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Gap Analysis Summary -->
-        <div class="bg-card rounded-lg border p-6" x-data="{ showGaps: false }">
+        <div class="bg-card rounded-lg border border-border p-6" x-data="{ showGaps: false }">
             <div class="flex items-center justify-between cursor-pointer" @click="showGaps = !showGaps">
                 <h3 class="text-lg font-semibold">Gap Analysis Summary</h3>
                 <div class="flex items-center gap-3">
@@ -219,7 +219,7 @@
             <div x-cloak x-show="showGaps" x-transition class="mt-4" role="dialog">
                 {% if gaps_summary.open_gaps %}
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
+                    <table class="dense-table w-full text-sm">
                         <thead>
                             <tr class="border-b">
                                 <th class="text-left py-2 pr-3 font-medium">Name</th>
@@ -248,7 +248,7 @@
                                     <button type="button"
                                             @click='planGap({{ gap.id }}, {{ gap.name|tojson }})'
                                             :disabled="planningGapId === {{ gap.id }}"
-                                            class="inline-flex items-center px-2.5 py-1 rounded-md border border-input bg-background text-xs font-medium hover:bg-accent hover:text-accent-foreground disabled:opacity-50 disabled:cursor-not-allowed">
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                         <span x-show="planningGapId !== {{ gap.id }}">Plan work package</span>
                                         <span x-show="planningGapId === {{ gap.id }}" x-cloak>Planning&hellip;</span>
                                     </button>
@@ -265,7 +265,7 @@
         </div>
 
         <!-- Architecture Plateaus -->
-        <div class="bg-card rounded-lg border p-6" x-data="{ showPlateaus: false }">
+        <div class="bg-card rounded-lg border border-border p-6" x-data="{ showPlateaus: false }">
             <div class="flex items-center justify-between cursor-pointer" @click="showPlateaus = !showPlateaus">
                 <h3 class="text-lg font-semibold">Architecture Plateaus</h3>
                 <div class="flex items-center gap-3">

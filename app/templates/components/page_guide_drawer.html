@@ -21,7 +21,7 @@
             </div>
             <button id="page-guide-clear"
                     type="button"
-                    class="inline-flex items-center rounded-md border border-input px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Clear history
             </button>
         </div>
@@ -44,13 +44,13 @@
             <label for="page-guide-input" class="sr-only">Ask a question about this page</label>
             <textarea id="page-guide-input"
                       rows="3"
-                      class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       placeholder="Ask what this page does, what to do next, or how to complete a task."></textarea>
             <div class="flex items-center justify-between gap-3">
                 <p class="text-xs text-muted-foreground">The guide explains the current page and suggests safe next steps.</p>
                 <button id="page-guide-submit"
                         type="submit"
-                        class="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     Send
                 </button>
             </div>

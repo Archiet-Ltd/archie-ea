@@ -66,13 +66,13 @@
                 <div class="overflow-x-auto">
                     <div class="flex items-stretch gap-3 min-w-max pb-2">
                         {% for stage in value_stream.stages %}
-                        <div class="w-64 shrink-0 rounded-lg border border-border bg-muted/20 p-4 relative" data-stage-card data-stage-id="{{ stage.id }}">
+                        <div class="w-64 shrink-0 rounded-md border border-border bg-muted/20 px-3 py-2 relative" data-stage-card data-stage-id="{{ stage.id }}">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-bold">{{ stage.stage_order }}</span>
                                 <div class="flex items-center gap-1">
                                     <button type="button" aria-label="Edit stage"
                                             @click='openStageEditModal({{ stage|tojson }})'
-                                            class="inline-flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground h-6 w-6">
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-6">
                                         <i data-lucide="pencil" class="h-3 w-3" aria-hidden="true"></i>
                                     </button>
                                     <button type="button" aria-label="Delete stage"
@@ -173,7 +173,7 @@
                     <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">AI-suggested draft</span>
                 </div>
                 <button type="button" @click="suggestMappings()" :disabled="aiLoading"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                         aria-label="Suggest capability mappings">
                     <span x-show="aiLoading" x-cloak class="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block"></span>
                     <span x-text="aiLoading ? 'Suggesting…' : (aiSuggestions.length ? 'Regenerate suggestions' : 'Suggest mappings')"></span>
@@ -203,7 +203,7 @@
                             </div>
                             <button type="button" @click="applySuggestion(index)"
                                     :disabled="suggestion.applied || aiApplyingIndex === index"
-                                    class="shrink-0 inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 disabled:opacity-50 disabled:pointer-events-none">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center justify-center">
                                 <span x-show="aiApplyingIndex === index" x-cloak class="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full inline-block mr-1.5"></span>
                                 <span x-text="suggestion.applied ? 'Applied' : 'Apply'"></span>
                             </button>
@@ -223,9 +223,9 @@
                 <div class="relative">
                     <input type="text" x-model="capabilitySearch" @input.debounce.300ms="searchCapabilities()"
                            placeholder="Add capability to grid..."
-                           class="flex h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Add capability to grid...">
+                           class="flex h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Add capability to grid...">
                     <div x-show="capabilityResults.length > 0" x-cloak @click.outside="capabilityResults = []"
-                         class="absolute z-10 mt-1 w-full rounded-md border border-border bg-card shadow-lg max-h-64 overflow-y-auto">
+                         class="absolute z-10 mt-1 w-full rounded-md border border-border bg-card max-h-64 overflow-y-auto">
                         <template x-for="cap in capabilityResults" :key="cap.id">
                             <button type="button" @click="selectCapabilityToAdd(cap)"
                                     class="block w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground">
@@ -267,7 +267,7 @@
                 <!-- Populated grid -->
                 <template x-if="!loading && !loadError && stages.length > 0 && capabilities.length > 0">
                     <div class="overflow-x-auto">
-                        <table class="min-w-full border-separate border-spacing-0">
+                        <table class="dense-table min-w-full border-separate border-spacing-0">
                             <thead>
                                 <tr>
                                     <th class="sticky left-0 bg-background text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 py-2 border-b border-border">Capability</th>
@@ -331,13 +331,13 @@
             <div>
                 <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Contribution (%)</label>
                 <input type="number" min="0" max="100" x-model.number="cellForm.capability_contribution"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Contribution (%)">
+                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Contribution (%)">
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Support Type</label>
                     <select x-model="cellForm.support_type"
-                            class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Support Type">
+                            class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Support Type">
                         <option value="primary">Primary</option>
                         <option value="secondary">Secondary</option>
                         <option value="supporting">Supporting</option>
@@ -346,7 +346,7 @@
                 <div>
                     <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Impact Level</label>
                     <select x-model="cellForm.impact_level"
-                            class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Impact Level">
+                            class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Impact Level">
                         <option value="critical">Critical</option>
                         <option value="high">High</option>
                         <option value="medium">Medium</option>
@@ -356,16 +356,16 @@
             </div>
             <div class="flex items-center justify-between pt-2">
                 <button type="button" x-show="activeCell && activeCell.mappingId" x-cloak @click="clearCell()"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-4 py-2">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Clear Mapping
                 </button>
                 <div class="flex gap-2 ml-auto">
                     <button type="button" data-modal-close="cell-edit-modal"
-                            class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 py-2">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Cancel
                     </button>
                     <button type="submit" :disabled="saving"
-                            class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         <span x-show="saving" class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block mr-2"></span>
                         Save
                     </button>
@@ -382,40 +382,40 @@
         <div>
             <label for="stage-name" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Name</label>
             <input type="text" id="stage-name" name="name" required
-                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
         </div>
         <div>
             <label for="stage-description" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</label>
             <textarea id="stage-description" name="description" rows="2"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
         </div>
         <div>
             <label for="stage-entry-criteria" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Entry criteria</label>
             <textarea id="stage-entry-criteria" name="entry_criteria" rows="2"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
         </div>
         <div>
             <label for="stage-exit-criteria" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Exit criteria</label>
             <textarea id="stage-exit-criteria" name="exit_criteria" rows="2"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
         </div>
         <div class="grid grid-cols-2 gap-4">
             <div>
                 <label for="stage-stakeholders" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Stakeholders (one per line)</label>
                 <textarea id="stage-stakeholders" name="stakeholders" rows="2"
-                          class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                          class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
             </div>
             <div>
                 <label for="stage-value-items" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Value items (one per line)</label>
                 <textarea id="stage-value-items" name="value_items" rows="2"
-                          class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                          class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
             </div>
         </div>
         <div class="grid grid-cols-2 gap-4">
             <div>
                 <label for="stage-type" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Stage Type</label>
                 <select id="stage-type" name="stage_type"
-                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     <option value="operational">Operational</option>
                     <option value="strategic">Strategic</option>
                     <option value="supporting">Supporting</option>
@@ -424,7 +424,7 @@
             <div>
                 <label for="stage-order" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Order</label>
                 <input type="number" id="stage-order" name="stage_order" min="1"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                        placeholder="Auto">
             </div>
         </div>
@@ -440,11 +440,11 @@
         </div>
         <div class="flex justify-end gap-2 pt-2">
             <button type="button" data-modal-close="stage-create-modal"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 py-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Cancel
             </button>
             <button type="submit"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Add Stage
             </button>
         </div>
@@ -459,40 +459,40 @@
         <div>
             <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Name</label>
             <input type="text" name="name" x-model="stageEditForm.name" required
-                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Name">
+                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Name">
         </div>
         <div>
             <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</label>
             <textarea name="description" x-model="stageEditForm.description" rows="2"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Description"></textarea>
+                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Description"></textarea>
         </div>
         <div>
             <label for="stage-edit-entry-criteria" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Entry criteria</label>
             <textarea id="stage-edit-entry-criteria" name="entry_criteria" x-model="stageEditForm.entry_criteria" rows="2"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
         </div>
         <div>
             <label for="stage-edit-exit-criteria" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Exit criteria</label>
             <textarea id="stage-edit-exit-criteria" name="exit_criteria" x-model="stageEditForm.exit_criteria" rows="2"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
         </div>
         <div class="grid grid-cols-2 gap-4">
             <div>
                 <label for="stage-edit-stakeholders" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Stakeholders (one per line)</label>
                 <textarea id="stage-edit-stakeholders" name="stakeholders" x-model="stageEditForm.stakeholders" rows="2"
-                          class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                          class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
             </div>
             <div>
                 <label for="stage-edit-value-items" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Value items (one per line)</label>
                 <textarea id="stage-edit-value-items" name="value_items" x-model="stageEditForm.value_items" rows="2"
-                          class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                          class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
             </div>
         </div>
         <div class="grid grid-cols-2 gap-4">
             <div>
                 <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Stage Type</label>
                 <select name="stage_type" x-model="stageEditForm.stage_type"
-                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Stage Type">
+                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Stage Type">
                     <option value="operational">Operational</option>
                     <option value="strategic">Strategic</option>
                     <option value="supporting">Supporting</option>
@@ -501,7 +501,7 @@
             <div>
                 <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Order</label>
                 <input type="number" name="stage_order" min="1" x-model.number="stageEditForm.stage_order"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Order">
+                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Order">
             </div>
         </div>
         <div class="flex items-center gap-6">
@@ -516,11 +516,11 @@
         </div>
         <div class="flex justify-end gap-2 pt-2">
             <button type="button" data-modal-close="stage-edit-modal"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 py-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Cancel
             </button>
             <button type="submit"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Save
             </button>
         </div>
@@ -538,11 +538,11 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="value_stream_id" value="{{ value_stream.id }}">
                 <button type="button" data-modal-close="stage-delete-modal"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 py-2">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Cancel
                 </button>
                 <button type="submit"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-4 py-2">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Delete
                 </button>
             </form>
@@ -557,32 +557,32 @@
         <div>
             <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Name</label>
             <input type="text" name="name" value="{{ value_stream.name }}" required
-                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Name">
+                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Name">
         </div>
         <div>
             <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</label>
             <textarea name="description" rows="3"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Description">{{ value_stream.description or '' }}</textarea>
+                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Description">{{ value_stream.description or '' }}</textarea>
         </div>
         <div class="grid grid-cols-2 gap-4">
             <div>
                 <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Target Cycle Time (days)</label>
                 <input type="number" name="target_cycle_time" value="{{ value_stream.target_cycle_time if value_stream.target_cycle_time is not none else '' }}"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Target Cycle Time (days)">
+                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Target Cycle Time (days)">
             </div>
             <div>
                 <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Current Cycle Time (days)</label>
                 <input type="number" name="current_cycle_time" value="{{ value_stream.current_cycle_time if value_stream.current_cycle_time is not none else '' }}"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Current Cycle Time (days)">
+                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Current Cycle Time (days)">
             </div>
         </div>
         <div class="flex justify-end gap-2 pt-2">
             <button type="button" data-modal-close="vs-edit-modal"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 py-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Cancel
             </button>
             <button type="submit"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Save
             </button>
         </div>
@@ -598,11 +598,11 @@
         <form method="POST" action="{{ url_for('value_stream.delete', value_stream_id=value_stream.id) }}" class="flex justify-end gap-2">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="button" data-modal-close="vs-delete-modal"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 py-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Cancel
             </button>
             <button type="submit"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-4 py-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Delete
             </button>
         </form>

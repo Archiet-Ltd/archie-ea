@@ -23,11 +23,11 @@
     {% endmacro %}
     {% macro _ps_actions() %}
                 <a href="{{ url_for('my_applications.app_edit', app_id=app.id) }}"
-                   class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-border text-sm hover:bg-accent transition-colors">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                     <i data-lucide="pencil" class="w-4 h-4"></i> Edit application
                 </a>
             <a href="{{ url_for('unified_applications.application_detail', app_id=app.id) }}"
-               class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border hover:bg-accent transition-colors">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                 <i data-lucide="external-link" class="w-4 h-4"></i>
                 Full Details
             </a>

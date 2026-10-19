@@ -24,7 +24,7 @@
             <option value="{{ sol.id }}" {% if selected_solution_id == sol.id %}selected{% endif %}>{{ sol.name }}</option>
             {% endfor %}
         </select>
-        <button type="submit" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent">
+        <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <i data-lucide="search" class="h-4 w-4"></i> Filter
         </button>
         {% if q or selected_solution_id %}
@@ -34,7 +34,7 @@
 
     {% if diagrams %}
     <div class="overflow-x-auto rounded-lg border border-border">
-        <table class="w-full text-sm" data-testid="diagrams-table">
+        <table class="dense-table w-full text-sm" data-testid="diagrams-table">
             <thead class="bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <tr>
                     <th class="px-4 py-2.5">Name</th>
@@ -55,7 +55,7 @@
                     <td class="px-4 py-2.5 text-muted-foreground">{{ d.updated_at[:10] if d.updated_at else '—' }}</td>
                     <td class="px-4 py-2.5 text-right">
                         <a href="{{ url_for('archimate.composer_page', viewpoint_id=d.id, solution_id=d.solution_id) }}"
-                           class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent"
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                            data-testid="open-diagram-{{ d.id }}">
                             <i data-lucide="external-link" class="h-3.5 w-3.5"></i> Open
                         </a>

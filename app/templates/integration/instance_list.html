@@ -12,22 +12,22 @@
         description='Monitor and manage workflow executions.'
     ) }}
         <div class="flex gap-2">
-            <a href="{{ url_for('integration.workflow_dashboard') }}" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+            <a href="{{ url_for('integration.workflow_dashboard') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Back to Dashboard
             </a>
-            <a href="{{ url_for('integration.list_workflows') }}" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
+            <a href="{{ url_for('integration.list_workflows') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 New Workflow
             </a>
         </div>
     </div>
 
     <!-- Filters -->
-    <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
         <div class="p-6">
             <form action="{{ url_for('integration.list_instances') }}" method="get" class="flex flex-col md:flex-row gap-4">
                 <div class="flex-1">
                     <label for="status" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Status</label>
-                    <select name="status" id="status" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1">
+                    <select name="status" id="status" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1">
                         <option value="all" {% if selected_status == 'all' %}selected{% endif %}>All Statuses</option>
                         <option value="running" {% if selected_status == 'running' %}selected{% endif %}>Running</option>
                         <option value="completed" {% if selected_status == 'completed' %}selected{% endif %}>Completed</option>
@@ -38,7 +38,7 @@
                 </div>
                 <div class="flex-1">
                     <label for="workflow_code" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Workflow Definition</label>
-                    <select name="workflow_code" id="workflow_code" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1">
+                    <select name="workflow_code" id="workflow_code" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1">
                         <option value="">All Workflows</option>
                         {% for def in definitions %}
                         <option value="{{ def.workflow_code }}" {% if selected_workflow == def.workflow_code %}selected{% endif %}>
@@ -57,10 +57,10 @@
     </div>
 
     <!-- Instances Table -->
-    <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
         <div class="p-6 pt-0 mt-6">
             <div class="relative w-full overflow-auto">
-                <table class="w-full caption-bottom text-sm">
+                <table class="dense-table w-full caption-bottom text-sm">
                     <thead class="[&_tr]:border-b">
                         <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Instance ID</th>
@@ -116,7 +116,7 @@
                                     {{ instance.duration_seconds }}s
                                 </td>
                                 <td class="p-4 align-middle text-right">
-                                    <a href="{{ url_for('integration.instance_detail', instance_id=instance.id) }}" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3">
+                                    <a href="{{ url_for('integration.instance_detail', instance_id=instance.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                                         View
                                     </a>
                                 </td>

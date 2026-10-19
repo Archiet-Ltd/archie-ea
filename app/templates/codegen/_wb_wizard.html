@@ -19,14 +19,14 @@
 
         <!-- Success banner -->
         <div x-show="successMsg" x-cloak x-transition
-             class="mb-4 flex items-start gap-3 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success-emphasis">
+             class="mb-4 flex items-start gap-3 rounded-md border border-success/40 bg-success/10 px-4 py-2 text-sm text-success-emphasis">
             <i data-lucide="check-circle-2" class="h-4 w-4 mt-0.5 shrink-0"></i>
             <span x-text="successMsg"></span>
         </div>
 
         <!-- Blueprint staleness warning -->
         {% if blueprint_stale %}
-        <div class="mb-4 flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-emphasis">
+        <div class="mb-4 flex items-start gap-3 rounded-md border border-warning/40 bg-warning/10 px-4 py-2 text-sm text-warning-emphasis">
             <i data-lucide="refresh-cw" class="h-4 w-4 mt-0.5 shrink-0"></i>
             <span>
                 <strong>Blueprint updated after last enrichment.</strong>
@@ -38,7 +38,7 @@
 
         <!-- Pending spec-data warning -->
         {% if pending_specs_count > 0 %}
-        <div class="mb-4 flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-emphasis">
+        <div class="mb-4 flex items-start gap-3 rounded-md border border-warning/40 bg-warning/10 px-4 py-2 text-sm text-warning-emphasis">
             <i data-lucide="alert-triangle" class="h-4 w-4 mt-0.5 shrink-0"></i>
             <span>
                 <strong>{{ pending_specs_count }} element{{ 's' if pending_specs_count != 1 else '' }}</strong>
@@ -59,7 +59,7 @@
                 Applying confirmed specs overwrites the LLM's field inference with your architect-verified definitions — making them binding for Phase 4 code generation.
             </div>
             <button type="button" @click="applySpecs()" :disabled="applyingSpecs"
-                    class="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center">
                 <i data-lucide="lock" class="h-3 w-3"></i>
                 Apply Specs
             </button>
@@ -68,7 +68,7 @@
 
         <!-- Error banners -->
         <template x-for="err in errors" :key="err.id">
-            <div x-transition class="mb-3 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-emphasis">
+            <div x-transition class="mb-3 flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis">
                 <i data-lucide="alert-circle" class="h-4 w-4 mt-0.5 shrink-0"></i>
                 <span x-text="err.text" class="flex-1"></span>
                 <button aria-label="Dismiss error" type="button" @click="errors = errors.filter(e => e.id !== err.id)" class="shrink-0 text-destructive-emphasis/70 hover:text-destructive-emphasis">
@@ -96,7 +96,7 @@
         <div class="space-y-4">
 
         <!-- ── PHASE 1: ENRICH ── -->
-        <div class="rounded-xl border bg-card" :class="phase === 1 ? 'border-primary/40' : 'border-border'">
+        <div class="rounded-lg border border-border bg-card" :class="phase === 1 ? 'border-primary/40' : 'border-border'">
             <div class="flex items-center justify-between p-5 cursor-pointer" @click="phase === 1 ? null : (phase = 1)">
                 <div class="flex items-center gap-3">
                     <div class="flex h-8 w-8 items-center justify-center rounded-full"
@@ -244,14 +244,14 @@
 
                 {% if linked_elements_count > 0 %}
                 {# ── Quick Generate: one click to code ── #}
-                <div x-show="!enriching && !generating" class="rounded-lg border-2 border-primary/30 bg-primary/5 p-4 mb-4">
+                <div x-show="!enriching && !generating" class="border rounded-md border-2 border-primary/40 bg-primary/10 px-3 py-2 mb-4">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-semibold text-foreground">{{ linked_elements_count }} ArchiMate elements ready</p>
                             <p class="text-xs text-muted-foreground mt-0.5">Generate a complete Python/FastAPI project directly from your architecture. No AI enrichment needed.</p>
                         </div>
                         <button type="button" @click="quickGenerate()"
-                                class="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground px-5 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors shadow-sm">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <i data-lucide="zap" class="h-4 w-4"></i>
                             Quick Generate
                         </button>
@@ -276,7 +276,7 @@
                     <p class="text-xs text-muted-foreground mb-2">Or use AI enrichment for deeper UML diagrams (requires LLM API key):</p>
                     <div class="flex items-center gap-3">
                         <button type="button" @click="enrich()"
-                                class="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <i data-lucide="sparkles" class="h-3 w-3"></i> AI Enrich
                         </button>
                     </div>
@@ -284,7 +284,7 @@
                 {% else %}
                 {# ── Standalone path: no architecture yet — show full manual controls ── #}
                 <!-- NL-to-Architecture -->
-                <div class="mb-5 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <div class="mb-5 rounded-md border border-primary/40 bg-primary/10 px-3 py-2">
                     <div class="flex items-center gap-2 mb-2">
                         <i data-lucide="wand-2" class="h-4 w-4 text-primary"></i>
                         <span class="text-sm font-medium text-foreground">Generate Architecture from Description</span>
@@ -296,13 +296,13 @@
                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 resize-none mb-2"></textarea>
                     <div class="flex items-center gap-3">
                         <button type="button" @click="generateArchitecture(false)" :disabled="nlGenerating || !nlDescription.trim()"
-                                class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <svg x-show="nlGenerating" x-cloak class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
                             <i x-show="!nlGenerating" data-lucide="wand-2" class="h-3 w-3"></i>
                             <span x-text="nlGenerating ? 'Generating…' : 'Generate Elements'"></span>
                         </button>
                         <button type="button" x-show="nlResult" x-cloak @click="generateArchitecture(true)" :disabled="nlGenerating || !nlDescription.trim()"
-                                class="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <i data-lucide="plus" class="h-3 w-3"></i> Append More
                         </button>
                     </div>
@@ -325,7 +325,7 @@
                 <p class="text-sm text-muted-foreground mb-4">Reads linked ArchiMate elements and uses AI to generate class, sequence, component, and deployment UML diagrams. You need at least one Application Component and one Data Object linked to this solution.</p>
                 <div class="flex items-center gap-3 flex-wrap">
                     <button type="button" @click="enrich()" :disabled="enriching"
-                            class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="sparkles" class="h-4 w-4"></i>
                         <span x-text="enriching ? 'Generating UML…' : 'Generate UML from ArchiMate'"></span>
                         <svg x-show="enriching" x-cloak class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
@@ -366,7 +366,7 @@
         </div>
 
         <!-- ── PHASE 2: REVIEW ── -->
-        <div class="rounded-xl border bg-card transition-opacity" :class="[phase >= 2 ? 'border-border' : 'border-border opacity-40 pointer-events-none', phase === 2 ? 'border-primary/40' : '']">
+        <div class="rounded-lg border border-border bg-card transition-opacity" :class="[phase >= 2 ? 'border-border' : 'border-border opacity-40 pointer-events-none', phase === 2 ? 'border-primary/40' : '']">
             <div class="flex items-center justify-between p-5 cursor-pointer" @click="phase >= 2 ? (phase = 2) : null">
                 <div class="flex items-center gap-3">
                     <div class="flex h-8 w-8 items-center justify-center rounded-full" :class="phase > 2 ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'">
@@ -402,7 +402,7 @@
                             </span>
                         </template>
                     </span>
-                    <button type="button" @click="skipToConfig()" class="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <button type="button" @click="skipToConfig()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         Skip field review <i data-lucide="arrow-right" class="h-3.5 w-3.5"></i>
                     </button>
                 </div>
@@ -410,8 +410,8 @@
                     <div class="flex items-center justify-between mb-2">
                         <h3 class="text-sm font-medium text-foreground">Class Diagram</h3>
                         <div class="flex items-center gap-1 rounded-md border border-border bg-muted/30 p-0.5">
-                            <button type="button" @click="showTable()" class="inline-flex items-center gap-1.5 rounded px-3 py-1 text-xs font-medium transition-colors" :class="!diagramView ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"><i data-lucide="table-2" class="h-3 w-3"></i> Table</button>
-                            <button type="button" @click="showDiagram()" class="inline-flex items-center gap-1.5 rounded px-3 py-1 text-xs font-medium transition-colors" :class="diagramView ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"><i data-lucide="workflow" class="h-3 w-3"></i> Diagram</button>
+                            <button type="button" @click="showTable()" class="inline-flex items-center gap-1.5 rounded px-3 py-1 text-xs font-medium transition-colors" :class="!diagramView ? 'bg-background text-foreground ' : 'text-muted-foreground hover:text-foreground'"><i data-lucide="table-2" class="h-3 w-3"></i> Table</button>
+                            <button type="button" @click="showDiagram()" class="inline-flex items-center gap-1.5 rounded px-3 py-1 text-xs font-medium transition-colors" :class="diagramView ? 'bg-background text-foreground ' : 'text-muted-foreground hover:text-foreground'"><i data-lucide="workflow" class="h-3 w-3"></i> Diagram</button>
                         </div>
                     </div>
                     <div x-show="!diagramView">
@@ -424,7 +424,7 @@
                                 <svg x-show="enrichingFields" x-cloak class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
                             </button>
                             <button type="button" @click="confirmAllClasses()" :disabled="confirmingClass === '__all__'"
-                                    class="inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 <i data-lucide="check-check" class="h-3.5 w-3.5"></i>
                                 <span x-text="confirmingClass === '__all__' ? 'Confirming…' : 'Confirm All Classes'"></span>
                             </button>
@@ -432,7 +432,7 @@
                         <div class="space-y-3">
                             <template x-for="cls in umlClasses" :key="cls.name">
                                 <div class="rounded-lg border border-border overflow-hidden">
-                                    <div class="flex items-center justify-between px-4 py-3 bg-muted/20 cursor-pointer hover:bg-muted/40 transition-colors" @click="toggleFieldEditor(cls)">
+                                    <div class="flex items-center justify-between px-4 py-2 bg-muted/20 cursor-pointer hover:bg-muted/40 transition-colors" @click="toggleFieldEditor(cls)">
                                         <div class="flex items-center gap-2 min-w-0">
                                             <i data-lucide="box" class="h-3.5 w-3.5 text-primary shrink-0"></i>
                                             <span class="text-sm font-mono font-medium text-foreground truncate" x-text="cls.name"></span>
@@ -448,7 +448,7 @@
                                     <div x-show="fieldEditorOpen[cls.name]" x-cloak x-collapse class="border-t border-border">
                                         <div class="p-3">
                                             <p class="text-xs text-muted-foreground mb-2" x-text="cls.description || 'No description'"></p>
-                                            <table class="w-full text-xs">
+                                            <table class="dense-table w-full text-xs">
                                                 <thead><tr class="border-b border-border"><th class="text-left py-1.5 px-2 font-medium text-muted-foreground w-1/4">Name</th><th class="text-left py-1.5 px-2 font-medium text-muted-foreground w-28">Type</th><th class="text-center py-1.5 px-2 font-medium text-muted-foreground w-16">Nullable</th><th class="text-left py-1.5 px-2 font-medium text-muted-foreground">Description</th><th class="w-8"></th></tr></thead>
                                                 <tbody>
                                                     <template x-for="(field, idx) in (editingFields[cls.name] || cls.fields || [])" :key="idx">
@@ -478,19 +478,19 @@
                     </div>
                 </div>
                 <div class="mt-4 pt-4 border-t border-border flex items-center gap-3">
-                    <button type="button" @click="resetUml()" :disabled="resetting" class="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 transition-colors">
+                    <button type="button" @click="resetUml()" :disabled="resetting" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i><span x-text="resetting ? 'Resetting…' : 'Re-enrich from ArchiMate'"></span>
                     </button>
-                    <a :href="'/solutions/' + solutionId + '/codegen/openapi.yaml'" class="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <a :href="'/solutions/' + solutionId + '/codegen/openapi.yaml'" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="file-json" class="h-3.5 w-3.5"></i> Export OpenAPI
                     </a>
                 </div>
-                <div class="mt-4"><button type="button" @click="skipToConfig()" class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors">Continue to Configure <i data-lucide="arrow-right" class="h-4 w-4"></i></button></div>
+                <div class="mt-4"><button type="button" @click="skipToConfig()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Continue to Configure <i data-lucide="arrow-right" class="h-4 w-4"></i></button></div>
             </div>
         </div>
 
         <!-- ── PHASE 3: CONFIGURE ── -->
-        <div class="rounded-xl border bg-card transition-opacity" :class="[phase >= 3 ? 'border-border' : 'border-border opacity-40 pointer-events-none', phase === 3 ? 'border-primary/40' : '']">
+        <div class="rounded-lg border border-border bg-card transition-opacity" :class="[phase >= 3 ? 'border-border' : 'border-border opacity-40 pointer-events-none', phase === 3 ? 'border-primary/40' : '']">
             <div class="flex items-center justify-between p-5 cursor-pointer" @click="phase >= 3 ? (phase = 3) : null">
                 <div class="flex items-center gap-3">
                     <div class="flex h-8 w-8 items-center justify-center rounded-full" :class="phase > 3 ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'">
@@ -543,7 +543,7 @@
 
                         <!-- SAP System Import panel — only visible for SAP stacks -->
                         <template x-if="['sap-cap','sap-btp-integration'].includes(config.language)">
-                            <div class="rounded-lg border border-warning/40 bg-warning/5 p-4 space-y-3">
+                            <div class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 space-y-3">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-2">
                                         <i data-lucide="database-zap" class="h-4 w-4 text-warning"></i>
@@ -617,7 +617,7 @@
                                     </div>
                                     <!-- Results -->
                                     <template x-if="sapImport.result && sapImport.result.ok">
-                                        <div class="rounded-md bg-success/10 border border-success/30 p-3 text-xs space-y-1">
+                                        <div class="rounded-md bg-success/10 border border-success/40 px-3 py-2 text-xs space-y-1">
                                             <p class="font-semibold text-success-emphasis">✓ Import successful</p>
                                             <p class="text-muted-foreground">
                                                 <span class="font-medium text-foreground" x-text="sapImport.result.stats && (sapImport.result.stats.tables + sapImport.result.stats.transactions + sapImport.result.stats.roles + sapImport.result.stats.components)"></span> ArchiMate elements ·
@@ -630,7 +630,7 @@
                                         </div>
                                     </template>
                                     <template x-if="sapImport.error">
-                                        <div class="rounded-md bg-destructive/10 border border-destructive/30 p-3 text-xs">
+                                        <div class="rounded-md bg-destructive/10 border border-destructive/40 px-3 py-2 text-xs">
                                             <p class="font-semibold text-destructive-emphasis">Import error</p>
                                             <p class="text-muted-foreground mt-1" x-text="sapImport.error"></p>
                                         </div>
@@ -705,13 +705,13 @@
                                 <label class="flex items-center gap-2 cursor-pointer"><input type="radio" x-model="config.visibility" value="public" class="h-4 w-4 accent-primary"><span class="text-sm text-foreground">Public</span></label>
                             </div>
                         </div>
-                        <button type="button" @click="saveConfig()" :disabled="savingConfig || !config.repo_name" class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                        <button type="button" @click="saveConfig()" :disabled="savingConfig || !config.repo_name" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <i data-lucide="save" class="h-4 w-4"></i><span x-text="savingConfig ? 'Saving…' : 'Save &amp; Continue'"></span>
                         </button>
                     </div>
                     <div>
                         <h3 class="text-sm font-medium text-foreground mb-2">Predicted File Structure</h3>
-                        <div class="rounded-lg border border-border bg-muted/20 p-3 font-mono text-xs text-muted-foreground leading-relaxed overflow-auto max-h-80">
+                        <div class="rounded-md border border-border bg-muted/20 px-3 py-2 font-mono text-xs text-muted-foreground leading-relaxed overflow-auto max-h-80">
                             <div x-text="config.repo_name || 'my-service'" class="text-foreground font-semibold mb-1"></div>
                             <div class="ml-2">
                                 <div>├─ app/</div><div class="ml-4">├─ models/</div>
@@ -727,7 +727,7 @@
         </div>
 
         <!-- ── PHASE 4: GENERATE (wizard) ── -->
-        <div class="rounded-xl border bg-card transition-opacity" :class="[phase >= 4 ? 'border-border' : 'border-border opacity-40 pointer-events-none', phase === 4 ? 'border-primary/40' : '']">
+        <div class="rounded-lg border border-border bg-card transition-opacity" :class="[phase >= 4 ? 'border-border' : 'border-border opacity-40 pointer-events-none', phase === 4 ? 'border-primary/40' : '']">
             <div class="flex items-center justify-between p-5">
                 <div class="flex items-center gap-3">
                     <div class="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
@@ -742,7 +742,7 @@
             <div x-show="phase >= 4" x-collapse class="border-t border-border px-5 pb-5 pt-4">
                 <!-- Error banners -->
                 <template x-for="err in errors" :key="err.id">
-                    <div x-transition class="mb-3 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-emphasis">
+                    <div x-transition class="mb-3 flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis">
                         <i data-lucide="alert-circle" class="h-4 w-4 mt-0.5 shrink-0"></i>
                         <span x-text="err.text" class="flex-1"></span>
                         <button aria-label="Dismiss error" type="button" @click="errors = errors.filter(e => e.id !== err.id)" class="shrink-0 text-destructive-emphasis/70 hover:text-destructive-emphasis"><i data-lucide="x" class="h-3.5 w-3.5"></i></button>
@@ -750,7 +750,7 @@
                 </template>
                 <div class="flex flex-wrap items-center gap-3 mb-4">
                     <button type="button" @click="generate()" :disabled="generating || (blueprintStale && config.generation_mode !== 'genome')"
-                            class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                             :title="blueprintStale && config.generation_mode !== 'genome' ? 'Blueprint updated after last enrichment — re-run Phase 1 first' : ''">
                         <svg x-show="generating" x-cloak class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
                         <i x-show="!generating" data-lucide="play" class="h-4 w-4"></i>

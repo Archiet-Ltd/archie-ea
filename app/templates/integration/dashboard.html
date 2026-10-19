@@ -23,7 +23,7 @@
     </div>
 
     <!-- Active Instances -->
-    <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
         <div class="flex flex-col space-y-1.5 p-6">
             <div class="flex items-center justify-between">
                 <h3 class="font-semibold leading-none tracking-tight">Active Workflows</h3>
@@ -32,7 +32,7 @@
         </div>
         <div class="p-6 pt-0">
             <div class="relative w-full overflow-auto">
-                <table class="w-full caption-bottom text-sm">
+                <table class="dense-table w-full caption-bottom text-sm">
                     <thead class="[&_tr]:border-b">
                         <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Instance ID</th>
@@ -78,7 +78,7 @@
                                     {{ instance.started_at.strftime('%Y-%m-%d %H:%M') if instance.started_at else '-' }}
                                 </td>
                                 <td class="p-4 align-middle text-right">
-                                    <a href="{{ url_for('integration.instance_detail', instance_id=instance.id) }}" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3">
+                                    <a href="{{ url_for('integration.instance_detail', instance_id=instance.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                                         View
                                     </a>
                                 </td>
@@ -102,7 +102,7 @@
         <h3 class="text-lg font-semibold mb-4">Available Workflows</h3>
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {% for def in definitions %}
-            <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow">
+            <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground transition-shadow">
                 <div class="flex flex-col space-y-1.5 p-6">
                     <div class="flex items-center justify-between">
                         <div class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
@@ -117,7 +117,7 @@
                     <div class="text-xs text-muted-foreground">
                         {{ def.execution_count|dash }} runs
                     </div>
-                    <a href="{{ url_for('integration.workflow_detail', workflow_code=def.workflow_code) }}" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                    <a href="{{ url_for('integration.workflow_detail', workflow_code=def.workflow_code) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Details
                     </a>
                 </div>

@@ -26,7 +26,7 @@
 {% endmacro %}
 
 {% macro user_info(user) %}
-    <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+    <div class="rounded-lg border border-border bg-card text-card-foreground">
         <div class="p-6">
             <div class="space-y-4">
                 <div class="flex justify-between items-start py-3 border-b border-border">
@@ -50,7 +50,7 @@
         </div>
     </div>
 
-    <div class="rounded-lg border bg-card text-card-foreground shadow-sm mt-6" data-testid="organization-memberships-card">
+    <div class="rounded-lg border border-border bg-card text-card-foreground mt-6" data-testid="organization-memberships-card">
         <div class="p-6">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -91,7 +91,7 @@
                 </fieldset>
                 <div class="flex justify-end">
                     <button type="submit"
-                            class="inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground h-9 px-4 py-2 text-sm font-medium transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Switch organisation
                     </button>
                 </div>
@@ -103,7 +103,7 @@
     </div>
 
     {# Security Information — Last Login #}
-    <div class="rounded-lg border bg-card text-card-foreground shadow-sm mt-6">
+    <div class="rounded-lg border border-border bg-card text-card-foreground mt-6">
         <div class="p-6">
             <h3 class="text-sm font-semibold mb-4">Security Information</h3>
             <div class="space-y-4">
@@ -160,7 +160,7 @@
         ('weekly_digest',       'Weekly digest',       'Receive a weekly summary of activity across your solutions and architecture portfolio.'),
         ('mention_notifications','Mentions',           'Receive notifications when you are mentioned in a comment or review.')
     ] %}
-    <div class="rounded-lg border bg-card text-card-foreground shadow-sm mt-6">
+    <div class="rounded-lg border border-border bg-card text-card-foreground mt-6">
         <div class="p-6">
             <h3 class="text-sm font-semibold mb-1">Notification Preferences</h3>
             <p class="text-xs text-muted-foreground mb-5">Choose which in-app notifications you want to receive.</p>
@@ -193,7 +193,7 @@
                                             btn.querySelector('span').classList.toggle('translate-x-0', checked);
                                         "
                                         class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ 'bg-primary' if is_enabled else 'bg-muted' }}">
-                                    <span class="inline-block h-4 w-4 transform rounded-full bg-background shadow transition-transform {{ 'translate-x-5' if is_enabled else 'translate-x-0' }} ml-0.5"></span>
+                                    <span class="inline-block h-4 w-4 transform rounded-full bg-background transition-transform {{ 'translate-x-5' if is_enabled else 'translate-x-0' }} ml-0.5"></span>
                                 </button>
                                 <input type="checkbox"
                                        id="pref_{{ pref_key }}"
@@ -207,7 +207,7 @@
                 </div>
                 <div class="mt-6 flex justify-end">
                     <button type="submit"
-                            class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Save preferences
                     </button>
                 </div>
@@ -216,7 +216,7 @@
     </div>
 
     {# Display Preferences #}
-    <div class="rounded-lg border bg-card text-card-foreground shadow-sm mt-6">
+    <div class="rounded-lg border border-border bg-card text-card-foreground mt-6">
         <div class="p-6">
             <h3 class="text-sm font-semibold mb-1">Display Preferences</h3>
             <p class="text-xs text-muted-foreground mb-5">Control how architecture terms are shown throughout the application.</p>
@@ -248,7 +248,7 @@
                                         btn.querySelector('span').classList.toggle('translate-x-0', checked);
                                     "
                                     class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ 'bg-primary' if show_archimate else 'bg-muted' }}">
-                                <span class="inline-block h-4 w-4 transform rounded-full bg-background shadow transition-transform {{ 'translate-x-5' if show_archimate else 'translate-x-0' }} ml-0.5"></span>
+                                <span class="inline-block h-4 w-4 transform rounded-full bg-background transition-transform {{ 'translate-x-5' if show_archimate else 'translate-x-0' }} ml-0.5"></span>
                             </button>
                             <input type="checkbox"
                                    id="pref_show_archimate"
@@ -261,7 +261,7 @@
                 </div>
                 <div class="mt-6 flex justify-end">
                     <button type="submit"
-                            class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Save preferences
                     </button>
                 </div>
@@ -282,7 +282,7 @@
             </div>
             <div class="md:col-span-3">
                 {% if form %}
-                    <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+                    <div class="rounded-lg border border-border bg-card text-card-foreground">
                         <div class="p-6">
                             {{ f.render_form(form) }}
                         </div>

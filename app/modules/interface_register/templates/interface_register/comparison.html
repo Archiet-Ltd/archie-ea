@@ -15,7 +15,7 @@
   ) }}
 
   {% if errors %}
-  <div role="alert" data-testid="comparison-error" class="border border-destructive/40 bg-destructive/10 text-destructive-emphasis rounded-lg p-4 mb-6">
+  <div role="alert" data-testid="comparison-error" class="border border-destructive/40 bg-destructive/10 text-destructive-emphasis rounded-md px-3 py-2 mb-6">
     <p class="text-sm">{{ errors }}</p>
   </div>
   {% endif %}
@@ -27,7 +27,7 @@
       <form method="POST" action="{{ url_for('interface_register.provision_comparison') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="initiative_id" value="{{ initiative.id }}">
-        <button type="submit" data-testid="provision-comparison" class="inline-flex items-center gap-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4">
+        <button type="submit" data-testid="provision-comparison" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
           Set up As-is/To-be comparison
         </button>
       </form>
@@ -64,13 +64,13 @@
             <form method="POST" action="{{ url_for('interface_register.raise_gap', element_id=element.id) }}" data-testid="raise-gap-{{ element.id }}" class="flex items-center gap-2">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="initiative_id" value="{{ initiative.id }}">
-              <select name="gap_type" required class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              <select name="gap_type" required class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 <option value="">Select gap type</option>
                 {% for gap_type in gap_types %}
                 <option value="{{ gap_type }}">{{ gap_type.replace('_', ' ').title() }}</option>
                 {% endfor %}
               </select>
-              <button type="submit" class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-transparent hover:bg-accent hover:text-accent-foreground h-9 px-3">
+              <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Raise Gap
               </button>
             </form>
@@ -125,17 +125,17 @@
             <input type="hidden" name="initiative_id" value="{{ initiative.id }}">
             <div class="flex flex-col">
               <label for="wp-name-{{ gap.id }}" class="sr-only">Work package name</label>
-              <input id="wp-name-{{ gap.id }}" type="text" name="name" placeholder="Work package name" class="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              <input id="wp-name-{{ gap.id }}" type="text" name="name" placeholder="Work package name" class="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             </div>
             <div class="flex flex-col">
               <label for="wp-cost-{{ gap.id }}" class="sr-only">Estimated cost</label>
-              <input id="wp-cost-{{ gap.id }}" type="number" name="estimated_cost" placeholder="Estimated cost" step="0.01" min="0" class="flex h-9 w-32 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              <input id="wp-cost-{{ gap.id }}" type="number" name="estimated_cost" placeholder="Estimated cost" step="0.01" min="0" class="flex h-9 w-32 rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             </div>
             <div class="flex flex-col">
               <label for="wp-hours-{{ gap.id }}" class="sr-only">Estimated hours</label>
-              <input id="wp-hours-{{ gap.id }}" type="number" name="estimated_effort_hours" placeholder="Estimated hours" step="1" min="0" max="2147483647" class="flex h-9 w-32 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              <input id="wp-hours-{{ gap.id }}" type="number" name="estimated_effort_hours" placeholder="Estimated hours" step="1" min="0" max="2147483647" class="flex h-9 w-32 rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             </div>
-            <button type="submit" :disabled="submitting" class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-transparent hover:bg-accent hover:text-accent-foreground h-9 px-3 disabled:opacity-50 disabled:pointer-events-none">
+            <button type="submit" :disabled="submitting" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
               <span x-show="!submitting">Attach work package</span>
               <span x-show="submitting" x-cloak role="status" aria-live="polite">Attaching…</span>
             </button>

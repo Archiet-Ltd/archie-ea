@@ -25,7 +25,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Status Panel -->
         <div class="lg:col-span-1">
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold flex items-center gap-2">
                         <i data-lucide="server" class="h-5 w-5 text-primary"></i>
@@ -104,7 +104,7 @@
             </div>
 
             <!-- Info Card -->
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card mt-6">
+            <div data-slot="card" class="rounded-lg border border-input bg-card mt-6">
                 <div class="p-4 sm:p-6">
                     <h4 class="text-sm font-semibold mb-3 flex items-center gap-2">
                         <i data-lucide="info" class="h-4 w-4 text-primary"></i>
@@ -138,7 +138,7 @@
 
         <!-- Settings Form -->
         <div class="lg:col-span-2">
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Configuration</h3>
                 </div>
@@ -231,11 +231,11 @@
                         <!-- Submit Button -->
                         <div class="flex items-center justify-end gap-3 pt-4 border-t">
                             <a href="{{ url_for('admin.index') }}" 
-                               class="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+                               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                                 Cancel
                             </a>
                             <button type="submit"
-                                    class="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                                 <i data-lucide="save" class="h-4 w-4"></i>
                                 Save Configuration
                             </button>

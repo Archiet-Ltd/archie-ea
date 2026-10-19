@@ -119,7 +119,7 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
             <textarea
                 x-model="formData.justification"
                 rows="4"
-                class="w-full rounded-lg border border-input bg-background px-4 py-2 text-sm resize-none focus:ring-2 focus:ring-primary"
+                class="w-full rounded-md border border-input bg-background px-4 py-2 text-sm resize-none focus:ring-2 focus:ring-primary"
                 placeholder="Add any additional context or justification for this ARB submission..."
              aria-label="Additional Justification (optional)"></textarea>
             <p class="text-xs text-muted-foreground">
@@ -137,7 +137,7 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
                 </label>
                 <select
                     x-model="formData.priority_override"
-                    class="w-full rounded-lg border border-input bg-background px-4 py-2 text-sm"
+                    class="w-full rounded-md border border-input bg-background px-4 py-2 text-sm"
                  aria-label="Override Priority (optional)">
                     <option value="">Use capability priority</option>
                     <option value="critical">Critical</option>
@@ -156,14 +156,14 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
                 <input
                     type="text"
                     x-model="formData.estimated_timeline"
-                    class="w-full rounded-lg border border-input bg-background px-4 py-2 text-sm"
+                    class="w-full rounded-md border border-input bg-background px-4 py-2 text-sm"
                     placeholder="e.g., 12-18 months"
                  aria-label="e.g., 12-18 months"/>
             </div>
         </div>
 
         <!-- Info Banner -->
-        <div class="flex items-start gap-3 p-3 bg-primary/10 border border-primary/30 rounded-lg">
+        <div class="flex items-start gap-3 px-3 py-2 bg-primary/10 border border-primary/40 rounded-md">
             <i data-lucide="info" class="h-5 w-5 text-primary flex-shrink-0 mt-0.5"></i>
             <div class="text-sm text-foreground">
                 <p class="font-medium">What happens next?</p>
@@ -189,7 +189,7 @@ x-effect="document.getElementById('arb-submission') && document.getElementById('
         <button type="button"
             @click="submitToARB()"
             :disabled="loading"
-            class="px-6 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
          aria-label="Submit">
             <span x-show="!loading" x-cloak>
                 <i data-lucide="send" class="h-4 w-4 inline"></i>

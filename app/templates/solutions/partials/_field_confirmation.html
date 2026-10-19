@@ -87,7 +87,7 @@
        class="fixed inset-0 z-50 flex items-center justify-center p-4"
        @click.self="importOpen = false">
     <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
-    <div class="relative bg-card border border-border rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+    <div class="relative bg-card border border-border rounded-lg w-full max-w-2xl max-h-[85vh] flex flex-col">
 
       {# Modal header #}
       <div class="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
@@ -250,7 +250,7 @@
           {# Field table #}
           <template x-if="el.fields.length > 0">
             <div>
-              <table class="w-full text-2xs mb-2.5">
+              <table class="dense-table w-full text-2xs mb-2.5">
                 <thead>
                   <tr class="text-2xs uppercase tracking-wider text-muted-foreground border-b border-border/50">
                     <th class="text-left pb-1 font-medium w-[35%]">Field</th>

@@ -37,7 +37,7 @@
         <button type="button" 
             @click="{{ current_page_model }} = 1"
             :disabled="{{ current_page_model }} === 1"
-            class="inline-flex items-center justify-center h-9 w-9 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50 transition-colors"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9"
             aria-label="First page"
         >
             <i data-lucide="chevrons-left" class="h-4 w-4"></i>
@@ -47,7 +47,7 @@
         <button type="button" 
             @click="{{ current_page_model }}--"
             :disabled="{{ current_page_model }} === 1"
-            class="inline-flex items-center justify-center h-9 w-9 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50 transition-colors"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9"
             aria-label="Previous page"
         >
             <i data-lucide="chevron-left" class="h-4 w-4"></i>
@@ -65,7 +65,7 @@
         <button type="button" 
             @click="{{ current_page_model }}++"
             :disabled="{{ current_page_model }} === {{ total_pages_model }}"
-            class="inline-flex items-center justify-center h-9 w-9 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50 transition-colors"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9"
             aria-label="Next page"
         >
             <i data-lucide="chevron-right" class="h-4 w-4"></i>
@@ -75,7 +75,7 @@
         <button type="button" 
             @click="{{ current_page_model }} = {{ total_pages_model }}"
             :disabled="{{ current_page_model }} === {{ total_pages_model }}"
-            class="inline-flex items-center justify-center h-9 w-9 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50 transition-colors"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9"
             aria-label="Last page"
         >
             <i data-lucide="chevrons-right" class="h-4 w-4"></i>
