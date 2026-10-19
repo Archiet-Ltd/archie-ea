@@ -84,13 +84,13 @@
     {% endfor %}
 
     <div id="ask-results" aria-busy="false" :aria-busy="busy ? 'true' : 'false'" x-show="answeredKey === 'impact' && state !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-results-heading" x-ref="resultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <h2 id="ask-results-heading" x-ref="resultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none">Results</h2>
         {{ impact_states("state === 'loading'") }}
         <ul class="space-y-3" x-show="state === 'ready'" x-cloak>
             <template x-for="row in rows" :key="row.key">
                 <li class="rounded-lg border border-border bg-card p-4" data-ask-row :data-kind="row.derived ? 'derived' : 'explicit'">
                     <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
-                        <h3 class="min-w-0 break-words text-base font-semibold text-foreground">{{ element_name('row.name') }}</h3>
+                        <h3 class="text-base font-semibold min-w-0 break-words text-foreground">{{ element_name('row.name') }}</h3>
                         <div class="flex flex-wrap items-center gap-x-6 gap-y-1">
                             {{ health_field() }}
                             {{ owner_field('row.ownerName') }}
@@ -113,7 +113,7 @@
        blast-radius rows -- a distinct shape from L1's flat row list, so a
        separate result block rather than overloading `rows`. #}
     <div id="ask-risk-results" aria-busy="false" :aria-busy="riskBusy ? 'true' : 'false'" x-show="answeredKey === 'risk' && riskState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-risk-results-heading" x-ref="riskResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <h2 id="ask-risk-results-heading" x-ref="riskResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none">Results</h2>
         <template x-if="riskState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -128,7 +128,7 @@
             <template x-for="risk in risks" :key="risk.riskId">
                 <li class="rounded-lg border border-border bg-card p-4" data-ask-risk-row>
                     <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
-                        <h3 class="min-w-0 break-words text-base font-semibold text-foreground" x-text="risk.title"></h3>
+                        <h3 class="text-base font-semibold min-w-0 break-words text-foreground" x-text="risk.title"></h3>
                         <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground" x-text="risk.riskLevel"></span>
                     </div>
                     <p class="mt-1 text-sm text-muted-foreground">
@@ -149,7 +149,7 @@
        why duplicate-detection and TCO are not offered here (neither has a
        per-application HTML page today). #}
     <div id="ask-portfolio-results" aria-busy="false" :aria-busy="portfolioBusy ? 'true' : 'false'" x-show="answeredKey === 'portfolio' && portfolioState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-portfolio-results-heading" x-ref="portfolioResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <h2 id="ask-portfolio-results-heading" x-ref="portfolioResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none">Results</h2>
         <template x-if="portfolioState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -173,7 +173,7 @@
     {# L5: one card per work package seeded on the picked element, each with
        its own blast-radius rows -- same shape as L6's risk cards. #}
     <div id="ask-programme-results" aria-busy="false" :aria-busy="programmeBusy ? 'true' : 'false'" x-show="answeredKey === 'programme' && programmeState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-programme-results-heading" x-ref="programmeResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <h2 id="ask-programme-results-heading" x-ref="programmeResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none">Results</h2>
         <template x-if="programmeState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -188,7 +188,7 @@
             <template x-for="wp in workPackages" :key="wp.workPackageId">
                 <li class="rounded-lg border border-border bg-card p-4" data-ask-programme-row>
                     <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
-                        <h3 class="min-w-0 break-words text-base font-semibold text-foreground" x-text="wp.name"></h3>
+                        <h3 class="text-base font-semibold min-w-0 break-words text-foreground" x-text="wp.name"></h3>
                         <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground" x-text="wp.statusLabel"></span>
                     </div>
                     <p class="mt-1 text-sm text-muted-foreground">
@@ -217,7 +217,7 @@
        its own blast-radius rows and a nested success-metrics list -- same
        shape as L5's work-package cards. #}
     <div id="ask-strategy-results" aria-busy="false" :aria-busy="strategyBusy ? 'true' : 'false'" x-show="answeredKey === 'strategy' && strategyState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-strategy-results-heading" x-ref="strategyResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <h2 id="ask-strategy-results-heading" x-ref="strategyResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none">Results</h2>
         <template x-if="strategyState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -232,7 +232,7 @@
             <template x-for="initiative in initiatives" :key="initiative.initiativeId">
                 <li class="rounded-lg border border-border bg-card p-4" data-ask-strategy-row>
                     <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
-                        <h3 class="min-w-0 break-words text-base font-semibold text-foreground" x-text="initiative.name"></h3>
+                        <h3 class="text-base font-semibold min-w-0 break-words text-foreground" x-text="initiative.name"></h3>
                         <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground" x-text="initiative.statusLabel"></span>
                     </div>
                     <p class="mt-1 text-sm text-muted-foreground">
@@ -271,7 +271,7 @@
        inside any loading/error/empty state gate, since it is true on
        every single response regardless of ownership data. #}
     <div id="ask-accountability-results" aria-busy="false" :aria-busy="accountabilityBusy ? 'true' : 'false'" x-show="answeredKey === 'accountability' && accountabilityState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-accountability-results-heading" x-ref="accountabilityResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <h2 id="ask-accountability-results-heading" x-ref="accountabilityResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none">Results</h2>
         <template x-if="accountabilityState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -286,7 +286,7 @@
             <template x-for="owner in owners" :key="owner.ownerId">
                 <li class="rounded-lg border border-border bg-card p-4" data-ask-accountability-row>
                     <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
-                        <h3 class="min-w-0 break-words text-base font-semibold text-foreground" x-text="owner.ownershipType"></h3>
+                        <h3 class="text-base font-semibold min-w-0 break-words text-foreground" x-text="owner.ownershipType"></h3>
                         <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground" x-show="owner.organizationUnit" x-text="owner.organizationUnit && owner.organizationUnit.name"></span>
                     </div>
                     <p class="mt-1 text-sm text-foreground" x-show="owner.primaryContact"><span x-text="owner.primaryContact"></span></p>
@@ -307,7 +307,7 @@
        the lineage flows. Steward and owner are free text as recorded, never a
        person; anything missing says "not recorded" (no blank, no zero). #}
     <div id="ask-data-results" aria-busy="false" :aria-busy="dataBusy ? 'true' : 'false'" x-show="answeredKey === 'data' && dataState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-data-results-heading" x-ref="dataResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <h2 id="ask-data-results-heading" x-ref="dataResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none">Results</h2>
         <template x-if="dataState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -324,7 +324,7 @@
                     <template x-for="obj in dataObjects" :key="obj.id">
                         <li class="rounded-lg border border-border bg-card p-4" data-ask-data-row>
                             <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
-                                <h3 class="min-w-0 break-words text-base font-semibold text-foreground" x-text="obj.name"></h3>
+                                <h3 class="text-base font-semibold min-w-0 break-words text-foreground" x-text="obj.name"></h3>
                                 <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground" x-show="obj.classification" x-text="obj.classification"></span>
                             </div>
                             <p class="mt-1 text-sm text-foreground"><span class="text-muted-foreground">Steward: </span><span x-text="obj.steward || 'Not recorded'"></span></p>
@@ -353,7 +353,7 @@
        so. The last scan time is shown only when one exists; nothing is shown as
        a percentage or a zero. #}
     <div id="ask-compliance-results" aria-busy="false" :aria-busy="complianceBusy ? 'true' : 'false'" x-show="answeredKey === 'compliance' && complianceState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-compliance-results-heading" x-ref="complianceResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <h2 id="ask-compliance-results-heading" x-ref="complianceResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none">Results</h2>
         <template x-if="complianceState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -370,7 +370,7 @@
                     <template x-for="control in controls" :key="control.code + control.name">
                         <li class="rounded-lg border border-border bg-card p-4" data-ask-compliance-row>
                             <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
-                                <h3 class="min-w-0 break-words text-base font-semibold text-foreground"><span x-show="control.code" x-text="control.code + ': '"></span><span x-text="control.name"></span></h3>
+                                <h3 class="text-base font-semibold min-w-0 break-words text-foreground"><span x-show="control.code" x-text="control.code + ': '"></span><span x-text="control.name"></span></h3>
                                 <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground" x-show="control.frameworkName" x-text="control.frameworkName"></span>
                             </div>
                             <p class="mt-1 text-sm text-foreground"><span class="text-muted-foreground">Status: </span><span x-text="control.status"></span></p>
@@ -408,7 +408,7 @@
         'bulk_operation': 'several records were changed at once',
     } %}
     <section class="rounded-xl border border-border bg-card p-6" data-derivation-status aria-labelledby="derivation-status-heading">
-        <h2 id="derivation-status-heading" class="text-lg font-semibold text-foreground">Indirect connections</h2>
+        <h2 id="derivation-status-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Indirect connections</h2>
         {% if derivation_status is none %}
         <p class="mt-2 text-sm text-muted-foreground" data-derivation-status-unavailable>We could not read when these were last worked out.</p>
         {% else %}
@@ -440,11 +440,11 @@
                 <caption class="sr-only">Recent runs</caption>
                 <thead>
                     <tr class="border-b border-border text-left text-muted-foreground">
-                        <th scope="col" class="py-2 pr-4 font-medium">Finished</th>
-                        <th scope="col" class="py-2 pr-4 font-medium">Started by</th>
-                        <th scope="col" class="py-2 pr-4 font-medium">Relationships read</th>
-                        <th scope="col" class="py-2 pr-4 font-medium">Connections found</th>
-                        <th scope="col" class="py-2 pr-4 font-medium">Time taken</th>
+                        <th scope="col" class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground py-2 pr-4">Finished</th>
+                        <th scope="col" class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground py-2 pr-4">Started by</th>
+                        <th scope="col" class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground py-2 pr-4">Relationships read</th>
+                        <th scope="col" class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground py-2 pr-4">Connections found</th>
+                        <th scope="col" class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground py-2 pr-4">Time taken</th>
                     </tr>
                 </thead>
                 <tbody>

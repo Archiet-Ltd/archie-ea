@@ -1,3 +1,68 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Type scale (design register: typography). Element defaults live in the base
+   layer so a utility on the element still wins; the scripted class map in the
+   templates carries the same values where a utility was already present. */
+@layer base {
+  body {
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+  h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  small {
+    font-size: 0.75rem;
+    font-weight: 400;
+  }
+  thead th {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: hsl(var(--muted-foreground));
+  }
+  /* Numbers line up in columns: tables, anything flagged numeric, chart text. */
+  table,
+  [data-numeric],
+  svg text {
+    font-variant-numeric: tabular-nums;
+  }
+  /* IDs, codes, references and element tags are monospace. */
+  code,
+  kbd,
+  samp,
+  pre,
+  [data-id],
+  [data-code],
+  [data-ref] {
+    font-family: theme(fontFamily.mono);
+  }
+}
+
+@layer components {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  /* The question line above an answer cascade. */
+  .question-line {
+    font-family: theme(fontFamily.serif);
+    font-style: italic;
+    font-size: 1.125rem;
+    letter-spacing: 0;
+    color: hsl(var(--muted-foreground));
+  }
+}

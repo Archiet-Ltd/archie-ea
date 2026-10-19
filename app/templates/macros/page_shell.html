@@ -105,10 +105,10 @@
             {% if icon %}
             <div class="flex items-center gap-3">
                 <i data-lucide="{{ icon }}" class="h-6 w-6 shrink-0 text-primary" aria-hidden="true"></i>
-                <h1 class="text-2xl font-bold text-foreground">{{ title }}</h1>
+                <h1 class="text-3xl font-bold tracking-[-0.02em] text-foreground">{{ title }}</h1>
             </div>
             {% else %}
-            <h1 class="text-2xl font-bold text-foreground">{{ title }}</h1>
+            <h1 class="text-3xl font-bold tracking-[-0.02em] text-foreground">{{ title }}</h1>
             {% endif %}
             {% if subtitle_caller %}
             <div class="mt-1 text-sm text-muted-foreground">{{ subtitle_caller() }}</div>
@@ -226,7 +226,7 @@
     {% if title or actions_caller %}
     <div class="flex items-center justify-between gap-4 p-6 pb-0">
         {% if title %}
-        <h2 class="text-lg font-semibold text-foreground">{{ title }}</h2>
+        <h2 class="text-xl font-semibold tracking-[-0.01em] text-foreground">{{ title }}</h2>
         {% endif %}
         {% if actions_caller %}
         <div class="flex items-center gap-2 shrink-0">
