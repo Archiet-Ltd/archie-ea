@@ -9,6 +9,8 @@ Usage:
     # Returns: {"name": "Capabilities", "children": [{id, name, children, ...}, ...]}
 """
 
+from sqlalchemy.orm.exc import StaleDataError
+
 from app import db
 from app.middleware.tenant_context import current_org_id
 
@@ -368,8 +370,6 @@ def _commit():
     reparenting delete tried to write through, for instance -- see
     ``delete_node``).
     """
-    from sqlalchemy.orm.exc import StaleDataError
-
     try:
         db.session.commit()
     except (PermissionError, StaleDataError) as exc:
@@ -552,27 +552,44 @@ def delete_node(tree_key, node_id):
         return f"{FORBIDDEN}: shared reference rows are read-only"
 
     parent_id = getattr(row, parent_fk, None)
-    children_query = Model.query.filter(getattr(Model, parent_fk) == node_id)
+    all_children = Model.query.filter(getattr(Model, parent_fk) == node_id)
     visible = _visible(Model, tree_key)
     if visible is not None:
-        children_query = children_query.filter(visible)
-    children = children_query.all()
+        children = all_children.filter(visible).all()
+        # A child this caller cannot see (another organisation's private
+        # row under a hybrid tree) can be neither reparented nor safely left
+        # alone: some models (ReferenceModelCapability is one) declare their
+        # self-referential children as an ORM relationship with
+        # cascade="all, delete-orphan", which would delete an unreparented
+        # child along with its parent -- another organisation's row, gone,
+        # with nothing in this request that organisation could ever see or
+        # consent to. Refuse the whole delete instead.
+        if all_children.count() != len(children):
+            return f"{FORBIDDEN}: this node has a child outside this organisation"
+    else:
+        children = all_children.all()
+
     for child in children:
         setattr(child, parent_fk, parent_id)
 
-    # Some models (ReferenceModelCapability is one) declare their
-    # self-referential children as an ORM relationship with
-    # cascade="all, delete-orphan". That cascade acts on the relationship's
-    # own in-memory collection, which setattr() on the raw foreign-key column
-    # above does not update -- row.children still lists every child it did
-    # before the reparenting, invisible children included, and
-    # session.delete(row) would cascade-delete all of them instead of
-    # leaving the reparented rows alone. Flushing the column updates first
-    # and expiring row's own cached state forces SQLAlchemy to re-read its
-    # relationships from the database, which now shows no more children,
-    # before the delete (and its cascade, now with nothing left to cascade
-    # to) is issued.
-    db.session.flush()
+    try:
+        # Some models declare their self-referential children as an ORM
+        # relationship with cascade="all, delete-orphan". That cascade acts
+        # on the relationship's own in-memory collection, which setattr() on
+        # the raw foreign-key column above does not update -- row.children
+        # still lists every child it did before the reparenting, and
+        # session.delete(row) would cascade-delete them instead of leaving
+        # the now-reparented rows alone. Flushing the column updates first
+        # and expiring row's own cached state forces SQLAlchemy to re-read
+        # its relationships from the database, which now shows no
+        # children left, before the delete (and its now-empty cascade) is
+        # issued. Any row-level-security rejection of this flush (a write
+        # the caller may not make) is handled the same way _commit() below
+        # handles one at the final commit.
+        db.session.flush()
+    except (PermissionError, StaleDataError) as exc:
+        db.session.rollback()
+        return f"{FORBIDDEN}: {exc}"
     db.session.expire(row)
 
     db.session.delete(row)

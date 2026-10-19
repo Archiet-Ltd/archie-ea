@@ -496,11 +496,13 @@ class TestReferenceCapabilityTree:
     ):
         """delete_node reparents a deleted node's children to its own parent.
         That reparenting query used no tenancy filter at all, so deleting a
-        node org_a legitimately owns could silently rewrite another
-        organisation's private child row -- a row org_a cannot even see
-        through this API. Only a child visible to the caller (shared, or the
-        caller's own) may be reparented; org_b's private child must come out
-        of this delete untouched.
+        node org_a legitimately owns could silently rewrite -- or, through
+        this model's own cascade="all, delete-orphan" relationship, silently
+        delete -- another organisation's private child row, one org_a
+        cannot even see through this API. A node with a child outside the
+        caller's organisation must refuse the whole delete instead of
+        reparenting what it can see and destroying or mutating what it
+        cannot.
         """
         from app.models.reference_models import ReferenceModelCapability
 
@@ -512,11 +514,36 @@ class TestReferenceCapabilityTree:
         db_session.commit()
 
         login_as(client, architect_a)
+        resp = client.delete(f"{BASE}/reference_capability/{parent.id}")
+        assert resp.status_code == 403
+
+        db_session.expire_all()
+        assert db_session.get(ReferenceModelCapability, parent.id) is not None
+        assert db_session.get(ReferenceModelCapability, own_child.id).parent_capability_id == parent.id
+        assert db_session.get(ReferenceModelCapability, other_org_child.id).parent_capability_id == parent.id
+
+    def test_delete_with_only_visible_children_still_reparents_them(
+        self, client, login_as, db_session, reference_model, org_a, architect_a
+    ):
+        """The refusal above must not block the ordinary case: every child
+        visible to the caller still gets reparented and the delete still
+        succeeds when there is no invisible child in the way."""
+        from app.models.reference_models import ReferenceModelCapability
+
+        parent = _owned_reference_capability(db_session, reference_model, org_a.id, "A parent")
+        own_child = _owned_reference_capability(db_session, reference_model, org_a.id, "A child")
+        own_child.parent_capability_id = parent.id
+        shared_child = _shared_reference_capability(db_session, reference_model)
+        shared_child.parent_capability_id = parent.id
+        db_session.commit()
+
+        login_as(client, architect_a)
         assert client.delete(f"{BASE}/reference_capability/{parent.id}").status_code == 200
 
         db_session.expire_all()
+        assert db_session.get(ReferenceModelCapability, parent.id) is None
         assert db_session.get(ReferenceModelCapability, own_child.id).parent_capability_id is None
-        assert db_session.get(ReferenceModelCapability, other_org_child.id).parent_capability_id == parent.id
+        assert db_session.get(ReferenceModelCapability, shared_child.id).parent_capability_id is None
 
 
 class TestUnifiedCapabilityTree:
