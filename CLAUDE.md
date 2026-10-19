@@ -10,6 +10,27 @@ with Tailwind/shadcn tokens and Alpine.js on the front end.
 **Read `DESIGN.md` before editing any template, CSS, or front-end JS file.** It is the authoritative
 UI contract (color tokens, base templates, component macros, Alpine rules) and is not repeated here.
 
+## Standing instruction — revenue-path work comes first (18 Oct 2026)
+
+Every role, every subagent, every session, on any machine: this project runs on a tight budget, so
+priority and spending discipline both matter in practice, not just in principle.
+
+1. **Revenue-path work outranks cleanups, refactors and consolidation that do not block a customer
+   today.** Shipping the thing a paying customer can use, honestly, now, beats a cleaner
+   architecture or a more complete feature that does not change whether someone can sign up and
+   pay this week. Section 10's "Fortune 500 readiness" consolidation work is real and worth doing,
+   but sequence it after, not instead of, whatever earns the first dollar.
+2. **Do not spend on anything not already authorised.** Paid APIs, paid models, paid infra, paid
+   tooling — assume none of it is approved unless told otherwise. Prefer free tiers, self-hosted or
+   already-owned infrastructure, and the cheapest adequate option, even when a paid one would be
+   modestly faster. If a task seems to need a paid resource, say so and wait rather than spend and
+   explain afterward.
+3. **Report time and risk honestly, not optimistically**, and verify a "done" claim against the
+   running product before making it. The standing no-truth-scaffolding rule below is about what a
+   document may say; this is about what you may privately believe and act on.
+4. **Tell the lead immediately when infrastructure itself is costing money** (a quota, a billing
+   lock, usage quietly accumulating) rather than quietly working around it.
+
 ## SDLC orchestration subagents — execution mechanism, not a second role system
 
 `.claude/agents/*.md` defines 27 Claude Code subagents (business-analyst,
