@@ -893,22 +893,45 @@ def test_comment_tenancy_migration(rls):
     Case 4: the non-owner case raises (mock _may_alter to false).
     """
     # Only run case 2 for now
-    # Get a user id for the comment's user_id foreign key.
     with rls.owner.connect() as connection:
-        user_id = connection.execute(text("SELECT id FROM users LIMIT 1")).scalar_one()
-
         # Setup: create organization, element, comment and commit them.
         trans_setup = connection.begin()
         try:
-            # Insert organization "Org Null"
+            # Insert organization "Org Null" and get its id
             org_null_id = connection.execute(
                 text("INSERT INTO organizations (name, slug) VALUES ('Org Null', :s) RETURNING id"),
                 {"s": "org-null-" + uuid.uuid4().hex[:8]},
             ).scalar_one()
-
+    
+            # Get a user id for the comment's user_id foreign key.
+            user_id = connection.execute(text("SELECT id FROM users LIMIT 1")).scalar_one_or_none()
+            if user_id is None:
+                # Insert a user with the organization_id set to the organization we just created
+                role_id = connection.execute(
+                    text("SELECT id FROM roles WHERE name = 'Administrator' LIMIT 1")
+                ).scalar_one()
+                if role_id is None:
+                    raise RuntimeError("Administrator role not found")
+                user_id = connection.execute(
+                    text("""
+                        INSERT INTO users (email, password_hash, confirmed, role_id, organization_id)
+                        VALUES (:email, :password_hash, true, :role_id, :org_id)
+                        RETURNING id
+                    """),
+                    {
+                        "email": "test@example.com",
+                        "password_hash": "pbkdf2:sha256:260000",
+                        "role_id": role_id,
+                        "org_id": org_null_id
+                    }
+                ).scalar_one()
+    
             # Temporarily allow NULL in archimate_elements.organization_id
-            connection.execute(text("ALTER TABLE archimate_elements ALTER COLUMN organization_id DROP NOT NULL"))
-
+            with rls.owner.connect() as ddladmin_conn:
+                ddladmin_conn.execute(text("ALTER TABLE archimate_elements ALTER COLUMN organization_id DROP NOT NULL"))
+                ddladmin_conn.execute(text("ALTER TABLE archimate_element_comments ALTER COLUMN organization_id DROP NOT NULL"))
+                ddladmin_conn.commit()
+    
             # Insert element with organization_id = NULL
             el_null_id = connection.execute(
                 text(
@@ -916,7 +939,7 @@ def test_comment_tenancy_migration(rls):
                     "VALUES ('Element Null', 'ApplicationComponent', 'application', NULL) RETURNING id"
                 ),
             ).scalar_one()
-
+    
             # Insert comment for that element (without organization_id, so it will be NULL)
             comment_null_id = connection.execute(
                 text(
@@ -926,7 +949,7 @@ def test_comment_tenancy_migration(rls):
                 ),
                 {"e": el_null_id, "u": user_id},
             ).scalar_one()
-
+    
             trans_setup.commit()
         except:
             trans_setup.rollback()
