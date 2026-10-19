@@ -89,6 +89,8 @@ class ChatEntityMatchingService:
                 ),
             }
 
+        except PermissionError as e:
+            return {"success": False, "error": str(e), "permission_denied": True}
         except Exception as e:
             logger.error(f"Error in chat entity analysis: {e}")
             return {
@@ -127,6 +129,10 @@ class ChatEntityMatchingService:
         # parsing, and silently falls through to an empty-but-"success"
         # result — exactly the "0 matches, 0 new, no explanation" failure
         # mode the QA register flagged. Surface it honestly instead.
+        if isinstance(extraction_response, dict) and extraction_response.get("permission_denied"):
+            # A write the chat attempted was refused for lack of write access:
+            # say so as a refusal, not as a failed extraction.
+            raise PermissionError(extraction_response.get("response") or "Write access is required")
         if isinstance(extraction_response, dict) and extraction_response.get("success") is False:
             raise RuntimeError(
                 extraction_response.get("error")

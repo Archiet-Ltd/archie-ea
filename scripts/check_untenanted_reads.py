@@ -55,6 +55,16 @@ with no organisation predicate -- the read count rises by one; and a new model w
 ``__tablename__`` and no ``TenantMixin`` added without listing it -- the table check
 reports it by name. Both are pinned in tests/test_check_untenanted_reads.py.
 
+Dynamic dispatch
+----------------
+A model chosen at runtime has no name for the checks above to match: ``REGISTRY[key].query``,
+``session.get(cls, id)`` where ``cls = _import_model(path)``, ``getattr(mod, name).query``.
+Such a site is reported as ``[dynamic-dispatch] <unresolved>`` and counts as a read until it is
+exempted with ``tenant-scoping-ok: <reason>`` or listed as ``file:line`` in
+``scripts/dynamic_dispatch_sites.txt`` after a person has confirmed every model the site can
+reach is fenced or the caller checks tenancy where it dispatches. Detection is in
+``scripts/dynamic_dispatch.py``, shared with ``check_tenant_scoping.py``.
+
 Exemptions
 ----------
 ``# tenant-scoping-ok: <reason>`` on the line before the statement, or on any line of
@@ -71,6 +81,9 @@ import json
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import dynamic_dispatch  # noqa: E402  (shared with check_tenant_scoping.py)
 
 REPO = Path(__file__).resolve().parent.parent
 APP = REPO / "app"
@@ -305,6 +318,11 @@ def scan(app=None, repo=None):
         scanner = _Scan(rel, lines, models)
         scanner.visit(tree)
         hits.extend(scanner.hits)
+        for site in dynamic_dispatch.unlisted(rel, dynamic_dispatch.find_dynamic_sites(tree, lines)):
+            hits.append({
+                "file": rel, "line": site["line"], "model": "<unresolved>",
+                "shape": "dynamic-dispatch", "has_org_col": None,
+            })
     return models, hits
 
 
@@ -350,7 +368,7 @@ def main() -> int:
         print(len(hits))
         return 0
     for hit in sorted(hits, key=lambda h: (h["file"], h["line"])):
-        col = "column" if hit["has_org_col"] else "NO COLUMN"
+        col = {True: "column", False: "NO COLUMN", None: "model resolved at runtime"}[hit["has_org_col"]]
         print(f"  {hit['file']}:{hit['line']}: [{hit['shape']}] {hit['model']} ({col}) read with no organisation predicate")
     print(f"\n{len(hits)} read(s) of {len(models)} unfenced model(s)")
     print(f"Add a predicate, or `# {MARKER}: <reason>` on the statement. See the module docstring.")
