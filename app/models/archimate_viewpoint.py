@@ -446,8 +446,16 @@ class ArchimateViewpointSnapshot(db.Model):
         return f"<ArchimateViewpointSnapshot {self.name} vp={self.viewpoint_id}>"
 
 
-class ArchimateElementComment(db.Model):
-    """CMP-024: a comment on an ArchiMate element, optionally scoped to a viewpoint."""
+class ArchimateElementComment(TenantMixin, db.Model):
+    """CMP-024: a comment on an ArchiMate element, optionally scoped to a viewpoint.
+
+    TenantMixin adds organisation_id (NOT NULL, indexed, foreign-keyed to
+    organisations) so every comment carries the organisation of the element it
+    comments on. The ORM tenant filter then scopes every read and the before_flush
+    listener stamps every write from the active organisation; the row-level
+    security policy in the element-comment-tenancy migration enforces the same
+    boundary at the database level.
+    """
 
     __tablename__ = "archimate_element_comments"
 

@@ -75,7 +75,6 @@ arb_workflow_stages
 archimate_audit_logs
 archimate_capabilities
 archimate_capability_mapping
-archimate_element_comments
 archimate_metamodel_violations
 archimate_patterns
 archimate_relationship_rules
