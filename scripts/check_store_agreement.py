@@ -250,6 +250,19 @@ CONCEPTS = {
         Surface("GET /api/roadmap/statistics", "http",
                 "/api/roadmap/statistics", extract="gaps.total",
                 scope="capability shortfall"),
+        # The three screens that show a gap total as a figure. Each reads the
+        # one register through gap_register_service.count_gaps, which leaves
+        # out plateau transitions, so they are asked as the same question the
+        # roadmap statistics answer. extract="html:..." reads the rendered tile.
+        Surface("GET /enterprise/ (Enterprise Dashboard)", "http",
+                "/enterprise/", extract="html:gap-count",
+                scope="capability shortfall"),
+        Surface("GET /enterprise/strategic (Strategic Planning)", "http",
+                "/enterprise/strategic", extract="html:gap-count",
+                scope="capability shortfall"),
+        Surface("GET /enterprise/implementation/gap-analysis (Gap Analysis)", "http",
+                "/enterprise/implementation/gap-analysis", extract="html:gap-count",
+                scope="capability shortfall"),
         Surface("orm:Gap(plateau transition)", "orm",
                 "app.models.implementation_migration.Gap",
                 filter_eq={"gap_kind": "plateau_transition"},
@@ -548,6 +561,19 @@ def _extract(payload, spec):
     if isinstance(node, bool) or not isinstance(node, (int, float)):
         raise KeyError("%r is not a number: %r" % (path, node))
     return int(node)
+
+
+def _extract_html(text, testid):
+    """(count, reason) read from the element a rendered screen marks
+    data-testid="<testid>". A screen shows a figure to a person; this reads
+    the same figure, so a number that appears only on a page is compared too."""
+    import re
+
+    match = re.search(
+        r'data-testid="%s"[^>]*>\s*([\d,]+)\s*<' % re.escape(testid), text)
+    if not match:
+        return None, "the page carries no figure marked %r" % testid
+    return int(match.group(1).replace(",", "")), None
 
 
 # --------------------------------------------------------------------------
@@ -969,6 +995,8 @@ def _ask(surface, db, client, org_id=None):
         return None, "the request raised: %s" % str(exc)[:160]
     if response.status_code != 200:
         return None, "HTTP %d (not an answer, so not compared)" % response.status_code
+    if (surface.extract or "").startswith("html:"):
+        return _extract_html(response.get_data(as_text=True), surface.extract[5:])
     try:
         payload = response.get_json()
     except Exception:

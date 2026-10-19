@@ -32,7 +32,7 @@ def index():
         "architecture/cto_scorecard.html",
         versions=svc.supported_version_share(org_id),
         exceptions=svc.open_exceptions(org_id),
-        agreement=svc.store_agreement_findings(org_id),
+        agreement=svc.store_agreement_findings(org_id, user=current_user._get_current_object()),
         exposure=exposure_rows,
         exposure_window_months=svc.lead_months_for(org_id),
     )

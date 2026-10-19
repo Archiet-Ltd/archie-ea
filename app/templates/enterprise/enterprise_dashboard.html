@@ -81,7 +81,7 @@
             <div class="flex items-start justify-between">
                 <div>
                     <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Gaps Identified</p>
-                    <p class="text-3xl font-bold tracking-tight {% if gaps_count %}text-warning{% else %}text-foreground{% endif %} mt-2">{{ gaps_count|dash }}</p>
+                    <p class="text-3xl font-bold tracking-tight {% if gaps_count %}text-warning{% else %}text-foreground{% endif %} mt-2" data-testid="gap-count">{{ gaps_count|dash }}</p>
                     <p class="text-2xs text-muted-foreground mt-1">Require attention</p>
                 </div>
                 <div class="p-2.5 rounded-lg {% if gaps_count %}bg-warning/10{% else %}bg-muted{% endif %}">

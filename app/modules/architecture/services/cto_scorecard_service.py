@@ -89,11 +89,19 @@ def escalate(organization_id: int, change_request_id: int) -> bool:
     return True
 
 
-def store_agreement_findings(organization_id: int) -> Dict[str, Any]:
+def store_agreement_findings(organization_id: int, user=None) -> Dict[str, Any]:
     """Read-only reuse of the store-agreement gate's own comparison engine.
 
-    Returns {"findings": [...], "notes": [...], "error": str|None}. An
-    import or runtime failure is reported as an error string, never silently
+    Every store AND every screen that answers a question is asked, the screens
+    as ``user`` (the signed-in reader) -- a figure that appears only on a page
+    is compared too. With no ``user`` only the stores can be asked, and the
+    result says so rather than implying the screens agree.
+
+    Returns {"findings": [...], "notes": [...], "error": str|None,
+    "questions": int, "compared": int, "not_compared": [...]}. ``compared`` is
+    how many questions had two or more surfaces actually answer with a
+    non-empty result; the scorecard's all-clear is only ever claimed from that
+    number. An import or runtime failure is reported as an error string, never
     swallowed into an empty (and therefore falsely reassuring) list.
     """
     try:
@@ -105,14 +113,29 @@ def store_agreement_findings(organization_id: int) -> Dict[str, Any]:
         g.current_org_id = organization_id
         try:
             observations, notes = observe_tenant(
-                current_app._get_current_object(), db, organization_id, http=False,
+                current_app._get_current_object(), db, organization_id,
+                user=user, http=user is not None,
             )
         finally:
             g.current_org_id = prior_org_id
         findings, compare_notes = compare(observations)
-        return {"findings": findings, "notes": notes + compare_notes, "error": None}
+        all_notes = notes + compare_notes
+        not_compared = sorted(
+            {n.split("[", 1)[0].strip() for n in all_notes if "[no-evidence]" in n}
+        )
+        return {
+            "findings": findings,
+            "notes": all_notes,
+            "error": None,
+            "questions": len(observations),
+            "compared": len(observations) - len(not_compared),
+            "not_compared": not_compared,
+            "screens_asked": user is not None,
+        }
     except Exception as exc:  # noqa: BLE001 - surfaced to the page, not swallowed
-        return {"findings": [], "notes": [], "error": str(exc)[:300]}
+        return {"findings": [], "notes": [], "error": str(exc)[:300],
+                "questions": 0, "compared": 0, "not_compared": [],
+                "screens_asked": False}
 
 
 def end_of_support_exposure(
