@@ -688,7 +688,7 @@ def test_arrivals_on_one_node_side_stay_apart_and_chip_and_ring_are_drawn_from_t
     assert abs(a["x"] - b["x"]) >= 12, (a, b)
     chips = page.evaluate("""() => {
       const out = [];
-      R.graph.getLinks().forEach(l => { (l.labels() || []).forEach(x => out.push([x.attrs.rect.fill, x.attrs.rect.stroke, x.attrs.rect.strokeDasharray])); });
+      R.graph.getLinks().forEach(l => { (l.labels() || []).forEach(x => out.push([x.attrs.chip.fill, x.attrs.chip.stroke, x.attrs.chip.strokeDasharray])); });
       return {chips: out, card: resolved('--card'), border: resolved('--border')};
     }""".replace("resolved(", "((n) => 'hsl(' + getComputedStyle(document.getElementById('host')).getPropertyValue(n).trim() + ')')("))
     assert chips["chips"]
