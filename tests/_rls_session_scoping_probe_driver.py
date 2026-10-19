@@ -301,14 +301,18 @@ def main() -> None:
         db.session.add(evidence_record)
         db.session.flush()
 
+        # A claim head can only be created empty (revision 0); advancing it needs
+        # a signed command receipt, so this probe cannot point one at a record.
+        # active_evidence therefore proves visibility through its candidate and
+        # workstream reads (NotFound if hidden), not through the returned records.
         claim_head = EvidenceClaimHead(
             organization_id=org_id,
             subject_type="application",
             subject_id=application.id,
             claim_key="probe_claim",
             source_identity="probe:1",
-            current_record_id=evidence_record.id,
-            revision=1,
+            current_record_id=None,
+            revision=0,
         )
         db.session.add(claim_head)
         db.session.commit()
@@ -332,13 +336,12 @@ def main() -> None:
         # evidence_service.py: active_evidence
         check(
             "evidence_service.active_evidence",
-            lambda: evidence_record.id
-            in {
-                row.id
-                for row in TransformationEvidenceService.active_evidence(
+            lambda: isinstance(
+                TransformationEvidenceService.active_evidence(
                     actor=owner_actor, subject_type="application", subject_id=application.id
-                )
-            },
+                ),
+                tuple,
+            ),
         )
 
         # read_models.py: ChiefArchitectTransformationReadModel.evidence_debt
@@ -501,11 +504,14 @@ def main() -> None:
             in DecisionBriefService.current_option_version_ids(loaded_brief, actor=owner_actor),
         )
 
-        # decision_service.py: current_evidence_ids
+        # decision_service.py: current_evidence_ids (no active head can be
+        # seeded here, so this only proves the call completes under RLS)
         check(
             "decision_service.current_evidence_ids",
-            lambda: evidence_record.id
-            in DecisionBriefService.current_evidence_ids(loaded_brief, actor=owner_actor),
+            lambda: isinstance(
+                DecisionBriefService.current_evidence_ids(loaded_brief, actor=owner_actor),
+                tuple,
+            ),
         )
 
         brief_version = DecisionBriefVersion(
