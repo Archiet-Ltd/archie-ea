@@ -355,6 +355,17 @@ else:
         superseded_at = db.Column(db.DateTime, nullable=True)
         last_confirmed = db.Column(db.DateTime, nullable=True)
 
+        # End-of-support dates carried on the element itself -- the technology
+        # element's own support record, distinct from VendorProduct.end_of_life_date
+        # which the CTO scorecard and the alert scanner read. Migration
+        # 20261019_support_dates adds these columns and copies any Device or
+        # SystemSoftware eos_date into support_end_date. All four are nullable
+        # per ADR-0002: existing elements simply have no support date recorded.
+        support_end_date = db.Column(db.Date, nullable=True)
+        extended_support_end_date = db.Column(db.Date, nullable=True)
+        support_source = db.Column(db.String(128), nullable=True)
+        support_verified_on = db.Column(db.Date, nullable=True)
+
         # Relationship tracking
         parent_id = db.Column(db.Integer, db.ForeignKey("archimate_elements.id"), nullable=True)
 

@@ -100,6 +100,14 @@ if _FAST_INIT:
         superseded_at = db.Column(db.DateTime, nullable=True)
         last_confirmed = db.Column(db.DateTime, nullable=True)
 
+        # End-of-support dates carried on the element itself, mirroring
+        # app/models/models.py's ArchiMateElement so both mappings keep one
+        # shape (see ADR 0002). Migration 20261019_support_dates adds them.
+        support_end_date = db.Column(db.Date, nullable=True)
+        extended_support_end_date = db.Column(db.Date, nullable=True)
+        support_source = db.Column(db.String(128), nullable=True)
+        support_verified_on = db.Column(db.Date, nullable=True)
+
         # Relationships
         # Note: app_component relationship is handled in the main ArchiMateElement model
         # to avoid conflicts with the duplicate class definition
