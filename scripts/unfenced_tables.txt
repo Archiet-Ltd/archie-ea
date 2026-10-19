@@ -31,9 +31,6 @@ ai_prompt_templates
 ai_recommendations
 ai_service_configs
 ai_suggestions
-analysis_audit_logs
-analysis_recommendations
-analysis_scenarios
 application_business_actor_mapping
 application_business_metrics
 application_capability
@@ -309,7 +306,6 @@ refactoring_tracking
 regulatory_frameworks
 relationship_suggestions
 replacement_plans
-required_capabilities
 requirement_change_log
 requirement_dependencies
 requirement_template
@@ -449,7 +445,6 @@ vendor_comparison_criteria
 vendor_concentration_analysis
 vendor_data_sources
 vendor_integration_catalog
-vendor_options
 vendor_organization_embeddings
 vendor_organizations
 vendor_process_hierarchy
