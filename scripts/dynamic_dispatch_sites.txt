@@ -8,8 +8,8 @@
 #
 # --- Accepted: every model the site can reach is fenced or global -----------------------
 app/services/portfolio_search_service.py:377  # _MODEL_MAP is five models: ApplicationComponent, BusinessCapability, ArchiMateElement, Solution (all fenced) and VendorOrganization (global catalogue). session.get is tenant-scoped on an identity-map miss only; entity_id is caller-supplied, so callers must still validate it (see the sweep report).
-app/services/architecture_assistant_service.py:1773  # three candidate modules, all resolving to ApplicationComponent (fenced); looks the referenced application up by id to confirm it exists.
-app/modules/ai_chat/services/context_aware_ai_helper.py:375  # selects a column of the model passed by the caller; both callers pass ApplicationComponent or UnifiedCapability (fenced); column is resolved with getattr, not the model.
+app/services/architecture_assistant_service.py:1784  # three candidate modules, all resolving to ApplicationComponent (fenced); looks the referenced application up by id to confirm it exists.
+app/modules/ai_chat/services/context_aware_ai_helper.py:391  # selects a column of the model passed by the caller; both callers pass ApplicationComponent or UnifiedCapability (fenced); column is resolved with getattr, not the model.
 app/services/query_optimization_service.py:254  # optimize_count_queries(model, column): model is a parameter, there is no caller in the tree; the model is whatever a future caller passes and is fenced at execution if it inherits TenantMixin.
 app/services/query_optimization_service.py:183  # BatchQueryExecutor.execute: models come from add_query(); no caller in the tree.
 app/modules/admin/v2/services/seed_management_service_v2.py:135  # record counts of the seeded reference catalogues; reached from a platform-admin route (admin_routes seed management).
