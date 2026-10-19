@@ -127,6 +127,22 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+  /* Dense table (design/patterns.json: dense-table). shadcn-components.css
+     scopes table rules to #main-content by id, so the pilot geometry needs an
+     id-plus-class selector to apply: 40px header, 48px rows, 12px cell
+     padding, hairline rows, card-coloured sticky header. */
+  #main-content .dense-table thead {
+    background-color: hsl(var(--card));
+  }
+  #main-content .dense-table th {
+    height: 2.5rem;
+    padding: 0 0.75rem;
+    letter-spacing: 0.06em;
+  }
+  #main-content .dense-table td {
+    height: 3rem;
+    padding: 0 0.75rem;
+  }
   /* The question line above an answer cascade. */
   .question-line {
     font-family: theme(fontFamily.serif);

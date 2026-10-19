@@ -39,12 +39,8 @@
 
             init: function () {
                 var self = this;
-                this.loadChanges().then(function () { return self.pickElement(); }).then(function (element) {
-                    if (!element) { self.state = 'empty'; return; }
-                    self.centreId = element.id;
-                    self.centreName = element.name;
-                    self.questionText = 'What breaks if ' + element.name + ' fails or is under-resourced?';
-                    return self.load(element.id);
+                this.loadChanges().then(function () { return self.pickElement(); }).then(function (candidates) {
+                    return self.loadFirstWithRows(candidates || []);
                 }).catch(function () { self.state = 'error'; });
             },
 
@@ -72,17 +68,41 @@
                     .catch(function () { self.changesState = 'error'; });
             },
 
+            /* The element to ask about: the most recently changed application
+             * when there is one, otherwise the most connected application-layer
+             * element the search returns. Resolution happens in load(), which
+             * walks the candidates until one has recorded connections. */
             pickElement: function () {
                 var candidate = this.changes.filter(function (c) {
                     return /application/.test(c.tableName || '') && c.what && c.what.charAt(0) !== '#';
                 })[0];
-                var term = candidate ? candidate.what : '';
-                if (!term) {
-                    return Intelligence.searchElements('a').then(function (hits) { return hits[0] || null; });
-                }
-                return Intelligence.searchElements(term).then(function (hits) {
-                    var exact = hits.filter(function (h) { return String(h.name).toLowerCase() === term.toLowerCase(); })[0];
-                    return exact || hits[0] || null;
+                var terms = candidate ? [candidate.what] : ['a', 'e', 'i', 'o', 's'];
+                var seen = {};
+                return Promise.all(terms.map(function (t) {
+                    return Intelligence.searchElements(t).catch(function () { return []; });
+                })).then(function (lists) {
+                    var hits = [];
+                    lists.forEach(function (list) {
+                        list.forEach(function (h) { if (!seen[h.id]) { seen[h.id] = true; hits.push(h); } });
+                    });
+                    if (candidate) {
+                        var exact = hits.filter(function (h) { return String(h.name).toLowerCase() === candidate.what.toLowerCase(); })[0];
+                        if (exact) { hits.unshift(exact); }
+                    }
+                    var apps = hits.filter(function (h) { return h.layer === 'application'; });
+                    var pool = (apps.length ? apps : hits).sort(function (a, b) { return (b.relationship_count || 0) - (a.relationship_count || 0); });
+                    return pool.slice(0, 8);
+                });
+            },
+
+            /* Try candidates in order until one answers with rows. */
+            loadFirstWithRows: function (candidates) {
+                var self = this;
+                if (!candidates.length) { this.state = 'empty'; return Promise.resolve(); }
+                var head = candidates[0];
+                return this.load(head.id).then(function () {
+                    if (self.state === 'ready' || candidates.length === 1) { return; }
+                    return self.loadFirstWithRows(candidates.slice(1));
                 });
             },
 

@@ -343,7 +343,7 @@
        bulkUpdateLifecycle() / promptBulkAssignOwner() / promptBulkTag() in
        static/js/applications/list.js. #}
 
-<table class="w-full border-collapse" data-testid="applications-table">
+<table class="dense-table w-full border-collapse" data-testid="applications-table">
         <thead class="sticky top-0 z-10 bg-card">
           <tr class="border-b border-border">
             <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle w-10 text-left">
@@ -405,8 +405,8 @@
             </td>
             <td class="px-3 py-0 align-middle"><span class="text-xs font-mono text-muted-foreground">{{ app.id }}</span></td>
             <td class="px-3 py-0 align-middle">
-              <p class="font-medium text-sm text-foreground truncate max-w-[200px]" title="{{ app.name | e }}">{{ app.name }}</p>
-              {% if app.description %}<p class="text-xs text-muted-foreground truncate max-w-[200px]">{{ app.description[:80] }}{% if app.description | length > 80 %}…{% endif %}</p>{% endif %}
+              <p class="font-medium text-sm text-foreground truncate max-w-[220px]" title="{{ app.name | e }}{% if app.description %} — {{ app.description[:120] | e }}{% endif %}">{{ app.name }}</p>
+              </p>{% endif %}
             </td>
             <td class="px-3 py-0 align-middle"><span class="text-sm text-muted-foreground">{{ app.component_type or '—' }}</span></td>
             <td class="px-3 py-0 align-middle text-center">

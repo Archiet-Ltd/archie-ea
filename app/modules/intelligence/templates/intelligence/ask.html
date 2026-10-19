@@ -67,7 +67,7 @@
        is rendered once and always; a chip sets openKey, which onSelect() in
        ask.js dispatches on. Chip ids are the contract the smoke journeys drive. #}
     <div class="mx-auto max-w-[760px] space-y-3">
-        <div class="ask-large-input">{{ entity_picker('ask', prompt='Type a team, service or system name') }}</div>
+        <div class="ask-large-input">{{ entity_picker('ask', prompt='Type a team, service or system name', input_class='h-12 w-full rounded-md border border-input bg-background px-4 text-base') }}</div>
         <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Question">
             {% set chip_labels = {
                 'impact': 'What breaks if it fails?',

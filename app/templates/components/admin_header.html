@@ -4,7 +4,7 @@
 {% set resolved_page_guide_context = page_guide_context | default({'enabled': false, 'supported': false}, true) %}
 {% from 'components/switch.html' import switch %}
 <header id="admin-header"
-        class="sticky top-0 z-30 flex items-center justify-between h-12 pl-14 lg:pl-4 pr-4 bg-background border-b border-border">
+        class="sticky top-0 z-30 flex h-12 shrink-0 items-center justify-between pl-14 lg:pl-4 pr-4 bg-background border-b border-border">
     <div class="flex items-center gap-4">
         <!-- Mobile sidebar open trigger lives in layouts/admin_base.html
              ("Global mobile sidebar opener") — it x-shows only while the sidebar is
