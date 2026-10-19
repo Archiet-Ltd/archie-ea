@@ -154,7 +154,6 @@ compliance_checks
 compliance_controls
 compliance_gaps
 compliance_governance_reports
-compliance_requirements
 compliance_requirements_model
 compliance_scan_reports
 composite_structures
@@ -280,7 +279,6 @@ platform_migration_scopes
 platform_types
 policy_enforcement
 policy_exemptions
-portfolio_initiatives
 process_actor_raci
 process_application_mapping
 process_embeddings
@@ -396,7 +394,6 @@ structural_locations
 subscriptions
 suggestion_feedback
 sync_logs
-system_boundaries
 system_dependencies
 system_deployments
 system_hierarchies
@@ -404,7 +401,6 @@ system_interfaces
 system_lifecycles
 system_settings
 systems
-tasks
 taxonomy_mappings
 tco_benchmarks
 tco_calculations
@@ -439,14 +435,12 @@ users
 validation_gates
 validation_violations
 vendor_archimate_templates
-vendor_capability_hierarchy
 vendor_comparison_criteria
 vendor_concentration_analysis
 vendor_data_sources
 vendor_integration_catalog
 vendor_organization_embeddings
 vendor_organizations
-vendor_process_hierarchy
 vendor_product_aliases
 vendor_product_apqc_mapping
 vendor_product_details
