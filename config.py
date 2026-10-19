@@ -121,6 +121,19 @@ class Config:
         if c.strip()
     ]
 
+    # ADR 0013: how the database tenant context is carried on every connection.
+    # enforce = the engine hook writes it; log = it only compares with the older
+    # writers and logs each difference; off = it does nothing on ordinary
+    # connections. Development and testing enforce; production overrides to log.
+    ARCHIE_TENANT_GUC_MODE = os.environ.get("ARCHIE_TENANT_GUC_MODE", "enforce")
+    # off / alert / refuse: the boot check that the runtime role cannot bypass
+    # row-level security. Production overrides to alert.
+    ARCHIE_DB_ROLE_CHECK = os.environ.get("ARCHIE_DB_ROLE_CHECK", "off")
+    # CI only (one extra round trip per statement): read the settings back.
+    ARCHIE_TENANT_GUC_SELFCHECK = os.environ.get(
+        "ARCHIE_TENANT_GUC_SELFCHECK", ""
+    ).lower() in ("1", "true", "yes")
+
     APP_NAME = os.environ.get("APP_NAME", "Entelim")
     # The assistant's citation gate: "log" (default; answers are shown
     # unchanged and an answer the gate would refuse is logged), "enforce"
@@ -721,6 +734,12 @@ class ProductionConfig(Config):
     DEBUG = False
     USE_RELOADER = False
 
+    # ADR 0013 rollout: observe before enforcing, alert before refusing. The
+    # self-check is a CI tool and is never switched on here.
+    ARCHIE_TENANT_GUC_MODE = os.environ.get("ARCHIE_TENANT_GUC_MODE", "log")
+    ARCHIE_DB_ROLE_CHECK = os.environ.get("ARCHIE_DB_ROLE_CHECK", "alert")
+    ARCHIE_TENANT_GUC_SELFCHECK = False
+
     # Session cookie security.
     #
     # Secure defaults to TRUE here. It used to be derived from
@@ -775,6 +794,10 @@ class ProductionConfig(Config):
             )
 
         Config.init_app(app)
+        if os.environ.get("ARCHIE_TENANT_GUC_SELFCHECK"):
+            app.logger.warning(
+                "ARCHIE_TENANT_GUC_SELFCHECK is set and is ignored in production"
+            )
         assert os.environ.get("SECRET_KEY"), "SECRET_KEY IS NOT SET!"
         if not app.config.get("TRANSFORMATION_COMMAND_CAPABILITY_SECRET"):
             raise ValueError(
