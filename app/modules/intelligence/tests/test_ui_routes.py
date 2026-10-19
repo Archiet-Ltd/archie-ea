@@ -585,7 +585,7 @@ def test_derived_edges_are_dashed_and_badged_and_explicit_edges_are_solid():
     # The page tells the engine which connections were worked out; the engine draws the
     # dash and the written badge (asserted on the rendered page in the browser tests).
     twin = _code(_scripts()["twin_map.js"])
-    assert "provenance: edge.kind === 'derived' ? 'derived' : 'recorded'" in twin
+    assert "provenance: edge.kind === 'derived' ? 'derivation' : 'explicit'" in twin
     assert "stale: edge.stale === true" in twin
     assert "var WORKED_OUT = 'Worked out';" in _code(_scripts()["core.js"])
 
