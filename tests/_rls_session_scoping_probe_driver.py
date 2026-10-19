@@ -35,6 +35,9 @@ import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+
 os.environ.setdefault("FLASK_CONFIG", "testing")
 
 from app import create_app, db  # noqa: E402
@@ -486,18 +489,24 @@ def main() -> None:
             status="draft",
             revision=1,
         )
-        db.session.add(brief)
-        db.session.flush()
+        # The runtime role may not INSERT into decision_briefs / decision_brief_versions
+        # (only the signed archie_* functions may), so these two fixtures are written
+        # through the schema owner's connection; every read below is still the runtime role.
+        owner_engine = create_engine(os.environ["PROBE_OWNER_URL"])
+        owner_session = Session(owner_engine)
+        owner_session.add(brief)
+        owner_session.commit()
+        brief_id_value = brief.id
 
         # decision_service.py: load_brief_for_tenant
         check(
             "decision_service.load_brief_for_tenant",
-            lambda: DecisionBriefService.load_brief_for_tenant(owner_actor, brief.id).id
-            == brief.id,
+            lambda: DecisionBriefService.load_brief_for_tenant(owner_actor, brief_id_value).id
+            == brief_id_value,
         )
 
         # decision_service.py: current_option_version_ids
-        loaded_brief = DecisionBriefService.load_brief_for_tenant(owner_actor, brief.id)
+        loaded_brief = DecisionBriefService.load_brief_for_tenant(owner_actor, brief_id_value)
         check(
             "decision_service.current_option_version_ids",
             lambda: version.id
@@ -516,7 +525,7 @@ def main() -> None:
 
         brief_version = DecisionBriefVersion(
             organization_id=org_id,
-            brief_id=brief.id,
+            brief_id=brief_id_value,
             workstream_id=workstream_id,
             version=1,
             source_revision=1,
@@ -530,23 +539,24 @@ def main() -> None:
             created_by_id=owner.id,
             content_hash="1" * 64,
         )
-        db.session.add(brief_version)
-        db.session.commit()
+        owner_session.add(brief_version)
+        owner_session.commit()
+        brief_version_id_value = brief_version.id
 
         # decision_service.py: require_latest_frozen_version
         check(
             "decision_service.require_latest_frozen_version",
             lambda: DecisionBriefService.require_latest_frozen_version(loaded_brief).id
-            == brief_version.id,
+            == brief_version_id_value,
         )
 
         # decision_service.py: require_version_for_tenant
         check(
             "decision_service.require_version_for_tenant",
             lambda: DecisionBriefService.require_version_for_tenant(
-                owner_actor, brief_version.id
+                owner_actor, brief_version_id_value
             ).id
-            == brief_version.id,
+            == brief_version_id_value,
         )
 
         # --- execution_service.py: _await_or_recover_export_attempt's

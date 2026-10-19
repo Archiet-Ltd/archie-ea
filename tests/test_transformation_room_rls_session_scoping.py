@@ -52,8 +52,13 @@ from __future__ import annotations
 
 import json
 import sys
+from urllib.parse import urlsplit, urlunsplit
 
-from tests.test_runtime_role_domain_writes import _run, deployed_roles_database  # noqa: F401
+from tests.test_runtime_role_domain_writes import (  # noqa: F401
+    _maintenance_url,
+    _run,
+    deployed_roles_database,
+)
 
 
 # One call site per fixed function (see the module docstring for which file
@@ -86,7 +91,9 @@ EXPECTED_OK_KEYS = (
 )
 
 
-def test_every_fixed_independent_session_sees_its_own_tenant_rows(deployed_roles_database):
+def test_every_fixed_independent_session_sees_its_own_tenant_rows(
+    deployed_roles_database, monkeypatch
+):
     """Every independent session this change fixed must see its own org's rows.
 
     Run against the pre-fix code, every key below whose function opens a
@@ -96,6 +103,12 @@ def test_every_fixed_independent_session_sees_its_own_tenant_rows(deployed_roles
     silently hides every row from a session with no tenant context -- exactly
     the production symptom PR 763 fixed for ``command_service.py``.
     """
+    # The runtime role cannot insert decision briefs directly; the driver seeds
+    # those two fixtures through the maintenance (owner) login on the same database.
+    owner_url = urlunsplit(
+        urlsplit(_maintenance_url())._replace(path=f"/{deployed_roles_database['name']}")
+    )
+    monkeypatch.setenv("PROBE_OWNER_URL", owner_url)
     done = _run(
         [sys.executable, "-m", "tests._rls_session_scoping_probe_driver"],
         deployed_roles_database["runtime_url"],
