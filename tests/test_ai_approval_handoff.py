@@ -446,6 +446,16 @@ def test_backfill_is_idempotent_and_reports_no_remaining_nulls(db_session, make_
     from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
 
     org = make_org("approval-backfill")
+    # A second organisation must exist before the legacy row is flushed. The
+    # tenant column default (app/models/mixins/core.py::_default_org_id) falls
+    # back to "the sole Organization row" outside a request context, exactly
+    # the single-tenant self-hosted case it is meant for. With only `org` in
+    # the database that fallback fires here too, silently attributing the
+    # legacy row at insert time and leaving nothing for the backfill to find.
+    # A second org makes the attribution genuinely ambiguous, matching the
+    # real legacy data this command exists to repair, so the row is inserted
+    # NULL as the test intends.
+    make_org("approval-backfill-other")
     requester = _make_user(db_session, org.id, "Requester")
     approval = AIChatCRUDApproval(
         user_id=requester.id,
@@ -460,6 +470,7 @@ def test_backfill_is_idempotent_and_reports_no_remaining_nulls(db_session, make_
     )
     db_session.add(approval)
     db_session.flush()
+    assert approval.organization_id is None
 
     first = run_backfill()
     second = run_backfill()
