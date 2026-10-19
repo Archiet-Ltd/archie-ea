@@ -1184,6 +1184,38 @@ let ComposerRenderer = (function() {
         return { zones: zones, placements: placements, height: Math.max(y, BAND_HEADER), nodeWidth: nodeW, nodeHeight: nodeH, perRow: perRow };
     }
 
+        /* Provenance styling for one edge. A no-op unless the relationship names a
+           provenance (an existing payload that happens to carry a `key` is untouched).
+           Derived edges are dashed AND carry a text badge; colour never carries the
+           meaning on its own.
+           Platform vocabulary (see derived_relationship.py and intelligence/services/
+           query_service.py): a worked-out fact carries provenance 'derivation' and/or
+           kind 'derived'; a genuinely recorded fact carries provenance 'explicit'. Any
+           other value is unrecognised and must NOT render with the confident "recorded"
+           styling -- it falls back to the safer, dashed "worked out" treatment. */
+        function decorateEdge(link, rel) {
+            if (!rel || !rel.provenance) return;
+            let isDerived = rel.provenance === 'derivation' || rel.kind === 'derived';
+            let isExplicit = rel.provenance === 'explicit';
+            let kind = isDerived ? 'derived' : (isExplicit ? 'recorded' : 'derived');
+            link.set('provenance', kind);
+            link.set('stale', rel.stale === true);
+            link.set('edgeKey', rel.key != null ? rel.key : (rel.id != null ? rel.id : null));
+            link.attr('root/data-kind', kind);
+            if (link.get('edgeKey') != null) link.attr('root/data-edge', String(link.get('edgeKey')));
+            if (kind === 'derived') {
+                link.attr('line/strokeDasharray', '4,4');
+                let text = rel.stale === true ? '◷ Worked out, may be out of date' : 'Worked out';
+                link.appendLabel({
+                    attrs: {
+                        text: { text: text, fontSize: 10, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif', fill: '#1a1a1a' },
+                        rect: { fill: '#fff', stroke: '#1a1a1a', strokeWidth: 0.5, strokeDasharray: '3,2', rx: 3, ry: 3, ref: 'text', refWidth: 8, refHeight: 4, refX: -4, refY: -2 },
+                    },
+                    position: { distance: 0.5, offset: 14 },
+                });
+            }
+        }
+
     /* ── Public factory: create a renderer bound to a container element ── */
     function create(containerEl, opts) {
         opts = opts || {};
@@ -1255,38 +1287,6 @@ let ComposerRenderer = (function() {
             node.attr('nameLabel/textAnchor', 'middle');
             node.attr('nameLabel/textVerticalAnchor', 'middle');
             node.attr('nameLabel/textWrap', { width: -16, maxLineCount: 2, ellipsis: true });
-        }
-
-        /* Provenance styling for one edge. A no-op unless the relationship names a
-           provenance (an existing payload that happens to carry a `key` is untouched).
-           Derived edges are dashed AND carry a text badge; colour never carries the
-           meaning on its own.
-           Platform vocabulary (see derived_relationship.py and intelligence/services/
-           query_service.py): a worked-out fact carries provenance 'derivation' and/or
-           kind 'derived'; a genuinely recorded fact carries provenance 'explicit'. Any
-           other value is unrecognised and must NOT render with the confident "recorded"
-           styling -- it falls back to the safer, dashed "worked out" treatment. */
-        function decorateEdge(link, rel) {
-            if (!rel || !rel.provenance) return;
-            let isDerived = rel.provenance === 'derivation' || rel.kind === 'derived';
-            let isExplicit = rel.provenance === 'explicit';
-            let kind = isDerived ? 'derived' : (isExplicit ? 'recorded' : 'derived');
-            link.set('provenance', kind);
-            link.set('stale', rel.stale === true);
-            link.set('edgeKey', rel.key != null ? rel.key : (rel.id != null ? rel.id : null));
-            link.attr('root/data-kind', kind);
-            if (link.get('edgeKey') != null) link.attr('root/data-edge', String(link.get('edgeKey')));
-            if (kind === 'derived') {
-                link.attr('line/strokeDasharray', '4,4');
-                let text = rel.stale === true ? '◷ Worked out, may be out of date' : 'Worked out';
-                link.appendLabel({
-                    attrs: {
-                        text: { text: text, fontSize: 10, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif', fill: '#1a1a1a' },
-                        rect: { fill: '#fff', stroke: '#1a1a1a', strokeWidth: 0.5, strokeDasharray: '3,2', rx: 3, ry: 3, ref: 'text', refWidth: 8, refHeight: 4, refX: -4, refY: -2 },
-                    },
-                    position: { distance: 0.5, offset: 14 },
-                });
-            }
         }
 
         function styleNode(node, layer, width) {
@@ -1596,6 +1596,7 @@ let ComposerRenderer = (function() {
         humanizeRelType: humanizeRelType,
         createNode: createNode,
         createLink: createLink,
+        decorateEdge: decorateEdge,
         createContainerNode: createContainerNode,
         applyImportedElementPresentation: applyImportedElementPresentation,
         createSpecialNode: createSpecialNode,

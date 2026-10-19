@@ -1511,6 +1511,28 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
             </div>
         </div>
 
+        {# ── Focus mode banner: an unsaved view opened from ?element= ───────── #}
+        <div x-show="focusView" x-cloak id="composer-focus-banner"
+             role="region" aria-label="Unsaved view"
+             class="absolute top-3 left-1/2 -translate-x-1/2 z-40 bg-card border shadow-xl rounded-xl px-5 py-3 max-w-xl"
+             style="border-color: hsl(var(--border));">
+            <div class="flex items-start gap-3">
+                <div class="flex-1">
+                    <h3 class="text-sm font-semibold text-foreground mb-1" id="composer-focus-title"
+                        x-text="focusView ? ('Unsaved view: ' + focusView.name + ', ' + _focusHopsText(focusView.depth)) : ''"></h3>
+                    <p class="text-xs text-muted-foreground mb-1" x-show="focusView && focusView.empty">No connections at this depth</p>
+                    <p class="text-xs text-muted-foreground mb-2" x-show="focusView && focusView.hasDerived">Worked-out connections are shown dashed and are not stored with a saved diagram.</p>
+                    <div class="flex gap-2">
+                        <button type="button" id="composer-focus-save" @click="saveFocusView()"
+                                :disabled="focusView && focusView.saving"
+                                class="px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">Save as diagram</button>
+                        <button type="button" id="composer-focus-discard" @click="discardFocusView()"
+                                class="px-3 py-1.5 text-xs font-medium rounded-md border text-foreground hover:bg-accent transition-colors" style="border-color: hsl(var(--border));">Discard</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {# ── Right detail panel (floating) ──────────────────── #}
         <div x-show="selectedNode || selectedEdge" x-cloak x-transition
              class="detail-panel">
@@ -2306,6 +2328,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
         crossorigin="anonymous"></script>
 <script src="{{ url_for('static', filename='vendor/pptxgenjs.bundle.js') }}"></script>
 <script src="{{ url_for('static', filename='js/archimate/composer_renderer.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
 <script src="{{ url_for('static', filename='js/archimate/composer_ai.js') }}"></script>
 <script src="{{ url_for('static', filename='js/archimate/composer_persistence.js') }}"></script>
 <script src="{{ url_for('static', filename='js/archimate/composer_graph.js') }}"></script>
@@ -2318,7 +2341,11 @@ window.__COMPOSER_CONFIG__ = {
     startBlank: {{ ('true' if request.args.get('blank') else 'false') }},
     initialViewpoint: {{ initial_viewpoint|tojson }},
     initialLayer: {{ initial_layer|tojson }},
-};
+{% if focus %}    focusElement: {{ focus.element|tojson }},
+    focusName: {{ focus.name|tojson }},
+    focusDepth: {{ focus.depth|tojson }},
+    focusDerived: {{ focus.derived|tojson }},
+{% endif %}};
 document.addEventListener('DOMContentLoaded', function() {
     if (window.lucide) lucide.createIcons();
 });

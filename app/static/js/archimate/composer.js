@@ -825,6 +825,9 @@ function composerApp() {
         savedViewpoints: [],
         currentSavedVpId: null,
         viewpointDirty: false,
+        /* Focus mode: an unsaved view of one element's impact neighbourhood
+           ({name, depth, derived, ids, hasDerived, empty, saving}) or null. */
+        focusView: null,
         /* GAP-CMP-007: ARB review status */
         viewpointReviewStatus: '',
 
@@ -2470,7 +2473,7 @@ function composerApp() {
             this.graph.on('change:elName', relMatrixRefresh);
 
             window.addEventListener('beforeunload', function(e) {
-                if (self.viewpointDirty && self.currentSavedVpId) {
+                if (self.viewpointDirty && (self.currentSavedVpId || self.focusView)) {
                     e.preventDefault();
                     e.returnValue = '';
                 }
@@ -2502,7 +2505,7 @@ function composerApp() {
                 }
             } catch(_) { /* swallow-ok: reading the localStorage crash-recovery snapshot throws in private mode; there is then simply no restore prompt, which promised the user nothing */ }
             setInterval(function() {
-                if (!self.graph || !self.viewpointDirty) return;
+                if (!self.graph || !self.viewpointDirty || self.focusView) return;
                 if (self.graph.getElements().length === 0) return;
                 try {
                     localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
@@ -2543,6 +2546,13 @@ function composerApp() {
                 this.loadViewpointTabs();
                 this.loadSavedViewpoint(parseInt(savedVpId, 10), '');
                 this.$nextTick(function() { self.viewpointDirty = false; UndoStack.clear(); });
+                return;
+            }
+
+            /* ── Focus mode: ?element=<id>&depth=<n>&derived=<0|1> ── */
+            let focusCfg = window.__COMPOSER_CONFIG__ || {};
+            if (focusCfg.focusElement) {
+                this._openFocusView(focusCfg.focusElement, focusCfg.focusName, focusCfg.focusDepth, focusCfg.focusDerived);
                 return;
             }
 
@@ -3062,6 +3072,133 @@ function composerApp() {
 
         /* ── Save viewpoint ────────────────────────────────── */
 
+
+        /* ── Focus mode: an element's impact neighbourhood as an unsaved view ──
+           Data: the impact answer (Intelligence.fetchImpact/buildRows/buildGraph),
+           the same answer the Twin Map shows. Canvas: the shared loader
+           _addCanvasCells. Worked-out links are drawn by the engine's decorateEdge. */
+        _focusHopsText: function(n) { return n + (n === 1 ? ' hop' : ' hops'); },
+
+        _openFocusView: function(elementId, centreName, depth, includeDerived) {
+            let self = this;
+            self.viewpointLoading = true;
+            self.statusText = 'Loading neighbourhood...';
+            let fail = function(err) {
+                self.viewpointLoading = false;
+                self.focusView = null;
+                self.statusText = 'Failed to load the neighbourhood of ' + (centreName || 'this element');
+                _toast('error', 'Could not load the neighbourhood of ' + (centreName || 'this element'));
+                if (window.console && console.error) console.error('composer focus mode', err);
+            };
+            if (!window.Intelligence) { fail(new Error('Intelligence core not loaded')); return; }
+            Intelligence.fetchImpact(elementId, { maxDepth: depth, includeDerived: includeDerived })
+            .then(function(payload) {
+                let rows = Intelligence.buildRows(payload, elementId);
+                let graph = Intelligence.buildGraph(rows, payload, elementId);
+
+                UndoStack.pause();
+                self.graph.clear();
+                self.canvasElements = {};
+                self._clearNeighborFocus();
+                let elements = graph.nodes.map(function(n) {
+                    return { id: n.id, name: n.name || ('Element #' + n.id), type: n.type || 'ApplicationComponent',
+                             layer: n.layer || '', x: 0, y: 0 };
+                });
+                let relationships = graph.edges.map(function(e) {
+                    return { id: e.key, source_id: e.from, target_id: e.to,
+                             type: String(e.type || 'association').toLowerCase(), kind: e.kind, stale: e.stale };
+                });
+                let loaded = self._addCanvasCells(elements, relationships, function(link, rel) {
+                    ComposerRenderer.decorateEdge(link, {
+                        provenance: rel.kind === 'derived' ? 'derivation' : 'explicit',
+                        kind: rel.kind, stale: rel.stale === true, key: rel.id
+                    });
+                });
+                self.elementCount = elements.length;
+                self.relCount = relationships.length;
+                self.layoutDagre('TB');
+                UndoStack.resume();
+                UndoStack.clear();
+
+                self.currentSavedVpId = null;
+                self.mode = 'edit';
+                self.viewpointLoading = false;
+                self.viewpointDirty = true;
+                self.focusView = {
+                    name: centreName || ('Element #' + elementId),
+                    depth: depth,
+                    derived: includeDerived,
+                    ids: elements.map(function(e) { return e.id; }),
+                    hasDerived: relationships.some(function(r) { return r.kind === 'derived'; }),
+                    empty: relationships.length === 0,
+                    saving: false
+                };
+
+                let centre = loaded.cellMap[elementId];
+                if (centre) {
+                    let view = self.paper.findViewByModel(centre);
+                    self._clearSelection();
+                    self._selectedCells = [centre];
+                    if (view) self._highlightCell(view);
+                    self.selectedEdge = null;
+                    self.selectedNode = {
+                        elementId: elementId, label: centre.get('elName') || '(unnamed)',
+                        elType: centre.get('elType') || '', layer: centre.get('elLayer') || '',
+                        description: '', status: '', relationshipCount: 0, viewpointCount: 0,
+                        solutionCount: 0, _zoneType: 'default'
+                    };
+                    self._currentSelectedCell = centre;
+                    self._applyNeighborFocus(centre);
+                }
+                self.statusText = relationships.length === 0 ? 'No connections at this depth' : 'Neighbourhood loaded';
+                self.$nextTick(function() { if (window.lucide) lucide.createIcons(); });
+            })
+            .catch(function(err) { UndoStack.resume(); fail(err); });
+        },
+
+        saveFocusView: function() {
+            let self = this;
+            let fv = self.focusView;
+            if (!fv || fv.saving) return;
+            fv.saving = true;
+            Platform.fetch.post('/archimate/api/create-diagram-from-elements', {
+                element_ids: fv.ids,
+                name: fv.name + ' and neighbours, ' + self._focusHopsText(fv.depth)
+            }, { silent: true })
+            .then(function(resp) {
+                let data = (resp && resp.data) ? resp.data : resp;
+                if (!data || !data.composer_url) throw new Error('No diagram returned');
+                self.viewpointDirty = false;
+                self.focusView = null;
+                window.location.href = data.composer_url;
+            })
+            .catch(function(err) {
+                fv.saving = false;
+                self.statusText = 'Failed to save the diagram';
+                _toast('error', 'Could not save the diagram');
+                if (window.console && console.error) console.error('composer focus save', err);
+            });
+        },
+
+        discardFocusView: function() {
+            let self = this;
+            UndoStack.pause();
+            self._clearNeighborFocus();
+            self.graph.clear();
+            self.canvasElements = {};
+            UndoStack.resume();
+            UndoStack.clear();
+            self.elementCount = 0;
+            self.relCount = 0;
+            self.selectedNode = null;
+            self.selectedEdge = null;
+            self.focusView = null;
+            self.viewpointDirty = false;
+            self.statusText = 'Ready';
+            let url = new URL(window.location.href);
+            ['element', 'depth', 'derived'].forEach(function(k) { url.searchParams.delete(k); });
+            window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+        },
 
         /* ── Neighbor focus (view mode) ───────────────────── */
         _applyNeighborFocus: function(targetCell) {
