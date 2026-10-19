@@ -14,7 +14,7 @@ fails loudly and lists their ids.
 Idempotent: every step checks before it acts, so a second run is a no-op.
 
 Revision ID: 20261018_element_comment_org_id
-Revises: 20261018_typed_tables_rls
+Revises: 20261018_tree_models_rls
 Create Date: 2026-10-18
 """
 import sqlalchemy as sa
@@ -22,7 +22,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "20261018_element_comment_org_id"
-down_revision = "20261018_typed_tables_rls"
+down_revision = "20261018_tree_models_rls"
 branch_labels = None
 depends_on = None
 
