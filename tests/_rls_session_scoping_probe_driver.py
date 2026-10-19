@@ -618,10 +618,12 @@ def main() -> None:
         # tenant context on a connection makes RLS admit exactly that
         # organisation's rows and none other -- the regression this whole
         # change guards against.
-        other = AccountService.register_user(
-            "Rls", "Other", f"rls-other-{suffix}@example.com", "Passw0rd!long1", confirmed=True
-        )
-        db.session.commit()
+        with app.test_request_context("/"):
+            other = AccountService.register_user(
+                "Rls", "Other", f"rls-other-{suffix}@example.com", "Passw0rd!long1",
+                confirmed=True,
+            )
+            db.session.commit()
         other_org_id = other.organization_id
 
         def _cross_tenant_hidden():
