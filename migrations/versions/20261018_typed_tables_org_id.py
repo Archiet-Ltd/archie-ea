@@ -13,10 +13,21 @@ is guessed, it stays NULL, matches no organisation's filter, and the column is
 only tightened to NOT NULL on a table where no NULL remains. The number of
 unattributed rows is printed.
 
-The deliverable parent-source list duplicates ``_DELIVERABLE_ORG_SOURCES`` in
-``app/models/implementation_migration.py`` (same four parents, used there by a
-``before_insert`` listener for new rows rather than this migration's one-time
-backfill of existing ones). Not imported: this file follows the same
+The deliverable parent-source list overlaps ``_DELIVERABLE_ORG_SOURCES`` in
+``app/models/implementation_migration.py`` (a ``before_insert`` listener for
+new rows rather than this migration's one-time backfill of existing ones), but
+the two have drifted and are not identical: this migration tries five parents
+in archimate-element-first order (``archimate_element_id``,
+``unified_work_package_id``, ``work_package_id``, ``application_component_id``,
+``architecture_id``); the listener tries four, work-package-first
+(``unified_work_package_id``, ``work_package_id``, ``archimate_element_id``,
+``application_component_id``), and has no ``architecture_id`` branch at all. A
+deliverable with two of these parents set to different organisations can in
+principle be backfilled to one organisation by this migration and assigned to
+a different one by the listener on a later insert of a similar row -- narrow,
+not fixed here since changing the listener's live insert-time behaviour is a
+separate decision from an urgent-security migration. Not imported: this file
+follows the same
 copied-not-imported convention as ``20261018_vendor_analysis_rls`` and
 ``20261008_row_level_security`` before it, so a migration stays runnable
 unchanged even if the model's event-listener logic moves later. This backfill
@@ -70,9 +81,15 @@ SOURCES = {
         ("archimate_elements", "archimate_element_id"),
         ("application_components", "application_component_id"),
     ),
+    # source_component_id/target_component_id were missing here, same shape as
+    # the application_collaborations fix above: a row linked only through one
+    # of those two (no archimate_element_id or application_component_id) was
+    # not backfilled.
     "application_interactions": (
         ("archimate_elements", "archimate_element_id"),
         ("application_components", "application_component_id"),
+        ("application_components", "source_component_id"),
+        ("application_components", "target_component_id"),
     ),
     # application_component_id was missing here: a row linked only through it
     # (archimate_element_id NULL) backfilled to nothing and stayed invisible
