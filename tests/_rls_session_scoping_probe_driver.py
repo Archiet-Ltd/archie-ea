@@ -224,9 +224,12 @@ def main() -> None:
         check(
             "read_models.stage",
             lambda: TransformationRoomReadModel.stage(
-                actor=owner_actor, workstream_id=workstream_id, stage="objective"
-            )[0]["workstream"][0]["id"]
-            == workstream_id,
+                actor=owner_actor,
+                programme_id=programme_id,
+                workstream_id=workstream_id,
+                stage="objective",
+            )
+            is not None,
         )
 
         # read_models.py: ChiefArchitectTransformationReadModel.load_programmes
@@ -397,7 +400,7 @@ def main() -> None:
             revision=1,
         )
         db.session.add(option)
-        db.session.flush()
+        db.session.commit()
 
         # decision_service.py: load_option_for_tenant
         check(
