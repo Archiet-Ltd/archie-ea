@@ -491,6 +491,33 @@ class TestReferenceCapabilityTree:
         assert resp.status_code == 200
         assert client.delete(f"{BASE}/reference_capability/{owned.id}").status_code == 200
 
+    def test_delete_does_not_reparent_another_organisations_child(
+        self, client, login_as, db_session, reference_model, org_a, org_b, architect_a
+    ):
+        """delete_node reparents a deleted node's children to its own parent.
+        That reparenting query used no tenancy filter at all, so deleting a
+        node org_a legitimately owns could silently rewrite another
+        organisation's private child row -- a row org_a cannot even see
+        through this API. Only a child visible to the caller (shared, or the
+        caller's own) may be reparented; org_b's private child must come out
+        of this delete untouched.
+        """
+        from app.models.reference_models import ReferenceModelCapability
+
+        parent = _owned_reference_capability(db_session, reference_model, org_a.id, "A parent")
+        own_child = _owned_reference_capability(db_session, reference_model, org_a.id, "A child")
+        own_child.parent_capability_id = parent.id
+        other_org_child = _owned_reference_capability(db_session, reference_model, org_b.id, "B child")
+        other_org_child.parent_capability_id = parent.id
+        db_session.commit()
+
+        login_as(client, architect_a)
+        assert client.delete(f"{BASE}/reference_capability/{parent.id}").status_code == 200
+
+        db_session.expire_all()
+        assert db_session.get(ReferenceModelCapability, own_child.id).parent_capability_id is None
+        assert db_session.get(ReferenceModelCapability, other_org_child.id).parent_capability_id == parent.id
+
 
 class TestUnifiedCapabilityTree:
     """UnifiedCapability keeps its own session listeners; they are correct."""
