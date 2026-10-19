@@ -251,13 +251,17 @@ def _is_connector_tool(schema: dict) -> bool:
 
 
 def _title_from_name(name: str) -> str:
-    """Convert a tool name to a plain English title."""
-    if name.startswith("ask_"):
-        return "Ask " + name[4:].replace("_", " ")
-    # For non-ask tools: replace underscores with spaces and capitalise first letter
-    spaced = name.replace("_", " ")
-    # Capitalise the first letter of the entire string
-    return spaced[0].upper() + spaced[1:] if spaced else spaced
+    """Convert a tool name to a plain English title.
+
+    Split on underscores, drop empty words, join with single spaces, and
+    capitalise the first letter. A name with no words returns an empty
+    string, so no stray or trailing spaces can appear.
+    """
+    words = [word for word in name.split("_") if word]
+    if not words:
+        return ""
+    title = " ".join(words)
+    return title[0].upper() + title[1:]
 
 
 def connector_tools() -> list[dict]:
@@ -270,9 +274,7 @@ def connector_tools() -> list[dict]:
     tools = []
     for schema in TOOL_SCHEMAS:
         if _is_connector_tool(schema):
-            title = schema.get("title")
-            if title is None:
-                title = _title_from_name(schema["name"])
+            title = schema.get("title") or _title_from_name(schema["name"])
             tools.append({
                 "name": schema["name"],
                 "description": schema["description"],
@@ -283,7 +285,7 @@ def connector_tools() -> list[dict]:
     for alias, target in CONNECTOR_ALIASES.items():
         for tool in list(tools):
             if tool["name"] == target:
-                tools.append({**tool, "name": alias})
+                tools.append({**tool, "name": alias, "title": _title_from_name(alias)})
     return sorted(tools, key=lambda t: t["name"])
 
 
