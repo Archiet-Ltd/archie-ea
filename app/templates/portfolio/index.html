@@ -1,5 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/empty_state.html' import empty_state %}
 
 {% block title %}Portfolio{% endblock %}
 
@@ -124,23 +125,13 @@
     </table>
 
     {% else %}
-    <div class="py-16 px-6 text-center">
-      <div class="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-        <i data-lucide="briefcase" class="h-5 w-5 text-muted-foreground" aria-hidden="true"></i>
-      </div>
-      <p class="text-base font-semibold text-foreground">No initiatives recorded yet</p>
-      <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
-        This is the transformation portfolio: each initiative tracks its phase,
-        RAG health, approved budget against spend, completion and the benefits
-        it is expected to deliver. Once initiatives exist here you can record
-        demand against them, log benefit measurements and track assumptions.
-      </p>
-      <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
-        Initiatives are not created from this screen — they arrive with your
-        portfolio data load (import or seed). Ask your administrator to load
-        them, or use the enterprise-initiative import.
-      </p>
-    </div>
+    {{ empty_state(
+        icon='briefcase',
+        title='No initiatives yet',
+        description='Initiatives are loaded with your portfolio data. Each one tracks its phase, health, budget against spend and expected benefits.',
+        cta_text='Talk to us about loading yours',
+        cta_href=url_for('main.public_site_page', slug='contact')
+    ) }}
     {% endif %}
   </div>
 
