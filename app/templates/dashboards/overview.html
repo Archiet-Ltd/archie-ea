@@ -138,7 +138,7 @@
     <div class="space-y-3">
         <div class="flex items-center gap-2">
             <i data-lucide="layout-grid" class="h-4 w-4 text-primary" aria-hidden="true"></i>
-            <h2 class="text-sm font-semibold text-foreground">Your Workspace</h2>
+            <h2 class="text-xl font-semibold tracking-[-0.01em] text-foreground">Your Workspace</h2>
         </div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             {# Shell-overhaul Wave 2 (Task 5): these used to be a hand-maintained
@@ -260,7 +260,7 @@
             {% call section_card() %}
                 <div class="flex items-center justify-between gap-4">
                     <div>
-                        <h2 class="text-sm font-semibold text-foreground">Architecture Overview — Layered Viewpoint</h2>
+                        <h2 class="text-xl font-semibold tracking-[-0.01em] text-foreground">Architecture Overview — Layered Viewpoint</h2>
                         <p class="text-xs text-muted-foreground mt-1">
                             {{ '{:,}'.format(nav_stats.elements) if nav_stats and nav_stats.elements else '0' }} elements ·
                             {{ '{:,}'.format(nav_stats.relationships) if nav_stats and nav_stats.relationships else '0' }} relationships across all ArchiMate layers
@@ -311,7 +311,7 @@
                 <div class="flex items-center justify-between px-5 py-3 border-b border-border">
                     <div class="flex items-center gap-2">
                         <i data-lucide="shield-alert" class="h-4 w-4 text-primary"></i>
-                        <h2 class="text-sm font-semibold text-foreground">AI governance</h2>
+                        <h2 class="text-xl font-semibold tracking-[-0.01em] text-foreground">AI governance</h2>
                     </div>
                     {% if governance_alerts.briefing_flagged %}
                     <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30">
@@ -491,7 +491,7 @@
             <p x-show="execError" x-cloak class="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" x-text="execError"></p>
             <template x-if="execData">
                 <div class="rounded-xl border border-border bg-card p-5 mb-6">
-                    <h3 class="text-sm font-semibold text-foreground mb-3">Executive Summary</h3>  <!-- frontend-quality-ok -->
+                    <h3 class="text-base font-semibold text-foreground mb-3">Executive Summary</h3>  <!-- frontend-quality-ok -->
                     <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
                         <template x-for="(val, key) in execData" :key="key">
                             <div class="rounded-lg border border-border bg-background p-3">
@@ -573,8 +573,8 @@
                         <table class="w-full text-sm">
                             <thead class="bg-muted/50">
                                 <tr>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Category</th>
-                                    <th class="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Total Cost</th>
+                                    <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground px-4 py-2 text-left">Category</th>
+                                    <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground px-4 py-2 text-right">Total Cost</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -624,7 +624,7 @@
             <div class="rounded-lg border border-border bg-card p-6">
                 <div class="flex items-start justify-between gap-4">
                     <div>
-                        <h2 class="text-lg font-semibold text-foreground" x-text="(_layers[activeRole]||{label:''}).label + ' layer'"></h2>
+                        <h2 class="text-xl font-semibold tracking-[-0.01em] text-foreground" x-text="(_layers[activeRole]||{label:''}).label + ' layer'"></h2>
                         <p class="mt-1 max-w-2xl text-sm text-muted-foreground" x-text="(_layers[activeRole]||{blurb:''}).blurb"></p>
                     </div>
                     <div class="shrink-0 text-right">
