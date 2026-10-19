@@ -337,10 +337,13 @@ def test_parent_chain_resolves_a_table_with_no_creator_fallback(scratch, table):
 
 def test_an_existing_organisation_is_never_overwritten(scratch):
     _upgrade_org_id(scratch)
+    # organisation 2 (not 1, task 'a''s own project-derived organisation) so
+    # a passing test can only mean the value survived untouched, not that
+    # the backfill happened to recompute the same answer.
     with scratch.begin() as connection:
-        connection.execute(text("UPDATE tasks SET organization_id = 99 WHERE note = 'a'"))
+        connection.execute(text("UPDATE tasks SET organization_id = 2 WHERE note = 'a'"))
     _upgrade_org_id(scratch)
-    assert _org_by_note(scratch, "tasks")["a"] == 99
+    assert _org_by_note(scratch, "tasks")["a"] == 2
 
 
 def test_an_existing_foreign_key_under_another_name_is_not_duplicated(scratch):
