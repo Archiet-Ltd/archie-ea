@@ -24,6 +24,19 @@ from app.models.unified_capability import UnifiedCapability
 from app.models.vendor.vendor_organization import VendorOrganization
 from app.services.llm_service import LLMService
 
+
+def _org_cache_key(key: str) -> Optional[str]:
+    """Prefix ``key`` with the active organisation; None when there is none.
+
+    The helper is a process-wide singleton and what it caches is read from
+    organisation-owned tables, so the organisation has to be part of the key and
+    nothing may be cached without one.
+    """
+    from flask import g, has_app_context
+
+    org_id = getattr(g, "current_org_id", None) if has_app_context() else None
+    return None if org_id is None else "org%s:%s" % (org_id, key)
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,10 +89,11 @@ class ContextAwareAIHelper:
         Returns:
             Dictionary of contextual information
         """
-        cache_key = f"{context_type}:{str(kwargs)}"
+        # Keyed by organisation; with no organisation in context nothing is cached.
+        cache_key = _org_cache_key(f"{context_type}:{str(kwargs)}")
 
         # Check cache first
-        if cache_key in self._context_cache:
+        if cache_key and cache_key in self._context_cache:
             cached = self._context_cache[cache_key]
             if (datetime.utcnow() - cached["timestamp"]).seconds < 300:  # 5 min TTL
                 return cached["data"]
@@ -101,7 +115,8 @@ class ContextAwareAIHelper:
                 context = self._load_general_context(**kwargs)
 
             # Cache the context
-            self._context_cache[cache_key] = {"data": context, "timestamp": datetime.utcnow()}
+            if cache_key:
+                self._context_cache[cache_key] = {"data": context, "timestamp": datetime.utcnow()}
 
         except Exception as e:
             self.logger.error(f"Error loading context: {e}", exc_info=True)
@@ -125,8 +140,8 @@ class ContextAwareAIHelper:
         """
         try:
             # Check suggestions cache
-            cache_key = f"{field_name}:{partial_value or ''}"
-            if cache_key in self._suggestions_cache:
+            cache_key = _org_cache_key(f"{field_name}:{partial_value or ''}")
+            if cache_key and cache_key in self._suggestions_cache:
                 cached = self._suggestions_cache[cache_key]
                 if (datetime.utcnow() - cached["timestamp"]).seconds < 60:
                     return cached["data"]
@@ -163,7 +178,8 @@ class ContextAwareAIHelper:
             }
 
             # Cache the result
-            self._suggestions_cache[cache_key] = {"data": result, "timestamp": datetime.utcnow()}
+            if cache_key:
+                self._suggestions_cache[cache_key] = {"data": result, "timestamp": datetime.utcnow()}
 
             return result
 
