@@ -158,19 +158,22 @@ def test_foreign_organisation_cannot_comment_on_its_own_element(scene, client, l
     assert resp.status_code == 404, resp.get_data(as_text=True)
 
 
-def test_comment_stamped_with_its_elements_organisation(scene, client, login_as):
-    """A comment written through the route carries the element's organisation,
-    stamped from the element, never from the request. Fails on the base commit
-    where the comment table has no organisation column."""
+def test_comment_table_is_tenant_fenced(scene, client, login_as, tenant_ctx):
+    """The comment table itself is fenced: organisation B cannot see organisation A's comment."""
     from app import db
     from app.models.archimate_viewpoint import ArchimateElementComment
 
-    _post(client, login_as, scene["user_a"], scene["el_a"], "mine")
+    # Organisation A creates a comment on its own element
+    _post(client, login_as, scene["user_a"], scene["el_a"], "A's comment")
     db.session.remove()
-    login_as(client, scene["user_a"])
-    comment = (
-        db.session.query(ArchimateElementComment)
-        .filter_by(element_id=scene["el_a"])
-        .one()
-    )
-    assert comment.organization_id == scene["org_a"]
+
+    # Organisation B's session queries the comment table directly
+    with tenant_ctx(scene["org_b"]):
+        comments_b = db.session.query(ArchimateElementComment).filter_by(element_id=scene["el_a"]).all()
+    assert len(comments_b) == 0, "Organisation B should not see organisation A's comment"
+
+    # Organisation A's session still sees its own comment
+    with tenant_ctx(scene["org_a"]):
+        comments_a = db.session.query(ArchimateElementComment).filter_by(element_id=scene["el_a"]).all()
+    assert len(comments_a) == 1, "Organisation A should see its own comment"
+    assert comments_a[0].comment_text == "A's comment"

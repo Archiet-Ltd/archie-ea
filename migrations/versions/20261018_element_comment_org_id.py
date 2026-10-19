@@ -91,8 +91,7 @@ def upgrade():
         print(f"element comment tenancy: skipped {TABLE} (table absent)")
         return
     if not _may_alter(bind):
-        print(f"element comment tenancy: skipped {TABLE} (not owned by the migration role)")
-        return
+        raise RuntimeError(f"{TABLE}: migration role does not own the table")
     if not _has_column(bind):
         op.add_column(TABLE, sa.Column("organization_id", sa.Integer(), nullable=True))
     # Backfill from the element's organisation; never guess a value.
@@ -106,7 +105,6 @@ def upgrade():
     orphans = bind.execute(
         text(
             f"SELECT c.id FROM {TABLE} AS c "
-            f"LEFT JOIN {ELEMENT_TABLE} AS e ON e.id = c.element_id "
             f"WHERE c.organization_id IS NULL"
         )
     ).scalars().all()
