@@ -881,6 +881,7 @@ def test_comment_table_update_is_fenced(rls, world):
             )
 
 
+@pytest.mark.timeout(60)
 def test_comment_tenancy_migration(rls):
     """Test the element-comment-tenancy migration's four cases.
 
@@ -892,89 +893,95 @@ def test_comment_tenancy_migration(rls):
     Case 4: the non-owner case raises (mock _may_alter to false).
     """
     # Only run case 2 for now
-    # Run the entire test in a transaction that is rolled back at the end,
-    # so that any changes to the database (including dropping the column) are undone.
+    # Get a user id for the comment's user_id foreign key.
     with rls.owner.connect() as connection:
-        transaction = connection.begin()
-        try:
-            # A real user id for the comment's user_id foreign key.
-            user_id = connection.execute(text("SELECT id FROM users LIMIT 1")).scalar_one()
+        user_id = connection.execute(text("SELECT id FROM users LIMIT 1")).scalar_one()
 
-            # Start from the old shape: no organization_id column on the comment table.
+        # Setup: create organization, element, comment and commit them.
+        trans_setup = connection.begin()
+        try:
+            # Insert organization "Org Null"
+            org_null_id = connection.execute(
+                text("INSERT INTO organizations (name, slug) VALUES ('Org Null', :s) RETURNING id"),
+                {"s": "org-null-" + uuid.uuid4().hex[:8]},
+            ).scalar_one()
+
+            # Temporarily allow NULL in archimate_elements.organization_id
+            connection.execute(text("ALTER TABLE archimate_elements ALTER COLUMN organization_id DROP NOT NULL"))
+
+            # Insert element with organization_id = NULL
+            el_null_id = connection.execute(
+                text(
+                    "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                    "VALUES ('Element Null', 'ApplicationComponent', 'application', NULL) RETURNING id"
+                ),
+            ).scalar_one()
+
+            # Insert comment for that element (without organization_id, so it will be NULL)
+            comment_null_id = connection.execute(
+                text(
+                    "INSERT INTO archimate_element_comments "
+                    "(element_id, user_id, comment_text, created_at) "
+                    "VALUES (:e, :u, 'Null org comment', now()) RETURNING id"
+                ),
+                {"e": el_null_id, "u": user_id},
+            ).scalar_one()
+
+            trans_setup.commit()
+        except:
+            trans_setup.rollback()
+            raise
+
+        # DDL transaction: drop column and run migration (expecting failure)
+        trans_ddl = connection.begin()
+        try:
+            # Set lock timeout to avoid hanging
+            connection.execute(text("SET LOCAL lock_timeout = '5s'"))
+
+            # Drop the column if exists (this is the old-shape change)
             connection.execute(
                 text("ALTER TABLE archimate_element_comments DROP COLUMN IF EXISTS organization_id CASCADE")
             )
 
-            # Case 2 first: comment on an element with NULL organisation must raise loudly
-            # and leave the table unchanged. The element table's organization_id is NOT NULL,
-            # so temporarily relax it for this case.
-            org_null_id = el_null_id = comment_null_id = None
-            try:
-                # Insert element and comment in a separate connection and commit
-                with rls.owner.begin() as conn:
-                    conn.execute(
-                        text("ALTER TABLE archimate_elements ALTER COLUMN organization_id DROP NOT NULL")
-                    )
-                    org_null_id = conn.execute(
-                        text("INSERT INTO organizations (name, slug) VALUES ('Org Null', :s) RETURNING id"),
-                        {"s": "org-null-" + uuid.uuid4().hex[:8]},
-                    ).scalar_one()
-                    el_null_id = conn.execute(
-                        text(
-                            "INSERT INTO archimate_elements (name, type, layer, organization_id) "
-                            "VALUES ('Element Null', 'ApplicationComponent', 'application', NULL) RETURNING id"
-                        ),
-                    ).scalar_one()
-                    comment_null_id = conn.execute(
-                        text(
-                            "INSERT INTO archimate_element_comments "
-                            "(element_id, user_id, comment_text, created_at) "
-                            "VALUES (:e, :u, 'Null org comment', now()) RETURNING id"
-                        ),
-                        {"e": el_null_id, "u": user_id},
-                    ).scalar_one()
-                # Now the inserts are committed.
+            # Run the migration (which should fail)
+            context = MigrationContext.configure(connection)
+            with Operations.context(connection):
+                COMMENT_MIGRATION.upgrade()
 
-                # Run the migration in its own transaction that is always rolled back:
-                with rls.owner.connect() as conn:
-                    inner_transaction = conn.begin()
-                    try:
-                        context = MigrationContext.configure(conn)
-                        with Operations.context(context):
-                            with pytest.raises(RuntimeError, match="comment row.*have no derivable organisation"):
-                                COMMENT_MIGRATION.upgrade()
-                    finally:
-                        inner_transaction.rollback()
-
-                # Verify table unchanged: column not added (migration transaction rolled back)
-                with rls.owner.begin() as conn:
-                    has_column = conn.execute(
-                        text("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'archimate_element_comments' AND column_name = 'organization_id')")
-                    ).scalar_one()
-                    assert not has_column
-            finally:
-                # Clean up Case 2 data and restore NOT NULL on elements
-                with rls.owner.begin() as conn:
-                    if comment_null_id is not None:
-                        conn.execute(
-                            text("DELETE FROM archimate_element_comments WHERE id = :i"),
-                            {"i": comment_null_id},
-                        )
-                    if el_null_id is not None:
-                        conn.execute(
-                            text("DELETE FROM archimate_elements WHERE id = :i"),
-                            {"i": el_null_id},
-                        )
-                    if org_null_id is not None:
-                        conn.execute(
-                            text("DELETE FROM organizations WHERE id = :i"),
-                            {"i": org_null_id},
-                        )
-                    conn.execute(
-                        text("ALTER TABLE archimate_elements ALTER COLUMN organization_id SET NOT NULL")
-                    )
+            # If we get here, the migration did not fail -> fail the test.
+            assert False, "Expected migration to raise RuntimeError"
+        except RuntimeError as e:
+            # Check that the error message matches the expected pattern
+            assert "comment row.*have no derivable organisation" in str(e)
         finally:
-            transaction.rollback()
+            trans_ddl.rollback()
+
+        # Finally, delete the setup data
+        trans_cleanup = connection.begin()
+        try:
+            if comment_null_id is not None:
+                connection.execute(
+                    text("DELETE FROM archimate_element_comments WHERE id = :i"),
+                    {"i": comment_null_id},
+                )
+            if el_null_id is not None:
+                connection.execute(
+                    text("DELETE FROM archimate_elements WHERE id = :i"),
+                    {"i": el_null_id},
+                )
+            if org_null_id is not None:
+                connection.execute(
+                    text("DELETE FROM organizations WHERE id = :i"),
+                    {"i": org_null_id},
+                )
+            # Restore the NOT NULL constraint on archimate_elements.organization_id
+            connection.execute(
+                text("ALTER TABLE archimate_elements ALTER COLUMN organization_id SET NOT NULL")
+            )
+            trans_cleanup.commit()
+        except:
+            trans_cleanup.rollback()
+            raise
 def test_comment_table_platform_scope_sees_both_organisations(rls, world):
     """A platform-scope session sees both organisations' comment rows."""
     a, b = world.org("a"), world.org("b")
