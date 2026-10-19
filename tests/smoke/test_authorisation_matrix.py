@@ -1643,6 +1643,30 @@ def test_approval_impact_route_authorisation(archetype, page, live_server, seede
         assert response.status == 403, "%s reached the impact route (%s)" % (archetype, response.status)
 
 
+# Duplicate detection: the run history is an organisation-administrator surface.
+# Running detection was platform-admin only, which refused every new organisation's
+# own administrator; the seeded personas below are not administrators, so they must
+# stay refused while the organisation administrator and the platform admin reach it.
+DUPLICATE_DETECTION_RUNS_PATH = "/duplicate-detection/simple/runs"
+DUPLICATE_DETECTION_RUNS_PERMITTED = {"platform_admin"}
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_duplicate_detection_runs_authorisation(archetype, page, live_server, seeded):
+    _login(page, live_server, seeded["emails"][archetype])
+    expected = ALLOWED if archetype in DUPLICATE_DETECTION_RUNS_PERMITTED else DENIED
+    actual = _observe(page, live_server, DUPLICATE_DETECTION_RUNS_PATH)
+    assert actual == expected, (
+        f"{archetype} on {DUPLICATE_DETECTION_RUNS_PATH}: expected {expected}, got {actual}"
+    )
+
+
+def test_duplicate_detection_runs_open_to_organisation_admin(page, live_server, org_admin_email):
+    """The organisation's own administrator (not a platform admin) reaches it."""
+    _login(page, live_server, org_admin_email)
+    assert _observe(page, live_server, DUPLICATE_DETECTION_RUNS_PATH) == ALLOWED
+
+
 @pytest.mark.parametrize("archetype", ARCHETYPES)
 def test_ai_chat_entity_matching_write_permission(archetype, page, live_server, seeded):
     """POST /ai-chat/entity-matching carries @login_required and no enterprise-
