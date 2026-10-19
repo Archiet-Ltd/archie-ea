@@ -55,7 +55,7 @@ def init_inline_routes(app: Flask, config_name: str):
 # Module-level rather than a closure local so a test can assert a FRESH probe
 # instead of silently asserting against a 30-second-old answer, which is the
 # one thing a health-check test must not do.
-_health_cache = {"result": None, "timestamp": 0.0}
+_health_cache = {"result": None, "timestamp": 0.0}  # cache-tenancy-ok: process health payload, identical for every organisation
 _CACHE_TTL_SECONDS = 30
 
 

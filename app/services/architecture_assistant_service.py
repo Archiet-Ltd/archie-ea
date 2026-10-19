@@ -40,6 +40,8 @@ from typing import Any, Dict, List, Optional
 
 from flask import current_app
 
+from app.extensions.cache import org_scoped_cache_key
+
 from .. import db
 from ..models.ai_recommendations import AIRecommendation
 from ..services.archimate_model_generator import ArchiMateModelGenerator
@@ -50,7 +52,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # ENH-010: Capability and application catalog cache (TTL-based, in-process)
 # ---------------------------------------------------------------------------
-_capability_cache: dict = {}
+_capability_cache: dict = {}  # {organisation-scoped key: {"ts", "by_id", "by_name"}}
 _CAPABILITY_CACHE_TTL = 300  # 5 minutes
 
 
@@ -62,37 +64,48 @@ def _invalidate_capability_cache():
 def _get_capability_by_id(capability_id: int):
     """Return a UnifiedCapability by primary key, using an in-process TTL cache.
 
-    The first call within the TTL window fetches the full capability list and
-    indexes it by id and by name (lower-cased).  Subsequent calls hit the cache.
+    The first call within the TTL window fetches the active organisation's
+    capability list and indexes it by id and by name (lower-cased).  Subsequent
+    calls from the same organisation hit the cache.
     """
-    _ensure_capability_cache()
-    return _capability_cache.get("by_id", {}).get(int(capability_id))
+    return _capability_index().get("by_id", {}).get(int(capability_id))
 
 
 def _get_capability_by_name(name: str):
     """Return a UnifiedCapability whose name matches (case-insensitive)."""
-    _ensure_capability_cache()
-    return _capability_cache.get("by_name", {}).get((name or "").strip().lower())
+    return _capability_index().get("by_name", {}).get((name or "").strip().lower())
 
 
-def _ensure_capability_cache():
-    """Populate the cache if empty or expired."""
+def _capability_index():
+    """The active organisation's capability index, from cache when fresh.
+
+    The cache is keyed by organisation: a cache hit runs no query, so neither the
+    ORM tenant filter nor row-level security could stop one organisation being
+    handed another's capabilities. With no organisation in context the index is
+    built for this call only and nothing is kept.
+    """
+    org_key = org_scoped_cache_key("capability_index")
     now = _time.time()
-    if _capability_cache.get("ts") and now - _capability_cache["ts"] < _CAPABILITY_CACHE_TTL:
-        return  # still fresh
+    entry = _capability_cache.get(org_key) if org_key is not None else None
+    if entry and entry.get("ts") and now - entry["ts"] < _CAPABILITY_CACHE_TTL:
+        return entry
 
     try:
         from ..models.unified_capability import UnifiedCapability
 
         caps = UnifiedCapability.query.all()
-        by_id = {c.id: c for c in caps}
-        by_name = {c.name.strip().lower(): c for c in caps if c.name}
-        _capability_cache["by_id"] = by_id
-        _capability_cache["by_name"] = by_name
-        _capability_cache["ts"] = now
+        entry = {
+            "by_id": {c.id: c for c in caps},
+            "by_name": {c.name.strip().lower(): c for c in caps if c.name},
+            "ts": now,
+        }
+        if org_key is not None:
+            _capability_cache[org_key] = entry
         logger.debug("ENH-010: Capability cache refreshed — %d entries", len(caps))
+        return entry
     except Exception as exc:
         logger.warning("ENH-010: Could not refresh capability cache: %s", exc)
+        return {}
 
 
 # =============================================================================

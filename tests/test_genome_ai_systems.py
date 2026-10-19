@@ -2462,18 +2462,18 @@ def test_obligation_evidence_status_is_the_recorded_status(db_session, org):
     verified = datetime(2026, 1, 2, 3, 4, 5)
     db_session.add_all([
         ComplianceRequirement(
-            archimate_element_id=el.id, title="A started", description="d",
+            organization_id=el.organization_id, archimate_element_id=el.id, title="A started", description="d",
             requirement_type="regulatory", status="active",
             implementation_status="not_started",
             evidence_location="https://evidence.example/a", last_verified_at=verified,
         ),
         ComplianceRequirement(
-            archimate_element_id=el.id, title="B unset", description="d",
+            organization_id=el.organization_id, archimate_element_id=el.id, title="B unset", description="d",
             requirement_type="regulatory", status="active",
             implementation_status=None,
         ),
         ComplianceRequirement(
-            archimate_element_id=el.id, title="C done", description="d",
+            organization_id=el.organization_id, archimate_element_id=el.id, title="C done", description="d",
             requirement_type="regulatory", status="active",
             implementation_status="completed",
         ),
@@ -2527,14 +2527,14 @@ def test_register_obligation_badge_shows_recorded_status_and_facts(
     db_session.flush()
     db_session.add_all([
         ComplianceRequirement(
-            archimate_element_id=el.id, title="Located", description="d",
+            organization_id=el.organization_id, archimate_element_id=el.id, title="Located", description="d",
             requirement_type="regulatory", status="active",
             implementation_status="in_progress",
             evidence_location="https://evidence.example/located",
             last_verified_at=datetime(2026, 2, 3, 4, 5, 6),
         ),
         ComplianceRequirement(
-            archimate_element_id=el.id, title="Unset", description="d",
+            organization_id=el.organization_id, archimate_element_id=el.id, title="Unset", description="d",
             requirement_type="regulatory", status="active",
             implementation_status=None,
         ),

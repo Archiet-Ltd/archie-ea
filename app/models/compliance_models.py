@@ -17,6 +17,7 @@ from datetime import datetime
 from app import db
 
 from .mixins import TenantMixin
+from .mixins.core import _default_org_id
 from .relationship_tables import capability_compliance_requirements
 
 # ============================================================================
@@ -146,7 +147,7 @@ class RegulatoryFramework(db.Model):
 # ============================================================================
 
 
-class ComplianceRequirement(db.Model):
+class ComplianceRequirement(TenantMixin, db.Model):
     """
     Specific compliance requirements that must be met in architecture/implementation.
 
@@ -154,6 +155,21 @@ class ComplianceRequirement(db.Model):
     """
 
     __tablename__ = "compliance_requirements"
+
+    # Override TenantMixin's normally non-nullable column for an ADD-only
+    # rollout: the 20261018_tree_models_org_id migration adds this to an
+    # existing table and leaves a row NULL when no organisation is
+    # derivable from its linked ArchiMate element, business capability,
+    # parent requirement or creator. The mixin is still essential: tenant
+    # middleware identifies tenant-owned models by it and applies the
+    # automatic query fence.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
 
     id = db.Column(db.Integer, primary_key=True)
 

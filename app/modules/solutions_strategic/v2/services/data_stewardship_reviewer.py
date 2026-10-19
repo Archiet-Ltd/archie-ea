@@ -70,7 +70,7 @@ def _norm(raw: str) -> str:
 # Catches synonyms the lexical key misses (Customer ~ Client ~ Account Holder).
 _SEMANTIC_THRESHOLD = 0.58   # tuned: Customer~Client≈0.61, Customer~Invoice≈0.42
 _SEMANTIC_MAX = 250          # bound the cost; the catalogue is ~100 today
-_semantic_cache: Dict[tuple, list] = {}  # {frozenset(names): [(a, b, sim), ...]}
+_semantic_cache: Dict[tuple, list] = {}  # cache-tenancy-ok: holds only name-pair similarity scores, found by the exact set of names asked about  # {frozenset(names): [(a, b, sim), ...]}
 
 
 def _semantic_pairs(names: List[str]) -> List[tuple]:
