@@ -31,7 +31,6 @@ def test_link_dependencies_step2_loads_only_own_org_applications(
 ):
     """Signed-in user of org A sees only org A's applications in step 2."""
     from app.models.application_portfolio import ApplicationComponent
-    from app.models.models import ArchiMateElement
 
     org_a, org_b = make_org("a"), make_org("b")
     a_app = ApplicationComponent(name="App owned by A", organization_id=org_a.id)
@@ -39,20 +38,12 @@ def test_link_dependencies_step2_loads_only_own_org_applications(
     db_session.add_all([a_app, b_app])
     db_session.flush()
 
-    # The dialog passes the selected archimate element id as the step-2 id.
-    element = ArchiMateElement(
-        name="Selected element", type="ApplicationComponent", layer="application",
-        organization_id=org_a.id,
-    )
-    db_session.add(element)
-    db_session.flush()
-    element_id = element.id
-
     user = _make_user(db_session, org_a, "link-deps-user")
     login_as(client, user)
 
-    # Endpoint the dialog's JavaScript calls in step 2 (archimate context).
-    resp = client.get(f"/capability-map/api/capabilities/{element_id}/archimate-mappings")
+    # Endpoint the dialog's JavaScript calls in step 2 (archimate context):
+    # the canonical applications list reader, tenant-scoped to org A.
+    resp = client.get("/applications/api/list")
 
     assert resp.status_code == 200, resp.get_data(as_text=True)
     payload = resp.get_json()
