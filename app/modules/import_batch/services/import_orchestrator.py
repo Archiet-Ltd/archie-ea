@@ -42,7 +42,7 @@ audit_logger = logging.getLogger("import_audit")
 # user accidentally double-clicks or retries an import.
 # ---------------------------------------------------------------------------
 
-_import_idempotency_cache: Dict[str, Dict[str, Any]] = {}
+_import_idempotency_cache: Dict[str, Dict[str, Any]] = {}  # cache-tenancy-ok: key is a hash of the file content and the user id, so an entry is only ever found by the user who made it
 _idempotency_lock = threading.Lock()
 IDEMPOTENCY_TTL = 300  # fabricated-ok: config constant (idempotency window seconds), not measured data
 
