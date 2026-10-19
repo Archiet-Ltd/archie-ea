@@ -41,6 +41,7 @@ from .enterprise import enterprise_bp
 from .impact import impact_bp
 from .llm import llm_bp
 from .mappings import mappings_bp
+from .application_components import application_components_v1_bp
 from .strategy import strategy_v1_bp
 from .vendors import vendors_bp
 
@@ -55,6 +56,9 @@ api_v1_bp.register_blueprint(llm_bp, url_prefix="/llm")
 api_v1_bp.register_blueprint(impact_bp, url_prefix="/impact")
 api_v1_bp.register_blueprint(elements_v1_bp, url_prefix="/elements")
 api_v1_bp.register_blueprint(strategy_v1_bp, url_prefix="")
+api_v1_bp.register_blueprint(
+    application_components_v1_bp, url_prefix="/application-components"
+)
 
 
 # Legacy endpoint redirects with deprecation warnings

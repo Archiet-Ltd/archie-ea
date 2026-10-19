@@ -43,6 +43,8 @@ PUBLISHED_OPERATIONS = [
     "getCapability",
     "listValueStreams",
     "getValueStream",
+    "listApplicationComponents",
+    "getApplicationComponent",
 ]
 
 
