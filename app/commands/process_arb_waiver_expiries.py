@@ -6,6 +6,8 @@ import json
 
 import click
 
+from app.jobs.tenant_safe_job import platform_scope
+
 from app.modules.transformation_room.arb_waiver_expiry_batch_service import (
     ARBWaiverExpiryBatchService,
 )
@@ -28,9 +30,13 @@ from app.modules.transformation_room.arb_waiver_expiry_batch_service import (
 )
 def process_arb_waiver_expiries(organization_ids, batch_size):
     """Expire due typed ARB condition waivers for explicit organizations."""
-    result = ARBWaiverExpiryBatchService.run(
-        organization_ids=organization_ids, batch_size=batch_size
-    )
+    # One locked batch over the named organisations; every statement in it names
+    # its organization_id. Without this scope the row-level-security policies
+    # hide every due waiver from the runtime role (as the scheduler path does).
+    with platform_scope("typed ARB waiver expiry: the named organisations in one locked batch"):
+        result = ARBWaiverExpiryBatchService.run(
+            organization_ids=organization_ids, batch_size=batch_size
+        )
     click.echo(json.dumps(result.as_dict(), sort_keys=True))
     if result.failed_count:
         raise click.exceptions.Exit(1)
