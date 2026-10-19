@@ -13,10 +13,16 @@ from pathlib import Path
 
 import pytest
 
-from app.services.legal_pages import AWAITING_APPROVAL, LEGAL_PAGES_FLAG, legal_links
+from app.services.legal_pages import (
+    ALWAYS_PUBLISHED,
+    AWAITING_APPROVAL,
+    LEGAL_PAGES_FLAG,
+    legal_links,
+)
 from app.services.public_pages import load_all_pages
 
 GATED = [slug for slug, _ in AWAITING_APPROVAL]
+ALWAYS = [slug for slug, _ in ALWAYS_PUBLISHED]
 TITLES = {
     "data-processing-agreement": "Data processing agreement",
     "cookie-policy": "Cookie policy",
@@ -70,7 +76,7 @@ def test_nothing_links_to_unapproved_pages_while_the_flag_is_off(flag_off):
     assert 'href="/terms"' in footer_page
     assert 'href="/privacy"' in footer_page
     with flag_off.app_context():
-        assert [link["slug"] for link in legal_links()] == ["terms", "privacy"]
+        assert [link["slug"] for link in legal_links()] == ALWAYS
         assert not [p for p in load_all_pages() if p.slug in GATED]
 
 
@@ -89,7 +95,7 @@ def test_each_page_renders_in_the_public_layout_when_the_flag_is_on(flag_on, slu
 
 def test_the_footer_links_every_legal_page_when_the_flag_is_on(flag_on):
     html = flag_on.test_client().get("/privacy").get_data(as_text=True)
-    for slug in ["terms", "privacy", *GATED]:
+    for slug in [*ALWAYS, *GATED]:
         assert f'href="/{slug}"' in html, slug
 
 
@@ -106,7 +112,7 @@ def test_every_link_the_footer_offers_is_served(flag_on):
     client = flag_on.test_client()
     with flag_on.app_context():
         links = legal_links()
-    assert [link["slug"] for link in links] == ["terms", "privacy", *GATED]
+    assert [link["slug"] for link in links] == [*ALWAYS, *GATED]
     for link in links:
         assert client.get(link["href"]).status_code == 200, link["href"]
 
@@ -116,8 +122,8 @@ def test_every_template_sees_only_the_links_the_flag_allows(app, monkeypatch):
     from flask import render_template_string
 
     snippet = '{% for link in legal_links %}<a href="{{ link.href }}">{{ link.label }}</a>{% endfor %}'
-    everything = ["terms", "privacy", *GATED]
-    for enabled, expected in ((False, ["terms", "privacy"]), (True, everything)):
+    everything = [*ALWAYS, *GATED]
+    for enabled, expected in ((False, ALWAYS), (True, everything)):
         monkeypatch.setitem(app.config, LEGAL_PAGES_FLAG, enabled)
         with app.test_request_context("/admin/billing/"):
             rendered = render_template_string(snippet)
