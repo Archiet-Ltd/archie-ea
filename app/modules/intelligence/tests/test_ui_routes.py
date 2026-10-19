@@ -775,6 +775,7 @@ def test_the_status_region_reads_results_for_a_search_and_connections_for_a_choi
     core = _code(_scripts()["core.js"])
     assert "' result' : ' results'" in core
     assert "' connection' : ' connections'" in core
+    assert "No team, service or system is called" in core
     assert "resultsText(this.options.length, typed)" in _code(_scripts()["picker.js"])
     for name in ("ask.js", "twin_map.js"):
         source = _code(_scripts()[name])
