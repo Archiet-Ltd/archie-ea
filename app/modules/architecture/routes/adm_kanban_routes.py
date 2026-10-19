@@ -32,6 +32,11 @@ from app.models.adm_kanban import (
     create_adm_phases,
 )
 from app.models.user import User
+from app.services.adm_card_element_links import (
+    CardElementLinkError,
+    change_card_elements,
+    check_element_ids,
+)
 from app.utils.tenant_users import same_user_id, user_in_org
 
 # ============================================================================
@@ -519,6 +524,13 @@ def create_card(board_id):
             return jsonify({"success": False, "error": "Invalid assigned_to_id"}), 400
         arb_review_id = data.get("arb_review_id") or None
 
+        # Refuse unknown or foreign elements before anything is added: the audit
+        # decorator commits the session even when this view returns an error.
+        try:
+            element_ids = check_element_ids(data.get("archimate_element_ids"), current_org_id())
+        except CardElementLinkError as exc:
+            return jsonify({"success": False, "error": str(exc)}), 400
+
         card = KanbanCard(
             title=data["title"],
             description=data.get("description") or None,
@@ -527,7 +539,6 @@ def create_card(board_id):
             card_type=data.get("card_type", "requirement"),
             status=data.get("status", "todo"),
             priority=data.get("priority", "medium"),
-            archimate_element_ids=data.get("archimate_element_ids") or [],
             application_ids=data.get("application_ids") or [],
             system_ids=data.get("system_ids") or [],
             initiative_ids=data.get("initiative_ids") or [],
@@ -542,6 +553,15 @@ def create_card(board_id):
         )
 
         db.session.add(card)
+        db.session.flush()
+        try:
+            change_card_elements(
+                card, element_ids, mode="replace",
+                organization_id=current_org_id(), actor_id=current_user.id,
+            )
+        except CardElementLinkError as exc:
+            db.session.rollback()
+            return jsonify({"success": False, "error": str(exc)}), 400
 
         # Handle ARB review creation if requested
         if data.get("requires_review"):
@@ -729,13 +749,21 @@ def update_card(card_id):
                         400,
                     )
 
+        if "archimate_element_ids" in data:
+            try:
+                change_card_elements(
+                    card, data["archimate_element_ids"], mode="replace",
+                    organization_id=current_org_id(), actor_id=current_user.id,
+                )
+            except CardElementLinkError as exc:
+                return jsonify({"success": False, "error": str(exc)}), 400
+
         for field in [
             "title",
             "description",
             "card_type",
             "status",
             "priority",
-            "archimate_element_ids",
             "application_ids",
             "system_ids",
             "initiative_ids",
