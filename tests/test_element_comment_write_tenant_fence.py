@@ -39,13 +39,18 @@ def scene(db_session, make_org):
     org_a = make_org("cmt-a")
     org_b = make_org("cmt-b")
     user_a = _user(db_session, org_a.id, "a")
+    user_b = _user(db_session, org_b.id, "b")
     el_a = ArchiMateElement(name="Own Element", type="ApplicationComponent",
                             layer="application", organization_id=org_a.id)
     el_b = ArchiMateElement(name="Foreign Element", type="ApplicationComponent",
                             layer="application", organization_id=org_b.id)
     db_session.add_all([el_a, el_b])
     db_session.flush()
-    ids = {"user_a": user_a.id, "el_a": el_a.id, "el_b": el_b.id}
+    ids = {
+        "org_a": org_a.id, "org_b": org_b.id,
+        "user_a": user_a.id, "user_b": user_b.id,
+        "el_a": el_a.id, "el_b": el_b.id,
+    }
     db_session.commit()
     return ids
 
@@ -99,3 +104,73 @@ def test_comment_refused_when_organisation_unknown(scene, client, login_as, monk
     resp = _post(client, login_as, scene["user_a"], scene["el_a"], "x")
     assert resp.status_code == 404, resp.get_data(as_text=True)
     assert _count(scene["el_a"]) == 0
+
+
+def test_foreign_organisation_cannot_comment_on_an_element(scene, client, login_as):
+    """A user of organisation B cannot write a comment on organisation A's
+    element through the existing create route, and nothing is written."""
+    resp = _post(client, login_as, scene["user_b"], scene["el_a"], "intruder")
+    assert resp.status_code == 404, resp.get_data(as_text=True)
+    assert _count(scene["el_a"]) == 0
+
+
+def test_foreign_organisation_cannot_list_an_elements_comments(scene, client, login_as):
+    """Organisation A's comment on its own element is not listed to
+    organisation B's session through the existing list route."""
+    from app import db
+
+    _post(client, login_as, scene["user_a"], scene["el_a"], "mine")
+    db.session.remove()
+    login_as(client, scene["user_b"])
+    resp = client.get(f"/archimate/api/elements/{scene['el_a']}/comments")
+    assert resp.status_code == 404, resp.get_data(as_text=True)
+
+
+def test_own_organisation_lists_its_comments(scene, client, login_as):
+    """A user can list the comments on its own element through the existing
+    list route, with the response shape unchanged."""
+    from app import db
+
+    _post(client, login_as, scene["user_a"], scene["el_a"], "mine")
+    db.session.remove()
+    login_as(client, scene["user_a"])
+    resp = client.get(f"/archimate/api/elements/{scene['el_a']}/comments")
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    body = resp.get_json()
+    assert len(body["comments"]) == 1
+    assert body["comments"][0]["comment_text"] == "mine"
+    assert set(body["comments"][0]) == {
+        "id", "element_id", "viewpoint_id", "user_id", "user_name",
+        "comment_text", "created_at",
+    }
+
+
+def test_foreign_organisation_cannot_comment_on_its_own_element(scene, client, login_as):
+    """Organisation B can still comment on its own element; organisation A's
+    session cannot see that comment."""
+    from app import db
+
+    _post(client, login_as, scene["user_b"], scene["el_b"], "b comment")
+    assert _count(scene["el_b"]) == 1
+    db.session.remove()
+    login_as(client, scene["user_a"])
+    resp = client.get(f"/archimate/api/elements/{scene['el_b']}/comments")
+    assert resp.status_code == 404, resp.get_data(as_text=True)
+
+
+def test_comment_stamped_with_its_elements_organisation(scene, client, login_as):
+    """A comment written through the route carries the element's organisation,
+    stamped from the element, never from the request. Fails on the base commit
+    where the comment table has no organisation column."""
+    from app import db
+    from app.models.archimate_viewpoint import ArchimateElementComment
+
+    _post(client, login_as, scene["user_a"], scene["el_a"], "mine")
+    db.session.remove()
+    login_as(client, scene["user_a"])
+    comment = (
+        db.session.query(ArchimateElementComment)
+        .filter_by(element_id=scene["el_a"])
+        .one()
+    )
+    assert comment.organization_id == scene["org_a"]

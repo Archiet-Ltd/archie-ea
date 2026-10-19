@@ -44,6 +44,7 @@ REPO = Path(__file__).resolve().parents[1]
 MIGRATION_PATH = REPO / "migrations" / "versions" / "20261008_row_level_security.py"
 NOTIF_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261011_notif_rls.py"
 TECHDEBT_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261016_technical_debt_rls.py"
+COMMENT_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261018_element_comment_org_id.py"
 RUNTIME_ROLE = "archie_rls_test_runtime"
 RUNTIME_PASSWORD = uuid.uuid4().hex  # test-only role; regenerated each run
 
@@ -58,6 +59,7 @@ def _load_migration(path, name):
 MIGRATION = _load_migration(MIGRATION_PATH, "rls_migration_under_test")
 NOTIF_MIGRATION = _load_migration(NOTIF_MIGRATION_PATH, "notif_rls_migration_under_test")
 TECHDEBT_MIGRATION = _load_migration(TECHDEBT_MIGRATION_PATH, "techdebt_rls_migration_under_test")
+COMMENT_MIGRATION = _load_migration(COMMENT_MIGRATION_PATH, "comment_tenancy_migration_under_test")
 
 
 def _apply_policies(engine):
@@ -89,6 +91,19 @@ def _apply_techdebt_policies(engine):
         context = MigrationContext.configure(connection)
         with Operations.context(context):
             TECHDEBT_MIGRATION.upgrade()
+
+
+def _apply_comment_policies(engine):
+    """Run the element-comment-tenancy migration's upgrade() on ``engine`` (idempotent).
+
+    This migration adds the organisation column, backfills it from the element,
+    tightens it to NOT NULL, indexes it and installs the row-level security
+    policies on ``archimate_element_comments``.
+    """
+    with engine.begin() as connection:
+        context = MigrationContext.configure(connection)
+        with Operations.context(context):
+            COMMENT_MIGRATION.upgrade()
 
 
 class RlsEnv:
@@ -153,6 +168,7 @@ def rls(app, _schema):
     _apply_policies(owner)
     _apply_notif_policies(owner)
     _apply_techdebt_policies(owner)
+    _apply_comment_policies(owner)
     runtime = create_engine(
         url.set(username=RUNTIME_ROLE, password=RUNTIME_PASSWORD), poolclass=NullPool
     )
@@ -791,6 +807,58 @@ def test_technical_debt_is_scoped_to_the_session_organisation(rls, world):
             )
     with rls.runtime_tx(None) as connection:
         assert _count(connection, "technical_debt") == 0
+
+
+def test_element_comments_are_scoped_to_the_session_organisation(rls, world):
+    """A comment of one organisation is invisible to another organisation's
+    session under the row-level security role, and a session with no
+    organisation sees none."""
+    a, b = world.org("a"), world.org("b")
+    user_a = _make_user(world, a, "cma", role="Architect")
+    with rls.owner.begin() as connection:
+        el_a = connection.execute(
+            text(
+                "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                "VALUES ('Element A', 'ApplicationComponent', 'application', :o) RETURNING id"
+            ),
+            {"o": a},
+        ).scalar_one()
+        el_b = connection.execute(
+            text(
+                "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                "VALUES ('Element B', 'ApplicationComponent', 'application', :o) RETURNING id"
+            ),
+            {"o": b},
+        ).scalar_one()
+        c_a = connection.execute(
+            text(
+                "INSERT INTO archimate_element_comments "
+                "(element_id, user_id, comment_text, organization_id, created_at) "
+                "VALUES (:e, :u, 'org-a comment', :o, now()) RETURNING id"
+            ),
+            {"e": el_a, "u": user_a, "o": a},
+        ).scalar_one()
+        c_b = connection.execute(
+            text(
+                "INSERT INTO archimate_element_comments "
+                "(element_id, user_id, comment_text, organization_id, created_at) "
+                "VALUES (:e, :u, 'org-b comment', :o, now()) RETURNING id"
+            ),
+            {"e": el_b, "u": user_a, "o": b},
+        ).scalar_one()
+    world.extra_deletes.append(("archimate_element_comments", "id", [c_a, c_b]))
+    world.extra_deletes.append(("archimate_elements", "id", [el_a, el_b]))
+
+    with rls.runtime_tx(a) as connection:
+        seen_a = {r[0] for r in connection.execute(text("SELECT id FROM archimate_element_comments"))}
+    with rls.runtime_tx(b) as connection:
+        seen_b = {r[0] for r in connection.execute(text("SELECT id FROM archimate_element_comments"))}
+    with rls.runtime_tx(None) as connection:
+        seen_none = _count(connection, "archimate_element_comments")
+
+    assert c_a in seen_a and c_b not in seen_a
+    assert c_b in seen_b and c_a not in seen_b
+    assert seen_none == 0
 
 
 def test_event_log_partitioned_parent_is_filtered(rls, world):
