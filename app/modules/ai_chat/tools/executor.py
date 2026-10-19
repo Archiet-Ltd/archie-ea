@@ -278,6 +278,41 @@ def record_paused_tool_call(user, tool_name: str, arguments, *, paused_by_name: 
         logger.warning("Could not record the paused tool call '%s'", tool_name, exc_info=True)
 
 
+def user_can_write(user_id) -> bool:
+    """Whether the user holds write access (``Permission.GENERAL``).
+
+    The one rule every AI write surface applies: the agent tool executor, the
+    slash commands and the natural-language write branches of the chat service.
+    The user is loaded scoped to the current tenant, so a user from another
+    organisation never authorises.
+    """
+    from app.models.user import Permission
+
+    user = _load_acting_user(user_id)
+    if not user:
+        return False
+    return bool(user.can(Permission.GENERAL))
+
+
+def refuse_unless_can_write(user_id, action_name: str, arguments=None, *, via: str):
+    """Gate a write that is not routed through ``ToolExecutor.execute``.
+
+    Returns None when the user may write. Otherwise records the refusal in the
+    audit log (``via`` says which surface was refused) and returns the same
+    permissions-framed refusal the agent path gives, as a result dict.
+    """
+    if user_can_write(user_id):
+        return None
+    user = _load_acting_user(user_id)
+    logger.warning(
+        "Refusing '%s' via %s for user_id=%s: no write permission",
+        action_name, via, user_id,
+    )
+    if user is not None:
+        record_refused_tool_call(user, action_name, arguments or {}, via=via)
+    return _permission_denied_result(action_name, user)
+
+
 def _duplicate_tool_result(noun: str, existing) -> dict:
     """The tool-call analogue of a 409 (ARCH-030).
 
@@ -399,12 +434,7 @@ class ToolExecutor:
         HTTP routes. Reusing it means the AI surface can never be *more*
         permissive than the API it wraps.
         """
-        from app.models.user import Permission
-
-        user = _load_acting_user(self.user_id)
-        if not user:
-            return False
-        return bool(user.can(Permission.GENERAL))
+        return user_can_write(self.user_id)
 
     def execute(self, tool_call: ToolCall, *, propagate_errors: bool = False) -> dict:
         """Dispatch one tool call. THE choke point for every agent write.
