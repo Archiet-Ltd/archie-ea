@@ -582,14 +582,21 @@ STRATEGY_ROUTES = [
     ("/api/v1/value-streams/<int:value_stream_id>", ["GET"], "api:read"),
 ]
 
-ALL_ROUTES = ELEMENT_ROUTES + STRATEGY_ROUTES
+MOTIVATION_ROUTES = [
+    ("/api/v1/drivers", ["GET"], "api:read"),
+    ("/api/v1/drivers/<int:driver_id>", ["GET"], "api:read"),
+    ("/api/v1/goals", ["GET"], "api:read"),
+    ("/api/v1/goals/<int:goal_id>", ["GET"], "api:read"),
+]
+
+ALL_ROUTES = ELEMENT_ROUTES + STRATEGY_ROUTES + MOTIVATION_ROUTES
 
 
 def _six_operation_contract() -> dict:
-    """The committed subset's six operations: the two element reads and the
-    four strategy reads this slice builds. The gate matches routes to
-    operations by path and method, so the fixture contract must list every
-    token-accepting route the real application registers."""
+    """The committed subset's ten operations: the two element reads, the
+    four strategy reads, and the four motivation reads this slice builds.
+    The gate matches routes to operations by path and method, so the fixture
+    contract must list every token-accepting route the real application registers."""
     contract = _minimal_contract()
     contract["paths"]["/capabilities"] = {
         "get": {
@@ -626,6 +633,46 @@ def _six_operation_contract() -> dict:
             "operationId": "getValueStream",
             "summary": "Get a Value Stream",
             "tags": ["Strategy"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/drivers"] = {
+        "get": {
+            "operationId": "listDrivers",
+            "summary": "List Driver records",
+            "tags": ["Motivation"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/drivers/{id}"] = {
+        "get": {
+            "operationId": "getDriver",
+            "summary": "Get a Driver",
+            "tags": ["Motivation"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/goals"] = {
+        "get": {
+            "operationId": "listGoals",
+            "summary": "List Goal records",
+            "tags": ["Motivation"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/goals/{id}"] = {
+        "get": {
+            "operationId": "getGoal",
+            "summary": "Get a Goal",
+            "tags": ["Motivation"],
             "parameters": [],
             "responses": {"200": {"description": "Success"}},
             "security": [{"entelimOAuth": ["model:read"]}],

@@ -1,7 +1,7 @@
 # API Contract Subset — auto-generated
 # Source: api-model-v1.yaml
 # SHA256: f34b68f30dd7d8e52334a523eae0af7f025f379232f3280754811be6a74204fc
-# Body-SHA256: a4487ff93859f41bbbca65f19a7e4328fc5f1bd0e47eeb0986fe662977d3b345
+# Body-SHA256: 47c206dc658f4b84ca0e5478f721a2dd100de84a15b154e2e8ceb38c6ab4db69
 # Do not edit by hand.
 openapi: 3.1.0
 info:
@@ -49,6 +49,8 @@ security:
 tags:
 - name: Model
   description: Model operations
+- name: Motivation
+  description: Motivation operations
 - name: Strategy
   description: Strategy operations
 paths:
@@ -212,6 +214,156 @@ paths:
       x-entity-id: ENT-0001
       x-entity: Capability
       x-archimate: Capability
+  /drivers:
+    get:
+      operationId: listDrivers
+      summary: List Driver records
+      tags:
+      - Motivation
+      parameters:
+      - $ref: '#/components/parameters/Filter'
+      - $ref: '#/components/parameters/Q'
+      - $ref: '#/components/parameters/Sort'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/IncludeRetired'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/ScopeParam'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Link:
+              $ref: '#/components/headers/Link'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DriverPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-pagination:
+        style: cursor
+        limit_default: 50
+        limit_max: 200
+        order: stable, by the sort key then id
+      x-personas:
+      - PER-007
+      - PER-011
+      - PER-001
+      - PER-035
+      - PER-009
+      - PER-020
+      - PER-024
+      - PER-010
+      x-use-case-ids:
+      - UC-215
+      - UC-364
+      x-use-cases:
+      - Assess which goals and capabilities a new market driver affects
+      - Record a new regulatory driver and link it to the goals that respond
+      x-entity-id: ENT-0013
+      x-entity: Driver
+      x-archimate: Driver
+  /drivers/{id}:
+    get:
+      operationId: getDriver
+      summary: Get a Driver
+      tags:
+      - Motivation
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Driver'
+        '304':
+          description: Not modified since the ETag given in If-None-Match.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '410':
+          $ref: '#/components/responses/Gone'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-personas:
+      - PER-007
+      - PER-011
+      - PER-001
+      - PER-035
+      - PER-009
+      - PER-020
+      - PER-024
+      - PER-010
+      x-use-case-ids:
+      - UC-215
+      - UC-364
+      x-use-cases:
+      - Assess which goals and capabilities a new market driver affects
+      - Record a new regulatory driver and link it to the goals that respond
+      x-entity-id: ENT-0013
+      x-entity: Driver
+      x-archimate: Driver
   /elements:
     get:
       operationId: listElements
@@ -287,6 +439,168 @@ paths:
       - entelimOAuth:
         - model:read
       x-rate-limit-tier: read
+  /goals:
+    get:
+      operationId: listGoals
+      summary: List Goal records
+      tags:
+      - Motivation
+      parameters:
+      - $ref: '#/components/parameters/Filter'
+      - $ref: '#/components/parameters/Q'
+      - $ref: '#/components/parameters/Sort'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/IncludeRetired'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/ScopeParam'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Link:
+              $ref: '#/components/headers/Link'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-pagination:
+        style: cursor
+        limit_default: 50
+        limit_max: 200
+        order: stable, by the sort key then id
+      x-personas:
+      - PER-007
+      - PER-011
+      - PER-001
+      - PER-009
+      - PER-019
+      - PER-004
+      - PER-035
+      - PER-020
+      x-use-case-ids:
+      - UC-040
+      - UC-048
+      - UC-090
+      - UC-215
+      - UC-331
+      - UC-364
+      x-use-cases:
+      - Show investment spend that cannot be traced to a goal or capability
+      - Link portfolio initiatives to the objectives and capabilities they serve
+      - Trace a strategic goal down to the applications and work packages that realise
+        it
+      x-entity-id: ENT-0016
+      x-entity: Goal
+      x-archimate: Goal
+  /goals/{id}:
+    get:
+      operationId: getGoal
+      summary: Get a Goal
+      tags:
+      - Motivation
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '304':
+          description: Not modified since the ETag given in If-None-Match.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '410':
+          $ref: '#/components/responses/Gone'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-personas:
+      - PER-007
+      - PER-011
+      - PER-001
+      - PER-009
+      - PER-019
+      - PER-004
+      - PER-035
+      - PER-020
+      x-use-case-ids:
+      - UC-040
+      - UC-048
+      - UC-090
+      - UC-215
+      - UC-331
+      - UC-364
+      x-use-cases:
+      - Show investment spend that cannot be traced to a goal or capability
+      - Link portfolio initiatives to the objectives and capabilities they serve
+      - Trace a strategic goal down to the applications and work packages that realise
+        it
+      x-entity-id: ENT-0016
+      x-entity: Goal
+      x-archimate: Goal
   /value-streams:
     get:
       operationId: listValueStreams
@@ -750,6 +1064,61 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Capability'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    Driver:
+      description: 'Driver: A motivating internal or external condition.'
+      allOf:
+      - $ref: '#/components/schemas/EntityBase'
+      - $ref: '#/components/schemas/DriverAttributes'
+      - type: object
+        properties:
+          lifecycle_state:
+            type: string
+            enum:
+            - draft
+            - proposed
+            - approved
+            - superseded
+            - rejected
+            readOnly: true
+            description: States of lifecycle set LC-DESIGN.
+        additionalProperties: false
+      x-entity-id: ENT-0013
+      x-ontology-class: ONT-0016 Driver
+      x-archimate: Driver
+      x-scope: tenant
+      x-identity-key: tenant_id + normalised name
+      x-lifecycle-set: LC-DESIGN
+      unevaluatedProperties: false
+    DriverAttributes:
+      type: object
+      properties:
+        origin:
+          type: string
+          enum:
+          - internal
+          - external
+        category:
+          type: string
+          enum:
+          - regulatory
+          - market
+          - technology
+          - financial
+          - social
+          - operational
+      description: Attributes specific to Driver (ENT-0013).
+    DriverPage:
+      type: object
+      required:
+      - data
+      - page
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Driver'
         page:
           $ref: '#/components/schemas/PageInfo'
     ElementDetail:
@@ -1257,6 +1626,56 @@ components:
           type: string
           format: date-time
       description: Attributes specific to External Identifier (ENT-0182).
+    Goal:
+      description: 'Goal: A high-level intended end state.'
+      allOf:
+      - $ref: '#/components/schemas/EntityBase'
+      - $ref: '#/components/schemas/GoalAttributes'
+      - type: object
+        properties:
+          lifecycle_state:
+            type: string
+            enum:
+            - draft
+            - proposed
+            - approved
+            - superseded
+            - rejected
+            readOnly: true
+            description: States of lifecycle set LC-DESIGN.
+        additionalProperties: false
+      x-entity-id: ENT-0016
+      x-ontology-class: ONT-0018 Goal
+      x-archimate: Goal
+      x-scope: tenant
+      x-identity-key: tenant_id + normalised name
+      x-lifecycle-set: LC-DESIGN
+      unevaluatedProperties: false
+    GoalAttributes:
+      type: object
+      properties:
+        target_date:
+          type: string
+          format: date
+        priority:
+          type: string
+          enum:
+          - must
+          - should
+          - could
+      description: Attributes specific to Goal (ENT-0016).
+    GoalPage:
+      type: object
+      required:
+      - data
+      - page
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Goal'
+        page:
+          $ref: '#/components/schemas/PageInfo'
     Id:
       type: string
       format: uuid
