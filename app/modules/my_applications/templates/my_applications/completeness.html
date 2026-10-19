@@ -1,0 +1,37 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% block title %}Completeness check{% endblock %}
+
+{% block content %}
+<div class="p-6 space-y-6 mx-auto">
+    {{ page_shell(title='Completeness check', breadcrumb=[('Home', '/'), ('My Applications', url_for('my_applications.dashboard')), ('Completeness check', none)], subtitle='Applications you own with a required fact missing or a record that has not changed for ' ~ stale_after_days ~ ' days') }}
+
+    <p class="text-sm text-muted-foreground">
+        Required facts: {{ required|join(', ') }}. Each finding links to the edit form where it can be fixed.
+    </p>
+
+    <div class="bg-card border border-border rounded-lg" data-testid="completeness-list">
+        {% for f in findings %}
+        <div class="px-6 py-4 border-b border-border last:border-0 flex flex-wrap items-start justify-between gap-4">
+            <div class="min-w-0">
+                <a href="{{ url_for('my_applications.app_detail', app_id=f.id) }}" class="font-medium text-primary underline underline-offset-2">{{ f.name }}</a>
+                {% if f.missing %}
+                <p class="text-sm mt-1">Missing: {{ f.missing|join(', ') }}</p>
+                {% endif %}
+                {% if f.stale %}
+                <p class="text-sm mt-1 text-warning-emphasis">Last changed {{ f.age_days }} days ago</p>
+                {% elif f.age_unknown %}
+                <p class="text-sm mt-1 text-muted-foreground">Last change date not recorded</p>
+                {% endif %}
+            </div>
+            <a href="{{ url_for('my_applications.app_edit', app_id=f.id) }}"
+               class="inline-flex items-center px-3 py-1.5 text-sm rounded-md border border-input bg-background hover:bg-accent">Fix on the edit form</a>
+        </div>
+        {% else %}
+        <p class="text-sm text-muted-foreground py-10 text-center">
+            {% if owned_count %}Nothing to fix: every application you own has all required facts and was changed within {{ stale_after_days }} days.{% else %}You do not own any applications yet.{% endif %}
+        </p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

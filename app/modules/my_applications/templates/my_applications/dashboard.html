@@ -16,6 +16,11 @@
             <i data-lucide="list" class="w-4 h-4"></i>
             View All
         </a>
+        <a href="{{ url_for('my_applications.completeness') }}"
+           class="inline-flex items-center gap-2 px-4 py-2 border border-input bg-background rounded-md hover:bg-accent transition-colors">
+            <i data-lucide="clipboard-check" class="w-4 h-4"></i>
+            Check completeness
+        </a>
     {% endmacro %}
     {{ page_shell(title='My Applications Dashboard', breadcrumb=[('Home', '/'), ('My Applications Dashboard', none)], subtitle='Overview of applications you own and manage', actions_caller=_ps_actions) }}
 
