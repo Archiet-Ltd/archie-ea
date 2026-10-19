@@ -9,7 +9,15 @@ Usage:
     # Returns: {"name": "Capabilities", "children": [{id, name, children, ...}, ...]}
 """
 
+import logging
+
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm.exc import StaleDataError
+
 from app import db
+from app.middleware.tenant_context import current_org_id
+
+logger = logging.getLogger(__name__)
 
 
 # ─── Tree Registry ────────────────────────────────────────────────────────────
@@ -275,6 +283,219 @@ def _import_model(dotted_path):
     return getattr(module, class_name)
 
 
+# ─── Tenant scope ─────────────────────────────────────────────────────────────
+# Every registry entry is exactly one of:
+#   tenant   - the model carries TenantMixin; the tenant middleware filters every
+#              statement and stamps organization_id on insert.
+#   hybrid   - shared reference rows (organization_id IS NULL) plus an
+#              organisation's own rows. Readable by everyone, writable only on
+#              the caller's own rows. UnifiedCapability enforces this in its own
+#              session listeners; ReferenceModelCapability is enforced here.
+#   platform - one catalogue shared by every organisation with no owner column;
+#              only a platform administrator may change it.
+HYBRID_TREES = {"capability", "reference_capability"}
+PLATFORM_TREES = {"apqc", "product_taxonomy"}
+
+FORBIDDEN = "Forbidden"
+# A referential or data conflict -- a real foreign key still pointing at the
+# row being removed, or a duplicate value -- as opposed to FORBIDDEN, which is
+# reserved for a genuine authorization/tenancy refusal.
+CONFLICT = "Conflict"
+# The caller's own request data was invalid (a required field missing, or a
+# value a check constraint rejects) -- the caller's mistake, not a refusal.
+INVALID = "Invalid"
+
+# Postgres SQLSTATEs this module classifies a refused IntegrityError by. Uses
+# the same exc.orig / diag.sqlstate extraction already used to classify a
+# database error in app/modules/transformation_room/command_service.py.
+_PG_NOT_NULL_VIOLATION = "23502"
+_PG_FOREIGN_KEY_VIOLATION = "23503"
+_PG_UNIQUE_VIOLATION = "23505"
+_PG_CHECK_VIOLATION = "23514"
+
+
+def tree_scope(tree_key):
+    if tree_key in HYBRID_TREES:
+        return "hybrid"
+    if tree_key in PLATFORM_TREES:
+        return "platform"
+    return "tenant"
+
+
+def _write_gate(tree_key, Model):
+    """Return an error string when this caller may not write this tree, else None.
+
+    Fails closed: a tenant-scoped tree whose model lost its TenantMixin refuses
+    writes rather than serving every organisation's rows.
+    """
+    scope = tree_scope(tree_key)
+    if scope == "platform":
+        from flask_login import current_user
+
+        from app.middleware.tenant_decorators import is_platform_admin
+
+        if not is_platform_admin(current_user):
+            return f"{FORBIDDEN}: this tree is shared by every organisation"
+    elif scope == "tenant":
+        from app.models.mixins import TenantMixin
+
+        if not issubclass(Model, TenantMixin):
+            return f"{FORBIDDEN}: tree is not organisation-scoped"
+    return None
+
+
+def _visible(Model, tree_key):
+    """Criteria limiting a hybrid reference tree to shared plus own rows."""
+    if tree_key != "reference_capability":
+        return None
+    from sqlalchemy import or_
+
+    org_id = current_org_id()
+    if org_id is None:
+        return Model.organization_id.is_(None)
+    return or_(Model.organization_id == org_id, Model.organization_id.is_(None))
+
+
+def _load(Model, tree_key, node_id):
+    """Fetch one row through the filtered statement path.
+
+    ``Session.get`` returns an identity-map hit without emitting SQL, so the
+    tenant filter never runs; a select always does.
+    """
+    stmt = db.select(Model).where(Model.id == node_id)
+    visible = _visible(Model, tree_key)
+    if visible is not None:
+        stmt = stmt.where(visible)
+    return db.session.execute(stmt).scalar_one_or_none()
+
+
+def _owned_by_caller(Model, tree_key, row):
+    """A hybrid reference row may only be changed by the organisation that owns it."""
+    if tree_key != "reference_capability":
+        return True
+    org_id = current_org_id()
+    return org_id is not None and row.organization_id == org_id
+
+
+def _reparentable(Model, tree_key):
+    """Criteria for a child this caller may actually write to during a
+    reparenting delete -- stricter than ``_visible()``: a hybrid tree's
+    shared row (``organization_id IS NULL``) is visible to read but owned by
+    no tenant, so it is excluded here even though ``_visible()`` includes it
+    for reads. ``None`` for a plain tenant tree: TenantMixin's own session
+    filter already means nothing not this caller's own was ever loaded, so
+    there is nothing further to exclude here.
+    """
+    if tree_key != "reference_capability":
+        return None
+    from sqlalchemy import false
+
+    org_id = current_org_id()
+    if org_id is None:
+        return false()
+    return Model.organization_id == org_id
+
+
+def _optimistic_lock_aware(Model):
+    """True for a model whose own concurrent-edit version check can raise
+    ``StaleDataError`` for a reason that has nothing to do with tenancy.
+
+    ``_commit()``/``delete_node`` otherwise treat ``StaleDataError`` as proof
+    that the row a flush expected to touch (zero rows matched an UPDATE/
+    DELETE that targeted exactly one by primary key) is no longer there to
+    write -- this caller's own load already proved tenancy and ownership, so
+    what changed since is someone else's concurrent write, not a refusal of
+    this one. A model mapped with ``version_id_col`` (``OptimisticLockMixin``)
+    raises the identical exception shape for an ordinary lost-update race
+    with no row disappearing at all, so that reason must not be assumed here.
+    """
+    from app.models.mixins import OptimisticLockMixin
+
+    return issubclass(Model, OptimisticLockMixin)
+
+
+def _integrity_error_message(exc):
+    """Classify a refused ``IntegrityError`` by its real Postgres cause.
+
+    Never put ``exc`` itself, or anything derived from its DETAIL text, in
+    the message returned here -- it is raw server-side content (table and
+    column names, the row ids involved) that must not reach an API client.
+    The caller already logs the real exception before calling this.
+
+    A foreign key still pointing at the row this write is removing -- the
+    cross-organisation-child-still-exists case ``delete_node`` guards -- is a
+    referential conflict, not an authorization refusal, so it is reported as
+    CONFLICT rather than FORBIDDEN; so is a duplicate value. A missing
+    required field or a rejected check constraint is the caller's own bad
+    input (INVALID), not a conflict with existing data.
+    """
+    orig = getattr(exc, "orig", None)
+    sqlstate = (
+        getattr(orig, "sqlstate", None)
+        or getattr(orig, "pgcode", None)
+        or getattr(getattr(orig, "diag", None), "sqlstate", None)
+    )
+    if sqlstate in (_PG_NOT_NULL_VIOLATION, _PG_CHECK_VIOLATION):
+        return f"{INVALID}: a required field is missing or not allowed"
+    if sqlstate == _PG_FOREIGN_KEY_VIOLATION:
+        return f"{CONFLICT}: this node still has something referencing it"
+    if sqlstate == _PG_UNIQUE_VIOLATION:
+        return f"{CONFLICT}: a conflicting record already exists"
+    return f"{CONFLICT}: this write could not be completed"
+
+
+def _commit(Model=None):
+    """Commit; a refused reference/cross-organisation write is reported as
+    FORBIDDEN, CONFLICT or INVALID depending on its real cause -- never as a
+    server defect worth a 500, and never by repeating the database's own
+    exception text back to the caller.
+
+    Three distinct shapes land here for the same broad reason -- a write
+    this caller may not make, or may not make right now: ``PermissionError``,
+    raised by application code with its own safe, static message (FORBIDDEN);
+    ``IntegrityError``, raised by a real constraint this write violated --
+    classified by ``_integrity_error_message`` rather than blanket-mapped to
+    FORBIDDEN, because most of what lands here is a foreign key still
+    pointing at the row this delete is removing (a child in another
+    organisation, or, under TenantMixin's own session filter, simply not
+    loaded at all to be reparented in the first place) that this caller's
+    session could not see to reparent, let alone exclude from the delete it
+    is now blocking -- a referential conflict, not an authorization refusal
+    (see ``delete_node``); and ``StaleDataError``, raised by the ORM's own
+    flush when an UPDATE/DELETE it expected to touch one row instead matched
+    zero. This caller's own ``_load()`` already proved it may see and own
+    that row, so a ``StaleDataError`` reaching here -- for a model that is
+    not ``_optimistic_lock_aware`` -- means the row was removed by someone
+    else between that load and this commit, reported as "Not found" (404),
+    not a refusal of this caller's own write.
+
+    A ``StaleDataError`` is only ever treated that way when ``Model`` is not
+    ``_optimistic_lock_aware`` -- UnifiedCapability (the ``capability`` tree)
+    carries its own version column, and a genuine lost update there must
+    reach the app-wide ``StaleDataError`` handler (``app/_bootstrap/
+    extensions.py``, which answers 409 Conflict with a reload-and-retry
+    message) rather than being mislabelled here.
+    """
+    try:
+        db.session.commit()
+    except PermissionError as exc:
+        db.session.rollback()
+        return f"{FORBIDDEN}: {exc}"
+    except IntegrityError as exc:
+        db.session.rollback()
+        logger.exception("Tree write refused: database integrity error")
+        return _integrity_error_message(exc)
+    except StaleDataError:
+        db.session.rollback()
+        if Model is not None and _optimistic_lock_aware(Model):
+            raise
+        logger.exception(
+            "Tree write refused: row no longer matches what this request loaded"
+        )
+        return "Not found"
+    return None
+
+
 def build_tree(tree_key):
     """
     Build nested tree JSON for a registered tree type.
@@ -298,7 +519,11 @@ def build_tree(tree_key):
         if col is not None:
             order_cols.append(col)
 
-    rows = Model.query.order_by(*order_cols).all() if order_cols else Model.query.all()
+    query = Model.query
+    visible = _visible(Model, tree_key)
+    if visible is not None:
+        query = query.filter(visible)
+    rows = query.order_by(*order_cols).all() if order_cols else query.all()
 
     # Build node dicts
     by_id = {}
@@ -333,7 +558,7 @@ def get_node(tree_key, node_id):
     """Get a single node by ID."""
     config = TREE_REGISTRY[tree_key]
     Model = _import_model(config["model"])
-    row = db.session.get(Model, node_id)
+    row = _load(Model, tree_key, node_id)
     if not row:
         return None
 
@@ -355,6 +580,10 @@ def create_node(tree_key, data):
     name_field = config["name_field"]
     parent_fk = config["parent_fk"]
 
+    denied = _write_gate(tree_key, Model)
+    if denied:
+        return None, denied
+
     name = (data.get("name") or data.get(name_field) or "").strip()
     if not name:
         return None, "Name is required"
@@ -362,7 +591,7 @@ def create_node(tree_key, data):
     kwargs = {name_field: name}
     parent_id = data.get("parent_id")
     if parent_id:
-        parent = db.session.get(Model, parent_id)
+        parent = _load(Model, tree_key, parent_id)
         if not parent:
             return None, "Parent not found"
         kwargs[parent_fk] = parent_id
@@ -372,9 +601,17 @@ def create_node(tree_key, data):
         if f in data:
             kwargs[f] = data[f]
 
+    if tree_key == "reference_capability":
+        org_id = current_org_id()
+        if org_id is None:
+            return None, f"{FORBIDDEN}: no organisation in context"
+        kwargs["organization_id"] = org_id
+
     row = Model(**kwargs)
     db.session.add(row)
-    db.session.commit()
+    error = _commit(Model)
+    if error:
+        return None, error
     return get_node(tree_key, row.id), None
 
 
@@ -385,9 +622,15 @@ def update_node(tree_key, node_id, data):
     parent_fk = config["parent_fk"]
     name_field = config["name_field"]
 
-    row = db.session.get(Model, node_id)
+    denied = _write_gate(tree_key, Model)
+    if denied:
+        return None, denied
+
+    row = _load(Model, tree_key, node_id)
     if not row:
         return None, "Not found"
+    if not _owned_by_caller(Model, tree_key, row):
+        return None, f"{FORBIDDEN}: shared reference rows are read-only"
 
     if "name" in data or name_field in data:
         setattr(row, name_field, data.get("name") or data.get(name_field))
@@ -396,13 +639,17 @@ def update_node(tree_key, node_id, data):
         new_parent = data["parent_id"]
         if new_parent == node_id:
             return None, "Cannot parent to self"
+        if new_parent is not None and not _load(Model, tree_key, new_parent):
+            return None, "Parent not found"
         setattr(row, parent_fk, new_parent)
 
     for f in config["fields"]:
         if f in data:
             setattr(row, f, data[f])
 
-    db.session.commit()
+    error = _commit(Model)
+    if error:
+        return None, error
     return get_node(tree_key, node_id), None
 
 
@@ -412,15 +659,87 @@ def delete_node(tree_key, node_id):
     Model = _import_model(config["model"])
     parent_fk = config["parent_fk"]
 
-    row = db.session.get(Model, node_id)
+    denied = _write_gate(tree_key, Model)
+    if denied:
+        return denied
+
+    row = _load(Model, tree_key, node_id)
     if not row:
         return "Not found"
+    if not _owned_by_caller(Model, tree_key, row):
+        return f"{FORBIDDEN}: shared reference rows are read-only"
 
     parent_id = getattr(row, parent_fk, None)
-    children = Model.query.filter(getattr(Model, parent_fk) == node_id).all()
+    all_children = Model.query.filter(getattr(Model, parent_fk) == node_id)
+    reparentable = _reparentable(Model, tree_key)
+    if reparentable is not None:
+        children = all_children.filter(reparentable).all()
+        # A child this caller may not write to -- another organisation's
+        # private row, or a hybrid tree's shared row, which belongs to no
+        # tenant -- can be neither reparented nor safely left alone: some
+        # models (ReferenceModelCapability is one) declare their
+        # self-referential children as an ORM relationship with
+        # cascade="all, delete-orphan", which would delete an unreparented
+        # child along with its parent -- another organisation's row, or a
+        # shared one, gone, with nothing in this request that owns it or
+        # could consent to that. Refuse the whole delete instead.
+        #
+        # This count only ever differs under a database role this caller's
+        # own write would not actually have: a genuinely tenant-scoped
+        # Postgres role has row-level security hide a foreign private row
+        # from both queries identically (the count can never catch what
+        # neither query can see), which is exactly why the flush below is
+        # still wrapped and _commit() below still catches IntegrityError --
+        # the real, final backstop for whatever this count cannot.
+        if all_children.count() != len(children):
+            return f"{FORBIDDEN}: this node has a child outside this organisation"
+    else:
+        # A plain tenant tree: TenantMixin's own session filter already
+        # means every row Model.query can return here is this caller's own,
+        # so there is nothing left to exclude. A child in another
+        # organisation was never loaded and is never reparented -- its real
+        # foreign key still points at this row, and the delete below raises
+        # IntegrityError, caught the same way as every other refused write.
+        children = all_children.all()
+
     for child in children:
         setattr(child, parent_fk, parent_id)
 
+    try:
+        # Some models declare their self-referential children as an ORM
+        # relationship with cascade="all, delete-orphan". That cascade acts
+        # on the relationship's own in-memory collection, which setattr() on
+        # the raw foreign-key column above does not update -- row.children
+        # still lists every child it did before the reparenting, and
+        # session.delete(row) would cascade-delete them instead of leaving
+        # the now-reparented rows alone. Flushing the column updates first
+        # and expiring row's own cached state forces SQLAlchemy to re-read
+        # its relationships from the database, which now shows no
+        # children left, before the delete (and its now-empty cascade) is
+        # issued. Any rejection of this flush -- a real foreign key a child
+        # outside this session's visibility still holds, or that child
+        # having been removed by someone else since it was loaded above --
+        # is classified the same way _commit() below classifies one at the
+        # final commit.
+        db.session.flush()
+    except PermissionError as exc:
+        db.session.rollback()
+        return f"{FORBIDDEN}: {exc}"
+    except IntegrityError as exc:
+        db.session.rollback()
+        logger.exception(
+            "Tree delete refused: database integrity error while reparenting children"
+        )
+        return _integrity_error_message(exc)
+    except StaleDataError:
+        db.session.rollback()
+        if _optimistic_lock_aware(Model):
+            raise
+        logger.exception(
+            "Tree delete refused: a child row no longer matches what this request loaded"
+        )
+        return "Not found"
+    db.session.expire(row)
+
     db.session.delete(row)
-    db.session.commit()
-    return None
+    return _commit(Model)

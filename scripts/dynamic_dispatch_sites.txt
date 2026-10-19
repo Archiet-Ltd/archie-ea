@@ -7,20 +7,16 @@
 # after the caller has checked tenancy. Line numbers move with edits: re-list a site you move.
 #
 # --- Accepted: every model the site can reach is fenced or global -----------------------
-app/services/portfolio_search_service.py:377  # _MODEL_MAP is five models: ApplicationComponent, BusinessCapability, ArchiMateElement, Solution (all fenced) and VendorOrganization (global catalogue). session.get is tenant-scoped on an identity-map miss only; entity_id is caller-supplied, so callers must still validate it (see the sweep report).
+app/services/portfolio_search_service.py:378  # _MODEL_MAP is five models: ApplicationComponent, BusinessCapability, ArchiMateElement, Solution (all fenced) and VendorOrganization (global catalogue). session.get is tenant-scoped on an identity-map miss only; entity_id is caller-supplied, so callers must still validate it (see the sweep report).
 app/services/architecture_assistant_service.py:1773  # three candidate modules, all resolving to ApplicationComponent (fenced); looks the referenced application up by id to confirm it exists.
 app/modules/ai_chat/services/context_aware_ai_helper.py:375  # selects a column of the model passed by the caller; both callers pass ApplicationComponent or UnifiedCapability (fenced); column is resolved with getattr, not the model.
 app/services/query_optimization_service.py:254  # optimize_count_queries(model, column): model is a parameter, there is no caller in the tree; the model is whatever a future caller passes and is fenced at execution if it inherits TenantMixin.
 app/services/query_optimization_service.py:183  # BatchQueryExecutor.execute: models come from add_query(); no caller in the tree.
 app/modules/admin/v2/services/seed_management_service_v2.py:135  # record counts of the seeded reference catalogues; reached from a platform-admin route (admin_routes seed management).
 app/services/seed_management_service.py:139  # same seed-category count as the v2 service; counts only, no rows returned. Called from the older admin routes, whose role guard was not re-checked here.
+app/services/tree_service.py:456  # build_tree's `query = Model.query`. TREE_REGISTRY's 21 models are now all one of: TenantMixin-fenced (the six this PR gave organization_id -- tasks, portfolio_initiatives, system_boundaries, compliance_requirements, vendor_capability_hierarchy, vendor_process_hierarchy -- plus every tree already fenced before it), a shared platform catalogue with no organisation column at all (apqc, product_taxonomy; writes gated on is_platform_admin in _write_gate, reads open by design), or a hybrid tree enforcing its own visibility instead of TenantMixin's blanket filter (capability/UnifiedCapability via its own session listeners; reference_capability/ReferenceModelCapability via this file's own _visible()). build_tree additionally applies _visible() itself when it returns a filter. Read-only.
+app/services/tree_service.py:607  # delete_node's own children query, same reasoning as build_tree above. Reparenting is additionally filtered through _reparentable() (stricter than _visible(): excludes a hybrid tree's shared rows, which _visible() allows for reads but no tenant owns a write to), and the whole delete is refused when a child this caller may not write to exists at all -- see this function's own guard a few lines below.
 #
 # --- Open: reaches an unfenced model. Listed so the gate can go live; NOT accepted. -----
 # Each needs a fix or a written decision; do not copy these as precedent.
 app/services/solution_archimate_sync_service.py:196  # OPEN: SYNC_MAP reaches ConstraintElement, which has no TenantMixin and no organisation column, and the lookup matches by name, so a same-named constraint of another organisation can be returned as the existing element.
-app/services/tree_service.py:301  # OPEN: TREE_REGISTRY reaches ComplianceRequirement, PortfolioInitiative, SystemBoundary, Task, VendorCapabilityHierarchy, VendorProcessHierarchy, ProductTaxonomy and RequiredCapability, none fenced; fix is the tree-service urgent brief.
-app/services/tree_service.py:336  # OPEN: as above (get_node).
-app/services/tree_service.py:365  # OPEN: as above (create_node).
-app/services/tree_service.py:388  # OPEN: as above (update_node).
-app/services/tree_service.py:415  # OPEN: as above (delete_node).
-app/services/tree_service.py:420  # OPEN: as above (delete_node query).

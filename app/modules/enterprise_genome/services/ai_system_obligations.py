@@ -156,6 +156,7 @@ def attach_obligations(
             continue
 
         req = ComplianceRequirement(
+            organization_id=element.organization_id,
             archimate_element_id=element.id,
             title=tmpl["title"],
             description=tmpl["description"],
