@@ -25,7 +25,7 @@ class ReferenceNumberCounter(db.Model):
     table_name = db.Column(db.String(128), nullable=False)
     column_name = db.Column(db.String(128), nullable=False)
     prefix = db.Column(db.String(64), nullable=False)
-    last_value = db.Column(db.Integer, nullable=False, server_default="0")
+    last_value = db.Column(db.BigInteger, nullable=False, server_default="0")
     updated_at = db.Column(db.DateTime, server_default=db.func.clock_timestamp())
 
     __table_args__ = (

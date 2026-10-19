@@ -30,7 +30,7 @@ from alembic import op
 from sqlalchemy import inspect, text
 
 revision = "20261019_reference_number_counters"
-down_revision = "20261018_typed_tables_rls"
+down_revision = "20261018_tree_models_rls"
 branch_labels = None
 depends_on = None
 
@@ -97,7 +97,7 @@ def upgrade():
             sa.Column("table_name", sa.String(128), nullable=False),
             sa.Column("column_name", sa.String(128), nullable=False),
             sa.Column("prefix", sa.String(64), nullable=False),
-            sa.Column("last_value", sa.Integer(), nullable=False, server_default="0"),
+            sa.Column("last_value", sa.BigInteger(), nullable=False, server_default="0"),
             sa.Column(
                 "updated_at",
                 sa.DateTime(),

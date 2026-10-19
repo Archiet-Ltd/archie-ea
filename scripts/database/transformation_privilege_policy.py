@@ -26,6 +26,7 @@ RUNTIME_SEQUENCE_ALLOWLIST = frozenset()
 PROTECTED_RUNTIME_TABLE_PRIVILEGES = {
     # app.utils.reference_numbers.next_reference's atomic counter. Runtime never
     # needs to delete a row here (a family's counter only ever increases).
+    # Listed here only so the privilege mechanism grants the runtime role SELECT/INSERT/UPDATE on it; it is not a transformation guard table.
     "reference_number_counters": ("SELECT", "INSERT", "UPDATE"),
     "command_materialisations": ("SELECT",),
     "operation_results": ("SELECT",),
