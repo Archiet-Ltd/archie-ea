@@ -229,6 +229,108 @@ def test_not_configured_without_the_four_settings(no_monelytics):
 
 
 # --------------------------------------------------------------------------- #
+# billing_plans.configuration_status(): the Monelytics branch                 #
+#                                                                              #
+# billing_service.create_checkout_session dispatches to Monelytics first and  #
+# only falls back to the direct-Stripe path when MONELYTICS_BASE_URL is not   #
+# set, so billing_plans.configuration_status() (what the billing page's       #
+# "not set up" banner is built from in the direct-Stripe branch of           #
+# app/modules/admin/billing_routes.py) must follow Monelytics' own settings   #
+# when Monelytics is the active provider, instead of requiring Stripe        #
+# settings checkout will never use.                                          #
+# --------------------------------------------------------------------------- #
+
+
+def _stripe_env_names():
+    from app.services import billing_plans
+
+    names = {"STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"}
+    for plan in billing_plans.purchasable_plans():
+        names.update(plan.price_env.values())
+    return names
+
+
+@pytest.fixture
+def no_stripe(monkeypatch):
+    for name in _stripe_env_names():
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_billing_plans_ready_via_monelytics_without_any_stripe_vars(monelytics_env, no_stripe):
+    """Monelytics fully configured makes billing_plans.configuration_status()
+    ready, even with none of STRIPE_SECRET_KEY/STRIPE_WEBHOOK_SECRET/a plan's
+    price_env vars set: checkout for this installation goes through
+    Monelytics, not the direct-Stripe path, and never needs them."""
+    from app.services import billing_plans, monelytics_provider
+
+    assert monelytics_provider.configured() is True
+    status = billing_plans.configuration_status()
+    assert status["ready"] is True
+    assert status["missing"] == []
+    assert status["prices"] is None
+
+
+def test_billing_plans_not_ready_when_monelytics_missing_its_own_setting(
+    monelytics_env, no_stripe, monkeypatch
+):
+    """Monelytics is the active provider (MONELYTICS_BASE_URL is set) but one
+    of its own required settings is absent: billing_plans.configuration_status()
+    must say not ready and name the real Monelytics gap, not a Stripe one."""
+    from app.services import billing_plans, monelytics_provider
+
+    monkeypatch.delenv("MONELYTICS_CLIENT_SECRET", raising=False)
+
+    assert monelytics_provider.configured() is True  # BASE_URL alone switches the provider on
+    status = billing_plans.configuration_status()
+    assert status["ready"] is False
+    assert status["missing"] == ["MONELYTICS_CLIENT_SECRET"]
+    assert "STRIPE_SECRET_KEY" not in status["missing"]
+    assert "STRIPE_WEBHOOK_SECRET" not in status["missing"]
+
+
+def test_billing_plans_direct_stripe_path_unchanged_without_monelytics(no_monelytics, no_stripe):
+    """Regression: with Monelytics not configured at all, billing_plans.
+    configuration_status() keeps today's direct-Stripe behaviour exactly --
+    not ready, naming the Stripe settings and every plan's price env as
+    missing, same as before this module learned about Monelytics."""
+    from app.services import billing_plans, monelytics_provider
+
+    assert monelytics_provider.configured() is False
+    status = billing_plans.configuration_status()
+    assert status["ready"] is False
+    assert "STRIPE_SECRET_KEY" in status["missing"]
+    assert "STRIPE_WEBHOOK_SECRET" in status["missing"]
+    for plan in billing_plans.purchasable_plans():
+        for env_name in plan.price_env.values():
+            assert env_name in status["missing"]
+    assert status["prices"] == {
+        (p.key, interval): False
+        for p in billing_plans.purchasable_plans()
+        for interval in p.price_env
+    }
+
+
+def test_billing_plans_direct_stripe_path_ready_without_monelytics(no_monelytics, monkeypatch):
+    """Regression: with Monelytics not configured and the direct-Stripe
+    settings fully present, billing_plans.configuration_status() reports
+    ready exactly as it did before -- unaffected by the new Monelytics
+    branch."""
+    from app.services import billing_plans, monelytics_provider
+
+    monkeypatch.setenv("STRIPE_SECRET_KEY", "unit-test-api-value")
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", "unit-test-signing-value")
+    for plan in billing_plans.purchasable_plans():
+        for env_name in plan.price_env.values():
+            monkeypatch.setenv(env_name, f"price_{env_name.lower()}")
+
+    assert monelytics_provider.configured() is False
+    status = billing_plans.configuration_status()
+    assert status["ready"] is True
+    assert status["missing"] == []
+    assert all(status["prices"].values())
+
+
+# --------------------------------------------------------------------------- #
 # Tenant id mapping                                                            #
 # --------------------------------------------------------------------------- #
 
