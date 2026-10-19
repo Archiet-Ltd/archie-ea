@@ -93,7 +93,7 @@
     {% set sp_line = sp_total ~ ' without a recorded ADM phase' %}
     {% elif sp_total > 0 and sp_phases|length == 1 %}
     {% set sp_letter, sp_name = sp_phases[0].label.split(': ', 1) %}
-    {% set sp_line = 'Nothing past ' ~ sp_name ~ ' yet — all ' ~ sp_total ~ ' in phase ' ~ sp_letter %}
+    {% set sp_line = 'Nothing past ' ~ sp_name ~ ' yet — all ' ~ sp_total ~ ' solution' ~ ('s' if sp_total != 1 else '') ~ ' ' ~ ('are' if sp_total != 1 else 'is') ~ ' in phase ' ~ sp_letter %}
     {% elif sp_total > 0 %}
     {% set sp_line = sp_phases|length ~ ' of ' ~ sp|length ~ ' ADM phases active' %}
     {% else %}
