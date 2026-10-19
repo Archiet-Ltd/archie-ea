@@ -140,7 +140,20 @@ def test_every_tenant_tree_model_is_a_tenant_mixin(key):
 @pytest.mark.parametrize("key", NEWLY_SCOPED)
 def test_newly_scoped_models_carry_a_required_organisation(key):
     column = _model(key).__table__.columns["organization_id"]
-    assert column.nullable is False
+    if key == "required_capability":
+        # Fenced by 20261018_vendor_analysis_rls, a different migration from
+        # a different PR -- it was never given the nullable=True override
+        # the other six models below needed; it still declares TenantMixin's
+        # plain nullable=False.
+        assert column.nullable is False
+    else:
+        # 20261018_tree_models_org_id leaves organization_id NULL on a row
+        # with no derivable organisation, an ADD-only migration's shape
+        # TenantMixin's own default (nullable=False) would otherwise
+        # contradict. These six models override it the same way PR 742's
+        # own typed-table models do (app/models/implementation_migration.py
+        # and the rest of that PR's six).
+        assert column.nullable is True
     assert column.foreign_keys
 
 

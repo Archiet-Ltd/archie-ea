@@ -377,7 +377,23 @@ def _reparentable(Model, tree_key):
     return Model.organization_id == org_id
 
 
-def _commit():
+def _optimistic_lock_aware(Model):
+    """True for a model whose own concurrent-edit version check can raise
+    ``StaleDataError`` for a reason that has nothing to do with tenancy.
+
+    ``_commit()``/``delete_node`` otherwise treat ``StaleDataError`` as proof
+    a write was silently refused by row-level security (zero rows matched an
+    UPDATE/DELETE that targeted exactly one by primary key) and report it as
+    FORBIDDEN. A model mapped with ``version_id_col`` (``OptimisticLockMixin``)
+    raises the identical exception shape for an ordinary lost-update race
+    with no RLS involved at all, so that reason must not be assumed here.
+    """
+    from app.models.mixins import OptimisticLockMixin
+
+    return issubclass(Model, OptimisticLockMixin)
+
+
+def _commit(Model=None):
     """Commit; a refused reference/cross-organisation write becomes FORBIDDEN.
 
     Three distinct shapes land here for the same underlying reason -- a
@@ -393,11 +409,23 @@ def _commit():
     not loaded at all to be reparented in the first place) that this
     caller's session could not see to reparent, let alone exclude from the
     delete it is now blocking. See ``delete_node``.
+
+    A ``StaleDataError`` is only ever treated as one of those three when
+    ``Model`` is not ``_optimistic_lock_aware`` -- UnifiedCapability (the
+    ``capability`` tree) carries its own version column, and a genuine lost
+    update there must reach the app-wide ``StaleDataError`` handler
+    (``app/_bootstrap/extensions.py``, which answers 409 Conflict with a
+    reload-and-retry message) rather than being mislabelled a 403 here.
     """
     try:
         db.session.commit()
-    except (PermissionError, StaleDataError, IntegrityError) as exc:
+    except (PermissionError, IntegrityError) as exc:
         db.session.rollback()
+        return f"{FORBIDDEN}: {exc}"
+    except StaleDataError as exc:
+        db.session.rollback()
+        if Model is not None and _optimistic_lock_aware(Model):
+            raise
         return f"{FORBIDDEN}: {exc}"
     return None
 
@@ -515,7 +543,7 @@ def create_node(tree_key, data):
 
     row = Model(**kwargs)
     db.session.add(row)
-    error = _commit()
+    error = _commit(Model)
     if error:
         return None, error
     return get_node(tree_key, row.id), None
@@ -553,7 +581,7 @@ def update_node(tree_key, node_id, data):
         if f in data:
             setattr(row, f, data[f])
 
-    error = _commit()
+    error = _commit(Model)
     if error:
         return None, error
     return get_node(tree_key, node_id), None
@@ -627,10 +655,15 @@ def delete_node(tree_key, node_id):
         # holds, is handled the same way _commit() below handles one at the
         # final commit.
         db.session.flush()
-    except (PermissionError, StaleDataError, IntegrityError) as exc:
+    except (PermissionError, IntegrityError) as exc:
         db.session.rollback()
+        return f"{FORBIDDEN}: {exc}"
+    except StaleDataError as exc:
+        db.session.rollback()
+        if _optimistic_lock_aware(Model):
+            raise
         return f"{FORBIDDEN}: {exc}"
     db.session.expire(row)
 
     db.session.delete(row)
-    return _commit()
+    return _commit(Model)

@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import UUID
 
 from app import db
 from app.models.mixins import TenantMixin
+from app.models.mixins.core import _default_org_id
 
 
 class Project(TenantMixin, db.Model):
@@ -126,6 +127,20 @@ class Task(TenantMixin, db.Model):
     """
 
     __tablename__ = "tasks"
+
+    # Override TenantMixin's normally non-nullable column for an ADD-only
+    # rollout: the 20261018_tree_models_org_id migration adds this to an
+    # existing table and leaves a row NULL when no organisation is
+    # derivable from its linked project/requirement/parent task. The mixin
+    # is still essential: tenant middleware identifies tenant-owned models
+    # by it and applies the automatic query fence.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
 
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title = db.Column(db.String(200), nullable=False)

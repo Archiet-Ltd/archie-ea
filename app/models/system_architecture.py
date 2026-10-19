@@ -18,6 +18,7 @@ from typing import Optional
 from sqlalchemy import event
 
 from app.models.mixins import TenantMixin
+from app.models.mixins.core import _default_org_id
 
 from .. import db
 
@@ -35,6 +36,20 @@ class SystemBoundary(TenantMixin, db.Model):
     """
 
     __tablename__ = "system_boundaries"
+
+    # Override TenantMixin's normally non-nullable column for an ADD-only
+    # rollout: the 20261018_tree_models_org_id migration adds this to an
+    # existing table and leaves a row NULL when no organisation is
+    # derivable from its linked ArchiMate element, parent boundary or
+    # creator. The mixin is still essential: tenant middleware identifies
+    # tenant-owned models by it and applies the automatic query fence.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False, index=True)
