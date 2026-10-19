@@ -70,6 +70,6 @@ def test_action_href_follows_centre_depth_and_toggle(browser, live_server, seede
         page.wait_for_selector(LINK, state="visible")
         classes = page.locator(LINK).get_attribute("class")
         assert "border-input" in classes and "bg-background" in classes and "bg-primary" not in classes
-        assert page.locator("a.bg-primary, button.bg-primary").count() <= 1
+        assert page.locator('[x-data="twinMapSurface()"] :is(a, button).bg-primary').count() <= 1
     finally:
         context.close()
