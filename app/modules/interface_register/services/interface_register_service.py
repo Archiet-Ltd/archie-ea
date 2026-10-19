@@ -76,19 +76,13 @@ def list_initiatives_for_org(organization_id: int) -> List[TechnologyRoadmapInit
     )
 
 
-def list_interfaces(initiative_id: int, organization_id: int) -> List[Dict]:
-    """Register list, element-rooted. Every ArchiMateElement of type
-    ApplicationInterface in this tenant, outer-joined to its metadata (which
-    may not exist yet — an element with no metadata row still lists, US-1 AC3).
-
-    Scoping to *one* initiative: interfaces created by this feature carry
-    initiative_id in ArchiMateElement.custom_properties (provenance), which
-    is how the register narrows to "interfaces for this initiative" without
-    a new column or table.
-    """
-    resolve_initiative(initiative_id, organization_id)
-
-    rows = (
+def _interface_rows(architecture_id: Optional[int] = None):
+    """Every ArchiMateElement of type ApplicationInterface in this tenant,
+    outer-joined to its metadata (which may not exist yet -- an element with no
+    metadata row still lists, US-1 AC3). Same element-rooted, tenant-filtered
+    query the Elements page runs (architecture_crud_routes.list_elements),
+    narrowed by ArchiMateElement.architecture_id when a model is given."""
+    query = (
         db.session.query(ArchiMateElement, ApplicationInterfaceMetadata)
         .outerjoin(
             ApplicationInterfaceMetadata,
@@ -96,12 +90,45 @@ def list_interfaces(initiative_id: int, organization_id: int) -> List[Dict]:
         )
         .filter(ArchiMateElement.type == "ApplicationInterface")
         .filter(ArchiMateElement.layer == "Application")
-        .order_by(ArchiMateElement.name)
-        .all()
     )
+    if architecture_id is not None:
+        query = query.filter(ArchiMateElement.architecture_id == architecture_id)
+    return query.order_by(ArchiMateElement.name).all()
+
+
+def list_architectures_for_org() -> List[ArchitectureModel]:
+    """Architecture models of the caller's tenant (ArchitectureModel is
+    TenantMixin, so do_orm_execute scopes this)."""
+    return ArchitectureModel.query.order_by(ArchitectureModel.name).all()
+
+
+def resolve_architecture(architecture_id: int) -> ArchitectureModel:
+    """An architecture model of the caller's tenant, or InterfaceRegisterError
+    (404, never "visible to everyone")."""
+    architecture = ArchitectureModel.query.filter_by(id=architecture_id).first()
+    if architecture is None:
+        raise InterfaceRegisterError("Architecture model not found")
+    return architecture
+
+
+def list_org_interfaces(organization_id: int, architecture_id: Optional[int] = None) -> List[Dict]:
+    """Register list for the caller's organisation, optionally narrowed to one
+    architecture model. No roadmap initiative is involved."""
+    if architecture_id is not None:
+        resolve_architecture(architecture_id)
+    return [
+        {"element": element, "metadata": metadata}
+        for element, metadata in _interface_rows(architecture_id)
+    ]
+
+
+def list_interfaces(initiative_id: int, organization_id: int) -> List[Dict]:
+    """Interfaces provenance-stamped with one roadmap initiative (used by the
+    initiative-scoped comparison and costing screens)."""
+    resolve_initiative(initiative_id, organization_id)
 
     results = []
-    for element, metadata in rows:
+    for element, metadata in _interface_rows():
         props = element.custom_properties or {}
         if props.get("initiative_id") != initiative_id:
             continue
@@ -268,10 +295,21 @@ def _validate_create_fields(form: Dict) -> Dict:
     }
 
 
-def create_interface(initiative_id: int, form: Dict, organization_id: int) -> ArchiMateElement:
+def create_interface(
+    initiative_id: Optional[int],
+    form: Dict,
+    organization_id: int,
+    architecture_id: Optional[int] = None,
+) -> ArchiMateElement:
     """US-2: element -> metadata -> two SystemDependency rows -> ArchiMateRelationship
-    rows, all in ONE transaction. Any failure rolls back leaving zero orphan rows."""
-    resolve_initiative(initiative_id, organization_id)
+    rows, all in ONE transaction. Any failure rolls back leaving zero orphan rows.
+
+    The register is scoped per architecture model; ``initiative_id`` is optional
+    provenance for the initiative-scoped comparison screens."""
+    if initiative_id is not None:
+        resolve_initiative(initiative_id, organization_id)
+    if architecture_id is not None:
+        resolve_architecture(architecture_id)
     fields = _validate_create_fields(form)
 
     provider_id = form.get("provider_component_id") or None
@@ -291,9 +329,10 @@ def create_interface(initiative_id: int, form: Dict, organization_id: int) -> Ar
             organization_id=organization_id,
             provenance={
                 "source_model": "InterfaceRegister",
-                "initiative_id": initiative_id,
+                **({"initiative_id": initiative_id} if initiative_id is not None else {}),
             },
         )
+        element.architecture_id = architecture_id
 
         metadata = ApplicationInterfaceMetadata(
             archimate_element_id=element.id,
@@ -376,6 +415,15 @@ def update_interface(element_id: int, form: Dict, organization_id: int) -> Archi
     try:
         element.name = fields["name"]
         element.description = fields["description"]
+        if "architecture_id" in form:
+            raw_architecture = form.get("architecture_id") or None
+            try:
+                new_architecture_id = int(raw_architecture) if raw_architecture else None
+            except ValueError:
+                raise InterfaceRegisterError("Architecture model not found")
+            if new_architecture_id is not None:
+                resolve_architecture(new_architecture_id)
+            element.architecture_id = new_architecture_id
 
         metadata = ApplicationInterfaceMetadata.query.filter_by(
             archimate_element_id=element_id

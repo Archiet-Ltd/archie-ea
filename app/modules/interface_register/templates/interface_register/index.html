@@ -7,46 +7,35 @@
 <div class="flex-1 overflow-auto p-6">
   {{ page_shell(
       title='Interface Register',
-      subtitle=initiative.name if initiative else 'Pick an initiative to view its interface register.',
+      subtitle=architecture.name if architecture else None,
       breadcrumb=[('Home', url_for('main.index')), ('Interface Register', None)]
   ) }}
 
-  {% if initiative is none %}
-  {% if initiatives %}
-  <div class="rounded-lg border border-border bg-card p-4">
-    <ul class="divide-y divide-border">
-      {% for init in initiatives %}
-      <li class="py-3 flex items-center justify-between gap-4">
-        <div class="min-w-0">
-          <p class="text-sm font-medium truncate">{{ init.name }}</p>
-          <p class="text-xs text-muted-foreground">{{ init.fiscal_year_start }}–{{ init.fiscal_year_end }}</p>
-        </div>
-        <a href="{{ url_for('interface_register.index', initiative_id=init.id) }}"
-           class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-transparent hover:bg-accent hover:text-accent-foreground h-9 px-3 shrink-0">
-          View register
-        </a>
-      </li>
+  {% if architectures %}
+  <form method="GET" action="{{ url_for('interface_register.index') }}" class="mb-4 flex items-center gap-2">
+    <label class="text-sm text-muted-foreground" for="architecture_id">Architecture model</label>
+    <select id="architecture_id" name="architecture_id" data-testid="interface-register-model-filter"
+            onchange="this.form.submit()"
+            class="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+      <option value="" {% if not architecture %}selected{% endif %}>All models</option>
+      {% for model in architectures %}
+      <option value="{{ model.id }}" {% if architecture and architecture.id == model.id %}selected{% endif %}>{{ model.name }}</option>
       {% endfor %}
-    </ul>
-  </div>
-  {% else %}
-  {{ empty_state(
-      icon='route',
-      headline='No technology roadmap initiatives yet',
-      body='The interface register is scoped to a technology roadmap initiative. Create one before registering interfaces.'
-  ) }}
+    </select>
+    <noscript><button type="submit" class="rounded-md border border-input px-3 py-1.5 text-sm">Filter</button></noscript>
+  </form>
   {% endif %}
 
-  {% else %}
-
   <div class="mb-4 flex justify-end gap-2">
+    {% for initiative in comparison_initiatives or [] %}
     <a href="{{ url_for('interface_register.comparison', initiative_id=initiative.id) }}"
-       data-testid="interface-comparison-link"
+       data-testid="{{ 'interface-comparison-link' if comparison_initiatives|length == 1 else 'interface-comparison-link-%d' % initiative.id }}"
        class="inline-flex items-center gap-2 rounded-md text-sm font-medium border border-input bg-transparent hover:bg-accent hover:text-accent-foreground h-9 px-4">
       <i data-lucide="git-compare" class="h-4 w-4" aria-hidden="true"></i>
-      As-is / To-be comparison
+      As-is / To-be comparison{% if comparison_initiatives|length > 1 %}: {{ initiative.name }}{% endif %}
     </a>
-    <a href="{{ url_for('interface_register.new', initiative_id=initiative.id) }}"
+    {% endfor %}
+    <a href="{{ url_for('interface_register.new', architecture_id=architecture.id if architecture else None, initiative_id=initiative_id) }}"
        data-testid="interface-register-new"
        class="inline-flex items-center gap-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4">
       <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
@@ -127,13 +116,11 @@
   {% else %}
   {{ empty_state(
       icon='cable',
-      headline='No interfaces registered for this initiative',
-      body='Register the first SAP S/4HANA interface for this initiative.',
+      headline='No interfaces registered yet',
+      body='Register the first interface between two applications.',
       cta_label='New interface',
-      cta_href=url_for('interface_register.new', initiative_id=initiative.id)
+      cta_href=url_for('interface_register.new', architecture_id=architecture.id if architecture else None)
   ) }}
-  {% endif %}
-
   {% endif %}
 </div>
 {% endblock %}

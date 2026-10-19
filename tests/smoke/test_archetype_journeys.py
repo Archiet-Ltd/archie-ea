@@ -412,11 +412,14 @@ def test_solution_architect_registers_an_interface(page, live_server, seeded):
     import uuid
 
     _login(page, live_server, seeded["emails"]["solution_architect"])
-    initiative_id = seeded["ids"]["interface_register_initiative"]
     ref = uuid.uuid4().hex[:6]
     name = "Smoke Interface %s" % ref
 
-    _visit(page, live_server, "/interface-register/new?initiative_id=%d" % initiative_id)
+    # No roadmap initiative anywhere: the register opens straight onto its
+    # own "New interface" control.
+    _visit(page, live_server, "/interface-register/")
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
+        page.get_by_test_id("interface-register-new").click()
     assert page.locator("#name").count() == 1, "the create form did not render"
     page.fill("#name", name)
     page.select_option("#interface_type", "REST")
