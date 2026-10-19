@@ -27,6 +27,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app import db
 from app.config.jira_field_mapping import JIRA_FIELD_MAPPINGS
+from app.services.adm_card_element_links import get_card_element_ids
 from app.connectors.jira import JiraALMConnector, JiraAPIError
 from app.models.jira_sync_tracking import JiraSyncTracking, PushStatus
 from app.models.models import ExternalSystem
@@ -493,7 +494,7 @@ class JiraPushService:
                 "arch_domain": card.arch_domain or "",
                 "togaf_deliverable": card.togaf_deliverable or "",
                 "requires_arb_signoff": bool(card.requires_arb_signoff),
-                "archimate_element_ids": card.archimate_element_ids or [],
+                "archimate_element_ids": get_card_element_ids(card),
             }
             fields = build_jira_fields(card_data)
             issue_type = get_jira_issue_type(card_data)
@@ -758,7 +759,7 @@ class JiraPushService:
                         "priority": card.priority or "medium",
                         "adm_phase_code": card.adm_phase.code if card.adm_phase else "A",
                         "card_type": card.card_type or "requirement",
-                        "archimate_element_ids": card.archimate_element_ids or [],
+                        "archimate_element_ids": get_card_element_ids(card),
                     }
                     fields = build_jira_fields(card_data)
                     fields["parent"] = {"key": parent.jira_issue_key}
