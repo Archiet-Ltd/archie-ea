@@ -77,45 +77,54 @@
          action in plain business language and a divider between groups. #}
       <button type="button" data-testid="btn-add-application" data-modal-open="modal-create"
         title="Register a new application in the portfolio"
-        class="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors" aria-label="Add application">
+        class="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-4 text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Add application">
         <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Add Application
       </button>
       <div class="hidden sm:block h-6 border-l border-input" aria-hidden="true"></div>
       <button type="button" data-testid="btn-import" data-modal-open="application-import-modal"
         title="Import applications from a spreadsheet or the Abacus feed"
-        class="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors" aria-label="Import applications">
+        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Import applications">
         <i data-lucide="upload" class="h-4 w-4" aria-hidden="true"></i>Import
       </button>
       <button type="button" data-testid="btn-export" @click="exportCSV()"
         title="Download the current filtered list as a CSV file"
-        class="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors" aria-label="Export applications">
+        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Export applications">
         <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export
       </button>
       <div class="hidden sm:block h-6 border-l border-input" aria-hidden="true"></div>
       {% if 'consolidation_list.dashboard' in flask.current_app.view_functions %}
-      <a href="{{ url_for('consolidation_list.dashboard') }}" data-testid="btn-consolidation"
-        title="Find duplicate or overlapping applications that could be consolidated"
-        class="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors">
-        <i data-lucide="layers-2" class="h-4 w-4" aria-hidden="true"></i>Consolidation
-      </a>
-      {% endif %}
-      {% if 'solution_design.list_solutions' in flask.current_app.view_functions %}
-      <a href="{{ url_for('solution_design.list_solutions') }}" data-testid="btn-design-solution"
-        title="Use AI to design a target-state solution from your application estate"
-        class="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors">
-        <i data-lucide="star" class="h-4 w-4" aria-hidden="true"></i>Design Solution
-      </a>
-      {% endif %}
-      <button type="button" data-testid="btn-match-vendors" @click="openUnifiedMappingModalDiscovery({context:'vendor'})"
-        title="Use AI to match applications to known vendor products"
-        class="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors" aria-label="Match vendors">
-        <i data-lucide="package" class="h-4 w-4" aria-hidden="true"></i>Vendor Match
+      <div class="relative" x-data="{ moreOpen: false }">
+        <button type="button" data-testid="btn-more-actions" @click="moreOpen = !moreOpen" @click.outside="moreOpen = false" @keydown.escape="moreOpen = false"
+          :aria-expanded="moreOpen.toString()" aria-haspopup="menu" aria-label="More actions"
+          class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          More<i data-lucide="chevron-down" class="h-4 w-4" aria-hidden="true"></i>
+        </button>
+        <div x-show="moreOpen" x-cloak class="absolute right-0 z-30 mt-1 w-56 rounded-md border border-border bg-popover p-1" role="menu">
+      <a href="{{ url_for('consolidation_list.dashboard') }}" data-testid="btn-consolidation"
+        title="Find duplicate or overlapping applications that could be consolidated"
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem">
+        <i data-lucide="layers-2" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-hidden="true"></i>Consolidation
+      </a>
+      {% endif %}
+      {% if 'solution_design.list_solutions' in flask.current_app.view_functions %}
+      <a href="{{ url_for('solution_design.list_solutions') }}" data-testid="btn-design-solution"
+        title="Use AI to design a target-state solution from your application estate"
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem">
+        <i data-lucide="star" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-hidden="true"></i>Design Solution
+      </a>
+      {% endif %}
+      <button type="button" data-testid="btn-match-vendors" @click="openUnifiedMappingModalDiscovery({context:'vendor'})"
+        title="Use AI to match applications to known vendor products"
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-label="Match vendors">
+        <i data-lucide="package" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-hidden="true"></i>Vendor Match
+      </button>
+      <button type="button" data-testid="btn-ai-map" @click="openAiMapModal()"
+        title="Use AI to suggest capability, process and ArchiMate mappings for your applications"
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-label="AI map applications">
+        <i data-lucide="sparkles" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-hidden="true"></i>AI Map
       </button>
-      <button type="button" data-testid="btn-ai-map" @click="openAiMapModal()"
-        title="Use AI to suggest capability, process and ArchiMate mappings for your applications"
-        class="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors" aria-label="AI map applications">
-        <i data-lucide="sparkles" class="h-4 w-4" aria-hidden="true"></i>AI Map
-      </button>
+        </div>
+      </div>
     </div>
   {% endmacro %}
   {{ page_shell(
@@ -126,48 +135,6 @@
   ) }}
 
   {# ─ STATS CARDS ─ #}
-  <div class="grid grid-cols-2 lg:grid-cols-5 gap-3" role="region" aria-label="Portfolio statistics">
-    {# ARCH-104: each tile filters the table below by its lifecycle bucket. Active Portfolio
-       clears the status filter (it's the "everything active" view, not one bucket); the
-       others set filters.status to the STATUS_MAP key that badge-maps to that bucket. #}
-    {{ stat_card(label='Active Portfolio', value=stats.active_portfolio, hint='All non-decommissioned applications', variant='hero', onclick="setStatusFilter('')") }}
-    {{ stat_card(label='Strategic', value=stats.strategic, hint='Strategic investments', onclick="setStatusFilter('2.1 strategic')", active=(filters.status == '2.1 strategic')) }}
-    {{ stat_card(label='Tactical', value=stats.tactical, hint='Tactical / maintain', onclick="setStatusFilter('2.2 tactical')", active=(filters.status == '2.2 tactical')) }}
-    {{ stat_card(label='Sunset/Decom Pipeline', value=stats.sunset_decom_pipeline, hint='Sunset or decommission planned', onclick="setStatusFilter('3. sunset')", active=(filters.status == '3. sunset')) }}
-    {# 5 cards in a 2-column mobile grid leaves this one alone in its own
-       row -- found in a visual-design pass on production. Spanning both
-       columns on mobile (full width) instead of a lonely half-width card;
-       lg: reverts to the normal 1-of-5 column at desktop width. #}
-    <div class="col-span-2 lg:col-span-1">
-      {{ stat_card(label='Decommissioned', value=stats.decommissioned, hint='Retired from the estate', onclick="setStatusFilter('5. decommissioned')", active=(filters.status == '5. decommissioned')) }}
-    </div>
-  </div>
-
-  {# ─ DATA QUALITY BANNER ─ #}
-  <div class="rounded-lg border border-warning/30 bg-warning/5 p-4 mb-4">
-    <div class="flex items-center gap-2 mb-2">
-      <i data-lucide="alert-triangle" class="h-4 w-4 text-warning"></i>
-      <span class="text-sm font-medium text-warning-emphasis">Data Quality</span>
-    </div>
-    <div class="flex flex-wrap gap-4 text-xs text-muted-foreground">
-      {# ARCH-106: was a hardcoded literal "0" for both numerators — a fabricated-data
-         violation. Both counts now come from stats.owner_assigned / stats.vendor_assigned,
-         computed server-side in application_list() from real business_owner / vendor_name
-         / vendor_product_id data. #}
-      {# D13: these are portfolio-wide figures (denominator = the full portfolio,
-         including the decommissioned app the default table hides). Say "in the
-         portfolio" so "24 of 24" cannot read as a contradiction of the 23-row
-         active view below it. #}
-      <span>{{ stats.owner_assigned|dash }} of {{ stats.total|dash }} applications in the portfolio have a named owner (a business owner on record, or an application manager assigned)</span>
-      <span>{{ stats.vendor_assigned|dash }} of {{ stats.total|dash }} applications in the portfolio have a vendor recorded</span>
-      <span>{{ stats.decommissioned|dash }} of {{ stats.total|dash }} applications in the portfolio decommissioned</span>
-      <a href="{{ url_for('enterprise_crud.data_freshness_cockpit') }}" class="inline-flex items-center gap-1 text-warning-emphasis font-medium hover:underline">
-        View full data-freshness report
-        <i data-lucide="arrow-right" class="h-3 w-3" aria-hidden="true"></i>
-      </a>
-    </div>
-  </div>
-
   {# ── BIZBOK: Application Cooperation Viewpoint (collapsible) ── #}
   <div x-data="{ appDiagramOpen: false, appDiagramLoaded: false, appDiagramError: '' }" class="mb-4">
     <button type="button" @click="appDiagramOpen = !appDiagramOpen; if(appDiagramOpen && !appDiagramLoaded) {
@@ -204,9 +171,14 @@
   </div>
 
   {# ─ MAIN TABLE CARD ─ #}
-  <div data-slot="card" class="rounded-xl border bg-card shadow-sm" role="region" aria-label="Applications table">
-    <div class="flex items-center justify-between px-4 py-3 border-b gap-3 flex-wrap">
-      <p class="text-sm text-muted-foreground">Track and manage all applications across your enterprise architecture.</p>
+  <div data-slot="card" class="rounded-lg border border-border bg-card" role="region" aria-label="Applications table">
+    <div class="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
+      <div class="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs text-foreground" role="status" data-testid="data-quality-alert">
+        <i data-lucide="alert-triangle" class="h-3.5 w-3.5 shrink-0 text-warning-emphasis" aria-hidden="true"></i>
+        <span class="font-medium text-warning-emphasis">Data quality</span>
+        <span class="truncate">{{ stats.owner_assigned|dash }} of {{ stats.total|dash }} applications in the portfolio have a named owner (a business owner on record, or an application manager assigned) · {{ stats.vendor_assigned|dash }} of {{ stats.total|dash }} applications in the portfolio have a vendor recorded · {{ stats.decommissioned|dash }} of {{ stats.total|dash }} applications in the portfolio decommissioned</span>
+        <a href="{{ url_for('enterprise_crud.data_freshness_cockpit') }}" class="ml-auto shrink-0 font-medium text-info hover:underline">View full data-freshness report</a>
+      </div>
       <div class="flex items-center gap-2">
         {# D13: this badge counts the rows in the current (filtered) view, which by
            default hides decommissioned apps — so it is NOT the portfolio total.
@@ -214,13 +186,6 @@
            23-row view and the 24-app portfolio can never read as a contradiction. #}
         {% if total_count %}<span class="text-xs font-medium bg-muted text-muted-foreground px-2.5 py-1 rounded-full" data-testid="total-count-badge">{{ total_count }} shown{% if portfolio_total and portfolio_total != total_count %} of {{ portfolio_total }}{% endif %}</span>{% endif %}
         {# ARCH-100: density toggle, persisted to localStorage in appPortfolio.init(). #}
-        <button type="button" data-testid="btn-density-toggle" @click="toggleDensity()"
-          title="Toggle row density between comfortable and compact"
-          :aria-label="density === 'compact' ? 'Switch to comfortable row spacing' : 'Switch to compact row spacing'"
-          class="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-input bg-background text-xs font-medium hover:bg-accent transition-colors">
-          <i data-lucide="rows-3" class="h-3.5 w-3.5" aria-hidden="true"></i>
-          <span x-text="density === 'compact' ? 'Compact' : 'Comfortable'">Comfortable</span>
-        </button>
       </div>
     </div>
     {# PLT-019: BU scope indicator #}
@@ -325,7 +290,7 @@
           </button>
           <!-- alpine-scope-ok --> <!-- modal-a11y-ok -->
           <div x-show="lcOpen" x-cloak @click.away="lcOpen = false"
-            class="absolute left-0 mt-1 w-40 bg-card border border-border rounded-md shadow-lg z-50" role="menu">
+            class="absolute left-0 mt-1 w-40 bg-card border border-border rounded-md  z-50" role="menu">
             {# Values match STATUS_MAP's keys exactly (lowercase) — the backend
                validates against this same vocabulary (APPLICATION_LIFECYCLE_STAGES)
                and the badge lookup below is case-sensitive on it. #}
@@ -362,7 +327,7 @@
     </div>
 
     {# ─ Desktop table ─ #}
-    <div class="hidden lg:block overflow-x-auto">
+    <div class="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)]">
       {% if applications %}
 
     {# A second "FRAG-007 Bulk Actions Bar" used to sit here. It was removed
@@ -379,9 +344,9 @@
        static/js/applications/list.js. #}
 
 <table class="w-full border-collapse" data-testid="applications-table">
-        <thead>
-          <tr class="bg-muted/40 border-b">
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground px-4 py-3 w-10 text-left">
+        <thead class="sticky top-0 z-10 bg-card">
+          <tr class="border-b border-border">
+            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle w-10 text-left">
               <input type="checkbox" id="select-all-desktop" data-testid="select-all"
                 :checked="allSelected()" :indeterminate="someSelected()"
                 @change="toggleSelectAll($event.target.checked)"
@@ -389,26 +354,26 @@
             </th>
             {# ARCH-100: sortable headers. sortBy() toggles asc/desc and re-navigates
                with the current filters + page preserved (see list.js _navigate()). #}
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground px-4 py-3 text-left w-20">
+            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left w-20">
               <button type="button" @click="sortBy('id')" data-testid="th-sort-id"
                 class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by ID">
                 ID<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'id' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'id' && dir === 'desc'" x-cloak aria-hidden="true"></i>
               </button>
             </th>
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground px-4 py-3 text-left min-w-[180px]">
+            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[180px]">
               <button type="button" @click="sortBy('name')" data-testid="th-sort-name"
                 class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by Application name">
                 Application<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'name' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'name' && dir === 'desc'" x-cloak aria-hidden="true"></i>
               </button>
             </th>
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground px-4 py-3 text-left min-w-[120px]">
+            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[120px]">
               <button type="button" @click="sortBy('type')" data-testid="th-sort-type"
                 class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by Type">
                 Type<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'type' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'type' && dir === 'desc'" x-cloak aria-hidden="true"></i>
               </button>
             </th>
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground px-4 py-3 text-left w-10" title="ArchiMate: whether this application has a linked ArchiMate element" aria-label="ArchiMate link status">AM</th>
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground px-4 py-3 text-left min-w-[160px]">
+            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left w-10" title="ArchiMate: whether this application has a linked ArchiMate element" aria-label="ArchiMate link status">AM</th>
+            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[160px]">
               <button type="button" @click="sortBy('lifecycle_status')" data-testid="th-sort-lifecycle-status"
                 class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by Lifecycle Status">
                 Lifecycle Status<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'lifecycle_status' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'lifecycle_status' && dir === 'desc'" x-cloak aria-hidden="true"></i>
@@ -416,12 +381,12 @@
             </th>
             {# Hidden until data enrichment — Criticality, Business Owner, Vendor #}
             {#
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground px-4 py-3 text-left min-w-[130px]">Criticality</th>
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground px-4 py-3 text-left min-w-[140px]">Business Owner</th>
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground px-4 py-3 text-left min-w-[130px]">Vendor</th>
+            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[130px]">Criticality</th>
+            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[140px]">Business Owner</th>
+            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[130px]">Vendor</th>
             #}
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground px-4 py-3 text-left min-w-[150px]">Capability</th>
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground px-4 py-3 text-right min-w-[180px]">Actions</th>
+            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[150px]">Capability</th>
+            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-right min-w-[180px]">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y">
@@ -431,20 +396,20 @@
           {%- set ck = (app.business_criticality or '').lower() -%}
           {%- set cc = CRIT_MAP.get(ck, 'bg-muted text-muted-foreground') -%}
           {%- set pc = app.capability_mappings[0] if app.capability_mappings else none -%}
-          <tr class="border-b hover:bg-muted/30 transition-colors" data-app-id="{{ app.id }}" data-testid="app-row-{{ app.id }}">
-            <td class="px-4" :class="density === 'compact' ? 'py-1' : 'py-3'">
+          <tr class="group h-12 border-b border-border transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" data-app-id="{{ app.id }}" data-testid="app-row-{{ app.id }}">
+            <td class="px-3 py-0 align-middle">
               <input type="checkbox" class="row-select rounded border-input h-4 w-4 cursor-pointer"
                 :checked="selectedIds.has({{ app.id }})"
                 @change="toggleRow({{ app.id }}, $event.target.checked)"
                 aria-label="Select {{ app.name | e }}" data-testid="row-select-{{ app.id }}">
             </td>
-            <td class="px-4" :class="density === 'compact' ? 'py-1' : 'py-3'"><span class="text-xs font-mono text-muted-foreground">{{ app.id }}</span></td>
-            <td class="px-4" :class="density === 'compact' ? 'py-1' : 'py-3'">
+            <td class="px-3 py-0 align-middle"><span class="text-xs font-mono text-muted-foreground">{{ app.id }}</span></td>
+            <td class="px-3 py-0 align-middle">
               <p class="font-medium text-sm text-foreground truncate max-w-[200px]" title="{{ app.name | e }}">{{ app.name }}</p>
               {% if app.description %}<p class="text-xs text-muted-foreground truncate max-w-[200px]">{{ app.description[:80] }}{% if app.description | length > 80 %}…{% endif %}</p>{% endif %}
             </td>
-            <td class="px-4" :class="density === 'compact' ? 'py-1' : 'py-3'"><span class="text-sm text-muted-foreground">{{ app.component_type or '—' }}</span></td>
-            <td class="px-4 text-center" :class="density === 'compact' ? 'py-1' : 'py-3'">
+            <td class="px-3 py-0 align-middle"><span class="text-sm text-muted-foreground">{{ app.component_type or '—' }}</span></td>
+            <td class="px-3 py-0 align-middle text-center">
               {% if app.archimate_element_id %}
               {# role="img" makes the aria-label legal: a bare span is a generic
                  element, and aria-label on it is an aria-prohibited-attr
@@ -454,18 +419,18 @@
               <span class="inline-block h-2.5 w-2.5 rounded-full bg-muted-foreground/30" title="No ArchiMate link" role="img" aria-label="Not linked to an ArchiMate element"></span>
               {% endif %}
             </td>
-            <td class="px-4" :class="density === 'compact' ? 'py-1' : 'py-3'">
+            <td class="px-3 py-0 align-middle">
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ si.cls }}">{{ si.label }}</span>
             </td>
             {# Hidden until data enrichment — Criticality, Business Owner, Vendor #}
             {#
-            <td class="px-4" :class="density === 'compact' ? 'py-1' : 'py-3'">
+            <td class="px-3 py-0 align-middle">
               {% if app.business_criticality %}
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ cc }}">{{ app.business_criticality }}</span>
               {% else %}<span class="text-xs text-muted-foreground">—</span>{% endif %}
             </td>
-            <td class="px-4" :class="density === 'compact' ? 'py-1' : 'py-3'"><span class="text-sm text-muted-foreground truncate max-w-[140px] block">{{ app.business_owner or '—' }}</span></td>
-            <td class="px-4" :class="density === 'compact' ? 'py-1' : 'py-3'">
+            <td class="px-3 py-0 align-middle"><span class="text-sm text-muted-foreground truncate max-w-[140px] block">{{ app.business_owner or '—' }}</span></td>
+            <td class="px-3 py-0 align-middle">
               <span class="text-sm text-muted-foreground truncate max-w-[130px] block">
                 {%- if app.vendor_name %}{{ app.vendor_name }}
                 {%- elif app.primary_vendor_product is defined and app.primary_vendor_product %}{{ app.primary_vendor_product.name }}
@@ -473,22 +438,22 @@
               </span>
             </td>
             #}
-            <td class="px-4" :class="density === 'compact' ? 'py-1' : 'py-3'">
+            <td class="px-3 py-0 align-middle">
               {% if pc and pc.business_capability %}
               <span class="text-xs text-muted-foreground truncate max-w-[150px] block" title="{{ pc.business_capability.name | e }}">{{ pc.business_capability.name }}</span>
               {% else %}<span class="text-xs text-muted-foreground">Not mapped</span>{% endif %}
             </td>
-            <td class="px-4 text-right" :class="density === 'compact' ? 'py-1' : 'py-3'">
-              <div class="flex gap-1 justify-end">
+            <td class="px-3 py-0 align-middle text-right">
+              <div class="flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                 <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}"
                   data-testid="btn-view-{{ app.id }}"
-                  class="inline-flex items-center justify-center h-8 px-3 rounded-md text-sm font-medium hover:bg-accent transition-colors">View</a>
+                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-info dark:hover:bg-slate-700">View</a>
                 <a href="{{ url_for('unified_applications.application_fact_sheet', id=app.id) }}"
                   data-testid="btn-factsheet-{{ app.id }}" title="Fact sheet — single source of truth"
-                  class="inline-flex items-center justify-center h-8 px-3 rounded-md text-sm font-medium hover:bg-accent transition-colors">Fact sheet</a>
+                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-info dark:hover:bg-slate-700">Fact sheet</a>
                 <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
                   data-testid="btn-edit-{{ app.id }}"
-                  class="inline-flex items-center justify-center h-8 px-3 rounded-md text-sm font-medium hover:bg-accent transition-colors">Edit</a>
+                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-info dark:hover:bg-slate-700">Edit</a>
                 <div class="relative" x-data="{ mapOpen: false }"
                   data-app-map-id="{{ app.id }}"
                   data-app-map-name="{{ app.name | e }}">
@@ -499,7 +464,7 @@
                     <i data-lucide="link" class="h-4 w-4" aria-hidden="true"></i>
                   </button>
                   <!-- modal-a11y-ok: dropdown menu, not a dialog --><div x-show="mapOpen" x-transition x-cloak
-                    class="absolute right-0 mt-1 w-52 bg-card border rounded-md shadow-lg z-30 py-1" role="menu">
+                    class="absolute right-0 mt-1 w-52 bg-card border rounded-md z-30 py-1" role="menu">
                     <button type="button" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'capability'); mapOpen=false; })()"
                       class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" role="menuitem" aria-label="Map to Capabilities">
                       <i data-lucide="box" class="h-4 w-4 text-primary" aria-hidden="true"></i>Map to Capabilities
@@ -644,7 +609,7 @@
                 <i data-lucide="link" class="h-3.5 w-3.5" aria-hidden="true"></i>Map
               </button>
               <!-- modal-a11y-ok: dropdown menu, not a dialog --><div x-show="mapOpen" x-transition x-cloak
-                class="absolute left-0 mt-1 w-52 bg-card border rounded-md shadow-lg z-30 py-1" role="menu">
+                class="absolute left-0 mt-1 w-52 bg-card border rounded-md z-30 py-1" role="menu">
                 <button type="button" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'capability'); mapOpen=false; })()"
                   class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" role="menuitem" aria-label="Map to Capabilities">
                   <i data-lucide="box" class="h-4 w-4 text-primary" aria-hidden="true"></i>Map to Capabilities
@@ -769,7 +734,7 @@
   <div id="ai-map-modal" hidden role="dialog" aria-modal="true" aria-labelledby="ai-map-modal-title"
     class="modal-root fixed inset-0 z-[1000] bg-black/50 items-center justify-center p-4" data-modal-backdrop="ai-map-modal" aria-hidden="true"
     data-testid="ai-map-modal">
-    <div class="bg-card rounded-xl shadow-xl w-full max-w-lg border flex flex-col max-h-[90vh]">
+    <div class="bg-card rounded-xl  w-full max-w-lg border flex flex-col max-h-[90vh]">
       <div class="flex items-center justify-between p-6 border-b shrink-0">
         <div>
           <h2 id="ai-map-modal-title" class="text-xl font-semibold tracking-[-0.01em]">AI Map Applications</h2>
@@ -857,7 +822,7 @@
 {# ─ Create Application Modal ─ #}
 <div id="modal-create" hidden role="dialog" aria-modal="true" aria-labelledby="modal-create-title"
   class="modal-root fixed inset-0 z-[1000] bg-black/50 items-center justify-center p-4" data-modal-backdrop="modal-create" aria-hidden="true">
-  <div class="bg-card rounded-xl shadow-xl w-full max-w-lg border flex flex-col max-h-[90vh]">
+  <div class="bg-card rounded-xl  w-full max-w-lg border flex flex-col max-h-[90vh]">
     <div class="flex items-center justify-between p-6 border-b shrink-0">
       <div>
         <h2 id="modal-create-title" class="text-xl font-semibold tracking-[-0.01em]">New Application</h2>
@@ -959,7 +924,7 @@
             <div class="relative">
               <input id="ca-owner" type="text" x-model="form.business_owner" @input.debounce.300ms="usearch()" maxlength="255" placeholder="Search by name or email..."
                 class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" autocomplete="off">
-              <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+              <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md  max-h-40 overflow-y-auto">
                 <template x-for="u in ures" :key="u.id">
                   <button type="button" @click="uselect(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
                     <span x-text="u.name" class="font-medium"></span>
@@ -1002,7 +967,7 @@
   x-data x-show="$store.appToast && $store.appToast.visible" x-cloak
   x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2"
   x-transition:enter-end="opacity-100 translate-y-0"
-  class="fixed top-16 left-1/2 -translate-x-1/2 sm:top-auto sm:left-auto sm:translate-x-0 sm:bottom-4 sm:right-4 z-30 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg max-w-sm text-sm font-medium bg-foreground text-background">
+  class="fixed top-16 left-1/2 -translate-x-1/2 sm:top-auto sm:left-auto sm:translate-x-0 sm:bottom-4 sm:right-4 z-30 flex items-center gap-3 px-4 py-3 rounded-lg  max-w-sm text-sm font-medium bg-foreground text-background">
   <span x-text="$store.appToast ? $store.appToast.message : ''"></span>
 </div>
 

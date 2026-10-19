@@ -10,6 +10,8 @@ with Tailwind/shadcn tokens and Alpine.js on the front end.
 **Read `DESIGN.md` before editing any template, CSS, or front-end JS file.** It is the authoritative
 UI contract (color tokens, base templates, component macros, Alpine rules) and is not repeated here.
 
+Layout consistency is enforced by `design/patterns.json`. Do not introduce a new layout pattern from shadcn-examples unless it is explicitly added to this file first. Do not use React. Use only the prescribed patterns for each job.
+
 ## SDLC orchestration subagents — execution mechanism, not a second role system
 
 `.claude/agents/*.md` defines 27 Claude Code subagents (business-analyst,

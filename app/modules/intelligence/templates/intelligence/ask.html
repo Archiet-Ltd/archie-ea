@@ -5,6 +5,7 @@
 {% from 'intelligence/_impact_states.html' import impact_states with context %}
 {% from 'intelligence/_parts.html' import element_name, owner_field, health_field, derived_note, stale_line, why_button with context %}
 {% from 'intelligence/_full_detail.html' import full_detail with context %}
+{% from 'components/answer_cascade.html' import answer_cascade %}
 {% from 'intelligence/_provenance_drawer.html' import provenance_drawer with context %}
 
 {% block title %}Ask{% endblock %}
@@ -47,7 +48,7 @@
 ] %}
 {% macro _ps_actions() %}
 <a href="{{ url_for('intelligence_ui.twin_map') }}"
-   class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+   class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
     <i data-lucide="network" class="mr-2 h-4 w-4" aria-hidden="true"></i>Twin map
 </a>
 {% endmacro %}
@@ -61,52 +62,55 @@
     ) }}
 
     {% call workspace_gate(home_url) %}
-    {% for question in questions %}
-    <section class="rounded-xl border border-border bg-card p-6" data-question="{{ question.key }}">
-        <button type="button" id="ask-question-{{ question.key }}"
-                class="flex w-full items-center justify-between gap-3 rounded-md text-left text-lg font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                aria-expanded="false" :aria-expanded="openKey === '{{ question.key }}' ? 'true' : 'false'"
-                aria-controls="ask-question-panel-{{ question.key }}"
-                @click="toggleQuestion('{{ question.key }}')">
-            <span>{{ question.before }} <span class="font-semibold tracking-widest text-primary underline">{{ question.blank }}</span> {{ question.after }}</span>
-            <span class="inline-flex shrink-0 transition-transform" :class="openKey === '{{ question.key }}' ? 'rotate-180' : ''"><i data-lucide="chevron-down" class="h-5 w-5" aria-hidden="true"></i></span>
-        </button>
-        {# The picker is one shared component (fixed input id / Alpine
-           $refs.pickerInput), not one per question -- rendering it inside
-           every panel would duplicate both. It lives in whichever panel is
-           currently open; onSelect() dispatches by openKey. #}
-        <div id="ask-question-panel-{{ question.key }}" hidden :hidden="openKey !== '{{ question.key }}'" class="mt-4">
-            <template x-if="openKey === '{{ question.key }}'">
-                <div>{{ entity_picker('ask') }}</div>
-            </template>
+    {# Command pattern (design/patterns.json: focused_task): one large input, the
+       question lenses as chips beneath it, the answer cascade below. The picker
+       is rendered once and always; a chip sets openKey, which onSelect() in
+       ask.js dispatches on. Chip ids are the contract the smoke journeys drive. #}
+    <div class="mx-auto max-w-[760px] space-y-3">
+        <div class="ask-large-input">{{ entity_picker('ask', prompt='Type a team, service or system name') }}</div>
+        <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Question">
+            {% set chip_labels = {
+                'impact': 'What breaks if it fails?',
+                'strategy': 'What are we trying to achieve?',
+                'risk': 'What could hurt it?',
+                'portfolio': 'Rationalization status',
+                'programme': "What's changing?",
+                'data': 'What data does it hold?',
+                'compliance': 'Regulations and controls',
+                'accountability': "Who's accountable?"
+            } %}
+            {% for question in questions %}
+            <button type="button" id="ask-question-{{ question.key }}" data-question="{{ question.key }}"
+                    class="inline-flex h-8 items-center rounded-md border px-3 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    :class="(openKey || 'impact') === '{{ question.key }}' ? 'border-ring bg-slate-100 text-info dark:bg-slate-800' : 'border-input bg-background text-muted-foreground hover:bg-slate-50 hover:text-foreground dark:hover:bg-slate-800'"
+                    :aria-pressed="(openKey || 'impact') === '{{ question.key }}' ? 'true' : 'false'"
+                    @click="openKey = '{{ question.key }}'; $nextTick(() => $refs.pickerInput && $refs.pickerInput.focus())">
+                {{ chip_labels[question.key] }}
+            </button>
+            {% endfor %}
         </div>
-    </section>
-    {% endfor %}
-
+        {% for question in questions %}
+        <p class="text-xs text-muted-foreground" x-show="(openKey || 'impact') === '{{ question.key }}'"{% if question.key != 'impact' %} x-cloak{% endif %}>{{ question.before }} <span class="font-mono text-foreground">___</span> {{ question.after }}</p>
+        {% endfor %}
+    </div>
     <div id="ask-results" aria-busy="false" :aria-busy="busy ? 'true' : 'false'" x-show="answeredKey === 'impact' && state !== 'idle'" x-cloak class="space-y-4">
         <h2 id="ask-results-heading" x-ref="resultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none">Results</h2>
         {{ impact_states("state === 'loading'") }}
-        <ul class="space-y-3" x-show="state === 'ready'" x-cloak>
-            <template x-for="row in rows" :key="row.key">
-                <li class="rounded-lg border border-border bg-card p-4" data-ask-row :data-kind="row.derived ? 'derived' : 'explicit'">
-                    <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
-                        <h3 class="text-base font-semibold min-w-0 break-words text-foreground">{{ element_name('row.name') }}</h3>
-                        <div class="flex flex-wrap items-center gap-x-6 gap-y-1">
-                            {{ health_field() }}
-                            {{ owner_field('row.ownerName') }}
-                        </div>
+        <div x-show="state === 'ready'" x-cloak>
+            {% call answer_cascade('ask-cascade', question="'What breaks if ' + (centreName || '…') + ' fails or is under-resourced?'", rows='rows', ask='load(node.elementId)', save="Platform.fetch('/api/v1/intelligence/answers', { method: 'POST', body: { question: 'impact', element_id: centreId }, silent: true }).catch(function () {})", row_attrs='data-ask-row') %}
+                {{ derived_note('node.derived') }}
+                {{ why_button('node.key') }}
+                <a :href="twinMapHref(node)" class="inline-flex h-8 items-center justify-center rounded-md px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-slate-50 hover:text-info dark:hover:bg-slate-800">Map</a>
+            {% endcall %}
+            <div class="mt-4 space-y-2">
+                <template x-for="row in rows" :key="'detail-' + row.key">
+                    <div>
+                        <div class="text-xs text-muted-foreground">{{ stale_line('row.staleLine') }}</div>
+                        {{ full_detail({'detail': 'row.detail', 'uid': 'row.key'}) }}
                     </div>
-                    <div class="mt-3 flex flex-wrap items-center gap-3">
-                        {{ derived_note('row.derived') }}
-                        {{ why_button('row.key') }}
-                        <a :href="twinMapHref(row)"
-                           class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">View on twin map</a>
-                    </div>
-                    <div class="mt-2">{{ stale_line('row.staleLine') }}</div>
-                    {{ full_detail({'detail': 'row.detail', 'uid': 'row.key'}) }}
-                </li>
-            </template>
-        </ul>
+                </template>
+            </div>
+        </div>
     </div>
 
     {# L6: one card per risk seeded on the picked element, each with its own
