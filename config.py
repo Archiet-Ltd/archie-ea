@@ -639,6 +639,24 @@ class TestingConfig(Config):
         "poolclass": _NullPool,
     }
 
+    # Opt-in: ARCHIE_TEST_POOL=one runs the suite on one pooled connection
+    # that every checkout reuses, as production does (ADR 0013). Two overflow
+    # connections stay available because job_lock, the error-tracking handler
+    # and CommandService hold a second connection by design; overflow
+    # connections close on return, so every sequential use still reuses the
+    # one pooled physical connection. Unset keeps NullPool.
+    if os.environ.get("ARCHIE_TEST_POOL", "").strip().lower() == "one":
+        from sqlalchemy.pool import QueuePool as _QueuePool  # noqa: PLC0415
+
+        SQLALCHEMY_ENGINE_OPTIONS = {
+            "pool_pre_ping": True,
+            "poolclass": _QueuePool,
+            "pool_size": 1,
+            "max_overflow": 2,
+            "pool_timeout": 5,
+            "pool_reset_on_return": "commit",
+        }
+
     @classmethod
     def init_app(cls, app):
         # Validate PostgreSQL is being used (not SQLite)
