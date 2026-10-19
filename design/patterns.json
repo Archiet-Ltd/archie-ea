@@ -1,0 +1,16 @@
+{
+  "pilot_patterns": {
+    "overview": { "pattern": "dashboard-01", "structure": ["kpi-band", "answer-cascade", "chart", "dense-table"] },
+    "list": { "pattern": "data-table", "structure": ["action-bar", "quiet-alert", "dense-table"] },
+    "focused_task": { "pattern": "command", "structure": ["large-input", "suggestion-chips", "answer-cascade"] }
+  },
+  "banned_patterns": [
+    "card-grid-navigation",
+    "accordion-faq",
+    "equal-weight-action-bars",
+    "full-width-warning-banners",
+    "multi-column-forms",
+    "drop-shadows",
+    "icons-inside-kpi-cards"
+  ]
+}
