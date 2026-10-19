@@ -1840,7 +1840,11 @@ let ComposerRenderer = (function() {
             elements.forEach(function(el, i) {
                 if (cellMap[el.id]) return;
                 let layer = (el.layer || '').toLowerCase() || guessLayer(el.type);
-                let node = createNode(el.id, el.name, el.type || 'ApplicationComponent', layer, 40 + (i % 4) * 240, 40 + Math.floor(i / 4) * 160);
+                let elType = el.type || 'ApplicationComponent';
+                /* One plain card for every type: the notation shapes (chamfered, folded,
+                   layered) carry their own outlines and shadows. The element keeps its type. */
+                let node = createNode(el.id, el.name, plain && !SPECIAL_TYPES[elType] ? 'ApplicationComponent' : elType, layer, 40 + (i % 4) * 240, 40 + Math.floor(i / 4) * 160);
+                if (plain) node.set('elType', elType);
                 node.set('modelEl', el);
                 node.set('signature', elementSignature(el));
                 styleNode(node, layer, width);
@@ -1925,7 +1929,9 @@ let ComposerRenderer = (function() {
                     let x = 40 + col * 240;
                     let y = 40 + row * 160;
                     let layer = (el.layer || '').toLowerCase() || guessLayer(el.type);
-                    let node = createNode(el.id, el.name, el.type || 'ApplicationComponent', layer, x, y);
+                    let elType = el.type || 'ApplicationComponent';
+                    let node = createNode(el.id, el.name, plain && !SPECIAL_TYPES[elType] ? 'ApplicationComponent' : elType, layer, x, y);
+                    if (plain) node.set('elType', elType);
                     if (useTokens || compact) { node.set('modelEl', el); styleNode(node, layer, 200); }
                     /* Always recorded (not just under useTokens/compact) so a later
                        update() call -- which is not itself gated on banded/useTokens/
