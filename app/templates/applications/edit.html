@@ -1,4 +1,5 @@
 {% extends "layouts/admin_base.html" %}
+{% from 'components/form_field.html' import form_group, form_footer %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}Edit — {{ application.name }}{% endblock %}
 
@@ -26,32 +27,27 @@
     <section class="rounded-lg border border-border bg-card p-6 space-y-4">
       <h2 class="text-lg font-semibold">Identity</h2>
 
-      <div>
-        <label for="name" class="block text-sm font-medium text-muted-foreground mb-1">Application Name <span class="text-destructive-emphasis">*</span></label>
+      {% call form_group(id='name', label='Application Name', required=true) %}
         <input type="text" id="name" name="name" value="{{ application.name or '' }}" required
                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-      </div>
+      {% endcall %}
 
-      <div>
-        <label for="description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
+      {% call form_group(id='description', label='Description') %}
         <textarea id="description" name="description" rows="3"
                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">{{ application.description or '' }}</textarea>
-      </div>
+      {% endcall %}
 
       <div class="grid grid-cols-1 gap-4">
-        <div>
-          <label for="application_code" class="block text-sm font-medium text-muted-foreground mb-1">Application Code</label>
+        {% call form_group(id='application_code', label='Application Code', help_text='Managed by Abacus sync') %}
           <!-- entity-picker-ok: readonly, Abacus-managed ID -->
           <input type="text" id="application_code" name="application_code" value="{{ application.application_code or '' }}"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" readonly>
-          <p class="text-xs text-muted-foreground mt-1">Managed by Abacus sync</p>
-        </div>
-        <div>
-          <label for="application_type" class="block text-sm font-medium text-muted-foreground mb-1">Application Type</label>
+        {% endcall %}
+        {% call form_group(id='application_type', label='Application Type') %}
           <!-- entity-picker-ok: free-text classification, no canonical type list -->
           <input type="text" id="application_type" name="application_type" value="{{ application.component_type or '' }}"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
+        {% endcall %}
       </div>
     </section>
 
@@ -62,18 +58,14 @@
 
       {# Legacy text columns — read-only, migrated to application_owners #}
       <div class="grid grid-cols-1 gap-4 mb-4">
-        <div>
-          <label for="business_owner" class="block text-sm font-medium text-muted-foreground mb-1">Business Owner (legacy)</label>
+        {% call form_group(id='business_owner', label='Business Owner (legacy)', help_text='Migrated to owner records. Edit below.') %}
           <input type="text" id="business_owner" name="business_owner" value="{{ application.business_owner or '' }}"
                  class="h-9 w-full rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground" readonly>
-          <p class="text-xs text-muted-foreground mt-1">Migrated to owner records. Edit below.</p>
-        </div>
-        <div>
-          <label for="technical_owner" class="block text-sm font-medium text-muted-foreground mb-1">Technical Owner (legacy)</label>
+        {% endcall %}
+        {% call form_group(id='technical_owner', label='Technical Owner (legacy)', help_text='Migrated to owner records. Edit below.') %}
           <input type="text" id="technical_owner" name="technical_owner" value="{{ application.technical_owner or '' }}"
                  class="h-9 w-full rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground" readonly>
-          <p class="text-xs text-muted-foreground mt-1">Migrated to owner records. Edit below.</p>
-        </div>
+        {% endcall %}
       </div>
 
       {# Current owner records from ApplicationOwner #}
@@ -104,8 +96,7 @@
                  data-app-id="{{ application.id }}">
           <div id="owner_picker_results" class="hidden absolute z-10 mt-1 w-full rounded-md border border-border bg-card max-h-48 overflow-y-auto"></div>
         </div>
-        <div>
-          <label for="owner_type_select" class="block text-sm font-medium text-muted-foreground mb-1">Role</label>
+        {% call form_group(id='owner_type_select', label='Role') %}
           <select id="owner_type_select"
                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             <option value="primary">Primary</option>
@@ -113,7 +104,7 @@
             <option value="technical">Technical</option>
             <option value="business">Business</option>
           </select>
-        </div>
+        {% endcall %}
         <div>
           <button type="button" id="add-owner-btn" disabled
                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
@@ -145,12 +136,11 @@
             {% endif %}
           </select>
         </div>
-        <div>
-          <label for="business_purpose" class="block text-sm font-medium text-muted-foreground mb-1">Business Purpose</label>
+        {% call form_group(id='business_purpose', label='Business Purpose') %}
           <input type="text" id="business_purpose" name="business_purpose" value="{{ application.business_purpose or '' }}"
                  placeholder="e.g. Core business function, compliance reporting"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
+        {% endcall %}
         <div>
           <label for="deployment_status" class="block text-sm font-medium text-muted-foreground mb-1">Deployment Status</label>
           <select id="deployment_status" name="deployment_status"
@@ -182,18 +172,16 @@
             {% endif %}
           </select>
         </div>
-        <div>
-          <label for="business_domain" class="block text-sm font-medium text-muted-foreground mb-1">Business Domain</label>
+        {% call form_group(id='business_domain', label='Business Domain') %}
           <input type="text" id="business_domain" name="business_domain" value="{{ application.business_domain or '' }}"
                  placeholder="e.g. Manufacturing, Finance, HR"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
-        <div>
-          <label for="technology_stack" class="block text-sm font-medium text-muted-foreground mb-1">Technology Stack</label>
+        {% endcall %}
+        {% call form_group(id='technology_stack', label='Technology Stack') %}
           <input type="text" id="technology_stack" name="technology_stack" value="{{ application.technology_stack or '' }}"
                  placeholder="e.g. Java, Spring Boot, PostgreSQL"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
+        {% endcall %}
         {# F-08(c), Capgemini dry-run: applications had no way to record where
            they sit in the baseline/target architecture — the Traceability
            Matrix's plateau filters had nothing to find for ApplicationComponent
@@ -216,58 +204,48 @@
       <h2 class="text-lg font-semibold">Technical profile</h2>
 
       <div class="grid grid-cols-1 gap-4">
-        <div>
-          <label for="cloud_provider" class="block text-sm font-medium text-muted-foreground mb-1">Cloud Provider</label>
+        {% call form_group(id='cloud_provider', label='Cloud Provider') %}
           <input type="text" id="cloud_provider" name="cloud_provider" value="{{ application.cloud_provider or '' }}"
                  placeholder="e.g. AWS, Azure, GCP, On-Prem"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
-        <div>
-          <label for="deployment_region" class="block text-sm font-medium text-muted-foreground mb-1">Deployment Region</label>
+        {% endcall %}
+        {% call form_group(id='deployment_region', label='Deployment Region') %}
           <input type="text" id="deployment_region" name="deployment_region" value="{{ application.deployment_region or '' }}"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
-        <div>
-          <label for="database_platforms" class="block text-sm font-medium text-muted-foreground mb-1">Database Platforms</label>
+        {% endcall %}
+        {% call form_group(id='database_platforms', label='Database Platforms') %}
           <input type="text" id="database_platforms" name="database_platforms" value="{{ application.database_platforms or '' }}"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
-        <div>
-          <label for="programming_languages" class="block text-sm font-medium text-muted-foreground mb-1">Programming Languages</label>
+        {% endcall %}
+        {% call form_group(id='programming_languages', label='Programming Languages') %}
           <input type="text" id="programming_languages" name="programming_languages" value="{{ application.programming_languages or '' }}"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
-        <div>
-          <label for="integration_methods" class="block text-sm font-medium text-muted-foreground mb-1">Integration Methods</label>
+        {% endcall %}
+        {% call form_group(id='integration_methods', label='Integration Methods') %}
           <input type="text" id="integration_methods" name="integration_methods" value="{{ application.integration_methods or '' }}"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
-        <div>
-          <label for="authentication_method" class="block text-sm font-medium text-muted-foreground mb-1">Authentication Method</label>
+        {% endcall %}
+        {% call form_group(id='authentication_method', label='Authentication Method') %}
           <input type="text" id="authentication_method" name="authentication_method" value="{{ application.authentication_method or '' }}"
                  placeholder="e.g. OAuth2, SAML, LDAP, API Key"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
-        <div>
-          <label for="container_image" class="block text-sm font-medium text-muted-foreground mb-1">Container Image</label>
+        {% endcall %}
+        {% call form_group(id='container_image', label='Container Image') %}
           <input type="text" id="container_image" name="container_image" value="{{ application.container_image or '' }}"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
-        <div>
-          <label for="kubernetes_namespace" class="block text-sm font-medium text-muted-foreground mb-1">Kubernetes Namespace</label>
+        {% endcall %}
+        {% call form_group(id='kubernetes_namespace', label='Kubernetes Namespace') %}
           <input type="text" id="kubernetes_namespace" name="kubernetes_namespace" value="{{ application.kubernetes_namespace or '' }}"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
-        <div>
-          <label for="version_control_url" class="block text-sm font-medium text-muted-foreground mb-1">Version Control URL</label>
+        {% endcall %}
+        {% call form_group(id='version_control_url', label='Version Control URL') %}
           <input type="text" id="version_control_url" name="version_control_url" value="{{ application.version_control_url or '' }}"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
-        <div>
-          <label for="main_branch" class="block text-sm font-medium text-muted-foreground mb-1">Main Branch</label>
+        {% endcall %}
+        {% call form_group(id='main_branch', label='Main Branch') %}
           <input type="text" id="main_branch" name="main_branch" value="{{ application.main_branch or '' }}"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
+        {% endcall %}
       </div>
     </section>
 
@@ -276,29 +254,25 @@
       <h2 class="text-lg font-semibold">Compliance and notes</h2>
 
       <div class="grid grid-cols-1 gap-4">
-        <div>
-          <label for="compliance_requirements" class="block text-sm font-medium text-muted-foreground mb-1">Compliance Requirements</label>
+        {% call form_group(id='compliance_requirements', label='Compliance Requirements') %}
           <input type="text" id="compliance_requirements" name="compliance_requirements" value="{{ application.compliance_requirements or '' }}"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
-        <div>
-          <label for="security_certifications" class="block text-sm font-medium text-muted-foreground mb-1">Security Certifications</label>
+        {% endcall %}
+        {% call form_group(id='security_certifications', label='Security Certifications') %}
           <input type="text" id="security_certifications" name="security_certifications" value="{{ application.security_certifications or '' }}"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-        </div>
+        {% endcall %}
       </div>
 
-      <div>
-        <label for="notes" class="block text-sm font-medium text-muted-foreground mb-1">Notes</label>
+      {% call form_group(id='notes', label='Notes') %}
         <textarea id="notes" name="notes" rows="3"
                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">{{ application.notes or '' }}</textarea>
-      </div>
+      {% endcall %}
 
-      <div>
-        <label for="assessment_notes" class="block text-sm font-medium text-muted-foreground mb-1">Assessment Notes</label>
+      {% call form_group(id='assessment_notes', label='Assessment Notes') %}
         <textarea id="assessment_notes" name="assessment_notes" rows="3"
                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">{{ application.assessment_notes or '' }}</textarea>
-      </div>
+      {% endcall %}
     </section>
 
     {# ── Actions ── #}

@@ -1,4 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/form_field.html' import form_group, form_footer %}
 {% block title %}AI Assistant{% endblock %}
 
 {% block extra_css %}
@@ -431,8 +432,7 @@
 
                 <div class="flex-1 overflow-y-auto p-4 space-y-4 min-h-0" tabindex="0">
                     {# Query Input #}
-                    <div class="relative">
-                        <label for="nl-query-input" class="sr-only">Natural language query</label>
+                    {% call form_group(id='nl-query-input', label='Natural language query', class='relative') %}
                         <input type="text" id="nl-query-input"
                             placeholder="e.g., Show apps without owner..."
                             class="w-full h-9 px-3 py-2 pr-10 text-sm border rounded-md bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -441,7 +441,7 @@
                             class="absolute right-1 top-1 h-7 px-2 bg-primary text-primary-foreground rounded text-xs">
                             <i data-lucide="play" class="h-3 w-3" aria-hidden="true"></i>
                         </button>
-                    </div>
+                    {% endcall %}
 
                     {# Example Queries #}
                     <div class="space-y-2">
@@ -930,14 +930,12 @@
     <div class="w-full max-w-lg rounded-lg bg-background p-6 mx-4 border border-border">
         <h2 id="ai-chat-create-solution-heading" class="text-lg font-semibold mb-4">Create solution from brief</h2>
         <form id="ai-chat-create-solution-form">
-            <div class="mb-4">
-                <label for="ai-chat-solution-title" class="block text-sm font-medium text-muted-foreground mb-1">Solution title</label>
+            {% call form_group(id='ai-chat-solution-title', label='Solution title', class='mb-4') %}
                 <input id="ai-chat-solution-title" type="text" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" placeholder="e.g. Modernise Customer Portal" required>
-            </div>
-            <div class="mb-4">
-                <label for="ai-chat-solution-brief" class="block text-sm font-medium text-muted-foreground mb-1">Brief (problem, current state, goals)</label>
+            {% endcall %}
+            {% call form_group(id='ai-chat-solution-brief', label='Brief (problem, current state, goals)', class='mb-4') %}
                 <textarea id="ai-chat-solution-brief" rows="4" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Describe the problem, current state, budget, and timeline..." required></textarea>
-            </div>
+            {% endcall %}
             <div class="flex justify-end gap-2">
                 <button type="button" id="ai-chat-create-solution-cancel" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" aria-label="Cancel">Cancel</button>
                 <button type="submit" id="ai-chat-create-solution-submit" class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90" aria-label="Create solution and generate draft">Create solution</button>

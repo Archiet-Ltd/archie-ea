@@ -1,4 +1,6 @@
 {% extends "layouts/admin_base.html" %}
+{% from 'components/form_field.html' import form_group, form_footer %}
+{% from 'components/dense_table.html' import dense_table %}
 {# smoke-coverage-ok: CSP inline style fix (removed style="width:0%"); covered by tests/test_capability_map_a11y_csp.py #}
 {% from 'components/data_card.html' import data_card %}
 {% from 'components/page_header.html' import page_header %}
@@ -242,56 +244,51 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="dense-table min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left">
+{% set _dt_header_17648 %}
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         <input type="checkbox" class="rounded border-input text-primary focus-visible:ring-ring"
                                                @change="$el.checked ? selectAllCapabilities('unified') : deselectAllCapabilities('unified')" aria-label="Checkbox field">
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'capability_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'capability_name')">
                                         Capability Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'domain')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'domain')">
                                         Domain <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'level')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'level')">
                                         Level <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'business_owner')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'business_owner')">
                                         Business Owner <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'application_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'application_name')">
                                         Application <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'business_impact')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'business_impact')">
                                         Business Impact <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'strategic_importance')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'strategic_importance')">
                                         Priority <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'coverage_percentage')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'coverage_percentage')">
                                         Coverage <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Status <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-right">
                                         Actions
                                     </th>
-                                </tr>
-                            </thead>
-                            <tbody id="unified-table-body" class="bg-card divide-y divide-border">
+                                
+{% endset %}
+{% call dense_table(header=_dt_header_17648) %}
                                 <tr>
-                                    <td colspan="11" class="px-6 py-8 text-center text-muted-foreground">
+                                    <td colspan="11" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
                                         <p>Loading unified capability data...</p>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Pagination and Bulk Actions -->
                     <div class="px-6 py-4 border-t border-border">
@@ -534,56 +531,51 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="dense-table min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left">
+{% set _dt_header_39335 %}
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         <input type="checkbox" class="rounded border-input text-primary focus-visible:ring-ring"
                                                @change="this.checked ? selectAllCapabilities('manufacturing') : deselectAllCapabilities('manufacturing')" aria-label="Checkbox field">
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'capability_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'capability_name')">
                                         Capability Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'domain')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'domain')">
                                         Domain <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'level')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'level')">
                                         Level <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'business_owner')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'business_owner')">
                                         Business Owner <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'application_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'application_name')">
                                         Application <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'business_impact')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'business_impact')">
                                         Business Impact <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'strategic_importance')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'strategic_importance')">
                                         Priority <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'coverage_percentage')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'coverage_percentage')">
                                         Coverage <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Status <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-right">
                                         Actions
                                     </th>
-                                </tr>
-                            </thead>
-                            <tbody id="manufacturing-table-body" class="bg-card divide-y divide-border">
+                                
+{% endset %}
+{% call dense_table(header=_dt_header_39335) %}
                                 <tr>
-                                    <td colspan="11" class="px-6 py-8 text-center text-muted-foreground">
+                                    <td colspan="11" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
                                         <p>Loading manufacturing capability data...</p>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Bulk Actions -->
                     <div class="px-6 py-3 border-t border-border flex items-center space-x-4">
@@ -687,56 +679,51 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="dense-table min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left">
+{% set _dt_header_50200 %}
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         <input type="checkbox" class="rounded border-input text-primary focus-visible:ring-ring"
                                                @change="this.checked ? selectAllCapabilities('application') : deselectAllCapabilities('application')" aria-label="Checkbox field">
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'capability_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'capability_name')">
                                         Capability Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'domain')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'domain')">
                                         Domain <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'level')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'level')">
                                         Level <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'business_owner')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'business_owner')">
                                         Business Owner <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'application_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'application_name')">
                                         Application <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'business_impact')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'business_impact')">
                                         Business Impact <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'strategic_importance')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'strategic_importance')">
                                         Priority <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'coverage_percentage')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'coverage_percentage')">
                                         Coverage <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Status <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-right">
                                         Actions
                                     </th>
-                                </tr>
-                            </thead>
-                            <tbody id="application-table-body" class="bg-card divide-y divide-border">
+                                
+{% endset %}
+{% call dense_table(header=_dt_header_50200) %}
                                 <tr>
-                                    <td colspan="11" class="px-6 py-8 text-center text-muted-foreground">
+                                    <td colspan="11" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
                                         <p>Loading application capability data...</p>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Bulk Actions -->
                     <div class="px-6 py-3 border-t border-border flex items-center space-x-4">
@@ -839,56 +826,51 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="dense-table min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left">
+{% set _dt_header_60937 %}
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         <input type="checkbox" class="rounded border-input text-primary focus-visible:ring-ring"
                                                @change="this.checked ? selectAllCapabilities('gap') : deselectAllCapabilities('gap')" aria-label="Checkbox field">
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'capability_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'capability_name')">
                                         Capability Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'domain')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'domain')">
                                         Domain <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'level')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'level')">
                                         Level <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'business_owner')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'business_owner')">
                                         Business Owner <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'application_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'application_name')">
                                         Application <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'business_impact')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'business_impact')">
                                         Business Impact <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'strategic_importance')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'strategic_importance')">
                                         Priority <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'coverage_percentage')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'coverage_percentage')">
                                         Coverage <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Status <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-right">
                                         Actions
                                     </th>
-                                </tr>
-                            </thead>
-                            <tbody id="gap-table-body" class="bg-card divide-y divide-border">
+                                
+{% endset %}
+{% call dense_table(header=_dt_header_60937) %}
                                 <tr>
-                                    <td colspan="11" class="px-6 py-8 text-center text-muted-foreground">
+                                    <td colspan="11" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
                                         <p>Loading gap analysis data...</p>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Bulk Actions -->
                     <div class="px-6 py-3 border-t border-border flex items-center space-x-4">
@@ -1035,40 +1017,14 @@
                                 <span id="acm-gap-showing">0</span> capabilities
                             </div>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="dense-table min-w-full divide-y divide-border">
-                                <thead class="bg-muted/50">
+{% call dense_table(columns=[('Capability', ''), ('Domain', ''), ('Level', ''), ('Applications', ''), ('Vendors', ''), ('Status', '')]) %}
                                     <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Capability
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Domain
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Level
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Applications
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Vendors
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Status
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody id="acm-gap-table-body" class="bg-card divide-y divide-border">
-                                    <tr>
-                                        <td colspan="6" class="px-6 py-8 text-center text-muted-foreground">
+                                        <td colspan="6" class="px-2 dense-empty text-center text-muted-foreground">
                                             <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-info mx-auto mb-4" aria-hidden="true"></i>
                                             <p>Loading ACM gap analysis data...</p>
                                         </td>
                                     </tr>
-                                </tbody>
-                            </table>
-                        </div>
+                                {% endcall %}
                     </div>
                 </div>
             </div>
@@ -1345,52 +1301,47 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="dense-table min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('name')">
+{% set _dt_header_97593 %}
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('name')">
                                         Process Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('process_type')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('process_type')">
                                         Type <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('level')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('level')">
                                         Level <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('process_owner')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('process_owner')">
                                         Owner <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('mapping_count')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('mapping_count')">
                                         Applications <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('avg_automation_coverage')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('avg_automation_coverage')">
                                         Automation <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('business_impact')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('business_impact')">
                                         Business Impact <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('gap_severity')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('gap_severity')">
                                         Gap Severity <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Gap Status
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Actions
                                     </th>
-                                </tr>
-                            </thead>
-                            <tbody id="process-gap-table-body" class="bg-card divide-y divide-border">
+                                
+{% endset %}
+{% call dense_table(header=_dt_header_97593) %}
                                 <tr>
-                                    <td colspan="10" class="px-6 py-8 text-center text-muted-foreground">
+                                    <td colspan="10" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
                                         <p>Loading process gap data...</p>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Pagination -->
                     <div class="px-6 py-4 border-t border-border flex items-center justify-between">
@@ -1669,29 +1620,14 @@
                             </select>
                         </div>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="dense-table min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
+{% call dense_table(columns=[('Code', ''), ('Name', ''), ('Domain', ''), ('Level', ''), ('Apps', ''), ('Status', ''), ('Actions', '')]) %}
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Code</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Domain</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Level</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Apps</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="acm-capabilities-table" class="bg-card divide-y divide-border">
-                                <tr>
-                                    <td colspan="7" class="px-6 py-12 text-center text-muted-foreground">
+                                    <td colspan="7" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2" aria-hidden="true"></i>
                                         Loading capabilities...
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Pagination -->
                     <div class="px-6 py-4 border-t border-border flex items-center justify-between">
@@ -1814,8 +1750,7 @@
                                 </div>
 
                                 <!-- Work Package Template -->
-                                <div id="convert-template-section">
-                                    <label for="convert-wp-template" class="block text-sm font-medium text-muted-foreground mb-2">Work Package Template</label>
+                                {% call form_group(id='convert-wp-template', label='Work Package Template', help_text='Select a template that matches your gap resolution approach. The auto-select option will choose the best template based on gap type.', attrs='id="convert-template-section"') %}
                                     <select id="convert-wp-template" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                         <option value="auto">Auto-select based on gap type</option>
                                         <option value="default">Default (Requirements → Design → Implementation → Testing → Deploy)</option>
@@ -1823,10 +1758,7 @@
                                         <option value="modernization">Modernization (Assessment → Design → Migration → Validation)</option>
                                         <option value="retirement">Retirement (Impact Analysis → Migration → Archive → Decommission)</option>
                                     </select>
-                                    <p class="text-xs text-muted-foreground mt-2">
-                                        Select a template that matches your gap resolution approach. The auto-select option will choose the best template based on gap type.
-                                    </p>
-                                </div>
+                                {% endcall %}
                             </div>
                         </div>
 
@@ -1894,20 +1826,17 @@
 
                         <!-- Basic Info -->
                         <div class="grid grid-cols-2 gap-4 mb-6">
-                            <div class="col-span-2">
-                                <label for="edit-gap-name" class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
+                            {% call form_group(id='edit-gap-name', label='Name', class='col-span-2') %}
                                 <input type="text" id="edit-gap-name" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            </div>
-                            <div class="col-span-2">
-                                <label for="edit-gap-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-description', label='Description', class='col-span-2') %}
                                 <textarea id="edit-gap-description" rows="3" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"></textarea>
-                            </div>
+                            {% endcall %}
                         </div>
 
                         <!-- Classification -->
                         <div class="grid grid-cols-3 gap-4 mb-6">
-                            <div>
-                                <label for="edit-gap-type" class="block text-sm font-medium text-muted-foreground mb-1">Gap Type</label>
+                            {% call form_group(id='edit-gap-type', label='Gap Type') %}
                                 <select id="edit-gap-type" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                     <option value="coverage">Coverage</option>
                                     <option value="quality">Quality</option>
@@ -1915,36 +1844,32 @@
                                     <option value="modernization">Modernization</option>
                                     <option value="custom">Custom</option>
                                 </select>
-                            </div>
-                            <div>
-                                <label for="edit-gap-priority" class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-priority', label='Priority') %}
                                 <select id="edit-gap-priority" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                     <option value="critical">Critical</option>
                                     <option value="high">High</option>
                                     <option value="medium">Medium</option>
                                     <option value="low">Low</option>
                                 </select>
-                            </div>
-                            <div>
-                                <label for="edit-gap-status" class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-status', label='Status') %}
                                 <select id="edit-gap-status" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                     <option value="identified">Identified</option>
                                     <option value="in_progress">In Progress</option>
                                     <option value="resolved">Resolved</option>
                                 </select>
-                            </div>
+                            {% endcall %}
                         </div>
 
                         <!-- Timeline & Color -->
                         <div class="grid grid-cols-3 gap-4 mb-6">
-                            <div>
-                                <label for="edit-gap-start-date" class="block text-sm font-medium text-muted-foreground mb-1">Start Date</label>
+                            {% call form_group(id='edit-gap-start-date', label='Start Date') %}
                                 <input type="date" id="edit-gap-start-date" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            </div>
-                            <div>
-                                <label for="edit-gap-end-date" class="block text-sm font-medium text-muted-foreground mb-1">Target Resolution Date</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-end-date', label='Target Resolution Date') %}
                                 <input type="date" id="edit-gap-end-date" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            </div>
+                            {% endcall %}
                             <div>
                                 <label class="block text-sm font-medium text-muted-foreground mb-1">Color</label>
                                 <div class="flex items-center space-x-2">
@@ -1964,18 +1889,15 @@
 
                         <!-- Owner & Effort -->
                         <div class="grid grid-cols-3 gap-4 mb-6">
-                            <div>
-                                <label for="edit-gap-owner" class="block text-sm font-medium text-muted-foreground mb-1">Owner</label>
+                            {% call form_group(id='edit-gap-owner', label='Owner') %}
                                 <input type="text" id="edit-gap-owner" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Responsible person">
-                            </div>
-                            <div>
-                                <label for="edit-gap-effort" class="block text-sm font-medium text-muted-foreground mb-1">Est. Effort (days)</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-effort', label='Est. Effort (days)') %}
                                 <input type="number" id="edit-gap-effort" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0">
-                            </div>
-                            <div>
-                                <label for="edit-gap-cost" class="block text-sm font-medium text-muted-foreground mb-1">Est. Cost</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-cost', label='Est. Cost') %}
                                 <input type="number" id="edit-gap-cost" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0" step="1000" placeholder="{{ config.CURRENCY_SYMBOL|default('£') }}">
-                            </div>
+                            {% endcall %}
                         </div>
 
                         <!-- Work Packages Section -->
@@ -2109,14 +2031,12 @@
                                     Basic Information
                                 </h4>
                                 <div class="space-y-4">
-                                    <div>
-                                        <label for="edit-wp-name" class="block text-sm font-medium text-muted-foreground mb-1">Name *</label>
+                                    {% call form_group(id='edit-wp-name', label='Name', required=true) %}
                                         <input type="text" id="edit-wp-name" placeholder="Enter work package name..." class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus:border-transparent">
-                                    </div>
-                                    <div>
-                                        <label for="edit-wp-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
+                                    {% endcall %}
+                                    {% call form_group(id='edit-wp-description', label='Description') %}
                                         <textarea id="edit-wp-description" rows="3" placeholder="Describe the work package objectives and scope..." class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus:border-transparent"></textarea>
-                                    </div>
+                                    {% endcall %}
                                 </div>
                             </div>
 
@@ -2127,8 +2047,7 @@
                                     Status &amp; Progress
                                 </h4>
                                 <div class="grid grid-cols-3 gap-4">
-                                    <div>
-                                        <label for="edit-wp-status" class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
+                                    {% call form_group(id='edit-wp-status', label='Status') %}
                                         <select id="edit-wp-status" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                             <option value="planned">Planned</option>
                                             <option value="in_progress">In Progress</option>
@@ -2136,16 +2055,15 @@
                                             <option value="blocked">Blocked</option>
                                             <option value="cancelled">❌ Cancelled</option>
                                         </select>
-                                    </div>
-                                    <div>
-                                        <label for="edit-wp-priority" class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
+                                    {% endcall %}
+                                    {% call form_group(id='edit-wp-priority', label='Priority') %}
                                         <select id="edit-wp-priority" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                             <option value="critical">Critical</option>
                                             <option value="high">High</option>
                                             <option value="medium">Medium</option>
                                             <option value="low">Low</option>
                                         </select>
-                                    </div>
+                                    {% endcall %}
                                     <div>
                                         <label class="block text-sm font-medium text-muted-foreground mb-1">Progress (%)</label>
                                         <div class="flex items-center space-x-3">
@@ -2167,14 +2085,12 @@
                                     Timeline &amp; Scheduling
                                 </h4>
                                 <div class="grid grid-cols-3 gap-4">
-                                    <div>
-                                        <label for="edit-wp-start-date" class="block text-sm font-medium text-muted-foreground mb-1">Start Date</label>
+                                    {% call form_group(id='edit-wp-start-date', label='Start Date') %}
                                         <input type="date" id="edit-wp-start-date" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                    </div>
-                                    <div>
-                                        <label for="edit-wp-end-date" class="block text-sm font-medium text-muted-foreground mb-1">Target Date</label>
+                                    {% endcall %}
+                                    {% call form_group(id='edit-wp-end-date', label='Target Date') %}
                                         <input type="date" id="edit-wp-end-date" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                    </div>
+                                    {% endcall %}
                                     <div>
                                         <label class="block text-sm font-medium text-muted-foreground mb-1">Color Theme</label>
                                         <div class="flex items-center space-x-2">
@@ -2193,14 +2109,12 @@
                                     Resources &amp; Budget
                                 </h4>
                                 <div class="grid grid-cols-4 gap-4">
-                                    <div>
-                                        <label for="edit-wp-est-hours" class="block text-sm font-medium text-muted-foreground mb-1">Est. Hours</label>
+                                    {% call form_group(id='edit-wp-est-hours', label='Est. Hours') %}
                                         <input type="number" id="edit-wp-est-hours" placeholder="0" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0">
-                                    </div>
-                                    <div>
-                                        <label for="edit-wp-act-hours" class="block text-sm font-medium text-muted-foreground mb-1">Actual Hours</label>
+                                    {% endcall %}
+                                    {% call form_group(id='edit-wp-act-hours', label='Actual Hours') %}
                                         <input type="number" id="edit-wp-act-hours" placeholder="0" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0">
-                                    </div>
+                                    {% endcall %}
                                     <div>
                                         <label for="edit-wp-est-cost" class="block text-sm font-medium text-muted-foreground mb-1">Est. Cost ({{ config.CURRENCY_SYMBOL|default('£') }})</label>
                                         <input type="number" id="edit-wp-est-cost" placeholder="0" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0" step="100">
@@ -2400,35 +2314,31 @@
 
                 <!-- Gap Details -->
                 <div class="space-y-4">
-                    <div>
-                        <label for="add-roadmap-gap-type" class="block text-sm font-medium text-muted-foreground mb-1">Gap Type</label>
+                    {% call form_group(id='add-roadmap-gap-type', label='Gap Type') %}
                         <select id="add-roadmap-gap-type" class="w-full px-3 py-2 border border-input rounded-md">
                             <option value="coverage">Coverage Gap</option>
                             <option value="quality">Quality Gap</option>
                             <option value="retirement">Retirement Gap</option>
                             <option value="modernization">Modernization Gap</option>
                         </select>
-                    </div>
+                    {% endcall %}
 
-                    <div>
-                        <label for="add-roadmap-priority" class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
+                    {% call form_group(id='add-roadmap-priority', label='Priority') %}
                         <select id="add-roadmap-priority" class="w-full px-3 py-2 border border-input rounded-md">
                             <option value="critical">Critical</option>
                             <option value="high">High</option>
                             <option value="medium" selected>Medium</option>
                             <option value="low">Low</option>
                         </select>
-                    </div>
+                    {% endcall %}
 
                     <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="add-roadmap-start-date" class="block text-sm font-medium text-muted-foreground mb-1">Start Date</label>
+                        {% call form_group(id='add-roadmap-start-date', label='Start Date') %}
                             <input type="date" id="add-roadmap-start-date" class="w-full px-3 py-2 border border-input rounded-md">
-                        </div>
-                        <div>
-                            <label for="add-roadmap-end-date" class="block text-sm font-medium text-muted-foreground mb-1">Target Date</label>
+                        {% endcall %}
+                        {% call form_group(id='add-roadmap-end-date', label='Target Date') %}
                             <input type="date" id="add-roadmap-end-date" class="w-full px-3 py-2 border border-input rounded-md">
-                        </div>
+                        {% endcall %}
                     </div>
 
                     <div>
@@ -2483,15 +2393,13 @@
 
                 <!-- Search and Filters -->
                 <div class="mb-4 space-y-3">
-                    <div>
-                        <label for="quick-add-search" class="block text-sm font-medium text-muted-foreground mb-1">Search capabilities</label>
+                    {% call form_group(id='quick-add-search', label='Search capabilities') %}
                         <input type="text" id="quick-add-search" placeholder="Search capabilities..."
                                @input="loadQuickAddCapabilities()"
                                class="w-full px-4 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    </div>
+                    {% endcall %}
                     <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label for="quick-add-type-filter" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
+                        {% call form_group(id='quick-add-type-filter', label='Type') %}
                             <select id="quick-add-type-filter" @change="loadQuickAddCapabilities()"
                                     class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <option value="">All Types</option>
@@ -2499,9 +2407,8 @@
                                 <option value="Manufacturing">Manufacturing</option>
                                 <option value="Application">Application</option>
                             </select>
-                        </div>
-                        <div>
-                            <label for="quick-add-level-filter" class="block text-sm font-medium text-muted-foreground mb-1">Level</label>
+                        {% endcall %}
+                        {% call form_group(id='quick-add-level-filter', label='Level') %}
                             <select id="quick-add-level-filter" @change="loadQuickAddCapabilities()"
                                     class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <option value="">All Levels</option>
@@ -2511,7 +2418,7 @@
                                 <option value="4">L4 (Detailed)</option>
                                 <option value="5">L5 (Task)</option>
                             </select>
-                        </div>
+                        {% endcall %}
                     </div>
                 </div>
 

@@ -1,4 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'macros/page_shell.html' import page_shell, section_card %}
 {% from 'components/answer_cascade.html' import answer_cascade %}
 {% block title %}Dashboard{% endblock %}
@@ -171,36 +172,20 @@
                 <h2 id="capability-coverage-heading" class="text-base font-semibold text-foreground">Capability coverage</h2>
                 <span class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ gap_count }} gap{{ 's' if gap_count != 1 else '' }} of {{ ch|length }}</span>
             </div>
-            <div class="max-h-[480px] overflow-auto">
-                <table class="dense-table w-full border-collapse text-sm">
-                    <thead class="sticky top-0 z-10 bg-card">
-                        <tr class="border-b border-border">
-                            <th class="h-10 px-3 text-left align-middle">Capability</th>
-                            <th class="h-10 px-3 text-right align-middle">Applications</th>
-                            <th class="h-10 px-3 text-left align-middle">Coverage</th>
-                            <th class="h-10 px-3 text-right align-middle"><span class="sr-only">Open</span></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for cap in ch %}
-                        <tr class="group h-12 border-b border-border transition-colors hover:bg-slate-50 dark:hover:bg-slate-800">
-                            <td class="px-3 align-middle font-medium text-foreground">{{ cap.name }}</td>
-                            <td class="px-3 text-right align-middle tabular-nums text-muted-foreground">{{ cap.app_count }}</td>
-                            <td class="px-3 align-middle">
+{% call dense_table(columns=[('Capability', ''), ('Applications', 'text-right'), ('Coverage', ''), ('', 'text-right')], rows=(ch)|length, empty_text='No capabilities recorded yet.', max_height='480px', flush=true) %}{% for cap in ch %}
+                        <tr class="group transition-colors hover:bg-slate-50 dark:hover:bg-slate-800">
+                            <td class="px-2 align-middle font-medium text-foreground">{{ cap.name }}</td>
+                            <td class="px-2 text-right align-middle tabular-nums text-muted-foreground">{{ cap.app_count }}</td>
+                            <td class="px-2 align-middle">
                                 {% if cap.coverage_status == 'covered' %}<span class="text-success-emphasis">Covered</span>
                                 {% elif cap.coverage_status == 'partial' %}<span class="text-warning-emphasis">Partial</span>
                                 {% else %}<span class="text-destructive-emphasis">Gap</span>{% endif %}
                             </td>
-                            <td class="px-3 text-right align-middle">
+                            <td class="px-2 text-right align-middle">
                                 <a href="{{ url_for('capability_map.index') }}?cap={{ cap.id }}" class="inline-flex h-8 items-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground opacity-0 transition-opacity hover:bg-slate-100 hover:text-info group-hover:opacity-100 focus-visible:opacity-100 dark:hover:bg-slate-700">View</a>
                             </td>
                         </tr>
-                        {% else %}
-                        <tr><td colspan="4" class="h-12 px-3 text-sm text-muted-foreground">No capabilities recorded yet.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                        {% endfor %}{% endcall %}
         </section>
     </section>
     {% endif %}

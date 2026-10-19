@@ -132,19 +132,25 @@
   }
   /* Dense table (design/patterns.json: dense-table). shadcn-components.css
      scopes table rules to #main-content by id, so the pilot geometry needs an
-     id-plus-class selector to apply: 40px header, 48px rows, 12px cell
-     padding, hairline rows, card-coloured sticky header. */
+     id-plus-class selector to apply: 40px header at weight 500, 48px rows,
+     8px cell padding, hairline rows, card-coloured sticky header. */
   #main-content .dense-table thead {
     background-color: hsl(var(--card));
   }
   #main-content .dense-table th {
     height: 2.5rem;
-    padding: 0 0.75rem;
+    padding: 0 0.5rem;
+    font-weight: 500;
     letter-spacing: 0.06em;
   }
   #main-content .dense-table td {
     height: 3rem;
-    padding: 0 0.75rem;
+    padding: 0 0.5rem;
+  }
+  /* Empty, loading and error rows keep room to breathe. */
+  #main-content .dense-table td.dense-empty {
+    height: auto;
+    padding: 2rem 0.5rem;
   }
   /* The question line above an answer cascade. */
   .question-line {

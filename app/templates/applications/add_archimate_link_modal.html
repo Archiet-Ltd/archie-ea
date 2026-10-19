@@ -1,3 +1,4 @@
+{% from 'components/form_field.html' import form_group, form_footer %}
 {% from 'components/modal_form.html' import modal_form %}
 
 {% call modal_form(
@@ -44,10 +45,9 @@
         </div>
     </div>
 
-    <div>
-        <label for="al-context" class="block text-sm font-medium mb-1.5">Context</label>
+    {% call form_group(id='al-context', label='Context') %}
         <textarea id="al-context" name="relationship_context" rows="2" placeholder="Optional context for this relationship..."
                   class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
-    </div>
+    {% endcall %}
 </div>
 {% endcall %}

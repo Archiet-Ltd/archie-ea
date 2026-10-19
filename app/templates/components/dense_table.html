@@ -1,0 +1,69 @@
+{# Canonical dense table (design/patterns.json: dense-table; north star).
+
+   Server-rendered rows go in the call block; the macro owns the wrapper,
+   header, sticky behaviour and the empty state. For the Alpine client-side
+   table with pagination see components/data_table.html — that is a different
+   mechanism, not a second copy of this one.
+
+   Call shape:
+     {% from 'components/dense_table.html' import dense_table %}
+     {% call dense_table(columns=[('Name', ''), ('Owner', ''), ('Cost', 'text-right'), ('', 'text-right')],
+                         empty_text='No applications yet.', caption='Applications', testid='applications-table',
+                         rows=applications|length, max_height='calc(100vh - 280px)') %}
+       {% for app in applications %}
+       <tr class="group h-12 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800">
+         <td class="px-2 align-middle font-medium text-foreground">{{ app.name }}</td>
+         ...
+       </tr>
+       {% endfor %}
+     {% endcall %}
+
+   columns     list of (label, extra th classes). An empty label renders a
+               visually hidden header cell (use for action columns).
+   header      alternative to columns: the header row's cells as markup, built
+               with {% set hdr %}<th scope="col" ...>...</th>{% endset %}. Use it
+               when a header cell holds a checkbox, a sort control or a legend.
+   rows        the row count; 0 renders the empty-state slot instead of <tbody>.
+   empty_text  the empty-state line (12px muted) — or pass empty_caller for markup.
+   caption     accessible caption (sr-only) and the region's label.
+   max_height  CSS height of the scroll container; the header sticks inside it.
+   flush       true when the table sits inside a card that already draws the
+               border: the wrapper then has no border or radius of its own.
+   attrs       extra attributes for the <table> element (data hooks).
+
+   Spec: wrapper 8px radius + hairline border, header row 40px / 11px / 500 /
+   uppercase / muted on the card surface, sticky inside the scroll container,
+   cells 8px padding, rows 48px, tabular figures everywhere, no shadows. #}
+{% macro dense_table(columns=[], header=None, rows=None, empty_text='Nothing recorded yet.', empty_caller=None, caption=None, testid=None, max_height=None, flush=false, class='', table_class='', id=None, attrs='') %}
+<div class="{% if flush %}bg-card{% else %}rounded-lg border border-border bg-card{% endif %} {{ class }}" role="region"{% if caption %} aria-label="{{ caption }}"{% endif %}{% if id %} id="{{ id }}"{% endif %}>
+    <div class="overflow-x-auto overflow-y-auto"{% if max_height %} style="max-height: {{ max_height }}"{% endif %}>
+        <table class="dense-table w-full border-collapse text-sm {{ table_class }}"{% if testid %} data-testid="{{ testid }}"{% endif %}{% if attrs %} {{ attrs|safe }}{% endif %}>
+            {% if caption %}<caption class="sr-only">{{ caption }}</caption>{% endif %}
+            <thead class="sticky top-0 z-10 bg-card">
+                <tr class="border-b border-border">
+                    {% if header %}{{ header }}{% else %}
+                    {% for col in columns %}
+                    {% set label = col[0] if col is sequence and col is not string else col %}
+                    {% set extra = col[1] if col is sequence and col is not string and col|length > 1 else '' %}
+                    <th scope="col" class="h-10 px-2 align-middle {% if 'text-right' not in extra and 'text-center' not in extra %}text-left {% endif %}{{ extra }}">{% if label %}{{ label }}{% else %}<span class="sr-only">Actions</span>{% endif %}</th>
+                    {% endfor %}
+                    {% endif %}
+                </tr>
+            </thead>
+            {% if rows is not none and rows == 0 %}
+            <tbody>
+                <tr>
+                    <td colspan="{{ columns|length or 1 }}" class="dense-empty px-2 text-center">
+                        {% if empty_caller %}{{ empty_caller() }}{% else %}<p class="text-xs text-muted-foreground">{{ empty_text }}</p>{% endif %}
+                    </td>
+                </tr>
+            </tbody>
+            {% else %}
+            <tbody class="divide-y divide-border">
+                {{ caller() }}
+            </tbody>
+            {% endif %}
+        </table>
+    </div>
+</div>
+{% endmacro %}

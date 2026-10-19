@@ -1,4 +1,5 @@
 {% extends "layouts/admin_base.html" %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/badge.html' import badge %}
@@ -195,79 +196,76 @@
         </button>
       </div>
     </div>
-    <div class="overflow-x-auto">
-      <table class="dense-table min-w-full text-sm">
-        <thead class="bg-muted/50">
-          <tr>
-            <th class="w-8 px-4 py-3">
+{% set _dt_header_12698 %}
+            <th scope="col" class="h-10 px-2 align-middle text-left w-8">
               <input type="checkbox" class="rounded border-input"
                 @change="toggleAllGaps($event)"
                 :checked="selectedGapIds.length === filteredGaps.length && filteredGaps.length > 0"
                 aria-label="Select all work packages">
             </th>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Work Package</th>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Priority</th>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Timeline</th>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Gap</th>
-            <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
+            <th scope="col" class="h-10 px-2 align-middle text-left">Work Package</th>
+            <th scope="col" class="h-10 px-2 align-middle text-left">Status</th>
+            <th scope="col" class="h-10 px-2 align-middle text-left">Priority</th>
+            <th scope="col" class="h-10 px-2 align-middle text-left">Timeline</th>
+            <th scope="col" class="h-10 px-2 align-middle text-left">Gap</th>
+            <th scope="col" class="h-10 px-2 align-middle text-right">Actions</th>
+          
+{% endset %}
+{% call dense_table(header=_dt_header_12698, flush=true) %}
           <template x-if="loading">
             <tr>
-              <td colspan="7" class="px-4 py-4">{{ skeleton_table(rows=3, columns=7) }}</td>
+              <td colspan="7" class="px-2 dense-empty">{{ skeleton_table(rows=3, columns=7) }}</td>
             </tr>
           </template>
           <template x-if="!loading && errorMessage">
             <tr>
-              <td colspan="7" class="px-4 py-10 text-center text-sm text-destructive-emphasis">
+              <td colspan="7" class="px-2 dense-empty text-center text-sm text-destructive-emphasis">
                 Work packages could not be read — this is not "none yet".
               </td>
             </tr>
           </template>
           <template x-if="!loading && !errorMessage && workPackages.length === 0">
             <tr>
-              <td colspan="7" class="px-4 py-10 text-center text-sm text-muted-foreground">
+              <td colspan="7" class="px-2 dense-empty text-center text-sm text-muted-foreground">
                 No work packages yet. Add a gap first, then create work packages to resolve it.
               </td>
             </tr>
           </template>
           <template x-for="wp in (loading ? [] : workPackages)" :key="wp.id">
-            <tr class="border-t border-border hover:bg-muted/30">
-              <td class="px-4 py-3">
+            <tr class="hover:bg-muted/30">
+              <td class="px-2">
                 <input type="checkbox" class="rounded border-input"
                   :value="wp.gap_id"
                   x-model="selectedGapIds"
                   :aria-label="'Select ' + (wp.name || 'work package')">
               </td>
-              <td class="px-4 py-3 align-top">
+              <td class="px-2 align-top">
                 <a :href="'/implementation/work-packages/' + wp.id" class="font-medium text-primary hover:underline"
                    data-testid="roadmap-wp-link" x-text="wp.name"></a>
                 <p class="mt-0.5 text-xs text-muted-foreground" x-text="wp.element_type || 'WorkPackage'"></p>
               </td>
-              <td class="px-4 py-3 align-top">
+              <td class="px-2 align-top">
                 <span class="inline-flex rounded-full border px-2 py-0.5 text-xs capitalize"
                   :class="statusClass(wp.status)"
                   x-text="(wp.status || 'planned').replaceAll('_', ' ')"></span>
               </td>
-              <td class="px-4 py-3 align-top">
+              <td class="px-2 align-top">
                 <span class="inline-flex rounded-full border px-2 py-0.5 text-xs capitalize"
                   :class="priorityClass(wp.priority)"
                   x-text="wp.priority || 'medium'"></span>
               </td>
-              <td class="px-4 py-3 align-top text-xs text-muted-foreground">
+              <td class="px-2 align-top text-xs text-muted-foreground">
                 <span x-text="formatDate(wp.start_date)"></span>
                 <span class="mx-1 text-muted-foreground/50">→</span>
                 <span x-text="formatDate(wp.end_date || wp.target_date)"></span>
               </td>
-              <td class="px-4 py-3 align-top text-xs text-muted-foreground" data-testid="roadmap-wp-gaps">
+              <td class="px-2 align-top text-xs text-muted-foreground" data-testid="roadmap-wp-gaps">
                 <template x-if="!wp.gaps || wp.gaps.length === 0"><span>—</span></template>
                 <template x-for="g in (wp.gaps || [])" :key="g.id">
                   <div x-text="g.name"></div>
                 </template>
               </td>
-              <td class="px-4 py-3 align-top text-right">
+              <td class="px-2 align-top text-right">
                 <div class="inline-flex items-center gap-2">
                   <button type="button"
                     class="rounded-md border border-input px-2.5 py-1.5 text-xs hover:bg-muted"
@@ -283,9 +281,7 @@
               </td>
             </tr>
           </template>
-        </tbody>
-      </table>
-    </div>
+        {% endcall %}
   </div>
 
   {# ── Error Banner ── #}
