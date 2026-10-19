@@ -43,10 +43,25 @@ def _make_app(db_session, org):
     return row
 
 
+def _status(db_session, table, group_id):
+    """Read a group's status past the tenant filter, so the check sees the row
+    whichever organisation the last request ran as."""
+    from sqlalchemy import text
+
+    statements = {
+        "unified_duplicate_groups": "SELECT status FROM unified_duplicate_groups WHERE id = :i",
+        "duplicate_groups": "SELECT status FROM duplicate_groups WHERE id = :i",
+    }
+    return db_session.execute(text(statements[table]), {"i": group_id}).scalar()  # tenant-exempt: test read
+
+
 def _unified_group(db_session, apps):
     from app.models.unified_duplicate_detection import UnifiedDuplicateGroup, unified_group_members
 
-    group = UnifiedDuplicateGroup(name=f"HF group {uuid.uuid4().hex[:6]}", similarity_score=0.9)
+    group = UnifiedDuplicateGroup(
+        name=f"HF group {uuid.uuid4().hex[:6]}", similarity_score=0.9,
+        organization_id=apps[0].organization_id,
+    )
     db_session.add(group)
     db_session.flush()
     for a in apps:
@@ -63,7 +78,9 @@ def _legacy_group(db_session, apps):
         duplicate_group_members,
     )
 
-    run = DuplicateDetectionRun(run_name=f"HF run {uuid.uuid4().hex[:6]}")
+    run = DuplicateDetectionRun(
+        run_name=f"HF run {uuid.uuid4().hex[:6]}", organization_id=apps[0].organization_id
+    )
     db_session.add(run)
     db_session.flush()
     group = DuplicateGroup(
@@ -71,6 +88,7 @@ def _legacy_group(db_session, apps):
         duplicate_type=DuplicateType.FUNCTIONAL,
         detection_run_id=run.id,
         overall_similarity_score=0.9,
+        organization_id=apps[0].organization_id,
     )
     db_session.add(group)
     db_session.flush()
@@ -127,8 +145,8 @@ class TestDuplicateGroupActionsByOrg:
             for _, url, body in _actions(unified, legacy):
                 assert client.post(url, json=body).status_code == 404, url
             db_session.expire_all()
-            assert UnifiedDuplicateGroup.query.get(uid).status == "pending"
-            assert DuplicateGroup.query.get(lid).status not in ("ignored", "approved", "rejected")
+            assert _status(db_session, "unified_duplicate_groups", uid) == "pending"
+            assert _status(db_session, "duplicate_groups", lid) not in ("ignored", "approved", "rejected")
             assert ConsolidationListEntry.query.filter_by(source_group_id=uid).count() == 0
 
     def test_own_org_still_succeeds(self, app, login_as, client, db_session, scene, impl):
@@ -147,8 +165,8 @@ class TestDuplicateGroupActionsByOrg:
             assert client.post(f"{base}/api/consolidation-recommendation/{lid}/approve", json={}).status_code == 200
             assert client.post(f"{base}/api/consolidation-recommendation/{lid}/reject", json={"reason": "x"}).status_code == 200
             db_session.expire_all()
-            assert UnifiedDuplicateGroup.query.get(uid).status == "ignored"
-            assert DuplicateGroup.query.get(lid).status == "rejected"
+            assert _status(db_session, "unified_duplicate_groups", uid) == "ignored"
+            assert _status(db_session, "duplicate_groups", lid) == "rejected"
 
     def test_platform_admin_not_refused(self, app, login_as, client, db_session, scene, impl):
         _, _, _, platform_admin, apps_a = scene
@@ -156,9 +174,11 @@ class TestDuplicateGroupActionsByOrg:
         with app.app_context():
             login_as(client, platform_admin)
             for kind, url, body in _actions(unified, legacy):
-                # Not refused. (The add path may still answer 400/500 for another
-                # organisation's members, which the tenant filter hides from it.)
-                assert client.post(url, json=body).status_code not in (403, 404), url
+                # Not refused by the role guard. A group now belongs to the
+                # organisation that ran detection, so the tenant filter hides
+                # another organisation's group from a platform admin too: 404,
+                # never 403.
+                assert client.post(url, json=body).status_code != 403, url
 
 
 class TestLegacyGroupIdsDoNotCrossTables:
@@ -194,7 +214,7 @@ class TestLegacyGroupIdsDoNotCrossTables:
             for url, body in urls:
                 assert client.post(url, json=body).status_code == 404, url
             db_session.expire_all()
-            assert DuplicateGroup.query.get(lid).status not in ("ignored", "approved", "rejected")
+            assert _status(db_session, "duplicate_groups", lid) not in ("ignored", "approved", "rejected")
 
             login_as(client, user_a)
             # add-to-consolidation on a legacy group has an unrelated existing
@@ -203,7 +223,7 @@ class TestLegacyGroupIdsDoNotCrossTables:
             for url, body in (urls[2], urls[3], urls[0]):
                 assert client.post(url, json=body).status_code == 200, url
             db_session.expire_all()
-            assert DuplicateGroup.query.get(lid).status == "ignored"
+            assert _status(db_session, "duplicate_groups", lid) == "ignored"
 
     def test_colliding_unified_id_of_other_org_does_not_grant_access(
         self, app, login_as, client, db_session, scene, impl
@@ -215,7 +235,9 @@ class TestLegacyGroupIdsDoNotCrossTables:
         org_b_app = _make_app(db_session, user_b.organization)
         legacy = self._legacy_with_distinct_id(db_session, apps_a)
         lid = legacy.id
-        clash = UnifiedDuplicateGroup(id=lid, name="HF clash", similarity_score=0.9)
+        clash = UnifiedDuplicateGroup(
+            id=lid, name="HF clash", similarity_score=0.9, organization_id=org_b_app.organization_id
+        )
         db_session.add(clash)
         db_session.flush()
         db_session.execute(unified_group_members.insert().values(group_id=lid, application_id=org_b_app.id))
@@ -227,7 +249,7 @@ class TestLegacyGroupIdsDoNotCrossTables:
                 assert client.post(f"{base}/api/consolidation-recommendation/{lid}/approve", json={}).status_code == 404
                 assert client.post(f"{base}/api/consolidation-recommendation/{lid}/reject", json={}).status_code == 404
                 db_session.expire_all()
-                assert DuplicateGroup.query.get(lid).status not in ("approved", "rejected")
+                assert _status(db_session, "duplicate_groups", lid) not in ("approved", "rejected")
         finally:
             db_session.execute(unified_group_members.delete().where(unified_group_members.c.group_id == lid))
             db_session.delete(db_session.get(UnifiedDuplicateGroup, lid))
