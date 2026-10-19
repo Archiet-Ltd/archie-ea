@@ -141,6 +141,10 @@ EXCLUDED_CHECKS = {
         "to main, so it can never gate a deploy); the same suite runs on the "
         "required shards."
     ),
+    "Pool-of-one run needed (tenant context)": (
+        "decides whether the pool-of-one run starts; runs only on workflow_dispatch "
+        "and pull requests, never on a push to main, so it can never gate a deploy."
+    ),
     "Failing-first proof": (
         "informational: runs only on pull requests (never on a push to main) "
         "and checks that a PR's new tests fail against the base code; it may "

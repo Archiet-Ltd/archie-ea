@@ -55,10 +55,11 @@ from pathlib import Path
 import psycopg2
 import pytest
 from flask import g
-from sqlalchemy import event, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import QueuePool
 
+from tests._tenant_cursors import recording_cursor_class
 from tests.test_runtime_role_domain_writes import (  # noqa: F401  (fixture)
     _maintenance_url,
     deployed_roles_database,
@@ -132,42 +133,63 @@ def _seed_probe_tables(database_name: str, runtime_role: str) -> None:
 # Applications built on the runtime role with a pool of exactly one connection
 # --------------------------------------------------------------------------- #
 
-SET_CONFIG_CALLS: list[str] = []
+STATEMENTS: list[str] = []  # every statement any cursor of these apps' connections ran
 
 
-class _CountingCursor(psycopg2.extensions.cursor):
-    """Counts every ``set_config`` statement that reaches the driver, from any cursor."""
-
-    def execute(self, query, vars=None):  # noqa: A002
-        text_ = query.decode() if isinstance(query, bytes) else str(query)
-        if "set_config" in text_:
-            SET_CONFIG_CALLS.append(text_)
-        return super().execute(query, vars)
+def _set_config_calls() -> list[str]:
+    return [statement for statement in STATEMENTS if "set_config" in statement]
 
 
 def _build_app(config_name, database_url, **overrides):
+    """Create an application on ``database_url``.
+
+    Application start-up opens more than one connection at once (the provider
+    settings read, the administrator reconciliation), so the app is created on an
+    ordinary pool and the engine is swapped for the pool of one afterwards by
+    ``_use_pool_of_one``. Every test body runs on the pool of one.
+    """
     import app as app_package
     from config import TestingConfig
+    from sqlalchemy.pool import NullPool
 
     attrs = {
         "SQLALCHEMY_DATABASE_URI": database_url,
-        "SQLALCHEMY_ENGINE_OPTIONS": {
-            "poolclass": QueuePool,
-            "pool_size": 1,
-            "max_overflow": 0,
-            "pool_timeout": 5,
-            "pool_reset_on_return": "commit",
-            "connect_args": {"cursor_factory": _CountingCursor},
-        },
+        "SQLALCHEMY_ENGINE_OPTIONS": {"poolclass": NullPool, **_cursor_options(database_url)},
         "WTF_CSRF_ENABLED": False,
         "PROPAGATE_EXCEPTIONS": False,
         **overrides,
     }
     app_package.Config[config_name] = type(f"TC_{config_name}", (TestingConfig,), attrs)
-    try:
-        application = app_package.create_app(config_name)
-    finally:
-        pass
+    return app_package.create_app(config_name)
+
+
+def _cursor_options(database_url):
+    return {
+        "connect_args": {
+            "cursor_factory": recording_cursor_class(database_url, STATEMENTS)
+        }
+    }
+
+
+def _use_pool_of_one(application):
+    """Replace the application's engine with one pooled connection, no overflow."""
+    from app.extensions import db
+
+    url = application.config["SQLALCHEMY_DATABASE_URI"]
+    with application.app_context():
+        old = db.engine
+        engine = create_engine(
+            url,
+            poolclass=QueuePool,
+            pool_size=1,
+            max_overflow=0,
+            pool_timeout=5,
+            pool_reset_on_return="commit",
+            **_cursor_options(url),
+        )
+        db.session.remove()
+        db._app_engines[application][None] = engine
+        old.dispose()
     return application
 
 
@@ -189,7 +211,9 @@ def probe_database(deployed_roles_database):
 
 @pytest.fixture(scope="module")
 def pooled_app(probe_database):
-    application = _build_app("tc_pooled_runtime", probe_database["runtime_url"])
+    application = _use_pool_of_one(
+        _build_app("tc_pooled_runtime", probe_database["runtime_url"])
+    )
     yield application
     _dispose(application)
 
@@ -557,6 +581,7 @@ def test_api_role_check_alert_logs_one_critical_and_keeps_serving(probe_database
     caplog.set_level(logging.INFO)
     superuser_url = os.environ["TEST_DATABASE_URL"]
     application = _build_app("tc_role_alert", superuser_url, ARCHIE_DB_ROLE_CHECK="alert")
+    _use_pool_of_one(application)
     try:
         assert len(_role_check_records(caplog, logging.CRITICAL)) == 1
         assert application.test_client().get("/").status_code < 500
@@ -571,6 +596,7 @@ def test_api_role_check_passes_for_the_runtime_role_and_logs_once(probe_database
     application = _build_app(
         "tc_role_pass", probe_database["runtime_url"], ARCHIE_DB_ROLE_CHECK="refuse"
     )
+    _use_pool_of_one(application)
     try:
         passed = _role_check_records(caplog, logging.INFO)
         assert len(passed) == 1, [r.getMessage() for r in passed]
@@ -586,7 +612,9 @@ def test_api_role_check_passes_for_the_runtime_role_and_logs_once(probe_database
 # --------------------------------------------------------------------------- #
 
 
-@pytest.mark.xfail(strict=True, reason="old writers are removed in T-004")
+@pytest.mark.xfail(
+    strict=True, raises=AssertionError, reason="old writers are removed in T-004"
+)
 def test_defect_authenticated_request_writes_the_tenant_once_per_transaction(ctx):
     """Requirement 14: a request that runs several ORM statements and one commit
     issues no more ``set_config`` calls than transactions it began, plus one for
@@ -626,7 +654,7 @@ def test_defect_authenticated_request_writes_the_tenant_once_per_transaction(ctx
 
     event.listen(engine, "begin", count_begin)
     try:
-        del SET_CONFIG_CALLS[:]
+        del STATEMENTS[:]
         response = client.post(
             "/api/risks",
             json={
@@ -639,7 +667,7 @@ def test_defect_authenticated_request_writes_the_tenant_once_per_transaction(ctx
                 "category": "operational",
             },
         )
-        writes = len(SET_CONFIG_CALLS)
+        writes = len(_set_config_calls())
     finally:
         event.remove(engine, "begin", count_begin)
     assert response.status_code in (200, 201), response.get_data(as_text=True)[:300]
