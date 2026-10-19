@@ -414,6 +414,10 @@ entries:
         regex: '(?i)(?:let|const|var|function|class)\s+\w*archimate\w*(?:renderer|diagramengine)\b'
         scope: [app/static/js, app/templates]
         suffixes: [.js, .html]
+    known_exceptions:
+      - path: app/static/js/intelligence/graph.js
+        reason: known duplicate pending migration -- pull request 701 ports Twin Map onto this renderer and
+          removes this file; not a fresh violation until that migration lands
 
   - id: public-button
     concept: The public site button (primary and outline, 40px, 2px solid focus outline)

@@ -1260,10 +1260,17 @@ let ComposerRenderer = (function() {
         /* Provenance styling for one edge. A no-op unless the relationship names a
            provenance (an existing payload that happens to carry a `key` is untouched).
            Derived edges are dashed AND carry a text badge; colour never carries the
-           meaning on its own. */
+           meaning on its own.
+           Platform vocabulary (see derived_relationship.py and intelligence/services/
+           query_service.py): a worked-out fact carries provenance 'derivation' and/or
+           kind 'derived'; a genuinely recorded fact carries provenance 'explicit'. Any
+           other value is unrecognised and must NOT render with the confident "recorded"
+           styling -- it falls back to the safer, dashed "worked out" treatment. */
         function decorateEdge(link, rel) {
             if (!rel || !rel.provenance) return;
-            let kind = rel.provenance === 'derived' ? 'derived' : 'recorded';
+            let isDerived = rel.provenance === 'derivation' || rel.kind === 'derived';
+            let isExplicit = rel.provenance === 'explicit';
+            let kind = isDerived ? 'derived' : (isExplicit ? 'recorded' : 'derived');
             link.set('provenance', kind);
             link.set('stale', rel.stale === true);
             link.set('edgeKey', rel.key != null ? rel.key : (rel.id != null ? rel.id : null));
@@ -1292,7 +1299,18 @@ let ComposerRenderer = (function() {
             return Math.max(w, 120);
         }
 
-        function edgeKeyOf(rel) { return rel.key != null ? rel.key : rel.id; }
+        /* A relationship's stable identity for change detection and matching. Most
+           payloads carry `key` or `id`; a relationship that carries neither still gets
+           a deterministic (if not guaranteed-unique across true duplicates) synthetic
+           key from its endpoints and type, so it renders instead of being dropped. */
+        function syntheticEdgeKey(rel) {
+            return 'syn\u0001' + rel.source_id + '\u0001' + rel.target_id + '\u0001' + (rel.type || '');
+        }
+        function edgeKeyOf(rel) {
+            if (rel.key != null) return rel.key;
+            if (rel.id != null) return rel.id;
+            return syntheticEdgeKey(rel);
+        }
         function linkKey(l) { return l.get('edgeKey') != null ? l.get('edgeKey') : l.get('relId'); }
 
         function elementSignature(el) {
@@ -1312,7 +1330,12 @@ let ComposerRenderer = (function() {
                 let isSel = id === selectedId, isCentre = id === centreId;
                 c.attr('root/data-selected', isSel ? 'true' : null);
                 c.attr('root/data-centre', isCentre ? 'true' : null);
-                c.attr('body/strokeWidth', isCentre ? 4 : (isSel ? 3 : (c.get('baseStrokeWidth') || 1)));
+                /* Capture the node's own original stroke width the first time it is
+                   painted (mirrors the link base-width capture below), so clearing
+                   selection restores what the node actually had, not a flat guess. */
+                let base = c.get('baseStrokeWidth');
+                if (base == null) { base = c.attr('body/strokeWidth') || 1; c.set('baseStrokeWidth', base); }
+                c.attr('body/strokeWidth', isCentre ? 4 : (isSel ? 3 : base));
             });
             graph.getLinks().forEach(function(l) {
                 let k = linkKey(l);
@@ -1356,6 +1379,11 @@ let ComposerRenderer = (function() {
                 let pos = c.position();
                 if (pos.x !== pl.x || pos.y !== pl.y) c.position(pl.x, pl.y);
                 c.set('band', pl.band);
+                /* Junction/Grouping/Location/Note still get positioned into their band,
+                   but never resized -- the same skip-list compactify uses, so a special
+                   node's own notation size (e.g. the small diamond junction glyph) is
+                   never stretched or squashed to fit the row. */
+                if (SPECIAL_TYPES[c.get('elType')]) return;
                 if (compact) {
                     if (c.size().width !== pl.width) {
                         c.resize(pl.width, pl.height);
@@ -1394,7 +1422,11 @@ let ComposerRenderer = (function() {
             graph.getLinks().forEach(function(l) {
                 let k = linkKey(l);
                 let rel = k != null ? wantRel[String(k)] : null;
-                if (!rel || (l.get('signature') != null && relSignature(rel) !== l.get('signature'))) l.remove();
+                /* No signature guard here (unlike the old check): a link with no
+                   recorded signature yet (e.g. one created before this engine tracked
+                   signatures) must be treated as changed, not kept as-is, or a relationship
+                   whose visual state changes is never actually replaced on update(). */
+                if (!rel || relSignature(rel) !== l.get('signature')) l.remove();
             });
 
             /* Add what is new (or was just removed because it changed). */
@@ -1480,6 +1512,11 @@ let ComposerRenderer = (function() {
                     let layer = (el.layer || '').toLowerCase() || guessLayer(el.type);
                     let node = createNode(el.id, el.name, el.type || 'ApplicationComponent', layer, x, y);
                     if (useTokens || compact) { node.set('modelEl', el); styleNode(node, layer, 200); }
+                    /* Always recorded (not just under useTokens/compact) so a later
+                       update() call -- which is not itself gated on banded/useTokens/
+                       compact -- has a real signature to diff against instead of treating
+                       every node as freshly changed. */
+                    node.set('signature', elementSignature(el));
                     graph.addCell(node);
                     cellMap[el.id] = node;
                     canvasElements[el.id] = el;
@@ -1491,6 +1528,12 @@ let ComposerRenderer = (function() {
                     if (!src || !tgt) return;
                     let link = createLink(src, tgt, rel.type || 'association', rel.id);
                     decorateEdge(link, rel);
+                    /* Same reasoning as the node signature above: give every link a
+                       stable edgeKey (synthetic when the relationship has neither key
+                       nor id) and a signature, so update() can both find it again and
+                       tell whether it changed. */
+                    if (link.get('edgeKey') == null) link.set('edgeKey', edgeKeyOf(rel));
+                    link.set('signature', relSignature(rel));
                     graph.addCell(link);
                 });
             },
@@ -1527,6 +1570,7 @@ let ComposerRenderer = (function() {
 
             destroy: function() {
                 if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
+                if (resizeFrame) { cancelAnimationFrame(resizeFrame); resizeFrame = 0; }
                 graph.clear();
                 paper.remove();
             },
