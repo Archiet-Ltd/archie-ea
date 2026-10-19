@@ -17,7 +17,7 @@ unique index (see app/utils/reference_numbers.py), so this table carries no
 organization_id and is deliberately outside both ``TENANT_TABLES`` and
 ``HYBRID_TABLES`` in the row-level-security migrations.
 
-Revision ID: 20261019_reference_number_counters
+Revision ID: 20261019_reference_counters
 Revises: 20261018_typed_tables_rls
 Create Date: 2026-10-19
 """
@@ -29,7 +29,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy import inspect, text
 
-revision = "20261019_reference_number_counters"
+revision = "20261019_reference_counters"
 down_revision = "20261018_tree_models_rls"
 branch_labels = None
 depends_on = None
