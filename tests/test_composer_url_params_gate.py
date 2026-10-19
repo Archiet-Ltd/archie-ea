@@ -80,7 +80,7 @@ def test_flags_interpolated_viewpoint_value(tmp_html):
 def test_flags_url_for_composer_pattern(tmp_html):
     with open(tmp_html, "w", encoding="utf-8") as fh:
         fh.write(
-            "<a href=\"{{ url_for('archimate.composer_page') }}?element=1\">Open</a>\n"
+            "<a href=\"{{ url_for('archimate.composer_page') }}?elem=1\">Open</a>\n"
         )
     result = _run(tmp_html)
     assert result.stdout.strip().splitlines()[-1] == "1"
@@ -89,7 +89,7 @@ def test_flags_url_for_composer_pattern(tmp_html):
 def test_flags_bad_param_after_double_escaped_ampersand(tmp_html):
     with open(tmp_html, "w", encoding="utf-8") as fh:
         fh.write(
-            '<a href="/archimate/composer?viewpoint=layered&amp;amp;element=1">Open</a>\n'
+            '<a href="/archimate/composer?viewpoint=layered&amp;amp;elem=1">Open</a>\n'
         )
     result = _run(tmp_html)
     assert result.stdout.strip().splitlines()[-1] == "1"
