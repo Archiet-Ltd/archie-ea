@@ -118,8 +118,8 @@ def test_canvas_matches_the_impact_answer(browser, live_server, seeded, graph):
         assert canvas["focused"] is True
         assert page.locator("g.highlighted").count() > 0
         # Worked-out links are marked and badged; recorded links are not.
-        derived = page.locator('g.joint-link[data-kind="derived"]')
-        recorded = page.locator('g.joint-link[data-kind="recorded"]')
+        derived = page.locator('[data-kind="derived"]')
+        recorded = page.locator('[data-kind="recorded"]')
         assert derived.count() >= 1
         assert recorded.count() >= 1
         assert derived.first.locator("text", has_text="Worked out").count() >= 1
@@ -149,8 +149,8 @@ def test_derived_off_drops_the_worked_out_link(browser, live_server, seeded, gra
         answer = _answer(page, centre, 3, False)
         assert canvas["linkKeys"] == answer["keys"]
         assert canvas["nodeIds"] == answer["ids"]
-        assert page.locator('g.joint-link[data-kind="derived"]').count() == 0
-        assert page.locator('g.joint-link[data-kind="recorded"]').count() >= 1
+        assert page.locator('[data-kind="derived"]').count() == 0
+        assert page.locator('[data-kind="recorded"]').count() >= 1
         expect(page.locator("#composer-focus-title")).to_have_text(
             "Unsaved view: %s, 3 hops" % graph["names"]["service"]
         )
