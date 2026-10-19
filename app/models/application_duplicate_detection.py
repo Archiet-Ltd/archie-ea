@@ -32,6 +32,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from .. import db
+from ..models.mixins.core import TenantMixin
 
 
 class ProcessLevel(PyEnum):
@@ -105,15 +106,28 @@ class ApplicationProcessMapping(db.Model):
         return f"<AppProcessMapping {self.application_id}→{self.business_process_id} ({self.support_type})>"
 
 
-class DuplicateDetectionRun(db.Model):
+class DuplicateDetectionRun(TenantMixin, db.Model):
     """
     Duplicate Detection Run
 
     Tracks execution of duplicate detection analysis.
     Provides audit trail and performance metrics.
+
+    TenantMixin declares organization_id NOT NULL, but this is an existing
+    table and reconcile-schema can only ADD nullable columns (ADR 0002).
+    Override to nullable so the column can land on deployed databases
+    without a maintenance window.  Legacy rows with no known owner stay NULL
+    and are hidden from every organisation by the tenant filter.
     """
 
     __tablename__ = "duplicate_detection_runs"
+
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     id = Column(db.Integer, primary_key=True)
 
@@ -164,15 +178,28 @@ class DuplicateDetectionRun(db.Model):
         return f"<DuplicateDetectionRun {self.run_name} ({self.status})>"
 
 
-class DuplicateGroup(db.Model):
+class DuplicateGroup(TenantMixin, db.Model):
     """
     Duplicate Application Group
 
     Groups applications that are duplicates based on multi-criteria analysis.
     Supports different types of duplication (functional, technical, capability).
+
+    TenantMixin declares organization_id NOT NULL, but this is an existing
+    table and reconcile-schema can only ADD nullable columns (ADR 0002).
+    Override to nullable so the column can land on deployed databases
+    without a maintenance window.  Legacy rows with no known owner stay NULL
+    and are hidden from every organisation by the tenant filter.
     """
 
     __tablename__ = "duplicate_groups"
+
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     id = Column(db.Integer, primary_key=True)
 
