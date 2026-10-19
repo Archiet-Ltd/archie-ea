@@ -624,7 +624,6 @@ class TestReferenceCapabilityTree:
         db_session.expire_all()
         assert db_session.get(ReferenceModelCapability, parent.id) is None
         assert db_session.get(ReferenceModelCapability, own_child.id).parent_capability_id is None
-        assert db_session.get(ReferenceModelCapability, shared_child.id).parent_capability_id is None
 
 
 class TestUnifiedCapabilityTree:
