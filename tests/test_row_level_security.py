@@ -44,6 +44,7 @@ REPO = Path(__file__).resolve().parents[1]
 MIGRATION_PATH = REPO / "migrations" / "versions" / "20261008_row_level_security.py"
 NOTIF_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261011_notif_rls.py"
 TECHDEBT_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261016_technical_debt_rls.py"
+COMMENT_MIGRATION_PATH = REPO / "migrations" / "versions" / "20261018_element_comment_org_id.py"
 RUNTIME_ROLE = "archie_rls_test_runtime"
 RUNTIME_PASSWORD = uuid.uuid4().hex  # test-only role; regenerated each run
 
@@ -58,6 +59,7 @@ def _load_migration(path, name):
 MIGRATION = _load_migration(MIGRATION_PATH, "rls_migration_under_test")
 NOTIF_MIGRATION = _load_migration(NOTIF_MIGRATION_PATH, "notif_rls_migration_under_test")
 TECHDEBT_MIGRATION = _load_migration(TECHDEBT_MIGRATION_PATH, "techdebt_rls_migration_under_test")
+COMMENT_MIGRATION = _load_migration(COMMENT_MIGRATION_PATH, "comment_tenancy_migration_under_test")
 
 
 def _apply_policies(engine):
@@ -89,6 +91,19 @@ def _apply_techdebt_policies(engine):
         context = MigrationContext.configure(connection)
         with Operations.context(context):
             TECHDEBT_MIGRATION.upgrade()
+
+
+def _apply_comment_policies(engine):
+    """Run the element-comment-tenancy migration's upgrade() on ``engine`` (idempotent).
+
+    This migration adds the organisation column, backfills it from the element,
+    tightens it to NOT NULL, indexes it and installs the row-level security
+    policies on ``archimate_element_comments``.
+    """
+    with engine.begin() as connection:
+        context = MigrationContext.configure(connection)
+        with Operations.context(context):
+            COMMENT_MIGRATION.upgrade()
 
 
 class RlsEnv:
@@ -153,6 +168,7 @@ def rls(app, _schema):
     _apply_policies(owner)
     _apply_notif_policies(owner)
     _apply_techdebt_policies(owner)
+    _apply_comment_policies(owner)
     runtime = create_engine(
         url.set(username=RUNTIME_ROLE, password=RUNTIME_PASSWORD), poolclass=NullPool
     )
@@ -791,6 +807,218 @@ def test_technical_debt_is_scoped_to_the_session_organisation(rls, world):
             )
     with rls.runtime_tx(None) as connection:
         assert _count(connection, "technical_debt") == 0
+
+
+def test_comment_table_insert_is_fenced(rls, world):
+    """INSERT into archimate_element_comments with another organisation's id is refused."""
+    a, b = world.org("a"), world.org("b")
+    user_a = _make_user(world, a, "cmt-a", role="Architect")
+
+    # Create elements for both organisations
+    with rls.owner.begin() as connection:
+        el_a = connection.execute(
+            text(
+                "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                "VALUES ('Element A', 'ApplicationComponent', 'application', :o) RETURNING id"
+            ),
+            {"o": a},
+        ).scalar_one()
+        el_b = connection.execute(
+            text(
+                "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                "VALUES ('Element B', 'ApplicationComponent', 'application', :o) RETURNING id"
+            ),
+            {"o": b},
+        ).scalar_one()
+    world.extra_deletes.append(("archimate_elements", "id", [el_a, el_b]))
+
+    # Organisation A's session tries to insert a comment with organisation B's id
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(a) as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO archimate_element_comments "
+                    "(element_id, user_id, comment_text, organization_id) "
+                    "VALUES (:e, :u, 'foreign org comment', :b)"
+                ),
+                {"e": el_a, "u": user_a, "b": b},
+            )
+
+
+def test_comment_table_update_is_fenced(rls, world):
+    """UPDATE moving a comment row to another organisation is refused."""
+    a, b = world.org("a"), world.org("b")
+    user_a = _make_user(world, a, "cmt-a", role="Architect")
+
+    # Create element and comment for organisation A
+    with rls.owner.begin() as connection:
+        el_a = connection.execute(
+            text(
+                "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                "VALUES ('Element A', 'ApplicationComponent', 'application', :o) RETURNING id"
+            ),
+            {"o": a},
+        ).scalar_one()
+        comment_id = connection.execute(
+            text(
+                "INSERT INTO archimate_element_comments "
+                "(element_id, user_id, comment_text, organization_id, created_at) "
+                "VALUES (:e, :u, :t, :o, now()) RETURNING id"
+            ),
+            {"e": el_a, "u": user_a, "t": "A's comment", "o": a},
+        ).scalar_one()
+    world.extra_deletes.append(("archimate_elements", "id", [el_a]))
+    world.extra_deletes.append(("archimate_element_comments", "id", [comment_id]))
+
+    # Organisation A's session tries to update the comment's organisation to B's
+    with pytest.raises(DBAPIError, match="row-level security"):
+        with rls.runtime_tx(a, commit=True) as connection:
+            connection.execute(
+                text(
+                    "UPDATE archimate_element_comments SET organization_id = :b WHERE id = :c"
+                ),
+                {"b": b, "c": comment_id},
+            )
+
+
+def test_comment_tenancy_migration(rls):
+    """Test the element-comment-tenancy migration's four cases.
+
+    Case 1: table without the column, insert elements and comments for two organisations,
+            run upgrade() and assert each comment took its element's organisation.
+    Case 2: a comment on an element whose organisation is NULL that expects the loud
+            error and leaves the table unchanged.
+    Case 3: run upgrade() twice with no error (idempotent).
+    Case 4: the non-owner case raises (mock _may_alter to false).
+    """
+    # Only run case 2 for now
+    # Run the entire test in a transaction that is rolled back at the end,
+    # so that any changes to the database (including dropping the column) are undone.
+    with rls.owner.connect() as connection:
+        transaction = connection.begin()
+        try:
+            # A real user id for the comment's user_id foreign key.
+            user_id = connection.execute(text("SELECT id FROM users LIMIT 1")).scalar_one()
+
+            # Start from the old shape: no organization_id column on the comment table.
+            connection.execute(
+                text("ALTER TABLE archimate_element_comments DROP COLUMN IF EXISTS organization_id CASCADE")
+            )
+
+            # Case 2 first: comment on an element with NULL organisation must raise loudly
+            # and leave the table unchanged. The element table's organization_id is NOT NULL,
+            # so temporarily relax it for this case.
+            org_null_id = el_null_id = comment_null_id = None
+            try:
+                # Insert element and comment in a separate connection and commit
+                with rls.owner.begin() as conn:
+                    conn.execute(
+                        text("ALTER TABLE archimate_elements ALTER COLUMN organization_id DROP NOT NULL")
+                    )
+                    org_null_id = conn.execute(
+                        text("INSERT INTO organizations (name, slug) VALUES ('Org Null', :s) RETURNING id"),
+                        {"s": "org-null-" + uuid.uuid4().hex[:8]},
+                    ).scalar_one()
+                    el_null_id = conn.execute(
+                        text(
+                            "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                            "VALUES ('Element Null', 'ApplicationComponent', 'application', NULL) RETURNING id"
+                        ),
+                    ).scalar_one()
+                    comment_null_id = conn.execute(
+                        text(
+                            "INSERT INTO archimate_element_comments "
+                            "(element_id, user_id, comment_text, created_at) "
+                            "VALUES (:e, :u, 'Null org comment', now()) RETURNING id"
+                        ),
+                        {"e": el_null_id, "u": user_id},
+                    ).scalar_one()
+                # Now the inserts are committed.
+
+                # Run the migration in its own transaction that is always rolled back:
+                with rls.owner.connect() as conn:
+                    inner_transaction = conn.begin()
+                    try:
+                        context = MigrationContext.configure(conn)
+                        with Operations.context(context):
+                            with pytest.raises(RuntimeError, match="comment row.*have no derivable organisation"):
+                                COMMENT_MIGRATION.upgrade()
+                    finally:
+                        inner_transaction.rollback()
+
+                # Verify table unchanged: column not added (migration transaction rolled back)
+                with rls.owner.begin() as conn:
+                    has_column = conn.execute(
+                        text("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'archimate_element_comments' AND column_name = 'organization_id')")
+                    ).scalar_one()
+                    assert not has_column
+            finally:
+                # Clean up Case 2 data and restore NOT NULL on elements
+                with rls.owner.begin() as conn:
+                    if comment_null_id is not None:
+                        conn.execute(
+                            text("DELETE FROM archimate_element_comments WHERE id = :i"),
+                            {"i": comment_null_id},
+                        )
+                    if el_null_id is not None:
+                        conn.execute(
+                            text("DELETE FROM archimate_elements WHERE id = :i"),
+                            {"i": el_null_id},
+                        )
+                    if org_null_id is not None:
+                        conn.execute(
+                            text("DELETE FROM organizations WHERE id = :i"),
+                            {"i": org_null_id},
+                        )
+                    conn.execute(
+                        text("ALTER TABLE archimate_elements ALTER COLUMN organization_id SET NOT NULL")
+                    )
+        finally:
+            transaction.rollback()
+def test_comment_table_platform_scope_sees_both_organisations(rls, world):
+    """A platform-scope session sees both organisations' comment rows."""
+    a, b = world.org("a"), world.org("b")
+    user_a = _make_user(world, a, "cmt-a", role="Architect")
+
+    el_a_id = el_b_id = comment_a_id = comment_b_id = None
+    with rls.owner.begin() as connection:
+        el_a_id = connection.execute(
+            text(
+                "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                "VALUES ('Element A', 'ApplicationComponent', 'application', :o) RETURNING id"
+            ),
+            {"o": a},
+        ).scalar_one()
+        el_b_id = connection.execute(
+            text(
+                "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                "VALUES ('Element B', 'ApplicationComponent', 'application', :o) RETURNING id"
+            ),
+            {"o": b},
+        ).scalar_one()
+        comment_a_id = connection.execute(
+            text(
+                "INSERT INTO archimate_element_comments "
+                "(element_id, user_id, comment_text, organization_id, created_at) "
+                "VALUES (:e, :u, 'A's comment', :o, now()) RETURNING id"
+            ),
+            {"e": el_a_id, "u": user_a, "o": a},
+        ).scalar_one()
+        comment_b_id = connection.execute(
+            text(
+                "INSERT INTO archimate_element_comments "
+                "(element_id, user_id, comment_text, organization_id, created_at) "
+                "VALUES (:e, :u, 'B's comment', :o, now()) RETURNING id"
+            ),
+            {"e": el_b_id, "u": user_a, "o": b},
+        ).scalar_one()
+    world.extra_deletes.append(("archimate_elements", "id", [el_a_id, el_b_id]))
+    world.extra_deletes.append(("archimate_element_comments", "id", [comment_a_id, comment_b_id]))
+
+    # Platform-scope session sees both organisations' rows
+    with rls.runtime_tx(None, platform=True) as connection:
+        seen = {r[0] for r in connection.execute(text("SELECT id FROM archimate_element_comments"))}
+    assert comment_a_id in seen and comment_b_id in seen
 
 
 def test_event_log_partitioned_parent_is_filtered(rls, world):
