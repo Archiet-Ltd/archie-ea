@@ -751,21 +751,8 @@
   </div>{# end table card #}
 
   {# AI Map modal — inside the appPortfolio() x-data scope, which owns aiMap state #}
-  <div id="ai-map-modal" hidden role="dialog" aria-modal="true" aria-labelledby="ai-map-modal-title"
-    class="modal-root fixed inset-0 z-[1000] items-center justify-center p-4 bg-slate-900/50" data-modal-backdrop="ai-map-modal" aria-hidden="true"
-    data-testid="ai-map-modal">
-    <div class="bg-card rounded-lg w-full max-w-lg border flex flex-col max-h-[90vh] border-border">
-      <div class="flex items-center justify-between p-6 border-b shrink-0">
-        <div>
-          <h2 id="ai-map-modal-title" class="text-base font-semibold text-foreground text-foreground">AI Map Applications</h2>
-          <p class="text-sm text-muted-foreground mt-0.5">Analyze existing applications with AI and propose capability, process and ArchiMate mappings.</p>
-        </div>
-        <!-- inline-event-ok --><button type="button" @click="closeAiMapModal()" aria-label="Close"
-          class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-        </button>
-      </div>
-      <div class="p-6 overflow-y-auto flex-1 space-y-4">
+  {% call modal(id='ai-map-modal', title='AI Map Applications', description='Analyze existing applications with AI and propose capability, process and ArchiMate mappings.', attrs='data-testid="ai-map-modal"') %}
+      <div class="overflow-y-auto flex-1 space-y-4">
         <div x-show="!aiMap.result" x-cloak class="space-y-3">
           {% call form_group(id='ai-map-max', label='Applications to analyze', help_text='Most recently added applications are analyzed first.') %}
             <input id="ai-map-max" type="number" min="1" max="200" x-model.number="aiMap.maxApplications"
@@ -828,8 +815,8 @@
           <span x-text="aiMap.accepting ? 'Saving...' : 'Accept & Save'">Accept &amp; Save</span>
         </button>
       </div>
-    </div>
-  </div>
+    
+{% endcall %}
 </div>{# end app-portfolio-root #}
 
 {# ─ Include existing unified mapping modal ─ #}
@@ -838,20 +825,8 @@
 {% include 'application_mgmt/application_import_modal.html' %}
 
 {# ─ Create Application Modal ─ #}
-<div id="modal-create" hidden role="dialog" aria-modal="true" aria-labelledby="modal-create-title"
-  class="modal-root fixed inset-0 z-[1000] items-center justify-center p-4 bg-slate-900/50" data-modal-backdrop="modal-create" aria-hidden="true">
-  <div class="bg-card rounded-lg w-full max-w-lg border flex flex-col max-h-[90vh] border-border">
-    <div class="flex items-center justify-between p-6 border-b shrink-0">
-      <div>
-        <h2 id="modal-create-title" class="text-base font-semibold text-foreground text-foreground">New Application</h2>
-        <p class="text-sm text-muted-foreground mt-0.5">Register a new application in the portfolio.</p>
-      </div>
-      <!-- inline-event-ok --><button type="button" @click="Platform.modal.close('modal-create')" aria-label="Close"
-        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-      </button>
-    </div>
-    <div class="p-6 overflow-y-auto flex-1" x-data="applicationCreateForm()">
+{% call modal(id='modal-create', title='New Application', description='Register a new application in the portfolio.') %}
+    <div class="overflow-y-auto flex-1" x-data="applicationCreateForm()">
       <form @submit.prevent="submit()" class="space-y-4">
         <div class="grid grid-cols-1 gap-4">
           {% call form_group(id='ca-name', label='Application Name', required=true) %}
@@ -964,8 +939,8 @@
         </div>
       </form>
     </div>
-  </div>
-</div>
+  
+{% endcall %}
 
 {# ─ AI Map Modal — reuses the existing comprehensive-auto-map + accept
      endpoints (app/modules/applications/routes/auto_mapping_routes.py).

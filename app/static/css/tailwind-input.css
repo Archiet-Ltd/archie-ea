@@ -142,6 +142,7 @@
     padding: 0 0.5rem;
     font-weight: 500;
     letter-spacing: 0.06em;
+    background-color: hsl(var(--card));
   }
   #main-content .dense-table td {
     height: 3rem;

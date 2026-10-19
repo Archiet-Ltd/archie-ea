@@ -1,4 +1,5 @@
 {% extends "layouts/admin_base.html" %}
+{% from 'components/modal.html' import modal %}
 {% from 'components/form_field.html' import form_group, form_footer %}
 {% from 'components/dense_table.html' import dense_table %}
 {# smoke-coverage-ok: CSP inline style fix (removed style="width:0%"); covered by tests/test_capability_map_a11y_csp.py #}
@@ -1660,25 +1661,10 @@
         </div>
 
         <!-- Convert to Roadmap Modal - Standardized Design -->
-        <div id="convert-modal" hidden role="dialog" aria-modal="true" aria-labelledby="convert-modal-title" class="modal-root fixed inset-0 overflow-y-auto z-50 bg-slate-900/50">
-            <div class="relative top-20 mx-auto p-0 w-full max-w-2xl">
-                <div class="bg-card rounded-lg">
-                    <!-- Header -->
-                    <div class="flex items-center justify-between p-5 border-b border-border bg-primary rounded-t-lg">
-                        <div class="flex items-center space-x-3">
-                            <i data-lucide="git-branch" class="w-6 h-6 text-primary-foreground" aria-hidden="true"></i>
-                            <div>
-                                <h3 class="text-lg font-semibold text-primary-foreground">Convert Gaps to Roadmap Items</h3>
-                                <p class="text-sm text-primary-foreground/70">Transform auto-detected gaps into trackable roadmap items</p>
-                            </div>
-                        </div>
-                        <button type="button" @click="closeConvertModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close convert gaps modal">
-                            <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
-                        </button>
-                    </div>
+        {% call modal(id='convert-modal', title='Convert Gaps to Roadmap Items', description='Transform auto-detected gaps into trackable roadmap items', size='lg') %}
 
                     <!-- Quick Stats Bar -->
-                    <div class="bg-muted/50 border-b border-border px-6 py-4">
+                    <div class="bg-muted/50 border-b border-border py-4 pb-4 mb-4">
                         <div class="grid grid-cols-3 gap-4">
                             <div class="flex items-center space-x-3">
                                 <div class="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
@@ -1711,7 +1697,7 @@
                     </div>
 
                     <!-- Body -->
-                    <div class="p-6 max-h-[60vh] overflow-y-auto">
+                    <div class="max-h-[60vh] overflow-y-auto">
                         <!-- Description -->
                         <div class="bg-primary/10 border border-primary/40 rounded-md px-3 py-2 mb-6">
                             <div class="flex items-start space-x-3">
@@ -1801,27 +1787,15 @@
                             </button>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
+                
+{% endcall %}
 
         <!-- Edit Gap Modal -->
-        <div id="edit-gap-modal" hidden role="dialog" aria-modal="true" aria-labelledby="edit-gap-title" class="modal-root fixed inset-0 overflow-y-auto z-50 bg-slate-900/50">
-            <div class="relative top-10 mx-auto p-0 w-full max-w-3xl">
-                <div class="bg-card rounded-lg">
-                    <!-- Header -->
-                    <div class="flex items-center justify-between p-4 border-b border-border bg-primary rounded-t-lg">
-                        <div class="flex items-center space-x-3">
-                            <i data-lucide="edit-3" class="w-6 h-6 text-primary-foreground" aria-hidden="true"></i>
-                            <h3 class="text-lg font-semibold text-primary-foreground" id="edit-gap-title">Edit Gap</h3>
-                        </div>
-                        <button type="button" @click="closeEditGapModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close edit gap modal">
-                            <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
-                        </button>
-                    </div>
+        {% call modal(id='edit-gap-modal', size='xl', labelledby='edit-gap-title') %}
+<h3 id="edit-gap-title" class="text-base font-semibold text-foreground mb-4">Edit Gap</h3>
 
                     <!-- Body -->
-                    <div class="p-6 max-h-[70vh] overflow-y-auto">
+                    <div class="max-h-[70vh] overflow-y-auto">
                         <input type="hidden" id="edit-gap-id">
 
                         <!-- Basic Info -->
@@ -1931,33 +1905,19 @@
                             </button>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
+                
+{% endcall %}
 
         <!-- Edit Work Package Modal - Standardized Design -->
-        <div id="edit-wp-modal" hidden role="dialog" aria-modal="true" aria-labelledby="edit-wp-title" class="modal-root fixed inset-0 overflow-y-auto z-50 bg-slate-900/50">
-            <div class="relative top-10 mx-auto p-0 w-full max-w-4xl">
-                <div class="bg-card rounded-lg">
-                    <!-- Header -->
-                    <div class="flex items-center justify-between p-5 border-b border-border bg-primary rounded-t-lg">
-                        <div class="flex items-center space-x-3">
-                            <i data-lucide="package" class="w-6 h-6 text-primary-foreground" aria-hidden="true"></i>
-                            <div>
-                                <h3 class="text-lg font-semibold text-primary-foreground" id="edit-wp-title">Edit Work Package</h3>
-                                <p class="text-sm text-primary-foreground/70" id="edit-wp-subtitle">Manage work package details and children</p>
-                            </div>
-                        </div>
-                        <button type="button" @click="closeEditWPModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close edit work package modal">
-                            <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
-                        </button>
-                    </div>
+        {% call modal(id='edit-wp-modal', size='xl', labelledby='edit-wp-title') %}
+<h3 id="edit-wp-title" class="text-base font-semibold text-foreground mb-4">Edit Work Package</h3>
+<p class="text-sm text-primary-foreground/70" id="edit-wp-subtitle">Manage work package details and children</p>
 
                     <input type="hidden" id="edit-wp-id">
                     <input type="hidden" id="edit-wp-parent-id">
 
                     <!-- Quick Stats Bar -->
-                    <div class="bg-muted/50 border-b border-border px-6 py-4">
+                    <div class="bg-muted/50 border-b border-border py-4 pb-4 mb-4">
                         <div class="grid grid-cols-4 gap-4">
                             <div class="flex items-center space-x-3">
                                 <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -2225,27 +2185,14 @@
                             </button>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
+                
+{% endcall %}
 
         <!-- Delete Confirmation Modal -->
-        <div id="delete-confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="delete-confirm-title" class="modal-root fixed inset-0 overflow-y-auto z-50 bg-slate-900/50">
-            <div class="relative top-20 mx-auto p-0 w-full max-w-md">
-                <div class="bg-card rounded-lg">
-                    <!-- Header -->
-                    <div class="flex items-center justify-between p-4 border-b border-border bg-destructive rounded-t-lg">
-                        <div class="flex items-center space-x-3">
-                            <i data-lucide="alert-triangle" class="w-6 h-6 text-primary-foreground" aria-hidden="true"></i>
-                            <h3 class="text-lg font-semibold text-primary-foreground">Confirm Delete</h3>
-                        </div>
-                        <button type="button" @click="closeDeleteConfirmModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close delete confirmation">
-                            <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
-                        </button>
-                    </div>
+        {% call modal(id='delete-confirm-modal', title='Confirm Delete') %}
 
                     <!-- Body -->
-                    <div class="p-6">
+                    <div class="">
                         <input type="hidden" id="delete-item-id">
                         <input type="hidden" id="delete-item-type">
 
@@ -2272,7 +2219,7 @@
                     </div>
 
                     <!-- Footer -->
-                    <div class="flex justify-end space-x-3 p-4 border-t border-border bg-muted/50 rounded-b-lg">
+                    <div class="flex justify-end space-x-3 border-t border-border bg-muted/50 rounded-b-lg pt-4 mt-4">
                         <button type="button" @click="closeDeleteConfirmModal()" class="px-4 py-2 text-muted-foreground bg-card border border-input rounded-md hover:bg-accent" aria-label="Cancel delete operation">
                             Cancel
                         </button>
@@ -2281,25 +2228,14 @@
                             Delete
                         </button>
                     </div>
-                </div>
-            </div>
-        </div>
+                
+{% endcall %}
 
         <!-- Add to Roadmap Modal -->
-        <div id="add-roadmap-modal" hidden role="dialog" aria-modal="true" aria-labelledby="add-roadmap-modal-title" class="modal-root fixed inset-0 overflow-y-auto z-50 bg-slate-900/50">
-            <div class="relative top-20 mx-auto p-5 border border-border w-full max-w-lg rounded-md bg-card">
-                <div class="flex justify-between items-center mb-4 pb-3 border-b">
-                    <h3 class="text-lg font-bold text-foreground flex items-center">
-                        <i data-lucide="map" class="w-5 h-5 mr-2 text-primary" aria-hidden="true"></i>
-                        Add to Roadmap
-                    </h3>
-                    <button type="button" @click="closeAddRoadmapModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
-                        <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
-                    </button>
-                </div>
+        {% call modal(id='add-roadmap-modal', title='Add to Roadmap') %}
 
                 <!-- Capability Info -->
-                <div class="bg-muted/50 rounded-lg p-4 mb-4">
+                <div class="bg-muted/50 rounded-lg mb-4">
                     <div class="text-sm text-muted-foreground mb-1">Capability</div>
                     <div id="add-roadmap-cap-name" class="font-medium text-foreground"></div>
                     <div class="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
@@ -2375,21 +2311,11 @@
                         Add to Roadmap
                     </button>
                 </div>
-            </div>
-        </div>
+            
+{% endcall %}
 
         <!-- Quick Add to Roadmap Modal -->
-        <div id="quick-add-modal" hidden role="dialog" aria-modal="true" aria-labelledby="quick-add-modal-title" class="modal-root fixed inset-0 overflow-y-auto z-50 bg-slate-900/50">
-            <div class="relative top-20 mx-auto p-5 border border-border w-full max-w-2xl rounded-md bg-card">
-                <div class="flex justify-between items-center mb-4 pb-3 border-b">
-                    <h3 class="text-lg font-bold text-foreground flex items-center">
-                        <i data-lucide="search" class="w-5 h-5 mr-2 text-primary" aria-hidden="true"></i>
-                        Quick Add to Roadmap
-                    </h3>
-                    <button type="button" @click="closeQuickAddModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close quick add modal">
-                        <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
-                    </button>
-                </div>
+        {% call modal(id='quick-add-modal', title='Quick Add to Roadmap', size='lg') %}
 
                 <!-- Search and Filters -->
                 <div class="mb-4 space-y-3">
@@ -2436,8 +2362,8 @@
                         Close
                     </button>
                 </div>
-            </div>
-        </div>
+            
+{% endcall %}
 
     {# ARCH-064: only the unified mapping modal is still rendered up front —
        it pulls in its own <script src=...>, which an injected fragment cannot

@@ -1,4 +1,5 @@
 {% extends "layouts/admin_base.html" %}
+{% from 'components/modal.html' import modal %}
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
@@ -297,21 +298,10 @@
    ════════════════════════════════════════════════════════════ #}
 
 {# Create / Edit Gap Modal #}
-<div id="rdm-create-gap-modal"
-     hidden
-     role="dialog" aria-modal="true" aria-labelledby="rdm-gap-modal-title"
-     class="fixed inset-0 z-50 items-center justify-center p-4 bg-slate-900/50">
-  <div class="w-full max-w-lg rounded-lg border border-border bg-card flex flex-col max-h-[90vh]"
-       x-data="rdmGapModalForm()"
-       x-init="initFromGlobal()">
-    <div class="flex shrink-0 items-center justify-between border-b px-6 py-4">
-      <h3 id="rdm-gap-modal-title" class="text-base font-semibold text-foreground text-foreground text-foreground"
-        x-text="isEditing ? 'Edit Gap' : 'Create Gap'"></h3>
-      <button type="button"
-        class="rounded-md border border-input px-2 py-1 text-sm hover:bg-muted"
-        data-modal-close="rdm-create-gap-modal">Close</button>
-    </div>
-    <form class="space-y-4 p-6 overflow-y-auto flex-1 min-h-0" @submit.prevent="submitGapForm()">
+{% call modal(id='rdm-create-gap-modal', labelledby='rdm-gap-modal-title') %}
+<div x-data="rdmGapModalForm()" x-init="initFromGlobal()">
+<h3 id="rdm-gap-modal-title" x-text="isEditing ? 'Edit Gap' : 'Create Gap'" class="text-base font-semibold text-foreground mb-4"></h3>
+    <form class="space-y-4 overflow-y-auto flex-1 min-h-0" @submit.prevent="submitGapForm()">
       <div>
         <label class="block text-sm font-medium text-muted-foreground mb-1">Gap Name <span class="text-destructive-emphasis">*</span></label>
         <input type="text" x-model="form.name" required
@@ -357,24 +347,14 @@
         </button>
       </div>
     </form>
-  </div>
+  
 </div>
+{% endcall %}
 
 {# Create Plateau Modal #}
-<div id="rdm-create-plateau-modal"
-     hidden
-     role="dialog" aria-modal="true" aria-labelledby="rdm-plateau-modal-title"
-     class="fixed inset-0 z-50 items-center justify-center p-4 bg-slate-900/50">
-  <div class="w-full max-w-md rounded-lg border border-border bg-card flex flex-col max-h-[90vh]"
-       x-data="rdmPlateauModalForm()"
-       x-init="initFromGlobal()">
-    <div class="flex shrink-0 items-center justify-between border-b px-6 py-4">
-      <h3 id="rdm-plateau-modal-title" class="text-base font-semibold text-foreground text-foreground text-foreground">Add Plateau</h3>
-      <button type="button"
-        class="rounded-md border border-input px-2 py-1 text-sm hover:bg-muted"
-        data-modal-close="rdm-create-plateau-modal">Close</button>
-    </div>
-    <form class="space-y-4 p-6 overflow-y-auto flex-1 min-h-0" @submit.prevent="submitPlateauForm()">
+{% call modal(id='rdm-create-plateau-modal', title='Add Plateau') %}
+<div x-data="rdmPlateauModalForm()" x-init="initFromGlobal()">
+    <form class="space-y-4 overflow-y-auto flex-1 min-h-0" @submit.prevent="submitPlateauForm()">
       <div>
         <label class="block text-sm font-medium text-muted-foreground mb-1">Plateau Name <span class="text-destructive-emphasis">*</span></label>
         <input type="text" x-model="form.name" required
@@ -410,25 +390,15 @@
         </button>
       </div>
     </form>
-  </div>
+  
 </div>
+{% endcall %}
 
 {# Create / Edit Work Package Modal #}
-<div id="rdm-create-wp-modal"
-     hidden
-     role="dialog" aria-modal="true" aria-labelledby="rdm-wp-modal-title"
-     class="fixed inset-0 z-50 items-center justify-center p-4 bg-slate-900/50">
-  <div class="w-full max-w-2xl rounded-lg border border-border bg-card flex flex-col max-h-[90vh]"
-       x-data="rdmWpModalForm()"
-       x-init="initFromGlobal()">
-    <div class="flex shrink-0 items-center justify-between border-b px-6 py-4">
-      <h3 id="rdm-wp-modal-title" class="text-base font-semibold text-foreground text-foreground text-foreground"
-        x-text="isEditing ? 'Edit Work Package' : 'Create Work Package'"></h3>
-      <button type="button"
-        class="rounded-md border border-input px-2 py-1 text-sm hover:bg-muted"
-        data-modal-close="rdm-create-wp-modal">Close</button>
-    </div>
-    <form class="space-y-4 p-6 overflow-y-auto flex-1 min-h-0" @submit.prevent="submitWpForm()">
+{% call modal(id='rdm-create-wp-modal', size='lg', labelledby='rdm-wp-modal-title') %}
+<div x-data="rdmWpModalForm()" x-init="initFromGlobal()">
+<h3 id="rdm-wp-modal-title" x-text="isEditing ? 'Edit Work Package' : 'Create Work Package'" class="text-base font-semibold text-foreground mb-4"></h3>
+    <form class="space-y-4 overflow-y-auto flex-1 min-h-0" @submit.prevent="submitWpForm()">
       <div>
         <label class="block text-sm font-medium text-muted-foreground mb-1">Name <span class="text-destructive-emphasis">*</span></label>
         <input type="text" x-model="form.name" required
@@ -512,27 +482,14 @@
         </button>
       </div>
     </form>
-  </div>
+  
 </div>
+{% endcall %}
 
 {# AI Generate Preview Modal #}
-<div id="rdm-ai-generate-modal"
-     hidden
-     role="dialog" aria-modal="true" aria-labelledby="rdm-ai-modal-title"
-     class="fixed inset-0 z-50 items-center justify-center p-4 bg-slate-900/50">
-  <div class="w-full max-w-2xl rounded-lg border border-border bg-card flex flex-col max-h-[90vh]"
-       x-data="rdmAiModalForm()"
-       x-init="initFromGlobal()">
-    <div class="flex shrink-0 items-center justify-between border-b px-6 py-4">
-      <div>
-        <h3 id="rdm-ai-modal-title" class="text-base font-semibold text-foreground text-foreground text-foreground">AI Roadmap Generation Preview</h3>
-        <p class="mt-0.5 text-xs text-muted-foreground">Review suggested work packages before confirming. No changes are saved until you click Confirm.</p>
-      </div>
-      <button type="button"
-        class="rounded-md border border-input px-2 py-1 text-sm hover:bg-muted"
-        data-modal-close="rdm-ai-generate-modal">Close</button>
-    </div>
-    <div class="flex-1 min-h-0 overflow-y-auto p-6">
+{% call modal(id='rdm-ai-generate-modal', title='AI Roadmap Generation Preview', description='Review suggested work packages before confirming. No changes are saved until you click Confirm.', size='lg') %}
+<div x-data="rdmAiModalForm()" x-init="initFromGlobal()">
+    <div class="flex-1 min-h-0 overflow-y-auto">
       <template x-if="isLoading">
         <div class="flex items-center justify-center py-10">
           <div class="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
@@ -578,7 +535,7 @@
         </div>
       </template>
     </div>
-    <div class="flex items-center justify-end gap-2 border-t px-6 py-4">
+    <div class="flex items-center justify-end gap-2 border-t py-4 pt-4 mt-4">
       <button type="button"
         class="rounded-md border border-input px-4 py-2 text-sm hover:bg-muted"
         data-modal-close="rdm-ai-generate-modal">Discard</button>
@@ -590,8 +547,9 @@
         <span x-show="isConfirming" x-cloak>Creating…</span>
       </button>
     </div>
-  </div>
+  
 </div>
+{% endcall %}
 {% endblock %}
 
 {% block scripts %}
