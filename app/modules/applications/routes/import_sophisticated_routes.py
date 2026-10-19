@@ -912,6 +912,19 @@ def upload_excel_applications():
             headers = [
                 str(cell.value).strip() if cell.value else "" for cell in ws[1] if cell.value
             ]
+            # Read the data rows too: without them a mapped .xlsx import
+            # finds the name column and then imports nothing.
+            sheet_header = [
+                str(cell.value).strip() if cell.value is not None else "" for cell in ws[1]
+            ]
+            for sheet_row in ws.iter_rows(min_row=2, values_only=True):
+                row_dict = {
+                    head: cell
+                    for head, cell in zip(sheet_header, sheet_row)
+                    if head and cell is not None and str(cell).strip() != ""
+                }
+                if row_dict:
+                    data_rows.append(row_dict)
 
         # Find name column using custom mappings or auto-detect
         name_column = None
