@@ -11,12 +11,41 @@
 function twinMapSurface() {
     var Intelligence = window.Intelligence;
     var controller = null;
+    var overlay = null;
 
     function findNode(model, id) {
         for (var i = 0; i < model.nodes.length; i++) {
             if (model.nodes[i].id === id) return model.nodes[i];
         }
         return null;
+    }
+
+    /* The page's own model, translated to the drawing engine's: `kind` becomes
+       `provenance`, `from`/`to` become `source_id`/`target_id`, `band` becomes
+       `layer`. The engine styles a connection by the lower-case name of its type. */
+    function toEngine(model) {
+        return {
+            elements: model.nodes.map(function (node) {
+                return {
+                    id: node.id,
+                    name: node.name || 'Not recorded',
+                    type: node.type || undefined,
+                    layer: node.band,
+                    depth: node.depth
+                };
+            }),
+            relationships: model.edges.map(function (edge) {
+                return {
+                    id: edge.key,
+                    key: edge.key,
+                    source_id: edge.from,
+                    target_id: edge.to,
+                    type: String(edge.type || '').replace(/Relationship$/, '').toLowerCase() || undefined,
+                    provenance: edge.kind === 'derived' ? 'derivation' : 'explicit',
+                    stale: edge.stale === true
+                };
+            })
+        };
     }
 
     return Object.assign(Intelligence.picker('twin'), Intelligence.drawerState(), {
@@ -56,11 +85,47 @@ function twinMapSurface() {
         /* The drawing is set up the first time it is needed, when the elements
            it draws into exist. */
         ensureDrawing() {
-            if (controller || !window.d3 || !window.IntelligenceGraph || !this.$refs.canvas) return;
+            if (controller || typeof ComposerRenderer === 'undefined' || !window.IntelligenceNodeOverlay ||
+                !this.$refs.canvas) return;
             var self = this;
-            controller = window.IntelligenceGraph.create(this.$refs.canvas, {
+            var paperHost = this.$refs.canvas.querySelector('[data-graph-svg]');
+            var nodeHost = this.$refs.canvas.querySelector('[data-graph-nodes]');
+            overlay = window.IntelligenceNodeOverlay.create(nodeHost, {
                 onSelect: function (id) { self.selectNode(id); }
             });
+            controller = ComposerRenderer.create(paperHost, {
+                mode: 'view',
+                layout: 'bands',
+                bands: Intelligence.BANDS,
+                nodeStyle: 'compact',
+                tokens: true,
+                background: 'transparent'
+            });
+            // The engine lays out again by itself when the width changes; the
+            // buttons follow whatever it moved.
+            var frame = 0;
+            controller.graph.on('change:position change:size', function () {
+                if (frame) return;
+                frame = window.requestAnimationFrame(function () {
+                    frame = 0;
+                    self.placeButtons();
+                });
+            });
+        },
+
+        /* One pass: the engine takes the model, then the selection, the centre and
+           the highlighted path; the buttons are placed where the engine put things. */
+        drawMap(model, selectedId, path) {
+            controller.update(toEngine(model));
+            controller.setCentre(model.centreId);
+            controller.setSelected(selectedId);
+            controller.setHighlightedEdges(Object.keys(path || {}));
+            this.placeButtons();
+        },
+
+        placeButtons() {
+            if (!controller || !overlay) return;
+            overlay.render(this.model, controller.getNodeBounds(), this.selectedId);
         },
 
         onSelect(option) {
@@ -128,10 +193,10 @@ function twinMapSurface() {
             queueMicrotask(function () {
                 self.ensureDrawing();
                 if (controller && self.hasGraph) {
-                    controller.render(self.model, self.selectedId, self.pathFor(self.selectedId));
+                    self.drawMap(self.model, self.selectedId, self.pathFor(self.selectedId));
                 }
                 Intelligence.refreshIcons();
-                if (options && options.focusCentre && controller) controller.focus(elementId);
+                if (options && options.focusCentre && overlay) overlay.focus(elementId);
             });
         },
 
@@ -150,7 +215,11 @@ function twinMapSurface() {
         selectNode(id) {
             this.selectedId = id;
             this.updatePanel();
-            if (controller) controller.select(id, this.pathFor(id));
+            if (controller) {
+                controller.setSelected(id);
+                controller.setHighlightedEdges(Object.keys(this.pathFor(id)));
+                overlay.select(id);
+            }
         },
 
         primaryRow(id) {
@@ -244,16 +313,18 @@ function twinMapSurface() {
         },
 
         toggleRail() {
+            var self = this;
             this.railOpen = !this.railOpen;
-            this.$nextTick(function () { if (controller) controller.resize(); });
+            this.$nextTick(function () { if (controller) { controller.resize(); self.placeButtons(); } });
         },
 
         /* Escape on a node closes the details panel and leaves focus and the
            selection exactly where they are. */
         closeRailFromNode() {
             if (!this.railOpen) return;
+            var self = this;
             this.railOpen = false;
-            this.$nextTick(function () { if (controller) controller.resize(); });
+            this.$nextTick(function () { if (controller) { controller.resize(); self.placeButtons(); } });
         },
 
         async recomputeNow() {
