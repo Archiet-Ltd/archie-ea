@@ -78,7 +78,16 @@ def _applications_without_owner(organization_id: int, **_: Any) -> Dict[str, Any
         )
         .all()
     )
-    unowned = [a for a in unowned if a.id not in owned_ids]
+    # An owner named at import that matches no user is held as text on the
+    # application (the owner record needs a user); it is still an owner.
+    unowned = [
+        a for a in unowned
+        if a.id not in owned_ids
+        and not any(
+            (getattr(a, column) or "").strip()
+            for column in ("legacy_application_owner", "legacy_business_owner", "legacy_technical_owner")
+        )
+    ]
 
     groups: Dict[str, List[Dict[str, Any]]] = {}
     for app in unowned:
