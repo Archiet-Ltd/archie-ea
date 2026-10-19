@@ -60,7 +60,7 @@
             <button type="button" @click="openAddApps()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Add Applications">
                 <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Add Applications
             </button>
-            <button type="button" @click="scoreAll()" :disabled="scoringInProgress" class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-primary bg-primary/10 hover:bg-primary/20 text-primary text-sm font-medium transition-colors disabled:opacity-50" aria-label="Score all entries using TIME framework">
+            <button type="button" @click="scoreAll()" :disabled="scoringInProgress" class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-primary bg-primary/10 hover:bg-primary/20 text-info-emphasis text-sm font-medium transition-colors disabled:opacity-50" aria-label="Score all entries using TIME framework">
                 <i data-lucide="bar-chart-3" class="h-4 w-4" aria-hidden="true"></i>
                 <span x-text="scoringInProgress ? 'Scoring...' : 'Score All (TIME)'"></span>
             </button>
@@ -353,7 +353,7 @@
                             {# Wave #}
                             <td class="px-4 py-3 hidden sm:table-cell">
                                 <template x-if="entry.wave">
-                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold border border-primary/20" x-text="entry.wave"></span>
+                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-info-emphasis text-xs font-semibold border border-primary/20" x-text="entry.wave"></span>
                                 </template>
                                 <span x-show="!entry.wave" class="text-muted-foreground text-xs" x-cloak>&mdash;</span>
                             </td>

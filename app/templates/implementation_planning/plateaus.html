@@ -89,7 +89,7 @@
                     {% elif s == 'in_progress' or s == 'in progress' %}
                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30">In Progress</span>
                     {% elif s == 'planned' %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Planned</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Planned</span>
                     {% else %}
                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">{{ plateau.status|title }}</span>
                     {% endif %}

@@ -44,7 +44,7 @@
   {% set domain_solutions = by_domain[domain] %}
   <div class="mb-8" x-show="domainFilter === '' || domainFilter === '{{ domain }}'" x-cloak>
     <h2 class="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-info-emphasis">
         {{ domain }}
       </span>
       <span class="text-sm text-muted-foreground/60">{{ domain_solutions|length }} solution(s)</span>

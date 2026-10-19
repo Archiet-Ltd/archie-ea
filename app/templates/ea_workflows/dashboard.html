@@ -199,7 +199,7 @@
             <div class="flex items-center gap-1.5" x-show="loaded">
                 <template x-for="p in phaseSummary" :key="p.phase">
                     <span x-show="p.element_count > 0"
-                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-primary/10 text-primary border border-primary/20"
+                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-primary/10 text-info-emphasis border border-primary/20"
                           :title="'Phase ' + p.phase + ': ' + p.element_count + ' ArchiMate elements'">
                         <span x-text="'Phase ' + p.phase"></span>
                         <span class="font-bold" x-text="p.element_count"></span>
@@ -580,7 +580,7 @@
                         <div class="flex items-center justify-between mb-3">
                             <div class="flex items-center gap-2">
                                 <span class="text-sm font-semibold text-foreground" x-text="'Iteration ' + journey.iteration_number"></span>
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary"
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-info-emphasis"
                                       x-text="journey.completed_phases + '/' + journey.total_phases + ' phases'"></span>
                             </div>
                             <div class="flex items-center gap-2">

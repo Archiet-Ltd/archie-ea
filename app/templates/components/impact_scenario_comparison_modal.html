@@ -238,7 +238,7 @@
                                         <td class="px-4 py-3 text-sm font-medium text-foreground">Change Type</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'type-' + scenarioId">
                                             <td class="px-4 py-3 text-sm">
-                                                <span class="px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium" x-text="getScenario(scenarioId)?.change_type"></span>
+                                                <span class="px-2 py-1 bg-primary/10 text-info-emphasis rounded text-xs font-medium" x-text="getScenario(scenarioId)?.change_type"></span>
                                             </td>
                                         </template>
                                     </tr>

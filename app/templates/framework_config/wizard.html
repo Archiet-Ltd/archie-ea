@@ -30,7 +30,7 @@
             <div class="bg-muted rounded-lg border p-4">
                 <h3 class="font-medium text-foreground mb-1">{{ template.template_name }}</h3>
                 <p class="text-xs text-muted-foreground mb-3">{{ template.template_description or '' }}</p>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-info-emphasis">
                     {{ template.organization_size.title() if template.organization_size else 'Any size' }}
                 </span>
             </div>

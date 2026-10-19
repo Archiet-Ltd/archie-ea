@@ -345,7 +345,7 @@
             </div>
             <div class="flex flex-wrap gap-1.5">
               <template x-for="cap in allCapabilities" :key="cap.id + '-' + cap._level">
-                <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium group">
+                <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-info-emphasis rounded text-xs font-medium group">
                   <span class="px-1 py-0 bg-primary/20 rounded text-xs font-bold" x-text="cap._level || 'L?'"></span>
                   <span x-text="cap.name"></span>
                   <button type="button" @click="removeCapability(cap)" class="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove capability">
@@ -483,7 +483,7 @@
             </div>
             <div class="flex flex-wrap gap-1.5">
               <template x-for="proc in allProcesses" :key="proc.id + '-' + proc._level">
-                <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium group">
+                <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-info-emphasis rounded text-xs font-medium group">
                   <span class="font-mono text-xs text-muted-foreground" x-text="proc.process_code || ''"></span>
                   <span x-text="proc.process_name || proc.name || ''"></span>
                   <button type="button" @click="removeProcess(proc)" class="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove process">
@@ -664,7 +664,7 @@
             </p>
             <div class="flex flex-wrap gap-1.5">
               <template x-for="cap in allCapabilities.slice(0, 6)" :key="cap.id">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/20" x-text="cap.name"></span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20" x-text="cap.name"></span>
               </template>
               <span x-show="allCapabilities.length > 6" x-cloak class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground"
                 x-text="'+' + (allCapabilities.length - 6) + ' more'"></span>
@@ -676,7 +676,7 @@
             </p>
             <div class="flex flex-wrap gap-1.5">
               <template x-for="proc in allProcesses.slice(0, 6)" :key="proc.id">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/20" x-text="proc.process_name || proc.name"></span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20" x-text="proc.process_name || proc.name"></span>
               </template>
               <span x-show="allProcesses.length > 6" x-cloak class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground"
                 x-text="'+' + (allProcesses.length - 6) + ' more'"></span>
@@ -1115,7 +1115,7 @@
                       <th class="px-3 py-2 text-center text-xs font-medium text-muted-foreground uppercase min-w-[120px]">
                         <div class="flex items-center justify-center gap-1">
                           <span x-text="s.scenario_name"></span>
-                          <span x-show="s.is_baseline" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/30">Base</span>
+                          <span x-show="s.is_baseline" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Base</span>
                           <button type="button" @click="deleteScenario(s.id)" class="ml-1 text-muted-foreground/50 hover:text-destructive-emphasis transition-colors" title="Delete scenario">
                             <i data-lucide="x" class="h-3 w-3"></i>
                           </button>
@@ -1370,7 +1370,7 @@
               <div class="text-xs">
                 <span class="text-muted-foreground">Preference votes:</span>
                 <template x-for="(count, vid) in stakeholderConsensus.vendor_preferences" :key="vid">
-                  <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30"
+                  <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30"
                         x-text="'Option #' + vid + ': ' + count + ' votes'"></span>
                 </template>
               </div>

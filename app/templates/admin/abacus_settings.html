@@ -83,7 +83,7 @@
                             <p class="text-sm text-muted-foreground mb-2">Auto Sync</p>
                             <div class="flex items-center gap-2">
                                 {% if abacus_config.sync_enabled %}
-                                    <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">Enabled</span>
+                                    <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-info-emphasis">Enabled</span>
                                     <span class="text-sm text-muted-foreground">
                                         Every {{ abacus_config.sync_interval_minutes or 1440 }} minutes
                                     </span>

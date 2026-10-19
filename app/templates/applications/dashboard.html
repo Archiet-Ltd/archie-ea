@@ -522,7 +522,7 @@
           <a href="{{ url_for('solution_design.view_solution', solution_id=sol.id) }}"
              class="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors group">
             <div class="flex items-center gap-3 min-w-0">
-              <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary text-xs font-bold shrink-0">{{ sol.adm_phase or 'A' }}</span>
+              <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-info-emphasis text-xs font-bold shrink-0">{{ sol.adm_phase or 'A' }}</span>
               <div class="min-w-0">
                 <p class="text-sm font-medium text-foreground truncate group-hover:text-primary">{{ sol.name }}</p>
                 <p class="text-xs text-muted-foreground">{{ sol.governance_status or 'Draft' }} · {{ sol.solution_type or 'Platform' }}</p>
@@ -880,7 +880,7 @@
             <div class="flex items-center gap-2 mb-3">
                 <i data-lucide="sparkles" class="h-4 w-4 text-primary" aria-hidden="true"></i>
                 <h3 class="text-sm font-semibold">Suggested Capabilities</h3>
-                <span class="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold">AI</span>
+                <span class="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-info-emphasis font-semibold">AI</span>
                 <span class="text-xs text-muted-foreground ml-auto" x-text="suggestions.length + ' suggestions from portfolio patterns'"></span>
             </div>
             <div class="space-y-2">

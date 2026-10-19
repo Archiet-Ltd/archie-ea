@@ -7,7 +7,7 @@
     <!-- Header -->
     {% macro _ps_meta() %}
                     {% if ownership %}
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-info-emphasis">
                         {{ ownership.ownership_type or 'Owner' }}
                         {% if ownership.is_primary %} (Primary){% endif %}
                     </span>

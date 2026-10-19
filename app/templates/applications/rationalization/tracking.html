@@ -140,7 +140,7 @@
                 <template x-for="(wave, idx) in retWaves" :key="idx">
                     <div class="border rounded-lg p-4">
                         <div class="flex items-center gap-2 mb-2">
-                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold"
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-info-emphasis text-xs font-bold"
                                   x-text="idx + 1"></span>
                             <span class="text-sm font-semibold text-foreground" x-text="'Wave ' + (idx + 1)"></span>
                             <span class="text-xs text-muted-foreground" x-text="wave.apps.length + ' application(s)'"></span>

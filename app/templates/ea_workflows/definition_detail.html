@@ -60,7 +60,7 @@
                     <div>
                         <h1 class="text-2xl font-bold">{{ definition.workflow_name }}</h1>
                         {% if definition.adm_phase %}
-                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary mt-1">
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-info-emphasis mt-1">
                             TOGAF Phase {{ definition.adm_phase }}: {{ definition.adm_phase_name }}
                         </span>
                         {% endif %}
@@ -258,7 +258,7 @@
                                         Your Review
                                     </span>
                                     {% elif step.step_type == 'notification' %}
-                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary shrink-0">
+                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-info-emphasis shrink-0">
                                         <i data-lucide="bell" class="h-3 w-3" aria-hidden="true"></i>
                                         Notification
                                     </span>

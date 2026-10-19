@@ -117,7 +117,7 @@
            save-as-template and export-OEF handlers still find their targets. #}
         {% macro _bp_meta() %}
                 {% if solution.status %}
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30 shrink-0">{{ solution.status }}</span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30 shrink-0">{{ solution.status }}</span>
                 {% endif %}
         {% endmacro %}
         {% macro _bp_sub() %}
@@ -621,7 +621,7 @@ function archieShowBanner(msg, type) {
                         </button>
                         <button type="button"
                                 @click="linkElements('{{ section_id }}')"
-                                class="bp-action-btn inline-flex items-center px-2.5 py-1 rounded-md text-2xs font-medium bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors"
+                                class="bp-action-btn inline-flex items-center px-2.5 py-1 rounded-md text-2xs font-medium bg-primary/10 text-info-emphasis border border-primary/30 hover:bg-primary/20 transition-colors"
                                 title="Link Elements">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                             Link

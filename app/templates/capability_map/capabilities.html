@@ -64,7 +64,7 @@
             <div class="flex justify-between items-start mb-2">
                 <h3 class="font-medium text-foreground leading-snug">{{ cap.name }}</h3>
                 <div class="flex items-center gap-1 shrink-0 ml-2">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">L{{ cap.level|default(1) }}</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">L{{ cap.level|default(1) }}</span>
                     {% if can_edit %}
                     <button type="button" data-action="openCapEdit"
                         class="p-1 rounded hover:bg-muted text-muted-foreground" aria-label="Edit {{ cap.name|e }}">

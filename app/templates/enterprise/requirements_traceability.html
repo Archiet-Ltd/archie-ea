@@ -117,7 +117,7 @@
                         </td>
                         <td class="px-4 py-3 text-xs">
                             {% if req.togaf_phase %}
-                            <span class="inline-flex items-center rounded-full bg-primary/10 text-primary px-2 py-0.5 text-2xs font-medium">Phase {{ req.togaf_phase }}</span>
+                            <span class="inline-flex items-center rounded-full bg-primary/10 text-info-emphasis px-2 py-0.5 text-2xs font-medium">Phase {{ req.togaf_phase }}</span>
                             {% else %}
                             <span class="text-muted-foreground">—</span>
                             {% endif %}
@@ -169,11 +169,11 @@
             Traceability Chain (TOGAF 9.2 / ArchiMate 3.2)
         </h3>
         <div class="flex flex-wrap gap-2 items-center text-sm text-muted-foreground">
-            <span class="rounded-full bg-primary/10 text-primary px-3 py-1 font-medium">Business Capability</span>
+            <span class="rounded-full bg-primary/10 text-info-emphasis px-3 py-1 font-medium">Business Capability</span>
             <i data-lucide="arrow-right" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
             <span class="rounded-full bg-violet-100 text-violet-700 px-3 py-1 font-medium">Requirement (Motivation)</span> {# token-migration-ok: violet is the app-wide AI-generated indicator colour, matching the AI badge this legend describes below #}
             <i data-lucide="arrow-right" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
-            <span class="rounded-full bg-primary/10 text-primary px-3 py-1 font-medium">Solution Architecture</span>
+            <span class="rounded-full bg-primary/10 text-info-emphasis px-3 py-1 font-medium">Solution Architecture</span>
             <i data-lucide="arrow-right" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
             <span class="rounded-full bg-success/10 text-success-emphasis px-3 py-1 font-medium">ADM Kanban Card</span>
         </div>

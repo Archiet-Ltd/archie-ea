@@ -688,7 +688,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
         </template>
         <div class="ml-auto flex gap-2">
             <button type="button" @click="generatePlateaus()" :disabled="plateauLoading"
-                    class="px-2.5 py-1 bg-primary/10 text-primary rounded-md text-xs font-medium hover:bg-primary/20 disabled:opacity-50">
+                    class="px-2.5 py-1 bg-primary/10 text-info-emphasis rounded-md text-xs font-medium hover:bg-primary/20 disabled:opacity-50">
                 <span x-text="plateauLoading ? 'Generating...' : 'Generate Plateaus'"></span>
             </button>
             <button type="button" @click="exitDeltaMode()"
@@ -922,15 +922,15 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                             <summary class="text-xs font-semibold uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground transition-colors">First time? Quick start guide</summary>
                             <div class="mt-3 grid grid-cols-3 gap-3">
                                 <div class="flex items-start gap-2.5 p-3 rounded-lg bg-muted/40 border border-border/50">
-                                    <span class="size-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary">1</span>
+                                    <span class="size-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-info-emphasis">1</span>
                                     <div><p class="text-xs font-medium">Drag & Drop</p><p class="text-2xs text-muted-foreground mt-0.5">Drag elements from the palette onto the canvas</p></div>
                                 </div>
                                 <div class="flex items-start gap-2.5 p-3 rounded-lg bg-muted/40 border border-border/50">
-                                    <span class="size-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary">2</span>
+                                    <span class="size-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-info-emphasis">2</span>
                                     <div><p class="text-xs font-medium">Connect</p><p class="text-2xs text-muted-foreground mt-0.5">Hover an element, drag from a port to create relationships</p></div>
                                 </div>
                                 <div class="flex items-start gap-2.5 p-3 rounded-lg bg-muted/40 border border-border/50">
-                                    <span class="size-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary">3</span>
+                                    <span class="size-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-info-emphasis">3</span>
                                     <div><p class="text-xs font-medium">Save</p><p class="text-2xs text-muted-foreground mt-0.5">Click Save to persist your viewpoint for collaboration</p></div>
                                 </div>
                             </div>
@@ -1081,7 +1081,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                                                 </div>
                                                 <button type="button" x-show="d.elementId" x-cloak
                                                         @click="highlightComplianceElement(d.elementId)"
-                                                        class="flex-shrink-0 px-2 py-0.5 rounded text-2xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                                                        class="flex-shrink-0 px-2 py-0.5 rounded text-2xs font-medium bg-primary/10 text-info-emphasis hover:bg-primary/20 transition-colors">
                                                     Highlight
                                                 </button>
                                             </div>
@@ -1107,7 +1107,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                                 </div>
                                 <div class="mt-1.5 flex gap-1">
                                     <button type="button" @click="s.kind === 'element' ? acceptElementSuggestion(s) : acceptRelSuggestion(s)"
-                                            class="px-2 py-0.5 bg-primary/10 text-primary rounded text-2xs font-medium hover:bg-primary/20">
+                                            class="px-2 py-0.5 bg-primary/10 text-info-emphasis rounded text-2xs font-medium hover:bg-primary/20">
                                         Add
                                     </button>
                                     <span x-text="s.kind === 'element' ? s.type : s.suggested_type"
@@ -1206,7 +1206,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                                 <div class="p-3 bg-muted/30 border border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
                                      @click="highlightPlateauElements(p.element_ids)">
                                     <div class="flex items-center gap-2 mb-1">
-                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-bold"
+                                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-info-emphasis text-xs font-bold"
                                               x-text="p.order"></span>
                                         <span class="text-sm font-semibold text-foreground" x-text="p.name"></span>
                                     </div>
@@ -1538,7 +1538,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                             </dd>
                         </div>
                         <div class="flex items-center gap-2">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-2xs font-medium bg-primary/10 text-primary border border-primary/30"
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-2xs font-medium bg-primary/10 text-info-emphasis border border-primary/30"
                                   x-text="(selectedNode.elType || '---').replace(/([A-Z])/g, ' $1').trim()"></span>
                             <span class="text-2xs text-muted-foreground capitalize" x-text="selectedNode.layer || ''"></span>
                         </div>
@@ -1683,7 +1683,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                             <div class="flex items-center justify-between text-xs">
                                 <a :href="'/solutions/' + sol.id" class="text-primary hover:underline truncate flex-1" x-text="sol.name"></a>
                                 <span x-show="sol.adm_phase" x-cloak
-                                      class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-primary/10 text-primary border border-primary/30 ml-1"
+                                      class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-primary/10 text-info-emphasis border border-primary/30 ml-1"
                                       x-text="'Phase ' + sol.adm_phase"></span>
                             </div>
                         </template>
@@ -1856,7 +1856,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                             <div class="space-y-1">
                                 <div class="text-2xs text-muted-foreground">Linked: <span x-text="_currentSelectedCell.get('linkedViewpointName')"></span></div>
                                 <div class="flex gap-1">
-                                    <button type="button" @click="drillDown(_currentSelectedCell)" class="flex-1 px-2 py-1 rounded text-xs bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                                    <button type="button" @click="drillDown(_currentSelectedCell)" class="flex-1 px-2 py-1 rounded text-xs bg-primary/10 text-info-emphasis hover:bg-primary/20 transition-colors">
                                         <i data-lucide="arrow-down-right" class="w-3 h-3 inline"></i> Drill Down
                                     </button>
                                     <button aria-label="Unlink viewpoint" type="button" @click="unlinkViewpoint()" class="px-2 py-1 rounded text-xs text-destructive-emphasis hover:bg-destructive/10 transition-colors">

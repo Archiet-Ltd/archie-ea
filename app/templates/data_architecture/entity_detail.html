@@ -77,7 +77,7 @@
                             <td class="text-center px-4 py-3" data-crud-cell="{{ letter }}"
                                 data-crud-value="{{ 'yes' if value is sameas true else ('no' if value is sameas false else 'unspecified') }}">
                                 {% if value is sameas true %}
-                                <span class="inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-md text-xs font-semibold bg-primary/10 text-primary border border-primary/30" title="{{ label }}s">{{ letter }}</span>
+                                <span class="inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-md text-xs font-semibold bg-primary/10 text-info-emphasis border border-primary/30" title="{{ label }}s">{{ letter }}</span>
                                 <span class="sr-only">{{ label }}s</span>
                                 {% elif value is sameas false %}
                                 <span class="text-muted-foreground" aria-hidden="true">&middot;</span>

@@ -23,7 +23,7 @@
       el.innerHTML=items.map(function(p){
         return '<div data-slot="card" class="rounded-lg border border-border bg-card p-5">'
           +'<div class="flex justify-between items-start mb-1"><h3 class="font-medium text-foreground leading-snug">'+esc(p.name)+'</h3>'
-          +(p.priority?'<span class="ml-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">'+esc(p.priority)+'</span>':'')
+          +(p.priority?'<span class="ml-2 shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">'+esc(p.priority)+'</span>':'')
           +'</div>'
           +(p.domain?'<p class="text-xs text-muted-foreground mb-2">'+esc(p.domain)+'</p>':'')
           +'<p class="text-sm text-muted-foreground">'+esc(p.statement||'')+'</p></div>';

@@ -64,7 +64,7 @@
                 </div>
                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground shrink-0" x-text="s.source_method"></span>
                 <div class="flex items-center gap-1 shrink-0">
-                    <button type="button" @click="acceptSuggestion(s.id)" :disabled="processing" class="inline-flex items-center justify-center h-7 w-7 rounded-md bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50" title="Accept">
+                    <button type="button" @click="acceptSuggestion(s.id)" :disabled="processing" class="inline-flex items-center justify-center h-7 w-7 rounded-md bg-primary/10 text-info-emphasis hover:bg-primary/20 disabled:opacity-50" title="Accept">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                     </button>
                     <button type="button" @click="rejectSuggestion(s.id)" :disabled="processing" class="inline-flex items-center justify-center h-7 w-7 rounded-md bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20 disabled:opacity-50" title="Reject">

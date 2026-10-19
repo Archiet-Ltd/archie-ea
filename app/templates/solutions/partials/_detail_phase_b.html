@@ -41,7 +41,7 @@
                             <i data-lucide="message-square" class="w-3.5 h-3.5" aria-hidden="true"></i>
                             <span x-show="commentCount('phase_bcd') > 0" x-text="commentCount('phase_bcd')" class="text-xs bg-primary text-primary-foreground rounded-full px-1 min-w-[16px] text-center" x-cloak></span>
                         </button>
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Phases B-D</span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Phases B-D</span>
                         <div class="flex items-center gap-1.5">
                             <div class="h-1.5 w-16 bg-muted rounded-full overflow-hidden"><div class="h-full bg-primary rounded-full transition-all" :style="{width: phaseCompleteness('BCD').percent + '%'}"></div></div>
                             <span class="text-xs text-muted-foreground" x-text="phaseCompleteness('BCD').label"></span>
@@ -491,7 +491,7 @@
                       <div class="space-y-2">
                         <template x-for="(a, idx) in aiSuggestions.nextActions" :key="idx">
                           <div class="flex items-start gap-3 px-4 py-3 rounded-md border border-border bg-background">
-                            <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center" x-text="idx+1"></span>
+                            <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-info-emphasis text-xs font-bold flex items-center justify-center" x-text="idx+1"></span>
                             <div class="flex-1 min-w-0">
                               <p class="text-sm font-medium" x-text="a.action || a.title || a.description || a"></p>
                               <p x-cloak x-show="a.rationale || a.reason" class="text-xs text-muted-foreground mt-0.5" x-text="a.rationale || a.reason"></p>
@@ -518,7 +518,7 @@
                         <div class="flex items-center gap-3">
                             <i data-lucide="boxes" class="w-4 h-4 text-primary flex-shrink-0" aria-hidden="true"></i>
                             <h3 class="text-lg font-semibold text-foreground">Business Capabilities</h3>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/30">Phase B</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Phase B</span>
                             <template x-if="capabilityMappingsLoading">
                                 <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-muted-foreground" aria-hidden="true"></i>
                             </template>
@@ -610,7 +610,7 @@
                     <div class="flex items-center gap-2 mb-3">
                         <i data-lucide="activity" class="w-4 h-4 text-muted-foreground flex-shrink-0"></i>
                         <h3 class="text-sm font-semibold text-foreground">Capability Health Scores</h3>
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/30">Phase B</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Phase B</span>
                         <template x-if="capabilityHealthLoading">
                             <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-muted-foreground"></i>
                         </template>
@@ -646,7 +646,7 @@
                     <div class="flex items-center gap-2 mb-3">
                         <i data-lucide="git-branch" class="w-4 h-4 text-muted-foreground flex-shrink-0"></i>
                         <h3 class="text-sm font-semibold text-foreground">Workflow Optimization — Critical Path</h3>
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/30">Phase B</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Phase B</span>
                         <template x-if="criticalPathLoading">
                             <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-muted-foreground"></i>
                         </template>

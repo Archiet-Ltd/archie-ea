@@ -57,7 +57,7 @@
                 <div class="flex items-center justify-between gap-2">
                     <span class="text-sm font-medium text-foreground">{{ cp.plateau_name or 'Plateau' }}</span>
                     {% if cp.has_critical_path %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis">
                         {{ cp.duration_days }} day critical path
                     </span>
                     {% else %}
@@ -179,7 +179,7 @@
                     </div>
                     <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
                         {% if card.arch_element_type %}
-                        <span class="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                        <span class="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-info-emphasis">
                             {{ card.arch_element_type }}
                         </span>
                         {% endif %}

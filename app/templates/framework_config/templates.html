@@ -20,7 +20,7 @@
         {% for template in templates %}
         <div class="bg-card rounded-lg border border-border p-6">
             <div class="flex items-center justify-between mb-4">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-info-emphasis">
                     {{ template.template_type.title() if template.template_type else 'General' }}
                 </span>
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">

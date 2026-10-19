@@ -281,7 +281,7 @@
                             {% for v in rr.relationship_gaps.violations %}
                             <tr class="border-b border-input/30 bg-destructive/[0.03]">
                                 <td class="py-2 pr-3 font-medium">{% set _h = am_href(v.source_layer, v.source_id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ v.source_name }}</a>{% else %}{{ v.source_name }}{% endif %}</td>
-                                <td class="py-2 pr-3"><span class="rounded px-1.5 py-0.5 bg-primary/10 text-primary font-medium">{{ v.relationship_type }}</span></td>
+                                <td class="py-2 pr-3"><span class="rounded px-1.5 py-0.5 bg-primary/10 text-info-emphasis font-medium">{{ v.relationship_type }}</span></td>
                                 <td class="py-2 pr-3 font-medium">{% set _h = am_href(v.target_layer, v.target_id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ v.target_name }}</a>{% else %}{{ v.target_name }}{% endif %}</td>
                                 <td class="py-2 text-destructive-emphasis">{{ v.issue }}</td>
                             </tr>
@@ -452,7 +452,7 @@
                             <div class="flex items-center gap-2 flex-wrap mb-1.5">
                                 <span class="font-semibold">{{ s.source_name }}</span>
                                 <i data-lucide="arrow-right" class="h-3 w-3 text-muted-foreground" aria-hidden="true"></i>
-                                <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold bg-primary/10 text-primary">{{ s.relationship_type }}</span>
+                                <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold bg-primary/10 text-info-emphasis">{{ s.relationship_type }}</span>
                                 <i data-lucide="arrow-right" class="h-3 w-3 text-muted-foreground" aria-hidden="true"></i>
                                 <span class="font-semibold">{{ s.target_name }}</span>
                                 <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ml-auto
@@ -494,7 +494,7 @@
                         <div class="flex items-center gap-2 flex-wrap mb-1.5">
                             <span class="font-semibold">{{ s.source_name }}</span>
                             <i data-lucide="arrow-right" class="h-3 w-3 text-muted-foreground" aria-hidden="true"></i>
-                            <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold bg-primary/10 text-primary">{{ s.relationship_type }}</span>
+                            <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold bg-primary/10 text-info-emphasis">{{ s.relationship_type }}</span>
                             <i data-lucide="arrow-right" class="h-3 w-3 text-muted-foreground" aria-hidden="true"></i>
                             <span class="font-semibold">{{ s.target_name }}</span>
                             <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ml-auto
@@ -697,7 +697,7 @@
                         <tr class="border-b border-input/30">
                             <td class="py-2 pr-3"><i data-lucide="{% if c.action == 'created' %}plus-circle{% else %}check-circle-2{% endif %}" class="h-3.5 w-3.5 text-success" aria-hidden="true"></i></td>
                             <td class="py-2 pr-3 font-medium">{{ c.get('source_name', '') }}</td>
-                            <td class="py-2 pr-3"><span class="rounded px-1.5 py-0.5 bg-primary/10 text-primary font-medium">{{ c.get('relationship_type', '') }}</span></td>
+                            <td class="py-2 pr-3"><span class="rounded px-1.5 py-0.5 bg-primary/10 text-info-emphasis font-medium">{{ c.get('relationship_type', '') }}</span></td>
                             <td class="py-2 pr-3 font-medium">{{ c.get('target_name', '') }}</td>
                             <td class="py-2"><span class="rounded px-1.5 py-0.5 bg-success/10 text-success-emphasis text-xs font-medium">{{ c.action }}</span></td>
                         </tr>
@@ -880,7 +880,7 @@
                 <h3 class="text-sm font-semibold mb-3">ArchiMate Layers</h3>
                 <div class="flex flex-wrap gap-1.5">
                     {% for layer in rr.application.layers_found %}
-                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-primary/10 text-primary">{{ layer }}</span>
+                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-primary/10 text-info-emphasis">{{ layer }}</span>
                     {% endfor %}
                 </div>
                 <p class="text-xs text-muted-foreground mt-2">{{ rr.application.get('element_count', 0) }} elements analyzed</p>
@@ -954,7 +954,7 @@
             </div>
             <div class="flex items-center gap-3 flex-wrap">
                 {% if instance.adm_phase %}
-                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-primary/10 text-primary">Phase {{ instance.adm_phase }}{% if instance.adm_phase_name %}: {{ instance.adm_phase_name }}{% endif %}</span>
+                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-primary/10 text-info-emphasis">Phase {{ instance.adm_phase }}{% if instance.adm_phase_name %}: {{ instance.adm_phase_name }}{% endif %}</span>
                 {% endif %}
                 <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold
                     {% if instance.status == 'completed' %}bg-success/10 text-success-emphasis
@@ -1355,7 +1355,7 @@
             <div class="space-y-2">
                 {% for wave in migration_scope.migration_waves %}
                 <div class="flex items-start gap-4 p-3 border border-border rounded-lg">
-                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0">{{ wave.get('wave',loop.index) }}</span>
+                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-info-emphasis text-xs font-bold shrink-0">{{ wave.get('wave',loop.index) }}</span>
                     <div>
                         <div class="font-medium text-sm">{{ wave.get('label','—') }}</div>
                         <div class="text-xs text-muted-foreground mt-0.5">{{ wave.get('scope','') }}</div>
@@ -2044,7 +2044,7 @@
                         <template x-for="(art, idx) in unexpectedArtifacts" :key="art.id || idx">
                             <div class="rounded-lg border-2 border-input bg-background p-4">
                                 <div class="flex flex-wrap items-center gap-2 mb-2">
-                                    <span class="inline-flex rounded-full px-2 py-1 text-xs font-medium bg-primary/10 text-primary"
+                                    <span class="inline-flex rounded-full px-2 py-1 text-xs font-medium bg-primary/10 text-info-emphasis"
                                           x-text="(art.artifact_type || 'artifact').replace(/_/g, ' ')"></span>
                                     <span class="inline-flex rounded-full px-2 py-1 text-xs font-medium"
                                           :class="art.status === 'approved' ? 'bg-success/10 text-success-emphasis' : 'bg-muted text-muted-foreground'"
@@ -2099,7 +2099,7 @@
                 <div class="flex items-center gap-2 mb-4">
                     <i data-lucide="layers" class="h-4 w-4 text-primary" aria-hidden="true"></i>
                     <h2 class="text-lg font-semibold">ArchiMate Elements</h2>
-                    <span class="ml-auto inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary">{{ archimate_elements|length }}</span>
+                    <span class="ml-auto inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-info-emphasis">{{ archimate_elements|length }}</span>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     {% for el in archimate_elements %}

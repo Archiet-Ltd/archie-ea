@@ -44,7 +44,7 @@
                                             <!-- webhook_type badge -->
                                             {% set wtype = sub.webhook_type if sub.webhook_type else 'generic' %}
                                             {% if wtype == 'teams' %}
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30"><!-- token-migration-ok -->Teams</span>
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30"><!-- token-migration-ok -->Teams</span>
                                             {% elif wtype == 'slack' %}
                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30"><!-- token-migration-ok -->Slack</span>
                                             {% else %}

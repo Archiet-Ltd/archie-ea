@@ -6,7 +6,7 @@
     <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-2">
             <h3 class="text-sm font-semibold text-foreground">Business Elements</h3>
-            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Phase B</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Phase B</span>
         </div>
         <div class="flex items-center gap-1 sad-actions">
             <button type="button" @click="$dispatch('open-archimate-picker', {phase: 'B', elementType: 'BusinessProcess', linkEndpoint: '/api/solutions/{{ solution.id }}/elements'})"
@@ -89,7 +89,7 @@
 <div class="mt-6" x-data="{ openGap: null }">
     <div class="flex items-center gap-2 mb-3">
         <h3 class="text-sm font-semibold text-foreground">Gaps &amp; Architecture Impact</h3>
-        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Phase B / C / D</span>
+        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Phase B / C / D</span>
     </div>
     <p class="text-xs text-muted-foreground mb-3">Delta between baseline and target architecture states</p>
 
@@ -173,7 +173,7 @@
                                                 <span class="text-xs text-muted-foreground" x-text="opt.approach" x-show="opt.approach" x-cloak></span>
                                             </div>
                                             <span x-show="opt.estimated_effort" x-cloak
-                                                class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/30 flex-shrink-0"
+                                                class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30 flex-shrink-0"
                                                 x-text="opt.estimated_effort"></span>
                                         </div>
                                     </template>
@@ -194,7 +194,7 @@
 <div class="mt-6" x-data="{ activeArchLayer: 'business', archModelExpanded: false }">
     <div class="flex items-center gap-2 mb-3">
         <h3 class="text-sm font-semibold text-foreground">Architecture Model Elements</h3>
-        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Phase B / C / D</span>
+        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Phase B / C / D</span>
     </div>
 
     {# Sub-tab bar #}

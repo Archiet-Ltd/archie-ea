@@ -263,7 +263,7 @@ function renderReviewQueue(items) {
           <div class="flex-1">
             <div class="flex items-center gap-3 mb-2">
               <span class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-muted"><i data-lucide="${typeIcons[item.type] || 'box'}" class="w-4 h-4 text-muted-foreground"></i></span>
-              <span class="px-2 py-1 bg-primary/10 text-primary text-xs font-semibold rounded">
+              <span class="px-2 py-1 bg-primary/10 text-info-emphasis text-xs font-semibold rounded">
                 ${typeLabels[item.type]}
               </span>
               <span class="text-sm font-medium text-foreground/80">${escapeHtml(item.application_name)}</span>

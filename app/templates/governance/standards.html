@@ -116,7 +116,7 @@
         {% set s = row.standard %}
         <tr class="border-b border-border last:border-0 align-top" data-testid="standard-row-{{ s.id }}">
           <td class="px-4 py-3 font-medium text-foreground">{{ s.technology_name }}</td>
-          <td class="px-4 py-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">{{ (s.status or '—').replace('_', ' ') | capitalize }}</span></td>
+          <td class="px-4 py-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">{{ (s.status or '—').replace('_', ' ') | capitalize }}</span></td>
           <td class="px-4 py-3" data-testid="standard-ring-{{ s.id }}">{{ ring_labels[row.ring] if row.ring else '—' }}</td>
           <td class="px-4 py-3 text-muted-foreground">{{ s.approved_version or '—' }}</td>
           <td class="px-4 py-3 text-muted-foreground" data-testid="standard-sunset-{{ s.id }}">{{ s.sunset_date | format_date if s.sunset_date else '—' }}</td>

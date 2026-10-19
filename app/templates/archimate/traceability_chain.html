@@ -360,7 +360,7 @@
         </h3>
         <div class="flex flex-wrap gap-2" id="linked-solutions-container">
             <template x-for="sol in linkedSolutions" :key="sol.id">
-                <a :href="'/solutions/' + sol.id" class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors">
+                <a :href="'/solutions/' + sol.id" class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30 hover:bg-primary/20 transition-colors">
                     <span x-text="sol.name"></span>
                     <span class="ml-1 opacity-60" x-text="'(' + sol.element_role + ')'"></span>
                 </a>

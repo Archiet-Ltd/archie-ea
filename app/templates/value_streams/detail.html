@@ -68,7 +68,7 @@
                         {% for stage in value_stream.stages %}
                         <div class="w-64 shrink-0 rounded-md border border-border bg-muted/20 px-3 py-2 relative" data-stage-card data-stage-id="{{ stage.id }}">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-bold">{{ stage.stage_order }}</span>
+                                <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-info-emphasis text-xs font-bold">{{ stage.stage_order }}</span>
                                 <div class="flex items-center gap-1">
                                     <button type="button" aria-label="Edit stage"
                                             @click='openStageEditModal({{ stage|tojson }})'
@@ -170,7 +170,7 @@
                 <div class="flex items-center gap-2">
                     <i data-lucide="sparkles" class="h-4 w-4 text-primary" aria-hidden="true"></i>
                     <h3 class="text-sm font-semibold text-foreground">AI Mapping Suggestions</h3>
-                    <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">AI-suggested draft</span>
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-info-emphasis font-medium">AI-suggested draft</span>
                 </div>
                 <button type="button" @click="suggestMappings()" :disabled="aiLoading"
                         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"

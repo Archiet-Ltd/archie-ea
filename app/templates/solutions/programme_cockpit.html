@@ -420,7 +420,7 @@
                 <ol class="space-y-2">
                     {% for w in rollup.waves %}
                     <li class="flex items-start gap-2 text-xs">
-                        <span class="shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold">{{ loop.index }}</span>
+                        <span class="shrink-0 w-5 h-5 rounded-full bg-primary/10 text-info-emphasis flex items-center justify-center font-semibold">{{ loop.index }}</span>
                         <div>
                             <p class="text-foreground font-medium">{{ w.name }}</p>
                             <p class="text-muted-foreground">{{ w.solution_name }}{% if w.target_date %} · {{ w.target_date }}{% endif %}</p>

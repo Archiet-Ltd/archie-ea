@@ -155,7 +155,7 @@
                         {% if closers %}
                         <div class="flex flex-wrap gap-1">
                             {% for c in closers %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-primary/10 text-primary border border-primary/20"
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-primary/10 text-info-emphasis border border-primary/20"
                                   title="{{ c.phase or '' }} · {{ c.arch_domain or '' }}">
                                 {{ c.title|truncate(35) }}
                                 {% if c.jira_issue_key %}

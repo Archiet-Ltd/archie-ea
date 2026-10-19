@@ -83,7 +83,7 @@
     <div x-show="showWizard" x-cloak class="border rounded-md border-2 border-primary/40 bg-primary/10 px-3 py-2 mb-8"
          x-transition>
         <div class="flex items-start gap-4 mb-6">
-            <div class="flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 text-primary shrink-0">
+            <div class="flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 text-info-emphasis shrink-0">
                 <i data-lucide="rocket" class="h-6 w-6"></i>
             </div>
             <div>
@@ -471,7 +471,7 @@
                 :disabled="isScoring"
                 class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group">
             <div class="flex items-start gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
+                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-info-emphasis group-hover:bg-primary/20 transition-colors">
                     <template x-if="isScoring">
                         <span class="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full inline-block"></span>
                     </template>
@@ -493,7 +493,7 @@
         <button type="button" @click="showDetectionModal = true"
                 class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group">
             <div class="flex items-start gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
+                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-info-emphasis group-hover:bg-primary/20 transition-colors">
                     <i data-lucide="search" class="h-5 w-5"></i>
                 </div>
                 <div>
@@ -560,7 +560,7 @@
         <button type="button" @click="showExportModal = true" x-show="hasScores" x-cloak
                 class="rounded-xl border bg-card p-5 text-left hover:border-primary/50 transition-all group">
             <div class="flex items-start gap-3">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
+                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-info-emphasis group-hover:bg-primary/20 transition-colors">
                     <i data-lucide="download" class="h-5 w-5"></i>
                 </div>
                 <div>

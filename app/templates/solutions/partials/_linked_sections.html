@@ -20,7 +20,7 @@
                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="settings-2" class="w-3 h-3" aria-hidden="true"></i> Manage
             </button>
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Phase B</span>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Phase B</span>
         </div>
     </div>
     <template x-if="linkedApplications.length > 0">
@@ -218,7 +218,7 @@
                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="settings-2" class="w-3 h-3" aria-hidden="true"></i> Manage
             </button>
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Phase B</span>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Phase B</span>
         </div>
     </div>
     <template x-if="linkedCapabilities && linkedCapabilities.length > 0">
@@ -341,7 +341,7 @@
     <template x-if="linkedRequirements && linkedRequirements.length > 0">
         <div class="flex flex-wrap gap-2">
             <template x-for="req in linkedRequirements" :key="req.id">
-                <span class="requirement-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30 group"
+                <span class="requirement-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30 group"
                       :data-testid="'req-badge-' + req.id">
                     <span x-text="req.name || ('Requirement #' + req.id)"></span>
                     <span x-show="req.moscow_priority" x-cloak

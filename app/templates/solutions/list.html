@@ -258,7 +258,7 @@
                             <td class="px-5 py-4 whitespace-nowrap">
                                 <div class="space-y-2">
                                     <div class="flex flex-wrap items-center gap-1.5">
-                                        <span class="inline-flex items-center rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">{{ ws.phase_label or ('Phase ' ~ (solution.adm_phase or 'A')) }}</span>
+                                        <span class="inline-flex items-center rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-semibold text-info-emphasis">{{ ws.phase_label or ('Phase ' ~ (solution.adm_phase or 'A')) }}</span>
                                         {{ status_badge_auto(solution.status or 'planned') }}
                                     </div>
                                     {% set GOV_LABELS = {'draft': 'Draft', 'arb_review': 'In Review', 'under_review': 'Under Review', 'approved': 'Approved', 'rejected': 'Rejected', 'in_progress': 'In Progress', 'proposed': 'Submitted'} %}

@@ -366,7 +366,7 @@
                                         </select>
                                         <span 
                                             x-show="!editMode" x-cloak
-                                            class="px-2 py-0.5 rounded text-xs bg-primary/10 text-primary"
+                                            class="px-2 py-0.5 rounded text-xs bg-primary/10 text-info-emphasis"
                                             x-text="element.type"
                                         ></span>
                                         
@@ -452,7 +452,7 @@
                                     <span class="text-muted-foreground">Allowed relationship types:</span>
                                     <div class="flex flex-wrap gap-1 mt-1">
                                         <template x-for="(allowedType, idx) in error.allowed_types" :key="idx">
-                                            <span class="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs" x-text="allowedType"></span>
+                                            <span class="px-2 py-0.5 rounded bg-primary/10 text-info-emphasis text-xs" x-text="allowedType"></span>
                                         </template>
                                     </div>
                                 </div>

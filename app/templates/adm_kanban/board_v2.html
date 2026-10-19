@@ -337,7 +337,7 @@
                                 {# Row 1: avatar + owner name + app count #}
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-1.5 min-w-0">
-                                        <span class="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-2xs font-bold flex items-center justify-center"
+                                        <span class="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-info-emphasis text-2xs font-bold flex items-center justify-center"
                                               x-text="(() => { const o = (card.owner || 'U'); const parts = o.split('@')[0].split(/[\s._-]/); return (parts[0] || '').charAt(0).toUpperCase() + (parts[1] || '').charAt(0).toUpperCase(); })()"></span>
                                         <span class="text-xs text-muted-foreground truncate"
                                               x-text="(card.owner || 'Unassigned').split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); })"></span>
@@ -474,7 +474,7 @@
                     {# Viewpoint link — maps ADM phase to ArchiMate viewpoint #}
                     <a @click.stop
                        :href="'/archimate/viewpoints?active=' + ({A:'stakeholder',B:'business_process',C:'application_cooperation',D:'technology',E:'implementation_deployment',F:'migration',G:'motivation',H:'motivation'}[phase.code] || 'basic')"
-                       class="ml-1 shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+                       class="ml-1 shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20 hover:bg-primary/20 transition-colors"
                        title="Open ArchiMate viewpoint for this phase">
                         <i data-lucide="eye" class="w-2.5 h-2.5"></i>
                         VP
@@ -694,7 +694,7 @@
                         <div class="space-y-1">
                             <label class="text-xs font-medium text-foreground">ADM Phase</label>
                             <div x-show="lockedPhase" x-cloak class="flex items-center gap-1.5">
-                                <span class="inline-flex items-center h-8 px-2.5 text-xs font-medium rounded bg-primary/10 text-primary border border-primary/20"
+                                <span class="inline-flex items-center h-8 px-2.5 text-xs font-medium rounded bg-primary/10 text-info-emphasis border border-primary/20"
                                       x-text="(phases.find(function(p){ return p.code === lockedPhase; }) || {label: lockedPhase}).label"></span>
                                 <span class="text-xs text-muted-foreground">pre-selected</span>
                             </div>
@@ -1285,7 +1285,7 @@
                         <div class="flex items-center gap-2">
                             <span class="text-sm font-semibold text-foreground">Requirements & Motivation</span>
                             <span x-show="card && ((card.requirement_ids && card.requirement_ids.length) || (card.goal_ids && card.goal_ids.length) || (card.driver_ids && card.driver_ids.length) || (card.principle_ids && card.principle_ids.length))" x-cloak
-                                  class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full bg-primary/10 text-primary"
+                                  class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full bg-primary/10 text-info-emphasis"
                                   x-text="((card && card.requirement_ids ? card.requirement_ids.length : 0) + (card && card.goal_ids ? card.goal_ids.length : 0) + (card && card.driver_ids ? card.driver_ids.length : 0) + (card && card.principle_ids ? card.principle_ids.length : 0))"></span>
                         </div>
                         <svg class="w-4 h-4 text-muted-foreground transition-transform duration-200"
@@ -2145,7 +2145,7 @@
                 <div class="space-y-2">
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-semibold text-foreground" x-text="activeSprint.name"></span>
-                        <span class="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium"
+                        <span class="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-info-emphasis font-medium"
                               x-text="activeSprint.status"></span>
                     </div>
                     <p class="text-xs text-muted-foreground">

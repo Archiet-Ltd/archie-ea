@@ -537,7 +537,7 @@
           <span class="font-semibold text-foreground" x-text="total"></span> scored applications
         </span>
         <span x-show="Object.keys(filters_applied).length > 0" x-cloak
-              class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30"><!-- token-migration-ok -->
+              class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30"><!-- token-migration-ok -->
           Filters active
         </span>
       </div>
@@ -809,7 +809,7 @@
                   </svg>
                 </div>
                 <h3 class="font-bold text-lg">Hybrid</h3>
-                <span class="ml-auto px-2 py-0.5 text-xs font-semibold rounded-full bg-primary/10 text-primary">Recommended</span>
+                <span class="ml-auto px-2 py-0.5 text-xs font-semibold rounded-full bg-primary/10 text-info-emphasis">Recommended</span>
               </div>
               <p class="text-sm text-muted-foreground leading-relaxed mb-4">Hash-based exact matching + fuzzy analysis. Balanced accuracy.</p>
               <div class="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
@@ -1496,7 +1496,7 @@
               </div>
               <!-- Selected target badge -->
               <div x-show="form.target_app_name" x-cloak
-                   class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">
+                   class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
                 <span x-text="form.target_app_name"></span>
                 <button type="button"
                         @click="clearTarget()"

@@ -10,7 +10,7 @@
         <div class="flex items-center gap-2 mb-3">
             <i data-lucide="layout-template" class="h-4 w-4 text-primary"></i>
             <span class="text-sm font-semibold text-foreground">Start from an Industry Template</span>
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/20">NEW</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20">NEW</span>
         </div>
         <p class="text-xs text-muted-foreground mb-3">Pre-built architectures with entities, state machines, roles, and compliance. Customize the 30% that makes your app unique.</p>
         <div x-show="!genomeTemplates" class="flex items-center gap-2">
@@ -314,7 +314,7 @@
                     <div class="rounded-md border border-border bg-background p-4 space-y-2">
                         <div class="flex items-start justify-between gap-2">
                             <div class="flex items-start gap-2">
-                                <span class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0 mt-0.5"
+                                <span class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-info-emphasis flex-shrink-0 mt-0.5"
                                       x-text="idx + 1"></span>
                                 <p class="text-sm text-foreground" x-text="typeof q === 'string' ? q : (q.question || q.text || '')"></p>
                             </div>
@@ -354,7 +354,7 @@
                                     </div>
                                     <div x-show="pickerState[idx].selected.length > 0" class="flex flex-wrap gap-1.5">
                                         <template x-for="(sel, si) in pickerState[idx].selected" :key="si">
-                                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
                                                 <span x-text="sel.name"></span>
                                                 <button @click="removeEntity(idx, sel.id)" type="button"
                                                         class="hover:text-destructive-emphasis transition-colors">&times;</button>
@@ -636,7 +636,7 @@
                 {# Selected apps #}
                 <div class="flex flex-wrap gap-2 mt-2">
                     <template x-for="app in structuredIntake.in_scope_apps" :key="app.id">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
                             <span x-text="app.name"></span>
                             <button @click="removeScopeApp(app.id)" type="button"
                                     class="ml-1 text-muted-foreground hover:text-destructive-emphasis">&times;</button>

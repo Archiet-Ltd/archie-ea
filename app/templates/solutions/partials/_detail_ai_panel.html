@@ -6,7 +6,7 @@
             <div class="flex items-center gap-2">
                 <i data-lucide="sparkles" class="h-4 w-4 text-primary" aria-hidden="true"></i>
                 <h3 class="text-sm font-semibold text-foreground">AI Insights</h3>
-                <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary border border-primary/20">AI-Assisted</span>
+                <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20">AI-Assisted</span>
                 <span x-show="aiInsightsLoading" x-cloak class="inline-flex items-center gap-1 text-xs text-muted-foreground">
                     <i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i>Loading…
                 </span>
@@ -180,7 +180,7 @@
                     <ol class="space-y-2">
                         <template x-for="(a, i) in aiInsightsData.actions.next_actions.slice(0,8)" :key="i">
                             <li class="flex items-start gap-3">
-                                <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold mt-0.5"
+                                <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-info-emphasis text-xs font-bold mt-0.5"
                                       x-text="i + 1"></span>
                                 <div>
                                     <p class="text-sm text-foreground" x-text="typeof a === 'string' ? a : (a.action || a.title || a.description || JSON.stringify(a))"></p>
@@ -416,7 +416,7 @@
 
                                 <div class="min-w-0 flex-1">
                                     <div class="flex items-center gap-2 mb-1">
-                                        <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary border border-primary/20"
+                                        <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20"
                                               x-text="el.type || 'Element'"></span>
                                         <span class="text-sm font-medium text-foreground" x-text="el.name"></span>
                                         <span x-show="el.layer" x-cloak class="text-xs text-muted-foreground" x-text="'(' + el.layer + ')'"></span>
@@ -506,7 +506,7 @@
                     <div class="space-y-2">
                         <template x-for="(el, i) in aiInsightsData.archimate.suggestions.slice(0,8)" :key="i">
                             <div class="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
-                                <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary border border-primary/20"
+                                <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20"
                                       x-text="el.type || el.element_type || 'Element'"></span>
                                 <span class="text-sm text-foreground" x-text="el.name || el.element_name || '—'"></span>
                                 <span x-show="el.layer" x-cloak class="text-xs text-muted-foreground" x-text="'(' + el.layer + ')'"></span>

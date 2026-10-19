@@ -78,7 +78,7 @@
         {% endfor %}
       </select>
       <span x-show="operatingModelType" x-cloak
-        class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30"
+        class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30"
         x-text="operatingModelType.charAt(0).toUpperCase() + operatingModelType.slice(1)"></span>
       <span x-show="savingMeta" x-cloak class="text-xs text-muted-foreground inline-flex items-center gap-1">
         <i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…
