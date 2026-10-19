@@ -213,7 +213,7 @@ else:
         __table_args__ = {"extend_existing": True}
 
         id = db.Column(db.Integer, primary_key=True)
-        name = db.Column(db.String(100), nullable=False)
+        name = db.Column(db.String(255), nullable=False)
         version = db.Column(db.String(20))
         user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
         model_data = db.Column(db.Text)  # store raw model or filepath

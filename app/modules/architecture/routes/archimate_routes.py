@@ -1258,7 +1258,10 @@ def api_materialize_elements():
     payload = {"elements": elements}
     element_id_map, _ = _materialize_canvas_items(payload)
     db.session.commit()
-    return jsonify({"element_id_map": element_id_map})
+    out = {"element_id_map": element_id_map}
+    if payload.get("truncated_names"):
+        out["truncated_names"] = payload["truncated_names"]
+    return jsonify(out)
 
 
 @archimate_bp.route("/api/valid-relationship-types", methods=["GET"])
@@ -1766,13 +1769,20 @@ def _materialize_canvas_items(data):
             return int(value)
         return None
 
+    from app.services.archimate_import_service import ArchiMateImportService
+
+    max_name = ArchiMateImportService.MAX_NAME_LENGTH
+    truncated_names = []
     element_id_map = {}
     for el_data in (data.get("elements") or []):
         el_id = el_data.get("element_id")
         if not el_id or _as_int(el_id) is not None:
             continue
+        full_name = el_data.get("name") or str(el_id)
+        if len(full_name) > max_name:
+            truncated_names.append({"element_id": str(el_id), "length": len(full_name), "limit": max_name})
         element = ArchiMateElement(
-            name=(el_data.get("name") or str(el_id))[:100],
+            name=full_name[:max_name],
             type=el_data.get("el_type") or "ApplicationComponent",
             layer=(el_data.get("layer") or "application")[:30],
         )
@@ -1805,6 +1815,8 @@ def _materialize_canvas_items(data):
         relationship_id_map[str(rel_id)] = relationship.id
         rel_data["relationship_id"] = relationship.id
 
+    # Names cut to the column limit are reported to the caller, never silent.
+    data["truncated_names"] = truncated_names
     return element_id_map, relationship_id_map
 
 
@@ -2022,6 +2034,8 @@ def api_create_saved_viewpoint():
     if element_id_map or relationship_id_map:
         body["element_id_map"] = element_id_map
         body["relationship_id_map"] = relationship_id_map
+    if data.get("truncated_names"):
+        body["truncated_names"] = data["truncated_names"]
     return jsonify(body), 201
 
 
@@ -2390,6 +2404,8 @@ def api_update_saved_viewpoint(vp_id):
     if element_id_map or relationship_id_map:
         body["element_id_map"] = element_id_map
         body["relationship_id_map"] = relationship_id_map
+    if data.get("truncated_names"):
+        body["truncated_names"] = data["truncated_names"]
     return jsonify(body)
 
 
@@ -7185,6 +7201,7 @@ def api_import_oef():
         "error_count": result["failed"] + len(result["relationships_failed"]),
         "element_ids": [r["id"] for r in elements_out],
         "warnings": warnings,
+        "unrepresentable": result.get("unrepresentable", []),
     })
 
 

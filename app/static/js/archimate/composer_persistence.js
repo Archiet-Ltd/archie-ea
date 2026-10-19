@@ -14,6 +14,34 @@
 let ComposerPersistence = (function() {
     'use strict';
 
+    /* A short, non-blocking sentence for content an import could not keep:
+       counts plus the first five examples. Returns '' when nothing was left out. */
+    function notImportedMessage(unrepresentable, truncatedNames) {
+        /* File identifiers are never stored, in every file; they stay in the
+           returned list but are not "left out" content worth a toast. */
+        let items = (unrepresentable || []).filter(function(item) {
+            return item.kind !== 'element identifier' && item.kind !== 'relationship identifier';
+        });
+        let cut = truncatedNames || [];
+        if (!items.length && !cut.length) return '';
+        let total = 0;
+        let examples = [];
+        items.forEach(function(item) {
+            total += item.count || 1;
+            if (item.examples && item.examples.length) {
+                item.examples.forEach(function(ex) { examples.push(item.kind + ': ' + (ex.name || ex.identifier)); });
+            } else {
+                examples.push(item.kind + ': ' + (item.element || item.identifier || ''));
+            }
+        });
+        let parts = [];
+        if (total) parts.push(total + ' item' + (total === 1 ? '' : 's') + ' in the file ' + (total === 1 ? 'was' : 'were') + ' not imported');
+        if (cut.length) parts.push(cut.length + ' name' + (cut.length === 1 ? '' : 's') + ' cut to fit the 255-character limit');
+        let text = parts.join('; ');
+        if (examples.length) text += ' (for example ' + examples.slice(0, 5).join(', ') + ')';
+        return text + '.';
+    }
+
     function getMethods(helpers) {
         let csrfToken = helpers.csrfToken;
         let createNode = helpers.createNode;
@@ -496,6 +524,8 @@ let ComposerPersistence = (function() {
                 saveCall(url, payload, { silent: true })
                 .then(function(data) {
                     if (data.id) {
+                        let cutNote = notImportedMessage(null, data.truncated_names);
+                        if (cutNote) _toast('warning', cutNote);
                         // Server materialized imported items into real model rows —
                         // adopt the new DB ids on the canvas so a re-save updates
                         // rather than duplicating.
@@ -1892,6 +1922,8 @@ let ComposerPersistence = (function() {
 
         applyImportedDiagramPayload: function(data, sourceLabel) {
             let self = this;
+            let leftOut = notImportedMessage(data.unrepresentable, data.truncated_names);
+            if (leftOut) _toast('warning', leftOut);
             let isLucidImport = String(sourceLabel || '').toLowerCase().indexOf('lucid') !== -1;
             if (
                 isLucidImport &&
@@ -3230,5 +3262,5 @@ let ComposerPersistence = (function() {
         return methods;
     }
 
-    return { getMethods: getMethods };
+    return { getMethods: getMethods, notImportedMessage: notImportedMessage };
 })();

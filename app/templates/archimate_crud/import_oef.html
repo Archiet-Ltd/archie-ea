@@ -104,6 +104,22 @@
         </div>
         {% endif %}
 
+        {% if result.unrepresentable %}
+        <div class="rounded-md border border-warning bg-warning/5 p-4 space-y-1" data-testid="import-unrepresentable">
+            <p class="text-sm font-medium text-warning-emphasis">In the file but not imported:</p>
+            <ul class="list-disc list-inside text-sm text-warning-emphasis/80 space-y-0.5">
+                {% for item in result.unrepresentable %}
+                <li data-testid="import-unrepresentable-item">
+                    {{ item.kind }}{% if item.count and item.count > 1 %} ({{ item.count }}){% endif %}:
+                    {{ item.element }}{% if item.key %} / {{ item.key }}{% endif %}
+                    &mdash; {{ item.reason }}{% if item.examples %}
+                    (for example {% for ex in item.examples %}{{ ex.name or ex.identifier }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
         <a href="/architecture/elements"
            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
             <i data-lucide="layout-grid" class="h-4 w-4" aria-hidden="true"></i>
@@ -208,6 +224,15 @@
                 </ul>
             </div>
 
+            <div x-show="unrepresentable().length" x-cloak class="rounded-md border border-warning bg-warning/5 p-4 space-y-1" data-testid="preview-unrepresentable">
+                <p class="text-sm font-medium text-warning-emphasis">In the file but not imported:</p>
+                <ul class="list-disc list-inside text-sm text-warning-emphasis/80 space-y-0.5">
+                    <template x-for="(item, idx) in unrepresentable()" :key="idx">
+                        <li x-text="describeUnrepresentable(item)"></li>
+                    </template>
+                </ul>
+            </div>
+
             <div class="overflow-x-auto rounded-md border border-border">
                 <table class="w-full text-sm">
                     <thead class="bg-muted/50">
@@ -286,6 +311,18 @@ document.addEventListener('alpine:init', function () {
             invalidRelationships() {
                 if (!this.preview || !this.preview.relationships) return [];
                 return this.preview.relationships.filter(function (rel) { return rel.status === 'invalid'; });
+            },
+
+            unrepresentable() {
+                return (this.preview && this.preview.unrepresentable) || [];
+            },
+
+            describeUnrepresentable(item) {
+                let text = item.kind + (item.count > 1 ? ' (' + item.count + ')' : '') + ': ' + (item.element || '') + ' — ' + item.reason;
+                if (item.examples && item.examples.length) {
+                    text += ' (for example ' + item.examples.map(function (ex) { return ex.name || ex.identifier; }).join(', ') + ')';
+                }
+                return text;
             },
 
             outcomeSentence() {
