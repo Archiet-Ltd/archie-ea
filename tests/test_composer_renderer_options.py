@@ -80,7 +80,8 @@ def test_plain_style_names_no_hex_colour_and_no_page():
     block = RENDERER[start:end]
     assert not re.search(r"#[0-9a-fA-F]{3,8}\b|rgb\(", block)
     assert "currentColor" in block
-    for token in ("--muted-foreground", "--primary", "--foreground", "--background"):
+    assert "shadow" not in block.lower().replace("no shadow", "")
+    for token in ("--muted-foreground", "--ring", "--foreground", "--border", "--card", "--accent"):
         assert token in block
     assert not re.search(r"twin", RENDERER, re.I)
     assert "d3." not in RENDERER

@@ -464,7 +464,8 @@ def test_plain_style_switches_label_dash_arrow_and_colour(page):
       const hi = inspect(plain);
       const plainRouters = plain.graph.getLinks().map(l => [l.get('router').name, l.get('connector').name]);
       const def = make({});
-      return {before, hi, plainRouters, def: inspect(def), muted: resolved('--muted-foreground'), primary: resolved('--primary'),
+      return {before, hi, plainRouters, def: inspect(def), muted: resolved('--border'), primary: resolved('--ring'), card: resolved('--card'), fg: resolved('--foreground'), mfg: resolved('--muted-foreground'),
+              chrome: (() => { const nodes = plain.graph.getElements(); return nodes.map(n => JSON.stringify(n.attributes.attrs)); })(),
               defRouters: def.graph.getLinks().map(l => [l.get('router').name, l.get('connector').name])};
     }""")
     by = {i["key"]: i for i in out["before"]}
@@ -475,17 +476,17 @@ def test_plain_style_switches_label_dash_arrow_and_colour(page):
         assert not re.search(HEX, info["dom"]), (key, "hex or rgb in rendered link")
         assert info["stroke"] == out["muted"], key
         assert info["arrowFill"] == out["muted"], key
-        assert info["width"] == 1.5, key
+        assert info["width"] == 1, key
     # no relationship word on any link; the worked-out one has exactly its badge
     assert by["s1"]["labels"] == [] and by["s2"]["labels"] == [] and by["s3"]["labels"] == []
     assert by["s4"]["labels"] == ["Worked out"]
     # solid when recorded, whatever the type; dashed 5,5 when worked out
     assert by["s1"]["dash"] == "" and by["s2"]["dash"] == "" and by["s3"]["dash"] == ""
     assert by["s4"]["dash"] == "5,5"
-    # highlighted links take the primary token and widen
+    # highlighted links take the ring token and widen
     hi = {i["key"]: i for i in out["hi"]}
     assert hi["s1"]["stroke"] == out["primary"] and hi["s1"]["arrowFill"] == out["primary"]
-    assert hi["s1"]["width"] == 3
+    assert hi["s1"]["width"] == 2.5
     assert hi["s2"]["stroke"] == out["muted"]
     assert out["plainRouters"] == [["normal", "smooth"]] * 4
     # the same page, default style: today's values, so the switch is per renderer instance
@@ -495,6 +496,13 @@ def test_plain_style_switches_label_dash_arrow_and_colour(page):
     assert d["s3"]["labels"] == ["Association"] and d["s3"]["arrow"] is False
     assert d["s4"]["labels"][0] == "Serving" and d["s4"]["dash"] == "4,4"
     assert re.search(HEX, d["s1"]["attrs"])
+    # node cards and band zones of the plain style: tokens only, no shadow, no literal colour
+    for blob in out["chrome"]:
+        assert not re.search(HEX, blob), blob[:200]
+        assert "shadow" not in blob.lower() and "filter" not in blob.lower()
+    assert any(out["card"] in blob for blob in out["chrome"])
+    assert any('"fontSize":14' in blob and out["fg"] in blob for blob in out["chrome"])
+    assert any('"fontSize":10' in blob and out["mfg"] in blob for blob in out["chrome"])
     assert out["defRouters"] == [["manhattan", "rounded"]] * 4
 
 

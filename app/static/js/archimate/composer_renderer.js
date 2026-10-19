@@ -1480,8 +1480,8 @@ let ComposerRenderer = (function() {
                 let ink = plain ? plainInk() : null;
                 link.appendLabel({
                     attrs: {
-                        text: { text: text, fontSize: 10, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif', fill: plain ? ink.text : '#1a1a1a' },
-                        rect: { fill: plain ? ink.badgeFill : '#fff', stroke: plain ? ink.stroke : '#1a1a1a', strokeWidth: 0.5, strokeDasharray: '3,2', rx: 3, ry: 3, ref: 'text', refWidth: 8, refHeight: 4, refX: -4, refY: -2 },
+                        text: Object.assign({ text: text, fontSize: plain ? 11 : 10, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif', fill: plain ? ink.text : '#1a1a1a' }, plain ? { textTransform: 'uppercase' } : {}),
+                        rect: { fill: plain ? ink.badgeFill : '#fff', stroke: plain ? ink.stroke : '#1a1a1a', strokeWidth: plain ? 1 : 0.5, strokeDasharray: plain ? '' : '3,2', rx: plain ? 6 : 3, ry: plain ? 6 : 3, ref: 'text', refWidth: 8, refHeight: 4, refX: -4, refY: -2 },
                     },
                     position: { distance: 0.5, offset: plain ? 0 : 14 },
                 });
@@ -1496,7 +1496,8 @@ let ComposerRenderer = (function() {
         }
 
         function styleNode(node, layer, width) {
-            if (useTokens) applyTokens(node, layer, false);
+            if (plain) plainNodeChrome(node);
+            else if (useTokens) applyTokens(node, layer, false);
             if (compact) compactify(node, width || 200);
         }
 
@@ -1541,7 +1542,8 @@ let ComposerRenderer = (function() {
                    selection restores what the node actually had, not a flat guess. */
                 let base = c.get('baseStrokeWidth');
                 if (base == null) { base = c.attr('body/strokeWidth') || 1; c.set('baseStrokeWidth', base); }
-                c.attr('body/strokeWidth', isCentre ? 4 : (isSel ? 3 : base));
+                if (plain) paintPlainNode(c, isSel || isCentre);
+                else c.attr('body/strokeWidth', isCentre ? 4 : (isSel ? 3 : base));
             });
             graph.getLinks().forEach(function(l) {
                 let k = linkKey(l);
@@ -1557,11 +1559,70 @@ let ComposerRenderer = (function() {
         /* ── Plain connection style: colours, link restyle and routing ── */
         function plainInk() {
             return {
-                stroke: tokenColour('--muted-foreground') || 'currentColor',
-                highlight: tokenColour('--primary') || 'currentColor',
-                text: tokenColour('--foreground') || 'currentColor',
-                badgeFill: tokenColour('--background') || 'none',
+                stroke: tokenColour('--border') || 'currentColor',
+                highlight: tokenColour('--ring') || 'currentColor',
+                text: tokenColour('--muted-foreground') || 'currentColor',
+                badgeFill: tokenColour('--card') || 'none',
+                foreground: tokenColour('--foreground') || 'currentColor',
+                accent: tokenColour('--accent') || tokenColour('--muted') || 'none',
             };
+        }
+
+        /* Node cards, band zones and hover for the plain style: token colours only, a
+           1px hairline, no tint and no shadow. The centre element and a selected one
+           get a 2px primary ring held 2px off the card. */
+        function scrubColourLiterals(cell) {
+            let walk = function(obj, path) {
+                Object.keys(obj).forEach(function(k) {
+                    let v = obj[k];
+                    if (v && typeof v === 'object') walk(v, path.concat(k));
+                    else if (typeof v === 'string' && /^(#[0-9a-fA-F]{3,8}|rgba?\(.*)$/.test(v)) cell.attr(path.concat(k).join('/'), 'currentColor');
+                });
+            };
+            walk(cell.attr(), []);
+        }
+
+        function plainNodeChrome(node) {
+            let ink = plainInk();
+            scrubColourLiterals(node);
+            node.attr('accentBar/display', 'none');
+            node.attr('iconBox/fill', 'none');
+            node.attr('iconBox/stroke', 'none');
+            node.attr('body/fill', tokenColour('--card') || 'none');
+            node.attr('body/stroke', ink.stroke);
+            node.attr('body/strokeWidth', 1);
+            node.attr('body/strokeDasharray', '');
+            node.attr('body/rx', 6);
+            node.attr('body/ry', 6);
+            node.attr('body/opacity', 1);
+            node.attr('body/style', { transition: 'fill 150ms ease-out' });
+            node.attr('nameLabel/fill', ink.foreground);
+            node.attr('nameLabel/fontSize', 14);
+            node.attr('nameLabel/fontWeight', 600);
+            node.attr('typeLabel/fill', ink.text);
+            node.attr('typeLabel/fontSize', 12);
+        }
+
+        function plainZoneChrome(zone) {
+            let ink = plainInk();
+            let muted = tokenColour('--muted', 0.25);
+            zone.attr('body/fill', muted || 'none');
+            zone.attr('body/stroke', ink.stroke);
+            zone.attr('body/strokeWidth', 1);
+            zone.attr('body/strokeDasharray', '');
+            zone.attr('body/opacity', 1);
+            zone.attr('body/rx', 6);
+            zone.attr('body/ry', 6);
+            zone.attr('label/fill', ink.text);
+            zone.attr('label/fontSize', 10);
+            zone.attr('label/fontWeight', 600);
+            zone.attr('label/letterSpacing', '0.08em');
+        }
+
+        function paintPlainNode(node, ringed) {
+            let ring = ringed ? { outline: '2px solid ' + plainInk().highlight, outlineOffset: '2px', transition: 'fill 150ms ease-out' }
+                              : { transition: 'fill 150ms ease-out' };
+            if (!sameJson(node.attr('body/style'), ring)) node.attr('body/style', ring);
         }
 
         function paintPlainLink(link, on) {
@@ -1580,7 +1641,7 @@ let ComposerRenderer = (function() {
         function stylePlainLink(link) {
             link.labels([]);
             link.removeAttr('line/sourceMarker');
-            link.attr('line/strokeWidth', 1.5);
+            link.attr('line/strokeWidth', 1);
             link.attr('line/strokeDasharray', '');
             link.set('router', { name: 'normal' });
             link.set('connector', { name: 'smooth' });
@@ -1603,7 +1664,7 @@ let ComposerRenderer = (function() {
             let labels = link.labels();
             if (!labels.length) return;
             let text = labels[0].attrs && labels[0].attrs.text ? String(labels[0].attrs.text.text) : '';
-            let bw = text.length * 6.2 + 12, bh = 18;
+            let bw = text.length * 7.4 + 12, bh = 20;
             let pts = plan.line;
             let lens = [0];
             for (let i = 1; i < pts.length; i++) lens.push(lens[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
@@ -1643,7 +1704,10 @@ let ComposerRenderer = (function() {
                 return { id: c.id, x: b.x, y: b.y, w: b.width, h: b.height };
             });
             let rows = plainRows(rects);
-            let taken = [];
+            let taken = graph.getElements().filter(function(c) { return c.get('isLayerZone'); }).map(function(z) {
+                let b = z.getBBox();
+                return { x: b.x, y: b.y, w: b.width, h: PLAIN_HEADER };
+            });
             let byId = {};
             rects.forEach(function(r) { byId[r.id] = r; });
             let groups = {};
@@ -1708,7 +1772,8 @@ let ComposerRenderer = (function() {
                     graph.addCell(zone);
                     zone.toBack();
                 }
-                if (useTokens) applyTokens(zone, z.layer, true);
+                if (plain) plainZoneChrome(zone);
+                else if (useTokens) applyTokens(zone, z.layer, true);
             });
             Object.keys(drawn).forEach(function(l) { if (!wanted[l]) drawn[l].remove(); });
             nodeCells().forEach(function(c) {
@@ -1813,6 +1878,18 @@ let ComposerRenderer = (function() {
         if (banded && typeof ResizeObserver !== 'undefined') {
             resizeObserver = new ResizeObserver(scheduleRelayout);
             resizeObserver.observe(containerEl);
+        }
+
+        if (plain) {
+            paper.on('element:mouseenter', function(view) {
+                if (view.model.get('isLayerZone') || view.model.get('elementId') == null) return;
+                let a = plainInk().accent;
+                if (a !== 'none') view.model.attr('body/fill', a);
+            });
+            paper.on('element:mouseleave', function(view) {
+                if (view.model.get('isLayerZone') || view.model.get('elementId') == null) return;
+                view.model.attr('body/fill', tokenColour('--card') || 'none');
+            });
         }
 
         if (typeof opts.onSelect === 'function') {
