@@ -35,6 +35,12 @@
    class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
     <i data-lucide="search" class="mr-2 h-4 w-4" aria-hidden="true"></i>Ask
 </a>
+<a id="twin-open-composer" x-show="centreId !== null" x-cloak
+   href="{{ url_for('archimate.composer_page') }}"
+   :href="'{{ url_for('archimate.composer_page') }}?element=' + centreId + '&amp;depth=' + maxDepth + '&amp;derived=' + (includeDerived ? 1 : 0)"
+   class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+    <i data-lucide="external-link" class="mr-2 h-4 w-4" aria-hidden="true"></i>Open in ArchiMate Composer
+</a>
 {% endmacro %}
 <div class="p-6 space-y-6" x-data="twinMapSurface()" data-initial-element="{{ initial_element_id if initial_element_id is not none else '' }}">
     {{ page_shell(
