@@ -41,7 +41,7 @@ function twinMapSurface() {
                     source_id: edge.from,
                     target_id: edge.to,
                     type: String(edge.type || '').replace(/Relationship$/, '').toLowerCase() || undefined,
-                    provenance: edge.kind === 'derived' ? 'derived' : 'recorded',
+                    provenance: edge.kind === 'derived' ? 'derivation' : 'explicit',
                     stale: edge.stale === true
                 };
             })
