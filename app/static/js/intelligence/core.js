@@ -431,6 +431,9 @@
 
     /* What the picker's status region says after a search: how many matches. */
     function resultsText(count, term) {
+        if (count === 0) {
+            return 'No team, service or system is called “' + term + '”. Type part of a name, for example a system you run.';
+        }
         return count + (count === 1 ? ' result' : ' results') + ' for ' + term;
     }
 
