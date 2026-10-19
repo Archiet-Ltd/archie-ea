@@ -262,6 +262,21 @@ class TestMCPInitialize:
             assert tool["annotations"].get("readOnlyHint") is True, \
                 f"Tool {tool['name']} missing readOnlyHint"
 
+    def test_ask_accountability_description_states_what_it_returns(self, client, db_session, make_org, login_as):
+        """The ask_accountability description says what the tool returns today:
+        the owners recorded in the model, or an empty answer when none are
+        recorded. No "not yet built" admission."""
+        org = make_org("mcp")
+        user = _make_user(db_session, org, "mcp-desc@example.com")
+        token = _mint_oauth_token(client, db_session, org, user, login_as)
+
+        tools = _mcp_tools_list(client, token)
+        by_name = {t["name"]: t for t in tools}
+        assert by_name["ask_accountability"]["description"] == (
+            "Ask who is accountable for an element, from the owners recorded "
+            "in the model. Returns an empty answer when no owner is recorded."
+        )
+
 
 class TestBearerOnlySessionLess:
     """A genuine MCP client authenticates with a bearer token ONLY -- no
