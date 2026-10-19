@@ -99,6 +99,8 @@ function twinMapSurface() {
                 bands: Intelligence.BANDS,
                 nodeStyle: 'compact',
                 tokens: true,
+                connectionStyle: 'plain',
+                rowAlign: 'centre',
                 background: 'transparent'
             });
             // The engine lays out again by itself when the width changes; the
