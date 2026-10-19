@@ -76,7 +76,15 @@ SOURCES = {
         ("architecture_models", "architecture_id"),
         ("archimate_elements", "goal_id"),
     ),
-    "strategy_resources": (("archimate_elements", "archimate_element_id"),),
+    # owning_organization_id is a real FK, but despite its name it points to
+    # business_actors (an ArchiMate Business Actor -- a department/role in the
+    # model, not this app's tenant Organization), not organizations directly.
+    # BusinessActor is itself TenantMixin, so the join still correctly resolves
+    # the tenant organisation that owns that actor.
+    "strategy_resources": (
+        ("archimate_elements", "archimate_element_id"),
+        ("business_actors", "owning_organization_id"),
+    ),
     "application_services": (
         ("archimate_elements", "archimate_element_id"),
         ("application_components", "application_component_id"),

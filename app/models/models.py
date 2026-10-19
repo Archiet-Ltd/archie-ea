@@ -12,6 +12,7 @@ from sqlalchemy.orm import validates
 from .. import db  # main SQLAlchemy object
 from .constants import ArchiMateLayer
 from .mixins import TenantMixin
+from .mixins.core import _default_org_id
 
 _key_log = logging.getLogger(__name__)
 
@@ -1885,6 +1886,20 @@ class ConstraintElement(TenantMixin, db.Model):
 
     # Relationships
     architecture_id = db.Column(db.Integer, db.ForeignKey("architecture_models.id"))
+
+    # Override TenantMixin's normally non-nullable column for an ADD-only
+    # rollout: the 20261018_typed_tables_org_id migration adds this to an
+    # existing table and leaves a row NULL when no organisation is derivable
+    # from its linked parents. The mixin is still essential: tenant
+    # middleware identifies tenant-owned models by it and applies the
+    # automatic query fence.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
 
     created_at = db.Column(db.DateTime, default=db.func.now())
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())

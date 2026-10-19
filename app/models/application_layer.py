@@ -26,6 +26,7 @@ from sqlalchemy.orm import relationship, validates
 
 from .. import db
 from .mixins import TenantMixin
+from .mixins.core import _default_org_id
 
 logger = logging.getLogger(__name__)
 
@@ -567,6 +568,20 @@ class ApplicationCollaboration(TenantMixin, db.Model):
         db.Integer, db.ForeignKey("application_components.id"), nullable=True, index=True
     )
 
+    # Override TenantMixin's normally non-nullable column for an ADD-only
+    # rollout: the 20261018_typed_tables_org_id migration adds this to an
+    # existing table and leaves a row NULL when no organisation is derivable
+    # from its linked parents. The mixin is still essential: tenant
+    # middleware identifies tenant-owned models by it and applies the
+    # automatic query fence.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
+
     # Collaboration Classification
     collaboration_type = db.Column(
         db.String(50)
@@ -881,6 +896,20 @@ class ApplicationInteraction(TenantMixin, db.Model):
         db.Integer, db.ForeignKey("application_components.id"), nullable=True
     )
 
+    # Override TenantMixin's normally non-nullable column for an ADD-only
+    # rollout: the 20261018_typed_tables_org_id migration adds this to an
+    # existing table and leaves a row NULL when no organisation is derivable
+    # from its linked parents. The mixin is still essential: tenant
+    # middleware identifies tenant-owned models by it and applies the
+    # automatic query fence.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
+
     # Performance
     average_latency_ms = db.Column(db.Integer)
     throughput_per_minute = db.Column(db.Integer)
@@ -1122,6 +1151,20 @@ class ApplicationService(TenantMixin, db.Model):
 
     # Minimal metadata used by application management UI
     service_type = db.Column(db.String(50), default="Shared")
+
+    # Override TenantMixin's normally non-nullable column for an ADD-only
+    # rollout: the 20261018_typed_tables_org_id migration adds this to an
+    # existing table and leaves a row NULL when no organisation is derivable
+    # from its linked parents. The mixin is still essential: tenant
+    # middleware identifies tenant-owned models by it and applies the
+    # automatic query fence.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
 
     # Relationships
     archimate_element = db.relationship(

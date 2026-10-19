@@ -25,6 +25,7 @@ from sqlalchemy.orm import foreign
 from app.datetime_helpers import utcnow
 
 from app.models.mixins import TenantMixin
+from app.models.mixins.core import _default_org_id
 
 from .. import db
 
@@ -400,6 +401,22 @@ class Deliverable(TenantMixin, db.Model):
 
     # Link to Goal (Deliverables contribute to Goal achievement)
     goal_id = db.Column(db.Integer, db.ForeignKey("goals.id", ondelete="SET NULL"), index=True)
+
+    # Override TenantMixin's normally non-nullable column for an ADD-only
+    # rollout: the 20261018_typed_tables_org_id migration adds this to an
+    # existing table and leaves a row NULL when no organisation is derivable
+    # from its linked parents. The mixin is still essential: tenant
+    # middleware identifies tenant-owned models by it and applies the
+    # automatic query fence. _deliverable_inherits_organization below still
+    # runs first on insert; this is only the fallback for whatever it leaves
+    # unset, same default function TenantMixin's own column already used.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
 
     # 50 wide to match roadmap_deliverables.status, the store merged in (R1-B04 PR 2).
     delivery_status = db.Column(db.String(50), default="planned", index=True)

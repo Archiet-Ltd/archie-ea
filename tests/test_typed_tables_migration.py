@@ -67,6 +67,10 @@ CREATE TABLE architecture_models (
     id SERIAL PRIMARY KEY, name VARCHAR(100) NOT NULL, organization_id INTEGER NOT NULL REFERENCES organizations(id)
 );
 
+CREATE TABLE business_actors (
+    id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, organization_id INTEGER NOT NULL REFERENCES organizations(id)
+);
+
 CREATE TABLE application_components (
     id SERIAL PRIMARY KEY, name VARCHAR(256) NOT NULL, organization_id INTEGER NOT NULL REFERENCES organizations(id)
 );
@@ -88,7 +92,8 @@ CREATE TABLE constraints (
 
 CREATE TABLE strategy_resources (
     id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL,
-    archimate_element_id INTEGER REFERENCES archimate_elements(id)
+    archimate_element_id INTEGER REFERENCES archimate_elements(id),
+    owning_organization_id INTEGER REFERENCES business_actors(id)
 );
 
 CREATE TABLE application_services (
@@ -293,6 +298,26 @@ def test_application_interaction_backfills_from_source_and_target_component(pre_
     assert _scalar(engine, "SELECT organization_id FROM application_interactions WHERE id = :i", i=via_target) == org_b, (
         "an interaction linked only via target_component_id did not backfill"
     )
+
+
+def test_strategy_resource_backfills_from_owning_organization_via_business_actor(pre_migration_db):
+    """owning_organization_id points to business_actors, not organizations
+    directly (despite the name) -- BusinessActor is TenantMixin, so the join
+    still resolves the real tenant organisation. A row linked only through it
+    (no archimate_element_id) must still backfill."""
+    engine = pre_migration_db
+    org_a = _make_org(engine, "a")
+    actor = _insert(
+        engine, "INSERT INTO business_actors (name, organization_id) VALUES ('dept', :o) RETURNING id", o=org_a
+    )
+    resource_id = _insert(
+        engine,
+        "INSERT INTO strategy_resources (name, owning_organization_id) VALUES ('r', :a) RETURNING id", a=actor,
+    )
+
+    _run_upgrade(engine)
+
+    assert _scalar(engine, "SELECT organization_id FROM strategy_resources WHERE id = :i", i=resource_id) == org_a
 
 
 def test_backfill_never_overwrites_an_existing_organization(pre_migration_db):
