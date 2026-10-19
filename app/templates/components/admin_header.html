@@ -150,9 +150,19 @@
                 </div>
                 <!-- Role badge for ALL roles, not just admin -->
                 {% if current_user.is_authenticated %}
+                    {% set _role_badge_text = get_role_display_name(current_user.enterprise_role) if current_user.enterprise_role else ('Admin' if current_user.is_admin() else 'User') %}
+                    {# enterprise_role defaults to 'platform_admin' on every row (backward
+                       compatibility, see app/models/user.py), so that value alone cannot be
+                       trusted to show "Platform Admin" -- it must also pass the real gate
+                       (app.middleware.tenant_decorators.is_platform_admin, the predicate PR
+                       677 put behind every platform_admin_required route). Any other
+                       enterprise_role persona (CTO, Enterprise Architect, ...) is unaffected. #}
+                    {% if current_user.enterprise_role == 'platform_admin' and not is_platform_admin_gate(current_user) %}
+                        {% set _role_badge_text = 'Admin' if current_user.is_admin() else 'User' %}
+                    {% endif %}
                     <span id="user-role-badge"
                           class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border bg-muted/50 text-foreground border-border">
-                        {{ get_role_display_name(current_user.enterprise_role) if current_user.enterprise_role else ('Admin' if current_user.is_admin() else 'User') }}
+                        {{ _role_badge_text }}
                     </span>
                 {% endif %}
                 <i id="user-chevron"

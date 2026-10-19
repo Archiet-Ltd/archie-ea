@@ -115,6 +115,85 @@ def test_header_role_badge_shows_the_persona_not_admin_or_user(app, db_session, 
     )
 
 
+def test_header_role_badge_hides_platform_admin_without_the_real_flag(app, db_session, make_org):
+    """The header must not show "Platform Admin" for a user whose
+    enterprise_role happens to be the default 'platform_admin' value
+    (app/models/user.py: the column defaults to it for backward
+    compatibility) but who is not actually a platform admin per the real
+    gate (app.middleware.tenant_decorators.is_platform_admin, the predicate
+    PR 677 put behind every platform_admin_required route). An Architect-role
+    account is exactly this case: role_archetype/Role say "Architect", but
+    enterprise_role was never set away from its default."""
+    from app.models import Role
+    from app.models.user import User
+
+    org = make_org("header-badge-no-admin")
+    suffix = uuid.uuid4().hex[:8]
+    architect_role = Role.query.filter_by(name="Architect").first()
+    user = User(
+        email=f"header-architect-{suffix}@example.com",
+        first_name="Badge", last_name="NotAdmin",
+        organization_id=org.id, confirmed=True,
+        enterprise_role="platform_admin",  # the column's own default value
+        role=architect_role,
+    )
+    user.password = "Sup3rSecret!23"
+    user.is_platform_admin = False
+    db_session.add(user)
+    db_session.flush()
+
+    client = app.test_client()
+    _login(client, user.id)
+
+    resp = client.get("/dashboard/overview")
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:2000]
+    html = resp.get_data(as_text=True)
+    assert 'id="user-role-badge"' in html
+    badge_start = html.index('id="user-role-badge"')
+    badge_fragment = html[badge_start:badge_start + 400]
+    assert "Platform Admin" not in badge_fragment, (
+        "role badge showed 'Platform Admin' for a user whose is_platform_admin "
+        f"flag is False — fragment: {badge_fragment!r}"
+    )
+
+
+def test_header_role_badge_shows_platform_admin_with_the_real_flag(app, db_session, make_org):
+    """A user who genuinely passes the platform-admin gate (is_platform_admin
+    flag AND Permission.ADMINISTER, via the Administrator role) must still see
+    the "Platform Admin" badge."""
+    from app.models import Role
+    from app.models.user import User
+
+    org = make_org("header-badge-admin")
+    suffix = uuid.uuid4().hex[:8]
+    admin_role = Role.query.filter_by(name="Administrator").first()
+    user = User(
+        email=f"header-platform-admin-{suffix}@example.com",
+        first_name="Badge", last_name="Admin",
+        organization_id=org.id, confirmed=True,
+        enterprise_role="platform_admin",
+        role=admin_role,
+    )
+    user.password = "Sup3rSecret!23"
+    user.is_platform_admin = True
+    db_session.add(user)
+    db_session.flush()
+
+    client = app.test_client()
+    _login(client, user.id)
+
+    resp = client.get("/dashboard/overview")
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:2000]
+    html = resp.get_data(as_text=True)
+    assert 'id="user-role-badge"' in html
+    badge_start = html.index('id="user-role-badge"')
+    badge_fragment = html[badge_start:badge_start + 400]
+    assert "Platform Admin" in badge_fragment, (
+        "role badge did not show 'Platform Admin' for a real platform admin — "
+        f"fragment: {badge_fragment!r}"
+    )
+
+
 def test_dashboard_header_has_no_model_provider_selector(app, db_session, make_org):
     """The global header must not surface LLM provider choice — that belongs
     in AI Chat's own Settings, not on every page in the app."""

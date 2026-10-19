@@ -650,6 +650,16 @@ def init_context_processors(app):
     from app.utils.role_access import get_role_display_name
     app.jinja_env.globals["get_role_display_name"] = get_role_display_name
 
+    # Header role-badge fix: enterprise_role defaults to 'platform_admin' for
+    # every row "for backward compatibility" (see app/models/user.py), so
+    # that one persona value cannot be trusted on its own to decide whether
+    # the badge may claim platform-admin authority -- it must agree with the
+    # real gate every platform_admin_required route already enforces (PR
+    # 677). Registered as a global, not reimplemented in the template, so
+    # the badge and the route gate can never drift apart again.
+    from app.middleware.tenant_decorators import is_platform_admin as _is_platform_admin_gate
+    app.jinja_env.globals["is_platform_admin_gate"] = _is_platform_admin_gate
+
     # Register HTML sanitizer filter for safe rendering of user-generated rich text
     from app.utils.html_sanitizer import sanitize_html
     app.jinja_env.filters["sanitize_html"] = sanitize_html
