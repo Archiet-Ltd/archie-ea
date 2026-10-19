@@ -105,9 +105,14 @@ class RlsEnv:
         Uses the same function the ORM listeners call. ``platform=True`` sets the
         platform-scope flag the way ``platform_scope`` does.
         """
-        from app.middleware.tenant_isolation import set_database_tenant_context
+        from app.middleware.tenant_isolation import bind_tenant, set_database_tenant_context
 
-        with self.runtime.connect() as connection:
+        with contextlib.ExitStack() as ambient, self.runtime.connect() as connection:
+            # The ambient tenant context is the organisation under test, so the
+            # call below is the one the ORM listeners make and the engine hook
+            # agrees with it (ADR 0013).
+            if org_id is not None:
+                ambient.enter_context(bind_tenant(org_id))
             transaction = connection.begin()
             try:
                 set_database_tenant_context(connection, org_id)
@@ -634,12 +639,12 @@ def test_a_transaction_with_an_organisation_then_one_without_returns_zero_rows_n
     """On ONE connection: the first transaction sets the organisation and commits,
     the second sets none. The setting then reads '' (not NULL); the policy must
     treat that as no organisation, never raise on ''::integer."""
-    from app.middleware.tenant_isolation import set_database_tenant_context
+    from app.middleware.tenant_isolation import bind_tenant, set_database_tenant_context
 
     a = world.org("a")
     world.application(a, "Reused connection")
     with rls.runtime.connect() as connection:
-        with connection.begin():
+        with connection.begin(), bind_tenant(a):
             set_database_tenant_context(connection, a)
             assert _count(connection, "application_components") >= 1
         with connection.begin():

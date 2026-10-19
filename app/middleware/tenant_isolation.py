@@ -516,8 +516,8 @@ def check_database_role(app) -> None:
     """Refuse (``refuse``) or shout (``alert``) when the runtime role could bypass
     row-level security. An inability to run the check logs CRITICAL and never
     refuses."""
-    mode = normalise_mode(app.config.get("ARCHIE_DB_ROLE_CHECK"), "off")
-    if mode == "off":
+    mode = str(app.config.get("ARCHIE_DB_ROLE_CHECK") or "off").strip().lower()
+    if mode not in ("alert", "refuse"):
         return
     try:
         with app.app_context():

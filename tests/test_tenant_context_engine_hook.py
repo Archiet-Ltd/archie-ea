@@ -361,10 +361,19 @@ def test_a_disagreement_logged_with_the_error_aggregation_handler_attached(
     ti._install_engine_hooks()
     ti._reset_disagreement_log()
     organization = 100000 + uuid.uuid4().int % 900000  # a line no earlier run produced
+    root = logging.getLogger()
     installed = app.extensions.get("error_aggregation_handler")
     handler = installed or _ErrorAggregationHandler(app)
+    # Every application this process created attached its own handler to the root
+    # logger; keep only this application's, so one line is one increment.
+    others = [
+        h for h in root.handlers
+        if isinstance(h, _ErrorAggregationHandler) and h is not handler
+    ]
+    for other in others:
+        root.removeHandler(other)
     if installed is None:
-        logging.getLogger().addHandler(handler)
+        root.addHandler(handler)
 
     def occurrences():
         return db.session.query(
@@ -382,4 +391,6 @@ def test_a_disagreement_logged_with_the_error_aggregation_handler_attached(
             db.session.remove()
     finally:
         if installed is None:
-            logging.getLogger().removeHandler(handler)
+            root.removeHandler(handler)
+        for other in others:
+            root.addHandler(other)
