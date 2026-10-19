@@ -1020,6 +1020,22 @@ def _selected_layer_for(layer):
     return presentation_config[selected_key]
 
 
+# Element types whose model declares a NOT NULL foreign key with no default
+# that this generic create form never collects anywhere else (not in the
+# name/description fields set unconditionally above, not in any
+# field_configs.py entry): BusinessFunction.capability_id is required by the
+# model (app/models/business_capabilities.py) but has no field here, so every
+# submission reached db.session.commit() and failed the database's own NOT
+# NULL constraint instead of a validated request. Checked explicitly in
+# create_element() below, before any insert is attempted, the same way every
+# other required-field check in this codebase already works (compare
+# _add_archimate_element's "name" check a few hundred lines up, and
+# create_process_link's "process_id" check in business_layer_routes.py).
+REQUIRED_RELATIONSHIP_FIELDS = {
+    "BusinessFunction": ("capability_id", "Capability"),
+}
+
+
 @archimate_crud.route(f"/{_LAYER_URL_PATTERN}/<element_type>/new", methods=["GET", "POST"])
 @login_required
 @write_role_required
@@ -1034,6 +1050,43 @@ def create_element(layer, element_type):
     if request.method == "POST":
         try:
             data = request.get_json() if request.is_json else request.form.to_dict()
+
+            # Required-relationship validation: reject before any insert is
+            # attempted, rather than let the model's own NOT NULL constraint
+            # catch it at commit time (see REQUIRED_RELATIONSHIP_FIELDS above).
+            required_field = REQUIRED_RELATIONSHIP_FIELDS.get(element_type)
+            relationship_field_value = None
+            if required_field:
+                field_name, field_label = required_field
+                raw_value = data.get(field_name)
+                try:
+                    relationship_field_value = (
+                        int(raw_value) if raw_value not in (None, "") else None
+                    )
+                except (TypeError, ValueError):
+                    relationship_field_value = None
+
+                if relationship_field_value is None:
+                    error_message = f"{field_label} is required"
+                    if request.is_json:
+                        return (
+                            jsonify({"success": False, "error": error_message}),
+                            400,
+                        )
+                    flash(error_message, "error")
+                    return (
+                        render_template(
+                            "archimate_crud/dashboard.html",
+                            layer=layer,
+                            element_type=element_type,
+                            layer_config=LAYER_CONFIG,
+                            selected_layer=_selected_layer_for(layer),
+                            field_config=get_element_config(element_type),
+                            form_data=create_empty_form_data(element_type),
+                            element_field_configs=ELEMENT_FIELD_CONFIGS,
+                        ),
+                        400,
+                    )
 
             # Create model instance
             element = model_class()
@@ -1055,6 +1108,13 @@ def create_element(layer, element_type):
 
             # Set layer-specific fields based on model
             _set_model_fields(element, data, model_class, element_type)
+
+            # Apply the validated required relationship field (e.g.
+            # BusinessFunction.capability_id) — not part of the legacy
+            # field_mappings table or a field_configs.py entry, so
+            # _set_model_fields above never touches it.
+            if required_field and relationship_field_value is not None:
+                setattr(element, required_field[0], relationship_field_value)
 
             # Auto-create ArchiMateElement if not provided
             if not element.archimate_element_id:
