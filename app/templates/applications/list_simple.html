@@ -736,7 +736,7 @@
     <div class="bg-card rounded-lg w-full max-w-lg border flex flex-col max-h-[90vh] border-border">
       <div class="flex items-center justify-between p-6 border-b shrink-0">
         <div>
-          <h2 id="ai-map-modal-title" class="text-base font-semibold text-foreground">AI Map Applications</h2>
+          <h2 id="ai-map-modal-title" class="text-base font-semibold text-foreground text-foreground">AI Map Applications</h2>
           <p class="text-sm text-muted-foreground mt-0.5">Analyze existing applications with AI and propose capability, process and ArchiMate mappings.</p>
         </div>
         <!-- inline-event-ok --><button type="button" @click="closeAiMapModal()" aria-label="Close"
@@ -824,7 +824,7 @@
   <div class="bg-card rounded-lg w-full max-w-lg border flex flex-col max-h-[90vh] border-border">
     <div class="flex items-center justify-between p-6 border-b shrink-0">
       <div>
-        <h2 id="modal-create-title" class="text-base font-semibold text-foreground">New Application</h2>
+        <h2 id="modal-create-title" class="text-base font-semibold text-foreground text-foreground">New Application</h2>
         <p class="text-sm text-muted-foreground mt-0.5">Register a new application in the portfolio.</p>
       </div>
       <!-- inline-event-ok --><button type="button" @click="Platform.modal.close('modal-create')" aria-label="Close"
@@ -835,7 +835,7 @@
     <div class="p-6 overflow-y-auto flex-1" x-data="applicationCreateForm()">
       <form @submit.prevent="submit()" class="space-y-4">
         <div class="grid grid-cols-1 gap-4">
-          <div class="sm:col-span-2">
+          <div class="">
             <label for="ca-name" class="block text-sm font-medium text-muted-foreground mb-1">Application Name <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
             <input id="ca-name" type="text" x-model="form.name" @input="scheduleCheck()" required maxlength="255" placeholder="e.g. Customer Portal"
               :aria-invalid="fieldInvalid('name') ? 'true' : 'false'"
@@ -843,7 +843,7 @@
               class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <p x-show="fieldInvalid('name')" x-cloak id="ca-name-error" role="alert" class="mt-1 text-sm text-destructive-emphasis" x-text="fieldErrors.name"></p>
           </div>
-          <div class="sm:col-span-2" id="ca-duplicate-check" aria-live="polite">
+          <div class="" id="ca-duplicate-check" aria-live="polite">
             <p x-show="checkError" x-cloak class="text-sm text-warning-emphasis" role="alert" x-text="checkError"></p>
             <template x-if="matches && matches.length > 0"><div class="rounded-md border border-border bg-muted p-3 text-sm">
               <p class="font-medium mb-2">These applications already exist</p>
@@ -933,7 +933,7 @@
               </div>
             </div>
           </div>
-          <div class="sm:col-span-2">
+          <div class="">
             <label for="ca-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
             <textarea id="ca-description" x-model="form.description" rows="2" maxlength="2000" placeholder="Brief description"
               class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"></textarea>

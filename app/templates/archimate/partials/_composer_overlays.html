@@ -990,7 +990,7 @@
             <div class="flex items-center gap-2 px-4 py-3 border-b border-border" style="background: hsl(var(--muted) / 0.3);"> <!-- inline-style-ok -->
                 <i data-lucide="folder-open" class="w-4 h-4 text-primary"></i>
                 <h3 class="text-sm font-semibold text-foreground">Load Saved Viewpoint</h3>
-                <button type="button" @click="savedVpOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">&times;</button>
+                <button type="button" @click="savedVpOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-auto" aria-label="Close">&times;</button>
             </div>
             <div class="p-2 max-h-80 overflow-y-auto">
                 <template x-if="savedViewpoints.length === 0">
@@ -1074,7 +1074,7 @@
             <div class="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/30">
                 <i data-lucide="git-compare" class="w-4 h-4 text-primary"></i>
                 <h3 class="text-sm font-semibold text-foreground">Compare Versions</h3>
-                <button type="button" @click="versionCompareOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">&times;</button>
+                <button type="button" @click="versionCompareOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-auto" aria-label="Close">&times;</button>
             </div>
             <div class="p-4 space-y-4">
                 <p class="text-xs text-muted-foreground">Select two snapshots to compare. Version A is the baseline (older), Version B is the newer version.</p>
@@ -1125,7 +1125,7 @@
         <div class="flex items-center gap-2 px-3 py-2.5 border-b border-border bg-muted/30">
             <i data-lucide="file-diff" class="w-3.5 h-3.5 text-primary"></i>
             <h4 class="text-xs font-semibold text-foreground">Change Summary</h4>
-            <button type="button" @click="diffSummaryOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close summary">&times;</button>
+            <button type="button" @click="diffSummaryOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-auto" aria-label="Close summary">&times;</button>
         </div>
         <div class="p-2 overflow-y-auto max-h-[calc(100vh-300px)]">
             <template x-if="diffDetails">
@@ -1240,7 +1240,7 @@
             <div class="flex items-center gap-2 px-4 py-3 border-b border-border" style="background: hsl(var(--muted) / 0.3);"> <!-- inline-style-ok -->
                 <i data-lucide="copy" class="w-4 h-4 text-primary"></i>
                 <h3 class="text-sm font-semibold text-foreground">Diagram Templates</h3>
-                <button type="button" @click="templateListOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">&times;</button>
+                <button type="button" @click="templateListOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-auto" aria-label="Close">&times;</button>
             </div>
 
             {# CMP2-006: Portfolio-generated templates section #}

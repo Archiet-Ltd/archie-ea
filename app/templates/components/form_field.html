@@ -42,7 +42,7 @@
     {% set field_name = name or id %}
     <div class="space-y-2 {{ class }}">
         {% if label %}
-        <label for="{{ id }}" class="block text-sm font-medium text-muted-foreground mb-1">
+        <label for="{{ id }}" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             {{ label }}{% if required %}<span class="text-destructive-emphasis ml-1">*</span>{% endif %}
         </label>
         {% endif %}
@@ -70,37 +70,14 @@
             {% if required %}required aria-required="true"{% endif %}
             {% if error %}aria-invalid="true"{% endif %}
             {% if error %}aria-describedby="{{ id }}-error"{% elif help_text %}aria-describedby="{{ id }}-help"{% endif %}
-            class="flex h-9 w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            class="flex h-10 w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         />
         {% endif %}
 
         {% if error %}
-        <p id="{{ id }}-error" class="text-xs text-destructive-emphasis" role="alert">{{ error }}</p>
+        <p id="{{ id }}-error" class="text-sm text-destructive-emphasis" role="alert">{{ error }}</p>
         {% elif help_text %}
-        <p id="{{ id }}-help" class="text-xs text-muted-foreground">{{ help_text }}</p>
+        <p id="{{ id }}-help" class="text-sm text-muted-foreground">{{ help_text }}</p>
         {% endif %}
-    </div>
-{% endmacro %}
-
-{# North-star form primitives (design/patterns.json: form). Stacked label above
-   the control, 36px/6px hairline controls, 12px inline error, right-aligned
-   footer with a ghost Cancel and a primary Submit. #}
-{% macro form_group(id, label, required=false, error='', help_text='', class='') %}
-    <div class="space-y-1 {{ class }}">
-        <label for="{{ id }}" class="block text-sm font-medium text-muted-foreground mb-1">{{ label }}{% if required %}<span class="text-destructive-emphasis ml-1">*</span>{% endif %}</label>
-        {{ caller() }}
-        {{ form_error(id, error) }}
-        {% if help_text %}<p id="{{ id }}-help" class="text-xs text-muted-foreground">{{ help_text }}</p>{% endif %}
-    </div>
-{% endmacro %}
-
-{% macro form_error(id, error='') %}
-    {% if error %}<p id="{{ id }}-error" class="text-xs text-destructive-emphasis" role="alert">{{ error }}</p>{% endif %}
-{% endmacro %}
-
-{% macro form_footer(submit_text='Save', cancel_text='Cancel', cancel_attrs='', submit_attrs='', class='') %}
-    <div class="flex items-center justify-end gap-2 {{ class }}">
-        <button type="button" {{ cancel_attrs|safe }} class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-9 px-4">{{ cancel_text }}</button>
-        <button type="submit" {{ submit_attrs|safe }} class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4">{{ submit_text }}</button>
     </div>
 {% endmacro %}

@@ -315,7 +315,7 @@ function implementationPlanningDashboard() {
 {% call modal(id='create-work-package', title='Create Work Package', description='Add a new implementation work package', size='lg') %}
 <form @submit.prevent="submitCreateWorkPackage()" class="space-y-4" x-data="workPackageCreateModal()">
   <div class="grid grid-cols-1 gap-4">
-    <div class="sm:col-span-2">
+    <div class="">
       <label for="cwp-name" class="block text-sm font-medium text-muted-foreground mb-1">Name <span class="text-destructive-emphasis">*</span></label>
       <input type="text" id="cwp-name" x-model="formData.name" required maxlength="255"
              class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -357,7 +357,7 @@ function implementationPlanningDashboard() {
              class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
              placeholder="Name or team">
     </div>
-    <div class="sm:col-span-2">
+    <div class="">
       <label for="cwp-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
       <textarea id="cwp-description" x-model="formData.description" rows="2"
                 class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

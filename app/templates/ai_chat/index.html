@@ -373,7 +373,7 @@
              :inert="!railOpen"
              class="absolute lg:relative inset-y-0 left-0 z-40 border-r bg-muted/30 flex flex-col transform -translate-x-full lg:translate-x-0 transition-all duration-200 ease-in-out max-h-full overflow-hidden">
             {# Mobile Close Button #}
-            <button type="button" @click="toggleSidebar()" aria-label="Close sidebar" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <button type="button" @click="toggleSidebar()" aria-label="Close sidebar" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden absolute top-2 right-2 z-50">
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
             </button>
             {# Sidebar Tabs #}

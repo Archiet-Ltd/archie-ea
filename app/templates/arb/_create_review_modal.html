@@ -6,7 +6,7 @@
 {% call modal(id='create-arb-review', title='Create Review Item', description='Submit a new item for Architecture Review Board consideration. Link artifacts for governance traceability.', size='lg') %}
 <form @submit.prevent="submitCreateReview()" class="space-y-4" x-data="arbReviewCreateModal()">
   <div class="grid grid-cols-1 gap-4">
-    <div class="sm:col-span-2">
+    <div class="">
       <label for="car-title" class="block text-sm font-medium text-muted-foreground mb-1">Title <span class="text-destructive-emphasis">*</span></label>
       <input type="text" id="car-title" x-model="formData.title" required maxlength="255"
              class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -99,13 +99,13 @@
         <option value="high">High</option>
       </select>
     </div>
-    <div class="sm:col-span-2">
+    <div class="">
       <label for="car-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
       <textarea id="car-description" x-model="formData.description" rows="3"
                 class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 placeholder="Describe the architecture change or decision being reviewed"></textarea>
     </div>
-    <div class="sm:col-span-2">
+    <div class="">
       <label for="car-alternatives" class="block text-sm font-medium text-muted-foreground mb-1">Alternatives Considered</label>
       <textarea id="car-alternatives" x-model="formData.alternatives_considered" rows="2"
                 class="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -116,7 +116,7 @@
     <summary class="cursor-pointer px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50">Link artifacts — capabilities required for Solution Design, Capability Implementation, Technology Selection</summary>
     <div class="px-3 py-3 space-y-3 border-t border-border">
       <div class="grid grid-cols-1 gap-3">
-        <div class="sm:col-span-2">
+        <div class="">
           <label for="car-applications" class="block text-sm font-medium text-muted-foreground mb-1">Applications Affected</label>
           <select id="car-applications" x-model="formData.application_ids" multiple
                   class="h-9 flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -126,7 +126,7 @@
           </select>
           <p class="text-xs text-muted-foreground mt-1">Systems delivering or affected by this change. Hold Ctrl/Cmd to select multiple.</p>
         </div>
-        <div class="sm:col-span-2">
+        <div class="">
           {# 2 Sep 2026 (Capgemini delivery-team dry-run): this used to be a
              Solution dropdown wired to formData.solution_id — but the server
              ALWAYS rejects a solution-linked submission from this modal
@@ -172,7 +172,7 @@
            Since then the legacy-generic review page gained a Submit control
            and the decision bar, so the warning says what is actually true:
            it can be decided, but only as a stored fact on the review. #}
-        <div class="sm:col-span-2" x-show="!formData.adr_id && !formData.architecture_model_id" x-cloak>
+        <div class="" x-show="!formData.adr_id && !formData.architecture_model_id" x-cloak>
           <div class="rounded-md bg-warning/10 border border-warning/30 px-3 py-2 text-sm text-warning-emphasis space-y-2">
             <p>Without a linked ADR or Architecture Model, this review carries no evidence snapshot. It can still be submitted and decided, but the decision is recorded on this review alone and adds nothing to an ADR's or model's governed record.</p>
             <label class="flex items-start gap-2 font-normal">
@@ -190,7 +190,7 @@
             </template>
           </select>
         </div>
-        <div class="sm:col-span-2">
+        <div class="">
           <label for="car-capabilities" class="block text-sm font-medium text-muted-foreground mb-1">Capabilities <span class="text-destructive-emphasis" x-cloak x-show="isCapabilityRequired()">*</span></label>
           <select id="car-capabilities" x-model="formData.capability_ids" multiple
                   class="h-9 flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">

@@ -141,7 +141,7 @@
       <h3 id="roadmap-modal-title" class="text-base font-semibold text-foreground text-foreground pr-8 mb-4" x-text="isEditing ? 'Edit Work Package' : 'Create Work Package'"></h3>
       <form class="space-y-4" @submit.prevent="submitForm()">
         <div class="grid gap-4 grid-cols-1">
-          <div class="sm:col-span-2">
+          <div class="">
             <label class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
             <input type="text" x-model="form.name" required class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Name">
           </div>
@@ -194,7 +194,7 @@
               </template>
             </select>
           </div>
-          <div class="sm:col-span-2">
+          <div class="">
             <label class="block text-sm font-medium text-muted-foreground mb-1">Target Architecture Element</label>
             <select x-model.number="form.archimate_element_id" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Target Architecture Element">
               <option :value="null">-- Auto (ApplicationComponent) --</option>
@@ -215,7 +215,7 @@
             <label class="block text-sm font-medium text-muted-foreground mb-1">Estimated Effort Hours</label>
             <input type="number" min="0" step="1" x-model.number="form.estimated_effort_hours" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Estimated Effort Hours">
           </div>
-          <div class="sm:col-span-2">
+          <div class="">
             <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
             <textarea x-model="form.description" rows="3" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Description"></textarea>
           </div>

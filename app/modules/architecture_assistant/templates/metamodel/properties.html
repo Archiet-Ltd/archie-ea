@@ -92,7 +92,7 @@
                     <textarea id="mm-allowed" name="allowed_values" rows="3"
                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ form.get('allowed_values', '') }}</textarea>
                 </div>
-                <div class="space-y-1 md:col-span-2">
+                <div class="space-y-1">
                     <label for="mm-help" class="block text-sm font-medium text-muted-foreground mb-1">Guidance for whoever fills it in</label>
                     <input id="mm-help" name="help_text" type="text" value="{{ form.get('help_text', '') }}" class="{{ field_classes }}">
                 </div>

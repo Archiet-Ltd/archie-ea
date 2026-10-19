@@ -68,7 +68,7 @@
                     <p class="text-xs text-muted-foreground">From your Slack app's "Basic Information" page.</p>
                 </div>
 
-                <div class="sm:col-span-2 flex flex-col gap-1.5">
+                <div class="flex flex-col gap-1.5">
                     <label for="monitored_channels" class="block text-sm font-medium text-muted-foreground mb-1">Monitored Channels <span class="text-muted-foreground font-normal">(optional)</span></label>
                     <input id="monitored_channels" name="monitored_channels" type="text"
                            value="{{ config.monitored_channels or '' }}"
@@ -78,7 +78,7 @@
                 </div>
 
                 <!-- Feature toggles -->
-                <div class="sm:col-span-2 flex flex-col gap-3">
+                <div class="flex flex-col gap-3">
                     <p class="text-sm font-medium">Features</p>
                     <label class="flex items-start gap-3 cursor-pointer">
                         <input type="checkbox" name="mention_response" value="1"
@@ -100,7 +100,7 @@
                     </label>
                 </div>
 
-                <div class="sm:col-span-2 flex items-center gap-3">
+                <div class="flex items-center gap-3">
                     <button type="submit"
                             class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Save configuration
