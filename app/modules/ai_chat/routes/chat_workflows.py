@@ -1568,6 +1568,59 @@ def generate_archimate_from_description():
 
 
 # ============================================================================
+# Workflow route gates: write permission + workspace ownership
+# ============================================================================
+
+def _refuse_unless_can_write():
+    """403 for a caller without write permission, else None.
+
+    Same predicate every non-AI write route uses (``Permission.GENERAL``); a
+    Viewer carries permissions=0 and fails it.
+    """
+    from app.models.user import Permission
+
+    if not current_user.can(Permission.GENERAL):
+        return jsonify({"success": False, "error": "You do not have permission to modify workspaces."}), 403
+    return None
+
+
+def _owned_workspace(workspace_id):
+    """The caller's own workspace in the active organisation, else None.
+
+    Same rule as ``chat_core._bind_trusted_workbench``: organisation match AND
+    creator match. A foreign, cross-organisation or non-numeric id answers
+    None, which the routes report as 404 (no existence oracle).
+    """
+    from flask import g
+    from app.models.solution_architect_models import SolutionAnalysisSession
+
+    try:
+        workspace_id = int(workspace_id)
+    except (ValueError, TypeError):
+        return None
+    return db.session.execute(
+        db.select(SolutionAnalysisSession).where(
+            SolutionAnalysisSession.id == workspace_id,
+            SolutionAnalysisSession.organization_id == getattr(g, "current_org_id", None),
+            SolutionAnalysisSession.created_by_id == current_user.id,
+        )
+    ).scalar_one_or_none()
+
+
+def _solution_in_active_org(solution_id):
+    """True when the solution exists in the caller's active organisation."""
+    from flask import g
+    from app.models.solution_models import Solution
+
+    return db.session.execute(
+        db.select(Solution.id).where(
+            Solution.id == solution_id,
+            Solution.organization_id == getattr(g, "current_org_id", None),
+        )
+    ).first() is not None
+
+
+# ============================================================================
 # AIC-313: Greenfield solution blueprint workflow routes
 # ============================================================================
 
@@ -1583,6 +1636,10 @@ def greenfield_workflow_start():
     Body: {"brief": "...", "solution_id": 123 (optional), "model": "..." (optional)}
     Returns: {"success": true, "workspace_id": N, "step": "BRIEF", "response": "..."}
     """
+    refusal = _refuse_unless_can_write()
+    if refusal:
+        return refusal
+
     data = request.get_json(silent=True) or {}
     brief = (data.get("brief") or "").strip()
     if not brief:
@@ -1594,11 +1651,13 @@ def greenfield_workflow_start():
             context["solution_id"] = int(data["solution_id"])
         except (ValueError, TypeError):
             return jsonify({"success": False, "error": "solution_id must be an integer"}), 400
+        if not _solution_in_active_org(context["solution_id"]):
+            return jsonify({"success": False, "error": "Solution not found"}), 404
 
     try:
         from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, GreenfieldWorkflow
 
-        kernel = WorkbenchKernel()
+        kernel = WorkbenchKernel(user_id=current_user.id)
         wf_obj = GreenfieldWorkflow(kernel, user_id=current_user.id)
         result = wf_obj.start(brief, context=context or None)
 
@@ -1635,6 +1694,10 @@ def greenfield_workflow_confirm(step_name):
     Body: {"workspace_id": N, "model": "..." (optional)}
     Returns: {"success": true, "workspace_id": N, "step": "NEXT_STEP", "response": "..."}
     """
+    refusal = _refuse_unless_can_write()
+    if refusal:
+        return refusal
+
     data = request.get_json(silent=True) or {}
     workspace_id = data.get("workspace_id")
     if not workspace_id:
@@ -1642,10 +1705,9 @@ def greenfield_workflow_confirm(step_name):
 
     try:
         from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, GreenfieldWorkflow
-        from app.models.solution_architect_models import SolutionAnalysisSession
 
-        kernel = WorkbenchKernel()
-        session = SolutionAnalysisSession.query.get(workspace_id)
+        kernel = WorkbenchKernel(user_id=current_user.id)
+        session = _owned_workspace(workspace_id)
         if not session:
             return jsonify({"success": False, "error": "Workspace not found"}), 404
 
@@ -1690,6 +1752,10 @@ def greenfield_workflow_skip(step_name):
     Body: {"workspace_id": N, "model": "..." (optional)}
     Returns: {"success": true, "workspace_id": N, "step": "NEXT_STEP", "response": "..."}
     """
+    refusal = _refuse_unless_can_write()
+    if refusal:
+        return refusal
+
     data = request.get_json(silent=True) or {}
     workspace_id = data.get("workspace_id")
     if not workspace_id:
@@ -1697,10 +1763,9 @@ def greenfield_workflow_skip(step_name):
 
     try:
         from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, GreenfieldWorkflow
-        from app.models.solution_architect_models import SolutionAnalysisSession
 
-        kernel = WorkbenchKernel()
-        session = SolutionAnalysisSession.query.get(workspace_id)
+        kernel = WorkbenchKernel(user_id=current_user.id)
+        session = _owned_workspace(workspace_id)
         if not session:
             return jsonify({"success": False, "error": "Workspace not found"}), 404
 
@@ -1794,6 +1859,10 @@ def brownfield_workflow_start():
     Body: {"target_domain": "...", "solution_id": 123 (optional), "model": "..." (optional)}
     Returns: {"success": true, "workspace_id": N, "step": "CONTEXT_LOAD", "response": "..."}
     """
+    refusal = _refuse_unless_can_write()
+    if refusal:
+        return refusal
+
     data = request.get_json(silent=True) or {}
     target_domain = (data.get("target_domain") or "").strip()
     if not target_domain:
@@ -1805,11 +1874,13 @@ def brownfield_workflow_start():
             context["solution_id"] = int(data["solution_id"])
         except (ValueError, TypeError):
             return jsonify({"success": False, "error": "solution_id must be an integer"}), 400
+        if not _solution_in_active_org(context["solution_id"]):
+            return jsonify({"success": False, "error": "Solution not found"}), 404
 
     try:
         from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, BrownfieldWorkflow
 
-        kernel = WorkbenchKernel()
+        kernel = WorkbenchKernel(user_id=current_user.id)
         wf_obj = BrownfieldWorkflow(kernel, user_id=current_user.id)
         result = wf_obj.start(target_domain, context=context or None)
 
@@ -1845,6 +1916,10 @@ def brownfield_workflow_confirm(step_name):
     Body: {"workspace_id": N, "model": "..." (optional)}
     Returns: {"success": true, "workspace_id": N, "step": "NEXT_STEP", "response": "..."}
     """
+    refusal = _refuse_unless_can_write()
+    if refusal:
+        return refusal
+
     data = request.get_json(silent=True) or {}
     workspace_id = data.get("workspace_id")
     if not workspace_id:
@@ -1852,10 +1927,9 @@ def brownfield_workflow_confirm(step_name):
 
     try:
         from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, BrownfieldWorkflow
-        from app.models.solution_architect_models import SolutionAnalysisSession
 
-        kernel = WorkbenchKernel()
-        session = SolutionAnalysisSession.query.get(workspace_id)
+        kernel = WorkbenchKernel(user_id=current_user.id)
+        session = _owned_workspace(workspace_id)
         if not session:
             return jsonify({"success": False, "error": "Workspace not found"}), 404
 
@@ -1900,6 +1974,10 @@ def brownfield_workflow_skip(step_name):
     Body: {"workspace_id": N, "model": "..." (optional)}
     Returns: {"success": true, "workspace_id": N, "step": "NEXT_STEP", "response": "..."}
     """
+    refusal = _refuse_unless_can_write()
+    if refusal:
+        return refusal
+
     data = request.get_json(silent=True) or {}
     workspace_id = data.get("workspace_id")
     if not workspace_id:
@@ -1907,10 +1985,9 @@ def brownfield_workflow_skip(step_name):
 
     try:
         from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, BrownfieldWorkflow
-        from app.models.solution_architect_models import SolutionAnalysisSession
 
-        kernel = WorkbenchKernel()
-        session = SolutionAnalysisSession.query.get(workspace_id)
+        kernel = WorkbenchKernel(user_id=current_user.id)
+        session = _owned_workspace(workspace_id)
         if not session:
             return jsonify({"success": False, "error": "Workspace not found"}), 404
 
