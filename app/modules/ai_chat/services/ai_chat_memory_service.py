@@ -317,7 +317,11 @@ def get_chat_memory_service(
     Returns:
         AIChatMemoryService instance
     """
-    key = f"{user_id}:{session_id}"
+    from app.extensions.cache import org_scoped_cache_key
+
+    key = org_scoped_cache_key(f"{user_id}:{session_id}")
+    if key is None:
+        return AIChatMemoryService(user_id, session_id)
     if key not in _chat_memory_instances:
         _chat_memory_instances[key] = AIChatMemoryService(user_id, session_id)
     return _chat_memory_instances[key]
