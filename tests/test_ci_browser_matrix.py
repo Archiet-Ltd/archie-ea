@@ -21,7 +21,17 @@ def test_ci_runs_critical_journeys_in_firefox_and_webkit():
     assert "browser-compatibility:" in workflow
     assert "browser: [firefox, webkit]" in workflow
     assert "SMOKE_BROWSER: ${{ matrix.browser }}" in workflow
-    assert "playwright install --with-deps ${{ matrix.browser }}" in workflow
+    job = _ci_jobs()["browser-compatibility"]
+    assert "browser" in job["runs-on"] and "self-hosted" in job["runs-on"]
+    runs = "
+".join(step.get("run", "") for step in job["steps"])
+    # Firefox and WebKit come from the runners' shared Playwright cache: nothing is installed.
+    assert "playwright install" not in runs
+    check = [s for s in job["steps"] if "shared Playwright cache" in s.get("name", "")]
+    assert check and "${{ matrix.browser }}" in check[0]["run"]
+    assert job["steps"].index(check[0]) < min(
+        i for i, s in enumerate(job["steps"]) if "pytest" in s.get("run", "")
+    )
     for suite in (
         "test_accessibility_audit.py",
         "test_archetype_journeys.py",
@@ -834,3 +844,24 @@ def test_heavy_jobs_run_when_the_detector_output_is_missing():
             continue
         expr = _strip_expr(str(job["if"])).replace("!cancelled()", "1 == 1")
         assert bool(_eval_github_expr(expr, c)), f"{name} must run when is_content_only is missing"
+
+
+def test_browser_jobs_run_on_the_browser_labelled_runners_with_limited_parallelism():
+    jobs = _ci_jobs()
+    names = [
+        "smoke-main", "smoke-adversarial", "smoke-other", "smoke",
+        "browser-compatibility", "walkthrough", "release-image",
+    ]
+    for name in names:
+        runs_on = jobs[name]["runs-on"]
+        assert '["self-hosted","browser"]' in runs_on, name
+        assert "ubuntu-latest" in runs_on, f"{name}: forks keep the hosted runner"
+    for name in names[:6]:
+        runs = "
+".join(s.get("run", "") for s in jobs[name]["steps"])
+        assert "playwright install" not in runs, name
+    for name in names[:5]:
+        service = jobs[name].get("services", {}).get("postgres")
+        if service:
+            assert service["ports"] == ["5432"], name
+    assert "&& 4 ||" in jobs["smoke-main"]["strategy"]["max-parallel"]

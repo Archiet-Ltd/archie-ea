@@ -1500,6 +1500,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install playwright pytest-timeout
+      - name: Check the shared Playwright cache has ${{ matrix.browser }}
+        # The runners carry Chromium, Firefox and WebKit in the shared Playwright cache,
+        # so nothing is installed here; a missing browser fails this step by name.
+        run: |
+          python - <<'PY'
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              getattr(p, "${{ matrix.browser }}").launch().close()
+          PY
       - name: Create schema
         id: compatibility-schema
         run: |
