@@ -12,6 +12,7 @@
    way to carry that handler. A second, separate breadcrumb_nav() call used
    to live in a {% block breadcrumb %} above; removed as a duplicate. #}
 
+{% from 'macros/shadcn_compat.html' import shadcn_badge %}
 {% block content %}
 {% set elem_name = element.name if element.name else (element.title if element.title else 'Unnamed') %}
 {% set layer_label = layer_config[layer].name if layer in layer_config else layer|title %}
@@ -61,12 +62,8 @@
 
             <!-- Identity badges -->
             <div class="flex flex-wrap items-center gap-2 -mt-3">
-                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-primary/5 text-primary border-primary/20">
-                    <i data-lucide="layers" class="h-3 w-3 mr-1" aria-hidden="true"></i>{{ element_type | plain_name(current_user) }}
-                </span>
-                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-info/10 text-info-emphasis border-info/20">
-                    <i data-lucide="stack" class="h-3 w-3 mr-1" aria-hidden="true"></i>{{ layer | plain_layer(current_user) }}
-                </span>
+                {% call shadcn_badge(variant="type") %}<i data-lucide="layers" class="h-3 w-3 mr-1" aria-hidden="true"></i>{{ element_type | plain_name(current_user) }}{% endcall %}
+                {% call shadcn_badge(variant="type") %}<i data-lucide="stack" class="h-3 w-3 mr-1" aria-hidden="true"></i>{{ layer | plain_layer(current_user) }}{% endcall %}
                 {% if element.scope %}
                 <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-muted text-foreground border-border">
                     {{ element.scope|title }}
@@ -160,11 +157,47 @@
                         <dd class="font-medium">{{ element.status }}</dd>
                     </div>
                     {% endif %}
-                    <div class="flex justify-between text-sm">
-                        <dt class="text-muted-foreground">Element ID</dt>
-                        <dd class="font-mono text-xs text-muted-foreground">#{{ element.id }}</dd>
+                    <div class="flex justify-between gap-3 text-sm" data-testid="element-owner">
+                        <dt class="text-muted-foreground">Owner</dt>
+                        <dd class="font-medium text-right">
+                            {% if owner_rows %}
+                            {{ owner_rows | map(attribute='user_name') | select | join(', ') or 'No owner recorded' }}
+                            {% else %}
+                            <span class="text-muted-foreground font-normal">No owner recorded</span>
+                            {% if owner_assign_url %}<a href="{{ owner_assign_url }}" class="ml-2 text-primary hover:underline">Assign owner</a>{% endif %}
+                            {% endif %}
+                        </dd>
                     </div>
+                    {% if element.updated_at %}
+                    <div class="flex justify-between text-sm" data-testid="element-provenance-asof">
+                        <dt class="text-muted-foreground">As of</dt>
+                        <dd class="font-medium">{{ element.updated_at.strftime('%d %b %Y') }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if external_links %}
+                    <div class="flex justify-between text-sm" data-testid="element-provenance-source">
+                        <dt class="text-muted-foreground">Source system</dt>
+                        <dd class="font-medium">{{ external_links | map(attribute='source_system') | unique | join(', ') }}</dd>
+                    </div>
+                    {% endif %}
                 </dl>
+                {% if current_user.is_platform_admin %}
+                <details class="pt-2 text-sm" data-testid="technical-details">
+                    <summary class="cursor-pointer text-muted-foreground">Technical details</summary>
+                    <dl class="mt-2 space-y-2">
+                        <div class="flex justify-between">
+                            <dt class="text-muted-foreground">Element ID</dt>
+                            <dd class="font-mono text-xs text-muted-foreground">#{{ element.id }}</dd>
+                        </div>
+                        {% for field in technical_fields %}
+                        <div class="flex justify-between">
+                            <dt class="text-muted-foreground">{{ field.label }}</dt>
+                            <dd class="font-mono text-xs text-muted-foreground">{{ field.value }}</dd>
+                        </div>
+                        {% endfor %}
+                    </dl>
+                </details>
+                {% endif %}
             </div>
 
             <!-- Auto-discovered attributes (display_fields) -->
