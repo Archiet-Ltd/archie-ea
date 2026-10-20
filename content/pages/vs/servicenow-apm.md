@@ -78,7 +78,7 @@ A product that runs on its own, a published price, free self-hosting, and ArchiM
 
 ### Can we run ServiceNow APM and Entelim side by side before deciding?
 
-Yes. Import a copy of your model into the free Community plan or a self-hosted copy, ask the same questions in both, and leave ServiceNow APM untouched. The health check puts your own data through Entelim for a fixed price and date.
+Yes. Import a copy of your model into the free Community plan or a self-hosted copy, ask the same questions in both, and leave ServiceNow APM untouched. The health check puts your own data through Entelim for a fixed scope.
 
 ### Can we buy ServiceNow APM on its own?
 
