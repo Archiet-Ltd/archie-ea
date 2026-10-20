@@ -37,6 +37,7 @@ def _initiative(db_session, element, *, name="Cloud migration programme", status
     from app.models.enterprise_intelligence import PortfolioInitiative
 
     initiative = PortfolioInitiative(
+        organization_id=element.organization_id,
         name=name,
         archimate_element_id=element.id,
         status=status,
