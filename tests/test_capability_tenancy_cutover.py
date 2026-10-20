@@ -22,6 +22,7 @@ from app.commands.cutover_capability_tenancy import (
     install_cutover_constraints,
     run_cutover,
 )
+from app.middleware.tenant_isolation import bind_tenant
 
 
 pytestmark = pytest.mark.usefixtures("db_session")
