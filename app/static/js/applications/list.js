@@ -525,29 +525,27 @@ function appPortfolio() {
     openMappingForApp(id, name, mappingType) {
       const normalizedType = mappingType || 'capability';
 
-      // Delegate to the unified mapping modal if registered
-      if (typeof window.openUnifiedMappingModal === 'function') {
+      // A role that cannot save a mapping is told so before the dialog opens.
+      const mapRow = document.querySelector('[data-app-map-id="' + id + '"]');
+      if (mapRow && mapRow.dataset.canMap === 'false') {
+        this.notify('Your role can view mappings but cannot change them.', 'error');
+        return;
+      }
+
+      // The unified mapping modal works from a target (a capability, process,
+      // vendor product or element) to its applications. From an application
+      // row the person picks the target first and this application is
+      // already ticked on the next step, as on the application detail page.
+      if (typeof window.openUnifiedMappingModalDiscovery === 'function') {
         if (typeof window.initUnifiedMappingModal === 'function') {
           window.initUnifiedMappingModal({
             context: normalizedType,
             apiEndpoint: '/capability-map/api',
           });
         }
-
-        // unified_mapping_modal.js's openUnifiedMappingModal is always
-        // (targetId, targetName, options) — see window.openUnifiedMappingModal
-        // in components/unified_mapping_modal.js, which does
-        // `UnifiedMappingModal.targetId = String(targetId)`. The
-        // window.UnifiedMappingModal-gated else-branch called it with a
-        // single {id, name, type} object instead, so targetId became that
-        // whole object and String(targetId) produced the literal string
-        // "[object Object]", which then flowed straight into the
-        // capability-lookup URL (`/capability-map/api/capability/[object
-        // Object]/applications`, a 400) every time this branch was taken.
-        // There is only one real signature; use it unconditionally.
-        window.openUnifiedMappingModal(id, name, {
+        window.openUnifiedMappingModalDiscovery({
           context: normalizedType,
-          targetType: normalizedType,
+          ids: [Number(id)],
         });
         return;
       }
