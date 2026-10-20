@@ -31,6 +31,10 @@ ai_prompt_templates
 ai_recommendations
 ai_service_configs
 ai_suggestions
+# api_operation_retirements: an operation belongs to the one API contract, so a retirement is platform-wide by design
+# api_retirement_notices: which user has been told about which retirement; reached through the retirement and the user
+api_operation_retirements
+api_retirement_notices
 application_business_actor_mapping
 application_business_metrics
 application_capability
