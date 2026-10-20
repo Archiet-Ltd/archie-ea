@@ -1,0 +1,63 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+
+{% block title %}Answer Quality{% endblock %}
+
+{% macro fig(v, fmt) %}{% if v is none %}<span class="text-muted-foreground">—</span>{% else %}{{ fmt.format(v) }}{% endif %}{% endmacro %}
+
+{% block content %}
+{{ page_shell(
+    title='Answer Quality',
+    breadcrumb=[('Home', '/'), ('Agent Run Records', url_for('unified_ai_chat.run_record_list')), ('Answer Quality', none)],
+    subtitle='Citation rate and citation-gate refusals for ' ~ start_time.strftime('%Y-%m-%d') ~ ' to ' ~ end_time.strftime('%Y-%m-%d') ~ ', against the prior period of the same length (' ~ prior_start.strftime('%Y-%m-%d') ~ ' to ' ~ prior_end.strftime('%Y-%m-%d') ~ ').'
+) }}
+
+<div class="overflow-x-auto rounded-md border">
+    <table class="w-full text-sm">
+        <thead class="border-b bg-muted/50">
+            <tr>
+                <th class="px-4 py-3 text-left font-medium">Figure</th>
+                <th class="px-4 py-3 text-left font-medium">This period</th>
+                <th class="px-4 py-3 text-left font-medium">Prior period</th>
+                <th class="px-4 py-3 text-left font-medium">Behind the figure</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            <tr>
+                <td class="px-4 py-3">Answers with a citation</td>
+                <td class="px-4 py-3" data-figure="citation-rate">{{ fig(citation_rate, '{:.1%}') }}</td>
+                <td class="px-4 py-3">{{ fig(prior_citation_rate, '{:.1%}') }}</td>
+                <td class="px-4 py-3">
+                    {% if uncited_addresses %}
+                    <details><summary>{{ uncited_addresses|length }} uncited answers</summary>
+                        <ul>{% for a in uncited_addresses %}<li>{{ a }}</li>{% endfor %}</ul>
+                    </details>
+                    {% else %}—{% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td class="px-4 py-3">Replies refused by the citation gate (per thousand runs)</td>
+                <td class="px-4 py-3" data-figure="refusal-rate">{{ fig(refusal_rate, '{:.1f}') }}</td>
+                <td class="px-4 py-3">{{ fig(prior_refusal_rate, '{:.1f}') }}</td>
+                <td class="px-4 py-3">
+                    {% if refusal_ids %}
+                    <a class="text-primary hover:underline" href="{{ url_for('unified_ai_chat.run_record_list', ids=refusal_ids|join(',')) }}">{{ refusal_ids|length }} runs</a>
+                    {% else %}—{% endif %}
+                </td>
+            </tr>
+            {% for persona, rate in persona_rates.items()|sort %}
+            <tr>
+                <td class="px-4 py-3 pl-8">Refusals, {{ persona }} (per thousand runs)</td>
+                <td class="px-4 py-3" data-figure="persona-{{ persona }}">{{ fig(rate, '{:.1f}') }}</td>
+                <td class="px-4 py-3">{{ fig(prior_persona_rates.get(persona), '{:.1f}') }}</td>
+                <td class="px-4 py-3">
+                    {% if persona_run_ids.get(persona) %}
+                    <a class="text-primary hover:underline" href="{{ url_for('unified_ai_chat.run_record_list', ids=persona_run_ids[persona]|join(',')) }}">{{ persona_run_ids[persona]|length }} runs</a>
+                    {% else %}—{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -121,6 +121,9 @@ POLICY = {
     # Agent oversight: pause/resume all agent writes, view refused-call log,
     # and check classification status — all gated by org_admin, which no
     # seeded archetype except platform_admin holds.
+    # Answer quality monitor: same guard as the run-record list (org admin or
+    # platform admin), so only platform_admin among the archetypes reaches it.
+    "/ai-chat/quality-monitor":          set(),
     "/ai-chat/oversight/state":          set(),
     "/ai-chat/oversight/refused-calls":  set(),
     "/ai-chat/oversight/classification/status": set(),

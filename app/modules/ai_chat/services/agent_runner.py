@@ -1645,7 +1645,7 @@ class AgentRunner:
             return
         self._log_would_refuse(uncited, domain, persona, validation_status="would_refuse_uncited")
 
-    def _log_would_refuse(self, uncited: list, domain: str, persona: Optional[str], validation_status: str = "would_refuse_uncited") -> None:
+    def _log_would_refuse(self, uncited: list, domain: Optional[str], persona: Optional[str], validation_status: str = "would_refuse_uncited") -> None:
         """One structured WARNING per answer the gate would have refused. The
         unverified record names are logged; the answer text is not."""
         try:
@@ -1684,8 +1684,8 @@ class AgentRunner:
                     persona=persona,
                 )
         except Exception:
-            # Don't let audit failure break the function
-            pass
+            # An audit failure must not break the reply, but it is not silent.
+            logger.warning("citation_gate_audit_write_failed", exc_info=True)
 
     def _finalize(
         self,

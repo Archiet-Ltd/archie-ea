@@ -5,12 +5,20 @@ Every organisation administrator can view and replay the agent run records for
 their organisation. Records from other organisations are never returned.
 """
 import logging
+from datetime import datetime, timedelta
 
 from flask import abort, jsonify, render_template, request
 from flask_login import current_user
 
 from app.models.agent_charter import AgentCharter
 from app.models.agent_run_record import AgentRunRecord
+from app.models.answer_record import AnswerRecord
+from app.modules.ai_chat.services.agent_quality_monitor import (
+    get_citation_rate,
+    get_refusal_rate,
+    get_refusal_rate_per_persona,
+    get_refusal_run_ids_by_persona,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +54,11 @@ def register_run_record_routes(bp):
         query = AgentRunRecord.query.filter_by(organization_id=org_id).order_by(
             AgentRunRecord.created_at.desc()
         )
+        # Drill-through from the quality monitor: only the listed run records.
+        ids_param = request.args.get("ids", "")
+        id_list = [int(i) for i in ids_param.split(",") if i.strip().isdigit()]
+        if id_list:
+            query = query.filter(AgentRunRecord.id.in_(id_list))
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         records = pagination.items
         return render_template(
@@ -126,3 +139,62 @@ def register_run_record_routes(bp):
             })
 
         return jsonify({"replayed": results, "record_id": record_id})
+
+    @bp.route("/quality-monitor")
+    def quality_monitor():
+        """Answer quality figures for this organisation: a period against the
+        prior period of the same length."""
+        _require_org_admin()
+        org_id = _org_id()
+        if org_id is None:
+            abort(400)
+        try:
+            end_time = (
+                datetime.fromisoformat(request.args["end"])
+                if request.args.get("end") else datetime.utcnow()
+            )
+            start_time = (
+                datetime.fromisoformat(request.args["start"])
+                if request.args.get("start") else end_time - timedelta(days=30)
+            )
+        except ValueError:
+            abort(400)
+        if start_time >= end_time:
+            abort(400)
+        prior_start = start_time - (end_time - start_time)
+        prior_end = start_time
+
+        citation_rate, uncited_ids = get_citation_rate(org_id, start_time, end_time)
+        prior_citation_rate, _ = get_citation_rate(org_id, prior_start, prior_end)
+        refusal_rate, refusal_ids = get_refusal_rate(org_id, start_time, end_time)
+        prior_refusal_rate, _ = get_refusal_rate(org_id, prior_start, prior_end)
+        persona_rates, _ = get_refusal_rate_per_persona(org_id, start_time, end_time)
+        prior_persona_rates, _ = get_refusal_rate_per_persona(org_id, prior_start, prior_end)
+        persona_run_ids = get_refusal_run_ids_by_persona(org_id, start_time, end_time)
+
+        uncited_addresses = []
+        if uncited_ids:
+            uncited_addresses = [
+                a.address
+                for a in AnswerRecord.query.filter(
+                    AnswerRecord.id.in_(uncited_ids),
+                    AnswerRecord.organization_id == org_id,
+                ).order_by(AnswerRecord.computed_at.asc())
+            ]
+
+        return render_template(
+            "ai_chat/run_records/quality_monitor.html",
+            start_time=start_time,
+            end_time=end_time,
+            prior_start=prior_start,
+            prior_end=prior_end,
+            citation_rate=citation_rate,
+            prior_citation_rate=prior_citation_rate,
+            uncited_addresses=uncited_addresses,
+            refusal_rate=refusal_rate,
+            prior_refusal_rate=prior_refusal_rate,
+            refusal_ids=refusal_ids,
+            persona_rates=persona_rates,
+            prior_persona_rates=prior_persona_rates,
+            persona_run_ids=persona_run_ids,
+        )

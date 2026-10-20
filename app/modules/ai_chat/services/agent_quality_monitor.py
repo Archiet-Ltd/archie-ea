@@ -189,3 +189,15 @@ def get_refusal_rate_per_persona(
             run_ids.append(run_id)
 
     return rates, _unique(run_ids)
+
+
+def get_refusal_run_ids_by_persona(
+    org_id: int, start_time: datetime, end_time: datetime
+) -> Dict[str, List[int]]:
+    """Run record ids behind each persona's refusals in the period."""
+    by_persona: Dict[str, List[int]] = {}
+    for log in _refusal_logs(org_id, start_time, end_time):
+        run_id = _closest_run_record(log.user_id, log.created_at)
+        if run_id is not None:
+            by_persona.setdefault(log.persona or "unknown", []).append(run_id)
+    return {persona: _unique(ids) for persona, ids in by_persona.items()}

@@ -9,6 +9,7 @@ literal and never a "total or 1" denominator.
 """
 from datetime import datetime, timedelta
 import json
+import uuid
 
 import pytest
 
@@ -30,20 +31,20 @@ PERIOD_END = datetime(2026, 1, 8)
 
 
 def _make_org(db_session, label):
-    org = Organization(name=f"Organisation {label}", slug=f"org-{label}")
+    suffix = uuid.uuid4().hex[:8]
+    org = Organization(name=f"Organisation {label} {suffix}", slug=f"org-{label}-{suffix}")
     db_session.add(org)
     db_session.flush()
     return org
 
 
-def _make_user(db_session, org, label, user_id):
+def _make_user(db_session, org, label, user_id, admin=True):
     user = User(
-        id=user_id,
-        email=f"user-{label}@{org.slug}.example.com",
+        email=f"user-{label}-{user_id}@{org.slug}.example.com",
         first_name="Quality",
         last_name="Monitor",
         organization_id=org.id,
-        is_org_admin=True,
+        is_org_admin=admin,
         confirmed=True,
     )
     db_session.add(user)
@@ -345,3 +346,75 @@ def test_gate_would_refusal_is_persisted_and_counted(db_session, app):
         org.id, now - timedelta(hours=1), now + timedelta(hours=1)
     )
     assert rate == 1000.0
+
+
+# ---------------------------------------------------------------------------
+# The page: role guard, organisation fence, dash for nothing to measure
+# ---------------------------------------------------------------------------
+
+def _seed_org_with_figures(db_session, label, user_id, now):
+    org = _make_org(db_session, label)
+    user = _make_user(db_session, org, label, user_id)
+    run = _make_run(db_session, org, user, f"persona-{label}", now)
+    _make_answer(db_session, org, user, f"addr-uncited-{label}", False, now)
+    _make_answer(db_session, org, user, f"addr-cited-{label}", True, now)
+    _make_refusal_log(db_session, user, "refused_uncited", now, persona=f"persona-{label}")
+    db_session.commit()
+    return org, user, run
+
+
+def test_page_shows_own_figures_and_never_another_organisations(client, db_session, login_as):
+    now = datetime.utcnow()
+    org_a, user_a, run_a = _seed_org_with_figures(db_session, "pa", 201, now)
+    org_b, user_b, run_b = _seed_org_with_figures(db_session, "pb", 202, now)
+
+    login_as(client, user_a)
+    resp = client.get("/ai-chat/quality-monitor")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert "50.0%" in html
+    assert "addr-uncited-pa" in html
+    assert "persona-pa" in html
+    assert f"ids={run_a.id}" in html
+    # Organisation B's persona, answer address and run id never appear.
+    assert "persona-pb" not in html
+    assert "addr-uncited-pb" not in html
+    assert f"ids={run_b.id}" not in html
+
+
+def test_page_shows_a_dash_when_there_is_nothing_to_measure(client, db_session, login_as):
+    org = _make_org(db_session, "dash")
+    user = _make_user(db_session, org, "dash", 203)
+    db_session.commit()
+
+    assert get_citation_rate(org.id, PERIOD_START, PERIOD_END)[0] is None
+
+    login_as(client, user)
+    resp = client.get("/ai-chat/quality-monitor")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'data-figure="citation-rate"><span class="text-muted-foreground">' in html
+    assert 'data-figure="refusal-rate"><span class="text-muted-foreground">' in html
+    assert "0.0%" not in html
+
+
+def test_page_requires_org_admin_like_the_run_record_list(client, db_session, login_as):
+    org = _make_org(db_session, "guard")
+    user = _make_user(db_session, org, "guard", 204, admin=False)
+    db_session.commit()
+
+    login_as(client, user)
+    assert client.get("/ai-chat/run-records").status_code == 403
+    assert client.get("/ai-chat/quality-monitor").status_code == 403
+
+
+def test_run_record_list_drill_through_filters_by_ids(client, db_session, login_as):
+    now = datetime.utcnow()
+    org, user, run_1 = _seed_org_with_figures(db_session, "dt", 205, now)
+    run_2 = _make_run(db_session, org, user, "other", now)
+    db_session.commit()
+
+    login_as(client, user)
+    html = client.get(f"/ai-chat/run-records?ids={run_1.id}").get_data(as_text=True)
+    assert f"/run-records/{run_1.id}" in html
+    assert f"/run-records/{run_2.id}" not in html
