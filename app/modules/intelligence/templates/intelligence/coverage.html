@@ -93,7 +93,7 @@
             </thead>
             <tbody>
                 {% for element_id, type_, node_layer in coverage.missing %}
-                <tr class="border-b border-border last:border-0">
+                <tr class="border-b border-border last:border-0" data-element-id="{{ element_id }}">
                     <td class="py-2 pr-4">{{ element_id }}</td>
                     <td class="py-2 pr-4">{{ type_ or '—' }}</td>
                     <td class="py-2 pr-4">{{ node_layer or '—' }}</td>
