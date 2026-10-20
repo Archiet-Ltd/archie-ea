@@ -198,7 +198,7 @@ DEPENDENCIES:
         <div x-show="!searching()">
 
         {% set ns = namespace(has_all_modules=false) %}
-        {% for zone in get_sidebar_zones(current_user) %}
+        {% for zone in get_launch_sidebar_zones(current_user) %}
         {# A zone whose every link's endpoint is unregistered (guardrail flag
            off, blueprint import failed, endpoint string drifted) must not
            print an empty heading — that reads as "you have Governance access
@@ -228,6 +228,20 @@ DEPENDENCIES:
         </div>
         {% endif %}
         {% endfor %}
+        {# Launch cut: every module outside the twelve is listed on this page. It sits at the foot of the
+           scrolling list, not in the footer, so the list keeps its full height. #}
+        {% if 'modules_directory.index' in flask.current_app.view_functions %}
+        {% set ns.has_all_modules = true %}
+        <div class="px-2 pb-2 pt-1">
+            <a href="{{ url_for('modules_directory.index') }}"
+               title="More tools"
+               data-testid="sidebar-more-tools"
+               class="flex h-8 items-center gap-2 rounded-md px-2 text-13 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground {% if request.endpoint == 'modules_directory.index' %}font-medium{% endif %}">
+                <i data-lucide="grid-3x3" class="h-4 w-4 flex-shrink-0"></i>
+                <span class="flex-1 truncate">More tools</span>
+            </a>
+        </div>
+        {% endif %}
         </div>
     </nav>
 
