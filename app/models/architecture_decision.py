@@ -427,17 +427,26 @@ class ArchitectureChangeRequest(TenantMixin, db.Model):
 
     @classmethod
     def next_acr_reference(cls):
+        """Generate the next ACR-<year>-NNN id.
+
+        ``acr_reference`` is UNIQUE across the whole table, but this class is a
+        ``TenantMixin`` -- so a ``cls.query...first()`` scan is narrowed to the
+        caller's organisation by ``do_orm_execute`` (and, in production, by the
+        database's own row-level security on the ``archie_runtime`` connection
+        regardless of the ORM). A second tenant's first change request would
+        compute the same ``ACR-<year>-001`` another tenant already held and
+        collide on the unique index -- the same defect documented in
+        ``app/utils/reference_numbers.py``. Allocate over the same domain the
+        index enforces.
+        """
         from datetime import datetime as dt
+
+        from app.utils.reference_numbers import next_reference
+
         year = dt.utcnow().year
-        last = cls.query.filter(cls.acr_reference.like(f'ACR-{year}-%')).order_by(cls.id.desc()).first()
-        if last:
-            try:
-                n = int(last.acr_reference.split('-')[-1]) + 1
-            except (ValueError, IndexError):
-                n = 1
-        else:
-            n = 1
-        return f'ACR-{year}-{n:03d}'
+        return next_reference(
+            "architecture_change_requests", "acr_reference", f"ACR-{year}-"
+        )
 
 
 class ChangeImpactAssessment(db.Model):
@@ -505,14 +514,20 @@ class ArchitectureChangeNotice(db.Model):
 
     @classmethod
     def next_acn_reference(cls):
+        """Generate the next ACN-<year>-NNN id.
+
+        ``acn_reference`` is UNIQUE across the whole table. This model is not
+        tenant-scoped, so it did not have the cross-organisation collision the
+        ACR/AD/ARB generators had, but it had the same read-then-insert race
+        under concurrency (two near-simultaneous notices could both compute the
+        same ``last + 1``) and the same duplicated allocation logic. Routed
+        through the one allocator the rest of this bug class now uses.
+        """
         from datetime import datetime as dt
+
+        from app.utils.reference_numbers import next_reference
+
         year = dt.utcnow().year
-        last = cls.query.filter(cls.acn_reference.like(f'ACN-{year}-%')).order_by(cls.id.desc()).first()
-        if last:
-            try:
-                n = int(last.acn_reference.split('-')[-1]) + 1
-            except (ValueError, IndexError):
-                n = 1
-        else:
-            n = 1
-        return f'ACN-{year}-{n:03d}'
+        return next_reference(
+            "architecture_change_notices", "acn_reference", f"ACN-{year}-"
+        )
