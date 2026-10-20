@@ -1662,13 +1662,20 @@ def api_update_relationship(rel_id):
 
 @archimate_bp.route("/api/relationships/<int:rel_id>", methods=["DELETE"])
 @login_required
+@require_permission("delete", "relationship")
 # CSRF: Protected via X-CSRFToken header sent by Platform.fetch
 def api_delete_relationship(rel_id):
     """Delete an ArchiMate relationship by ID."""
-    from app.models.archimate_core import ArchiMateRelationship
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
     rel = db.session.get(ArchiMateRelationship, rel_id)
     if not rel:
+        return api_error("Relationship not found", 404)
+    if not _in_callers_organisation(
+        rel,
+        db.session.get(ArchiMateElement, rel.source_id),
+        db.session.get(ArchiMateElement, rel.target_id),
+    ):
         return api_error("Relationship not found", 404)
 
     db.session.delete(rel)

@@ -171,3 +171,54 @@ class TestEdit:
         db_session.expire_all()
         assert foreign.description != "taken"
         assert mixed.description != "taken"
+
+
+class TestDelete:
+    def _exists(self, db_session, rel_id):
+        from app.models.archimate_core import ArchiMateRelationship
+
+        db_session.expire_all()
+        return db_session.get(ArchiMateRelationship, rel_id) is not None
+
+    def test_viewer_delete_is_refused(self, app, db_session, login_as, client):
+        org = _org(db_session, "vd")
+        viewer = _user(db_session, org, "viewer")
+        a, b = _element(db_session, org, "A"), _element(db_session, org, "B")
+        rel = _relationship(db_session, org, a, b)
+        db_session.commit()
+        login_as(client, viewer)
+        resp = client.delete(f"/archimate/api/relationships/{rel.id}")
+        assert resp.status_code == 403
+        assert self._exists(db_session, rel.id)
+
+    def test_architect_delete_succeeds(self, app, db_session, login_as, client):
+        org = _org(db_session, "ad")
+        architect = _user(db_session, org, "architect")
+        a, b = _element(db_session, org, "A"), _element(db_session, org, "B")
+        rel = _relationship(db_session, org, a, b)
+        rel_id = rel.id
+        db_session.commit()
+        login_as(client, architect)
+        resp = client.delete(f"/archimate/api/relationships/{rel_id}")
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        assert not self._exists(db_session, rel_id)
+
+    def test_delete_across_organisations_is_not_found(
+        self, app, db_session, login_as, client
+    ):
+        org_a, org_b = _org(db_session, "da"), _org(db_session, "db")
+        architect = _user(db_session, org_a, "architect")
+        x, y = _element(db_session, org_b, "X"), _element(db_session, org_b, "Y")
+        foreign = _relationship(db_session, org_b, x, y)
+        mixed = _relationship(db_session, org_a, x, y)
+        ids = (foreign.id, mixed.id)
+        db_session.commit()
+        login_as(client, architect)
+        from app.models.archimate_core import ArchiMateRelationship
+
+        assert db_session.get(ArchiMateRelationship, foreign.id) is not None
+        for rid in ids:
+            resp = client.delete(f"/archimate/api/relationships/{rid}")
+            assert resp.status_code == 404, resp.get_data(as_text=True)
+        for rid in ids:
+            assert self._exists(db_session, rid)
