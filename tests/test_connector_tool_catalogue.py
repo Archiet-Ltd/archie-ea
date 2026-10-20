@@ -24,12 +24,12 @@ from app.modules.ai_chat.tools.route_read_tools import (
     resolve_connector_tool,
 )
 
-# The ten names an assistant may already depend on. Removing or renaming one
+# The eleven names an assistant may already depend on. Removing or renaming one
 # is a deliberate, documented decision, never a side effect.
 PUBLISHED_NAMES = {
     "ask_impact", "ask_strategy", "ask_portfolio", "ask_programme",
-    "ask_risk", "ask_accountability", "search_elements", "get_element",
-    "list_canvases", "get_canvas",
+    "ask_risk", "ask_accountability", "ask_contents", "search_elements",
+    "get_element", "list_canvases", "get_canvas",
 }
 
 

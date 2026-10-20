@@ -1916,6 +1916,28 @@ TOOL_SCHEMAS.extend([
         _ELEMENT_ID_PARAMETERS,
     ),
     _route_read_tool(
+        "ask_contents",
+        "GET /api/v1/intelligence/contents/<element_id> + GET /archimate/api/elements/search",
+        "Ask what is in a release, plateau or work package: the applications, "
+        "capabilities, gaps, value propositions and other work packages linked to it, "
+        "one hop and the derived second hop, each with its relationship type, direction "
+        "and documentation. Give an element id, or a name to search for.",
+        {
+            "type": "object",
+            "properties": {
+                "element_id": {
+                    "type": "integer",
+                    "description": "The WorkPackage, Plateau or ImplementationEvent element id",
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Name of the release, plateau or work package, used when no element_id is given",
+                },
+            },
+            "required": [],
+        },
+    ),
+    _route_read_tool(
         "ask_risk",
         "GET /api/v1/intelligence/risk/<element_id>",
         "Ask what risks threaten an element, and what each risk touches.",

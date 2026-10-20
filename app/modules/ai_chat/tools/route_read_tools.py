@@ -130,6 +130,40 @@ def _search_elements(args: dict) -> dict:
     return result
 
 
+_CONTAINER_TYPES = ("WorkPackage", "Plateau", "ImplementationEvent")
+
+
+def _ask_contents(args: dict) -> dict:
+    """What a release, plateau or work package contains. Takes an element id, or
+    a name resolved through the same search the ``search_elements`` tool runs
+    (exact name first, otherwise the first container-type match)."""
+    if args.get("element_id") not in (None, ""):
+        element_id = int(args["element_id"])
+    else:
+        name = str(args.get("name") or "").strip()
+        if not name:
+            return {"success": False, "error": {"code": "INVALID_PARAMETER",
+                    "message": "Give an element_id or a name"}}
+        found = _search_elements({"query": name, "limit": 50})
+        candidates = [
+            item for item in ((found or {}).get("data") or [])
+            if isinstance(item, dict) and item.get("type") in _CONTAINER_TYPES
+        ]
+        exact = [c for c in candidates if str(c.get("name", "")).casefold() == name.casefold()]
+        chosen = (exact or candidates or [None])[0]
+        if chosen is None:
+            return {"success": False, "error": {"code": "NOT_FOUND",
+                    "message": "No release, plateau or work package with that name",
+                    "details": {"reason": "element_not_found"}}}
+        element_id = int(chosen["id"])
+    _status, data = call_internal_api(
+        "GET", f"/api/v1/intelligence/contents/{element_id}", pass_session=True
+    )
+    if data and data.get("success") and data.get("data"):
+        _fence_response_text(data["data"])
+    return data
+
+
 def _get_element(args: dict) -> dict:
     element_id = int(args["element_id"])
     _status, result = call_internal_api(
@@ -199,6 +233,7 @@ ROUTE_READ_HANDLERS: dict[str, Callable[[dict], dict]] = {
     "ask_strategy": _intelligence("strategy"),
     "ask_portfolio": _intelligence("portfolio"),
     "ask_programme": _intelligence("programme"),
+    "ask_contents": _ask_contents,
     "ask_risk": _intelligence("risk"),
     "ask_accountability": _intelligence("accountability"),
     "search_elements": _search_elements,
