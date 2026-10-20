@@ -81,3 +81,115 @@ def test_contact_form_stores_a_submission(client, db_session):
     assert resp.status_code == 200
     assert "Thank you" in resp.get_data(as_text=True)
     assert ProductInquiry.query.filter_by(email=email, offer="sales_enquiry").count() == before + 1
+
+# Phrases that were promised on public pages and are not delivered today. Each is
+# checked against the page as a visitor reads it.
+REMOVED = {
+    # -- BEGIN removed phrases
+    '/pricing': [
+        'ai assistants that query your model',
+        'save, share and export an answer',
+        'scenarios and what-if',
+        'import your model from files',
+        'you keep your plan until',
+        'cancelling stops the subscription',
+        'changes the number of editor seats',
+        'tax number',
+        'produces an invoice',
+        'invoice e-mail',
+        'within two weeks of kickoff',
+        'fixed-price services',
+        'billing page',
+        'billing portal',
+    ],
+    '/architecture-health-check': [
+        'within two weeks of kickoff',
+        'fixed-price',
+        'price is fixed',
+        'the clock starts at kickoff',
+    ],
+    '/team-annual-onboarding': [
+        'pro-rata',
+        'fixed-price assessment',
+        'single sign-on',
+        'export your data for 30 days',
+        'from the billing page',
+    ],
+    '/': [
+        'read access for your ai assistants opens',
+        'read access for your own ai assistants',
+        'every row shows its source',
+    ],
+    '/features': [
+        'single sign-on',
+        'plans you can change and cancel yourself',
+        'audit and billing',
+        'will be able to read the model securely',
+        'cites its sources, explains itself',
+        'every row shows its source',
+        'shareable, reviewable and deliverable',
+    ],
+    '/about': [
+        'cites the records it came from',
+        'how it was worked out',
+        'the same question gets the same answer everywhere',
+        'opens read access for your own ai assistants',
+        'opens in q1 2027',
+    ],
+    '/contact': [
+        'live and priced',
+    ],
+    '/privacy': [
+        'other organisations on the same instance cannot read it',
+    ],
+    '/vs/ardoq': [
+        'fixed price and date',
+    ],
+    '/vs/avolution-abacus': [
+        'fixed price and date',
+    ],
+    '/vs/bizzdesign-hopex': [
+        'fixed price and date',
+    ],
+    '/vs/boc-adoit': [
+        'fixed price and date',
+        'connecting an outside assistant to your model is not something you can do today',
+    ],
+    '/vs/leanix': [
+        'fixed price and date',
+    ],
+    '/vs/orbus-iserver': [
+        'fixed price and date',
+    ],
+    '/vs/servicenow-apm': [
+        'fixed price and date',
+    ],
+    '/vs/sparx-enterprise-architect': [
+        'fixed price and date',
+    ],
+    '/modules/compliance-frameworks': [
+        'data says against a framework',
+    ],
+    '/use-cases/duplicate-software-spend': [
+        'spend recommendations (ai)',
+    ],
+    '/use-cases/business-case-for-the-cio': [
+        'a ranked view of where to invest',
+    ],
+    # -- END removed phrases
+}
+
+REMOVED_CASES = [(path, phrase) for path, phrases in REMOVED.items() for phrase in phrases]
+
+
+@pytest.mark.parametrize("path,phrase", REMOVED_CASES)
+def test_undelivered_promise_is_gone(client, path, phrase):
+    resp = client.get(path)
+    assert resp.status_code == 200
+    assert phrase not in _visible_text(resp.get_data(as_text=True)), f"{path} still says: {phrase}"
+
+
+def test_jira_and_github_page_says_where_github_stands(client):
+    resp = client.get("/use-cases/import-from-jira-and-github")
+    assert resp.status_code == 200
+    assert "github" in _visible_text(resp.get_data(as_text=True))
