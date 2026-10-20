@@ -2,6 +2,7 @@
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'macros/page_shell.html' import page_shell, section_card %}
 {% from 'components/answer_cascade.html' import answer_cascade %}
+{% from 'components/provenance.html' import answer_envelope %}
 {% block title %}Dashboard{% endblock %}
 {% block extra_head_js %}
 <script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
@@ -112,9 +113,12 @@
             <p class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
             <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
             {% if line %}<p class="mt-1 truncate text-xs text-muted-foreground tabular-nums" title="{{ line }}">{{ line }}</p>{% endif %}
+            {% if label == 'Solutions' %}<div class="mt-1">{{ answer_envelope() }}</div>{% endif %}
         </div>
         {% endfor %}
     </section>
+
+    <div class="mt-1">{{ answer_envelope() }}</div>
 
     {# What the health score was weighted from. A component that was not
        measured reads as an em dash, never as a confident zero. #}
@@ -141,6 +145,8 @@
             {% endfor %}
         </div>
     </section>
+
+    <div class="mt-1">{{ answer_envelope() }}</div>
 
     {# Chart: application lifecycle, one series, hairline container, no vertical grid. #}
     <section aria-labelledby="lifecycle-chart-heading" class="rounded-lg border border-border bg-card" data-testid="lifecycle-distribution">
