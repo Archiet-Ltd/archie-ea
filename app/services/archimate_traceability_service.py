@@ -38,6 +38,25 @@ _LAYER_RANK = {
 }
 
 
+def _one_row_per_capability(query, pivot_type):
+    """Narrow a pivot query to one element per capability name (DG-031).
+
+    A capability modelled twice (imported once and synced once, or stored with
+    two layer spellings) is one capability to the reader, so the pivot lists it
+    once. Deduplicated here, at the query, on the same name folding the
+    duplicate guard uses; the lowest id stands for the group. Other element
+    types are untouched.
+    """
+    if pivot_type != 'Capability':
+        return query
+    from app.utils.duplicate_guard import folded_column
+
+    keep = query.with_entities(db.func.min(ArchiMateElement.id)).group_by(
+        folded_column(ArchiMateElement.name)
+    )
+    return query.filter(ArchiMateElement.id.in_(keep.subquery().select()))
+
+
 class ArchiMateTraceabilityService:
 
     def get_element_chain(self, element_id: int, max_hops: int = 4) -> dict:
@@ -146,7 +165,19 @@ class ArchiMateTraceabilityService:
                     if item["type"] == el_type and item["layer"] == layer_title:
                         item["count"] += count
                         break
+        for item in result:
+            if item["type"] == 'Capability':
+                # Count capabilities the way the matrix lists them: once each.
+                item["count"] = self._distinct_capability_count(item["layer"])
         return result
+
+    def _distinct_capability_count(self, layer) -> int:
+        base = ArchiMateElement.query.filter(
+            db.func.lower(ArchiMateElement.layer) == (layer or '').lower(),
+            ArchiMateElement.type == 'Capability',
+            ~ArchiMateElement.name.like('tmp-%'),
+        )
+        return _one_row_per_capability(base, 'Capability').count()
 
     def get_full_matrix(self, pivot_type='ApplicationComponent', pivot_layer=None, plateau=None,
                         limit=50, offset=0, search=None, scope=None) -> list:
@@ -181,6 +212,8 @@ class ArchiMateTraceabilityService:
             query = query.filter(ArchiMateElement.name.ilike(f'%{search}%'))
         if scope:
             query = query.filter(db.func.lower(ArchiMateElement.scope) == scope.lower())
+
+        query = _one_row_per_capability(query, pivot_type)
 
         if limit is not None:
             app_elements = query.order_by(ArchiMateElement.name).offset(offset).limit(limit).all()
@@ -236,7 +269,7 @@ class ArchiMateTraceabilityService:
             query = query.filter(ArchiMateElement.name.ilike(f'%{search}%'))
         if scope:
             query = query.filter(db.func.lower(ArchiMateElement.scope) == scope.lower())
-        return query.count()
+        return _one_row_per_capability(query, pivot_type).count()
 
 
 # ── SA-002 — 8-layer traceability chain ─────────────────────────────────────
