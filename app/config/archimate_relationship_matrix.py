@@ -357,6 +357,7 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ("Capability", "Capability"): ["composition", "aggregation", "specialization", "association"],
     ("Capability", "CourseOfAction"): ["realization", "association"],
     ("Capability", "ValueStream"): ["realization", "serving", "association"],
+    ("BusinessService", "ValueStream"): ["serving"],  # a business service serves a value stream stage
     ("Capability", "BusinessProcess"): ["realization", "association"],
     ("Capability", "BusinessFunction"): ["realization", "association"],
     ("Capability", "BusinessService"): ["realization", "association"],
