@@ -51,6 +51,8 @@ PUBLISHED_OPERATIONS = [
     "getBusinessActor",
     "listBusinessProcesses",
     "getBusinessProcess",
+    "listRisks",
+    "getRisk",
 ]
 
 

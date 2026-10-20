@@ -596,7 +596,12 @@ BUSINESS_ROUTES = [
     ("/api/v1/business-processes/<int:process_id>", ["GET"], "api:read"),
 ]
 
-ALL_ROUTES = ELEMENT_ROUTES + STRATEGY_ROUTES + MOTIVATION_ROUTES + BUSINESS_ROUTES
+RISK_ROUTES = [
+    ("/api/v1/risks", ["GET"], "api:read"),
+    ("/api/v1/risks/<int:risk_id>", ["GET"], "api:read"),
+]
+
+ALL_ROUTES = ELEMENT_ROUTES + STRATEGY_ROUTES + MOTIVATION_ROUTES + BUSINESS_ROUTES + RISK_ROUTES
 
 
 def _six_operation_contract() -> dict:
@@ -721,6 +726,26 @@ def _six_operation_contract() -> dict:
             "operationId": "getBusinessProcess",
             "summary": "Get a Business Process",
             "tags": ["Business"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/risks"] = {
+        "get": {
+            "operationId": "listRisks",
+            "summary": "List Risk records",
+            "tags": ["Risk and compliance"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/risks/{id}"] = {
+        "get": {
+            "operationId": "getRisk",
+            "summary": "Get a Risk",
+            "tags": ["Risk and compliance"],
             "parameters": [],
             "responses": {"200": {"description": "Success"}},
             "security": [{"entelimOAuth": ["model:read"]}],
