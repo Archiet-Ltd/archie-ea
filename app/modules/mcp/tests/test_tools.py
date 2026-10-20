@@ -360,6 +360,12 @@ class TestLensToolParity:
         org = make_org("mcp")
         user = _make_user(db_session, org, "mcp-impact@example.com")
         element = _make_element(db_session, org.id, "impact-test")
+        from app.models import ArchiMateRelationship
+
+        leaf = _make_element(db_session, org.id, "impact-test-leaf")
+        db_session.add(ArchiMateRelationship(
+            source_id=element.id, target_id=leaf.id, type="Serving", organization_id=org.id))
+        db_session.commit()
 
         # REST call
         login_as(client, user)
@@ -377,7 +383,8 @@ class TestLensToolParity:
         # Core data matches (excluding timing fields that differ between requests)
         mcp_summary = mcp_result["result"]["summary"]
         assert rest_data["data"]["total"] == mcp_summary["total"]
-        assert mcp_result["result"]["citations"] is not None
+        assert mcp_result["result"]["citations"], "citations must be present"
+        assert "confidence" in mcp_result["result"]
         assert mcp_result["result"]["freshness"]["computed_at"]
 
     def test_ask_risk_parity(self, client, db_session, make_org, login_as):

@@ -84,9 +84,11 @@ def _fence_response_text(payload: dict) -> None:
         elif isinstance(value, dict):
             _fence_response_text(value)
         elif isinstance(value, list):
-            for item in value:
+            for index, item in enumerate(value):
                 if isinstance(item, dict):
                     _fence_response_text(item)
+                elif isinstance(item, str) and key not in _FENCE_SAFE_KEYS:
+                    value[index] = neutralize_fence_lookalikes(item)
 
 
 def _fence_keys(item: Any, keys: tuple[str, ...]) -> None:
@@ -124,17 +126,29 @@ def _impact_answer(args: dict) -> dict:
     service's own immutable answer record."""
     from flask_login import current_user
 
-    from app.modules.intelligence.services.answer_envelope import as_whole_number
+    from .executor import ToolCall, ToolExecutor
 
-    from .executor import ToolExecutor
-
-    element_id = as_whole_number(args["element_id"], "element_id")
-    out = ToolExecutor(user_id=current_user.id)._canonical_answer(
-        "impact", {"element_id": element_id}
+    return ToolExecutor(user_id=current_user.id).execute(
+        ToolCall(
+            id="mcp-ask-impact",
+            name="answer",
+            arguments={"question": "impact", "element_id": args["element_id"]},
+        ),
+        propagate_errors=True,
     )
-    if out.get("success") and isinstance(out.get("result"), dict):
-        _fence_response_text(out["result"])
-    return out
+
+
+# Tools whose result is the answer service's envelope. It names records and
+# carries free text (element names, reasons, messages), so on the connector it
+# is fenced like every route tool's payload. Chat does not go through here.
+ANSWER_ENVELOPE_TOOLS = frozenset({"answer", "ask_impact"})
+
+
+def fence_connector_result(tool_name: str, result: Any) -> Any:
+    """Neutralise fence look-alikes in an answer-envelope tool's result."""
+    if tool_name in ANSWER_ENVELOPE_TOOLS and isinstance(result, dict):
+        _fence_response_text(result)
+    return result
 
 
 def _search_elements(args: dict) -> dict:

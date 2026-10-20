@@ -1,4 +1,4 @@
-"""All ten MCP tools, two organisations, under real PostgreSQL row-level security.
+"""Every MCP tool, two organisations, under real PostgreSQL row-level security.
 
 Every other isolation test in this package (test_isolation.py) calls through the
 ``app``/``db_session`` fixtures, which share one outer transaction that the
@@ -18,7 +18,7 @@ scripts on sdlc-orchestrator origin/qa/pr455-review-2026-10-10):
    a SECRET-tagged name, and a PKCE authorization code for organisation A's
    user scoped to ``/mcp``.
 2. ``_PROBE`` (run as a role that is NOSUPERUSER, NOBYPASSRLS and not the
-   table owner): redeems the code at ``/oauth/token``, then calls all ten
+   table owner): redeems the code at ``/oauth/token``, then calls every
    listed MCP tools with that token against both organisations' data.
 
 Skips cleanly, rather than failing, when the ambient connection cannot create
@@ -237,12 +237,12 @@ def _cleanup_seeded_rows(base_uri, state):
         engine.dispose()
 
 
-def test_all_ten_tools_see_zero_rows_from_the_other_organisation_under_rls(
+def test_all_tools_see_zero_rows_from_the_other_organisation_under_rls(
     app, probe_role, tmp_path
 ):
     """Seed as the owner (one real process), probe as the restricted role
     (a second real process): zero rows from organisation B, across every one
-    of the ten listed tools, reaches organisation A's token.
+    of the listed tools, reaches organisation A's token.
     """
     state_path = tmp_path / "state.json"
     base_env = dict(__import__("os").environ)
@@ -284,7 +284,7 @@ def test_all_ten_tools_see_zero_rows_from_the_other_organisation_under_rls(
 
         called_line = next(line for line in out.splitlines() if line.startswith("CALLED"))
         called_tools = set(json.loads(called_line.split(" ", 1)[1]))
-        assert called_tools == set(ALL_TOOLS), f"not all ten tools were exercised: missing {set(ALL_TOOLS) - called_tools}"
+        assert called_tools == set(ALL_TOOLS), f"not all tools were exercised: missing {set(ALL_TOOLS) - called_tools}"
 
         bad_status_line = next(line for line in out.splitlines() if line.startswith("BAD_STATUS"))
         bad_status = json.loads(bad_status_line.split(" ", 1)[1])

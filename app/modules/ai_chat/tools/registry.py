@@ -1842,7 +1842,7 @@ TOOL_SCHEMAS = [
 # ---------------------------------------------------------------------------
 # Read tools that answer by calling an existing JSON route in-process.
 #
-# These are the ten tools the assistant connector (the /mcp endpoint) serves.
+# These are the tools the assistant connector (the /mcp endpoint) serves.
 # They live here, in the one catalogue, rather than in a list of the
 # connector's own: the connector derives its tool list from the entries that
 # carry the "mcp" surface (see route_read_tools.connector_tools). Their handlers
@@ -1887,13 +1887,24 @@ _ELEMENT_ID_PARAMETERS = {
 }
 
 TOOL_SCHEMAS.extend([
-    _route_read_tool(
-        "ask_impact",
-        "GET /api/v1/intelligence/impact/<element_id>",
-        "Ask what stops if an element fails, and who owns it. "
-        "Returns the cross-layer impact chain for an ArchiMate element.",
-        _ELEMENT_ID_PARAMETERS,
-    ),
+    {
+        # Not a plain route read: it returns the stored answer envelope (rows,
+        # truth class, confidence, citations, freshness) from the answer
+        # service. Read-only apart from that service's own answer record.
+        **_route_read_tool(
+            "ask_impact",
+            "GET /api/v1/intelligence/impact/<element_id>",
+            "",
+            _ELEMENT_ID_PARAMETERS,
+        ),
+        "route": "answer_envelope.ask_and_store",
+        "description": (
+            "Ask what stops if an element fails. Returns the canonical impact "
+            "answer for an ArchiMate element: the rows downstream, with their "
+            "truth class, confidence, citations and the date it was worked out, "
+            "at a permanent address."
+        ),
+    },
     _route_read_tool(
         "ask_strategy",
         "GET /api/v1/intelligence/strategy/<element_id>",
