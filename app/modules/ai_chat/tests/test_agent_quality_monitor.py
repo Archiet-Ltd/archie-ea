@@ -115,7 +115,7 @@ def test_citation_rate_is_cited_over_answers_for_one_organisation(db_session):
     user_a = _make_user(db_session, org_a, "a", 1)
     user_b = _make_user(db_session, org_b, "b", 2)
 
-    cited_a = _make_answer(db_session, org_a, user_a, "addr-a-cited", True, PERIOD_START)
+    _make_answer(db_session, org_a, user_a, "addr-a-cited", True, PERIOD_START)
     uncited_a_1 = _make_answer(db_session, org_a, user_a, "addr-a-uncited-1", False, PERIOD_START + timedelta(hours=1))
     uncited_a_2 = _make_answer(db_session, org_a, user_a, "addr-a-uncited-2", False, PERIOD_START + timedelta(hours=2))
     _make_answer(db_session, org_b, user_b, "addr-b-cited", True, PERIOD_START)
@@ -134,7 +134,7 @@ def test_citation_rate_uncited_ids_match_the_uncited_answers(db_session):
     org = _make_org(db_session, "cited-ids")
     user = _make_user(db_session, org, "cited-ids", 3)
 
-    cited = _make_answer(db_session, org, user, "addr-cited", True, PERIOD_START)
+    _make_answer(db_session, org, user, "addr-cited", True, PERIOD_START)
     uncited_1 = _make_answer(db_session, org, user, "addr-uncited-1", False, PERIOD_START + timedelta(hours=1))
     uncited_2 = _make_answer(db_session, org, user, "addr-uncited-2", False, PERIOD_START + timedelta(hours=2))
 
@@ -218,7 +218,7 @@ def test_prior_period_is_the_same_length_immediately_before(db_session):
     end = start + timedelta(days=1)
 
     _make_answer(db_session, org, user, "addr-prior", False, prior_start)
-    run_prior = _make_run(db_session, org, user, "doctor", prior_start)
+    _make_run(db_session, org, user, "doctor", prior_start)
     _make_refusal_log(db_session, user, "would_refuse_uncited", prior_start, "doctor")
 
     # The current period holds nothing: every figure is None.
