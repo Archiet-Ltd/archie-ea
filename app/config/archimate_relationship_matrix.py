@@ -353,8 +353,6 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ("Resource", "CourseOfAction"): ["association"],
     # Resource assigned to a Business Function: derivable per ArchiMate 3.2 Appendix B.
     ("Resource", "BusinessFunction"): ["assignment", "association"],
-    # Resource assigned to a Business Function: derivable per ArchiMate 3.2 Appendix B.
-    ("Resource", "BusinessFunction"): ["assignment", "association"],
     ("Resource", "ValueStream"): ["association"],
     # Capability relationships
     ("Capability", "Resource"): ["association"],
@@ -381,8 +379,6 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ],
     ("CourseOfAction", "ValueStream"): ["association"],
     ("CourseOfAction", "Goal"): ["realization", "association"],
-    # Course of Action realizes Outcome (ArchiMate 3.2 section 7).
-    ("CourseOfAction", "Outcome"): ["realization", "association"],
     # Course of Action realizes Outcome (ArchiMate 3.2 section 7).
     ("CourseOfAction", "Outcome"): ["realization", "association"],
     ("CourseOfAction", "Requirement"): ["realization", "association"],
@@ -1434,17 +1430,6 @@ for _pair, _types in VALID_RELATIONSHIPS.items():
         _types.remove("realization")
 
 del _pair, _types, _tgt
-
-# Association may connect any two concepts (ArchiMate 3.2 section 5.4.3 and
-# Appendix B). Applied last, over the finished table, and only ever added: no
-# existing entry is removed or reordered.
-for _src in ALL_ELEMENTS:
-    for _dst in ALL_ELEMENTS:
-        _assoc = VALID_RELATIONSHIPS.setdefault((_src, _dst), [])
-        if "association" not in _assoc:
-            _assoc.append("association")
-
-del _src, _dst, _assoc
 
 # Association may connect any two concepts (ArchiMate 3.2 section 5.4.3 and
 # Appendix B). Applied last, over the finished table, and only ever added: no
