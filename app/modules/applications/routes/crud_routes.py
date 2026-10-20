@@ -999,7 +999,7 @@ def application_delete(id):
 
 
 @unified_applications_bp.route("/bulk-delete", methods=["POST"])
-@require_permission("delete", "application")
+@require_permission("bulk_delete", "application")
 @login_required
 @audit_log("application_bulk_delete")
 @rate_limit(5, "1m")

@@ -21,17 +21,22 @@ from __future__ import annotations
 
 from typing import Optional
 
-ACTIONS = ("create", "read", "edit", "delete")
+ACTIONS = ("create", "read", "edit", "delete", "bulk_delete")
 OBJECT_TYPES = ("application",)
 
 _ALL = frozenset(ACTIONS)
+# Architects create, read, edit and delete one application at a time; deleting
+# many at once (``bulk_delete``) stays administrators only by default.
+_ARCHITECT = frozenset({"create", "read", "edit", "delete"})
 _READ = frozenset({"read"})
 
 # Defaults per object type and role key. For ``application`` these are what the
 # route gates allowed before the matrix existed: create, edit and delete were
 # ``require_roles("admin", "architect")``, reading was open to every signed-in
-# account. The changes: the architect role may also delete in bulk (bulk delete
-# was administrators only), and the organisation's own role strings
+# account. The one change in practice: an architect with an organisation
+# role may now delete one application (the control used to be drawn only for
+# ``role_archetype == 'architect'``). Bulk delete stays administrators only
+# (``bulk_delete``). The organisation's own role strings
 # (``org_admin``, ``architect``, ``viewer``) are what the matrix keys on. Any
 # role key not listed gets ``_FALLBACK`` (read only), which is what
 # ``require_roles`` gave it.
@@ -40,7 +45,7 @@ DEFAULTS = {
         "org_admin": _ALL,
         "administrator": _ALL,
         "admin": _ALL,
-        "architect": _ALL,
+        "architect": _ARCHITECT,
         "viewer": _READ,
     }
 }

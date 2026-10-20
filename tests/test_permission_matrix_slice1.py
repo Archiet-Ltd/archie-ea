@@ -2,7 +2,7 @@
 
 The server and the templates read the same matrix. With no grant rows every
 role behaves as before for applications, except that the Architect role may
-delete. An organisation administrator changes the matrix on the Team page.
+delete one application. Bulk delete stays administrators only by default. An organisation administrator changes the matrix on the Team page.
 """
 
 import uuid
@@ -148,6 +148,62 @@ class TestDefaults:
         resp = client.post(f"/applications/{target.id}/delete")
         assert resp.status_code == 401
         assert _exists(db_session, target.id)
+
+
+class TestBulkDeleteDefaults:
+    def test_architect_is_refused_bulk_delete_and_sees_no_bulk_control(
+        self, app, db_session, login_as, client
+    ):
+        org = _org(db_session, "bulk-arch")
+        architect = _user(db_session, org, "architect")
+        target = _application(db_session, org)
+        db_session.commit()
+
+        html = _list_html(client, login_as, architect)
+        assert f'data-testid="btn-delete-{target.id}"' in html
+        assert 'data-testid="bulk-btn-delete"' not in html
+
+        login_as(client, architect)
+        resp = client.post(
+            "/applications/bulk-delete", json={"ids": [target.id], "confirm": True}
+        )
+        assert resp.status_code == 403
+        assert _exists(db_session, target.id)
+
+    def test_administrator_bulk_deletes_by_default(
+        self, app, db_session, login_as, client
+    ):
+        org = _org(db_session, "bulk-admin")
+        admin = _user(db_session, org, "org_admin", platform_role="Administrator")
+        target = _application(db_session, org)
+        db_session.commit()
+
+        html = _list_html(client, login_as, admin)
+        assert 'data-testid="bulk-btn-delete"' in html
+        login_as(client, admin)
+        resp = client.post(
+            "/applications/bulk-delete", json={"ids": [target.id], "confirm": True}
+        )
+        assert resp.status_code not in (401, 403)
+
+    def test_administrator_can_grant_architects_bulk_delete(
+        self, app, db_session, login_as, client
+    ):
+        org = _org(db_session, "bulk-grant")
+        admin = _user(db_session, org, "org_admin", platform_role="Administrator")
+        architect = _user(db_session, org, "architect")
+        target = _application(db_session, org)
+        db_session.commit()
+
+        resp = _set_role_cell(client, login_as, admin, "architect", "bulk_delete", True)
+        assert resp.status_code in (200, 302)
+        html = _list_html(client, login_as, architect)
+        assert 'data-testid="bulk-btn-delete"' in html
+        login_as(client, architect)
+        resp = client.post(
+            "/applications/bulk-delete", json={"ids": [target.id], "confirm": True}
+        )
+        assert resp.status_code not in (401, 403)
 
 
 class TestMatrixOnTheScreen:

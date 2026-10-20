@@ -31,7 +31,7 @@ class PermissionGrant(TenantMixin, db.Model):
     subject_type = db.Column(db.String(16), nullable=False)  # "role" or "user"
     subject_key = db.Column(db.Text, nullable=False)  # role string, or the user id
     object_type = db.Column(db.String(64), nullable=False)  # "application" in slice 1
-    action = db.Column(db.String(16), nullable=False)  # create | read | edit | delete
+    action = db.Column(db.String(16), nullable=False)  # create | read | edit | delete | bulk_delete
     allowed = db.Column(db.Boolean, nullable=False)
     granted_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)

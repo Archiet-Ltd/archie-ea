@@ -351,7 +351,7 @@
           class="h-8 px-3 rounded-md border border-input bg-background text-xs font-medium hover:bg-accent transition-colors inline-flex items-center gap-1.5" aria-label="Add tag">
           <i data-lucide="tag" class="h-3.5 w-3.5" aria-hidden="true"></i>Tag
         </button>
-        {% if can('delete', 'application') %}
+        {% if can('bulk_delete', 'application') %}
         <button type="button" data-testid="bulk-btn-delete" @click="confirmBulkDelete()"
           class="h-8 px-3 rounded-md border border-destructive/30 bg-destructive/5 text-destructive-emphasis text-xs font-medium hover:bg-destructive/10 transition-colors inline-flex items-center gap-1.5" aria-label="Delete">
           <i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i>Delete
