@@ -206,19 +206,19 @@ def attach_relationship_sources(organization_id: int, rows: List[Dict[str, Any]]
     recorded against, which the "Open the record" row links to), ``kindLabel``
     (the relationship type in plain words), ``derived`` and ``source_confidence``.
 
-    ``source_name`` and ``source_timestamp`` answer "how did this fact get into
-    the model" and are set only when a provenance origin exists for the
-    relationship (an import batch, a connector run, or a manual edit with its
-    author role). The relationship model records none of these today (it has
-    ``created_by_id`` and ``derived_from`` only: app/models/archimate_core.py,
-    class ArchiMateRelationship), so both stay ``None`` and the dialog says
-    "Source not recorded", or "Worked out from the model" for a derived row.
+    ``source_timestamp`` is the relationship's recorded as-of date
+    (``updated_at``, else ``created_at``) whenever either exists. ``source_name``
+    is the recorder when the model knows one: the person who drew the link
+    ("Drawn by <name>"), and ``None`` when nobody is recorded. The dialog says
+    "Source not recorded" only when both are ``None``, and "Worked out from the
+    model" for a derived row.
 
     The last id of the row's chain is read inside ``organization_id`` only and
     its element comes from the same organisation, so a link never crosses
     organisations; nothing is invented.
     """
     from app.models import ArchiMateElement, ArchiMateRelationship
+    from app.utils.tenant_users import user_in_org
 
     last_ids = {}
     for index, row in enumerate(rows):
@@ -245,12 +245,24 @@ def attach_relationship_sources(organization_id: int, rows: List[Dict[str, Any]]
         ).scalars().all()
         elements = {e.id: e for e in found_elements}
 
+    people: Dict[int, Optional[str]] = {}
+
+    def drawn_by(user_id) -> Optional[str]:
+        if user_id is None:
+            return None
+        if user_id not in people:
+            user = user_in_org(user_id, organization_id)
+            people[user_id] = _user_label(user) if user is not None else None
+        return people[user_id]
+
     for index, row in enumerate(rows):
         relation = row.setdefault("relation", {})
         rel = relationships.get(last_ids.get(index))
         origin = elements.get(rel.source_id) if rel is not None else None
-        relation["source_name"] = None
-        relation["source_timestamp"] = None
+        who = drawn_by(rel.created_by_id) if rel is not None else None
+        moment = (rel.updated_at or rel.created_at) if rel is not None else None
+        relation["source_name"] = f"Drawn by {who}" if who else None
+        relation["source_timestamp"] = moment.isoformat() if moment else None
         relation["record_name"] = origin.name if origin is not None and origin.name else None
         relation["source_confidence"] = relation.get("confidence")
         relation["derived"] = relation.get("kind") == "derived"
