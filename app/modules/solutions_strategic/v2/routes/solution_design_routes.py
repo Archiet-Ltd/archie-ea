@@ -5043,13 +5043,13 @@ def _engine_archimate_cleanup(solution_ids):
         # they are cast with int() above. Every statement below is keyed off
         # these ids, so the whole cascade is scoped by its input.
         mids = [r[0] for r in conn.execute(
-            text("SELECT id FROM architecture_models WHERE solution_id IN (:sids)").bindparams(bindparam("sids", expanding=True)),
+            text("SELECT id FROM architecture_models WHERE solution_id IN :sids").bindparams(bindparam("sids", expanding=True)),
             {"sids": sids}
         ).fetchall()]
         _ids["mids"] = mids
         if not mids:
             visible = conn.execute(
-                text("SELECT count(*) FROM solutions WHERE id IN (:sids)").bindparams(bindparam("sids", expanding=True)),
+                text("SELECT count(*) FROM solutions WHERE id IN :sids").bindparams(bindparam("sids", expanding=True)),
                 {"sids": sids}
             ).scalar()
             if visible != len(set(sids)):
@@ -5062,192 +5062,192 @@ def _engine_archimate_cleanup(solution_ids):
 
         # tenancy-ok: mids derive from the org-scoped solution ids above.
         eids = [r[0] for r in conn.execute(
-            text("SELECT id FROM archimate_elements WHERE architecture_id IN (:mids)").bindparams(bindparam("mids", expanding=True)),
+            text("SELECT id FROM archimate_elements WHERE architecture_id IN :mids").bindparams(bindparam("mids", expanding=True)),
             {"mids": mids}
         ).fetchall()]
         _ids["eids"] = eids
         if eids:
             # ── Clear back-references that would block element deletion ─────
             _sp_exe("UPDATE solutions SET archimate_element_id = NULL "
-                    "WHERE archimate_element_id IN (:eids)")
+                    "WHERE archimate_element_id IN :eids")
             _sp_exe("UPDATE archimate_elements SET parent_id = NULL "
-                    "WHERE parent_id IN (:eids)")
+                    "WHERE parent_id IN :eids")
 
             # ── Relationships: cover source_id/target_id cross-solution refs ─
             # This is the primary FK that was blocking the delete.
             _sp_exe("DELETE FROM archimate_relationships "
-                    "WHERE source_id IN (:eids) "
-                    "   OR target_id IN (:eids) "
-                    "   OR architecture_id IN (:mids)")
+                    "WHERE source_id IN :eids "
+                    "   OR target_id IN :eids "
+                    "   OR architecture_id IN :mids")
             _sp_exe("DELETE FROM other_relationships "
-                    "WHERE source_id IN (:eids) OR target_id IN (:eids)")
+                    "WHERE source_id IN :eids OR target_id IN :eids")
 
             # ── Multi-column FK tables ──────────────────────────────────────
             _sp_exe("DELETE FROM data_lineage_flows "
-                    "WHERE source_element_id IN (:eids) "
-                    "   OR target_element_id IN (:eids)")
+                    "WHERE source_element_id IN :eids "
+                    "   OR target_element_id IN :eids")
             _sp_exe("DELETE FROM traceability_links "
-                    "WHERE source_archimate_element_id IN (:eids) "
-                    "   OR target_archimate_element_id IN (:eids)")
+                    "WHERE source_archimate_element_id IN :eids "
+                    "   OR target_archimate_element_id IN :eids")
             _sp_exe("DELETE FROM composite_structures "
-                    "WHERE child_element_id IN (:eids) "
-                    "   OR parent_element_id IN (:eids)")
+                    "WHERE child_element_id IN :eids "
+                    "   OR parent_element_id IN :eids")
             _sp_exe("DELETE FROM relationship_suggestions "
-                    "WHERE source_element_id IN (:eids) "
-                    "   OR target_element_id IN (:eids)")
+                    "WHERE source_element_id IN :eids "
+                    "   OR target_element_id IN :eids")
 
             # ── Tables with cross-refs among themselves (must go first) ──────
             _sp_exe("DELETE FROM solution_quality_attributes "
-                    "WHERE constraint_id IN (:eids) OR principle_id IN (:eids)")
+                    "WHERE constraint_id IN :eids OR principle_id IN :eids")
             _sp_exe("DELETE FROM solution_governance_exceptions "
-                    "WHERE principle_id IN (:eids)")
+                    "WHERE principle_id IN :eids")
             _sp_exe("DELETE FROM requirements "
-                    "WHERE archimate_element_id IN (:eids) "
-                    "   OR goal_id           IN (:eids) "
-                    "   OR source_element_id IN (:eids) "
-                    "   OR stakeholder_id    IN (:eids) "
-                    "   OR driver_id         IN (:eids)")
+                    "WHERE archimate_element_id IN :eids "
+                    "   OR goal_id           IN :eids "
+                    "   OR source_element_id IN :eids "
+                    "   OR stakeholder_id    IN :eids "
+                    "   OR driver_id         IN :eids")
             _sp_exe("DELETE FROM risk_assessments "
-                    "WHERE archimate_element_id IN (:eids) "
-                    "   OR goal_id IN (:eids) OR driver_id IN (:eids)")
+                    "WHERE archimate_element_id IN :eids "
+                    "   OR goal_id IN :eids OR driver_id IN :eids")
             _sp_exe("DELETE FROM outcomes "
-                    "WHERE archimate_element_id IN (:eids) "
-                    "   OR goal_id IN (:eids)")
+                    "WHERE archimate_element_id IN :eids "
+                    "   OR goal_id IN :eids")
             _sp_exe("DELETE FROM constraints "
-                    "WHERE archimate_element_id IN (:eids) "
-                    "   OR goal_id IN (:eids)")
+                    "WHERE archimate_element_id IN :eids "
+                    "   OR goal_id IN :eids")
 
             # ── System tables (cross-referencing element IDs) ───────────────
             _sp_exe("DELETE FROM system_dependencies "
-                    "WHERE target_system_id IN (:eids) "
-                    "   OR source_system_id IN (:eids) "
-                    "   OR interface_id     IN (:eids)")
+                    "WHERE target_system_id IN :eids "
+                    "   OR source_system_id IN :eids "
+                    "   OR interface_id     IN :eids")
             _sp_exe("DELETE FROM system_hierarchies "
-                    "WHERE parent_system_id IN (:eids) "
-                    "   OR child_system_id  IN (:eids)")
+                    "WHERE parent_system_id IN :eids "
+                    "   OR child_system_id  IN :eids")
             _sp_exe("DELETE FROM system_interfaces "
-                    "WHERE target_system_id    IN (:eids) "
-                    "   OR source_system_id    IN (:eids) "
-                    "   OR archimate_element_id IN (:eids)")
+                    "WHERE target_system_id    IN :eids "
+                    "   OR source_system_id    IN :eids "
+                    "   OR archimate_element_id IN :eids")
             _sp_exe("DELETE FROM system_lifecycles "
-                    "WHERE system_id              IN (:eids) "
-                    "   OR replacement_system_id  IN (:eids)")
-            _sp_exe("DELETE FROM system_deployments    WHERE system_id              IN (:eids)")
-            _sp_exe("DELETE FROM system_boundaries     WHERE archimate_element_id   IN (:eids)")
-            _sp_exe("DELETE FROM interface_consumer    WHERE consumer_application_id IN (:eids)")
-            _sp_exe("DELETE FROM data_object_storage   WHERE application_component_id IN (:eids)")
+                    "WHERE system_id              IN :eids "
+                    "   OR replacement_system_id  IN :eids")
+            _sp_exe("DELETE FROM system_deployments    WHERE system_id              IN :eids")
+            _sp_exe("DELETE FROM system_boundaries     WHERE archimate_element_id   IN :eids")
+            _sp_exe("DELETE FROM interface_consumer    WHERE consumer_application_id IN :eids")
+            _sp_exe("DELETE FROM data_object_storage   WHERE application_component_id IN :eids")
 
             # ── Application layer ───────────────────────────────────────────
-            _sp_exe("DELETE FROM application_capability          WHERE archimate_application_id IN (:eids)")
-            _sp_exe("DELETE FROM application_collaborations      WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM application_data_objects        WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM application_events              WHERE archimate_element_id IN (:eids) OR publisher_application_id IN (:eids)")
-            _sp_exe("DELETE FROM application_functions           WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM application_interactions        WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM application_interface_metadata  WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM application_interfaces          WHERE archimate_element_id IN (:eids) OR provider_application_id IN (:eids)")
-            _sp_exe("DELETE FROM application_processes           WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM application_services            WHERE archimate_element_id IN (:eids)")
+            _sp_exe("DELETE FROM application_capability          WHERE archimate_application_id IN :eids")
+            _sp_exe("DELETE FROM application_collaborations      WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM application_data_objects        WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM application_events              WHERE archimate_element_id IN :eids OR publisher_application_id IN :eids")
+            _sp_exe("DELETE FROM application_functions           WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM application_interactions        WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM application_interface_metadata  WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM application_interfaces          WHERE archimate_element_id IN :eids OR provider_application_id IN :eids")
+            _sp_exe("DELETE FROM application_processes           WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM application_services            WHERE archimate_element_id IN :eids")
 
             # ── Business layer ──────────────────────────────────────────────
-            _sp_exe("DELETE FROM business_actors        WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM business_capability    WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM business_collaborations WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM business_events        WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM business_function      WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM business_interactions  WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM business_interfaces    WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM business_objects       WHERE archimate_element_id IN (:eids) OR master_system_id IN (:eids)")
-            _sp_exe("DELETE FROM business_processes     WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM business_roles         WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM business_services      WHERE archimate_element_id IN (:eids)")
+            _sp_exe("DELETE FROM business_actors        WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM business_capability    WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM business_collaborations WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM business_events        WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM business_function      WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM business_interactions  WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM business_interfaces    WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM business_objects       WHERE archimate_element_id IN :eids OR master_system_id IN :eids")
+            _sp_exe("DELETE FROM business_processes     WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM business_roles         WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM business_services      WHERE archimate_element_id IN :eids")
 
             # ── Technology layer ────────────────────────────────────────────
-            _sp_exe("DELETE FROM technology_artifacts             WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM technology_collaborations        WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM technology_collaborations_full   WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM technology_communication_networks WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM technology_devices               WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM technology_events                WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM technology_functions             WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM technology_interactions          WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM technology_interfaces            WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM technology_nodes                 WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM technology_paths                 WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM technology_processes             WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM technology_services              WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM technology_system_software       WHERE archimate_element_id IN (:eids)")
+            _sp_exe("DELETE FROM technology_artifacts             WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM technology_collaborations        WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM technology_collaborations_full   WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM technology_communication_networks WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM technology_devices               WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM technology_events                WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM technology_functions             WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM technology_interactions          WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM technology_interfaces            WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM technology_nodes                 WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM technology_paths                 WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM technology_processes             WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM technology_services              WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM technology_system_software       WHERE archimate_element_id IN :eids")
 
             # ── Motivation / data ───────────────────────────────────────────
-            _sp_exe("DELETE FROM drivers             WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM goals               WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM principles          WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM stakeholders        WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM assessments         WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM capability_archimate_classifications WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM code_artifacts      WHERE source_element_id IN (:eids)")
-            _sp_exe("DELETE FROM compliance_requirements WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM conceptual_data_models WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM courses_of_action   WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM data_catalogs       WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM data_domains        WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM data_entities       WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM data_lineage        WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM data_transformations WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM design_patterns     WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM equipment           WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM functional_requirement WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM logical_data_models WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM manufacturing_plants WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM meanings            WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM missing_business_collaborations WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM missing_business_interactions   WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM missing_business_interfaces     WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM motivation_drivers   WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM motivation_goals     WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM motivation_principles WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM non_functional_requirement WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM physical_data_models          WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM physical_distribution_networks WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM physical_equipment            WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM physical_facilities           WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM physical_materials            WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM portfolio_initiatives         WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM production_lines              WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM products                      WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM project_constraints           WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM quality_attributes            WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM representations               WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM saved_diagram_elements        WHERE element_id           IN (:eids)")
-            _sp_exe("DELETE FROM software_dependencies         WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM software_modules              WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM solution_compliance_mappings  WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM solution_contracts_model      WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM solution_patterns             WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM strategy_resources            WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM structural_groupings          WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM structural_junctions          WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM structural_locations          WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM uml_elements                  WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM unified_capabilities          WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM values                        WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM architecture_review_findings  WHERE element_id           IN (:eids)")
-            _sp_exe("DELETE FROM archimate_contracts           WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM archimate_representations     WHERE archimate_element_id IN (:eids)")
-            _sp_exe("DELETE FROM archimate_resources           WHERE archimate_element_id IN (:eids)")
+            _sp_exe("DELETE FROM drivers             WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM goals               WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM principles          WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM stakeholders        WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM assessments         WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM capability_archimate_classifications WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM code_artifacts      WHERE source_element_id IN :eids")
+            _sp_exe("DELETE FROM compliance_requirements WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM conceptual_data_models WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM courses_of_action   WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM data_catalogs       WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM data_domains        WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM data_entities       WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM data_lineage        WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM data_transformations WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM design_patterns     WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM equipment           WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM functional_requirement WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM logical_data_models WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM manufacturing_plants WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM meanings            WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM missing_business_collaborations WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM missing_business_interactions   WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM missing_business_interfaces     WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM motivation_drivers   WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM motivation_goals     WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM motivation_principles WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM non_functional_requirement WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM physical_data_models          WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM physical_distribution_networks WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM physical_equipment            WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM physical_facilities           WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM physical_materials            WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM portfolio_initiatives         WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM production_lines              WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM products                      WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM project_constraints           WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM quality_attributes            WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM representations               WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM saved_diagram_elements        WHERE element_id           IN :eids")
+            _sp_exe("DELETE FROM software_dependencies         WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM software_modules              WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM solution_compliance_mappings  WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM solution_contracts_model      WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM solution_patterns             WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM strategy_resources            WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM structural_groupings          WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM structural_junctions          WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM structural_locations          WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM uml_elements                  WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM unified_capabilities          WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM values                        WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM architecture_review_findings  WHERE element_id           IN :eids")
+            _sp_exe("DELETE FROM archimate_contracts           WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM archimate_representations     WHERE archimate_element_id IN :eids")
+            _sp_exe("DELETE FROM archimate_resources           WHERE archimate_element_id IN :eids")
 
             # ── Now safe to delete archimate_elements ───────────────────────
             # tenancy-ok: mids derive from the org-scoped solution ids above.
-            conn.execute(text("DELETE FROM archimate_elements WHERE architecture_id IN (:mids)").bindparams(bindparam("mids", expanding=True)), {"mids": mids})
+            conn.execute(text("DELETE FROM archimate_elements WHERE architecture_id IN :mids").bindparams(bindparam("mids", expanding=True)), {"mids": mids})
 
         # ── Architecture model child tables (model_id / architecture_id) ───
         _sp_exe("UPDATE arb_review_items SET architecture_model_id = NULL "
-                "WHERE architecture_model_id IN (:mids)")
+                "WHERE architecture_model_id IN :mids")
         _sp_exe("UPDATE viewpoint_views SET architecture_model_id = NULL "
-                "WHERE architecture_model_id IN (:mids)")
-        _sp_exe("DELETE FROM archimate_contracts      WHERE model_id           IN (:mids)")
-        _sp_exe("DELETE FROM archimate_representations WHERE model_id          IN (:mids)")
-        _sp_exe("DELETE FROM archimate_resources       WHERE model_id          IN (:mids)")
+                "WHERE architecture_model_id IN :mids")
+        _sp_exe("DELETE FROM archimate_contracts      WHERE model_id           IN :mids")
+        _sp_exe("DELETE FROM archimate_representations WHERE model_id          IN :mids")
+        _sp_exe("DELETE FROM archimate_resources       WHERE model_id          IN :mids")
         # This is a full solution teardown, so the paired canonical row goes
         # with its source ADR record rather than being left dangling. Three
         # steps, in order: architecture_decision_records.retired_into_id is a
@@ -5260,52 +5260,52 @@ def _engine_archimate_cleanup(solution_ids):
         _sp_exe("CREATE TEMP TABLE IF NOT EXISTS _teardown_canonical_ids (id integer) ON COMMIT DROP")
         _sp_exe("INSERT INTO _teardown_canonical_ids "
                 "SELECT retired_into_id FROM architecture_decision_records "
-                "WHERE architecture_model_id IN (:mids) AND retired_into_id IS NOT NULL")
+                "WHERE architecture_model_id IN :mids AND retired_into_id IS NOT NULL")
         _sp_exe("UPDATE architecture_decision_records SET retired_into_id = NULL "
-                "WHERE architecture_model_id IN (:mids)")
+                "WHERE architecture_model_id IN :mids")
         _sp_exe("DELETE FROM architecture_decisions WHERE id IN (SELECT id FROM _teardown_canonical_ids)")
-        _sp_exe("DELETE FROM architecture_decision_records WHERE architecture_model_id IN (:mids)")
-        _sp_exe("DELETE FROM business_collaborations   WHERE model_id          IN (:mids)")
-        _sp_exe("DELETE FROM business_interactions     WHERE model_id          IN (:mids)")
-        _sp_exe("DELETE FROM business_interfaces       WHERE model_id          IN (:mids)")
-        _sp_exe("DELETE FROM business_processes        WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM code_artifacts            WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM constraints               WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM data_domains              WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM data_entities             WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM drivers                   WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM generation_pipelines      WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM git_repositories          WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM goals                     WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM implementation_gaps       WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM implementation_plateaus   WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM implementation_work_packages WHERE architecture_id IN (:mids)")
-        _sp_exe("DELETE FROM jira_issues               WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM jira_projects             WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM motivation_assessments    WHERE model_id          IN (:mids)")
-        _sp_exe("DELETE FROM motivation_constraints    WHERE model_id          IN (:mids)")
-        _sp_exe("DELETE FROM motivation_meanings       WHERE model_id          IN (:mids)")
-        _sp_exe("DELETE FROM motivation_outcomes       WHERE model_id          IN (:mids)")
-        _sp_exe("DELETE FROM motivation_stakeholders   WHERE model_id          IN (:mids)")
-        _sp_exe("DELETE FROM motivation_values         WHERE model_id          IN (:mids)")
-        _sp_exe("DELETE FROM outcomes                  WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM planning_deliverables     WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM principles                WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM representations           WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM requirements              WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM risk_assessments          WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM salesforce_object         WHERE architecture_model_id IN (:mids)")
-        _sp_exe("DELETE FROM technology_collaborations_full WHERE model_id     IN (:mids)")
-        _sp_exe("DELETE FROM technology_events         WHERE model_id          IN (:mids)")
-        _sp_exe("DELETE FROM technology_functions      WHERE model_id          IN (:mids)")
-        _sp_exe("DELETE FROM technology_interactions   WHERE model_id          IN (:mids)")
-        _sp_exe("DELETE FROM technology_processes      WHERE model_id          IN (:mids)")
-        _sp_exe("DELETE FROM uml_models                WHERE architecture_id   IN (:mids)")
-        _sp_exe("DELETE FROM workflow_pipelines        WHERE architecture_id   IN (:mids)")
+        _sp_exe("DELETE FROM architecture_decision_records WHERE architecture_model_id IN :mids")
+        _sp_exe("DELETE FROM business_collaborations   WHERE model_id          IN :mids")
+        _sp_exe("DELETE FROM business_interactions     WHERE model_id          IN :mids")
+        _sp_exe("DELETE FROM business_interfaces       WHERE model_id          IN :mids")
+        _sp_exe("DELETE FROM business_processes        WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM code_artifacts            WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM constraints               WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM data_domains              WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM data_entities             WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM drivers                   WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM generation_pipelines      WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM git_repositories          WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM goals                     WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM implementation_gaps       WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM implementation_plateaus   WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM implementation_work_packages WHERE architecture_id IN :mids")
+        _sp_exe("DELETE FROM jira_issues               WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM jira_projects             WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM motivation_assessments    WHERE model_id          IN :mids")
+        _sp_exe("DELETE FROM motivation_constraints    WHERE model_id          IN :mids")
+        _sp_exe("DELETE FROM motivation_meanings       WHERE model_id          IN :mids")
+        _sp_exe("DELETE FROM motivation_outcomes       WHERE model_id          IN :mids")
+        _sp_exe("DELETE FROM motivation_stakeholders   WHERE model_id          IN :mids")
+        _sp_exe("DELETE FROM motivation_values         WHERE model_id          IN :mids")
+        _sp_exe("DELETE FROM outcomes                  WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM planning_deliverables     WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM principles                WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM representations           WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM requirements              WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM risk_assessments          WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM salesforce_object         WHERE architecture_model_id IN :mids")
+        _sp_exe("DELETE FROM technology_collaborations_full WHERE model_id     IN :mids")
+        _sp_exe("DELETE FROM technology_events         WHERE model_id          IN :mids")
+        _sp_exe("DELETE FROM technology_functions      WHERE model_id          IN :mids")
+        _sp_exe("DELETE FROM technology_interactions   WHERE model_id          IN :mids")
+        _sp_exe("DELETE FROM technology_processes      WHERE model_id          IN :mids")
+        _sp_exe("DELETE FROM uml_models                WHERE architecture_id   IN :mids")
+        _sp_exe("DELETE FROM workflow_pipelines        WHERE architecture_id   IN :mids")
 
         # ── Now safe to delete architecture_models ──────────────────────────
         # tenancy-ok: mids derive from the org-scoped solution ids above.
-        conn.execute(text("DELETE FROM architecture_models WHERE id IN (:mids)").bindparams(bindparam("mids", expanding=True)), {"mids": mids})
+        conn.execute(text("DELETE FROM architecture_models WHERE id IN :mids").bindparams(bindparam("mids", expanding=True)), {"mids": mids})
 
     # engine transaction committed — all archimate data is cleanly gone
 
