@@ -1159,6 +1159,7 @@ def api_roadmap_delete_gap(gap_id):
 
 @capability_map.route("/api/roadmap/gaps/<int:gap_id>/work-packages", methods=["POST"])
 @login_required
+@require_roles(*_LINK_WRITE_ROLES)
 @rate_limit(30, "1m")
 @audit_log("roadmap_work_package_create")
 def api_roadmap_create_work_package(gap_id):
