@@ -90,8 +90,8 @@ CACHE_TTL_SECONDS = 3600  # fabricated-ok: named config constant (cache TTL), no
 DEFAULT_TOKEN_COST_MULTIPLIER = 1000  # fabricated-ok: named config constant (token cost multiplier), not displayed data
 
 # Fallback in-memory cache if Redis is not available
-_llm_cache_fallback = {}
-_cache_expiry_fallback = {}
+_llm_cache_fallback = {}  # cache-tenancy-ok: the key is a SHA-256 of the full prompt and model, so only a caller sending the identical prompt can read an entry
+_cache_expiry_fallback = {}  # cache-tenancy-ok: expiry times for the prompt-hash keys above; holds no tenant data
 
 # ENT-040: field patterns that must be scrubbed before prompt transmission.
 # Keys are human-readable labels; values are (pattern, replacement) tuples.
