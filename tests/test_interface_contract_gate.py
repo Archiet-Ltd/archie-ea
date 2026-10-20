@@ -692,8 +692,14 @@ class TestCheckInterfaceContract:
         }
         assert gate.count_unbuilt_operations(_app_with_routes(ELEMENT_ROUTES), subset) == 1
 
+        # The real application also serves /answers and /elements/search, so
+        # the subset the subprocess checks it against must list them too.
+        deployed = _minimal_contract()
+        deployed["paths"].update(PUBLIC_READ_ROUTES)
+        deployed["paths"]["/extra"] = subset["paths"]["/extra"]
+
         subset_path = tmp_path / "subset.yaml"
-        _write_contract(subset_path, subset)
+        _write_contract(subset_path, deployed)
         at_baseline = _run(
             sys.executable, str(GATE_SCRIPT), "--subset", str(subset_path), "--baseline", "1"
         )
@@ -757,6 +763,50 @@ EXTRA_OPERATION = {
     }
 }
 
+# The three token-accepting /api/v1 read routes added for stored answers and
+# element search. Any test that runs the gate against the real application
+# with a hand-built subset must list them, or they show up as unlisted.
+PUBLIC_READ_ROUTES = {
+    "/answers": {
+        "get": {
+            "operationId": "listAnswers",
+            "summary": "List the organisation's stored answers",
+            "tags": ["Intelligence"],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    },
+    "/answers/{address}": {
+        "get": {
+            "operationId": "getAnswer",
+            "summary": "Get one stored answer by its permanent address",
+            "tags": ["Intelligence"],
+            "parameters": [
+                {
+                    "name": "address",
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string"},
+                }
+            ],
+            "responses": {
+                "200": {"description": "Success"},
+                "404": {"description": "Not found"},
+            },
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    },
+    "/elements/search": {
+        "get": {
+            "operationId": "searchElements",
+            "summary": "Search the organisation's elements by name",
+            "tags": ["Model"],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    },
+}
+
 
 def _verify_module():
     scripts_dir = str(REPO_ROOT / "scripts")
@@ -786,6 +836,7 @@ class TestZeroGateIsIndependentOfTheRatchet:
         (it used to fail with '[1 > 0]') and the ratchet gate passes."""
         verify = _verify_module()
         subset = _minimal_contract()
+        subset["paths"].update(PUBLIC_READ_ROUTES)
         subset["paths"]["/extra"] = EXTRA_OPERATION
         subset_path = tmp_path / "subset.yaml"
         _write_contract(subset_path, subset)
@@ -801,6 +852,7 @@ class TestZeroGateIsIndependentOfTheRatchet:
         header line."""
         verify = _verify_module()
         subset = _minimal_contract()
+        subset["paths"].update(PUBLIC_READ_ROUTES)
         del subset["paths"]["/elements/{id}"]
         subset_path = tmp_path / "subset.yaml"
         _write_contract(subset_path, subset)
@@ -815,6 +867,7 @@ class TestZeroGateIsIndependentOfTheRatchet:
 
     def test_unlisted_only_flag_skips_the_ratchet(self, tmp_path):
         subset = _minimal_contract()
+        subset["paths"].update(PUBLIC_READ_ROUTES)
         subset["paths"]["/extra"] = EXTRA_OPERATION
         subset_path = tmp_path / "subset.yaml"
         _write_contract(subset_path, subset)

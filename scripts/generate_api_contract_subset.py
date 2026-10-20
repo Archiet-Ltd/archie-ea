@@ -29,7 +29,7 @@ import yaml
 
 # The groups whose operations are published in this subset.
 # Each entry is the first path segment (without leading /).
-PUBLISHED_GROUPS = ["elements"]
+PUBLISHED_GROUPS = ["answers", "elements"]
 
 
 def _to_plain(obj: Any) -> Any:
