@@ -47,6 +47,10 @@ PUBLISHED_OPERATIONS = [
     "getDriver",
     "listGoals",
     "getGoal",
+    "listBusinessActors",
+    "getBusinessActor",
+    "listBusinessProcesses",
+    "getBusinessProcess",
 ]
 
 

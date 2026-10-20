@@ -1,7 +1,7 @@
 # API Contract Subset — auto-generated
 # Source: api-model-v1.yaml
 # SHA256: f34b68f30dd7d8e52334a523eae0af7f025f379232f3280754811be6a74204fc
-# Body-SHA256: 47c206dc658f4b84ca0e5478f721a2dd100de84a15b154e2e8ceb38c6ab4db69
+# Body-SHA256: 35585ec0098a96f042d0a03526eb9957243e3bec46a76892cefdfc91debb27e4
 # Do not edit by hand.
 openapi: 3.1.0
 info:
@@ -47,6 +47,8 @@ servers:
 security:
 - entelimOAuth: []
 tags:
+- name: Business
+  description: Business operations
 - name: Model
   description: Model operations
 - name: Motivation
@@ -54,6 +56,300 @@ tags:
 - name: Strategy
   description: Strategy operations
 paths:
+  /business-actors:
+    get:
+      operationId: listBusinessActors
+      summary: List Business Actor records
+      tags:
+      - Business
+      parameters:
+      - $ref: '#/components/parameters/Filter'
+      - $ref: '#/components/parameters/Q'
+      - $ref: '#/components/parameters/Sort'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/IncludeRetired'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/ScopeParam'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Link:
+              $ref: '#/components/headers/Link'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessActorPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-pagination:
+        style: cursor
+        limit_default: 50
+        limit_max: 200
+        order: stable, by the sort key then id
+      x-personas:
+      - PER-011
+      - PER-041
+      - PER-014
+      - PER-022
+      x-use-cases:
+      - Keep business actor records current and traceable
+      x-entity-id: ENT-0023
+      x-entity: Business Actor
+      x-archimate: Business Actor
+  /business-actors/{id}:
+    get:
+      operationId: getBusinessActor
+      summary: Get a Business Actor
+      tags:
+      - Business
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessActor'
+        '304':
+          description: Not modified since the ETag given in If-None-Match.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '410':
+          $ref: '#/components/responses/Gone'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-personas:
+      - PER-011
+      - PER-041
+      - PER-014
+      - PER-022
+      x-use-cases:
+      - Keep business actor records current and traceable
+      x-entity-id: ENT-0023
+      x-entity: Business Actor
+      x-archimate: Business Actor
+  /business-processes:
+    get:
+      operationId: listBusinessProcesses
+      summary: List Business Process records
+      tags:
+      - Business
+      parameters:
+      - $ref: '#/components/parameters/Filter'
+      - $ref: '#/components/parameters/Q'
+      - $ref: '#/components/parameters/Sort'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/IncludeRetired'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/ScopeParam'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Link:
+              $ref: '#/components/headers/Link'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessProcessPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-pagination:
+        style: cursor
+        limit_default: 50
+        limit_max: 200
+        order: stable, by the sort key then id
+      x-personas:
+      - PER-011
+      - PER-026
+      - PER-010
+      - PER-024
+      - PER-016
+      - PER-008
+      - PER-012
+      - PER-015
+      x-use-case-ids:
+      - UC-182
+      - UC-220
+      - UC-221
+      - UC-272
+      - UC-450
+      - UC-459
+      x-use-cases:
+      - Capture business requirements in a solution design traced to capabilities
+      - Assess which roles and organisation units a transformation changes
+      - Assess clean-core conformance of custom ERP code before an S/4HANA move
+      x-entity-id: ENT-0027
+      x-entity: Business Process
+      x-archimate: Business Process
+  /business-processes/{id}:
+    get:
+      operationId: getBusinessProcess
+      summary: Get a Business Process
+      tags:
+      - Business
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessProcess'
+        '304':
+          description: Not modified since the ETag given in If-None-Match.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '410':
+          $ref: '#/components/responses/Gone'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-personas:
+      - PER-011
+      - PER-026
+      - PER-010
+      - PER-024
+      - PER-016
+      - PER-008
+      - PER-012
+      - PER-015
+      x-use-case-ids:
+      - UC-182
+      - UC-220
+      - UC-221
+      - UC-272
+      - UC-450
+      - UC-459
+      x-use-cases:
+      - Capture business requirements in a solution design traced to capabilities
+      - Assess which roles and organisation units a transformation changes
+      - Assess clean-core conformance of custom ERP code before an S/4HANA move
+      x-entity-id: ENT-0027
+      x-entity: Business Process
+      x-archimate: Business Process
   /capabilities:
     get:
       operationId: listCapabilities
@@ -999,6 +1295,118 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
   schemas:
+    BusinessActor:
+      description: 'Business Actor: An internal or external business actor acting
+        in processes: a department, partner, customer type.'
+      allOf:
+      - $ref: '#/components/schemas/EntityBase'
+      - $ref: '#/components/schemas/BusinessActorAttributes'
+      - type: object
+        properties:
+          lifecycle_state:
+            type: string
+            enum:
+            - planned
+            - in-development
+            - active
+            - phasing-out
+            - retired
+            readOnly: true
+            description: States of lifecycle set LC-ASSET.
+        additionalProperties: false
+      x-entity-id: ENT-0023
+      x-ontology-class: ONT-0028 Business Actor
+      x-archimate: Business Actor
+      x-scope: tenant
+      x-identity-key: tenant_id + actor_type + normalised name
+      x-lifecycle-set: LC-ASSET
+      unevaluatedProperties: false
+    BusinessActorAttributes:
+      type: object
+      properties:
+        actor_type:
+          type: string
+          enum:
+          - internal-unit
+          - external-party
+          - customer
+          - partner
+          - regulator
+        organisation_unit_id:
+          $ref: '#/components/schemas/EntityRef'
+          x-target-entity: OrganisationUnit
+        legal_entity_id:
+          $ref: '#/components/schemas/EntityRef'
+          x-target-entity: LegalEntity
+      description: Attributes specific to Business Actor (ENT-0023).
+    BusinessActorPage:
+      type: object
+      required:
+      - data
+      - page
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/BusinessActor'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    BusinessProcess:
+      description: 'Business Process: A business process at a stated level, optionally
+        classified against a process framework.'
+      allOf:
+      - $ref: '#/components/schemas/EntityBase'
+      - $ref: '#/components/schemas/BusinessProcessAttributes'
+      - type: object
+        properties:
+          lifecycle_state:
+            type: string
+            enum:
+            - planned
+            - in-development
+            - active
+            - phasing-out
+            - retired
+            readOnly: true
+            description: States of lifecycle set LC-ASSET.
+        additionalProperties: false
+      x-entity-id: ENT-0027
+      x-ontology-class: ONT-0032 Business Process
+      x-archimate: Business Process
+      x-scope: tenant
+      x-identity-key: tenant_id + normalised name + process_level
+      x-lifecycle-set: LC-ASSET
+      unevaluatedProperties: false
+    BusinessProcessAttributes:
+      type: object
+      properties:
+        process_level:
+          type: integer
+        reference_entry_id:
+          $ref: '#/components/schemas/EntityRef'
+          x-target-entity: ReferenceModelEntry
+        cycle_time:
+          type: string
+          description: ISO 8601 duration, e.g. P30D.
+        automation_level:
+          type: number
+          minimum: 0
+          maximum: 100
+        critical_function:
+          type: boolean
+      description: Attributes specific to Business Process (ENT-0027).
+    BusinessProcessPage:
+      type: object
+      required:
+      - data
+      - page
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/BusinessProcess'
+        page:
+          $ref: '#/components/schemas/PageInfo'
     Capability:
       description: 'Capability: A business capability at level 0 to 3 of the capability
         map, the anchor most questions are asked against.'

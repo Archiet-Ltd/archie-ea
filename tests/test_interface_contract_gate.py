@@ -589,12 +589,20 @@ MOTIVATION_ROUTES = [
     ("/api/v1/goals/<int:goal_id>", ["GET"], "api:read"),
 ]
 
-ALL_ROUTES = ELEMENT_ROUTES + STRATEGY_ROUTES + MOTIVATION_ROUTES
+BUSINESS_ROUTES = [
+    ("/api/v1/business-actors", ["GET"], "api:read"),
+    ("/api/v1/business-actors/<int:actor_id>", ["GET"], "api:read"),
+    ("/api/v1/business-processes", ["GET"], "api:read"),
+    ("/api/v1/business-processes/<int:process_id>", ["GET"], "api:read"),
+]
+
+ALL_ROUTES = ELEMENT_ROUTES + STRATEGY_ROUTES + MOTIVATION_ROUTES + BUSINESS_ROUTES
 
 
 def _six_operation_contract() -> dict:
-    """The committed subset's ten operations: the two element reads, the
-    four strategy reads, and the four motivation reads this slice builds.
+    """The committed subset's fourteen operations: the two element reads, the
+    four strategy reads, the four motivation reads, and the four business
+    reads this slice builds.
     The gate matches routes to operations by path and method, so the fixture
     contract must list every token-accepting route the real application registers."""
     contract = _minimal_contract()
@@ -673,6 +681,46 @@ def _six_operation_contract() -> dict:
             "operationId": "getGoal",
             "summary": "Get a Goal",
             "tags": ["Motivation"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/business-actors"] = {
+        "get": {
+            "operationId": "listBusinessActors",
+            "summary": "List Business Actor records",
+            "tags": ["Business"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/business-actors/{id}"] = {
+        "get": {
+            "operationId": "getBusinessActor",
+            "summary": "Get a Business Actor",
+            "tags": ["Business"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/business-processes"] = {
+        "get": {
+            "operationId": "listBusinessProcesses",
+            "summary": "List Business Process records",
+            "tags": ["Business"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/business-processes/{id}"] = {
+        "get": {
+            "operationId": "getBusinessProcess",
+            "summary": "Get a Business Process",
+            "tags": ["Business"],
             "parameters": [],
             "responses": {"200": {"description": "Success"}},
             "security": [{"entelimOAuth": ["model:read"]}],
