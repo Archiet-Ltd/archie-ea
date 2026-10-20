@@ -44,6 +44,9 @@ from app.models.architecture_review_board import (
 )
 from app.decorators import audit_log, require_roles
 from app.middleware.tenant_decorators import is_active_org_admin
+from app.modules.architecture.services.review_submission_answers import (
+    submission_review_answers,
+)
 from app.services.arb_analytics_service import ARBAnalyticsService
 from app.services.rate_limiter import rate_limit
 from app.services.arb_governance_service import (
@@ -1532,6 +1535,7 @@ def review_detail(id):
             ARBCapabilityImpact.capability
         ),
         joinedload(ARBReviewItem.comments).joinedload(ARBReviewComment.user),
+        joinedload(ARBReviewItem.arb_session),
     ).get_or_404(id)
 
     # Resolve application names from capability_impacts.application_ids
@@ -1634,6 +1638,14 @@ def review_detail(id):
         current_app.logger.exception(f"Failed to load audit trail for review {id}")
 
     typed_review = _typed_review_context(id)
+    # R1-B74 slice 1: the submission review panel reads the review's stored
+    # set-impact and risk-propagation answers from the one answer store.
+    # Best-effort: the panel must never 500 the review detail page.
+    try:
+        submission_answers = submission_review_answers(review)
+    except Exception:
+        current_app.logger.exception("Submission review answers failed for review %s", id)
+        submission_answers = None
     # Consolidated governance workspace - typed review is the single code path.
     # The legacy branch has been removed. The typed review workspace handles all
     # states: available, historical_unverified, legacy_generic, failed.
@@ -1653,6 +1665,7 @@ def review_detail(id):
         # decision on `pending_info`, which record_decision refuses, and
         # withheld it on `deferred`, which it accepts).
         decidable_statuses=sorted(DECIDABLE_STATUSES),
+        submission_answers=submission_answers,
     ), response_status
 
 
