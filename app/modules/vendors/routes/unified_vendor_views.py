@@ -37,7 +37,6 @@ def _get_vendor_list_context():
         if org_id is None:
             # No organization context: return None stats as per spec
             return {"total": None, "active": None, "strategic": None, "total_products": None, "total_linked_apps": None, "total_acv": None, "renewals_due": None}, []
-        _org_clause, _org_params = org_scope("ac.", keyword="AND")
         rows = db.session.execute(text("""
             SELECT vo.id, vo.name,
                    COUNT(DISTINCT vp.id) AS product_count,
@@ -48,10 +47,10 @@ def _get_vendor_list_context():
             LEFT JOIN vendor_products vp ON vp.vendor_organization_id = vo.id
             LEFT JOIN application_vendor_product_mappings m ON m.vendor_product_id = vp.id
             LEFT JOIN application_components ac ON ac.id = m.application_component_id
-                {_org_clause}
+                AND ac.organization_id = :org_id
             GROUP BY vo.id, vo.name, vo.contract_value_annual, vo.contract_end_date
             ORDER BY app_count DESC, vo.name
-        """.format(_org_clause=_org_clause)), _org_params).fetchall()
+        """), {"org_id": org_id}).fetchall()
         from datetime import datetime, timedelta
         cutoff = datetime.utcnow() + timedelta(days=90)
         vendors = [
