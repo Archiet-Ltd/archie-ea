@@ -417,7 +417,7 @@
                 // so a toast on top of the inline error below was a third
                 // surface for one fault. Keep the inline message (it carries
                 // the admin-link remedy in context); drop the toast.
-                appendError(_streamErr.message, null, { adminLink: true });
+                // The banner states the fault and what still answers; one message only.
                 return;
             }
             /* fall through to non-streaming */
@@ -503,8 +503,8 @@
                 }
 
                 /* A missing provider is a configuration fault, not a transient
-                   one: Retry can only reproduce it. Route the user to the
-                   remedy instead. */
+                   one. The page banner already says so and says what can be
+                   answered without a model; no second message is added. */
                 const _isConfigFault =
                     ArchieChat.transport.isProviderConfigurationFault(data);
 
@@ -516,7 +516,7 @@
                     // surfaces (banner + toast + inline) say one thing. The
                     // inline message stays; it carries the admin-link remedy
                     // in context, which the banner and a toast both lack.
-                    appendError(errorMessage || fullError, null, { adminLink: true });
+                    return;
                 } else {
                     Platform.toast.error(fullError);
                     appendError(fullError, () => _retryTurn(message, timestamp));
