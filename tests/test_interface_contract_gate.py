@@ -608,7 +608,12 @@ IMPLEMENTATION_ROUTES = [
     ("/api/v1/deliverables/<int:deliverable_id>", ["GET"], "api:read"),
 ]
 
-ALL_ROUTES = ELEMENT_ROUTES + STRATEGY_ROUTES + MOTIVATION_ROUTES + BUSINESS_ROUTES + RISK_ROUTES + IMPLEMENTATION_ROUTES
+AI_ROUTES = [
+    ("/api/v1/ai-systems", ["GET"], "api:read"),
+    ("/api/v1/ai-systems/<int:system_id>", ["GET"], "api:read"),
+]
+
+ALL_ROUTES = ELEMENT_ROUTES + STRATEGY_ROUTES + MOTIVATION_ROUTES + BUSINESS_ROUTES + RISK_ROUTES + IMPLEMENTATION_ROUTES + AI_ROUTES
 
 
 def _six_operation_contract() -> dict:
@@ -793,6 +798,26 @@ def _six_operation_contract() -> dict:
             "operationId": "getDeliverable",
             "summary": "Get a Deliverable",
             "tags": ["Implementation and migration"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/ai-systems"] = {
+        "get": {
+            "operationId": "listAISystems",
+            "summary": "List AI System records",
+            "tags": ["AI systems"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/ai-systems/{id}"] = {
+        "get": {
+            "operationId": "getAISystem",
+            "summary": "Get an AI System",
+            "tags": ["AI systems"],
             "parameters": [],
             "responses": {"200": {"description": "Success"}},
             "security": [{"entelimOAuth": ["model:read"]}],

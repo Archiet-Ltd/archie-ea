@@ -1,7 +1,7 @@
 # API Contract Subset — auto-generated
 # Source: api-model-v1.yaml
 # SHA256: f34b68f30dd7d8e52334a523eae0af7f025f379232f3280754811be6a74204fc
-# Body-SHA256: 0711449cd731af781c388a8a7920a1e276eb335a47be6be97c7e7f1c09096e01
+# Body-SHA256: 7b7da9e3d64a90355749f0059ee871636c58abfe73003ea0695b40ddfde98f87
 # Do not edit by hand.
 openapi: 3.1.0
 info:
@@ -47,6 +47,8 @@ servers:
 security:
 - entelimOAuth: []
 tags:
+- name: AI systems
+  description: AI systems operations
 - name: Business
   description: Business operations
 - name: Implementation and migration
@@ -60,6 +62,166 @@ tags:
 - name: Strategy
   description: Strategy operations
 paths:
+  /ai-systems:
+    get:
+      operationId: listAISystems
+      summary: List AI System records
+      tags:
+      - AI systems
+      parameters:
+      - $ref: '#/components/parameters/Filter'
+      - $ref: '#/components/parameters/Q'
+      - $ref: '#/components/parameters/Sort'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/IncludeRetired'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/ScopeParam'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Link:
+              $ref: '#/components/headers/Link'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AISystemPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-pagination:
+        style: cursor
+        limit_default: 50
+        limit_max: 200
+        order: stable, by the sort key then id
+      x-personas:
+      - PER-015
+      - PER-036
+      - PER-035
+      - PER-006
+      - PER-018
+      - PER-031
+      - PER-038
+      - PER-005
+      x-use-case-ids:
+      - UC-034
+      - UC-038
+      - UC-039
+      - UC-081
+      - UC-179
+      - UC-207
+      x-use-cases:
+      - Register an AI system with its models, data and owner
+      - Trace where a personal data category goes across suppliers and AI
+      - Propose the regulatory risk tier of an AI system
+      x-entity-id: ENT-0166
+      x-entity: AI System
+      x-archimate: Application Component (AI system)
+  /ai-systems/{id}:
+    get:
+      operationId: getAISystem
+      summary: Get a AI System
+      tags:
+      - AI systems
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AISystem'
+        '304':
+          description: Not modified since the ETag given in If-None-Match.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '410':
+          $ref: '#/components/responses/Gone'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-personas:
+      - PER-015
+      - PER-036
+      - PER-035
+      - PER-006
+      - PER-018
+      - PER-031
+      - PER-038
+      - PER-005
+      x-use-case-ids:
+      - UC-034
+      - UC-038
+      - UC-039
+      - UC-081
+      - UC-179
+      - UC-207
+      x-use-cases:
+      - Register an AI system with its models, data and owner
+      - Trace where a personal data category goes across suppliers and AI
+      - Propose the regulatory risk tier of an AI system
+      x-entity-id: ENT-0166
+      x-entity: AI System
+      x-archimate: Application Component (AI system)
   /business-actors:
     get:
       operationId: listBusinessActors
@@ -1763,6 +1925,75 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
   schemas:
+    AISystem:
+      description: 'AI System: An AI system in the enterprise''s AI register.'
+      allOf:
+      - $ref: '#/components/schemas/EntityBase'
+      - $ref: '#/components/schemas/AISystemAttributes'
+      - type: object
+        properties:
+          lifecycle_state:
+            type: string
+            enum:
+            - proposed
+            - assessed
+            - approved-for-pilot
+            - in-production
+            - suspended
+            - retired
+            readOnly: true
+            description: States of lifecycle set LC-AI.
+        additionalProperties: false
+      x-entity-id: ENT-0166
+      x-ontology-class: ONT-0162 AI System
+      x-archimate: Application Component (AI system)
+      x-scope: tenant
+      x-identity-key: tenant_id + normalised name
+      x-lifecycle-set: LC-AI
+      unevaluatedProperties: false
+    AISystemAttributes:
+      type: object
+      properties:
+        purpose:
+          type: string
+          maxLength: 50000
+        role:
+          type: string
+          enum:
+          - provider
+          - deployer
+          - importer
+          - distributor
+        risk_class:
+          type: string
+          enum:
+          - prohibited
+          - high
+          - limited
+          - minimal
+          - gpai
+        human_oversight:
+          type: string
+          maxLength: 50000
+        affected_persons:
+          type: string
+          maxLength: 50000
+        application_id:
+          $ref: '#/components/schemas/EntityRef'
+          x-target-entity: ApplicationComponent
+      description: Attributes specific to AI System (ENT-0166).
+    AISystemPage:
+      type: object
+      required:
+      - data
+      - page
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AISystem'
+        page:
+          $ref: '#/components/schemas/PageInfo'
     BusinessActor:
       description: 'Business Actor: An internal or external business actor acting
         in processes: a department, partner, customer type.'

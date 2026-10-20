@@ -57,6 +57,8 @@ PUBLISHED_OPERATIONS = [
     "getWorkPackage",
     "listDeliverables",
     "getDeliverable",
+    "listAISystems",
+    "getAISystem",
 ]
 
 

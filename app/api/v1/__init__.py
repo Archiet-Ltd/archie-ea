@@ -33,6 +33,7 @@ def after_request(response):
 
 
 # Import and register all versioned endpoints
+from .ai import ai_v1_bp
 from .applications import applications_bp
 from .business import business_v1_bp
 from .capabilities import capabilities_bp
@@ -63,6 +64,7 @@ api_v1_bp.register_blueprint(strategy_v1_bp, url_prefix="")
 api_v1_bp.register_blueprint(business_v1_bp, url_prefix="")
 api_v1_bp.register_blueprint(risks_v1_bp, url_prefix="")
 api_v1_bp.register_blueprint(implementation_v1_bp, url_prefix="")
+api_v1_bp.register_blueprint(ai_v1_bp, url_prefix="")
 
 
 # Legacy endpoint redirects with deprecation warnings
