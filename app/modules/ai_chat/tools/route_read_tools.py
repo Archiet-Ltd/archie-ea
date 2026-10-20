@@ -116,6 +116,27 @@ def _intelligence(lens: str) -> Callable[[dict], dict]:
     return handler
 
 
+def _impact_answer(args: dict) -> dict:
+    """``ask_impact`` returns the envelope the canonical answer service stores:
+    rows, truth class, confidence, citations and freshness, at a permanent
+    address. The organisation is the caller's, taken from the token or session
+    by the middleware; it is not an argument. The only write is the answer
+    service's own immutable answer record."""
+    from flask_login import current_user
+
+    from app.modules.intelligence.services.answer_envelope import as_whole_number
+
+    from .executor import ToolExecutor
+
+    element_id = as_whole_number(args["element_id"], "element_id")
+    out = ToolExecutor(user_id=current_user.id)._canonical_answer(
+        "impact", {"element_id": element_id}
+    )
+    if out.get("success") and isinstance(out.get("result"), dict):
+        _fence_response_text(out["result"])
+    return out
+
+
 def _search_elements(args: dict) -> dict:
     query = str(args["query"])
     limit = int(args.get("limit", 30))
@@ -195,7 +216,7 @@ def _get_canvas(args: dict) -> dict:
 
 
 ROUTE_READ_HANDLERS: dict[str, Callable[[dict], dict]] = {
-    "ask_impact": _intelligence("impact"),
+    "ask_impact": _impact_answer,
     "ask_strategy": _intelligence("strategy"),
     "ask_portfolio": _intelligence("portfolio"),
     "ask_programme": _intelligence("programme"),

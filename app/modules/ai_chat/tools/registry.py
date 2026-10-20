@@ -724,7 +724,7 @@ TOOL_SCHEMAS = [
     },
     {
         "name": "answer",
-        "surfaces": ["chat"],
+        "surfaces": ["chat", "mcp"],
         "route": "answer_envelope.ask_and_store",
         "fenced_fields": [],
         "risk_class": "read",

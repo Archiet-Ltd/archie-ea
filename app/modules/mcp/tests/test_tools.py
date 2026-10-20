@@ -232,8 +232,8 @@ class TestMCPInitialize:
         resp = client.post("/mcp", data=json.dumps(payload), content_type="application/json")
         assert resp.status_code == 401
 
-    def test_tools_list_returns_ten_tools(self, client, db_session, make_org, login_as):
-        """tools/list returns exactly the ten read-only tools."""
+    def test_tools_list_returns_the_catalogue_read_tools(self, client, db_session, make_org, login_as):
+        """tools/list returns exactly the read-only tools the catalogue publishes."""
         org = make_org("mcp")
         user = _make_user(db_session, org, "mcp-list@example.com")
         token = _mint_oauth_token(client, db_session, org, user, login_as)
@@ -243,7 +243,7 @@ class TestMCPInitialize:
         expected = {
             "ask_impact", "ask_strategy", "ask_portfolio", "ask_programme",
             "ask_risk", "ask_accountability", "search_elements", "get_element",
-            "list_canvases", "get_canvas",
+            "list_canvases", "get_canvas", "answer",
         }
         assert tool_names == expected
 
@@ -308,7 +308,7 @@ class TestBearerOnlySessionLess:
         )
         assert resp.status_code == 200, resp.get_data(as_text=True)
         data = resp.get_json()
-        assert len(data["result"]["tools"]) == 10
+        assert len(data["result"]["tools"]) == 11
 
     def test_tools_call_with_no_session_cookie_succeeds(self, client, db_session, make_org, login_as):
         """A real tools/call (ask_impact) over a bearer token, on a client
@@ -356,7 +356,7 @@ class TestLensToolParity:
     """Each lens tool returns the same payload as its REST endpoint."""
 
     def test_ask_impact_parity(self, client, db_session, make_org, login_as):
-        """ask_impact returns the same JSON as GET /api/v1/intelligence/impact/<id>."""
+        """ask_impact returns the stored answer envelope; its row count matches the impact route."""
         org = make_org("mcp")
         user = _make_user(db_session, org, "mcp-impact@example.com")
         element = _make_element(db_session, org.id, "impact-test")
@@ -375,11 +375,10 @@ class TestLensToolParity:
         assert rest_data["success"] is True
         assert mcp_result["success"] is True
         # Core data matches (excluding timing fields that differ between requests)
-        rest_summary = {k: v for k, v in rest_data["data"]["summary"].items()
-                        if k != "latency_ms"}
-        mcp_summary = {k: v for k, v in mcp_result["data"]["summary"].items()
-                       if k != "latency_ms"}
-        assert rest_summary == mcp_summary
+        mcp_summary = mcp_result["result"]["summary"]
+        assert rest_data["data"]["total"] == mcp_summary["total"]
+        assert mcp_result["result"]["citations"] is not None
+        assert mcp_result["result"]["freshness"]["computed_at"]
 
     def test_ask_risk_parity(self, client, db_session, make_org, login_as):
         """ask_risk returns the same JSON as GET /api/v1/intelligence/risk/<id>."""
@@ -491,7 +490,8 @@ class TestLensToolParity:
 
         assert rest_data["success"] is False
         assert mcp_result["success"] is False
-        assert rest_data["error"]["code"] == mcp_result["error"]["code"]
+        # The answer service says "not recorded" for a missing element.
+        assert mcp_result["code"] == "NOT_RECORDED"
 
 
 class TestElementTools:
