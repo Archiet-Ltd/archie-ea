@@ -109,7 +109,7 @@ def test_lens_results_still_pass_through_fencing_and_scrubbing(client, db_sessio
         }}
 
     monkeypatch.setattr(route_read_tools, "call_internal_api", fake_route)
-    status, body = _mcp_call(client, token, "ask_impact", {"element_id": element.id})
+    status, body = _mcp_call(client, token, "ask_strategy", {"element_id": element.id})
     assert status == 200, body
     text = body["result"]["content"][0]["text"]
     assert "sk-live-77" not in text
