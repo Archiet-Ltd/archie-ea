@@ -48,32 +48,75 @@ def _relationship(db_session, org_id, source, target):
     return rel
 
 
+def _blank_relationship_dates(db_session, rel, created_at, updated_at):
+    from sqlalchemy import text
+
+    db_session.execute(
+        text("UPDATE archimate_relationships SET created_at = :c, updated_at = :u, created_by_id = NULL WHERE id = :i"),
+        {"c": created_at, "u": updated_at, "i": rel.id},
+    )
+    db_session.commit()
+
+
+def _cascade_relation(client, login_as, user, element_id):
+    login_as(client, user)
+    resp = client.get(f"/api/v1/intelligence/impact/{element_id}")
+    assert resp.status_code == 200
+    rows = resp.get_json()["data"]["rows"]
+    assert rows
+    return rows[0]["relation"]
+
+
 def test_cascade_row_with_a_recorded_source_carries_the_four_fields(app, db_session, make_org, client, login_as):
     org = make_org("dg034-known")
     user = _user(db_session, org.id)
     ledger = _element(db_session, org.id, "Calibration Ledger")
     lookup = _element(db_session, org.id, "Calibration Lookup")
-    _relationship(db_session, org.id, ledger, lookup)
+    rel = _relationship(db_session, org.id, ledger, lookup)
+    rel.created_by_id = user.id
     db_session.commit()
 
-    login_as(client, user)
-    resp = client.get(f"/api/v1/intelligence/impact/{ledger.id}")
-    assert resp.status_code == 200
-    rows = resp.get_json()["data"]["rows"]
-    assert rows
-    relation = rows[0]["relation"]
+    relation = _cascade_relation(client, login_as, user, ledger.id)
     for field in FIELDS:
         assert field in relation, field
-    # The relationship model records no import batch, connector run or author
-    # role (ArchiMateRelationship in app/models/archimate_core.py), so no
-    # origin exists: source_name and source_timestamp stay absent.
-    assert relation["source_name"] is None
-    assert relation["source_timestamp"] is None
+    # The relationship records who drew it and when: both are shown.
+    assert relation["source_name"] == "Drawn by Dg Tester"
+    assert relation["source_timestamp"]
+    assert relation["source_timestamp"][:10] == (rel.updated_at or rel.created_at).date().isoformat()
     assert relation["record_name"] == "Calibration Ledger"
     assert relation["kindLabel"] == "serving"
     assert relation["derived"] is False
     assert "source_confidence" in relation
     assert relation["record_url"] and relation["record_url"].startswith("/")
+
+
+def test_cascade_row_with_only_a_date_keeps_the_date_and_no_recorder(app, db_session, make_org, client, login_as):
+    import datetime
+
+    org = make_org("dg034-dateonly")
+    user = _user(db_session, org.id)
+    a = _element(db_session, org.id, "Date Only A")
+    b = _element(db_session, org.id, "Date Only B")
+    rel = _relationship(db_session, org.id, a, b)
+    _blank_relationship_dates(db_session, rel, datetime.datetime(2026, 3, 4, 9, 30), None)
+
+    relation = _cascade_relation(client, login_as, user, a.id)
+    assert relation["source_name"] is None
+    assert relation["source_timestamp"] and relation["source_timestamp"].startswith("2026-03-04")
+    assert relation["record_name"] == "Date Only A"
+
+
+def test_cascade_row_with_neither_date_nor_recorder_carries_neither(app, db_session, make_org, client, login_as):
+    org = make_org("dg034-neither")
+    user = _user(db_session, org.id)
+    a = _element(db_session, org.id, "Neither A")
+    b = _element(db_session, org.id, "Neither B")
+    rel = _relationship(db_session, org.id, a, b)
+    _blank_relationship_dates(db_session, rel, None, None)
+
+    relation = _cascade_relation(client, login_as, user, a.id)
+    assert relation["source_name"] is None
+    assert relation["source_timestamp"] is None
 
 
 def test_cascade_row_without_a_source_carries_a_null_source_record(app, db_session, make_org):
@@ -111,6 +154,11 @@ def test_the_why_dialog_shows_each_field_or_says_source_not_recorded():
     assert "data-why-source" in template
     assert "Source not recorded" in template
     assert "Worked out from the model" in template
+    # "Source not recorded" shows only when neither a recorder nor a date is recorded
+    not_recorded = re.search(r'x-show="([^"]*)"[^>]*>Source not recorded', template)
+    assert not_recorded, "Source not recorded line missing"
+    assert "!drawer.detail.sourceName" in not_recorded.group(1)
+    assert "!drawer.detail.asOf" in not_recorded.group(1)
     for hook in ("data-source-name", "data-source-type", "data-source-as-of", "data-source-link"):
         assert hook in template, hook
     # the four values are read from the row's detail, filled by core.js
