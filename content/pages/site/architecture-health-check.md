@@ -1,18 +1,18 @@
 ---
 page_family: site
 title: "Architecture health check"
-page_role: "Fixed-price, one-time engagement page for the architecture health check offer."
+page_role: "Fixed-scope, one-time engagement page for the architecture health check offer."
 cta: inquiry
 offer: architecture_health_check
 offer_summary: "I'd like to schedule an architecture health check."
 inquiry_button: "Talk to us"
 inquiry_consent_text: "Used to follow up about pricing and scheduling for the architecture health check you requested."
-description: "A fixed-price enterprise architecture assessment: $4,500, a written report within two weeks of kickoff, run on your own application data. Request yours below."
+description: "A fixed-scope enterprise architecture assessment: $4,500, a written report on a date agreed on the scoping call, run on your own application data. Request yours below."
 ---
 
-# Architecture health check: a fixed-price enterprise architecture assessment
+# Architecture health check: a fixed-scope enterprise architecture assessment
 
-The architecture health check is a fixed-price enterprise architecture assessment of your application landscape. For $4,500 we import your own data into Entelim, run its analysis over it, and deliver a written report within two weeks of kickoff. The report covers what is in your landscape, what breaks if each critical system fails and who owns it, what you pay for twice, which applications have no owner, and which contracts renew next.
+The architecture health check is a fixed-scope enterprise architecture assessment of your application landscape. For $4,500 we import your own data into Entelim, run its analysis over it, and deliver a written report on a date agreed on the scoping call. The report covers what is in your landscape, what breaks if each critical system fails and who owns it, what you pay for twice, which applications have no owner, and which contracts renew next.
 
 ## Who it is for
 
@@ -41,10 +41,10 @@ Where your data is incomplete, the report shows the gap as a gap. A missing owne
 
 ## How it works
 
-1. **Scoping call.** A short call to agree what to import and which systems matter most. The clock starts at kickoff.
+1. **Scoping call.** A short call to agree what to import and which systems matter most, and the date for the report.
 2. **Import.** You send the files. We load them into Entelim: spreadsheets, an Archi or ArchiMate Open Exchange file, or exports from your current tools.
 3. **Analysis.** We run duplicate detection, rationalisation scoring and the dependency analysis across your landscape, and check every finding against your data.
-4. **Written report.** The report is delivered within two weeks of kickoff.
+4. **Written report.** The report is delivered on the date agreed on the scoping call.
 5. **Read-out call.** We take your team through the findings and the gaps in the data.
 
 ## What we need from you
@@ -58,9 +58,9 @@ Your side is gathering the files and answering questions about what they mean. E
 
 ## Price and terms
 
-**$4,500, one time.** Delivered within two weeks of kickoff.
+**$4,500, one time.** The report date is agreed on the scoping call.
 
-The price is fixed. It covers the scoping call, the import, the analysis, the written report and the read-out call. It does not include a subscription: if you want to keep using Entelim after the report, the model stays in your workspace, and you can work on the free Community plan (one organisation, up to three people) or choose a plan on the [pricing page](/pricing). You can also export the model as ArchiMate Open Exchange, or self-host the open-source edition under AGPL-3.0.
+The price covers the scoping call, the import, the analysis, the written report and the read-out call. It does not include a subscription: if you want to keep using Entelim after the report, the model stays in your workspace, and you can work on the free Community plan (one organisation, up to three people) or choose a plan on the [pricing page](/pricing). You can also export the model as ArchiMate Open Exchange, or self-host the open-source edition under AGPL-3.0.
 
 To go ahead, talk to us using the form below and we will set up the scoping call.
 
@@ -79,11 +79,11 @@ If you would rather have the tool set up for your team to run, see the [Team ann
 
 ### How long does an architecture health check take, and what if we are slow to respond?
 
-The report is delivered within two weeks of kickoff, which follows a short scoping call where we agree what to import. The analysis runs on your files and your answers, so the date moves with them. Agree a date for the files on the scoping call, name one person to answer questions, and send what you have as soon as the call is booked.
+The report is delivered on a date agreed on the scoping call, where we also agree what to import. The analysis runs on your files and your answers, so the date moves with them. Agree a date for the files on the scoping call, name one person to answer questions, and send what you have as soon as the call is booked.
 
 ### What if our landscape turns out to be more complex than expected?
 
-The price is fixed for the scope we agree on the scoping call: what to import and which systems matter most. If your landscape is larger than you first described, we say so on that call and agree the scope before kickoff, so the $4,500 never changes halfway through. The report always shows what the data could and could not support.
+The scope and price are agreed on the scoping call: what to import and which systems matter most. If your landscape is larger than you first described, we say so on that call and agree the scope before kickoff. The report always shows what the data could and could not support.
 
 ### What if we don't have an existing ArchiMate model?
 
@@ -105,9 +105,9 @@ The health check is a fixed scope, and the model stays in your workspace when it
 
 Everyone we authorise to handle personal data is bound by a duty of confidentiality, set out in our [data processing agreement](/data-processing-agreement). If you want a mutual NDA signed before any file is sent, say so when you request the health check: nothing is imported until after the scoping call. See the [privacy page](/privacy) for how Entelim handles personal data.
 
-### What exactly is fixed for $4,500, and is anything guaranteed?
+### What is included for $4,500?
 
-Scope and price are fixed: the scoping call, the import, the analysis, the written report and the read-out call, with no hourly billing and no subscription attached. Every finding is checked against your data before it goes into the report, and a thin section means thin data, which the report says plainly. The [pricing page](/pricing) covers the plans, which are separate.
+The price covers the scoping call, the import, the analysis, the written report and the read-out call, with no hourly billing and no subscription attached. Every finding is checked against your data before it goes into the report, and a thin section means thin data, which the report says plainly. The [pricing page](/pricing) covers the plans, which are separate.
 
 ## Request the health check
 
