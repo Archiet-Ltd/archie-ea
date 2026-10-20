@@ -618,6 +618,97 @@ def test_solution_teardown_deletes_the_paired_canonical_row_too(app):
             db.session.commit()
 
 
+def test_solution_teardown_deletes_paired_records_without_request_context(app):
+    """Regression: the cleanup takes its organisation from the solution row,
+    so deleting a solution outside any request context (no ambient
+    organisation) still removes its paired ArchiMate records.
+
+    Does not use the db_session fixture: _engine_archimate_cleanup opens its
+    own db.engine.begin() transaction and commits for real, with manual
+    cleanup below.
+    """
+    from app.models.archimate_core import ArchiMateElement, ArchitectureModel
+    from app.models.organization import Organization
+    from app.models.solution_models import Solution
+    from app.modules.solutions_strategic.v2.routes.solution_design_routes import (
+        _engine_archimate_cleanup,
+    )
+
+    with app.app_context():
+        org = Organization(
+            name="No-context teardown org", slug=f"noctx-{uuid.uuid4().hex[:10]}"
+        )
+        db.session.add(org)
+        db.session.flush()
+
+        solution = Solution(name="No-context target", organization_id=org.id)
+        db.session.add(solution)
+        db.session.flush()
+
+        model = ArchitectureModel(
+            organization_id=org.id,
+            name="No-context model",
+            version="1.0",
+            solution_id=solution.id,
+            model_data="{}",
+            is_default=False,
+        )
+        db.session.add(model)
+        db.session.flush()
+
+        element = ArchiMateElement(
+            organization_id=org.id,
+            name="No-context element",
+            type="ApplicationComponent",
+            layer="Application",
+            architecture_id=model.id,
+        )
+        db.session.add(element)
+        db.session.commit()
+        element_id, solution_id, model_id = element.id, solution.id, model.id
+
+        try:
+            # No request context: g.current_org_id is unset. The solution's own
+            # organisation is passed explicitly, so the scoped deletes still match.
+            _engine_archimate_cleanup([solution_id], organization_id=org.id)
+
+            remaining = (
+                db.session.query(ArchiMateElement)
+                .filter_by(id=element_id)
+                .first()
+            )
+            assert remaining is None, (
+                "paired archimate element survived teardown with no ambient organisation"
+            )
+        finally:
+            db.session.rollback()
+            # Creating the element queued an immutable outbox event for this
+            # organisation; deletion of that table is trigger-guarded, so the
+            # repair setting clears it before the organisation row can go.
+            db.session.execute(
+                db.text("SET LOCAL archie.signed_envelope_repair = 'on'")
+            )
+            db.session.execute(
+                db.text(
+                    "DELETE FROM transformation_outbox_events WHERE organization_id = :i"
+                ),
+                {"i": org.id},
+            )
+            db.session.execute(
+                db.text("DELETE FROM archimate_elements WHERE id = :i"), {"i": element_id}
+            )
+            db.session.execute(
+                db.text("DELETE FROM architecture_models WHERE id = :i"), {"i": model_id}
+            )
+            db.session.execute(
+                db.text("DELETE FROM solutions WHERE id = :i"), {"i": solution_id}
+            )
+            db.session.execute(
+                db.text("DELETE FROM organizations WHERE id = :i"), {"i": org.id}
+            )
+            db.session.commit()
+
+
 def test_set_status_updates_the_canonical_row_and_leaves_the_legacy_row_frozen(db_session, make_org, tenant_ctx):
     """architecture_decisions is the only writer (lead ruling):
     SolutionOptionsAdvisor.set_status() now writes status only to the paired
