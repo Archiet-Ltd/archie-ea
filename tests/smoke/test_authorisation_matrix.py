@@ -60,6 +60,9 @@ POLICY = {
     # risk.risk_register and risk.risk_page (/risks/<id>, 404 for another
     # organisation's risk, pinned in tests/test_risk_ranking.py) are @login_required only.
     "/risks/":                 set(ARCHETYPES),
+    # capability_support.index is @login_required only: the viewer's own
+    # capabilities and the applications of their own organisation.
+    "/architecture/capability-support/": set(ARCHETYPES),
     "/my-applications/":       {"application_manager"},
     "/my-applications/list":   {"application_manager"},
     "/my-applications/health": {"application_manager"},
