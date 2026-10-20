@@ -67,10 +67,10 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
             <div class="flex items-center gap-2">
                 <i data-lucide="sparkles" class="h-4 w-4 text-primary"></i>
                 <h3 class="text-sm font-semibold text-foreground">AI Priority Suggestions</h3>
-                <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">AI-suggested sequencing</span>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-info-emphasis font-medium">AI-suggested sequencing</span>
             </div>
             <button type="button" @click="generate()" :disabled="loading"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                 aria-label="Generate AI priority suggestions">
                 <svg x-show="loading" x-cloak class="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -109,7 +109,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
     </div>
 
     <!-- Investment Priority Matrix -->
-    <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+    <div class="rounded-lg border border-border bg-card text-card-foreground">
         <div class="flex flex-col space-y-1.5 p-6 pb-3">
             <h3 class="text-2xl font-semibold leading-none tracking-tight">Investment Priority Matrix</h3>
         </div>
@@ -161,7 +161,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full caption-bottom text-sm">
+                <table class="dense-table w-full caption-bottom text-sm">
                     <thead class="[&_tr]:border-b">
                         <tr class="border-b transition-colors hover:bg-muted/50">
                             <th class="h-12 px-4 w-10 text-left align-middle font-medium text-muted-foreground">
@@ -273,7 +273,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                 </div>
                 <div class="flex items-center gap-2">
                     <button type="button" @click="currentPage--; syncSelectAll()" :disabled="currentPage === 1"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 disabled:opacity-50 disabled:pointer-events-none"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                         aria-label="Previous page">
                         <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>
                         Previous
@@ -281,7 +281,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                     <span class="inline-flex items-center px-3 text-sm text-muted-foreground"
                           x-text="currentPage + ' / ' + totalPages"></span>
                     <button type="button" @click="currentPage++; syncSelectAll()" :disabled="currentPage === totalPages"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 disabled:opacity-50 disabled:pointer-events-none"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                         aria-label="Next page">
                         Next
                         <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>
@@ -296,7 +296,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
     </div>
 
     <!-- Investment Recommendations -->
-    <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+    <div class="rounded-lg border border-border bg-card text-card-foreground">
         <div class="flex flex-col space-y-1.5 p-6 pb-3">
             <h3 class="text-2xl font-semibold leading-none tracking-tight">Strategic Investment Recommendations</h3>
         </div>
@@ -320,7 +320,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
 
     <!-- Priority Distribution Chart -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+        <div class="rounded-lg border border-border bg-card text-card-foreground">
             <div class="flex flex-col space-y-1.5 p-6 pb-3">
                 <h3 class="text-2xl font-semibold leading-none tracking-tight">Priority Distribution</h3>
             </div>
@@ -329,7 +329,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
             </div>
         </div>
 
-        <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+        <div class="rounded-lg border border-border bg-card text-card-foreground">
             <div class="flex flex-col space-y-1.5 p-6 pb-3">
                 <h3 class="text-2xl font-semibold leading-none tracking-tight">Investment Allocation</h3>
             </div>

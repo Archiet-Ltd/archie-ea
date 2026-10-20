@@ -6,7 +6,7 @@
 #}
 
 {# ── Associated Applications (TOGAF Phase B) ── #}
-<div class="bg-card rounded-xl border border-border shadow-sm p-6 transition-all"
+<div class="bg-card rounded-lg border border-border p-6 transition-all"
      :class="isSectionActive('B') ? 'ring-1 ring-primary/10' : ''">
     <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
@@ -17,10 +17,10 @@
         </div>
         <div class="flex items-center gap-2">
             <button type="button" @click="openManageModal('application')"
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="settings-2" class="w-3 h-3" aria-hidden="true"></i> Manage
             </button>
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Phase B</span>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Phase B</span>
         </div>
     </div>
     <template x-if="linkedApplications.length > 0">
@@ -48,7 +48,7 @@
 </div>
 
 {# ── Vendor Products / Technology Components (TOGAF Phase E) ── #}
-<div class="bg-card rounded-xl border border-border shadow-sm p-6 transition-all"
+<div class="bg-card rounded-lg border border-border p-6 transition-all"
      :class="isSectionActive('E') ? 'ring-1 ring-primary/10' : ''">
     <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
@@ -62,7 +62,7 @@
         </div>
         <div class="flex items-center gap-2">
             <button type="button" @click="openManageModal('vendor_product')"
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="settings-2" class="w-3 h-3" aria-hidden="true"></i> Manage
             </button>
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30">Phase E</span>
@@ -106,7 +106,7 @@
 </div>
 
 {# ── Architecture Decision Records (TOGAF Phase G) ── #}
-<div class="bg-card rounded-xl border border-border shadow-sm p-6 transition-all"
+<div class="bg-card rounded-lg border border-border p-6 transition-all"
      :class="isSectionActive('G') ? 'ring-1 ring-primary/10' : ''">
     <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
@@ -120,7 +120,7 @@
         </div>
         <div class="flex items-center gap-2">
             <button type="button" @click="openManageModal('adr')"
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="settings-2" class="w-3 h-3" aria-hidden="true"></i> Manage
             </button>
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-info/10 text-info-emphasis border border-info/30">Phase G</span>
@@ -154,7 +154,7 @@
     </template>
     <template x-if="linkedADRs.length === 0">
         {% if solution.complexity_level in ('High', 'Complex', 'Enterprise') %}
-        <div class="flex items-start gap-2 p-3 rounded-md bg-warning/10 border border-warning/30 text-warning-emphasis text-sm">
+        <div class="flex items-start gap-2 px-3 py-2 rounded-md bg-warning/10 border border-warning/40 text-warning-emphasis text-sm">
             <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0 mt-0.5 text-warning" aria-hidden="true"></i>
             <span><strong>No ADRs linked.</strong> High-complexity solutions should document key technical decisions as Architecture Decision Records. Click <strong>Manage</strong> to add.</span>
         </div>
@@ -165,7 +165,7 @@
 </div>
 
 {# ── APQC Processes (TOGAF Phase A) ── #}
-<div class="bg-card rounded-xl border border-border shadow-sm p-6 transition-all"
+<div class="bg-card rounded-lg border border-border p-6 transition-all"
      :class="isSectionActive('A') ? 'ring-1 ring-primary/10' : ''">
     <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
@@ -176,7 +176,7 @@
         </div>
         <div class="flex items-center gap-2">
             <button type="button" @click="openManageModal('apqc_process')"
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="settings-2" class="w-3 h-3" aria-hidden="true"></i> Manage
             </button>
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-info/10 text-info-emphasis border border-info/30">Phase A</span>
@@ -204,7 +204,7 @@
 </div>
 
 {# ── Associated Capabilities (TOGAF Phase B) ── #}
-<div class="bg-card rounded-xl border border-border shadow-sm p-6 transition-all"
+<div class="bg-card rounded-lg border border-border p-6 transition-all"
      :class="isSectionActive('B') ? 'ring-1 ring-primary/10' : ''">
     <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
@@ -215,10 +215,10 @@
         </div>
         <div class="flex items-center gap-2">
             <button type="button" @click="openManageModal('capability')"
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="settings-2" class="w-3 h-3" aria-hidden="true"></i> Manage
             </button>
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Phase B</span>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Phase B</span>
         </div>
     </div>
     <template x-if="linkedCapabilities && linkedCapabilities.length > 0">
@@ -260,7 +260,7 @@
 
 {# ── ArchiMate Staging Panel (CAP-009) ── #}
 <div x-show="stagedElements && stagedElements.length > 0" x-cloak
-     class="bg-card rounded-xl border border-info/30 shadow-sm p-6 transition-all ring-1 ring-primary/10"
+     class="bg-card rounded-xl border border-info/30 p-6 transition-all ring-1 ring-primary/10"
      data-testid="archimate-staging-panel">
     <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
@@ -272,12 +272,12 @@
         </div>
         <div class="flex items-center gap-2">
             <button type="button" @click="rejectAllStaged()"
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-destructive-emphasis hover:bg-destructive/10 border border-input transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                 data-testid="btn-reject-all-staged" aria-label="Reject all staged elements">
                 <i data-lucide="x" class="w-3 h-3" aria-hidden="true"></i> Reject All
             </button>
             <button type="button" @click="acceptAllStaged()"
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                 data-testid="btn-accept-all-staged" aria-label="Accept all staged elements">
                 <i data-lucide="check" class="w-3 h-3" aria-hidden="true"></i> Accept All
             </button>
@@ -322,7 +322,7 @@
 </div>
 
 {# ── Requirements (CBP-002: AI-generated, EARS-format, ADM-traced) ── #}
-<div class="requirements-section bg-card rounded-xl border border-border shadow-sm p-6 transition-all">
+<div class="requirements-section bg-card rounded-lg border border-border p-6 transition-all">
     <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
             <h3 class="text-lg font-semibold text-foreground">Requirements</h3>
@@ -332,7 +332,7 @@
                   x-text="(linkedRequirements || []).length + ' linked'" data-testid="requirements-linked-count"></span>
             <button type="button" @click="openManageModal('requirement')"
                 data-manage="requirement"
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                 data-testid="btn-manage-requirements" aria-label="Manage linked requirements">
                 <i data-lucide="settings-2" class="w-3 h-3" aria-hidden="true"></i> Manage
             </button>
@@ -341,7 +341,7 @@
     <template x-if="linkedRequirements && linkedRequirements.length > 0">
         <div class="flex flex-wrap gap-2">
             <template x-for="req in linkedRequirements" :key="req.id">
-                <span class="requirement-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30 group"
+                <span class="requirement-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30 group"
                       :data-testid="'req-badge-' + req.id">
                     <span x-text="req.name || ('Requirement #' + req.id)"></span>
                     <span x-show="req.moscow_priority" x-cloak
@@ -363,11 +363,11 @@
 
 {# ── Multi-Select Picker Modal (shared across all 4 sections) ── #}
 <div x-show="manageModalType" x-cloak
-     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+     class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50"
      role="dialog" aria-modal="true"
      x-trap="!!manageModalType"
      @keydown.escape.window="closeManageModal()">
-    <div class="bg-card rounded-xl border border-border shadow-lg w-full max-w-lg mx-4 flex flex-col" style="max-height: 80vh;"
+    <div class="bg-card rounded-lg border border-border w-full max-w-lg mx-4 flex flex-col" style="max-height: 80vh;"
          @click.outside="closeManageModal()">
         {# Header #}
         <div class="p-6 pb-4 border-b border-border flex-shrink-0">

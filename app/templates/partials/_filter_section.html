@@ -36,13 +36,13 @@
             id="{{ filter.id }}"
             placeholder="{{ filter.placeholder or 'Search...' }}"
             value="{{ filter.value or '' }}"
-            class="flex h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            class="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
         </div>
         {% elif filter.type == 'select' %}
         <select
           id="{{ filter.id }}"
-          class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {% for option in filter.options %}
           <option value="{{ option.value }}" {{ 'selected' if option.selected else '' }}>{{ option.label }}</option>

@@ -1,4 +1,7 @@
 {% extends "layouts/admin_base.html" %}
+{% from 'components/modal.html' import modal %}
+{% from 'components/form_field.html' import form_group, form_footer %}
+{% from 'components/dense_table.html' import dense_table %}
 {# smoke-coverage-ok: CSP inline style fix (removed style="width:0%"); covered by tests/test_capability_map_a11y_csp.py #}
 {% from 'components/data_card.html' import data_card %}
 {% from 'components/page_header.html' import page_header %}
@@ -11,7 +14,7 @@
 
 {# Reusable filter bar macro for capability tables #}
 {% macro capability_filter_bar(context_id, filters=[], has_search=True, has_clear=True) %}
-<div class="bg-card rounded-lg shadow p-4 mb-6">
+<div class="bg-card rounded-lg p-4 mb-6">
     <div class="flex flex-wrap gap-4 items-center">
         {% for filter in filters %}
         {#- Pluralise properly. "All {{ label }}s" produced "All Statuss" and
@@ -205,7 +208,7 @@
                 </div>
 
                 <!-- Business Domain Cards -->
-                <div class="bg-card rounded-lg shadow p-6 mb-6">
+                <div class="bg-card rounded-lg p-6 mb-6">
                     <h3 class="text-lg font-medium text-foreground mb-4">Business Domains</h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4" id="unified-domains-grid">
                         <div class="col-span-full text-center py-8 text-muted-foreground">
@@ -234,7 +237,7 @@
                 ]) }}
 
                 <!-- Data Table with Pagination -->
-                <div class="bg-card rounded-lg shadow">
+                <div class="bg-card rounded-lg">
                     <div class="px-6 py-4 border-b border-border flex justify-between items-center">
                         <h2 class="text-lg font-medium text-foreground">Unified Capability View (Application + Manufacturing)</h2>
                         <div class="text-sm text-muted-foreground">
@@ -242,56 +245,51 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left">
+{% set _dt_header_17648 %}
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         <input type="checkbox" class="rounded border-input text-primary focus-visible:ring-ring"
                                                @change="$el.checked ? selectAllCapabilities('unified') : deselectAllCapabilities('unified')" aria-label="Checkbox field">
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'capability_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'capability_name')">
                                         Capability Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'domain')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'domain')">
                                         Domain <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'level')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'level')">
                                         Level <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'business_owner')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'business_owner')">
                                         Business Owner <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'application_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'application_name')">
                                         Application <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'business_impact')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'business_impact')">
                                         Business Impact <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'strategic_importance')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'strategic_importance')">
                                         Priority <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'coverage_percentage')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'coverage_percentage')">
                                         Coverage <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Status <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-right">
                                         Actions
                                     </th>
-                                </tr>
-                            </thead>
-                            <tbody id="unified-table-body" class="bg-card divide-y divide-border">
+                                
+{% endset %}
+{% call dense_table(header=_dt_header_17648, tbody_id='unified-table-body') %}
                                 <tr>
-                                    <td colspan="11" class="px-6 py-8 text-center text-muted-foreground">
+                                    <td colspan="11" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
                                         <p>Loading unified capability data...</p>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Pagination and Bulk Actions -->
                     <div class="px-6 py-4 border-t border-border">
@@ -404,11 +402,11 @@
                 </div>
 
                 <!-- Manufacturing Domain Cards -->
-                <div class="bg-card rounded-lg shadow p-6 mb-6">
+                <div class="bg-card rounded-lg p-6 mb-6">
                     <h3 class="text-lg font-medium text-foreground mb-4">Manufacturing Domains</h3>
                     <div class="grid grid-cols-1 md:grid-cols-5 gap-4" id="mfg-domains-grid">
                         <!-- Production -->
-                        <div class="bg-warning/5 border-2 border-warning/20 rounded-md p-4 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-warning/10 border-2 border-warning/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="document.getElementById('manufacturing-domain-filter').value='production'; filterTable('manufacturing');">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="p-2 rounded-lg bg-warning/10">
@@ -428,7 +426,7 @@
                         </div>
 
                         <!-- Supply Chain -->
-                        <div class="bg-primary/5 border-2 border-primary/20 rounded-md p-4 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-primary/10 border-2 border-primary/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="document.getElementById('manufacturing-domain-filter').value='supply_chain'; filterTable('manufacturing');">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="p-2 rounded-lg bg-primary/10">
@@ -448,7 +446,7 @@
                         </div>
 
                         <!-- Quality -->
-                        <div class="bg-success/5 border-2 border-success/20 rounded-md p-4 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-success/10 border-2 border-success/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="document.getElementById('manufacturing-domain-filter').value='quality'; filterTable('manufacturing');">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="p-2 rounded-lg bg-success/10">
@@ -468,7 +466,7 @@
                         </div>
 
                         <!-- Maintenance -->
-                        <div class="bg-accent border-2 border-primary/20 rounded-md p-4 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="bg-accent border-2 border-primary/20 rounded-md p-4 transition-shadow cursor-pointer"
                              @click="document.getElementById('manufacturing-domain-filter').value='maintenance'; filterTable('manufacturing');">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="p-2 rounded-lg bg-accent">
@@ -488,7 +486,7 @@
                         </div>
 
                         <!-- Engineering -->
-                        <div class="bg-primary/5 border-2 border-primary/20 rounded-md p-4 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-primary/10 border-2 border-primary/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="document.getElementById('manufacturing-domain-filter').value='engineering'; filterTable('manufacturing');">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="p-2 rounded-lg bg-primary/10">
@@ -526,7 +524,7 @@
                 ]) }}
 
                 <!-- Data Table with Pagination -->
-                <div class="bg-card rounded-lg shadow">
+                <div class="bg-card rounded-lg">
                     <div class="px-6 py-4 border-b border-border flex justify-between items-center">
                         <h2 class="text-lg font-medium text-foreground">Manufacturing Capability Mappings</h2>
                         <div class="text-sm text-muted-foreground">
@@ -534,56 +532,51 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left">
+{% set _dt_header_39335 %}
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         <input type="checkbox" class="rounded border-input text-primary focus-visible:ring-ring"
                                                @change="this.checked ? selectAllCapabilities('manufacturing') : deselectAllCapabilities('manufacturing')" aria-label="Checkbox field">
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'capability_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'capability_name')">
                                         Capability Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'domain')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'domain')">
                                         Domain <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'level')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'level')">
                                         Level <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'business_owner')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'business_owner')">
                                         Business Owner <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'application_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'application_name')">
                                         Application <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'business_impact')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'business_impact')">
                                         Business Impact <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'strategic_importance')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'strategic_importance')">
                                         Priority <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'coverage_percentage')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'coverage_percentage')">
                                         Coverage <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Status <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-right">
                                         Actions
                                     </th>
-                                </tr>
-                            </thead>
-                            <tbody id="manufacturing-table-body" class="bg-card divide-y divide-border">
+                                
+{% endset %}
+{% call dense_table(header=_dt_header_39335, tbody_id='manufacturing-table-body') %}
                                 <tr>
-                                    <td colspan="11" class="px-6 py-8 text-center text-muted-foreground">
+                                    <td colspan="11" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
                                         <p>Loading manufacturing capability data...</p>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Bulk Actions -->
                     <div class="px-6 py-3 border-t border-border flex items-center space-x-4">
@@ -658,7 +651,7 @@
                 </div>
 
                 <!-- Application Domain Cards -->
-                <div class="bg-card rounded-lg shadow p-6 mb-6">
+                <div class="bg-card rounded-lg p-6 mb-6">
                     <h3 class="text-lg font-medium text-foreground mb-4">Application Domains</h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4" id="application-domains-grid">
                         <div class="col-span-full text-center py-8 text-muted-foreground">
@@ -679,7 +672,7 @@
                 ]) }}
 
                 <!-- Data Table with Pagination -->
-                <div class="bg-card rounded-lg shadow">
+                <div class="bg-card rounded-lg">
                     <div class="px-6 py-4 border-b border-border flex justify-between items-center">
                         <h2 class="text-lg font-medium text-foreground">Application Capability Mappings</h2>
                         <div class="text-sm text-muted-foreground">
@@ -687,56 +680,51 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left">
+{% set _dt_header_50200 %}
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         <input type="checkbox" class="rounded border-input text-primary focus-visible:ring-ring"
                                                @change="this.checked ? selectAllCapabilities('application') : deselectAllCapabilities('application')" aria-label="Checkbox field">
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'capability_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'capability_name')">
                                         Capability Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'domain')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'domain')">
                                         Domain <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'level')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'level')">
                                         Level <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'business_owner')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'business_owner')">
                                         Business Owner <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'application_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'application_name')">
                                         Application <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'business_impact')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'business_impact')">
                                         Business Impact <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'strategic_importance')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'strategic_importance')">
                                         Priority <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'coverage_percentage')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'coverage_percentage')">
                                         Coverage <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Status <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-right">
                                         Actions
                                     </th>
-                                </tr>
-                            </thead>
-                            <tbody id="application-table-body" class="bg-card divide-y divide-border">
+                                
+{% endset %}
+{% call dense_table(header=_dt_header_50200, tbody_id='application-table-body') %}
                                 <tr>
-                                    <td colspan="11" class="px-6 py-8 text-center text-muted-foreground">
+                                    <td colspan="11" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
                                         <p>Loading application capability data...</p>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Bulk Actions -->
                     <div class="px-6 py-3 border-t border-border flex items-center space-x-4">
@@ -831,7 +819,7 @@
                 ]) }}
 
                 <!-- Data Table with Pagination -->
-                <div class="bg-card rounded-lg shadow">
+                <div class="bg-card rounded-lg">
                     <div class="px-6 py-4 border-b border-border flex justify-between items-center">
                         <h2 class="text-lg font-medium text-foreground">Gap Analysis (Capabilities Without Applications)</h2>
                         <div class="text-sm text-muted-foreground">
@@ -839,56 +827,51 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left">
+{% set _dt_header_60937 %}
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         <input type="checkbox" class="rounded border-input text-primary focus-visible:ring-ring"
                                                @change="this.checked ? selectAllCapabilities('gap') : deselectAllCapabilities('gap')" aria-label="Checkbox field">
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'capability_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'capability_name')">
                                         Capability Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'domain')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'domain')">
                                         Domain <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'level')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'level')">
                                         Level <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'business_owner')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'business_owner')">
                                         Business Owner <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'application_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'application_name')">
                                         Application <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'business_impact')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'business_impact')">
                                         Business Impact <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'strategic_importance')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'strategic_importance')">
                                         Priority <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'coverage_percentage')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'coverage_percentage')">
                                         Coverage <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Status <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-right">
                                         Actions
                                     </th>
-                                </tr>
-                            </thead>
-                            <tbody id="gap-table-body" class="bg-card divide-y divide-border">
+                                
+{% endset %}
+{% call dense_table(header=_dt_header_60937, tbody_id='gap-table-body') %}
                                 <tr>
-                                    <td colspan="11" class="px-6 py-8 text-center text-muted-foreground">
+                                    <td colspan="11" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
                                         <p>Loading gap analysis data...</p>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Bulk Actions -->
                     <div class="px-6 py-3 border-t border-border flex items-center space-x-4">
@@ -973,7 +956,7 @@
                     </div>
 
                     <!-- ACM Domain Coverage Summary -->
-                    <div class="bg-card rounded-lg shadow p-4 mb-6">
+                    <div class="bg-card rounded-lg p-4 mb-6">
                         <h3 class="text-md font-medium text-foreground mb-4">Domain Coverage Summary</h3>
                         <div class="grid grid-cols-1 md:grid-cols-7 gap-2" id="acm-domain-coverage-grid">
                             <!-- Populated by JS -->
@@ -982,7 +965,7 @@
                     </div>
 
                     <!-- ACM Gap Filters -->
-                    <div class="bg-card rounded-lg shadow p-4 mb-6">
+                    <div class="bg-card rounded-lg p-4 mb-6">
                         <div class="flex flex-wrap gap-4 items-center">
                             <div class="flex items-center space-x-2">
                                 <label for="acm-gap-domain-filter" class="text-sm font-medium text-muted-foreground">Domain:</label>
@@ -1028,47 +1011,21 @@
                     </div>
 
                     <!-- ACM Gap Table -->
-                    <div class="bg-card rounded-lg shadow">
+                    <div class="bg-card rounded-lg">
                         <div class="px-6 py-4 border-b border-border flex justify-between items-center">
                             <h3 class="text-lg font-medium text-foreground">Technical Capabilities Gap Details</h3>
                             <div class="text-sm text-muted-foreground">
                                 <span id="acm-gap-showing">0</span> capabilities
                             </div>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-border">
-                                <thead class="bg-muted/50">
+{% call dense_table(columns=[('Capability', ''), ('Domain', ''), ('Level', ''), ('Applications', ''), ('Vendors', ''), ('Status', '')], tbody_id='acm-gap-table-body') %}
                                     <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Capability
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Domain
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Level
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Applications
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Vendors
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Status
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody id="acm-gap-table-body" class="bg-card divide-y divide-border">
-                                    <tr>
-                                        <td colspan="6" class="px-6 py-8 text-center text-muted-foreground">
+                                        <td colspan="6" class="px-2 dense-empty text-center text-muted-foreground">
                                             <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-info mx-auto mb-4" aria-hidden="true"></i>
                                             <p>Loading ACM gap analysis data...</p>
                                         </td>
                                     </tr>
-                                </tbody>
-                            </table>
-                        </div>
+                                {% endcall %}
                     </div>
                 </div>
             </div>
@@ -1115,14 +1072,14 @@
                 </div>
 
                 <!-- APQC Process Category Cards -->
-                <div class="bg-card rounded-lg shadow p-6 mb-6">
+                <div class="bg-card rounded-lg p-6 mb-6">
                     <h3 class="text-lg font-medium text-foreground mb-4">APQC Process Categories (PCF)</h3>
                     <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-3" id="process-categories-grid">
                         <!-- Operating Processes (1-5) -->
-                        <div class="bg-primary/5 border-2 border-primary/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-primary/10 border-2 border-primary/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('1.0')">
                             <div class="flex items-start justify-between mb-2">
-                                <span class="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">1.0</span>
+                                <span class="text-xs font-bold text-info-emphasis bg-primary/10 px-2 py-0.5 rounded">1.0</span>
                                 <div class="w-2 h-2 rounded-full bg-muted-foreground/40" id="proc-cat-1-status"></div>
                             </div>
                             <h4 class="text-sm font-semibold text-primary mb-1">Vision &amp; Strategy</h4>
@@ -1131,7 +1088,7 @@
                                 <span class="font-medium text-primary" id="proc-cat-1-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-success/5 border-2 border-success/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-success/10 border-2 border-success/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('2.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-success-emphasis bg-success/10 px-2 py-0.5 rounded">2.0</span>
@@ -1143,7 +1100,7 @@
                                 <span class="font-medium text-success-emphasis" id="proc-cat-2-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-accent border-2 border-primary/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="bg-accent border-2 border-primary/20 rounded-md p-3 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('3.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-primary bg-accent px-2 py-0.5 rounded">3.0</span>
@@ -1155,7 +1112,7 @@
                                 <span class="font-medium text-primary" id="proc-cat-3-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-warning/5 border-2 border-warning/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-warning/10 border-2 border-warning/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('4.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-warning-emphasis bg-warning/10 px-2 py-0.5 rounded">4.0</span>
@@ -1167,7 +1124,7 @@
                                 <span class="font-medium text-warning-emphasis" id="proc-cat-4-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-success/5 border-2 border-info/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-success/10 border-2 border-info/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('5.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-success-emphasis bg-success/10 px-2 py-0.5 rounded">5.0</span>
@@ -1180,10 +1137,10 @@
                             </div>
                         </div>
                         <!-- Management & Support (6-13) -->
-                        <div class="bg-primary/5 border-2 border-primary/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-primary/10 border-2 border-primary/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('6.0')">
                             <div class="flex items-start justify-between mb-2">
-                                <span class="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">6.0</span>
+                                <span class="text-xs font-bold text-info-emphasis bg-primary/10 px-2 py-0.5 rounded">6.0</span>
                                 <div class="w-2 h-2 rounded-full bg-muted-foreground/40" id="proc-cat-6-status"></div>
                             </div>
                             <h4 class="text-sm font-semibold text-primary mb-1">Customer Service</h4>
@@ -1192,7 +1149,7 @@
                                 <span class="font-medium text-primary" id="proc-cat-6-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-destructive/5 border-2 border-destructive/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-destructive/10 border-2 border-destructive/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('7.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-destructive-emphasis bg-destructive/10 px-2 py-0.5 rounded">7.0</span>
@@ -1204,7 +1161,7 @@
                                 <span class="font-medium text-destructive-emphasis" id="proc-cat-7-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-info/5 border-2 border-info/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-info/10 border-2 border-info/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('8.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-info bg-info/10 px-2 py-0.5 rounded">8.0</span>
@@ -1216,7 +1173,7 @@
                                 <span class="font-medium text-info" id="proc-cat-8-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-warning/5 border-2 border-warning/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-warning/10 border-2 border-warning/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('9.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-warning-emphasis bg-warning/10 px-2 py-0.5 rounded">9.0</span>
@@ -1228,7 +1185,7 @@
                                 <span class="font-medium text-warning-emphasis" id="proc-cat-9-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-destructive/5 border-2 border-destructive/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-destructive/10 border-2 border-destructive/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('10.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-destructive-emphasis bg-destructive/10 px-2 py-0.5 rounded">10.0</span>
@@ -1240,7 +1197,7 @@
                                 <span class="font-medium text-destructive-emphasis" id="proc-cat-10-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-success/5 border-2 border-success/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-success/10 border-2 border-success/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('11.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-success-emphasis bg-success/10 px-2 py-0.5 rounded">11.0</span>
@@ -1252,7 +1209,7 @@
                                 <span class="font-medium text-success-emphasis" id="proc-cat-11-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-muted border-2 border-border rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="bg-muted border-2 border-border rounded-md p-3 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('12.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded">12.0</span>
@@ -1264,7 +1221,7 @@
                                 <span class="font-medium text-muted-foreground" id="proc-cat-12-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-destructive/5 border-2 border-destructive/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-destructive/10 border-2 border-destructive/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('13.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-destructive-emphasis bg-destructive/10 px-2 py-0.5 rounded">13.0</span>
@@ -1280,7 +1237,7 @@
                 </div>
 
                 <!-- Table Filters -->
-                <div class="bg-card rounded-lg shadow p-4 mb-6">
+                <div class="bg-card rounded-lg p-4 mb-6">
                     <div class="flex flex-wrap gap-4 items-center">
                         <div class="flex items-center space-x-2">
                             <label for="process-category-filter" class="text-sm font-medium text-muted-foreground">Category:</label>
@@ -1334,7 +1291,7 @@
                 </div>
 
                 <!-- Data Table with Pagination -->
-                <div class="bg-card rounded-lg shadow">
+                <div class="bg-card rounded-lg">
                     <div class="px-6 py-4 border-b border-border flex justify-between items-center">
                         <div>
                             <h2 class="text-lg font-medium text-foreground">Process Gap Analysis (Processes Without Applications)</h2>
@@ -1345,52 +1302,47 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('name')">
+{% set _dt_header_97593 %}
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('name')">
                                         Process Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('process_type')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('process_type')">
                                         Type <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('level')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('level')">
                                         Level <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('process_owner')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('process_owner')">
                                         Owner <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('mapping_count')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('mapping_count')">
                                         Applications <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('avg_automation_coverage')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('avg_automation_coverage')">
                                         Automation <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('business_impact')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('business_impact')">
                                         Business Impact <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('gap_severity')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('gap_severity')">
                                         Gap Severity <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Gap Status
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Actions
                                     </th>
-                                </tr>
-                            </thead>
-                            <tbody id="process-gap-table-body" class="bg-card divide-y divide-border">
+                                
+{% endset %}
+{% call dense_table(header=_dt_header_97593, tbody_id='process-gap-table-body') %}
                                 <tr>
-                                    <td colspan="10" class="px-6 py-8 text-center text-muted-foreground">
+                                    <td colspan="10" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
                                         <p>Loading process gap data...</p>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Pagination -->
                     <div class="px-6 py-4 border-t border-border flex items-center justify-between">
@@ -1419,7 +1371,7 @@
                 </div>
 
                 <!-- Legend -->
-                <div class="mt-6 bg-card rounded-lg shadow p-4">
+                <div class="mt-6 bg-card rounded-lg p-4">
                     <h3 class="text-sm font-medium text-muted-foreground mb-3">Gap Status Legend</h3>
                     <div class="flex items-center gap-6 flex-wrap">
                         <div class="flex items-center gap-2">
@@ -1499,7 +1451,7 @@
                             <h3 id="heatmap-detail-name" class="text-base font-bold text-foreground"></h3>
                             <p id="heatmap-detail-domain" class="text-xs text-muted-foreground"></p>
                         </div>
-                        <button aria-label="Close capability details" type="button" @click="document.getElementById('heatmap-detail').classList.add('hidden')" class="text-muted-foreground hover:text-foreground p-1">
+                        <button aria-label="Close capability details" type="button" @click="document.getElementById('heatmap-detail').classList.add('hidden')" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <i data-lucide="x" class="w-4 h-4"></i>
                         </button>
                     </div>
@@ -1620,7 +1572,7 @@
                 </div>
 
                 <!-- Domain Cards Grid -->
-                <div class="bg-card rounded-lg shadow">
+                <div class="bg-card rounded-lg">
                     <div class="px-6 py-4 border-b border-border">
                         <h2 class="text-lg font-medium text-foreground">ACM Technical Capability Domains</h2>
                         <p class="text-sm text-muted-foreground">7 domains covering application architecture capabilities (L0-L4 hierarchy)</p>
@@ -1639,7 +1591,7 @@
                 </div>
 
                 <!-- Capabilities Table -->
-                <div class="bg-card rounded-lg shadow mt-6">
+                <div class="bg-card rounded-lg mt-6">
                     <div class="px-6 py-4 border-b border-border flex justify-between items-center">
                         <div>
                             <h2 class="text-lg font-medium text-foreground">Technical Capabilities</h2>
@@ -1669,29 +1621,14 @@
                             </select>
                         </div>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
+{% call dense_table(columns=[('Code', ''), ('Name', ''), ('Domain', ''), ('Level', ''), ('Apps', ''), ('Status', ''), ('Actions', '')], tbody_id='acm-capabilities-table') %}
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Code</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Domain</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Level</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Apps</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="acm-capabilities-table" class="bg-card divide-y divide-border">
-                                <tr>
-                                    <td colspan="7" class="px-6 py-12 text-center text-muted-foreground">
+                                    <td colspan="7" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2" aria-hidden="true"></i>
                                         Loading capabilities...
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Pagination -->
                     <div class="px-6 py-4 border-t border-border flex items-center justify-between">
@@ -1724,25 +1661,10 @@
         </div>
 
         <!-- Convert to Roadmap Modal - Standardized Design -->
-        <div id="convert-modal" hidden role="dialog" aria-modal="true" aria-labelledby="convert-modal-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
-            <div class="relative top-20 mx-auto p-0 w-full max-w-2xl">
-                <div class="bg-card rounded-lg shadow-xl">
-                    <!-- Header -->
-                    <div class="flex items-center justify-between p-5 border-b border-border bg-primary rounded-t-lg">
-                        <div class="flex items-center space-x-3">
-                            <i data-lucide="git-branch" class="w-6 h-6 text-primary-foreground" aria-hidden="true"></i>
-                            <div>
-                                <h3 class="text-lg font-semibold text-primary-foreground">Convert Gaps to Roadmap Items</h3>
-                                <p class="text-sm text-primary-foreground/70">Transform auto-detected gaps into trackable roadmap items</p>
-                            </div>
-                        </div>
-                        <button type="button" @click="closeConvertModal()" class="text-primary-foreground hover:text-muted-foreground/50" aria-label="Close convert gaps modal">
-                            <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
-                        </button>
-                    </div>
+        {% call modal(id='convert-modal', title='Convert Gaps to Roadmap Items', description='Transform auto-detected gaps into trackable roadmap items', size='lg') %}
 
                     <!-- Quick Stats Bar -->
-                    <div class="bg-muted/50 border-b border-border px-6 py-4">
+                    <div class="bg-muted/50 border-b border-border py-4 pb-4 mb-4">
                         <div class="grid grid-cols-3 gap-4">
                             <div class="flex items-center space-x-3">
                                 <div class="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
@@ -1775,9 +1697,9 @@
                     </div>
 
                     <!-- Body -->
-                    <div class="p-6 max-h-[60vh] overflow-y-auto">
+                    <div class="max-h-[60vh] overflow-y-auto">
                         <!-- Description -->
-                        <div class="bg-primary/5 border border-primary/20 rounded-lg p-4 mb-6">
+                        <div class="bg-primary/10 border border-primary/40 rounded-md px-3 py-2 mb-6">
                             <div class="flex items-start space-x-3">
                                 <i data-lucide="info" class="w-5 h-5 text-primary mt-0.5" aria-hidden="true"></i>
                                 <div>
@@ -1814,8 +1736,7 @@
                                 </div>
 
                                 <!-- Work Package Template -->
-                                <div id="convert-template-section">
-                                    <label for="convert-wp-template" class="block text-sm font-medium text-muted-foreground mb-2">Work Package Template</label>
+                                {% call form_group(id='convert-wp-template', label='Work Package Template', help_text='Select a template that matches your gap resolution approach. The auto-select option will choose the best template based on gap type.', attrs='id="convert-template-section"') %}
                                     <select id="convert-wp-template" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                         <option value="auto">Auto-select based on gap type</option>
                                         <option value="default">Default (Requirements → Design → Implementation → Testing → Deploy)</option>
@@ -1823,10 +1744,7 @@
                                         <option value="modernization">Modernization (Assessment → Design → Migration → Validation)</option>
                                         <option value="retirement">Retirement (Impact Analysis → Migration → Archive → Decommission)</option>
                                     </select>
-                                    <p class="text-xs text-muted-foreground mt-2">
-                                        Select a template that matches your gap resolution approach. The auto-select option will choose the best template based on gap type.
-                                    </p>
-                                </div>
+                                {% endcall %}
                             </div>
                         </div>
 
@@ -1863,51 +1781,36 @@
                             <button type="button" @click="closeConvertModal()" class="px-5 py-2.5 text-muted-foreground bg-card border border-input rounded-md hover:bg-accent font-medium" aria-label="Cancel gap conversion">
                                 Cancel
                             </button>
-                            <button type="button" @click="executeConvertGaps(event)" class="px-5 py-2.5 bg-primary text-primary-foreground rounded-md hover:bg-primary flex items-center font-medium shadow-sm" aria-label="Execute gap conversion">
+                            <button type="button" @click="executeConvertGaps(event)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Execute gap conversion">
                                 <i data-lucide="check" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                                 Convert Gaps
                             </button>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
+                
+{% endcall %}
 
         <!-- Edit Gap Modal -->
-        <div id="edit-gap-modal" hidden role="dialog" aria-modal="true" aria-labelledby="edit-gap-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
-            <div class="relative top-10 mx-auto p-0 w-full max-w-3xl">
-                <div class="bg-card rounded-lg shadow-xl">
-                    <!-- Header -->
-                    <div class="flex items-center justify-between p-4 border-b border-border bg-primary rounded-t-lg">
-                        <div class="flex items-center space-x-3">
-                            <i data-lucide="edit-3" class="w-6 h-6 text-primary-foreground" aria-hidden="true"></i>
-                            <h3 class="text-lg font-semibold text-primary-foreground" id="edit-gap-title">Edit Gap</h3>
-                        </div>
-                        <button type="button" @click="closeEditGapModal()" class="text-primary-foreground hover:text-muted-foreground/50" aria-label="Close edit gap modal">
-                            <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
-                        </button>
-                    </div>
+        {% call modal(id='edit-gap-modal', size='xl', labelledby='edit-gap-title') %}
+<h3 id="edit-gap-title" class="text-base font-semibold text-foreground mb-4">Edit Gap</h3>
 
                     <!-- Body -->
-                    <div class="p-6 max-h-[70vh] overflow-y-auto">
+                    <div class="max-h-[70vh] overflow-y-auto">
                         <input type="hidden" id="edit-gap-id">
 
                         <!-- Basic Info -->
                         <div class="grid grid-cols-2 gap-4 mb-6">
-                            <div class="col-span-2">
-                                <label for="edit-gap-name" class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
+                            {% call form_group(id='edit-gap-name', label='Name', class='col-span-2') %}
                                 <input type="text" id="edit-gap-name" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            </div>
-                            <div class="col-span-2">
-                                <label for="edit-gap-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-description', label='Description', class='col-span-2') %}
                                 <textarea id="edit-gap-description" rows="3" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"></textarea>
-                            </div>
+                            {% endcall %}
                         </div>
 
                         <!-- Classification -->
                         <div class="grid grid-cols-3 gap-4 mb-6">
-                            <div>
-                                <label for="edit-gap-type" class="block text-sm font-medium text-muted-foreground mb-1">Gap Type</label>
+                            {% call form_group(id='edit-gap-type', label='Gap Type') %}
                                 <select id="edit-gap-type" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                     <option value="coverage">Coverage</option>
                                     <option value="quality">Quality</option>
@@ -1915,41 +1818,37 @@
                                     <option value="modernization">Modernization</option>
                                     <option value="custom">Custom</option>
                                 </select>
-                            </div>
-                            <div>
-                                <label for="edit-gap-priority" class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-priority', label='Priority') %}
                                 <select id="edit-gap-priority" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                     <option value="critical">Critical</option>
                                     <option value="high">High</option>
                                     <option value="medium">Medium</option>
                                     <option value="low">Low</option>
                                 </select>
-                            </div>
-                            <div>
-                                <label for="edit-gap-status" class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-status', label='Status') %}
                                 <select id="edit-gap-status" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                     <option value="identified">Identified</option>
                                     <option value="in_progress">In Progress</option>
                                     <option value="resolved">Resolved</option>
                                 </select>
-                            </div>
+                            {% endcall %}
                         </div>
 
                         <!-- Timeline & Color -->
                         <div class="grid grid-cols-3 gap-4 mb-6">
-                            <div>
-                                <label for="edit-gap-start-date" class="block text-sm font-medium text-muted-foreground mb-1">Start Date</label>
+                            {% call form_group(id='edit-gap-start-date', label='Start Date') %}
                                 <input type="date" id="edit-gap-start-date" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            </div>
-                            <div>
-                                <label for="edit-gap-end-date" class="block text-sm font-medium text-muted-foreground mb-1">Target Resolution Date</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-end-date', label='Target Resolution Date') %}
                                 <input type="date" id="edit-gap-end-date" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            </div>
+                            {% endcall %}
                             <div>
                                 <label class="block text-sm font-medium text-muted-foreground mb-1">Color</label>
                                 <div class="flex items-center space-x-2">
                                     <label for="edit-gap-color" class="block text-sm font-medium text-muted-foreground mb-1">Gap color</label>
-                                    <input type="color" id="edit-gap-color" class="w-12 h-10 border border-input rounded cursor-pointer">
+                                    <input type="color" id="edit-gap-color" class="w-12 h-9 border border-input rounded cursor-pointer">
                                     <div id="edit-gap-color-presets" class="flex space-x-1">
                                         <button type="button" @click="setGapColor('#6B7280')" class="w-6 h-6 rounded bg-muted-foreground hover:ring-2 ring-offset-1 ring-muted-foreground" aria-label="Set gap color to gray"></button>
                                         <button type="button" @click="setGapColor('#EAB308')" class="w-6 h-6 rounded bg-warning hover:ring-2 ring-offset-1 ring-warning" aria-label="Set gap color to warning"></button>
@@ -1964,25 +1863,22 @@
 
                         <!-- Owner & Effort -->
                         <div class="grid grid-cols-3 gap-4 mb-6">
-                            <div>
-                                <label for="edit-gap-owner" class="block text-sm font-medium text-muted-foreground mb-1">Owner</label>
+                            {% call form_group(id='edit-gap-owner', label='Owner') %}
                                 <input type="text" id="edit-gap-owner" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Responsible person">
-                            </div>
-                            <div>
-                                <label for="edit-gap-effort" class="block text-sm font-medium text-muted-foreground mb-1">Est. Effort (days)</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-effort', label='Est. Effort (days)') %}
                                 <input type="number" id="edit-gap-effort" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0">
-                            </div>
-                            <div>
-                                <label for="edit-gap-cost" class="block text-sm font-medium text-muted-foreground mb-1">Est. Cost</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-cost', label='Est. Cost') %}
                                 <input type="number" id="edit-gap-cost" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0" step="1000" placeholder="{{ config.CURRENCY_SYMBOL|default('£') }}">
-                            </div>
+                            {% endcall %}
                         </div>
 
                         <!-- Work Packages Section -->
                         <div class="border-t border-border pt-4">
                             <div class="flex items-center justify-between mb-3">
                                 <h4 class="font-medium text-muted-foreground">Work Packages</h4>
-                                <button type="button" @click="addWorkPackageToGap()" class="px-3 py-1 text-sm bg-primary/10 text-primary rounded hover:bg-primary/20 flex items-center" aria-label="Add new work package">
+                                <button type="button" @click="addWorkPackageToGap()" class="px-3 py-1 text-sm bg-primary/10 text-info-emphasis rounded hover:bg-primary/20 flex items-center" aria-label="Add new work package">
                                     <i data-lucide="plus" class="w-4 h-4 mr-1" aria-hidden="true"></i>
                                     Add Work Package
                                 </button>
@@ -2003,39 +1899,25 @@
                             <button type="button" @click="closeEditGapModal()" class="px-4 py-2 text-muted-foreground bg-muted rounded-md hover:bg-accent" aria-label="Cancel editing gap">
                                 Cancel
                             </button>
-                            <button type="button" @click="saveGapChanges()" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary flex items-center" aria-label="Save gap changes">
+                            <button type="button" @click="saveGapChanges()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Save gap changes">
                                 <i data-lucide="save" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                                 Save Changes
                             </button>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
+                
+{% endcall %}
 
         <!-- Edit Work Package Modal - Standardized Design -->
-        <div id="edit-wp-modal" hidden role="dialog" aria-modal="true" aria-labelledby="edit-wp-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
-            <div class="relative top-10 mx-auto p-0 w-full max-w-4xl">
-                <div class="bg-card rounded-lg shadow-xl">
-                    <!-- Header -->
-                    <div class="flex items-center justify-between p-5 border-b border-border bg-primary rounded-t-lg">
-                        <div class="flex items-center space-x-3">
-                            <i data-lucide="package" class="w-6 h-6 text-primary-foreground" aria-hidden="true"></i>
-                            <div>
-                                <h3 class="text-lg font-semibold text-primary-foreground" id="edit-wp-title">Edit Work Package</h3>
-                                <p class="text-sm text-primary-foreground/70" id="edit-wp-subtitle">Manage work package details and children</p>
-                            </div>
-                        </div>
-                        <button type="button" @click="closeEditWPModal()" class="text-primary-foreground hover:text-muted-foreground/50" aria-label="Close edit work package modal">
-                            <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
-                        </button>
-                    </div>
+        {% call modal(id='edit-wp-modal', size='xl', labelledby='edit-wp-title') %}
+<h3 id="edit-wp-title" class="text-base font-semibold text-foreground mb-4">Edit Work Package</h3>
+<p class="text-sm text-primary-foreground/70" id="edit-wp-subtitle">Manage work package details and children</p>
 
                     <input type="hidden" id="edit-wp-id">
                     <input type="hidden" id="edit-wp-parent-id">
 
                     <!-- Quick Stats Bar -->
-                    <div class="bg-muted/50 border-b border-border px-6 py-4">
+                    <div class="bg-muted/50 border-b border-border py-4 pb-4 mb-4">
                         <div class="grid grid-cols-4 gap-4">
                             <div class="flex items-center space-x-3">
                                 <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -2109,14 +1991,12 @@
                                     Basic Information
                                 </h4>
                                 <div class="space-y-4">
-                                    <div>
-                                        <label for="edit-wp-name" class="block text-sm font-medium text-muted-foreground mb-1">Name *</label>
+                                    {% call form_group(id='edit-wp-name', label='Name', required=true) %}
                                         <input type="text" id="edit-wp-name" placeholder="Enter work package name..." class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus:border-transparent">
-                                    </div>
-                                    <div>
-                                        <label for="edit-wp-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
+                                    {% endcall %}
+                                    {% call form_group(id='edit-wp-description', label='Description') %}
                                         <textarea id="edit-wp-description" rows="3" placeholder="Describe the work package objectives and scope..." class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus:border-transparent"></textarea>
-                                    </div>
+                                    {% endcall %}
                                 </div>
                             </div>
 
@@ -2127,8 +2007,7 @@
                                     Status &amp; Progress
                                 </h4>
                                 <div class="grid grid-cols-3 gap-4">
-                                    <div>
-                                        <label for="edit-wp-status" class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
+                                    {% call form_group(id='edit-wp-status', label='Status') %}
                                         <select id="edit-wp-status" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                             <option value="planned">Planned</option>
                                             <option value="in_progress">In Progress</option>
@@ -2136,16 +2015,15 @@
                                             <option value="blocked">Blocked</option>
                                             <option value="cancelled">❌ Cancelled</option>
                                         </select>
-                                    </div>
-                                    <div>
-                                        <label for="edit-wp-priority" class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
+                                    {% endcall %}
+                                    {% call form_group(id='edit-wp-priority', label='Priority') %}
                                         <select id="edit-wp-priority" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                             <option value="critical">Critical</option>
                                             <option value="high">High</option>
                                             <option value="medium">Medium</option>
                                             <option value="low">Low</option>
                                         </select>
-                                    </div>
+                                    {% endcall %}
                                     <div>
                                         <label class="block text-sm font-medium text-muted-foreground mb-1">Progress (%)</label>
                                         <div class="flex items-center space-x-3">
@@ -2167,19 +2045,17 @@
                                     Timeline &amp; Scheduling
                                 </h4>
                                 <div class="grid grid-cols-3 gap-4">
-                                    <div>
-                                        <label for="edit-wp-start-date" class="block text-sm font-medium text-muted-foreground mb-1">Start Date</label>
+                                    {% call form_group(id='edit-wp-start-date', label='Start Date') %}
                                         <input type="date" id="edit-wp-start-date" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                    </div>
-                                    <div>
-                                        <label for="edit-wp-end-date" class="block text-sm font-medium text-muted-foreground mb-1">Target Date</label>
+                                    {% endcall %}
+                                    {% call form_group(id='edit-wp-end-date', label='Target Date') %}
                                         <input type="date" id="edit-wp-end-date" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                    </div>
+                                    {% endcall %}
                                     <div>
                                         <label class="block text-sm font-medium text-muted-foreground mb-1">Color Theme</label>
                                         <div class="flex items-center space-x-2">
                                             <label for="edit-wp-color" class="block text-sm font-medium text-muted-foreground mb-1">Timeline bar color</label>
-                                            <input type="color" id="edit-wp-color" class="w-16 h-10 border border-input rounded cursor-pointer">
+                                            <input type="color" id="edit-wp-color" class="w-16 h-9 border border-input rounded cursor-pointer">
                                             <span class="text-xs text-muted-foreground">Timeline bar color</span>
                                         </div>
                                     </div>
@@ -2193,14 +2069,12 @@
                                     Resources &amp; Budget
                                 </h4>
                                 <div class="grid grid-cols-4 gap-4">
-                                    <div>
-                                        <label for="edit-wp-est-hours" class="block text-sm font-medium text-muted-foreground mb-1">Est. Hours</label>
+                                    {% call form_group(id='edit-wp-est-hours', label='Est. Hours') %}
                                         <input type="number" id="edit-wp-est-hours" placeholder="0" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0">
-                                    </div>
-                                    <div>
-                                        <label for="edit-wp-act-hours" class="block text-sm font-medium text-muted-foreground mb-1">Actual Hours</label>
+                                    {% endcall %}
+                                    {% call form_group(id='edit-wp-act-hours', label='Actual Hours') %}
                                         <input type="number" id="edit-wp-act-hours" placeholder="0" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0">
-                                    </div>
+                                    {% endcall %}
                                     <div>
                                         <label for="edit-wp-est-cost" class="block text-sm font-medium text-muted-foreground mb-1">Est. Cost ({{ config.CURRENCY_SYMBOL|default('£') }})</label>
                                         <input type="number" id="edit-wp-est-cost" placeholder="0" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0" step="100">
@@ -2221,7 +2095,7 @@
                                     <div class="relative">
                                         <i data-lucide="search" class="absolute left-4 top-3.5 w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
                                         <label for="wp-children-search" class="block text-sm font-medium text-muted-foreground mb-1">Search child work packages</label>
-                                        <input type="text" id="wp-children-search" placeholder="Search child work packages by name..." class="w-full pl-12 pr-4 py-3 border border-input rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @input="filterWPChildren()">
+                                        <input type="text" id="wp-children-search" placeholder="Search child work packages by name..." class="w-full pl-12 pr-4 py-3 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @input="filterWPChildren()">
                                     </div>
                                 </div>
                                 <div class="grid grid-cols-4 gap-3">
@@ -2305,33 +2179,20 @@
                             <button type="button" @click="closeEditWPModal()" class="px-5 py-2.5 text-muted-foreground bg-card border border-input rounded-md hover:bg-accent font-medium" aria-label="Cancel editing work package">
                                 Cancel
                             </button>
-                            <button type="button" @click="saveWPChanges()" class="px-5 py-2.5 bg-primary text-primary-foreground rounded-md hover:bg-primary flex items-center font-medium shadow-sm" aria-label="Save work package changes">
+                            <button type="button" @click="saveWPChanges()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Save work package changes">
                                 <i data-lucide="save" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                                 Save Changes
                             </button>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
+                
+{% endcall %}
 
         <!-- Delete Confirmation Modal -->
-        <div id="delete-confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="delete-confirm-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
-            <div class="relative top-20 mx-auto p-0 w-full max-w-md">
-                <div class="bg-card rounded-lg shadow-xl">
-                    <!-- Header -->
-                    <div class="flex items-center justify-between p-4 border-b border-border bg-destructive rounded-t-lg">
-                        <div class="flex items-center space-x-3">
-                            <i data-lucide="alert-triangle" class="w-6 h-6 text-primary-foreground" aria-hidden="true"></i>
-                            <h3 class="text-lg font-semibold text-primary-foreground">Confirm Delete</h3>
-                        </div>
-                        <button type="button" @click="closeDeleteConfirmModal()" class="text-primary-foreground hover:text-muted-foreground/50" aria-label="Close delete confirmation">
-                            <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
-                        </button>
-                    </div>
+        {% call modal(id='delete-confirm-modal', title='Confirm Delete') %}
 
                     <!-- Body -->
-                    <div class="p-6">
+                    <div class="">
                         <input type="hidden" id="delete-item-id">
                         <input type="hidden" id="delete-item-type">
 
@@ -2344,7 +2205,7 @@
                         </div>
 
                         <!-- Warning for items with children -->
-                        <div id="delete-cascade-warning" class="hidden bg-warning/5 border border-warning/20 rounded-lg p-3 mb-4">
+                        <div id="delete-cascade-warning" class="hidden bg-warning/10 border border-warning/40 rounded-md px-3 py-2 mb-4">
                             <div class="flex items-start">
                                 <i data-lucide="alert-triangle" class="w-5 h-5 text-warning-emphasis mr-2 mt-0.5" aria-hidden="true"></i>
                                 <div class="text-sm">
@@ -2358,38 +2219,27 @@
                     </div>
 
                     <!-- Footer -->
-                    <div class="flex justify-end space-x-3 p-4 border-t border-border bg-muted/50 rounded-b-lg">
+                    <div class="flex justify-end space-x-3 border-t border-border bg-muted/50 rounded-b-lg pt-4 mt-4">
                         <button type="button" @click="closeDeleteConfirmModal()" class="px-4 py-2 text-muted-foreground bg-card border border-input rounded-md hover:bg-accent" aria-label="Cancel delete operation">
                             Cancel
                         </button>
-                        <button type="button" @click="confirmDelete()" class="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive flex items-center" aria-label="Confirm delete operation">
+                        <button type="button" @click="confirmDelete()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Confirm delete operation">
                             <i data-lucide="trash-2" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                             Delete
                         </button>
                     </div>
-                </div>
-            </div>
-        </div>
+                
+{% endcall %}
 
         <!-- Add to Roadmap Modal -->
-        <div id="add-roadmap-modal" hidden role="dialog" aria-modal="true" aria-labelledby="add-roadmap-modal-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
-            <div class="relative top-20 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-card">
-                <div class="flex justify-between items-center mb-4 pb-3 border-b">
-                    <h3 class="text-lg font-bold text-foreground flex items-center">
-                        <i data-lucide="map" class="w-5 h-5 mr-2 text-primary" aria-hidden="true"></i>
-                        Add to Roadmap
-                    </h3>
-                    <button type="button" @click="closeAddRoadmapModal()" class="text-muted-foreground hover:text-muted-foreground" aria-label="Close">
-                        <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
-                    </button>
-                </div>
+        {% call modal(id='add-roadmap-modal', title='Add to Roadmap') %}
 
                 <!-- Capability Info -->
-                <div class="bg-muted/50 rounded-lg p-4 mb-4">
+                <div class="bg-muted/50 rounded-lg mb-4">
                     <div class="text-sm text-muted-foreground mb-1">Capability</div>
                     <div id="add-roadmap-cap-name" class="font-medium text-foreground"></div>
                     <div class="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                        <span id="add-roadmap-cap-type" class="px-2 py-0.5 rounded bg-primary/10 text-primary"></span>
+                        <span id="add-roadmap-cap-type" class="px-2 py-0.5 rounded bg-primary/10 text-info-emphasis"></span>
                         <span id="add-roadmap-cap-level" class="px-2 py-0.5 rounded bg-muted text-muted-foreground"></span>
                     </div>
                 </div>
@@ -2400,42 +2250,38 @@
 
                 <!-- Gap Details -->
                 <div class="space-y-4">
-                    <div>
-                        <label for="add-roadmap-gap-type" class="block text-sm font-medium text-muted-foreground mb-1">Gap Type</label>
+                    {% call form_group(id='add-roadmap-gap-type', label='Gap Type') %}
                         <select id="add-roadmap-gap-type" class="w-full px-3 py-2 border border-input rounded-md">
                             <option value="coverage">Coverage Gap</option>
                             <option value="quality">Quality Gap</option>
                             <option value="retirement">Retirement Gap</option>
                             <option value="modernization">Modernization Gap</option>
                         </select>
-                    </div>
+                    {% endcall %}
 
-                    <div>
-                        <label for="add-roadmap-priority" class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
+                    {% call form_group(id='add-roadmap-priority', label='Priority') %}
                         <select id="add-roadmap-priority" class="w-full px-3 py-2 border border-input rounded-md">
                             <option value="critical">Critical</option>
                             <option value="high">High</option>
                             <option value="medium" selected>Medium</option>
                             <option value="low">Low</option>
                         </select>
-                    </div>
+                    {% endcall %}
 
                     <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="add-roadmap-start-date" class="block text-sm font-medium text-muted-foreground mb-1">Start Date</label>
+                        {% call form_group(id='add-roadmap-start-date', label='Start Date') %}
                             <input type="date" id="add-roadmap-start-date" class="w-full px-3 py-2 border border-input rounded-md">
-                        </div>
-                        <div>
-                            <label for="add-roadmap-end-date" class="block text-sm font-medium text-muted-foreground mb-1">Target Date</label>
+                        {% endcall %}
+                        {% call form_group(id='add-roadmap-end-date', label='Target Date') %}
                             <input type="date" id="add-roadmap-end-date" class="w-full px-3 py-2 border border-input rounded-md">
-                        </div>
+                        {% endcall %}
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-muted-foreground mb-1">Color</label>
                         <div class="flex items-center gap-2">
                             <label for="add-roadmap-color" class="block text-sm font-medium text-muted-foreground mb-1">Gap color</label>
-                            <input type="color" id="add-roadmap-color" value="#6B7280" class="w-10 h-10 rounded cursor-pointer">
+                            <input type="color" id="add-roadmap-color" value="#6B7280" class="w-10 h-9 rounded cursor-pointer">
                             <div class="flex gap-1">
                                 <button type="button" @click="document.getElementById('add-roadmap-color').value='#6B7280'" class="w-6 h-6 rounded-full bg-muted-foreground hover:ring-2 ring-offset-1 ring-muted-foreground" aria-label="Set roadmap color to gray"></button>
                                 <button type="button" @click="document.getElementById('add-roadmap-color').value='#EAB308'" class="w-6 h-6 rounded-full bg-warning hover:ring-2 ring-offset-1 ring-warning" aria-label="Set roadmap color to warning"></button>
@@ -2460,38 +2306,26 @@
                     <button type="button" @click="closeAddRoadmapModal()" class="px-4 py-2 text-muted-foreground bg-muted rounded-md hover:bg-accent" aria-label="Cancel adding to roadmap">
                         Cancel
                     </button>
-                    <button type="button" @click="submitAddToRoadmap()" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary flex items-center" aria-label="Submit roadmap addition">
+                    <button type="button" @click="submitAddToRoadmap()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit roadmap addition">
                         <i data-lucide="plus" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                         Add to Roadmap
                     </button>
                 </div>
-            </div>
-        </div>
+            
+{% endcall %}
 
         <!-- Quick Add to Roadmap Modal -->
-        <div id="quick-add-modal" hidden role="dialog" aria-modal="true" aria-labelledby="quick-add-modal-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
-            <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-card">
-                <div class="flex justify-between items-center mb-4 pb-3 border-b">
-                    <h3 class="text-lg font-bold text-foreground flex items-center">
-                        <i data-lucide="search" class="w-5 h-5 mr-2 text-primary" aria-hidden="true"></i>
-                        Quick Add to Roadmap
-                    </h3>
-                    <button type="button" @click="closeQuickAddModal()" class="text-muted-foreground hover:text-muted-foreground" aria-label="Close quick add modal">
-                        <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
-                    </button>
-                </div>
+        {% call modal(id='quick-add-modal', title='Quick Add to Roadmap', size='lg') %}
 
                 <!-- Search and Filters -->
                 <div class="mb-4 space-y-3">
-                    <div>
-                        <label for="quick-add-search" class="block text-sm font-medium text-muted-foreground mb-1">Search capabilities</label>
+                    {% call form_group(id='quick-add-search', label='Search capabilities') %}
                         <input type="text" id="quick-add-search" placeholder="Search capabilities..."
                                @input="loadQuickAddCapabilities()"
                                class="w-full px-4 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    </div>
+                    {% endcall %}
                     <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label for="quick-add-type-filter" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
+                        {% call form_group(id='quick-add-type-filter', label='Type') %}
                             <select id="quick-add-type-filter" @change="loadQuickAddCapabilities()"
                                     class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <option value="">All Types</option>
@@ -2499,9 +2333,8 @@
                                 <option value="Manufacturing">Manufacturing</option>
                                 <option value="Application">Application</option>
                             </select>
-                        </div>
-                        <div>
-                            <label for="quick-add-level-filter" class="block text-sm font-medium text-muted-foreground mb-1">Level</label>
+                        {% endcall %}
+                        {% call form_group(id='quick-add-level-filter', label='Level') %}
                             <select id="quick-add-level-filter" @change="loadQuickAddCapabilities()"
                                     class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <option value="">All Levels</option>
@@ -2511,7 +2344,7 @@
                                 <option value="4">L4 (Detailed)</option>
                                 <option value="5">L5 (Task)</option>
                             </select>
-                        </div>
+                        {% endcall %}
                     </div>
                 </div>
 
@@ -2525,12 +2358,12 @@
 
                 <!-- Footer -->
                 <div class="flex justify-end pt-4 border-t">
-                    <button type="button" @click="closeQuickAddModal()" class="px-4 py-2 text-muted-foreground bg-muted rounded-md hover:bg-accent" aria-label="Close quick add dialog">
+                    <button type="button" @click="closeQuickAddModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close quick add dialog">
                         Close
                     </button>
                 </div>
-            </div>
-        </div>
+            
+{% endcall %}
 
     {# ARCH-064: only the unified mapping modal is still rendered up front —
        it pulls in its own <script src=...>, which an injected fragment cannot

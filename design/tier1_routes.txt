@@ -1,0 +1,52 @@
+# Tier 1 templates — conformance blocks CI
+# One repo-relative path per line. The brief's paths are mapped to this repository's layout:
+# the shell lives in layouts/admin_base.html with components/admin_sidebar.html and
+# components/admin_header.html; macros live under app/templates/components/, not macros/;
+# the Ask page is a module template; sign-in pages are under account/.
+app/templates/layouts/admin_base.html
+app/templates/components/admin_sidebar.html
+app/templates/components/admin_header.html
+app/templates/components/button.html
+app/templates/components/form_field.html
+app/templates/components/input.html
+app/templates/components/data_table.html
+app/templates/components/table.html
+app/templates/components/modal.html
+app/templates/components/dialog.html
+app/templates/components/card.html
+app/templates/components/badge.html
+app/templates/dashboards/overview.html
+app/templates/applications/list_simple.html
+app/templates/applications/dashboard.html
+app/templates/vendors/list.html
+app/modules/intelligence/templates/intelligence/ask.html
+app/templates/ai_chat/index.html
+app/templates/capability_map/index.html
+app/templates/capability_map/hierarchy.html
+app/templates/archimate_views/traceability.html
+app/templates/archimate_crud/import_oef.html
+app/templates/governance/risk_register.html
+app/templates/enterprise/gap_analysis.html
+app/templates/capability_roadmap/capability_roadmap.html
+app/templates/account/register.html
+app/templates/account/login.html
+# Paths from the brief that do not exist in this repository (mapped above, kept for the record):
+# app/templates/layouts/base.html          -> layouts/admin_base.html
+# app/templates/layouts/sidebar.html       -> components/admin_sidebar.html
+# app/templates/layouts/header.html        -> components/admin_header.html
+# app/templates/macros/button.html         -> components/button.html
+# app/templates/macros/form.html           -> components/form_field.html and components/input.html
+# app/templates/macros/table.html          -> components/data_table.html and components/table.html (dense_table arrives with PR 784)
+# app/templates/macros/dialog.html         -> components/modal.html and components/dialog.html
+# app/templates/macros/badge.html          -> components/badge.html
+# app/templates/dashboard/overview.html    -> dashboards/overview.html
+# app/templates/applications/list.html     -> applications/list_simple.html
+# app/templates/applications/detail.html   -> applications/dashboard.html
+# app/templates/applications/vendors.html  -> vendors/list.html
+# app/templates/intelligence/ask.html      -> app/modules/intelligence/templates/intelligence/ask.html
+# app/templates/architecture/traceability.html -> archimate_views/traceability.html
+# app/templates/architecture/import_oef.html   -> archimate_crud/import_oef.html
+# app/templates/risks/list.html            -> governance/risk_register.html
+# app/templates/capability_roadmap.html    -> capability_roadmap/capability_roadmap.html
+# app/templates/auth/signup.html           -> account/register.html
+# app/templates/auth/login.html            -> account/login.html

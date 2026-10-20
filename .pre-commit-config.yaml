@@ -57,6 +57,12 @@ repos:
         language: system
         files: ^app/templates/.*\.html$
         pass_filenames: true
+      - id: design-patterns
+        name: design patterns (tier 1)
+        entry: python scripts/check_design_patterns.py --tier 1
+        language: system
+        files: ^app/templates/.*\.html$
+        pass_filenames: false
 
       - id: no-console-log
         name: no console.log in shipped templates/JS

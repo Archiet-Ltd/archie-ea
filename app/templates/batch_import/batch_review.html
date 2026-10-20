@@ -55,7 +55,7 @@
                 <div class="flex items-center gap-2">
                     <button type="button"
                         @click="refreshElements()"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 transition-colors"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                      aria-label="Refresh">
                         <i data-lucide="refresh-cw" class="mr-2 h-4 w-4" :class="{ 'animate-spin': refreshing }"></i>
                         Refresh
@@ -162,7 +162,7 @@
                         type="text"
                         x-model="searchQuery"
                         placeholder="Search elements..."
-                        class="flex h-10 w-64 rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="flex h-9 w-64 rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                      aria-label="Search elements..."/>
                 </div>
 
@@ -179,7 +179,7 @@
                         x-show="dropOpen" x-cloak @keydown.escape.window="dropOpen = false" role="dialog" aria-modal="true"
                         @click.away="dropOpen = false"
                         x-transition
-                        class="absolute z-50 mt-1 w-48 rounded-md border bg-popover text-popover-foreground shadow-md hidden" >
+                        class="absolute z-50 mt-1 w-48 rounded-md border border-border bg-popover text-popover-foreground hidden" >
                         <div class="p-1">
                             <button type="button"
                                 @click="filterLayer = ''; dropOpen = false"
@@ -211,7 +211,7 @@
                         x-show="dropOpen" x-cloak @keydown.escape.window="dropOpen = false" role="dialog" aria-modal="true"
                         @click.away="dropOpen = false"
                         x-transition
-                        class="absolute z-50 mt-1 w-40 rounded-md border bg-popover text-popover-foreground shadow-md hidden" >
+                        class="absolute z-50 mt-1 w-40 rounded-md border border-border bg-popover text-popover-foreground hidden" >
                         <div class="p-1">
                             <button type="button" @click="filterStatus = ''; dropOpen = false" class="relative flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent" aria-label="Open">All Status</button>
                             <button type="button" @click="filterStatus = 'pending'; dropOpen = false" class="relative flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent" aria-label="Open">Pending</button>
@@ -237,7 +237,7 @@
                     </button>
                     <button type="button"
                         @click="bulkReject()"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-3 transition-colors"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                      aria-label="Reject">
                         <i data-lucide="x" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Reject
@@ -261,7 +261,7 @@
     {% call card.card() %}
         <div class="p-6">
             <div class="rounded-md border">
-                <table class="w-full caption-bottom text-sm">
+                <table class="dense-table w-full caption-bottom text-sm">
                     <thead class="[&_tr]:border-b">
                         <tr class="border-b transition-colors hover:bg-muted/50">
                             <th class="h-12 w-12 px-4 align-middle">
@@ -380,14 +380,14 @@
                                         </button>
                                         <button type="button"
                                             @click="showElementDetail(element)"
-                                            class="inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground h-8 w-8 transition-colors"
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
                                             title="View Details"
                                         >
                                             <i data-lucide="eye" class="h-4 w-4" aria-hidden="true"></i>
                                         </button>
                                         <button type="button"
                                             @click="editElement(element)"
-                                            class="inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground h-8 w-8 transition-colors"
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
                                             title="Edit"
                                         >
                                             <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i>
@@ -409,7 +409,7 @@
                     <button type="button"
                         @click="currentPage--"
                         :disabled="currentPage === 1"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent h-9 px-3"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                      aria-label="Go to previous page">
                         Previous
                     </button>
@@ -435,9 +435,9 @@
         x-transition
         class="modal-root fixed inset-0 z-50 flex items-center justify-center"
     >
-        <div class="modal-root fixed inset-0 bg-background/80" @click="showDetailModal = false"></div>
-        <div class="relative z-50 w-full max-w-2xl rounded-lg border bg-background p-6 shadow-lg max-h-[80vh] overflow-y-auto" role="dialog" aria-modal="true" tabindex="-1">
-            <button type="button" @click="showDetailModal = false" class="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100" aria-label="Close element detail dialog">
+        <div class="modal-root fixed inset-0 bg-overlay/50" @click="showDetailModal = false"></div>
+        <div class="relative z-50 w-full max-w-2xl rounded-lg border bg-background p-6 max-h-[80vh] overflow-y-auto border-border" role="dialog" aria-modal="true" tabindex="-1">
+            <button type="button" @click="showDetailModal = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring absolute right-4 top-4" aria-label="Close element detail dialog">
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
             </button>
 
@@ -536,7 +536,7 @@
                     </button>
                     <button type="button"
                         @click="editElement(selectedElement); showDetailModal = false"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-10 px-4 py-2 transition-colors"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                      aria-label="Edit">
                         <i data-lucide="pencil" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                         Edit
@@ -561,8 +561,8 @@
         x-transition
         class="modal-root fixed inset-0 z-50 flex items-center justify-center"
     >
-        <div class="modal-root fixed inset-0 bg-background/80" @click="showEditModal = false"></div>
-        <div class="relative z-50 w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg" role="dialog" aria-modal="true" tabindex="-1">
+        <div class="modal-root fixed inset-0 bg-overlay/50" @click="showEditModal = false"></div>
+        <div class="relative z-50 w-full max-w-lg rounded-lg border bg-background p-6 border-border" role="dialog" aria-modal="true" tabindex="-1">
             <button type="button" @click="showEditModal = false" class="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100" aria-label="Edit">
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
             </button>
@@ -571,25 +571,25 @@
 
             <form @submit.prevent="saveElement()" class="space-y-4">
                 <div>
-                    <label class="text-sm font-medium">Name</label>
+                    <label class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
                     <input
                         type="text"
                         x-model="editingElement.name"
-                        class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
+                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
                      aria-label="Element name"/>
                 </div>
 
                 <div>
-                    <label class="text-sm font-medium">Type</label>
+                    <label class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
                     <input
                         type="text"
                         x-model="editingElement.element_type"
-                        class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
+                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
                      aria-label="Element type"/>
                 </div>
 
                 <div>
-                    <label class="text-sm font-medium">Description</label>
+                    <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
                     <textarea
                         x-model="editingElement.description"
                         rows="3"
@@ -601,13 +601,13 @@
                     <button
                         type="button"
                         @click="showEditModal = false"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-10 px-4 py-2"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"
                      aria-label="Edit">
                         Cancel
                     </button>
                     <button
                         type="submit"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                      aria-label="Submit">
                         Save Changes
                     </button>
@@ -623,9 +623,9 @@
         x-transition
         class="modal-root fixed inset-0 z-50 flex items-center justify-center"
     >
-        <div class="modal-root fixed inset-0 bg-background/80" @click="showCommitModal = false"></div>
-        <div class="relative z-50 w-full max-w-md rounded-lg border bg-background p-6 shadow-lg" role="alertdialog" aria-modal="true" tabindex="-1">
-            <button type="button" @click="showCommitModal = false" class="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100" aria-label="Close commit confirmation dialog">
+        <div class="modal-root fixed inset-0 bg-overlay/50" @click="showCommitModal = false"></div>
+        <div class="relative z-50 w-full max-w-md rounded-lg border bg-background p-6 border-border" role="alertdialog" aria-modal="true" tabindex="-1">
+            <button type="button" @click="showCommitModal = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring absolute right-4 top-4" aria-label="Close commit confirmation dialog">
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
             </button>
 
@@ -651,7 +651,7 @@
             </div>
 
             <template x-if="summary.pending > 0">
-                <div class="rounded-lg bg-warning/5 border border-warning/20 p-4 mb-4">
+                <div class="rounded-md bg-warning/10 border border-warning/40 px-3 py-2 mb-4">
                     <div class="flex items-start gap-2">
                         <i data-lucide="alert-triangle" class="h-5 w-5 text-warning mt-0.5" aria-hidden="true"></i>
                         <div>
@@ -667,7 +667,7 @@
             <div class="flex justify-end gap-2">
                 <button type="button"
                     @click="showCommitModal = false"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-10 px-4 py-2"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                  aria-label="Cancel commit">
                     Cancel
                 </button>
