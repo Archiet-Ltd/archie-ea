@@ -81,7 +81,7 @@ A published price, free self-hosting, and ArchiMate 3.2 as the stated modelling 
 
 ### Can we run Bizzdesign HOPEX and Entelim side by side before deciding?
 
-Yes. Import a copy of your model into the free Community plan or a self-hosted copy, ask the same questions in both, and leave Bizzdesign HOPEX untouched. The health check puts your own data through Entelim for a fixed price and date.
+Yes. Import a copy of your model into the free Community plan or a self-hosted copy, ask the same questions in both, and leave Bizzdesign HOPEX untouched. The health check puts your own data through Entelim for a fixed scope.
 
 ### Is this still MEGA HOPEX?
 
