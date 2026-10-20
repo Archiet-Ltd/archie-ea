@@ -1030,3 +1030,21 @@ def test_single_points_of_failure_stream_walks_are_capped_and_reported(
     assert data["summary"]["value_streams_existing"] == cap + 1
     assert f"{cap} of {cap + 1} value streams" in data["summary"]["statement"]
     assert len(data["rows"]) == cap
+
+
+def test_single_points_of_failure_empty_answer_carries_the_full_summary(
+    app, db_session, make_org, client, login_as
+):
+    """The no-value-streams answer carries every summary key the page reads."""
+    org = make_org("spof-empty-summary")
+    user = _user(db_session, org.id)
+    db_session.commit()
+    login_as(client, user)
+
+    summary = _ask(client, question="single_points_of_failure").get_json()["data"]["summary"]
+
+    assert summary["total"] == 0
+    assert summary["value_streams_considered"] == 0
+    assert summary["value_streams_existing"] == 0
+    assert summary["include_derived"] is True
+    assert "nothing to rank" in summary["statement"]

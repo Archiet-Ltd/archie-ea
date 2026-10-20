@@ -780,6 +780,28 @@ def _not_computed_counts() -> Dict[str, Any]:
     }
 
 
+def _empty_spof_answer(reason, statement, considered, existing, elements, include_derived):
+    return {
+        "rows": [],
+        "summary": {
+            "explicit_count": 0,
+            "derived_count": 0,
+            "stale_count": 0,
+            "derivation_state": "not_computed",
+            "total": 0,
+            "value_streams_considered": considered,
+            "value_streams_existing": existing,
+            "include_derived": include_derived,
+            "statement": statement,
+        },
+        "reasons": [reason],
+        "elements": elements,
+        "total": 0,
+        "next_cursor": None,
+        "truncated": False,
+    }
+
+
 class IntelligenceQueryService:
     """DE-9: read-only cross-layer intelligence queries."""
 
@@ -3214,20 +3236,7 @@ class IntelligenceQueryService:
 
         org_id = current_org_id()
         if org_id is None:
-            return {
-                "rows": [],
-                "summary": {
-                    "explicit_count": 0,
-                    "derived_count": 0,
-                    "stale_count": 0,
-                    "derivation_state": "not_computed",
-                },
-                "reasons": [NO_TENANT_CONTEXT_REASON],
-                "elements": {},
-                "total": 0,
-                "next_cursor": None,
-                "truncated": False,
-            }
+            return _empty_spof_answer(NO_TENANT_CONTEXT_REASON, "No organisation is active, so nothing could be worked out.", 0, 0, {}, include_derived)
 
         # Value streams of the organisation that have an archimate element, in
         # a stable order; at most SPOF_MAX_VALUE_STREAMS are walked.
@@ -3244,20 +3253,7 @@ class IntelligenceQueryService:
         streams_capped = streams_existing > len(value_streams)
 
         if not value_streams:
-            return {
-                "rows": [],
-                "summary": {
-                    "explicit_count": 0,
-                    "derived_count": 0,
-                    "stale_count": 0,
-                    "derivation_state": "not_computed",
-                },
-                "reasons": [NO_DATA_RECORDED_REASON],  # Using existing reason for no data
-                "elements": {},
-                "total": 0,
-                "next_cursor": None,
-                "truncated": False,
-            }
+            return _empty_spof_answer(NO_DATA_RECORDED_REASON, "No value stream with a linked element is recorded yet, so there is nothing to rank.", 0, 0, {}, include_derived)
 
         # We will collect:
         #   all_elements: dict[element_id] = {id, name, type, layer}
@@ -3302,20 +3298,7 @@ class IntelligenceQueryService:
 
         # If we have no elements after processing, return empty
         if not element_to_row:
-            return {
-                "rows": [],
-                "summary": {
-                    "explicit_count": 0,
-                    "derived_count": 0,
-                    "stale_count": 0,
-                    "derivation_state": "not_computed",
-                },
-                "reasons": [NO_DATA_RECORDED_REASON],
-                "elements": all_elements,
-                "total": 0,
-                "next_cursor": None,
-                "truncated": False,
-            }
+            return _empty_spof_answer(NO_DATA_RECORDED_REASON, "Nothing is recorded as depending on the value streams considered.", len(value_streams), streams_existing, all_elements, include_derived)
 
         # Prepare list of elements for sorting: (element_id, count, row)
         elements_list: List[Tuple[int, int, Dict[str, Any]]] = []
