@@ -1,8 +1,30 @@
 {
   "pilot_patterns": {
-    "overview": { "pattern": "dashboard-01", "structure": ["kpi-band", "answer-cascade", "chart", "dense-table"] },
-    "list": { "pattern": "data-table", "structure": ["action-bar", "quiet-alert", "dense-table"] },
-    "focused_task": { "pattern": "command", "structure": ["large-input", "suggestion-chips", "answer-cascade"] }
+    "overview": {
+      "pattern": "dashboard-01",
+      "structure": [
+        "kpi-band",
+        "answer-cascade",
+        "chart",
+        "dense-table"
+      ]
+    },
+    "list": {
+      "pattern": "data-table",
+      "structure": [
+        "action-bar",
+        "quiet-alert",
+        "dense-table"
+      ]
+    },
+    "focused_task": {
+      "pattern": "command",
+      "structure": [
+        "large-input",
+        "suggestion-chips",
+        "answer-cascade"
+      ]
+    }
   },
   "banned_patterns": [
     "card-grid-navigation",
@@ -11,6 +33,148 @@
     "full-width-warning-banners",
     "multi-column-forms",
     "drop-shadows",
-    "icons-inside-kpi-cards"
-  ]
+    "icons-inside-kpi-cards",
+    "mermaid",
+    "force-directed-graph",
+    "page-level-d3",
+    "word-cloud",
+    "geographic-map",
+    "observable",
+    "d3-chord",
+    "d3-sankey",
+    "composer-matrix",
+    "paginated-matrix"
+  ],
+  "conformance": {
+    "note": "Canonical tokens are read from the macros as they are on this branch (components/*.html), not guessed. Where the macro's own output departs from the register's canonical (card radius and shadow, modal shadow, input height, table class), the checker reports the macro file itself; those fixes travel on PRs 771, 783 and 784.",
+    "canonical": {
+      "button": {
+        "macro": "button",
+        "file": "app/templates/components/button.html",
+        "base": "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+        "variants": {
+          "default": "bg-primary text-primary-foreground hover:bg-primary/90",
+          "destructive": "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+          "outline": "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+          "secondary": "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "ghost": "hover:bg-accent hover:text-accent-foreground",
+          "link": "text-primary underline-offset-4 hover:underline"
+        },
+        "sizes": {
+          "default": "h-10 px-4 py-2",
+          "sm": "h-9 rounded-md px-3",
+          "lg": "h-11 rounded-md px-8",
+          "icon": "h-10 w-10"
+        },
+        "accepted_tokens": [
+          "bg-background",
+          "bg-destructive",
+          "bg-primary",
+          "bg-secondary",
+          "border",
+          "border-input",
+          "hover:bg-accent",
+          "hover:bg-destructive/90",
+          "hover:bg-primary/90",
+          "hover:bg-secondary/80",
+          "hover:text-accent-foreground",
+          "hover:underline",
+          "text-destructive-foreground",
+          "text-primary",
+          "text-primary-foreground",
+          "text-secondary-foreground",
+          "underline-offset-4"
+        ]
+      },
+      "input": {
+        "macro": "input (components/input.html) and form_field (components/form_field.html)",
+        "files": [
+          "app/templates/components/input.html",
+          "app/templates/components/form_field.html"
+        ],
+        "macro_emits": "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
+        "accepted_tokens": [
+          "h-9",
+          "rounded-md",
+          "border",
+          "border-input"
+        ],
+        "height": "36px",
+        "height_class": "h-9",
+        "note": "the macro on this branch emits h-10 (40px); the register's canonical is 36px, which PR 783 applies"
+      },
+      "table": {
+        "macro": "dense_table",
+        "file": "app/templates/components/dense_table.html (arrives with PR 784)",
+        "files": [
+          "app/templates/components/data_table.html",
+          "app/templates/components/table.html"
+        ],
+        "macro_emits_on_this_branch": "w-full caption-bottom text-sm (data_table, table)",
+        "required_class": "dense-table",
+        "header_height": "40px",
+        "sticky": true
+      },
+      "card": {
+        "macro": "card",
+        "file": "app/templates/components/card.html",
+        "macro_emits": "rounded-xl border bg-card text-card-foreground shadow-sm",
+        "accepted_tokens": [
+          "rounded-lg",
+          "border"
+        ],
+        "forbidden_tokens": [
+          "rounded-xl",
+          "rounded-2xl",
+          "shadow",
+          "shadow-sm",
+          "shadow-md",
+          "shadow-lg",
+          "shadow-xl",
+          "shadow-2xl"
+        ],
+        "note": "the macro on this branch emits rounded-xl and shadow-sm; PR 771 moves it to the canonical"
+      },
+      "dialog": {
+        "macro": "modal (components/modal.html) and dialog (components/dialog.html)",
+        "files": [
+          "app/templates/components/modal.html",
+          "app/templates/components/dialog.html",
+          "app/templates/components/modal_form.html",
+          "app/templates/components/modal_standardized.html"
+        ],
+        "macro_emits": "modal-root fixed inset-0; panel bg-background border border-border rounded-lg shadow-lg p-6",
+        "required_tokens": [
+          "role=\"dialog\"",
+          "aria-modal=\"true\""
+        ],
+        "forbidden_tokens": [
+          "shadow",
+          "shadow-lg",
+          "shadow-xl",
+          "backdrop-blur"
+        ],
+        "note": "the modal panel on this branch carries shadow-lg and dialog.html a backdrop blur; PR 783 removes both"
+      }
+    },
+    "banned_patterns": [
+      "card-grid-navigation",
+      "accordion-faq",
+      "equal-weight-action-bars",
+      "full-width-warning-banners",
+      "multi-column-forms",
+      "drop-shadows",
+      "icons-inside-kpi-cards",
+      "mermaid",
+      "force-directed-graph",
+      "page-level-d3",
+      "word-cloud",
+      "geographic-map",
+      "observable",
+      "d3-chord",
+      "d3-sankey",
+      "composer-matrix",
+      "paginated-matrix"
+    ]
+  }
 }
