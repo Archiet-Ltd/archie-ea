@@ -1,0 +1,35 @@
+{# The chat's answer card: Ask's cascade and provenance line for one estate answer.
+
+   Rendered on the server from the card model in services/answer_card.py and
+   inserted under the assistant's one-sentence reply. It reuses the Ask page's
+   answer_cascade and answer_envelope; the "not recorded" state shows no figure.
+   Nothing here is computed: every value comes from the stored answer. #}
+{% from 'components/answer_cascade.html' import answer_cascade %}
+{% from 'components/provenance.html' import answer_envelope, provenance_badge %}
+<div class="mt-3 rounded-lg border border-border bg-card p-4 text-foreground" data-answer-card data-state="{{ card.state }}"{% if card.address %} data-answer-address="{{ card.address }}" data-citation-count="{{ card.citations }}"{% endif %}>
+{% if card.state == 'answered' %}
+    <div x-data="{ rows: {{ card.nodes|tojson|forceescape }}, qtext: {{ card.question|tojson|forceescape }}, rootName: {{ (card.root or '')|tojson|forceescape }} }">
+        {{ answer_cascade('chat-cascade-' ~ (card.address or 'catalogue'), question='qtext', rows='rows', root=('rootName' if card.root else None)) }}
+    </div>
+    <p class="mt-2 text-xs text-muted-foreground" data-answer-count>
+        {{ card.total }} {{ 'row' if card.total == 1 else 'rows' }}{% if card.shown < card.total %}, the first {{ card.shown }} shown{% endif %}.
+    </p>
+    {{ answer_envelope(source=('the relationships recorded in the model' if card.address else 'the application register'), kind=('derived' if card.truth_class == 'derived' else 'measured'), confidence=((card.confidence_percent ~ '%') if card.confidence_percent is not none else none), as_of=card.as_of) }}
+{% elif card.state == 'none_found' %}
+    <p class="question-line mb-3 max-w-[640px]">{{ card.question }}</p>
+    <p class="text-sm text-foreground" data-none-found>Nothing in the model matches this question.</p>
+    {% if card.reason %}<p class="mt-2 text-xs text-muted-foreground">{{ card.reason }}</p>{% endif %}
+{% else %}
+    {% if card.question %}<p class="question-line mb-3 max-w-[640px]">{{ card.question }}</p>{% endif %}
+    <div class="flex flex-wrap items-center gap-2">
+        {{ provenance_badge('missing') }}
+        <p class="text-sm text-foreground" data-not-recorded>{{ not_recorded_line }}</p>
+    </div>
+    {% if card.reason %}<p class="mt-2 text-xs text-muted-foreground">{{ card.reason }}</p>{% endif %}
+{% endif %}
+{% if card.page_url %}
+    <p class="mt-2 text-xs">
+        <a href="{{ card.page_url }}" class="text-muted-foreground underline underline-offset-4 hover:text-info" data-answer-link>Open this answer</a>
+    </p>
+{% endif %}
+</div>
