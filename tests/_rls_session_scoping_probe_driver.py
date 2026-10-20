@@ -701,6 +701,17 @@ def main() -> None:
                     is not None
                 )
 
+        def _element2_exists():
+            with db.engine.connect() as connection:
+                set_database_tenant_context(connection, org_id)
+                return (
+                    connection.execute(
+                        db.text("SELECT 1 FROM archimate_elements WHERE id = :id"),
+                        {"id": element2_id},
+                    ).first()
+                    is not None
+                )
+
         def _relationship_exists():
             with db.engine.connect() as connection:
                 set_database_tenant_context(connection, org_id)
@@ -720,7 +731,7 @@ def main() -> None:
         def _own_org_cleans():
             g.current_org_id = org_id
             _engine_archimate_cleanup([solution_id_value])
-            return not _element_exists() and not _relationship_exists()
+            return not _element_exists() and not _element2_exists() and not _relationship_exists()
 
         check("archimate_cleanup_other_org_leaves_rows", _other_org_cannot_clean)
         check("archimate_cleanup_deletes_own_org_rows", _own_org_cleans)
