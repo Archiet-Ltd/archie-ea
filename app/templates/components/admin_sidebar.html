@@ -26,6 +26,7 @@ DEPENDENCIES:
     - Flask context (url_for, current_user, config)
 ===============================================================================
 #}
+{% from 'components/sidebar_nav.html' import sidebar_group, sidebar_item, sidebar_collapsible, sidebar_subitem %}
 <aside
     id="admin-sidebar"
     data-testid="sidebar"
@@ -96,6 +97,8 @@ DEPENDENCIES:
        custom chrome, since the sidebar's own :hover/:focus-within styling
        already handles when it should be visually quiet. #}
     <script src="{{ url_for('static', filename='js/sidebar/module_search.js') }}"></script>
+    {# sidebar_collapsible (components/sidebar_nav.html) needs this component once per page. #}
+    <script src="{{ url_for('static', filename='js/sidebar/collapsible.js') }}"></script>
     {# #sidebar-nav's own box height is the full flex-1 space available to it regardless of what
        scrolls inside -- clientHeight measures the box, not its scrolled content. The search box is
        `sticky top-0` (not a sibling outside nav) so it stays on screen while the list scrolls beneath it,
@@ -197,36 +200,29 @@ DEPENDENCIES:
 
         <div x-show="!searching()">
 
+        {# The grouped tree (navigation specification v1, section 2): group headings, level-1 links and
+           toggles, one level of sub-items. get_launch_sidebar_zones() carries the tree, the `requires`
+           filtering and the `active` flags; sidebar_nav.html owns the markup. A link whose endpoint is
+           not registered is left out, so a blueprint that failed to load cannot 500 the page. #}
         {% set ns = namespace(has_all_modules=false) %}
-        {% for zone in get_sidebar_zones(current_user) %}
-        {# A zone whose every link's endpoint is unregistered (guardrail flag
-           off, blueprint import failed, endpoint string drifted) must not
-           print an empty heading — that reads as "you have Governance access
-           but zero Governance links" instead of "you have no Governance
-           access here". Compute the surviving links once and gate the whole
-           zone, heading included, on that list being non-empty. #}
-        {% set visible_links = zone.links | selectattr('endpoint', 'in', flask.current_app.view_functions) | list %}
-        {% if visible_links %}
-        <div class="px-2 pb-1">
-            <div class="mb-1 mt-4 px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground" role="heading" aria-level="3">
-                {{ zone.title }}
-            </div>
-            <div class="space-y-0.5">
-                {% for link in visible_links %}
-                {% if link.endpoint == 'modules_directory.index' %}{% set ns.has_all_modules = true %}{% endif %}
-                {# title, not just the label span: collapsed, the span is
-                   display:none and the icon is the only thing left, so the
-                   tooltip is the only way to learn what this link is. #}
-                <a href="{{ url_for(link.endpoint, **(link.query_params or {})) }}"
-                   title="{{ link.label }}"
-                   class="flex h-8 items-center gap-2 rounded-md px-2 text-[13px] transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 {% if request.endpoint == link.endpoint %}bg-slate-100 text-info font-medium dark:bg-slate-800{% else %}text-muted-foreground{% endif %}" {%- if request.endpoint == link.endpoint -%} aria-current="page"{%- endif -%}>
-                    <i data-lucide="{{ link.icon }}" class="h-4 w-4 flex-shrink-0"></i>
-                    <span class="flex-1 truncate">{{ link.label }}</span>
-                </a>
+        {% for zone in get_launch_sidebar_zones(current_user) %}
+        {% set views = flask.current_app.view_functions %}
+        {% call sidebar_group(zone.title) %}
+            {% for link in zone.links %}
+            {% if link.children %}
+            {% set kids = link.children | selectattr('endpoint', 'in', views) | list %}
+            {% if kids %}
+            {% call sidebar_collapsible(link.id, link.label, icon=link.icon, open=false, active=link.active) %}
+                {% for kid in kids %}
+                {{ sidebar_subitem(url_for(kid.endpoint, **(kid.query_params or {})), kid.label, active=kid.active) }}
                 {% endfor %}
-            </div>
-        </div>
-        {% endif %}
+            {% endcall %}
+            {% endif %}
+            {% elif link.endpoint in views %}
+            {{ sidebar_item(url_for(link.endpoint, **(link.query_params or {})), link.label, icon=link.icon, active=link.active) }}
+            {% endif %}
+            {% endfor %}
+        {% endcall %}
         {% endfor %}
         </div>
     </nav>
@@ -238,10 +234,11 @@ DEPENDENCIES:
          the directory stays reachable from every role's sidebar regardless of
          which zone has room for it. -->
     {% if not ns.has_all_modules and 'modules_directory.index' in flask.current_app.view_functions %}
-    <div class="px-4 py-2 border-t border-border">
+    <div class="px-2 py-0.5 border-t border-border">
         <a href="{{ url_for('modules_directory.index') }}"
            title="All modules"
-           class="w-full flex items-center gap-2 rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors {% if request.endpoint == 'modules_directory.index' %}text-foreground font-medium{% endif %}">
+           data-testid="sidebar-all-modules"
+           class="w-full flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors {% if request.endpoint == 'modules_directory.index' %}text-foreground font-medium{% endif %}">
             <i data-lucide="grid" class="h-3.5 w-3.5 flex-shrink-0"></i>
             {# sidebar-footer-text, because this link sits OUTSIDE <nav> and the
                collapse rule is scoped to `.sidebar-collapsed nav span`. Without

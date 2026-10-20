@@ -46,9 +46,22 @@ LINK_RE = re.compile(r"<a ")
 TEMPLATE_RE = re.compile(r"<template[ >].*?</template>", re.S)
 
 
+SUBITEM_RE = re.compile(r'<a\s[^>]*data-slot="sidebar-subitem"')
+TOGGLE_RE = re.compile(r'data-slot="sidebar-collapsible"')
+
+
+def count_sublinks(html: str) -> int:
+    """Level-2 links (sub-menu items) in rendered sidebar HTML."""
+    return len(SUBITEM_RE.findall(TEMPLATE_RE.sub("", html)))
+
+
 def count_links(html: str) -> int:
-    """Real, visible links in rendered sidebar HTML."""
-    return len(LINK_RE.findall(TEMPLATE_RE.sub("", html)))
+    """Level-1 entries in rendered sidebar HTML: every link that is not a sub-menu item, plus each
+    collapsible item (a toggle button is a level-1 entry). The header logo, the All modules link and
+    the logout link are counted here, as before. Sub-menu items are counted separately by
+    count_sublinks and capped by SIDEBAR_SUBLINK_BUDGET (grouped sidebar, 20 Oct 2026)."""
+    visible = TEMPLATE_RE.sub("", html)
+    return len(LINK_RE.findall(visible)) - len(SUBITEM_RE.findall(visible)) + len(TOGGLE_RE.findall(visible))
 
 
 class _Any:
@@ -101,6 +114,9 @@ class _StubUser:
         return _Any()
 
 
+MEASURED_SUBLINKS: dict[str, int] = {}
+
+
 def measure() -> dict[str, int]:
     """Render the real sidebar template once per role; return role -> link count."""
     from flask import render_template
@@ -110,27 +126,34 @@ def measure() -> dict[str, int]:
 
     app = create_app("testing")
     results: dict[str, int] = {}
+    MEASURED_SUBLINKS.clear()
     for role in SIDEBAR_ZONES:
         with app.app_context(), app.test_request_context("/"):
             html = render_template(
                 "components/admin_sidebar.html", current_user=_StubUser(role)
             )
         results[role] = count_links(html)
+        MEASURED_SUBLINKS[role] = count_sublinks(html)
     return results
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", action="store_true", help="print {max_role, max_links}")
-    parser.add_argument("--count", action="store_true", help="print bare max_links integer")
+    parser.add_argument("--count", action="store_true", help="print bare max_links integer (level 1)")
+    parser.add_argument("--sublinks", action="store_true", help="print bare worst level-2 link count")
     args = parser.parse_args(argv)
 
-    from app.utils.role_access import SIDEBAR_LINK_BUDGET
+    from app.utils.role_access import SIDEBAR_LINK_BUDGET, SIDEBAR_SUBLINK_BUDGET
 
     results = measure()
     max_role = max(results, key=results.get)
     max_links = results[max_role]
+    max_sub = max(MEASURED_SUBLINKS.values())
 
+    if args.sublinks:
+        print(max_sub)
+        return 0 if max_sub <= SIDEBAR_SUBLINK_BUDGET else 1
     if args.count:
         print(max_links)
     elif args.json:
@@ -139,9 +162,10 @@ def main(argv: list[str] | None = None) -> int:
         for role, count in sorted(results.items(), key=lambda kv: -kv[1]):
             marker = "FAIL" if count > SIDEBAR_LINK_BUDGET else "ok  "
             print(f"{marker} {role:24} {count} links")
-        print(f"\nworst case: {max_role} with {max_links} links (budget {SIDEBAR_LINK_BUDGET})")
+        print(f"\nworst case: {max_role} with {max_links} level-1 links (budget {SIDEBAR_LINK_BUDGET})")
+        print(f"worst level-2 count: {max_sub} (budget {SIDEBAR_SUBLINK_BUDGET})")
 
-    return 0 if max_links <= SIDEBAR_LINK_BUDGET else 1
+    return 0 if max_links <= SIDEBAR_LINK_BUDGET and max_sub <= SIDEBAR_SUBLINK_BUDGET else 1
 
 
 if __name__ == "__main__":

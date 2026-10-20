@@ -143,7 +143,7 @@ def test_a_long_label_wraps_instead_of_being_cut(app, client, browser):
     document = client.get(path).get_data(as_text=True)
     pg = _open(browser, client, document, path)
     try:
-        link = pg.locator('#sidebar-nav a[title="Transformation programmes"] span.flex-1')
+        link = pg.locator('#sidebar-nav a[title="Traceability Matrix"] span.flex-1')
         link.wait_for(state="visible", timeout=10000)
         info = link.evaluate("""el => ({
             wraps: getComputedStyle(el).whiteSpace !== 'nowrap',
@@ -151,7 +151,7 @@ def test_a_long_label_wraps_instead_of_being_cut(app, client, browser):
             clipped: el.scrollWidth > el.clientWidth && getComputedStyle(el).textOverflow === 'ellipsis',
         })""")
         assert info["wraps"], "the label still forces a single line (white-space: nowrap)"
-        assert info["fullText"] == "Transformation programmes"
+        assert info["fullText"] == "Traceability Matrix"
         assert not info["clipped"], "the label still ellipsis-clips instead of wrapping"
     finally:
         pg.close()
@@ -220,14 +220,14 @@ def test_a_long_label_wraps_in_the_mobile_drawer_too(app, client, browser):
     document = client.get(path).get_data(as_text=True)
     pg = _open(browser, client, document, path, width=390, height=844)
     try:
-        link = pg.locator('#sidebar-nav a[title="Transformation programmes"] span.flex-1')
+        link = pg.locator('#sidebar-nav a[title="Traceability Matrix"] span.flex-1')
         link.wait_for(state="attached", timeout=10000)
         info = link.evaluate("""el => ({
             wraps: getComputedStyle(el).whiteSpace !== 'nowrap',
             fullText: el.textContent.trim(),
         })""")
         assert info["wraps"], "the label still forces a single line at 390x844"
-        assert info["fullText"] == "Transformation programmes"
+        assert info["fullText"] == "Traceability Matrix"
     finally:
         pg.close()
 
@@ -243,7 +243,8 @@ def test_no_zone_link_or_label_changed_for_any_persona(app, client, role):
     import html as html_module
     import re
 
-    from app.utils.role_access import get_sidebar_zones
+    from app.utils.role_access import get_launch_sidebar_zones as get_sidebar_zones
+    from app.utils.role_access import iter_sidebar_links
 
     class _StubUser:
         """Same shape get_sidebar_zones() reads: enterprise_role, is_admin(), is_platform_admin, is_org_admin, can()."""
@@ -276,9 +277,10 @@ def test_no_zone_link_or_label_changed_for_any_persona(app, client, role):
     rendered_labels = [html_module.unescape(label) for _, label in rendered_hrefs]
 
     expected_labels = []
-    for zone in get_sidebar_zones(_StubUser(role)):
-        for link in zone["links"]:
-            if link["endpoint"] in app.view_functions:
-                expected_labels.append(link["label"])
+    # Grouped sidebar: every level-1 link and every sub-menu item, in tree order. The toggles have no
+    # link of their own, and All modules sits in the footer, outside the nav.
+    for link in iter_sidebar_links(get_sidebar_zones(_StubUser(role))):
+        if link["endpoint"] in app.view_functions:
+            expected_labels.append(link["label"])
 
     assert rendered_labels == expected_labels, (role, rendered_labels, expected_labels)
