@@ -988,6 +988,101 @@ def test_comment_table_platform_scope_sees_both_organisations(rls, world):
     assert comment_a_id in seen and comment_b_id in seen
 
 
+def test_comment_table_select_is_fenced(rls, world):
+    """Organisation A's runtime session reads only its own comment rows."""
+    a, b = world.org("a"), world.org("b")
+    user_a = _make_user(world, a, "cmt-a", role="Architect")
+
+    el_a_id = el_b_id = comment_a_id = comment_b_id = None
+    with rls.owner.begin() as connection:
+        el_a_id = connection.execute(
+            text(
+                "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                "VALUES ('Element A', 'ApplicationComponent', 'application', :o) RETURNING id"
+            ),
+            {"o": a},
+        ).scalar_one()
+        el_b_id = connection.execute(
+            text(
+                "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                "VALUES ('Element B', 'ApplicationComponent', 'application', :o) RETURNING id"
+            ),
+            {"o": b},
+        ).scalar_one()
+        comment_a_id = connection.execute(
+            text(
+                "INSERT INTO archimate_element_comments "
+                "(element_id, user_id, comment_text, organization_id, created_at) "
+                "VALUES (:e, :u, :t, :o, now()) RETURNING id"
+            ),
+            {"e": el_a_id, "u": user_a, "t": "A's comment", "o": a},
+        ).scalar_one()
+        comment_b_id = connection.execute(
+            text(
+                "INSERT INTO archimate_element_comments "
+                "(element_id, user_id, comment_text, organization_id, created_at) "
+                "VALUES (:e, :u, :t, :o, now()) RETURNING id"
+            ),
+            {"e": el_b_id, "u": user_a, "t": "B's comment", "o": b},
+        ).scalar_one()
+    world.extra_deletes.append(("archimate_element_comments", "id", [comment_a_id, comment_b_id]))
+    world.extra_deletes.append(("archimate_elements", "id", [el_a_id, el_b_id]))
+
+    # Organisation A's runtime session sees only organisation A's comment row.
+    with rls.runtime_tx(a) as connection:
+        seen = {r[0] for r in connection.execute(text("SELECT id FROM archimate_element_comments"))}
+    assert seen == {comment_a_id}
+
+
+def test_comment_table_delete_is_fenced(rls, world):
+    """Organisation A's runtime session deletes none of organisation B's comment rows."""
+    a, b = world.org("a"), world.org("b")
+    user_a = _make_user(world, a, "cmt-a", role="Architect")
+
+    el_a_id = el_b_id = comment_b_id = None
+    with rls.owner.begin() as connection:
+        el_a_id = connection.execute(
+            text(
+                "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                "VALUES ('Element A', 'ApplicationComponent', 'application', :o) RETURNING id"
+            ),
+            {"o": a},
+        ).scalar_one()
+        el_b_id = connection.execute(
+            text(
+                "INSERT INTO archimate_elements (name, type, layer, organization_id) "
+                "VALUES ('Element B', 'ApplicationComponent', 'application', :o) RETURNING id"
+            ),
+            {"o": b},
+        ).scalar_one()
+        comment_b_id = connection.execute(
+            text(
+                "INSERT INTO archimate_element_comments "
+                "(element_id, user_id, comment_text, organization_id, created_at) "
+                "VALUES (:e, :u, :t, :o, now()) RETURNING id"
+            ),
+            {"e": el_b_id, "u": user_a, "t": "B's comment", "o": b},
+        ).scalar_one()
+    world.extra_deletes.append(("archimate_element_comments", "id", [comment_b_id]))
+    world.extra_deletes.append(("archimate_elements", "id", [el_a_id, el_b_id]))
+
+    # Organisation A's runtime session tries to delete organisation B's comment row.
+    with rls.runtime_tx(a, commit=True) as connection:
+        result = connection.execute(
+            text("DELETE FROM archimate_element_comments WHERE id = :c"),
+            {"c": comment_b_id},
+        )
+    assert result.rowcount == 0
+
+    # Organisation B's comment row remains.
+    with rls.owner.begin() as connection:
+        remaining = connection.execute(
+            text("SELECT count(*) FROM archimate_element_comments WHERE id = :c"),
+            {"c": comment_b_id},
+        ).scalar_one()
+    assert remaining == 1
+
+
 def test_event_log_partitioned_parent_is_filtered(rls, world):
     """event_log is partitioned by month in production; the policies sit on the
     parent only. Postgres applies a partitioned table's own policies when the
