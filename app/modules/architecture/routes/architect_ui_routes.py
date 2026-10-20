@@ -341,7 +341,7 @@ def import_oef():
             "No file uploaded. POST multipart/form-data with a field named 'oef_file'.", 400
         )
 
-    # Get filename for provenance (Task 01)
+    # The uploaded file name is the origin recorded on each row
     source_label = None
     for field in ("oef_file", "file"):
         uploaded = request.files.get(field) if request.files else None
