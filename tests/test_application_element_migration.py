@@ -216,6 +216,52 @@ def test_cli_command_is_registered_with_dry_run_and_revert(app, world):
     assert "--revert" in out.output and "--dry-run" in out.output
 
 
+def _count_applications(db_session, org):
+    from app.models.archimate_core import ArchiMateElement
+
+    return ArchiMateElement.query.filter(  # model-safety-ok: explicit org predicate
+        ArchiMateElement.organization_id == org.id,
+        ArchiMateElement.type == "Application",
+    ).count()
+
+
+def test_cli_without_scope_flag_refuses_and_writes_nothing(app, world, db_session):
+    runner = app.test_cli_runner()
+    for extra in ([], ["--dry-run"], ["--revert"]):
+        out = runner.invoke(args=["application-element", "migrate", *extra])
+        assert out.exit_code != 0, extra
+        assert "--org-ids" in out.output and "--all-organisations" in out.output
+    assert _count_applications(db_session, world["org_a"]) == 0
+    assert _count_applications(db_session, world["org_b"]) == 0
+
+
+def test_cli_org_ids_limits_to_those_organisations(app, world, db_session):
+    out = app.test_cli_runner().invoke(
+        args=["application-element", "migrate", "--org-ids", str(world["org_a"].id)]
+    )
+    assert out.exit_code == 0, out.output
+    assert _count_applications(db_session, world["org_a"]) == 3
+    assert _count_applications(db_session, world["org_b"]) == 0
+
+
+def test_cli_all_organisations_behaves_as_before(app, world, db_session):
+    out = app.test_cli_runner().invoke(
+        args=["application-element", "migrate", "--all-organisations"]
+    )
+    assert out.exit_code == 0, out.output
+    assert _count_applications(db_session, world["org_a"]) == 3
+    assert _count_applications(db_session, world["org_b"]) == 1
+
+
+def test_cli_org_ids_and_all_organisations_together_are_refused(app, world, db_session):
+    out = app.test_cli_runner().invoke(
+        args=["application-element", "migrate", "--all-organisations",
+              "--org-ids", str(world["org_a"].id)]
+    )
+    assert out.exit_code != 0
+    assert _count_applications(db_session, world["org_a"]) == 0
+
+
 def test_archiet_file_gives_55_applications_and_no_components(
     app, db_session, make_org, tenant_ctx
 ):

@@ -279,9 +279,25 @@ application_element_cli = AppGroup(
 @click.option("--dry-run", is_flag=True, help="Report what would change without writing.")
 @click.option("--revert", is_flag=True, help="Undo a previous run: restore the marked elements.")
 @click.option("--org-ids", default=None, help="Comma-separated organisation IDs to process.")
+@click.option(
+    "--all-organisations",
+    "all_organisations",
+    is_flag=True,
+    help="Process every organisation. Required when --org-ids is not given.",
+)
 @with_appcontext
-def migrate_command(dry_run, revert, org_ids):
-    """Make every inventory row's mirror element an Application (or revert)."""
+def migrate_command(dry_run, revert, org_ids, all_organisations):
+    """Make every inventory row's mirror element an Application (or revert).
+
+    Name the scope: --org-ids 1,2 or --all-organisations. With neither, nothing runs.
+    """
+    if bool(org_ids) == bool(all_organisations):
+        click.echo(
+            "Refusing to run: give exactly one of --org-ids (comma-separated) or "
+            "--all-organisations. Nothing was read or written.",
+            err=True,
+        )
+        raise SystemExit(2)
     click.echo(
         "application-element migrate"
         + (" --revert" if revert else "")
