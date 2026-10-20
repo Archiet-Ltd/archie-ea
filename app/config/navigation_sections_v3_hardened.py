@@ -259,13 +259,6 @@ AI_ANALYSIS_SECTION = NavigationSectionV3(
             order=2,
         ),
         NavigationItemV3(
-            label="Gap Discovery",
-            icon="search",
-            endpoint="main.agentic_gaps_ui",
-            url_fallback="/agentic-gaps",
-            order=3,
-        ),
-        NavigationItemV3(
             label="Market Intelligence",
             icon="trending-up",
             endpoint="architect_ui.market_intelligence",
