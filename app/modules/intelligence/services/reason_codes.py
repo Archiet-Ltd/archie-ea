@@ -43,6 +43,11 @@ REASON_CODES = frozenset(
         # endpoint may invent an absence string inline.
         "no_tenant_context",
         "element_not_found",
+        # Scenario branches (R3-B03): a branch id that is not the active
+        # organisation's, and the honest note that stored derived facts
+        # describe the base model and are not recomputed over a branch.
+        "scenario_not_found",
+        "derivation_not_applied_to_scenario",
         # T-005 (US-5) addition: the yield endpoint's p95 bucket-edge read
         # (D3) has no honest number to report when the 95th percentile falls
         # in the histogram's +Inf overflow bucket -- reporting the top

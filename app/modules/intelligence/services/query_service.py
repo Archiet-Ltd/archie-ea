@@ -42,6 +42,8 @@ VALUE_STREAM_RISK_REASONS = frozenset(
 NO_OWNERSHIP_REASON = validate_reason_code("no_ownership_recorded")
 NO_TENANT_CONTEXT_REASON = validate_reason_code("no_tenant_context")
 ELEMENT_NOT_FOUND_REASON = validate_reason_code("element_not_found")
+SCENARIO_NOT_FOUND_REASON = validate_reason_code("scenario_not_found")
+SCENARIO_DERIVATION_REASON = validate_reason_code("derivation_not_applied_to_scenario")
 DERIVATION_NOT_COMPUTED_REASON = validate_reason_code("derivation_not_computed")
 NO_RISK_RECORDED_REASON = validate_reason_code("no_risk_recorded")
 NO_APPLICATION_COMPONENT_REASON = validate_reason_code("no_application_component")
@@ -461,6 +463,22 @@ def _element_ids_in_rows(rows: List[Dict[str, Any]]) -> List[int]:
     return ids
 
 
+def _elements_as_branch_sees_them(elements, ids, overlay):
+    """Identity map with the branch's additions, renames and removals laid over it."""
+    for eid in ids:
+        seen = overlay.describe_element(eid, elements.get(str(eid)))
+        if seen is None:
+            elements.pop(str(eid), None)
+        else:
+            elements[str(eid)] = {
+                "id": eid,
+                "name": seen.get("name"),
+                "type": seen.get("type"),
+                "layer": seen.get("layer"),
+            }
+    return elements
+
+
 def _name_in(elements: Dict[str, Dict[str, Any]], element_id: Optional[int]) -> Optional[str]:
     entry = elements.get(str(element_id))
     return entry["name"] if entry is not None else None
@@ -515,12 +533,44 @@ def _explicit_row(rel, depth: int, chain: List[int], chain_elements: List[int], 
     }
 
 
-def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[str, Any]]:
+def _apply_overlay_to_relationships(rels, overlay, frontier_ids, direction):
+    """The base relationships as a scenario branch sees them, plus the branch's own."""
+    from types import SimpleNamespace
+
+    kept = [
+        SimpleNamespace(
+            id=r.id, source_id=r.source_id, target_id=r.target_id,
+            type=overlay.relationship_type(r.id, r.type),
+        )
+        for r in rels
+        if not overlay.drops_relationship(r.id, r.source_id, r.target_id)
+    ]
+    added = []
+    if direction in ("downstream", "both"):
+        added += overlay.relationships_from(frontier_ids)
+    if direction in ("upstream", "both"):
+        added += overlay.relationships_to(frontier_ids)
+    seen = set()
+    for rid, r in added:
+        if rid in seen:
+            continue
+        seen.add(rid)
+        kept.append(SimpleNamespace(id=rid, source_id=r["source_id"], target_id=r["target_id"], type=r["type"]))
+    return kept
+
+
+def _walk_explicit(root_id: int, max_depth: int, direction: str, overlay=None) -> List[Dict[str, Any]]:
     """BFS over ``ArchiMateRelationship`` (TenantMixin-fenced, no hand-written
     predicate needed) up to ``max_depth`` hops, in the requested direction.
 
     Cycle-safe: a node already visited is never re-queued, so this
     terminates even on a cyclic graph within ``max_depth`` iterations.
+
+    With an ``overlay`` (a scenario branch) the same walk runs over the base
+    relationships with the branch's changes applied: removed relationships and
+    the relationships of removed elements are skipped, retyped ones carry the
+    branch's type, and relationships the branch adds are walked too. Without
+    one the code path is unchanged.
     """
     from app.models import ArchiMateRelationship
 
@@ -545,6 +595,8 @@ def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[st
             .scalars()
             .all()
         )
+        if overlay is not None:
+            rels = _apply_overlay_to_relationships(rels, overlay, frontier_ids, direction)
 
         next_frontier: Dict[int, Dict[str, List[int]]] = {}
         for rel in rels:
@@ -571,7 +623,7 @@ def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[st
     return rows
 
 
-def _filter_explicit_by_layer(rows: List[Dict[str, Any]], layer: str) -> List[Dict[str, Any]]:
+def _filter_explicit_by_layer(rows: List[Dict[str, Any]], layer: str, overlay=None) -> List[Dict[str, Any]]:
     from app.models import ArchiMateElement
 
     element_ids = set()
@@ -586,6 +638,11 @@ def _filter_explicit_by_layer(rows: List[Dict[str, Any]], layer: str) -> List[Di
             )
         ).all()
     )
+    if overlay is not None:
+        for eid in element_ids:
+            described = overlay.describe_element(eid, {"layer": layers.get(eid)})
+            if described is not None:
+                layers[eid] = described.get("layer")
     return [
         row
         for row in rows
@@ -822,6 +879,7 @@ class IntelligenceQueryService:
         with_owner: bool = True,
         cursor: Optional[int] = None,
         page_size: Optional[int] = None,
+        scenario_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         if direction not in VALID_DIRECTIONS:
             raise ValueError(f"direction must be one of {sorted(VALID_DIRECTIONS)}")
@@ -829,6 +887,17 @@ class IntelligenceQueryService:
             raise ValueError("max_depth must be between 1 and 10")
 
         org_id = current_org_id()
+
+        # A scenario branch laid over the base model; None leaves every step
+        # below exactly as it is. A branch of another organisation, or one that
+        # does not exist, is answered as not found and nothing is walked.
+        overlay = None
+        scenario_missing = False
+        if scenario_id is not None:
+            from app.modules.intelligence.services.scenario_service import overlay_for
+
+            overlay = overlay_for(org_id, scenario_id)
+            scenario_missing = overlay is None and org_id is not None
 
         with record_query_latency("cross_layer_impact") as scope:
             scope.organization_id = org_id
@@ -849,12 +918,29 @@ class IntelligenceQueryService:
                 }
                 reasons = [NO_TENANT_CONTEXT_REASON]
                 maturity_flags = _maturity_flags(NO_TENANT_CONTEXT_REASON)
+            elif scenario_missing:
+                rows = []
+                summary = {
+                    "explicit_count": 0,
+                    "derived_count": 0,
+                    "stale_count": 0,
+                    "derivation_state": "not_computed",
+                }
+                reasons = [SCENARIO_NOT_FOUND_REASON]
+                maturity_flags = _maturity_flags(SCENARIO_NOT_FOUND_REASON)
             else:
                 from app.models import ArchiMateElement
 
-                element = db.session.execute(
-                    db.select(ArchiMateElement).where(ArchiMateElement.id == element_id)
-                ).scalar_one_or_none()
+                if overlay is not None and element_id < 0:
+                    # An element the branch added has no base row; it is found
+                    # only while the branch still has it.
+                    element = True if overlay.element_exists(element_id) else None
+                elif overlay is not None and element_id in overlay.removed_elements:
+                    element = None
+                else:
+                    element = db.session.execute(
+                        db.select(ArchiMateElement).where(ArchiMateElement.id == element_id)
+                    ).scalar_one_or_none()
 
                 if element is None:
                     rows = []
@@ -867,24 +953,29 @@ class IntelligenceQueryService:
                     reasons = [ELEMENT_NOT_FOUND_REASON]
                     maturity_flags = _maturity_flags(ELEMENT_NOT_FOUND_REASON)
                 else:
-                    explicit_rows = _walk_explicit(element_id, max_depth, direction)
+                    explicit_rows = _walk_explicit(element_id, max_depth, direction, overlay)
                     if layer is not None:
-                        explicit_rows = _filter_explicit_by_layer(explicit_rows, layer)
+                        explicit_rows = _filter_explicit_by_layer(explicit_rows, layer, overlay)
 
                     src, tgt, dir_kw = _derived_filter_args(element_id, direction)
 
                     # Fetched regardless of include_derived: the summary's
                     # derivation_state must always be a real measurement,
                     # never fabricated when include_derived=False.
-                    all_matching_derived = list_derived_facts(
-                        org_id,
-                        include_stale=True,
-                        source_element_id=src,
-                        target_element_id=tgt,
-                        max_depth=max_depth,
-                        direction=dir_kw,
-                        layer=layer,
-                    )
+                    if overlay is not None:
+                        # Stored derived facts describe the base model; they are
+                        # not recomputed over a branch, so none are shown.
+                        all_matching_derived = []
+                    else:
+                        all_matching_derived = list_derived_facts(
+                            org_id,
+                            include_stale=True,
+                            source_element_id=src,
+                            target_element_id=tgt,
+                            max_depth=max_depth,
+                            direction=dir_kw,
+                            layer=layer,
+                        )
                     if not all_matching_derived:
                         derivation_state = "not_computed"
                     elif all(r["stale"] for r in all_matching_derived):
@@ -893,7 +984,7 @@ class IntelligenceQueryService:
                         derivation_state = "current"
 
                     derived_rows: List[Dict[str, Any]] = []
-                    if _include_derived_gate(include_derived):
+                    if overlay is None and _include_derived_gate(include_derived):
                         matching = list_derived_facts(
                             org_id,
                             include_stale=include_stale,
@@ -912,6 +1003,10 @@ class IntelligenceQueryService:
                     # ``summary.latency_ms`` and the histogram measure it,
                     # then let the derived rows name both of their ends.
                     elements = _resolve_elements_batch(_element_ids_in_rows(rows), org_id)
+                    if overlay is not None:
+                        elements = _elements_as_branch_sees_them(
+                            elements, set(_element_ids_in_rows(rows)) | {element_id}, overlay
+                        )
                     _attach_plain_terms(rows, elements)
 
                     # The distinct Capability element ids the identity map
@@ -927,7 +1022,7 @@ class IntelligenceQueryService:
                         {
                             eid
                             for eid in _element_ids_in_rows(rows)
-                            if elements.get(str(eid), {}).get("type") == "Capability"
+                            if elements.get(str(eid), {}).get("type") == "Capability" and eid > 0
                         }
                     )
                     maturity_by_element: Dict[int, Dict[str, Any]] = {}
@@ -951,7 +1046,10 @@ class IntelligenceQueryService:
                         # not applicable is not an absence, and the row's own
                         # ``reason`` above is unrelated to and unchanged by
                         # this block (the block carries its own reason).
-                        if elements.get(str(row["element_id"]), {}).get("type") == "Capability":
+                        if (
+                            elements.get(str(row["element_id"]), {}).get("type") == "Capability"
+                            and row["element_id"] in maturity_by_element
+                        ):
                             row["maturity"] = maturity_by_element[row["element_id"]]
                             row["health"] = maturity_by_element[row["element_id"]]
                         else:
@@ -977,7 +1075,9 @@ class IntelligenceQueryService:
                         "stale_count": stale_count,
                         "derivation_state": derivation_state,
                     }
-                    reasons = []
+                    reasons = [SCENARIO_DERIVATION_REASON] if overlay is not None else []
+                    if overlay is not None:
+                        summary["scenario_id"] = overlay.branch_id
                     # The whole-answer flags block: computed only when at
                     # least one Capability id was found (capability_ids
                     # non-empty, so maturity_by_element is non-empty too --

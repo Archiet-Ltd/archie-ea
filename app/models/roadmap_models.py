@@ -472,71 +472,9 @@ class RoadmapResource(db.Model):
         }
 
 
-class RoadmapScenario(db.Model):
-    """Roadmap scenario model for what-if analysis"""
-
-    __tablename__ = "roadmap_scenarios"
-
-    # Core fields
-    id = Column(Integer, primary_key=True)
-    name = Column(String(255), nullable=False, index=True)
-    description = Column(Text)
-    scenario_type = Column(String(50), index=True)  # baseline, optimistic, pessimistic, custom
-
-    # Parameters
-    budget_constraint = Column(Float)
-    timeline_constraint = Column(Integer)  # in days
-    resource_constraint = Column(Text)  # JSON string of resource constraints
-
-    # Results
-    total_work_packages = Column(Integer, default=0)
-    total_cost = Column(Float, default=0.0)
-    total_duration = Column(Integer, default=0)  # in days
-    success_probability = Column(Float, default=0.0)
-
-    # Status
-    status = Column(String(20), default="draft", index=True)  # draft, running, completed, failed
-    generated_at = Column(DateTime)
-
-    # Metadata
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    created_by = Column(Integer, ForeignKey("users.id"))
-
-    # Relationships
-    work_packages = relationship(
-        "RoadmapWorkPackage", secondary="scenario_work_packages", backref="scenarios"
-    )
-
-    def to_dict(self):
-        """Convert to dictionary"""
-        return {
-            "id": self.id,
-            "name": self.name,
-            "description": self.description,
-            "scenario_type": self.scenario_type,
-            "budget_constraint": self.budget_constraint,
-            "timeline_constraint": self.timeline_constraint,
-            "resource_constraint": self.resource_constraint,
-            "total_work_packages": self.total_work_packages,
-            "total_cost": self.total_cost,
-            "total_duration": self.total_duration,
-            "success_probability": self.success_probability,
-            "status": self.status,
-            "generated_at": self.generated_at.isoformat() if self.generated_at else None,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-        }
-
-
-# Association table for scenarios and work packages
-scenario_work_packages = Table(
-    "scenario_work_packages",
-    db.metadata,
-    Column("scenario_id", Integer, ForeignKey("roadmap_scenarios.id"), primary_key=True),
-    Column("work_package_id", BigInteger, ForeignKey("roadmap_work_packages.id"), primary_key=True),
-    Column("added_at", DateTime, default=datetime.utcnow),
-)
+# RoadmapScenario and its scenario_work_packages association were retired into
+# scenario branches (app/models/scenario.py): nothing read or wrote them. The
+# tables are left in place, unmapped, for anyone who wants their rows back.
 
 
 class RoadmapAudit(db.Model):

@@ -314,7 +314,6 @@ review_queue_statistics
 rfp_templates
 roadmap_audit
 roadmap_gaps
-roadmap_scenarios
 roadmap_work_packages
 role_permissions
 roles

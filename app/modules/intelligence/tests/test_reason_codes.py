@@ -86,6 +86,8 @@ _EXPECTED = {
     "feed_not_connected",
     "no_tenant_context",
     "element_not_found",
+    "scenario_not_found",
+    "derivation_not_applied_to_scenario",
     "p95_above_highest_bucket",
     "no_application_component",
     "no_work_package_recorded",
@@ -123,8 +125,8 @@ _EXPECTED = {
 }
 
 
-def test_reason_codes_has_exactly_fifty_two_members():
-    assert len(REASON_CODES) == 52
+def test_reason_codes_has_exactly_fifty_four_members():
+    assert len(REASON_CODES) == 54
     assert REASON_CODES == frozenset(_EXPECTED)
 
 
