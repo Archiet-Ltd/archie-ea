@@ -1,9 +1,16 @@
-"""Outbox emission for ArchiMate element and relationship mutations.
+"""Outbox emission for model changes: elements, relationships, applications,
+owners, cost facts and risks.
 
 Uses a session-level ``after_flush`` listener so outbox events are queued
 inside the same transaction without triggering a nested flush.  Every write
 to ``ArchiMateElement`` and ``ArchiMateRelationship`` produces exactly one
-row in ``transformation_outbox_events``.
+row in ``transformation_outbox_events``.  The other watched models (see
+``_EMIT_ACTIONS``) produce one only when something an owner would act on
+changed.
+
+Each payload says what changed (``changes``: field, before, after), who owns
+the changed thing (``owner_user_ids``) and where the change came from
+(``source``); ``app/services/change_feed_payload.py`` builds those.
 
 The relay in ``app/services/event_log_service.py`` copies these rows into
 the partitioned ``event_log``.
@@ -24,6 +31,16 @@ logger = logging.getLogger(__name__)
 
 # The models we listen for.
 _TARGET_MODELS: dict = {}
+
+# Which actions each watched type emits. A type not listed emits all three.
+# An application is created through its ArchiMate mirror, which already emits,
+# so only a change to it is an event of its own.
+_ALL_ACTIONS = frozenset({"created", "updated", "deleted"})
+_EMIT_ACTIONS: dict = {
+    "application_component": frozenset({"updated"}),
+}
+# Types whose event is only worth queuing when a watched field changed.
+_NEEDS_A_CHANGE = frozenset({"application_component", "cost_fact", "risk", "application_owner"})
 
 # Keys for session.info dict — scoped per session, never shared across threads.
 _INFO_KEY_PENDING = "_archimate_outbox_pending"
@@ -130,9 +147,12 @@ def _on_after_flush(session, flush_context):
 
     # Now create outbox rows.  This happens AFTER the main flush has
     # committed its SQL to the database, so we are safe to add more objects.
+    from app.services.change_feed_payload import describe_change
     from app.services.outbox import emit_event
 
     for entity_type, action, target in pending:
+        if action not in _EMIT_ACTIONS.get(entity_type, _ALL_ACTIONS):
+            continue
         org_id = getattr(target, "organization_id", None)
         if org_id is None:
             logger.warning(
@@ -153,6 +173,10 @@ def _on_after_flush(session, flush_context):
             payload["layer"] = target.layer
 
         try:
+            extra = describe_change(session, entity_type, action, target, org_id)
+            if entity_type in _NEEDS_A_CHANGE and not extra["changes"]:
+                continue
+            payload.update(extra)
             emit_event(
                 organization_id=org_id,
                 event_type=event_type_val,
@@ -169,18 +193,50 @@ def _on_after_flush(session, flush_context):
     _set_depth(session, depth - 1)
 
 
+def _record_old_values(model_cls, entity_type: str) -> None:
+    """Ask SQLAlchemy to keep the old value of every watched field.
+
+    Without this, assigning to a field that was not loaded leaves the old value
+    unknown and the event could only say what it became, not what it was.
+    """
+    from app.services.change_feed_payload import WATCHED_FIELDS
+
+    for name in WATCHED_FIELDS.get(entity_type, ()):
+        attribute = getattr(model_cls, name, None)
+        if attribute is None or not hasattr(attribute, "property"):
+            continue
+        if event.contains(attribute, "set", _keep_old_value):
+            continue
+        event.listen(attribute, "set", _keep_old_value, active_history=True)
+
+
+def _keep_old_value(target, value, oldvalue, initiator):
+    return None
+
+
 def install_archimate_outbox_sync():
     """Record the models to watch; the listener is global on ``db.session``.
 
     Idempotent — calling again is safe.
     """
+    from app.models.application_owner import ApplicationOwner
+    from app.models.application_portfolio import ApplicationComponent
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.models.cost_fact import CostFact
+    from app.models.risk import Risk
 
     _TARGET_MODELS.clear()
     _TARGET_MODELS[ArchiMateElement] = "archimate_element"
     _TARGET_MODELS[ArchiMateRelationship] = "archimate_relationship"
+    _TARGET_MODELS[ApplicationComponent] = "application_component"
+    _TARGET_MODELS[ApplicationOwner] = "application_owner"
+    _TARGET_MODELS[CostFact] = "cost_fact"
+    _TARGET_MODELS[Risk] = "risk"
 
-    logger.info("ArchiMate outbox sync installed for elements and relationships")
+    for model_cls, entity_type in _TARGET_MODELS.items():
+        _record_old_values(model_cls, entity_type)
+
+    logger.info("Outbox sync installed for elements, relationships, applications, owners, costs and risks")
 
 
 __all__ = ["install_archimate_outbox_sync"]
