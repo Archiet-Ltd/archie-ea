@@ -1318,9 +1318,10 @@ def gate_sidebar_links(baseline: int) -> Result:
     except (ValueError, IndexError):
         return Result("sidebar-links", FAIL, f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
     detail = ""
-    if count > baseline:
+    sub_ok = _run([sys.executable, "scripts/check_sidebar_links.py", "--sublinks"]).returncode == 0
+    if count > baseline or not sub_ok:
         detail = _run([sys.executable, "scripts/check_sidebar_links.py"]).stdout[-1500:]
-    return Result("sidebar-links", PASS if count <= baseline else FAIL, detail, count, baseline)
+    return Result("sidebar-links", PASS if count <= baseline and sub_ok else FAIL, detail, count, baseline)
 
 
 def gate_deployed_deps() -> Result:

@@ -16,7 +16,7 @@ from flask import Flask, render_template_string
 from playwright.sync_api import expect, sync_playwright
 from werkzeug.serving import make_server
 
-from app.utils.role_access import get_launch_sidebar_zones, get_sidebar_zones
+from app.utils.role_access import get_launch_sidebar_zones, get_sidebar_zones, iter_sidebar_links
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -44,10 +44,9 @@ def brand_shell(request):
     shell.add_url_rule("/admin/", "admin.index", lambda: (
         ("<h1>Command Center</h1>", 200) if administrator else ("Forbidden", 403)))
     shell.add_url_rule("/account/logout", "account.logout", lambda: "Signed out")
-    for zone in get_sidebar_zones(user) + get_launch_sidebar_zones(user):
-        for link in zone["links"]:
-            if link["endpoint"] not in shell.view_functions:
-                shell.add_url_rule("/fixture/" + link["endpoint"], link["endpoint"], lambda: "Fixture destination")
+    for link in list(iter_sidebar_links(get_sidebar_zones(user))) + list(iter_sidebar_links(get_launch_sidebar_zones(user))):
+        if link["endpoint"] not in shell.view_functions:
+            shell.add_url_rule("/fixture/" + link["endpoint"], link["endpoint"], lambda: "Fixture destination")
 
     @shell.get("/fixture/start")
     def start():

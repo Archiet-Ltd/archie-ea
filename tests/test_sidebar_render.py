@@ -260,7 +260,7 @@ def test_sidebar_includes_all_modules_link(app, db_session, make_org, role, labe
     platform_admin uses the footer fallback — see
     test_platform_admin_hits_the_link_budget_exactly)."""
     sidebar_html = _sidebar_html(app, db_session, make_org, role, label)
-    assert "More tools" in sidebar_html, (
+    assert "All modules" in sidebar_html, (
         f"{role} sidebar has no reachable link to the All-modules directory"
     )
 

@@ -244,6 +244,7 @@ def test_no_zone_link_or_label_changed_for_any_persona(app, client, role):
     import re
 
     from app.utils.role_access import get_launch_sidebar_zones as get_sidebar_zones
+    from app.utils.role_access import iter_sidebar_links
 
     class _StubUser:
         """Same shape get_sidebar_zones() reads: enterprise_role, is_admin(), is_platform_admin, is_org_admin, can()."""
@@ -276,11 +277,10 @@ def test_no_zone_link_or_label_changed_for_any_persona(app, client, role):
     rendered_labels = [html_module.unescape(label) for _, label in rendered_hrefs]
 
     expected_labels = []
-    for zone in get_sidebar_zones(_StubUser(role)):
-        for link in zone["links"]:
-            if link["endpoint"] in app.view_functions:
-                expected_labels.append(link["label"])
+    # Grouped sidebar: every level-1 link and every sub-menu item, in tree order. The toggles have no
+    # link of their own, and All modules sits in the footer, outside the nav.
+    for link in iter_sidebar_links(get_sidebar_zones(_StubUser(role))):
+        if link["endpoint"] in app.view_functions:
+            expected_labels.append(link["label"])
 
-    # Launch cut: the twelve modules, then the way to the More tools page.
-    expected_labels.append("More tools")
     assert rendered_labels == expected_labels, (role, rendered_labels, expected_labels)

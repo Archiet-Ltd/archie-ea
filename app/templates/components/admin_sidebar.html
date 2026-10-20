@@ -234,11 +234,11 @@ DEPENDENCIES:
          the directory stays reachable from every role's sidebar regardless of
          which zone has room for it. -->
     {% if not ns.has_all_modules and 'modules_directory.index' in flask.current_app.view_functions %}
-    <div class="px-4 py-2 border-t border-border">
+    <div class="px-2 py-0.5 border-t border-border">
         <a href="{{ url_for('modules_directory.index') }}"
            title="All modules"
            data-testid="sidebar-all-modules"
-           class="w-full flex items-center gap-2 rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors {% if request.endpoint == 'modules_directory.index' %}text-foreground font-medium{% endif %}">
+           class="w-full flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors {% if request.endpoint == 'modules_directory.index' %}text-foreground font-medium{% endif %}">
             <i data-lucide="grid" class="h-3.5 w-3.5 flex-shrink-0"></i>
             {# sidebar-footer-text, because this link sits OUTSIDE <nav> and the
                collapse rule is scoped to `.sidebar-collapsed nav span`. Without
