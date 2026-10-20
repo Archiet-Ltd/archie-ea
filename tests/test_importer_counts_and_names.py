@@ -131,7 +131,7 @@ def test_british_realisation_is_normalised_to_realization(app, org_ctx):
 
 
 def test_archiet_file_counts_match_its_relationships(app, org_ctx):
-    path = os.path.join(os.path.dirname(__file__), "fixtures", "oef", "archiet-model-v1.oef.xml")
+    path = os.path.join(os.path.dirname(__file__), "fixtures", "archiet-model-v1.oef.xml")
     with open(path, "rb") as fh:
         content = fh.read().decode("utf-8")
     res = _run(content)
