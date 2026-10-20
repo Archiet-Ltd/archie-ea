@@ -128,3 +128,36 @@ def test_bound_envelope_never_invents_a_source(app):
     assert "Worked out" in html and "Measured" in html, html
     assert "Recorded in the model" not in html, html
     _no_empty_lines(html)
+
+
+def _render_with_trust(app, trust):
+    with app.test_request_context("/"):
+        return render_template_string(
+            "{% from 'components/provenance.html' import answer_envelope %}"
+            "{{ answer_envelope(source='applications.owner', trust=trust) }}",
+            trust=trust,
+        )
+
+
+def test_trust_line_renders_the_resolver_sentence_under_the_provenance_line(app):
+    trust = {"area": "application", "state": "recorded",
+             "line": "From the application layer: 31 of 40 owned, last change 3 days ago"}
+    html = _render_with_trust(app, trust)
+    assert 'data-slot="trust-meter"' in html
+    assert 'data-trust-area="application"' in html
+    assert "31 of 40 owned" in html
+    assert html.index("applications.owner") < html.index("31 of 40 owned")
+
+
+def test_trust_line_absent_without_a_trust_record(app):
+    assert "trust-meter" not in _render_with_trust(app, None)
+
+
+def test_empty_area_shows_nothing_recorded_and_no_gauge(app):
+    trust = {"area": "capability", "state": "nothing_recorded",
+             "line": "From the capability layer: nothing recorded"}
+    html = _render_with_trust(app, trust)
+    assert 'data-trust-state="nothing_recorded"' in html
+    assert "nothing recorded" in html
+    for banned in ("progress", "role=\"meter\"", "%</", "gauge"):
+        assert banned not in html

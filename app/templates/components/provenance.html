@@ -72,7 +72,7 @@
 {% endmacro %}
 
 
-{% macro answer_envelope(source=None, kind='measured', confidence=None, as_of=None, href=None, label=None, class='', x_source=None, x_as_of=None, x_confidence=None, x_kind=None) %}
+{% macro answer_envelope(source=None, kind='measured', confidence=None, as_of=None, href=None, label=None, class='', x_source=None, x_as_of=None, x_confidence=None, x_kind=None, trust=None) %}
 {# One line of provenance under a Tier 1 result: badge, source, as-of, confidence.
 
    States (the badge vocabulary above, plus the one this macro adds):
@@ -95,6 +95,13 @@
    Confidence formatting (server-side): a number <= 1 renders as a percentage
    with no decimals (0.85 -> "85%"), a number > 1 as itself, a word as itself.
    A bound confidence renders the value the expression gives.
+
+   trust (optional): one area record from model_trust() (stored on an answer as
+   answer.freshness.model_trust). Renders its resolver-built line under the
+   provenance line, e.g. "From the application layer: 31 of 40 owned, last change
+   3 days ago"; an empty area reads "nothing recorded". Counts with denominators
+   only: never a score, a gauge or a grade (design/patterns.json: trust-meter).
+   This is the one presentation of the trust line under an answer.
 #}
 {% set _has_source = source is not none and source != '' %}
 {% set _display = label if label is not none else source %}
@@ -130,6 +137,9 @@
         {{ provenance_badge('missing') }}Source not recorded
     {% endif %}
 </div>
+{% if trust and trust.line %}
+<p class="text-xs text-muted-foreground mt-0.5 {{ class }}" data-slot="trust-meter" data-trust-area="{{ trust.area }}" data-trust-state="{{ trust.state or 'recorded' }}">{{ trust.line }}</p>
+{% endif %}
 {% endmacro %}
 
 

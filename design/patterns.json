@@ -51,6 +51,23 @@
         "hairline-border",
         "8px-radius"
       ]
+    },
+    "trust_meter": {
+      "pattern": "trust-meter",
+      "parent": "answer-envelope",
+      "macros": "components/provenance.html answer_envelope(trust=...) for the line under an answer; the per-area view is a dense_table",
+      "spec": {
+        "line": "one muted 12px text line under the provenance line: the resolver's sentence with counts and denominators and the last-change age",
+        "empty_area": "the resolver's 'nothing recorded' sentence, never 0 percent",
+        "per_area_view": "dense_table, one row per area, a column per fact (owner, lifecycle, cost, connected, last change); a fact the type does not carry reads 'Not held'",
+        "source": "model_trust(organization_id, area), the one resolver (reuse register: model-trust)"
+      },
+      "banned": [
+        "trust-score",
+        "trust-gauge",
+        "coloured-grade",
+        "progress-ring"
+      ]
     }
   },
   "banned_patterns": [
