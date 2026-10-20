@@ -1064,12 +1064,141 @@ LAUNCH_ENDPOINTS = frozenset(link["endpoint"] for link in LAUNCH_MODULES)
 # Architects reach these two most, so the /modules/ page lists them first.
 MORE_TOOLS_FIRST_ENDPOINTS = ("archimate.composer_page", "tech_radar.index")
 
-SIDEBAR_LAUNCH_ZONES: List[Dict] = [_zone("launch", LAUNCH_MODULES)]
+# The grouped sidebar (navigation specification v1, section 2). Level 1 is an item: a link, or a toggle
+# that holds one level of sub-items. Group titles (Overview, Answers, ...) are headings, not a level.
+# Nothing here adds a module: every entry points at a route that answers today.
+_LAUNCH_BY_LABEL = {m["label"]: m for m in LAUNCH_MODULES}
+
+
+def _toggle(item_id, label, icon, children, requires=None):
+    """A level-1 sidebar item that opens a sub-menu (no link of its own)."""
+    d = {"id": item_id, "label": label, "endpoint": None, "icon": icon, "children": children}
+    if requires:
+        d["requires"] = requires
+    return d
+
+
+def _sub(label, endpoint, **query_params):
+    """A level-2 sidebar link."""
+    return _link(label, endpoint, None, query_params=query_params or None)
+
+
+# The Catalogue group. ONE list: the catalogue task (T-cat-01 and after) changes the targets here and
+# nowhere else. Until the catalogue pages exist every target is a page that answers today: the layer
+# workspace (archimate_crud.dashboard?layer=...) for a group, and the existing element-type lists.
+CATALOGUE_SIDEBAR: List[Dict] = [
+    _link("All catalogues", "modules_directory.index", "library"),
+    _link("Layer overview", "archimate_crud.dashboard", "layers"),
+    _toggle("catalogue-business", "Business architecture", "briefcase", [
+        _sub("All business elements", "archimate_crud.dashboard", layer="business"),
+        _sub("Actors", "archimate_layers.business_actors"),
+        _sub("Processes", "archimate_layers.business_processes"),
+        _sub("Services", "archimate_layers.business_services"),
+    ]),
+    _toggle("catalogue-application", "Application architecture", "app-window", [
+        _sub("All application elements", "archimate_crud.dashboard", layer="application"),
+        _sub("Applications and components", "archimate_layers.application_components"),
+        _sub("Application services", "archimate_layers.application_services"),
+    ]),
+    _toggle("catalogue-data", "Data architecture", "database", [
+        _sub("All data elements", "archimate_layers.application_data_objects"),
+        _sub("Data objects", "archimate_layers.application_data_objects"),
+    ]),
+    _toggle("catalogue-technology", "Technology architecture", "server", [
+        _sub("All technology elements", "archimate_crud.dashboard", layer="technology"),
+        _sub("Nodes", "archimate_layers.technology_nodes"),
+        _sub("Devices", "archimate_layers.technology_devices"),
+        _sub("System software", "archimate_layers.technology_system_software"),
+    ]),
+    _toggle("catalogue-strategy", "Strategy and motivation", "target", [
+        _sub("All strategy elements", "archimate_crud.dashboard", layer="motivation"),
+        _sub("Capabilities", "archimate_layers.strategy_capabilities_tree"),
+        _sub("Value streams", "archimate_layers.strategy_value_streams"),
+        _sub("Goals", "archimate_layers.motivation_goals"),
+        _sub("Requirements", "archimate_layers.motivation_requirements"),
+        _sub("Stakeholders", "archimate_layers.motivation_stakeholders"),
+    ]),
+    _toggle("catalogue-delivery", "Delivery and change", "milestone", [
+        _sub("All delivery elements", "archimate_crud.dashboard", layer="implementation"),
+        _sub("Plateaus", "archimate_layers.implementation_plateaus"),
+        _sub("Deliverables", "archimate_layers.implementation_deliverables"),
+    ]),
+]
+
+# Sub-items of Capability Map: the views that exist today as their own routes.
+CAPABILITY_MAP_VIEWS: List[Dict] = [
+    _sub("Map", "capability_map.index"),
+    _sub("Hierarchy", "capability_map.hierarchy"),
+    _sub("Network", "capability_map.network"),
+    _sub("Simple view", "capability_map.simple_view"),
+    _sub("Application view", "unified_low_priority.capability_map_applications"),
+    _sub("Capability list", "unified_low_priority.capability_map_capabilities"),
+]
+
+SIDEBAR_GROUPS: List[Dict] = [
+    {"zone": "overview", "title": "Overview", "links": [_LAUNCH_BY_LABEL["Dashboard Overview"]]},
+    {"zone": "answers", "title": "Answers", "links": [_ASK_LINK, _LAUNCH_BY_LABEL["Impact Analysis"]]},
+    {"zone": "model", "title": "Model", "links": [
+        _LAUNCH_BY_LABEL["Applications"],
+        _toggle("model-capability-map", "Capability Map", "map", CAPABILITY_MAP_VIEWS),
+        _LAUNCH_BY_LABEL["Traceability Matrix"],
+        _LAUNCH_BY_LABEL["Vendors"],
+        _toggle("model-import", "Import", "upload", [
+            _sub("Import a model file", "architect_ui.import_oef"),
+            _sub("Import a spreadsheet", "batch_import_view.dashboard"),
+        ]),
+    ]},
+    {"zone": "change", "title": "Change", "links": [
+        _LAUNCH_BY_LABEL["Gap Analysis"],
+        _LAUNCH_BY_LABEL["Work Packages"],
+        _LAUNCH_BY_LABEL["Roadmaps"],
+        _LAUNCH_BY_LABEL["Risk Register"],
+        _APPROVAL_INBOX_LINK,
+    ]},
+    {"zone": "catalogue", "title": "Catalogue", "links": CATALOGUE_SIDEBAR},
+]
+
+# Level-2 links are capped separately from level 1 (SIDEBAR_LINK_BUDGET).
+SIDEBAR_SUBLINK_BUDGET = 35
+
+
+def iter_sidebar_links(zones):
+    """Every link in `zones`, level 1 and level 2, in order (toggles themselves have no endpoint)."""
+    for zone in zones:
+        for link in zone["links"]:
+            if link.get("children"):
+                for child in link["children"]:
+                    yield child
+            else:
+                yield link
+
+
+def sidebar_link_active(link, endpoint, args) -> bool:
+    """True when `link` is the page being viewed: same endpoint, and the link's own query
+    parameters (layer=...) match the request. A link with no parameters on an endpoint that others
+    reach with ?layer= is the page only while no layer is chosen."""
+    if not link.get("endpoint") or link["endpoint"] != endpoint:
+        return False
+    params = link.get("query_params") or {}
+    if params:
+        return all(str(args.get(k)) == str(v) for k, v in params.items())
+    return not args.get("layer")
 
 
 def get_launch_sidebar_zones(user=None) -> List[Dict]:
-    """The sidebar's zones: the one launch zone, the same twelve links for every role."""
-    return SIDEBAR_LAUNCH_ZONES
+    """The grouped sidebar for `user`: the same tree for every role, minus links whose `requires` guard
+    the user cannot satisfy (Approval Inbox needs write access). New dicts; the constants are shared."""
+    zones = []
+    for z in SIDEBAR_GROUPS:
+        links = []
+        for link in z["links"]:
+            if not link_requires_satisfied(user, link.get("requires")):
+                continue
+            if link.get("children"):
+                link = {**link, "children": [c for c in link["children"] if link_requires_satisfied(user, c.get("requires"))]}
+            links.append(link)
+        zones.append({**z, "links": links})
+    return zones
 
 
 # Pages that are not ready for the soft launch. This list is the one source of the reason shown as
