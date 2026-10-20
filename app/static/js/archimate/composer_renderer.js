@@ -1140,10 +1140,18 @@ let ComposerRenderer = (function() {
         return Math.min(168, Math.max(96, width - 24));
     }
 
-    function computeBandLayout(elements, bands, width, compact) {
+    /* Optional fifth argument, used only by the opt-in connection style and row
+     * alignment: { colGap, rowGap, header, rowAlign: 'centre' }. Absent, the
+     * placement is the left-aligned one every existing caller gets. */
+    function computeBandLayout(elements, bands, width, compact, layoutOpts) {
+        let lo = layoutOpts || {};
+        let colGap = lo.colGap != null ? lo.colGap : BAND_GAP;
+        let rowGap = lo.rowGap != null ? lo.rowGap : BAND_GAP;
+        let header = lo.header != null ? lo.header : BAND_HEADER;
+        let centreRows = lo.rowAlign === 'centre';
         let nodeW = bandNodeWidth(width);
         let nodeH = compact ? NODE_H_COMPACT : NODE_H_FULL;
-        let perRow = Math.max(1, Math.floor((width - 2 * BAND_PAD + BAND_GAP) / (nodeW + BAND_GAP)));
+        let perRow = Math.max(1, Math.floor((width - 2 * BAND_PAD + colGap) / (nodeW + colGap)));
         let declared = (bands || []).map(function(b) { return { layer: String(b.layer || '').toLowerCase(), label: b.label }; });
         let known = {};
         declared.forEach(function(b) { known[b.layer] = true; });
@@ -1169,13 +1177,18 @@ let ComposerRenderer = (function() {
         all.forEach(function(b) {
             let list = (members[b.layer] || []).slice().sort(order);
             let rows = Math.ceil(list.length / perRow);
-            let h = list.length ? BAND_HEADER + rows * (nodeH + BAND_GAP) + (BAND_PAD - BAND_GAP) : BAND_HEADER;
+            let h = list.length ? header + rows * (nodeH + rowGap) + (BAND_PAD - rowGap) : header;
             zones.push({ layer: b.layer, label: b.label, x: 0, y: y, width: width, height: h, count: list.length });
             list.forEach(function(el, i) {
+                let startX = BAND_PAD;
+                if (centreRows) {
+                    let inRow = Math.min(perRow, list.length - Math.floor(i / perRow) * perRow);
+                    startX = Math.floor((width - (inRow * nodeW + (inRow - 1) * colGap)) / 2);
+                }
                 placements[el.id] = {
                     band: b.layer,
-                    x: BAND_PAD + (i % perRow) * (nodeW + BAND_GAP),
-                    y: y + BAND_HEADER + Math.floor(i / perRow) * (nodeH + BAND_GAP),
+                    x: startX + (i % perRow) * (nodeW + colGap),
+                    y: y + header + Math.floor(i / perRow) * (nodeH + rowGap),
                     width: nodeW, height: nodeH,
                 };
             });
@@ -1216,6 +1229,189 @@ let ComposerRenderer = (function() {
             }
         }
 
+    /* ── Plain connection style (opt-in: create(el, {connectionStyle:'plain'})) ──
+     *  Pure geometry for routing one connection around the nodes of a drawing.
+     *  Rectangles are {id, x, y, w, h} in drawing pixels. Band zones are never
+     *  passed in: only nodes are obstacles, so a route never hugs a band edge.
+     *  Values: columns 24px apart and rows 16px apart (so every gap between nodes
+     *  is wider than the 16px floor), a 36px band header (arcs sit below the band
+     *  label), a worked-out partner offset 13px, routes kept 4px off nodes and 6px
+     *  inside the drawing. */
+    let PLAIN_COL_GAP = 24, PLAIN_ROW_GAP = 16, PLAIN_HEADER = 36;
+    let PLAIN_PAIR_OFFSET = 13, PLAIN_CLEARANCE = 4, PLAIN_EDGE = 6, PLAIN_MIN_CORRIDOR = 8, PLAIN_CORNER = 12, PLAIN_STEP = 12;
+
+    function plainSegmentHitsRect(a, b, r, m) {
+        let x0 = r.x - m, y0 = r.y - m, x1 = r.x + r.w + m, y1 = r.y + r.h + m;
+        let dx = b.x - a.x, dy = b.y - a.y, t0 = 0, t1 = 1;
+        let p = [-dx, dx, -dy, dy], q = [a.x - x0, x1 - a.x, a.y - y0, y1 - a.y];
+        for (let i = 0; i < 4; i++) {
+            if (p[i] === 0) { if (q[i] < 0) return false; continue; }
+            let t = q[i] / p[i];
+            if (p[i] < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
+            else { if (t < t0) return false; if (t < t1) t1 = t; }
+        }
+        return true;
+    }
+
+    /* x positions of the vertical gaps in one row that stay clear of its nodes: the
+       middle of each gap between nodes (nearest to midX first), then, only when the
+       row has no such gap, the middle of a side margin. */
+    function plainRowGaps(rowRects, midX, width) {
+        let m = PLAIN_CLEARANCE;
+        let spans = rowRects.map(function(r) { return [r.x - m, r.x + r.w + m]; })
+            .sort(function(a, b) { return a[0] - b[0]; });
+        let merged = [];
+        spans.forEach(function(s) {
+            let last = merged[merged.length - 1];
+            if (last && s[0] <= last[1]) last[1] = Math.max(last[1], s[1]);
+            else merged.push([s[0], s[1]]);
+        });
+        let lo = PLAIN_EDGE, hi = width - PLAIN_EDGE, cur = lo, inner = [], side = [];
+        let gap = function(from, to) { return { x: (from + to) / 2, lo: from, hi: to }; };
+        merged.forEach(function(g, i) {
+            if (g[0] - cur >= PLAIN_MIN_CORRIDOR) { (i === 0 ? side : inner).push(gap(cur, g[0])); }
+            cur = Math.max(cur, g[1]);
+        });
+        if (hi - cur >= PLAIN_MIN_CORRIDOR) { (merged.length ? side : inner).push(gap(cur, hi)); }
+        let byDistance = function(a, b) { return Math.abs(a.x - midX) - Math.abs(b.x - midX) || a.x - b.x; };
+        return inner.sort(byDistance).concat(side.sort(byDistance));
+    }
+
+    /* Rows of nodes: nodes whose vertical extents overlap share a row. Sorted top to bottom. */
+    function plainRows(rects) {
+        let sorted = rects.slice().sort(function(a, b) { return a.y - b.y; });
+        let rows = [];
+        sorted.forEach(function(r) {
+            let last = rows[rows.length - 1];
+            if (last && r.y < last.bottom - 1) { last.rects.push(r); last.bottom = Math.max(last.bottom, r.y + r.h); }
+            else rows.push({ top: r.y, bottom: r.y + r.h, rects: [r] });
+        });
+        return rows;
+    }
+
+    /* y of the horizontal channel between row i and row i + 1: the middle of a narrow
+       gap, or, below a band, just above the next row (clear of the band edges and of
+       the next band label). */
+    function plainChannel(rows, i) {
+        let upper = rows[i], lower = rows[i + 1];
+        return lower.top - upper.bottom <= 24 ? (upper.bottom + lower.top) / 2 : lower.top - 8;
+    }
+
+    /* The smooth connector curves through its vertices with a spline that treats them
+       as evenly spaced, so a handful of far-apart corners makes it swing wide. The
+       engine therefore hands it a route that is already rounded: the corners of the
+       routed polyline are cut with a small curve and the whole path is sampled at an
+       even step. Returns the interior points; the anchors are the two ends. */
+    function plainSmoothVertices(line, radius, step) {
+        let dense = [line[0]];
+        for (let i = 1; i < line.length - 1; i++) {
+            let p0 = line[i - 1], p1 = line[i], p2 = line[i + 1];
+            let d1 = Math.hypot(p1.x - p0.x, p1.y - p0.y), d2 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+            let r = Math.min(radius, d1 / 2, d2 / 2);
+            if (r < 0.5) { dense.push(p1); continue; }
+            let q1 = { x: p1.x + (p0.x - p1.x) / d1 * r, y: p1.y + (p0.y - p1.y) / d1 * r };
+            let q2 = { x: p1.x + (p2.x - p1.x) / d2 * r, y: p1.y + (p2.y - p1.y) / d2 * r };
+            for (let k = 0; k <= 4; k++) {
+                let t = k / 4, u = 1 - t;
+                dense.push({ x: u * u * q1.x + 2 * u * t * p1.x + t * t * q2.x, y: u * u * q1.y + 2 * u * t * p1.y + t * t * q2.y });
+            }
+        }
+        dense.push(line[line.length - 1]);
+        let lens = [0];
+        for (let i = 1; i < dense.length; i++) lens.push(lens[i - 1] + Math.hypot(dense[i].x - dense[i - 1].x, dense[i].y - dense[i - 1].y));
+        let total = lens[lens.length - 1];
+        let n = Math.max(2, Math.round(total / step));
+        let out = [], j = 1;
+        for (let k = 1; k < n; k++) {
+            let t = total * k / n;
+            while (j < dense.length - 1 && lens[j] < t) j++;
+            let seg = (lens[j] - lens[j - 1]) || 1, f = (t - lens[j - 1]) / seg;
+            out.push({ x: dense[j - 1].x + (dense[j].x - dense[j - 1].x) * f, y: dense[j - 1].y + (dense[j].y - dense[j - 1].y) * f });
+        }
+        return out;
+    }
+
+    /* One connection. S and T are the end nodes; `rows` is plainRows() of every node;
+       `slot` = {index, corridor}: index is the connection place among those joining
+       the same two nodes (each later one sits PLAIN_PAIR_OFFSET further along),
+       corridor is how many earlier ones already took a route round the nodes, so a
+       later one takes the next-nearest gap. Returns anchors, vertices and the polyline. */
+    function planPlainRoute(S, T, rows, width, height, slot, arcMax) {
+        let tOff = slot.tOff || 0;
+        let sc = { x: S.x + S.w / 2, y: S.y + S.h / 2 }, tc = { x: T.x + T.w / 2, y: T.y + T.h / 2 };
+        let off = slot.index * PLAIN_PAIR_OFFSET;
+        let clampV = function(v) {
+            return { x: Math.min(width - PLAIN_EDGE, Math.max(PLAIN_EDGE, v.x)), y: Math.min(height, Math.max(0, v.y)) };
+        };
+        let rowOf = function(r) {
+            for (let i = 0; i < rows.length; i++) { if (rows[i].rects.indexOf(r) >= 0) return i; }
+            return -1;
+        };
+        let iS = rowOf(S), iT = rowOf(T);
+        let A, B, line = null, vertices = [], srcSide, tgtSide, corridor = false;
+        if (S === T || iS === iT) {
+            /* Same row: both ends on the top edge, an arc over the row between them. */
+            let sx = sc.x + (S === T ? -12 : off), tx = tc.x + (S === T ? 12 : off + tOff);
+            A = { x: sx, y: S.y }; B = { x: tx, y: T.y };
+            srcSide = tgtSide = 'top';
+            let span = Math.abs(tx - sx);
+            let h = Math.min(arcMax, 5 + 2 * Math.round(span / 100)) + 4 * slot.index;
+            let top = Math.min(S.y, T.y);
+            line = [A, clampV({ x: sx, y: top - h }), clampV({ x: tx, y: top - h }), B];
+        } else {
+            let down = iT > iS, step = down ? 1 : -1;
+            srcSide = down ? 'bottom' : 'top'; tgtSide = down ? 'top' : 'bottom';
+            A = { x: sc.x + off, y: down ? S.y + S.h : S.y };
+            B = { x: tc.x + off + tOff, y: down ? T.y : T.y + T.h };
+            let others = [];
+            rows.forEach(function(row) { row.rects.forEach(function(r) { if (r !== S && r !== T) others.push(r); }); });
+            /* A straight line is kept only when it is steep enough not to graze the
+               band edges it crosses and clear of every other node. */
+            let steep = Math.abs(B.y - A.y) >= 0.45 * Math.abs(B.x - A.x);
+            let blocked = !steep || others.some(function(r) { return plainSegmentHitsRect(A, B, r, PLAIN_CLEARANCE + 2); });
+            if (blocked) {
+                corridor = true;
+                let midX = (A.x + B.x) / 2;
+                let pts = [A];
+                let chan = function(j) { return plainChannel(rows, step > 0 ? iS + j : iS - j - 1); };
+                pts.push({ x: A.x, y: chan(0) });
+                let m = Math.abs(iT - iS) - 1;
+                for (let j = 1; j <= m; j++) {
+                    let gaps = plainRowGaps(rows[iS + step * j].rects, midX, width);
+                    /* the next-nearest gap; when the row has no more, the same gap, shifted
+                       along inside it so the two connections do not share a line */
+                    let gx = midX;
+                    if (gaps.length) {
+                        let g = gaps[Math.min(slot.corridor, gaps.length - 1)];
+                        let extra = Math.max(0, slot.corridor - gaps.length + 1);
+                        gx = Math.min(g.hi - 2, Math.max(g.lo + 2, g.x + extra * PLAIN_PAIR_OFFSET));
+                        if (extra && gx === g.hi - 2 && g.x + extra * PLAIN_PAIR_OFFSET > g.hi - 2) gx = Math.max(g.lo + 2, g.x - extra * PLAIN_PAIR_OFFSET);
+                    }
+                    pts.push({ x: gx, y: chan(j - 1) });
+                    pts.push({ x: gx, y: chan(j) });
+                }
+                pts.push({ x: B.x, y: chan(m) });
+                pts.push(B);
+                /* drop repeated points and points that sit on a straight run */
+                let clean = [];
+                pts.forEach(function(p) {
+                    let q = clean[clean.length - 1];
+                    if (q && Math.abs(q.x - p.x) < 1 && Math.abs(q.y - p.y) < 1) return;
+                    clean.push(p);
+                });
+                line = [clean[0]];
+                for (let i = 1; i < clean.length - 1; i++) {
+                    let p = clean[i - 1], q = clean[i], n = clean[i + 1];
+                    let straight = (Math.abs(p.x - q.x) < 1 && Math.abs(q.x - n.x) < 1) || (Math.abs(p.y - q.y) < 1 && Math.abs(q.y - n.y) < 1);
+                    if (!straight) line.push(clampV(q));
+                }
+                line.push(clean[clean.length - 1]);
+            }
+        }
+        if (line && line.length > 2) vertices = plainSmoothVertices(line, PLAIN_CORNER, PLAIN_STEP);
+        return { A: A, B: B, line: line || [A, B], srcSide: srcSide, tgtSide: tgtSide, off: off, tOff: tOff, vertices: vertices, corridor: corridor };
+    }
+
     /* ── Public factory: create a renderer bound to a container element ── */
     function create(containerEl, opts) {
         opts = opts || {};
@@ -1247,6 +1443,9 @@ let ComposerRenderer = (function() {
         let banded = opts.layout === 'bands';
         let compact = opts.nodeStyle === 'compact';
         let useTokens = opts.tokens === true;
+        let plain = opts.connectionStyle === 'plain';
+        let centreRows = opts.rowAlign === 'centre';
+        let lastPaperHeight = 0;
         let selectedId = null, centreId = null, highlighted = {};
         let resizeObserver = null, resizeFrame = 0;
 
@@ -1289,8 +1488,63 @@ let ComposerRenderer = (function() {
             node.attr('nameLabel/textWrap', { width: -16, maxLineCount: 2, ellipsis: true });
         }
 
+        /* Provenance styling for one edge. A no-op unless the relationship names a
+           provenance (an existing payload that happens to carry a `key` is untouched).
+           Derived edges are dashed AND carry a text badge; colour never carries the
+           meaning on its own.
+           Platform vocabulary (see derived_relationship.py and intelligence/services/
+           query_service.py): a worked-out fact carries provenance 'derivation' and/or
+           kind 'derived'; a genuinely recorded fact carries provenance 'explicit'. Any
+           other value is unrecognised and must NOT render with the confident "recorded"
+           styling -- it falls back to the safer, dashed "worked out" treatment. */
+        function decorateEdge(link, rel) {
+            if (!rel || !rel.provenance) return;
+            let isDerived = rel.provenance === 'derivation' || rel.kind === 'derived';
+            let isExplicit = rel.provenance === 'explicit';
+            let kind = isDerived ? 'derived' : (isExplicit ? 'recorded' : 'derived');
+            link.set('provenance', kind);
+            link.set('stale', rel.stale === true);
+            link.set('edgeKey', rel.key != null ? rel.key : (rel.id != null ? rel.id : null));
+            link.attr('root/data-kind', kind);
+            if (link.get('edgeKey') != null) link.attr('root/data-edge', String(link.get('edgeKey')));
+            if (kind === 'derived') {
+                link.attr('line/strokeDasharray', plain ? '5,5' : '4,4');
+                let text = rel.stale === true ? '◷ Worked out, may be out of date' : 'Worked out';
+                if (plain) {
+                    let ink = plainInk();
+                    /* Its own markup, so the standard label's reference-sized rect does not
+                       apply: the chip has a fixed size and is centred on its point. */
+                    let w = text.length * 7.6 + 16;
+                    link.appendLabel({
+                        markup: [{ tagName: 'rect', selector: 'chip' }, { tagName: 'text', selector: 'text' }],
+                        attrs: {
+                            chip: { x: -w / 2, y: -10, width: w, height: 20, rx: 6, ry: 6, fill: ink.badgeFill, stroke: ink.stroke, strokeWidth: 1 },
+                            text: { text: text, fontSize: 11, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif', fill: ink.text, textAnchor: 'middle', textVerticalAnchor: 'middle', style: { textTransform: 'uppercase' }, pointerEvents: 'none' },
+                        },
+                        position: { distance: 0.5, offset: 0 },
+                    });
+                    return;
+                }
+                link.appendLabel({
+                    attrs: {
+                        text: { text: text, fontSize: 10, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif', fill: '#1a1a1a' },
+                        rect: { fill: '#fff', stroke: '#1a1a1a', strokeWidth: 0.5, strokeDasharray: '3,2', rx: 3, ry: 3, ref: 'text', refWidth: 8, refHeight: 4, refX: -4, refY: -2 },
+                    },
+                    position: { distance: 0.5, offset: 14 },
+                });
+            }
+        }
+
+        function makeLink(src, tgt, rel) {
+            let link = createLink(src, tgt, rel.type || 'association', rel.id);
+            if (plain) stylePlainLink(link);
+            decorateEdge(link, rel);
+            return link;
+        }
+
         function styleNode(node, layer, width) {
-            if (useTokens) applyTokens(node, layer, false);
+            if (plain) plainNodeChrome(node);
+            else if (useTokens) applyTokens(node, layer, false);
             if (compact) compactify(node, width || 200);
         }
 
@@ -1335,7 +1589,8 @@ let ComposerRenderer = (function() {
                    selection restores what the node actually had, not a flat guess. */
                 let base = c.get('baseStrokeWidth');
                 if (base == null) { base = c.attr('body/strokeWidth') || 1; c.set('baseStrokeWidth', base); }
-                c.attr('body/strokeWidth', isCentre ? 4 : (isSel ? 3 : base));
+                if (plain) paintPlainNode(c, isSel || isCentre);
+                else c.attr('body/strokeWidth', isCentre ? 4 : (isSel ? 3 : base));
             });
             graph.getLinks().forEach(function(l) {
                 let k = linkKey(l);
@@ -1344,14 +1599,244 @@ let ComposerRenderer = (function() {
                 let base = l.get('baseStrokeWidth');
                 if (base == null) { base = l.attr('line/strokeWidth') || 2; l.set('baseStrokeWidth', base); }
                 l.attr('line/strokeWidth', on ? base + 1.5 : base);
+                if (plain) paintPlainLink(l, on);
             });
+        }
+
+        /* ── Plain connection style: colours, link restyle and routing ── */
+        function plainInk() {
+            return {
+                stroke: tokenColour('--border') || 'currentColor',
+                line: tokenColour('--muted-foreground') || 'currentColor',
+                highlight: tokenColour('--ring') || 'currentColor',
+                text: tokenColour('--muted-foreground') || 'currentColor',
+                badgeFill: tokenColour('--card') || 'Canvas',
+                foreground: tokenColour('--foreground') || 'currentColor',
+                accent: tokenColour('--accent') || tokenColour('--muted') || 'none',
+            };
+        }
+
+        /* Node cards, band zones and hover for the plain style: token colours only, a
+           1px hairline, no tint and no shadow. The centre element and a selected one
+           get a 2px primary ring held 2px off the card. */
+        function scrubColourLiterals(cell) {
+            let walk = function(obj, path) {
+                Object.keys(obj).forEach(function(k) {
+                    let v = obj[k];
+                    if (v && typeof v === 'object') walk(v, path.concat(k));
+                    else if (typeof v === 'string' && /^(#[0-9a-fA-F]{3,8}|rgba?\(.*)$/.test(v)) cell.attr(path.concat(k).join('/'), 'currentColor');
+                });
+            };
+            walk(cell.attr(), []);
+        }
+
+        function plainNodeChrome(node) {
+            let ink = plainInk();
+            scrubColourLiterals(node);
+            node.attr('accentBar/display', 'none');
+            node.attr('iconBox/fill', 'none');
+            node.attr('iconBox/stroke', 'none');
+            node.attr('body/fill', tokenColour('--card') || 'none');
+            node.attr('body/stroke', ink.stroke);
+            node.attr('body/strokeWidth', 1);
+            node.attr('body/strokeDasharray', '');
+            node.attr('body/rx', 6);
+            node.attr('body/ry', 6);
+            node.attr('body/opacity', 1);
+            node.attr('body/style', { transition: 'fill 150ms ease-out' });
+            let markup = node.get('markup') || node.markup;
+            if (Array.isArray(markup) && !markup.some(function(m) { return m.selector === 'ring'; })) {
+                node.set('markup', markup.concat([{ tagName: 'rect', selector: 'ring' }]));
+            }
+            node.attr('ring', { x: -3, y: -3, refWidth: 6, refHeight: 6, rx: 9, ry: 9, fill: 'none', strokeWidth: 2, pointerEvents: 'none', display: 'none' });
+            node.attr('nameLabel/fill', ink.foreground);
+            node.attr('nameLabel/fontSize', 14);
+            node.attr('nameLabel/fontWeight', 600);
+            node.attr('typeLabel/fill', ink.text);
+            node.attr('typeLabel/fontSize', 12);
+        }
+
+        function plainZoneChrome(zone) {
+            let ink = plainInk();
+            let muted = tokenColour('--muted', 0.25);
+            zone.attr('body/fill', muted || 'none');
+            zone.attr('body/stroke', ink.stroke);
+            zone.attr('body/strokeWidth', 1);
+            zone.attr('body/strokeDasharray', '');
+            zone.attr('body/opacity', 1);
+            zone.attr('body/rx', 6);
+            zone.attr('body/ry', 6);
+            zone.attr('label/fill', ink.text);
+            zone.attr('label/fontSize', 10);
+            zone.attr('label/fontWeight', 600);
+            zone.attr('label/letterSpacing', '0.08em');
+            zone.attr('label/style', { textTransform: 'uppercase' });
+        }
+
+        function paintPlainNode(node, ringed) {
+            if (ringed) node.attr('ring/stroke', plainInk().highlight);
+            let display = ringed ? 'block' : 'none';
+            if (node.attr('ring/display') !== display) node.attr('ring/display', display);
+        }
+
+        function paintPlainLink(link, on) {
+            let ink = plainInk();
+            let c = on ? ink.highlight : ink.line;
+            if (link.attr('line/stroke') !== c) link.attr('line/stroke', c);
+            let m = link.attr('line/targetMarker');
+            if (!m || m.fill !== c || m.stroke !== c) {
+                link.attr('line/targetMarker', { type: 'path', d: markerPath('filled-arrow'), fill: c, stroke: c, strokeWidth: 1 });
+            }
+        }
+
+        /* Restyle a freshly created link: no relationship word, one filled arrowhead,
+           solid unless worked out, token colours, and the engine-routed pair
+           normal router + smooth connector (the Composer editor's own vocabulary). */
+        function stylePlainLink(link) {
+            link.labels([]);
+            link.removeAttr('line/sourceMarker');
+            link.attr('line/strokeWidth', 1);
+            link.attr('line/strokeDasharray', '');
+            link.set('router', { name: 'normal' });
+            link.set('connector', { name: 'smooth' });
+            paintPlainLink(link, false);
+        }
+
+        function plainSize() {
+            let w = bandWidth();
+            let h = lastPaperHeight;
+            if (!h) { try { h = paper.getComputedSize().height; } catch (e) { h = 0; } }
+            return { width: w, height: h || opts.height || 400 };
+        }
+
+        function sameJson(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+        /* Put the "Worked out" badge where it sits clear of every node: the point
+           along the drawn polyline nearest the middle whose badge-sized box touches
+           no node and stays inside the drawing. */
+        function placePlainBadge(link, plan, rects, width, taken, others) {
+            let labels = link.labels();
+            if (!labels.length) return;
+            let text = labels[0].attrs && labels[0].attrs.text ? String(labels[0].attrs.text.text) : '';
+            let bw = text.length * 7.6 + 16, bh = 20;
+            let pts = plan.line;
+            let lens = [0];
+            for (let i = 1; i < pts.length; i++) lens.push(lens[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+            let total = lens[lens.length - 1] || 1;
+            let at = function(d) {
+                let t = d * total;
+                for (let i = 1; i < pts.length; i++) {
+                    if (t <= lens[i] || i === pts.length - 1) {
+                        let seg = (lens[i] - lens[i - 1]) || 1, f = Math.min(1, Math.max(0, (t - lens[i - 1]) / seg));
+                        return { x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * f, y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * f };
+                    }
+                }
+                return pts[pts.length - 1];
+            };
+            let best = 0.5, chosen = null;
+            let tries = [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82];
+            for (let k = 0; k < tries.length; k++) {
+                let p = at(tries[k]);
+                let box = { x: p.x - bw / 2 - 3, y: p.y - bh / 2 - 3, w: bw + 6, h: bh + 6 };
+                let hits = function(r) {
+                    return box.x < r.x + r.w && box.x + box.w > r.x && box.y < r.y + r.h && box.y + box.h > r.y;
+                };
+                let onOther = others.some(function(o) {
+                    if (o.link === link) return false;
+                    for (let i = 1; i < o.line.length; i++) { if (plainSegmentHitsRect(o.line[i - 1], o.line[i], { x: box.x, y: box.y, w: box.w, h: box.h }, 0)) return true; }
+                    return false;
+                });
+                if (box.x >= 0 && box.x + box.w <= width && !rects.some(hits) && !taken.some(hits) && !onOther) { best = tries[k]; chosen = box; break; }
+            }
+            if (chosen) taken.push({ x: chosen.x, y: chosen.y, w: chosen.w, h: chosen.h });
+            let pos = { distance: best, offset: 0 };
+            if (!sameJson(link.prop('labels/0/position'), pos)) link.prop('labels/0/position', pos);
+        }
+
+        /* Recompute every plain link's route. Called after every layout, update and
+           resize: moving one node changes the obstacles for every link, not only its own. */
+        function routePlain() {
+            if (!plain) return;
+            let size = plainSize();
+            let rects = nodeCells().map(function(c) {
+                let b = c.getBBox();
+                return { id: c.id, x: b.x, y: b.y, w: b.width, h: b.height };
+            });
+            let rows = plainRows(rects);
+            let taken = graph.getElements().filter(function(c) { return c.get('isLayerZone'); }).map(function(z) {
+                let b = z.getBBox();
+                return { x: b.x, y: b.y, w: b.width, h: PLAIN_HEADER };
+            });
+            let byId = {};
+            rects.forEach(function(r) { byId[r.id] = r; });
+            let groups = {};
+            graph.getLinks().forEach(function(l) {
+                let s = l.source().id, t = l.target().id;
+                if (!byId[s] || !byId[t]) return;
+                let g = [s, t].sort().join('|');
+                (groups[g] = groups[g] || []).push(l);
+            });
+            /* Pass 1 plans every link; connections that arrive on the same side of the same
+               node are then spread (recorded first, each later one 13px further along) and
+               planned again, so no two arrivals share a stretch of line. */
+            let items = [];
+            Object.keys(groups).forEach(function(g) {
+                let list = groups[g].slice().sort(function(a, b) {
+                    let ra = a.get('provenance') === 'derived' ? 1 : 0, rb = b.get('provenance') === 'derived' ? 1 : 0;
+                    return (ra - rb) || String(linkKey(a)).localeCompare(String(linkKey(b)));
+                });
+                let corridors = 0;
+                list.forEach(function(link, index) {
+                    let sId = link.source().id, tId = link.target().id;
+                    let slot = { index: index, corridor: corridors, tOff: 0 };
+                    let plan = planPlainRoute(byId[sId], byId[tId], rows, size.width, size.height, slot, banded ? 8 : 24);
+                    if (plan.corridor) corridors++;
+                    items.push({ link: link, sId: sId, tId: tId, slot: slot, plan: plan });
+                });
+            });
+            let arrivals = {};
+            items.slice().sort(function(a, b) {
+                let ra = a.link.get('provenance') === 'derived' ? 1 : 0, rb = b.link.get('provenance') === 'derived' ? 1 : 0;
+                return (ra - rb) || String(linkKey(a.link)).localeCompare(String(linkKey(b.link)));
+            }).forEach(function(it) {
+                if (it.sId === it.tId) return;
+                let k = it.tId + '|' + it.plan.tgtSide;
+                let n = arrivals[k] = (arrivals[k] || 0);
+                arrivals[k]++;
+                let want = n * PLAIN_PAIR_OFFSET - it.plan.off;
+                if (want > 0) {
+                    it.slot.tOff = want;
+                    it.plan = planPlainRoute(byId[it.sId], byId[it.tId], rows, size.width, size.height, it.slot, banded ? 8 : 24);
+                }
+            });
+            items.forEach(function(it) {
+                let plan = it.plan, link = it.link;
+                /* Measure from the node's own body when it has one, so a resize handle or port
+                   sticking out of the box does not hold the connection off the visible border. */
+                let src = { id: it.sId, anchor: { name: plan.srcSide, args: { dx: plan.off } }, connectionPoint: { name: 'boundary' } };
+                let tgt = { id: it.tId, anchor: { name: plan.tgtSide, args: { dx: plan.off + plan.tOff } }, connectionPoint: { name: 'boundary' } };
+                if (it.sId === it.tId) { src.anchor.args.dx = -12; tgt.anchor.args.dx = 12; }
+                if (graph.getCell(it.sId).attr('body')) src.selector = 'body';
+                if (graph.getCell(it.tId).attr('body')) tgt.selector = 'body';
+                if (!sameJson(link.source(), src)) link.source(src);
+                if (!sameJson(link.target(), tgt)) link.target(tgt);
+                if (!sameJson(link.vertices(), plan.vertices)) link.vertices(plan.vertices);
+            });
+            let drawn = items.map(function(it) { return { link: it.link, line: it.plan.line }; });
+            items.forEach(function(it) { placePlainBadge(it.link, it.plan, rects, size.width, taken, drawn); });
         }
 
         /* Banded layout: draws the zones and positions every node. Returns nothing. */
         function layoutBands() {
             let elements = nodeCells().map(function(c) { return c.get('modelEl'); });
             let width = bandWidth();
-            let plan = computeBandLayout(elements, opts.bands, width, compact);
+            let layoutOpts;
+            if (plain || centreRows) {
+                layoutOpts = {};
+                if (centreRows) layoutOpts.rowAlign = 'centre';
+                if (plain) { layoutOpts.colGap = PLAIN_COL_GAP; layoutOpts.rowGap = PLAIN_ROW_GAP; layoutOpts.header = PLAIN_HEADER; }
+            }
+            let plan = computeBandLayout(elements, opts.bands, width, compact, layoutOpts);
             /* Reuse a zone that is already drawn; only touch what moved or resized. */
             let drawn = {};
             graph.getCells().filter(function(c) { return c.get('isLayerZone'); }).forEach(function(z) { drawn[z.get('zoneLayer')] = z; });
@@ -1370,7 +1855,8 @@ let ComposerRenderer = (function() {
                     graph.addCell(zone);
                     zone.toBack();
                 }
-                if (useTokens) applyTokens(zone, z.layer, true);
+                if (plain) plainZoneChrome(zone);
+                else if (useTokens) applyTokens(zone, z.layer, true);
             });
             Object.keys(drawn).forEach(function(l) { if (!wanted[l]) drawn[l].remove(); });
             nodeCells().forEach(function(c) {
@@ -1394,11 +1880,12 @@ let ComposerRenderer = (function() {
                 }
             });
             paper.setDimensions(opts.width || '100%', plan.height);
+            lastPaperHeight = plan.height;
         }
 
         function relayout() {
-            if (!banded) return;
-            layoutBands();
+            if (banded) layoutBands();
+            if (plain) { routePlain(); paintSelection(); }
         }
 
         function updateModel(model) {
@@ -1436,7 +1923,11 @@ let ComposerRenderer = (function() {
             elements.forEach(function(el, i) {
                 if (cellMap[el.id]) return;
                 let layer = (el.layer || '').toLowerCase() || guessLayer(el.type);
-                let node = createNode(el.id, el.name, el.type || 'ApplicationComponent', layer, 40 + (i % 4) * 240, 40 + Math.floor(i / 4) * 160);
+                let elType = el.type || 'ApplicationComponent';
+                /* One plain card for every type: the notation shapes (chamfered, folded,
+                   layered) carry their own outlines and shadows. The element keeps its type. */
+                let node = createNode(el.id, el.name, plain && !SPECIAL_TYPES[elType] ? 'ApplicationComponent' : elType, layer, 40 + (i % 4) * 240, 40 + Math.floor(i / 4) * 160);
+                if (plain) node.set('elType', elType);
                 node.set('modelEl', el);
                 node.set('signature', elementSignature(el));
                 styleNode(node, layer, width);
@@ -1454,8 +1945,7 @@ let ComposerRenderer = (function() {
                 let k = edgeKeyOf(rel);
                 let src = cellMap[rel.source_id], tgt = cellMap[rel.target_id];
                 if (k == null || !src || !tgt || linked[String(k)]) return;
-                let link = createLink(src, tgt, rel.type || 'association', rel.id);
-                decorateEdge(link, rel);
+                let link = makeLink(src, tgt, rel);
                 if (link.get('edgeKey') == null) link.set('edgeKey', k);
                 link.set('signature', relSignature(rel));
                 graph.addCell(link);
@@ -1475,6 +1965,18 @@ let ComposerRenderer = (function() {
         if (banded && typeof ResizeObserver !== 'undefined') {
             resizeObserver = new ResizeObserver(scheduleRelayout);
             resizeObserver.observe(containerEl);
+        }
+
+        if (plain) {
+            paper.on('element:mouseenter', function(view) {
+                if (view.model.get('isLayerZone') || view.model.get('elementId') == null) return;
+                let a = plainInk().accent;
+                if (a !== 'none') view.model.attr('body/fill', a);
+            });
+            paper.on('element:mouseleave', function(view) {
+                if (view.model.get('isLayerZone') || view.model.get('elementId') == null) return;
+                view.model.attr('body/fill', tokenColour('--card') || 'none');
+            });
         }
 
         if (typeof opts.onSelect === 'function') {
@@ -1510,7 +2012,9 @@ let ComposerRenderer = (function() {
                     let x = 40 + col * 240;
                     let y = 40 + row * 160;
                     let layer = (el.layer || '').toLowerCase() || guessLayer(el.type);
-                    let node = createNode(el.id, el.name, el.type || 'ApplicationComponent', layer, x, y);
+                    let elType = el.type || 'ApplicationComponent';
+                    let node = createNode(el.id, el.name, plain && !SPECIAL_TYPES[elType] ? 'ApplicationComponent' : elType, layer, x, y);
+                    if (plain) node.set('elType', elType);
                     if (useTokens || compact) { node.set('modelEl', el); styleNode(node, layer, 200); }
                     /* Always recorded (not just under useTokens/compact) so a later
                        update() call -- which is not itself gated on banded/useTokens/
@@ -1526,8 +2030,7 @@ let ComposerRenderer = (function() {
                     let src = cellMap[rel.source_id];
                     let tgt = cellMap[rel.target_id];
                     if (!src || !tgt) return;
-                    let link = createLink(src, tgt, rel.type || 'association', rel.id);
-                    decorateEdge(link, rel);
+                    let link = makeLink(src, tgt, rel);
                     /* Same reasoning as the node signature above: give every link a
                        stable edgeKey (synthetic when the relationship has neither key
                        nor id) and a signature, so update() can both find it again and
@@ -1536,6 +2039,7 @@ let ComposerRenderer = (function() {
                     link.set('signature', relSignature(rel));
                     graph.addCell(link);
                 });
+                if (plain) relayout();
             },
 
             fitToContent: function() {

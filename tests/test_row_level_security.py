@@ -1902,3 +1902,116 @@ def test_every_api_token_route_denies_the_other_org_under_the_runtime_role(app, 
                 # The token granted a real, scoped read — its own org's data
                 # comes back, and only its own.
                 assert "RLS-Home" in response.get_data(as_text=True), rule.rule
+
+
+# --------------------------------------------------------------------------- #
+# app.utils.reference_numbers.next_reference: the 01 Sep 2026 cross-org
+# collision, reproduced and proven fixed under the real restricted runtime
+# role, not the table-owner connection the rest of the suite uses.
+# --------------------------------------------------------------------------- #
+
+
+def test_next_reference_does_not_collide_across_organisations_under_the_runtime_role(
+    app, rls, world
+):
+    """Org A holding the first reference in a family must never make org B's
+    first allocation in that family recompute the same value.
+
+    Reproduces the exact production shape: ``archie_runtime`` is NOBYPASSRLS,
+    so org B's session genuinely cannot see org A's row at the database level
+    (asserted below) — which is exactly what made the old table-scan allocator
+    recompute a value org A already held and die on the unique index.
+    """
+    import uuid as uuid_module
+
+    from app import db
+    from app.jobs.tenant_safe_job import tenant_scope
+    from app.models.architecture_decision import ArchitectureDecision
+    from app.utils.reference_numbers import next_reference
+
+    a, b = world.org("a"), world.org("b")
+    prefix = f"RLS-XORG-{uuid_module.uuid4().hex[:8]}-"
+
+    with _app_runs_as(app, rls.runtime), app.app_context():
+        db.session.remove()
+        with tenant_scope(a):
+            ref_a = next_reference("architecture_decisions", "decision_id", prefix)
+            db.session.add(
+                ArchitectureDecision(decision_id=ref_a, title="Org A's first decision")
+            )
+            db.session.commit()
+
+        with tenant_scope(b):
+            # The precondition the old allocator got wrong: under the real
+            # runtime role, org B's session cannot see org A's row at all.
+            assert (
+                db.session.execute(
+                    text("SELECT count(*) FROM architecture_decisions")
+                ).scalar()
+                == 0
+            )
+            ref_b = next_reference("architecture_decisions", "decision_id", prefix)
+            db.session.add(
+                ArchitectureDecision(decision_id=ref_b, title="Org B's first decision")
+            )
+            db.session.commit()  # raised IntegrityError pre-fix
+
+    assert ref_a == f"{prefix}001"
+    assert ref_b == f"{prefix}002"
+    assert ref_a != ref_b
+
+
+def test_next_reference_concurrent_allocations_in_one_family_never_collide(
+    app, rls, world
+):
+    """Several near-simultaneous allocations in the SAME family each get a
+    distinct, gapless number — the atomic UPSERT serialises them instead of
+    racing a read-then-insert like the pre-fix generators did."""
+    import threading
+    import uuid as uuid_module
+
+    from app import db
+    from app.jobs.tenant_safe_job import tenant_scope
+    from app.utils.reference_numbers import next_reference
+
+    org = world.org("concurrent")
+    prefix = f"RLS-CONC-{uuid_module.uuid4().hex[:8]}-"
+    thread_count = 8
+    barrier = threading.Barrier(thread_count)
+    results: list[str] = []
+    errors: list[BaseException] = []
+    lock = threading.Lock()
+
+    def worker():
+        try:
+            with app.app_context():
+                try:
+                    barrier.wait(timeout=10)
+                    with tenant_scope(org):
+                        value = next_reference(
+                            "architecture_decisions", "decision_id", prefix
+                        )
+                        db.session.commit()
+                    with lock:
+                        results.append(value)
+                finally:
+                    # Must run while the app context pushed above is still
+                    # active: db.session is scoped per app context, and
+                    # removing it after that context has already popped
+                    # raises "working outside of application context".
+                    db.session.remove()
+        except BaseException as exc:  # noqa: BLE001 - surfaced via errors, not swallowed
+            with lock:
+                errors.append(exc)
+
+    with _app_runs_as(app, rls.runtime):
+        threads = [threading.Thread(target=worker) for _ in range(thread_count)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=30)
+
+    assert not errors, errors
+    assert len(results) == thread_count
+    assert len(set(results)) == thread_count, "two threads were handed the same reference"
+    assert sorted(results) == [f"{prefix}{n:03d}" for n in range(1, thread_count + 1)]
