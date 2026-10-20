@@ -151,6 +151,7 @@ def _bring_calls_to_current_shape(bind):
             sa.Column("token_kind", sa.String(length=16), nullable=False, server_default="oauth_client"),
         )
     op.alter_column(_CALLS, "client_id", existing_type=sa.String(length=128), nullable=True)
+    _one_named_foreign_key_per_column(bind)
     constraints = _constraints(bind, _CALLS)
     if "uq_api_operation_calls_org_client_operation" in constraints:
         op.drop_constraint("uq_api_operation_calls_org_client_operation", _CALLS, type_="unique")
@@ -159,6 +160,31 @@ def _bring_calls_to_current_shape(bind):
             "uq_api_operation_calls_org_consumer_operation", _CALLS,
             ["organization_id", "consumer_key", "operation_id"],
         )
+
+
+def _one_named_foreign_key_per_column(bind):
+    """Leave exactly one foreign key on each of the two linked columns, under our names.
+
+    The earlier shape declared each key twice (once inline, once named).
+    """
+    wanted = {
+        "organization_id": ("fk_api_operation_calls_organization_id", "organizations", "id", "CASCADE"),
+        "client_id": ("fk_api_operation_calls_client_id", "oauth_clients", "client_id", "CASCADE"),
+    }
+    existing = bind.execute(
+        text(
+            "SELECT con.conname, att.attname FROM pg_constraint con "
+            "JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = ANY (con.conkey) "
+            "WHERE con.contype = 'f' AND con.conrelid = to_regclass(:t)"
+        ),
+        {"t": f"public.{_CALLS}"},
+    ).all()
+    for column, (name, referred_table, referred_column, ondelete) in wanted.items():
+        names = [row.conname for row in existing if row.attname == column]
+        for stray in (n for n in names if n != name):
+            op.drop_constraint(stray, _CALLS, type_="foreignkey")
+        if name not in names:
+            op.create_foreign_key(name, _CALLS, referred_table, [column], [referred_column], ondelete=ondelete)
 
 
 def _require_owner(bind, table):

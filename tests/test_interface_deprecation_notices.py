@@ -159,13 +159,19 @@ def test_migration_runs_twice_and_both_tables_exist(app, db_session):
                 text("SELECT count(*) FROM pg_policies WHERE tablename = :t"), {"t": table}
             ).scalar()
             assert policies == 4, (table, policies)
-        foreign_keys = connection.execute(
-            text(
-                "SELECT count(*) FROM pg_constraint WHERE contype = 'f' "
-                "AND conrelid = to_regclass('public.api_operation_calls')"
+        foreign_keys = {
+            row[0]
+            for row in connection.execute(
+                text(
+                    "SELECT conname FROM pg_constraint WHERE contype = 'f' "
+                    "AND conrelid = to_regclass('public.api_operation_calls')"
+                )
             )
-        ).scalar()
-        assert foreign_keys == 2, "one named foreign key per column, no duplicates"
+        }
+        assert foreign_keys == {
+            "fk_api_operation_calls_organization_id",
+            "fk_api_operation_calls_client_id",
+        }, "one named foreign key per column, no duplicates"
 
 
 # ---------------------------------------------------------------------------
