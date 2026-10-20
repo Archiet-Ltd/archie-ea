@@ -11,6 +11,7 @@
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/skeleton.html' import skeleton_list %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/provenance.html' import answer_envelope %}
 
 {# Reusable filter bar macro for capability tables #}
 {% macro capability_filter_bar(context_id, filters=[], has_search=True, has_clear=True) %}
@@ -206,6 +207,8 @@
                         subtitle='Application support'
                     ) }}
                 </div>
+
+                <div class="mt-1">{{ answer_envelope() }}</div>
 
                 <!-- Business Domain Cards -->
                 <div class="bg-card rounded-lg p-6 mb-6">
