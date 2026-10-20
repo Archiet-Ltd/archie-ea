@@ -9,7 +9,7 @@ Idempotent: the table and index are created only when absent, and the fence is
 dropped and recreated, so a second run is a no-op.
 
 Revision ID: 20261020_change_feed_offsets
-Revises: 20261019_reference_counters
+Revises: 20261020_provenance_origin
 Create Date: 2026-10-20
 """
 import sqlalchemy as sa
@@ -17,7 +17,7 @@ from alembic import op
 from sqlalchemy import inspect, text
 
 revision = "20261020_change_feed_offsets"
-down_revision = "20261019_reference_counters"
+down_revision = "20261020_provenance_origin"
 branch_labels = None
 depends_on = None
 
