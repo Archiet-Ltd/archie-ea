@@ -1,4 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'macros/shadcn_compat.html' import shadcn_select %}
 {% from 'components/skeleton.html' import skeleton_table %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'macros/page_shell.html' import page_shell, stat_card %}
@@ -83,12 +84,12 @@
       <div class="hidden sm:block h-6 border-l border-input" aria-hidden="true"></div>
       <button type="button" data-testid="btn-import" data-modal-open="application-import-modal"
         title="Import applications from a spreadsheet or the Abacus feed"
-        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Import applications">
+        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Import applications">
         <i data-lucide="upload" class="h-4 w-4" aria-hidden="true"></i>Import
       </button>
       <button type="button" data-testid="btn-export" @click="exportCSV()"
         title="Download the current filtered list as a CSV file"
-        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Export applications">
+        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Export applications">
         <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export
       </button>
       <div class="hidden sm:block h-6 border-l border-input" aria-hidden="true"></div>
@@ -96,32 +97,54 @@
       <div class="relative" x-data="{ moreOpen: false }">
         <button type="button" data-testid="btn-more-actions" @click="moreOpen = !moreOpen" @click.outside="moreOpen = false" @keydown.escape="moreOpen = false"
           :aria-expanded="moreOpen.toString()" aria-haspopup="menu" aria-label="More actions"
-          class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           More<i data-lucide="chevron-down" class="h-4 w-4" aria-hidden="true"></i>
         </button>
         <div x-show="moreOpen" x-cloak class="absolute right-0 z-30 mt-1 w-56 rounded-md border border-border bg-popover p-1" role="menu">
-      <a href="{{ url_for('consolidation_list.dashboard') }}" data-testid="btn-consolidation"
-        title="Find duplicate or overlapping applications that could be consolidated"
-        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem">
-        <i data-lucide="layers-2" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-hidden="true"></i>Consolidation
-      </a>
-      {% endif %}
-      {% if 'solution_design.list_solutions' in flask.current_app.view_functions %}
-      <a href="{{ url_for('solution_design.list_solutions') }}" data-testid="btn-design-solution"
-        title="Use AI to design a target-state solution from your application estate"
-        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem">
-        <i data-lucide="star" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-hidden="true"></i>Design Solution
-      </a>
-      {% endif %}
-      <button type="button" data-testid="btn-match-vendors" @click="openUnifiedMappingModalDiscovery({context:'vendor'})"
-        title="Use AI to match applications to known vendor products"
-        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-label="Match vendors">
-        <i data-lucide="package" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-hidden="true"></i>Vendor Match
-      </button>
-      <button type="button" data-testid="btn-ai-map" @click="openAiMapModal()"
-        title="Use AI to suggest capability, process and ArchiMate mappings for your applications"
-        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-label="AI map applications">
-        <i data-lucide="sparkles" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-hidden="true"></i>AI Map
+      <a href="{{ url_for('consolidation_list.dashboard') }}" data-testid="btn-consolidation"
+
+        title="Find duplicate or overlapping applications that could be consolidated"
+
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent" role="menuitem">
+
+        <i data-lucide="layers-2" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent" role="menuitem" aria-hidden="true"></i>Consolidation
+
+      </a>
+
+      {% endif %}
+
+      {% if 'solution_design.list_solutions' in flask.current_app.view_functions %}
+
+      <a href="{{ url_for('solution_design.list_solutions') }}" data-testid="btn-design-solution"
+
+        title="Use AI to design a target-state solution from your application estate"
+
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent" role="menuitem">
+
+        <i data-lucide="star" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent" role="menuitem" aria-hidden="true"></i>Design Solution
+
+      </a>
+
+      {% endif %}
+
+      <button type="button" data-testid="btn-match-vendors" @click="openUnifiedMappingModalDiscovery({context:'vendor'})"
+
+        title="Use AI to match applications to known vendor products"
+
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent" role="menuitem" aria-label="Match vendors">
+
+        <i data-lucide="package" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent" role="menuitem" aria-hidden="true"></i>Vendor Match
+
+      </button>
+
+      <button type="button" data-testid="btn-ai-map" @click="openAiMapModal()"
+
+        title="Use AI to suggest capability, process and ArchiMate mappings for your applications"
+
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent" role="menuitem" aria-label="AI map applications">
+
+        <i data-lucide="sparkles" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent" role="menuitem" aria-hidden="true"></i>AI Map
+
       </button>
         </div>
       </div>
@@ -226,11 +249,10 @@
         </div>
         <div class="min-w-[180px]">
           <label for="filter-status" class="block text-xs font-medium text-muted-foreground mb-1">Lifecycle Status</label>
-          <select id="filter-status" name="status" data-testid="filter-lifecycle-status" x-model="filters.status" @change="onFilterChange()"
-            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          {% call shadcn_select('status', bare=true, id='filter-status', class='h-9 w-full', attrs='data-testid="filter-lifecycle-status" x-model="filters.status" @change="onFilterChange()"') %}
             <option value="">All lifecycle statuses</option>
             {% for s in filter_options.lifecycle_statuses %}<option value="{{ s.value }}" {% if filters.status == s.value %}selected{% endif %}>{{ s.label }}</option>{% endfor %}
-          </select>
+          {% endcall %}
         </div>
         <div class="min-w-[140px]">
           <label for="filter-domain" class="block text-xs font-medium text-muted-foreground mb-1">Domain</label>
@@ -396,7 +418,7 @@
           {%- set ck = (app.business_criticality or '').lower() -%}
           {%- set cc = CRIT_MAP.get(ck, 'bg-muted text-muted-foreground') -%}
           {%- set pc = app.capability_mappings[0] if app.capability_mappings else none -%}
-          <tr class="group h-12 border-b border-border transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" data-app-id="{{ app.id }}" data-testid="app-row-{{ app.id }}">
+          <tr class="group h-12 border-b border-border transition-colors hover:bg-accent" data-app-id="{{ app.id }}" data-testid="app-row-{{ app.id }}">
             <td class="px-3 py-0 align-middle">
               <input type="checkbox" class="row-select rounded border-input h-4 w-4 cursor-pointer"
                 :checked="selectedIds.has({{ app.id }})"
@@ -446,13 +468,13 @@
               <div class="flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                 <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}"
                   data-testid="btn-view-{{ app.id }}"
-                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-info dark:hover:bg-slate-700">View</a>
+                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info">View</a>
                 <a href="{{ url_for('unified_applications.application_fact_sheet', id=app.id) }}"
                   data-testid="btn-factsheet-{{ app.id }}" title="Fact sheet — single source of truth"
-                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-info dark:hover:bg-slate-700">Fact sheet</a>
+                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info">Fact sheet</a>
                 <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
                   data-testid="btn-edit-{{ app.id }}"
-                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-info dark:hover:bg-slate-700">Edit</a>
+                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info">Edit</a>
                 <div class="relative" x-data="{ mapOpen: false }"
                   data-app-map-id="{{ app.id }}"
                   data-app-map-name="{{ app.name | e }}">
