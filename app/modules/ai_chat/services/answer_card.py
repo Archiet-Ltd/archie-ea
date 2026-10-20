@@ -13,6 +13,7 @@ answer tool) and the wording for a chat with no model configured.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -228,6 +229,48 @@ def answer_typed_question(user_id: Optional[int], message: Any) -> Optional[Dict
     return {
         "result": result,
         "card": render_card(card),
+        "state": card["state"],
+        "sentence": card_sentence(card),
+    }
+
+
+_IMPACT_SUBJECT = re.compile(
+    r"\b(?:if|when)\s+(?:the\s+)?(?P<name>.+?)\s+"
+    r"(?:is|are|was|were|goes|go|fails?|stops?|becomes?|gets?)\b",
+    re.I,
+)
+
+
+def answer_estate_question_without_model(user_id: Optional[int], message: Any) -> Optional[Dict[str, Any]]:
+    """Answer "what breaks if <name> ..." with no model: the same estate-question
+    reading the assistant uses, the executor's own name resolution, and the
+    stored answer. None when the message is not that question or the name does
+    not resolve to exactly one element of the person's organisation."""
+    from app.modules.ai_chat.tools.executor import ToolCall, ToolExecutor
+    from app.modules.intelligence.services.answer_envelope import (
+        KIND_IMPACT,
+        classify_estate_question,
+    )
+
+    if classify_estate_question(message) != KIND_IMPACT:
+        return None
+    found = _IMPACT_SUBJECT.search(message)
+    name = found.group("name").strip(" ?.\"'") if found else ""
+    if not name:
+        return None
+    arguments = {"element_name": name}
+    result = ToolExecutor(user_id).execute(
+        ToolCall(id="typed", name="simulate_impact", arguments=arguments)
+    )
+    card = card_from_tool_result("simulate_impact", result)
+    html = render_card(card)
+    if not html:
+        return None
+    return {
+        "tool": "simulate_impact",
+        "arguments": arguments,
+        "result": result,
+        "card": html,
         "state": card["state"],
         "sentence": card_sentence(card),
     }
