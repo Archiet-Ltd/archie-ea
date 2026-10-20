@@ -202,17 +202,21 @@ def explain_fact(organization_id: int, fact: Dict[str, Any]) -> Dict[str, Any]:
 
 def attach_relationship_sources(organization_id: int, rows: List[Dict[str, Any]]) -> None:
     """Give every cascade row's ``relation`` the facts the Why dialog shows:
-    ``source_name`` (the element the last drawn link was recorded against),
-    ``source_timestamp`` (as of when), ``source_confidence``, ``derived``,
-    ``kindLabel`` (the relationship type in plain words) and ``record_url``
-    (the link to the record).
+    ``record_url`` and ``record_name`` (the element the last drawn link was
+    recorded against, which the "Open the record" row links to), ``kindLabel``
+    (the relationship type in plain words), ``derived`` and ``source_confidence``.
 
-    The last id of the row's chain is the relationship that reaches the row's
-    element. It is read inside ``organization_id`` only and its element comes
-    from the same organisation, with the same ``_element_href`` the explanation
-    uses, so a link never crosses organisations. Where nothing resolves,
-    ``source_name`` and ``record_url`` are ``None`` (the dialog says "Source not
-    recorded"); nothing is invented.
+    ``source_name`` and ``source_timestamp`` answer "how did this fact get into
+    the model" and are set only when a provenance origin exists for the
+    relationship (an import batch, a connector run, or a manual edit with its
+    author role). The relationship model records none of these today (it has
+    ``created_by_id`` and ``derived_from`` only: app/models/archimate_core.py,
+    class ArchiMateRelationship), so both stay ``None`` and the dialog says
+    "Source not recorded", or "Worked out from the model" for a derived row.
+
+    The last id of the row's chain is read inside ``organization_id`` only and
+    its element comes from the same organisation, so a link never crosses
+    organisations; nothing is invented.
     """
     from app.models import ArchiMateElement, ArchiMateRelationship
 
@@ -245,12 +249,9 @@ def attach_relationship_sources(organization_id: int, rows: List[Dict[str, Any]]
         relation = row.setdefault("relation", {})
         rel = relationships.get(last_ids.get(index))
         origin = elements.get(rel.source_id) if rel is not None else None
-        stamp = relation.get("computed_at")
-        if not stamp and rel is not None:
-            moment = rel.updated_at or rel.created_at
-            stamp = moment.isoformat() if moment else None
-        relation["source_name"] = origin.name if origin is not None and origin.name else None
-        relation["source_timestamp"] = stamp or None
+        relation["source_name"] = None
+        relation["source_timestamp"] = None
+        relation["record_name"] = origin.name if origin is not None and origin.name else None
         relation["source_confidence"] = relation.get("confidence")
         relation["derived"] = relation.get("kind") == "derived"
         kind = relation.get("type") or (rel.type if rel is not None else None)

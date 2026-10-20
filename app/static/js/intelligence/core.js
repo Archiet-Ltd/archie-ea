@@ -464,7 +464,7 @@
         return {
             derived: false, type: null, layer: null, ruleId: null, confidence: null,
             chain: [], depth: null, computedAt: null, engineVersion: null, derivedId: null,
-            sourceName: null, sourceUrl: null, relationshipType: null, asOf: null
+            sourceName: null, recordName: null, sourceUrl: null, relationshipType: null, asOf: null
         };
     }
 
@@ -491,6 +491,7 @@
             // (source_name, kindLabel, source_timestamp, record_url); a missing
             // one stays null and the dialog says it was not recorded.
             sourceName: relation.source_name || null,
+            recordName: relation.record_name || null,
             sourceUrl: relation.record_url || null,
             relationshipType: relation.kindLabel || null,
             asOf: timeText(relation.source_timestamp)

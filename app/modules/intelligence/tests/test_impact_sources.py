@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 DRAWER = REPO_ROOT / "app" / "modules" / "intelligence" / "templates" / "intelligence" / "_provenance_drawer.html"
 CORE = REPO_ROOT / "app" / "static" / "js" / "intelligence" / "core.js"
 
-FIELDS = ("source_name", "kindLabel", "source_timestamp", "record_url")
+FIELDS = ("source_name", "kindLabel", "source_timestamp", "record_url", "record_name")
 
 
 def _user(db_session, org_id):
@@ -64,9 +64,13 @@ def test_cascade_row_with_a_recorded_source_carries_the_four_fields(app, db_sess
     relation = rows[0]["relation"]
     for field in FIELDS:
         assert field in relation, field
-    assert relation["source_name"] == "Calibration Ledger"
+    # The relationship model records no import batch, connector run or author
+    # role (ArchiMateRelationship in app/models/archimate_core.py), so no
+    # origin exists: source_name and source_timestamp stay absent.
+    assert relation["source_name"] is None
+    assert relation["source_timestamp"] is None
+    assert relation["record_name"] == "Calibration Ledger"
     assert relation["kindLabel"] == "serving"
-    assert relation["source_timestamp"]
     assert relation["derived"] is False
     assert "source_confidence" in relation
     assert relation["record_url"] and relation["record_url"].startswith("/")
@@ -83,7 +87,7 @@ def test_cascade_row_without_a_source_carries_a_null_source_record(app, db_sessi
     assert relation["source_name"] is None
     assert relation["record_url"] is None
     assert relation["kindLabel"] == "serving"
-    assert "source_timestamp" in relation
+    assert relation["source_timestamp"] is None
     assert relation["derived"] is True
 
 
@@ -106,6 +110,7 @@ def test_the_why_dialog_shows_each_field_or_says_source_not_recorded():
     template = DRAWER.read_text(encoding="utf-8")
     assert "data-why-source" in template
     assert "Source not recorded" in template
+    assert "Worked out from the model" in template
     for hook in ("data-source-name", "data-source-type", "data-source-as-of", "data-source-link"):
         assert hook in template, hook
     # the four values are read from the row's detail, filled by core.js
