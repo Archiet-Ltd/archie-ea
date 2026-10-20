@@ -1664,7 +1664,6 @@ jobs:
       - walkthrough
       - dependency-audit
     runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","browser"]') || 'ubuntu-latest' }}
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     permissions:
       contents: read
       packages: write
