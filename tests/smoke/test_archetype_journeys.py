@@ -386,6 +386,44 @@ def test_application_edit_and_fact_sheet_render_the_technical_profile_fields(pag
         "the fact sheet's Deployment panel did not show the value just saved on the edit form"
 
 
+def test_security_architect_adopts_a_framework_and_sees_its_controls(page, live_server, seeded):
+    """The compliance dashboard listed frameworks but could not adopt one, and
+    its expand-controls call went to an address that does not exist. Click
+    Adopt on the real dashboard, see the framework adopted with its controls
+    counted after the reload, and open it to read the controls."""
+    import uuid
+
+    from app import create_app, db
+    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+
+    code = "SMK-%s" % uuid.uuid4().hex[:6].upper()
+    app = create_app("testing")
+    with app.app_context():
+        framework = RegulatoryFramework(code=code, name="Smoke framework %s" % code, category="security",
+                                        jurisdiction="Global", status="active")
+        db.session.add(framework)
+        db.session.flush()
+        for i in (1, 2):
+            db.session.add(ComplianceControl(framework_id=framework.id, control_code="%s.%d" % (code, i),
+                                             title="Smoke control %d" % i, priority="high"))
+        db.session.commit()
+        framework_id = framework.id
+
+    _login(page, live_server, seeded["emails"]["security_architect"])
+    _visit(page, live_server, "/dashboard/compliance")
+    cell = page.locator('[data-testid="framework-adoption-%d"]' % framework_id)
+    assert "Not adopted" in cell.inner_text()
+    cell.get_by_role("button", name="Adopt").click()
+    page.wait_for_function(
+        "id => (document.querySelector('[data-testid=\"framework-adoption-' + id + '\"]') || {}).innerText"
+        " && document.querySelector('[data-testid=\"framework-adoption-' + id + '\"]').innerText.includes('Adopted')",
+        arg=framework_id, timeout=PAGE_TIMEOUT)
+    assert "2 controls" in page.locator('[data-testid="framework-adoption-%d"]' % framework_id).inner_text()
+
+    page.get_by_role("button", name="Show controls for Smoke framework %s" % code).click()
+    page.get_by_text("Smoke control 1").first.wait_for(timeout=PAGE_TIMEOUT)
+
+
 def test_application_manager_maintains_an_owned_application(page, live_server, seeded):
     """Set health on an owned application and see it reach the health overview."""
     _login(page, live_server, seeded["emails"]["application_manager"])

@@ -65,6 +65,9 @@
     <div class="bg-card text-card-foreground rounded-lg border border-border overflow-hidden" x-data="frameworksTable()">
         <div class="px-5 py-4 border-b border-border">
             <h2 class="text-base font-semibold text-foreground">Frameworks</h2>
+            {% if frameworks and not adoption_error and not adopted %}
+            <p class="mt-1 text-sm text-muted-foreground" data-testid="none-adopted">None adopted yet.{% if can_adopt %} Adopt a framework to copy its controls into your organisation.{% endif %}</p>
+            {% endif %}
         </div>
         {% if frameworks %}
         <div class="overflow-x-auto">
@@ -78,6 +81,7 @@
                         <th class="px-5 py-3 font-medium">Enforcement</th>
                         <th class="px-5 py-3 font-medium">Penalty risk</th>
                         <th class="px-5 py-3 font-medium text-right">Controls</th>
+                        <th class="px-5 py-3 font-medium">Your organisation</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -102,9 +106,31 @@
                         <td class="px-5 py-3 text-right text-foreground">
                             {{ f.control_count if f.control_count else '—' }}
                         </td>
+                        <td class="px-5 py-3" data-testid="framework-adoption-{{ f.id }}">
+                            {% if adoption_error %}
+                            <span class="text-muted-foreground">—</span>
+                            {% elif f.id in adopted %}
+                            <span class="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-xs text-foreground">
+                                Adopted · {{ adopted[f.id] }} control{{ '' if adopted[f.id] == 1 else 's' }}
+                            </span>
+                            {% else %}
+                            <span class="text-muted-foreground mr-2">Not adopted</span>
+                            {% if can_adopt %}
+                            <button type="button"
+                                    class="px-2.5 py-1 text-xs rounded-md border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                                    @click.stop="adopt({{ f.id }})"
+                                    @keydown.enter.stop="keep()"
+                                    :disabled="adoptingId !== null"
+                                    aria-label="Adopt {{ f.name }} for your organisation">
+                                <span x-show="adoptingId !== {{ f.id }}">Adopt</span>
+                                <span x-show="adoptingId === {{ f.id }}">Adopting…</span>
+                            </button>
+                            {% endif %}
+                            {% endif %}
+                        </td>
                     </tr>
                     <tr x-show="openId === {{ f.id }}" x-cloak>
-                        <td colspan="7" class="px-5 py-4 bg-muted/30 border-b border-border">
+                        <td colspan="8" class="px-5 py-4 bg-muted/30 border-b border-border">
                             <template x-if="loadingId === {{ f.id }}">
                                 <div class="text-sm text-muted-foreground">Loading controls…</div>
                             </template>
@@ -142,17 +168,42 @@
         {% else %}
         <div class="px-5 py-12 text-center text-sm text-muted-foreground">
             <p class="mb-2">Regulatory frameworks define the compliance standards, controls and obligations your organisation must meet — such as GDPR, SOC 2 or ISO 27001.</p>
-            <p>Frameworks are added by an administrator.</p>
+            <p>No frameworks are available to adopt yet.</p>
         </div>
         {% endif %}
     </div>
 </div>
 <script>
     function frameworksTable() {
+        // The frameworks API is served under this blueprint's own prefix.
+        const frameworksUrl = {{ url_for('application_mgmt.get_compliance_frameworks')|tojson }};
         return {
             openId: null,
             loadingId: null,
             controlsByFramework: {},
+            adoptingId: null,
+            keep() {},
+            adopt(frameworkId) {
+                if (this.adoptingId !== null) return;
+                this.adoptingId = frameworkId;
+                Platform.fetch.post(frameworksUrl + '/' + frameworkId + '/adopt', {})
+                    .then(() => {
+                        Platform.toast.success('Framework adopted.');
+                        window.location.reload();
+                    })
+                    .catch((err) => {
+                        if (err && err.status === 409) {
+                            Platform.toast.info('This framework is already adopted.');
+                            window.location.reload();
+                            return;
+                        }
+                        Platform.toast.error('Could not adopt this framework.');
+                        throw err;
+                    })
+                    .finally(() => {
+                        this.adoptingId = null;
+                    });
+            },
             toggle(frameworkId) {
                 if (this.openId === frameworkId) {
                     this.openId = null;
@@ -163,7 +214,7 @@
                     return;
                 }
                 this.loadingId = frameworkId;
-                Platform.fetch.get('/api/compliance/frameworks/' + frameworkId + '/controls')
+                Platform.fetch.get(frameworksUrl + '/' + frameworkId + '/controls')
                     .then((data) => {
                         this.controlsByFramework[frameworkId] = Array.isArray(data) ? data : [];
                     })

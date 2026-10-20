@@ -267,6 +267,16 @@ GAP_WORK_PACKAGE_LINK_POST_POLICY = {
 for _allowed in GAP_WORK_PACKAGE_LINK_POST_POLICY.values():
     _allowed.add("platform_admin")
 
+# Adopting a regulatory framework is role-gated by require_roles on the route
+# (admin, architect, business_architect, security_architect). Every seeded
+# archetype holds the Architect role, so each reaches the handler, which answers
+# 409 for the framework id 0 used here (no such framework to adopt); a read-only
+# Viewer is refused before it runs (pinned with a real Viewer account in
+# tests/test_compliance_adoption_dashboard.py).
+COMPLIANCE_ADOPT_POST_POLICY = {
+    "/dashboard/api/compliance/frameworks/0/adopt": set(ARCHETYPES),
+}
+
 OVERSIGHT_POST_POLICY = {
     "/ai-chat/oversight/pause":  set(),
     "/ai-chat/oversight/resume": set(),
@@ -861,6 +871,24 @@ def test_gap_work_package_link_post_authorisation(
     )
     if actual == ALLOWED:
         assert response.status == 404, (archetype, path, response.status)
+
+
+@pytest.mark.parametrize("path,allowed", COMPLIANCE_ADOPT_POST_POLICY.items())
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_compliance_adopt_post_authorisation(archetype, path, allowed, page, live_server, seeded):
+    """Only the roles the adopt route names reach its handler (409 for a framework
+    that does not exist); every other persona is refused before it runs."""
+    _login(page, live_server, seeded["emails"][archetype])
+    page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    csrf = page.locator('meta[name="csrf-token"]').get_attribute("content") or ""
+    response = page.request.post(live_server + path, form={"csrf_token": csrf}, max_redirects=0)
+    expected = ALLOWED if archetype in allowed else DENIED
+    actual = DENIED if response.status in (401, 403) else ALLOWED
+    assert actual == expected, (
+        "%s reached %s: expected %s, got %s" % (archetype, path, expected, response.status)
+    )
+    if actual == ALLOWED:
+        assert response.status == 409, (archetype, path, response.status)
 
 
 @pytest.mark.parametrize("path,allowed", OVERSIGHT_POST_POLICY.items())
