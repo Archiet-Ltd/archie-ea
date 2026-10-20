@@ -22,6 +22,7 @@ from flask import Blueprint, Response, current_app, flash, jsonify, redirect, re
 from flask_login import current_user, login_required
 
 from app import db
+from app.decorators import require_roles
 from app.utils.pagination import safe_int_arg
 # ArchiMateHealthService import removed — architecture_health route deleted
 
@@ -300,6 +301,7 @@ def _oef_wants_json():
 
 @architect_ui_bp.route("/architecture/import/oef", methods=["GET", "POST"])
 @login_required
+@require_roles("admin", "architect")
 def import_oef():
     """The model-import screen, over the one OEF import engine.
 
@@ -365,6 +367,7 @@ def import_oef():
 
 @architect_ui_bp.route("/architecture/import/oef/preview", methods=["POST"])
 @login_required
+@require_roles("admin", "architect")
 def import_oef_preview():
     """What an import of this document would do, writing nothing (JSON).
 
