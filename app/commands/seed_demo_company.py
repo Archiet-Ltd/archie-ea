@@ -1509,6 +1509,7 @@ def seed_demo_company() -> dict:
                 continue
             el = elements.get(el_name)
             prog = PortfolioInitiative(
+                organization_id=org_id,
                 name=name,
                 code=code,
                 status=status,

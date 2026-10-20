@@ -59,8 +59,10 @@ ALLOW = re.compile(r"cache-tenancy-ok:[ \t]*\S")
 CACHE_NAME = re.compile(r"cache|_memo|_store|_registry_by", re.I)
 # A term that means "this key includes the tenant".
 TENANT_TERM = re.compile(r"org|tenant", re.I)
-# The module deals with tenant-owned data at all.
-TENANT_MODULE = re.compile(r"current_org_id|organization_id|TenantMixin")
+# The module deals with tenant-owned data at all. Reading through the ORM counts: a
+# module such as the architecture assistant routes never names an organisation yet
+# queries tenant tables, and its f-string-keyed cache was skipped for that reason.
+TENANT_MODULE = re.compile(r"current_org_id|organization_id|TenantMixin|\.query\b|db\.session")
 
 
 def _module_level_caches(tree: ast.Module) -> dict:
