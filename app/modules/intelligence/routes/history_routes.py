@@ -208,7 +208,7 @@ def history_changes_api():
     - from (required): ISO date/datetime
     - to (required): ISO date/datetime
 
-    Returns:
+    Returns (inside the standard ``data`` envelope):
     {
         "from": "ISO datetime",
         "to": "ISO datetime",
