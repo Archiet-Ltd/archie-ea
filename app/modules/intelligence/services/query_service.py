@@ -390,6 +390,83 @@ def _resolve_application_owners_batch(
     return results
 
 
+def _resolve_suppliers_batch(
+    element_ids: List[int], org_id: int
+) -> Dict[int, str]:
+    """Batch-resolve the supplier (vendor organisation name) for a set of
+    element ids, through the application portfolio's vendor master link.
+
+    Element → ApplicationComponent (archimate_element_id) → VendorProduct
+    (vendor_product_id) → VendorOrganization (name). Blank when no vendor
+    product is recorded; never a placeholder.
+
+    Returns ``{element_id: supplier_name_or_blank}``.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.vendor.vendor_organization import VendorOrganization, VendorProduct
+
+    distinct_ids = sorted(set(element_ids))
+    results: Dict[int, str] = {eid: "" for eid in distinct_ids}
+    if not distinct_ids:
+        return results
+
+    # Element → component → vendor product, in one read each.
+    components = (
+        db.session.execute(
+            db.select(ApplicationComponent.id, ApplicationComponent.archimate_element_id, ApplicationComponent.vendor_product_id)
+            .where(ApplicationComponent.organization_id == org_id)
+            .where(ApplicationComponent.archimate_element_id.in_(distinct_ids))
+        )
+        .all()
+    )
+
+    element_to_product: Dict[int, int] = {}
+    product_ids: List[int] = []
+    for component_id, archimate_element_id, vendor_product_id in components:
+        if vendor_product_id is None:
+            continue
+        element_to_product[archimate_element_id] = vendor_product_id
+        product_ids.append(vendor_product_id)
+
+    if not product_ids:
+        return results
+
+    products = (
+        db.session.execute(
+            db.select(VendorProduct.id, VendorProduct.vendor_organization_id)
+            .where(VendorProduct.id.in_(product_ids))
+        )
+        .all()
+    )
+
+    product_to_vendor: Dict[int, int] = {}
+    vendor_ids: List[int] = []
+    for product_id, vendor_organization_id in products:
+        product_to_vendor[product_id] = vendor_organization_id
+        if vendor_organization_id is not None:
+            vendor_ids.append(vendor_organization_id)
+
+    if not vendor_ids:
+        return results
+
+    vendors = {
+        vendor.id: vendor.name
+        for vendor in db.session.execute(
+            db.select(VendorOrganization).where(VendorOrganization.id.in_(vendor_ids))
+        ).scalars()
+    }
+
+    for element_id, product_id in element_to_product.items():
+        vendor_org_id = product_to_vendor.get(product_id)
+        if vendor_org_id is None:
+            continue
+        supplier = vendors.get(vendor_org_id)
+        if supplier:
+            results[element_id] = supplier
+
+    return results
+
+
 def _resolve_elements_batch(element_ids: Iterable[int], org_id: Optional[int]) -> Dict[str, Dict[str, Any]]:
     """The element identity map -- ``{str(id): {id, name, type, layer}}``.
 
@@ -3130,7 +3207,7 @@ class IntelligenceQueryService:
         """R1-B83 slice 1: which systems would stop the business trading.
         Returns elements ranked by the number of distinct value streams that reach them.
         """
-        from app.models.unified_capability import ValueStream  # Adjust the import if needed
+        from app.models.unified_capability import ValueStream
 
         org_id = current_org_id()
         if org_id is None:
@@ -3253,7 +3330,8 @@ class IntelligenceQueryService:
         explicit_count = 0
         derived_count = 0
         stale_count = 0
-        for eid, count, row in elements_list:
+        for position, (eid, count, row) in enumerate(elements_list, start=1):
+            row["rank"] = position
             final_rows.append(row)
             # Update summary counts based on the row's relation
             relation_kind = row.get("relation", {}).get("kind")
@@ -3263,6 +3341,17 @@ class IntelligenceQueryService:
                 derived_count += 1
             if row.get("relation", {}).get("stale"):
                 stale_count += 1
+
+        # Owner and supplier on every ranked row. Owner comes from the walk's
+        # rows (with_owner=True on the cross_layer_impact call above); supplier
+        # comes from the vendor master link the application portfolio holds.
+        supplier_by_element = _resolve_suppliers_batch(
+            [eid for eid, _, _ in elements_list], org_id
+        )
+        for row in final_rows:
+            row.setdefault("owner", None)
+            row.setdefault("owners", [])
+            row["supplier"] = supplier_by_element.get(row["element_id"], "")
 
         # Determine derivation_state
         if not final_rows:
