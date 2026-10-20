@@ -39,7 +39,8 @@
                 <span class="truncate text-sm font-semibold text-foreground" x-text="{{ root }}"></span>
                 <span class="ml-auto shrink-0 text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Asked about</span>
             </div>
-            <div class="mt-1">{{ answer_envelope() }}</div>
+            {# The cascade is worked out from the relationships the model records. #}
+            <div class="mt-1">{{ answer_envelope(source='the relationships recorded in the model', kind='derived') }}</div>
         </li>
         {% endif %}
         <template x-for="(node, i) in ({{ rows }})" :key="node.key || i">
@@ -76,11 +77,13 @@
                             aria-label="Source of this connection"></button>
                     <div x-show="tip === node.key" x-cloak role="tooltip"
                          class="absolute left-0 top-full z-20 mt-1 w-72 rounded-md border border-border bg-popover p-2 text-xs leading-5 text-popover-foreground">
+                        {# A derived row names what it was worked out from; a recorded row
+                           names its source only when the model recorded one. #}
                         {{ answer_envelope(
-                            x_source="node.source_name || node.sourceName || (node.derived ? (node.kindLabel || 'Worked out from the model') : 'Recorded in the model')",
-                            x_as_of="node.source_timestamp || node.sourceTimestamp || node.staleLine",
-                            x_confidence="'Confidence ' + (node.source_confidence != null ? node.source_confidence : node.sourceConfidence)",
-                            x_kind="node.derived ? 'ai' : 'measured'"
+                            x_source="node.derived ? (node.kindLabel || 'the recorded relationships') : (node.source_name || node.sourceName || '')",
+                            x_as_of="node.source_timestamp || node.sourceTimestamp || node.staleLine || ''",
+                            x_confidence="(node.source_confidence != null ? node.source_confidence : (node.sourceConfidence != null ? node.sourceConfidence : null))",
+                            x_kind="node.derived ? 'derived' : 'measured'"
                         ) }}
                     </div>
                     <span class="ml-auto shrink-0 truncate text-xs text-muted-foreground" x-text="node.owner || node.ownerName || 'No owner recorded'"></span>

@@ -113,12 +113,12 @@
             <p class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
             <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
             {% if line %}<p class="mt-1 truncate text-xs text-muted-foreground tabular-nums" title="{{ line }}">{{ line }}</p>{% endif %}
-            {% if label == 'Solutions' %}<div class="mt-1">{{ answer_envelope() }}</div>{% endif %}
+            {% if label == 'Solutions' %}<div class="mt-1">{{ answer_envelope(source='count of solutions by ADM phase in this organisation') }}</div>{% endif %}
         </div>
         {% endfor %}
     </section>
 
-    <div class="mt-1">{{ answer_envelope() }}</div>
+    <div class="mt-1">{{ answer_envelope(source='the health score components measured on this organisation; an unmeasured component reads as an em dash') }}</div>
 
     {# What the health score was weighted from. A component that was not
        measured reads as an em dash, never as a confident zero. #}
@@ -146,7 +146,7 @@
         </div>
     </section>
 
-    <div class="mt-1">{{ answer_envelope() }}</div>
+    <div class="mt-1">{{ answer_envelope(source='solutions by ADM phase, one row per phase') }}</div>
 
     {# Chart: application lifecycle, one series, hairline container, no vertical grid. #}
     <section aria-labelledby="lifecycle-chart-heading" class="rounded-lg border border-border bg-card" data-testid="lifecycle-distribution">

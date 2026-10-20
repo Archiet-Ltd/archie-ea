@@ -97,3 +97,32 @@ def test_unavailable(app):
     assert "Could not measure" in html, html
     assert "Query" in html, html
     _no_empty_lines(html)
+
+
+def test_derived(app):
+    """Worked out from the model is its own kind: neither a measurement nor a model's prose."""
+    html = _render(app, source="the relationships recorded in the model", kind="derived")
+    assert "Worked out" in html, html
+    assert "the relationships recorded in the model" in html, html
+    assert "AI-generated" not in html and "Measured" not in html, html
+    _no_empty_lines(html)
+
+
+def test_bound_envelope_never_invents_a_source(app):
+    """A client-rendered envelope carries both outcomes and lets Alpine show one: the
+    source when the expression has a value, "Source not recorded" when it has none. No
+    static fallback label may stand in for a source."""
+    template_str = (
+        "{% from 'components/provenance.html' import answer_envelope %}"
+        "{{ answer_envelope(x_source=\"node.source_name || ''\", x_kind=\"node.derived ? 'derived' : 'measured'\","
+        " x_as_of=\"node.source_timestamp || ''\", x_confidence=\"node.source_confidence\") }}"
+    )
+    with app.test_request_context("/"):
+        html = render_template_string(template_str)
+    assert 'x-show="(node.source_name || \'\')"' in html, html
+    assert 'x-show="!(node.source_name || \'\')"' in html, html
+    assert 'x-text="node.source_name || \'\'"' in html, html
+    assert "Source not recorded" in html, html
+    assert "Worked out" in html and "Measured" in html, html
+    assert "Recorded in the model" not in html, html
+    _no_empty_lines(html)

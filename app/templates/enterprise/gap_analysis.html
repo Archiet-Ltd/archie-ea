@@ -35,7 +35,7 @@
         {{ metrics_card(title='Resolved', value=gaps|selectattr('status', 'equalto', 'Resolved')|list|length|default(0), icon='check-circle', icon_class='!text-success', value_class='text-success') }}
     </div>
 
-    <div class="mt-1">{{ answer_envelope() }}</div>
+    <div class="mt-1">{{ answer_envelope(source='count of gaps in the gap register of this organisation') }}</div>
 
     <!-- Gaps Table -->
     <div data-slot="card" class="rounded-lg border border-border bg-card" x-data="gapAnalysisTable()">

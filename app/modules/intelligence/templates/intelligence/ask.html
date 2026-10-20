@@ -451,7 +451,7 @@
                         <td class="px-2">{{ (run.duration_ms ~ ' ms') if run.duration_ms is not none else '—' }}</td>
                     </tr>
                     <tr>
-                        <td colspan="5" class="px-2 pt-1 text-xs">{{ answer_envelope() }}</td>
+                        <td colspan="5" class="px-2 pt-1 text-xs">{{ answer_envelope(source='this derivation run over the recorded relationships', kind='derived', as_of=(run.finished_at | format_datetime) if run.finished_at else none) }}</td>
                     </tr>
                     {% endfor %}
                 {% endcall %}
