@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -380,3 +381,66 @@ def test_the_ask_address_opens_the_chat_and_pre_runs_the_same_answer(
         typed = envelope.ask_and_store("impact", {"element_id": root.id}, user_id=user.id)
         assert envelope.open_answer(address).citations == typed.citations
         assert envelope.open_answer(address).rows == typed.rows
+
+
+# --- no model: estate questions, the evidence strip, one message -----------------
+
+
+def test_with_no_model_a_typed_impact_question_is_answered_with_the_card(
+    app, db_session, make_org, client, chat_client, no_model_calls
+):
+    org, user = chat_client("askchat-nomodel-impact")
+    root = _element(db_session, org.id, "Calibration Ledger")
+    mid = _element(db_session, org.id, "Calibration Reports")
+    from app.models import ArchiMateRelationship
+
+    db_session.add(ArchiMateRelationship(
+        source_id=root.id, target_id=mid.id, type="Serving", organization_id=org.id))
+    db_session.commit()
+
+    events = _stream_events(client, {"message": "What breaks if Calibration Ledger is unavailable?"})
+
+    done = events[-1]
+    assert done["type"] == "done" and not done.get("error")
+    card = done["answer_cards"][0]
+    assert 'data-state="answered"' in card and "Calibration Reports" in card
+
+    from app.modules.intelligence.services import answer_envelope as envelope
+
+    address = re.search(r'data-answer-address="([0-9a-f]{32})"', card).group(1)
+    with app.test_request_context("/"):
+        g.current_org_id = org.id
+        stored = envelope.open_answer(address)
+        assert stored.citations and f'data-citation-count="{len(stored.citations)}"' in card
+
+
+def test_with_no_model_a_name_that_is_not_recorded_gets_no_invented_answer(
+    app, db_session, make_org, client, chat_client, no_model_calls
+):
+    chat_client("askchat-nomodel-unknown")
+
+    response = client.post("/ai-chat/message/stream",
+                           json={"message": "What breaks if Nothing Here is unavailable?"})
+
+    assert response.status_code == 503
+
+
+def test_the_evidence_strip_does_not_say_nothing_was_read_under_a_cited_card(app):
+    script = Path(app.root_path, "static", "js", "ai_chat", "render.js").read_text()
+    stubs = (
+        "global.window = global; global.document = {addEventListener(){}, getElementById(){return null;},"
+        " createElement(){const o = {}; Object.defineProperty(o, 'innerHTML', {get(){return o.textContent;}}); return o;}};"
+        "global.sessionStorage = {}; global.localStorage = {};"
+    )
+    call = (
+        "const out = window.ArchieChat.render.renderAnswerFooter("
+        "{answerCards: ['<div data-answer-card></div>'], trail: [], contextUsed: false});"
+        "console.log(JSON.stringify(out));"
+    )
+    harness = chr(10).join([stubs, script, call])
+    result = subprocess.run(["node", "-e", harness], capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stderr[:400]
+    html = json.loads(result.stdout.strip().splitlines()[-1])
+    assert "data-answer-card" in html
+    assert "No portfolio data was read" not in html
+    assert "sources are shown on the card" in html
