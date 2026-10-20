@@ -18,14 +18,19 @@ from datetime import datetime
 
 import requests
 from flask import Blueprint, jsonify, render_template, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.decorators import admin_required, audit_log
-from app.middleware.tenant_decorators import org_admin_required, platform_admin_required
+from app.middleware.tenant_decorators import (
+    is_platform_admin,
+    org_admin_required,
+    platform_admin_required,
+)
 
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
 from app.modules.admin.routes.deprecation_routes import (
+    clear_retiring_response,
     clients_response,
     mark_retiring_response,
 )
@@ -173,7 +178,9 @@ def send_opsgenie_alert(alert_data):
 @org_admin_required
 def dashboard():
     """Render the deprecation status dashboard."""
-    return render_template("admin/deprecation_status.html")
+    return render_template(
+        "admin/deprecation_status.html", can_mark_retiring=is_platform_admin(current_user)
+    )
 
 
 @deprecation_bp_v2.route("/api/clients")
@@ -188,11 +195,21 @@ def api_clients():
 @deprecation_bp_v2.route("/api/mark-retiring", methods=["POST"])
 @timed_route
 @login_required
-@org_admin_required
+@platform_admin_required
 @audit_log("mark_operation_retiring")
 def api_mark_retiring():
     """Mark an operation as retiring and notify its consumers' owners once."""
     return mark_retiring_response()
+
+
+@deprecation_bp_v2.route("/api/clear-retiring", methods=["POST"])
+@timed_route
+@login_required
+@platform_admin_required
+@audit_log("clear_operation_retirement")
+def api_clear_retiring():
+    """Undo the retirement of an operation."""
+    return clear_retiring_response()
 
 
 @deprecation_bp_v2.route("/api/stats")

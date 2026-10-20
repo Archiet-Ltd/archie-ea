@@ -36,9 +36,10 @@
       </div>
     </div>
 
+    {% if can_mark_retiring %}
     <div class="mt-6 rounded-xl border bg-card">
       <div class="p-4 border-b">
-        <h3 class="text-sm font-semibold">Mark an operation as retiring</h3>
+        <h3 class="text-sm font-semibold">Mark an operation as retiring for every caller</h3>
       </div>
       <div class="p-4 space-y-3">
         <form id="mark-retiring-form" class="space-y-3">
@@ -66,11 +67,16 @@
                   class="inline-flex items-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-9 px-4 py-2 transition-colors">
             Mark as retiring
           </button>
+          <button type="button" id="clear-retiring"
+                  class="inline-flex items-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-9 px-4 py-2 transition-colors">
+            Undo retirement
+          </button>
           <div id="mark-result" class="hidden p-3 rounded-md bg-success/10 text-success-emphasis border border-success/20 text-sm"></div>
           <div id="mark-error" class="hidden p-3 rounded-md bg-destructive/10 text-destructive-emphasis border border-destructive/20 text-sm"></div>
         </form>
       </div>
     </div>
+    {% endif %}
   </div>
 </div>
 
@@ -133,7 +139,8 @@
     return div.innerHTML;
   }
 
-  document.getElementById('mark-retiring-form').addEventListener('submit', function (e) {
+  var markForm = document.getElementById('mark-retiring-form');
+  if (markForm) markForm.addEventListener('submit', function (e) {
     e.preventDefault();
     var opId = document.getElementById('op-id').value;
     var retiresOn = document.getElementById('retires-on').value;
@@ -165,6 +172,33 @@
       })
       .catch(function () {
         errorDiv.textContent = 'Failed to mark operation.';
+        errorDiv.classList.remove('hidden');
+      });
+  });
+
+  var clearButton = document.getElementById('clear-retiring');
+  if (clearButton) clearButton.addEventListener('click', function () {
+    var resultDiv = document.getElementById('mark-result');
+    var errorDiv = document.getElementById('mark-error');
+    resultDiv.classList.add('hidden');
+    errorDiv.classList.add('hidden');
+    Platform.fetch('/admin/deprecation/api/clear-retiring', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({operation_id: document.getElementById('op-id').value}),
+    })
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        if (data.status === 'cleared') {
+          resultDiv.textContent = 'Retirement of ' + data.operation_id + ' removed.';
+          resultDiv.classList.remove('hidden');
+        } else {
+          errorDiv.textContent = data.error || 'Failed to remove the retirement.';
+          errorDiv.classList.remove('hidden');
+        }
+      })
+      .catch(function () {
+        errorDiv.textContent = 'Failed to remove the retirement.';
         errorDiv.classList.remove('hidden');
       });
   });

@@ -22,16 +22,20 @@ request.
 from __future__ import annotations
 
 import logging
-import re
 from datetime import datetime, time, timezone
 from email.utils import format_datetime
 from functools import wraps
-from pathlib import Path
 
 from flask import after_this_request, g, request
 from flask_login import current_user
 
 from app.extensions import db
+from app.utils.api_contract_index import (
+    build_operation_paths,
+    build_route_index,
+    load_subset,
+    normalize_path,
+)
 from app.utils.api_response import forbidden_response, unauthorized_response
 
 logger = logging.getLogger(__name__)
@@ -45,20 +49,9 @@ MCP_READ_SCOPE = "mcp:read"
 # The only scopes a client-credentials grant may ever issue.
 API_SCOPES = (API_READ_SCOPE,)
 
-_CONTRACT_SUBSET = Path(__file__).resolve().parents[3] / "app" / "config" / "api_contract_subset.yaml"
-_API_PREFIX = "/api/v1"
 # (normalised path, method) -> operation id, and operation id -> contract path.
 _operation_index: dict | None = None
 _operation_paths: dict | None = None
-
-
-def _normalize_path(path: str) -> str:
-    """Strip the /api/v1 prefix and replace path parameters with {}."""
-    if path == _API_PREFIX or path.startswith(_API_PREFIX + "/"):
-        path = path[len(_API_PREFIX):] or "/"
-    if len(path) > 1:
-        path = path.rstrip("/")
-    return re.sub(r"\{[^}]+\}|<[^>]+>", "{}", path)
 
 
 def _load_contract() -> tuple[dict, dict]:
@@ -66,20 +59,14 @@ def _load_contract() -> tuple[dict, dict]:
     global _operation_index, _operation_paths
     if _operation_index is not None and _operation_paths is not None:
         return _operation_index, _operation_paths
-    import yaml
-
-    with open(_CONTRACT_SUBSET, encoding="utf-8") as f:
-        subset = yaml.safe_load(f)
-    index: dict = {}
-    paths: dict = {}
-    for path_key, path_item in (subset or {}).get("paths", {}).items():
-        for method in ("get", "post", "put", "patch", "delete"):
-            operation = path_item.get(method)
-            if operation is not None and operation.get("operationId"):
-                index[(_normalize_path(_API_PREFIX + path_key), method)] = operation["operationId"]
-                paths[operation["operationId"]] = _API_PREFIX + path_key
-    _operation_index, _operation_paths = index, paths
-    return index, paths
+    subset = load_subset()
+    _operation_index = {
+        key: operation["operationId"]
+        for key, operation in build_route_index(subset).items()
+        if operation.get("operationId")
+    }
+    _operation_paths = build_operation_paths(subset)
+    return _operation_index, _operation_paths
 
 
 def _load_operation_index() -> dict:
@@ -94,7 +81,7 @@ def _request_operation_id() -> str | None:
     path parameter resolves as well as a collection read.
     """
     rule = request.url_rule.rule if request.url_rule is not None else request.path
-    return _load_operation_index().get((_normalize_path(rule), request.method.lower()))
+    return _load_operation_index().get((normalize_path(rule), request.method.lower()))
 
 
 def operation_path(operation_id: str | None) -> str | None:
@@ -123,25 +110,23 @@ _RELAXED_COMMIT = db.text("SET LOCAL synchronous_commit = off")
 _SELECT_RETIREMENT = db.text(
     "SELECT retires_on, replacement_operation_id, marked_at "
     "FROM api_operation_retirements "
-    "WHERE organization_id = :org_id AND operation_id = :operation_id"
+    "WHERE operation_id = :operation_id"
 )
 
 
-def _find_retirement(org_id: int, operation_id: str):
-    """The organisation's retirement record for an operation, or None; never raises.
+def _find_retirement(operation_id: str):
+    """The retirement record for an operation, or None; never raises.
 
     One indexed read on the request's own connection, before the view has done
-    anything. If it fails (a missing table, a dropped connection) the request's
-    transaction is rolled back to a clean state and the call goes on without
-    retirement headers.
+    anything, inside a savepoint: if it fails (a missing table, a dropped
+    connection) only the savepoint is rolled back, so what the request's
+    transaction already holds (the identity's last-used mark, for one) stays.
     """
     try:
-        return db.session.execute(
-            _SELECT_RETIREMENT, {"org_id": org_id, "operation_id": operation_id}
-        ).first()
+        with db.session.begin_nested():
+            return db.session.execute(_SELECT_RETIREMENT, {"operation_id": operation_id}).first()
     except Exception as exc:
         logger.warning("Retirement lookup skipped for %s: %s", operation_id, exc)
-        db.session.rollback()
         return None
 
 
@@ -204,7 +189,14 @@ def retirement_headers(retirement) -> dict:
     }
     path = operation_path(retirement.replacement_operation_id)
     if path:
-        headers["Link"] = f'<{path}>; rel="deprecation", <{path}>; rel="successor-version"'
+        # A Link target must be a URI reference, and the contract's templated
+        # form (``/api/v1/elements/{id}``) is not one. When the replacement has
+        # path parameters the link names its collection path (the template cut
+        # at the first parameter) instead; rel is ``successor-version`` because
+        # ``deprecation`` (RFC 9745) is reserved for documentation of the
+        # deprecation itself.
+        target = path.split("{", 1)[0].rstrip("/") if "{" in path else path
+        headers["Link"] = f'<{target}>; rel="successor-version"'
     return headers
 
 
@@ -255,16 +247,15 @@ def require_api_scope(required_scope: str):
                     return forbidden_response("This token belongs to another organisation")
                 operation_id = _request_operation_id()
                 if operation_id is not None:
-                    retirement = _find_retirement(token.organization_id, operation_id)
+                    retirement = _find_retirement(operation_id)
                     if retirement is not None:
                         _announce_retirement(retirement)
                     _record_after_response(token.organization_id, token.client_id, operation_id)
                 return view(*args, **kwargs)
             if current_user.is_authenticated:
-                org_id = getattr(g, "current_org_id", None)
                 operation_id = _request_operation_id()
-                if operation_id is not None and org_id is not None:
-                    retirement = _find_retirement(org_id, operation_id)
+                if operation_id is not None:
+                    retirement = _find_retirement(operation_id)
                     if retirement is not None:
                         _announce_retirement(retirement)
                 return view(*args, **kwargs)

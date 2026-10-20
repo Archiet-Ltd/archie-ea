@@ -35,11 +35,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
 from pathlib import Path
 
-import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
@@ -83,15 +81,14 @@ def _operation_has_read_only_scopes(operation: dict, default_security: list | No
     return all(_is_read_scope(s) for s in scopes)
 
 
-def _load_subset(path: Path) -> dict:
-    """Load and return the contract subset from *path*."""
-    with open(path, encoding="utf-8") as f:
-        return yaml.safe_load(f)
-
-
-def _under_api_v1(path: str) -> bool:
-    """True for /api/v1 and anything below it, but not /api/v10."""
-    return path == "/api/v1" or path.startswith("/api/v1/")
+# One definition of path normalisation, the route index and the subset loader,
+# shared with the runtime (app.modules.oauth_provider.scopes).
+from app.utils.api_contract_index import (  # noqa: E402
+    build_route_index as _build_route_index,
+    load_subset as _load_subset,
+    normalize_path as _normalize_path,
+    under_api_v1 as _under_api_v1,
+)
 
 
 def _get_token_accepting_routes(app) -> list[tuple[str, str, str]]:
@@ -115,32 +112,6 @@ def _get_token_accepting_routes(app) -> list[tuple[str, str, str]]:
         for method in info["methods"]:
             routes.append((path, method.lower(), scope))
     return routes
-
-
-def _normalize_path(path: str) -> str:
-    """Normalize a path for comparison by stripping the /api/v1 prefix and
-    replacing path parameters with a generic placeholder.
-
-    /api/v1/elements/{element_id} -> /elements/{}
-    /elements/{id} -> /elements/{}
-    """
-    # Strip /api/v1 prefix if present
-    if _under_api_v1(path):
-        path = path[len("/api/v1"):] or "/"
-    if len(path) > 1:
-        path = path.rstrip("/")
-    return re.sub(r"\{[^}]+\}", "{}", path)
-
-
-def _build_route_index(subset: dict) -> dict[tuple[str, str], dict]:
-    """Build a dict of (normalized_path, method) -> operation from the subset paths."""
-    index: dict[tuple[str, str], dict] = {}
-    for path_key, path_item in subset.get("paths", {}).items():
-        for method in ("get", "post", "put", "patch", "delete"):
-            operation = path_item.get(method)
-            if operation is not None:
-                index[(_normalize_path(path_key), method)] = operation
-    return index
 
 
 def check_unlisted_routes(

@@ -22,6 +22,7 @@ from app.middleware.tenant_decorators import (
 )
 
 from app.utils.deprecation import (
+    clear_operation_retirement,
     create_retiring_notices,
     get_deprecation_metrics,
     mark_operation_retiring,
@@ -220,10 +221,11 @@ def clients_response():
 
 
 def mark_retiring_response():
-    """Mark an operation as retiring for the active organisation, as a JSON response.
+    """Mark an operation as retiring for every caller, as a JSON response.
 
-    Stores the retirement, notifies each affected consumer owner once, and
-    commits both. Marking the same operation again notifies nobody twice.
+    Platform administrators only: an operation belongs to the one API contract.
+    Stores the retirement, notifies the owners of every recorded consumer once
+    (an earlier date notifies them again), and commits both.
     """
     data = request.get_json(silent=True) or {}
     try:
@@ -234,11 +236,7 @@ def mark_retiring_response():
         return jsonify({"error": str(exc)}), 400
 
     retirement = mark_operation_retiring(
-        g.current_org_id,
-        data["operation_id"],
-        retires_on,
-        replacement,
-        user_id=current_user.id,
+        data["operation_id"], retires_on, replacement, user_id=current_user.id
     )
     created = create_retiring_notices(retirement)
     db.session.commit()
@@ -253,6 +251,19 @@ def mark_retiring_response():
     )
 
 
+def clear_retiring_response():
+    """Undo the retirement of an operation, as a JSON response (platform administrators)."""
+    data = request.get_json(silent=True) or {}
+    operation_id = data.get("operation_id")
+    if not operation_id:
+        return jsonify({"error": "operation_id is required"}), 400
+    cleared = clear_operation_retirement(operation_id)
+    db.session.commit()
+    if not cleared:
+        return jsonify({"error": "that operation is not marked as retiring"}), 404
+    return jsonify({"status": "cleared", "operation_id": operation_id})
+
+
 @deprecation_bp.route("/")
 @login_required
 # The page itself shows only the active organisation's interface consumers
@@ -265,7 +276,9 @@ def mark_retiring_response():
 @org_admin_required
 def dashboard():
     """Render the deprecation status dashboard."""
-    return render_template("admin/deprecation_status.html")
+    return render_template(
+        "admin/deprecation_status.html", can_mark_retiring=is_platform_admin(current_user)
+    )
 
 
 @deprecation_bp.route("/api/clients")
@@ -278,11 +291,20 @@ def api_clients():
 
 @deprecation_bp.route("/api/mark-retiring", methods=["POST"])
 @login_required
-@org_admin_required
+@platform_admin_required
 @audit_log("mark_operation_retiring")
 def api_mark_retiring():
     """Mark an operation as retiring and notify its consumers' owners once."""
     return mark_retiring_response()
+
+
+@deprecation_bp.route("/api/clear-retiring", methods=["POST"])
+@login_required
+@platform_admin_required
+@audit_log("clear_operation_retirement")
+def api_clear_retiring():
+    """Undo the retirement of an operation."""
+    return clear_retiring_response()
 
 
 @deprecation_bp.route("/api/stats")

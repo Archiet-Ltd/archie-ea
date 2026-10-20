@@ -521,20 +521,21 @@ class ApiOperationCall(TenantMixin, db.Model):
     )
 
 
-class ApiOperationRetirement(TenantMixin, db.Model):
-    """An operation an organisation administrator has marked as retiring.
+class ApiOperationRetirement(db.Model):
+    """An API operation a platform administrator has marked as retiring.
 
-    One row per (organisation, operation). Kept in the database rather than in
-    process memory so every worker answers with the same headers and a restart
-    forgets nothing. ``require_api_scope`` reads it to add the retirement
-    headers to the operation's real responses; ``id`` is the stable key of the
-    owner notices, so marking twice notifies each owner once.
+    One row per operation. An operation belongs to the one API contract, not to
+    an organisation, so this is platform data (no organization_id, no row-level
+    security) and one row drives the retirement headers for every caller. Kept
+    in the database rather than in process memory so every worker answers with
+    the same headers and a restart forgets nothing. ``require_api_scope`` reads
+    it to add the headers to the operation's real responses.
     """
 
     __tablename__ = "api_operation_retirements"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    operation_id = db.Column(db.String(255), nullable=False, index=True)
+    operation_id = db.Column(db.String(255), nullable=False, unique=True)
     retires_on = db.Column(db.Date, nullable=False)
     replacement_operation_id = db.Column(db.String(255), nullable=True)
     marked_by_user_id = db.Column(
@@ -544,10 +545,29 @@ class ApiOperationRetirement(TenantMixin, db.Model):
         db.DateTime(timezone=True), nullable=False, server_default=db.func.now()
     )
 
+
+class ApiRetirementNotice(db.Model):
+    """That a user has been told about a retirement, and for which date.
+
+    The unique (retirement, user) constraint is what makes concurrent markings
+    notify each owner once; ``notified_for`` lets an earlier retirement date
+    notify again.
+    """
+
+    __tablename__ = "api_retirement_notices"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    retirement_id = db.Column(
+        db.Integer,
+        db.ForeignKey("api_operation_retirements.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    notified_for = db.Column(db.Date, nullable=False)
+
     __table_args__ = (
-        db.UniqueConstraint(
-            "organization_id",
-            "operation_id",
-            name="uq_api_operation_retirements_org_operation",
-        ),
+        db.UniqueConstraint("retirement_id", "user_id", name="uq_api_retirement_notices_retirement_user"),
     )
