@@ -120,8 +120,13 @@ def test_coverage_report_shows_elements_per_layer_and_yield_from_stored_rows(
     response = client.get("/intelligence/coverage")
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    for fragment in ("Application", "Business", "Technology", "3", "Derived relationships"):
+    for fragment in ("Application", "Business", "Technology", "Derived relationships"):
         assert fragment in html, f"missing {fragment!r} in coverage report"
+    # Check the latest run yield via the service and the HTML
+    coverage = derivation_coverage(org.id)
+    assert coverage["latest_run"] is not None
+    assert coverage["latest_run"].derived_count == 3
+    assert f'<dd class="text-foreground">{coverage["latest_run"].derived_count}</dd>' in html
 
     coverage = derivation_coverage(org.id)
     assert coverage["latest_run"] is not None
@@ -159,16 +164,22 @@ def test_organisation_b_never_sees_organisation_a_figures(
 
     login_as(client, user_b)
     data_b = client.get("/intelligence/coverage").get_data(as_text=True)
-    # Org B has elements but no derived relationships and no run: its own
-    # figures, never A's yield or derived count.
-    assert str(a1.id) not in data_b and str(a2.id) not in data_b
-    assert str(b1.id) in data_b and str(b2.id) in data_b
     coverage_b = derivation_coverage(org_b.id)
+    # Check service's return value for org B
     assert coverage_b["latest_run"] is None
     assert coverage_b["derived_count"] == 0
     assert coverage_b["missing_total"] == 2
     assert {entry["layer"] for entry in coverage_b["layers"]} == {"application"}
     assert coverage_b["layers"][0]["missing_count"] == 2
+    # Check that the missing list contains the two elements of org B
+    missing_ids = {element_id for element_id, _, _ in coverage_b["missing"]}
+    assert missing_ids == {b1.id, b2.id}
+    # Check HTML: org B's HTML should not contain org A's element ids in the missing rows
+    assert f'data-element-id="{a1.id}"' not in data_b
+    assert f'data-element-id="{a2.id}"' not in data_b
+    # Org B's HTML should contain its own element ids in the missing rows
+    assert f'data-element-id="{b1.id}"' in data_b
+    assert f'data-element-id="{b2.id}"' in data_b
 
 
 def test_no_run_shows_none_yield_not_zero(app, db_session, make_org, client, login_as):
@@ -234,8 +245,13 @@ def test_layer_filter_shows_only_that_layers_missing_elements(
 
     login_as(client, user)
     html = client.get("/intelligence/coverage?layer=application").get_data(as_text=True)
-    assert str(app2.id) in html
-    assert str(app1.id) not in html
+    coverage = derivation_coverage(org.id, layer="application")
+    # Check service's return value
+    assert coverage["missing_total"] == 1
+    assert coverage["missing"][0][0] == app2.id
+    # Check HTML: the missing element row for app2 should be present, and for app1 absent
+    assert f'data-element-id="{app2.id}"' in html
+    assert f'data-element-id="{app1.id}"' not in html
 
     coverage = derivation_coverage(org.id, layer="application")
     layers = coverage["layers"]
