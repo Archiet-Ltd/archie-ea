@@ -18,8 +18,7 @@ what's implemented, what's still a gap.*
 
 ## What this module does
 
-Records, per application, where it stands against each framework's controls. It shows what your
-own model's data says against a framework's requirements — never a certification or a guarantee
+Records, per application, where it stands against each framework's controls. It is never a certification or a guarantee
 that you pass an audit.
 
 ## Where you'll meet it
