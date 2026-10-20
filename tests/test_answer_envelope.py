@@ -119,6 +119,8 @@ def test_bound_envelope_never_invents_a_source(app):
     )
     with app.test_request_context("/"):
         html = render_template_string(template_str)
+    # Jinja escapes the quotes inside attribute values (&#39;); the browser reads them back.
+    html = html.replace("&#39;", "'").replace("&quot;", '"')
     assert 'x-show="(node.source_name || \'\')"' in html, html
     assert 'x-show="!(node.source_name || \'\')"' in html, html
     assert 'x-text="node.source_name || \'\'"' in html, html
