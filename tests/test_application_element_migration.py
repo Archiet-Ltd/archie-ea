@@ -79,15 +79,21 @@ def world(app, db_session, make_org):
     a3 = _app_row(db_session, org_a, "A Orphan Row")
     _drop_mirror(db_session, a3)
     comp_a = _plain_component(db_session, org_a, "A Gateway")
-    b1 = _app_row(db_session, org_b, "B Entelim")
-    comp_b = _plain_component(db_session, org_b, "B Gateway")
+    _app_row(db_session, org_b, "B Entelim")
+    _plain_component(db_session, org_b, "B Gateway")
     ok_rel = _rel(db_session, org_a, "composition", a1.archimate_element_id, comp_a.id)
     app_app = _rel(db_session, org_a, "composition", a1.archimate_element_id, a2.archimate_element_id)
     comp_app = _rel(db_session, org_a, "aggregation", comp_a.id, a2.archimate_element_id)
     db_session.commit()
-    return dict(org_a=org_a, org_b=org_b, a1=a1, a2=a2, a3=a3, b1=b1,
-                comp_a=comp_a, comp_b=comp_b, ok_rel=ok_rel,
-                app_app=app_app, comp_app=comp_app)
+    # The migration resets the session per organisation (tenant scope), which detaches
+    # every object loaded here, so the tests keep plain ids only.
+    from types import SimpleNamespace as Id
+
+    return dict(
+        org_a=Id(id=org_a.id), org_b=Id(id=org_b.id),
+        a2_element_id=a2.archimate_element_id, a3_row_id=a3.id,
+        ok_rel=Id(id=ok_rel.id), app_app=Id(id=app_app.id), comp_app=Id(id=comp_app.id),
+    )
 
 
 def _run(**kw):
@@ -126,8 +132,10 @@ def test_apply_changes_only_inventory_mirrors(world, db_session):
     assert elements["A Iyene"].type == "Application"
     assert elements["A Gateway"].type == "ApplicationComponent"
     assert MARKER not in (elements["A Gateway"].custom_properties or {})
-    db_session.refresh(world["a3"])
-    orphan = db_session.get(ArchiMateElement, world["a3"].archimate_element_id)
+    from app.models.application_portfolio import ApplicationComponent
+
+    row = db_session.get(ApplicationComponent, world["a3_row_id"])
+    orphan = db_session.get(ArchiMateElement, row.archimate_element_id)
     assert orphan.type == "Application" and orphan.layer == "Application"
     assert orphan.organization_id == world["org_a"].id
 
@@ -193,7 +201,7 @@ def test_flagged_relationships_are_listed_not_changed(world, db_session):
         rel = db_session.get(ArchiMateRelationship, world[key].id)
         assert rel.type == rtype
     assert db_session.get(ArchiMateRelationship, world["ok_rel"].id).type == "composition"
-    assert world["a2"].archimate_element_id in a["demotion_candidates"]
+    assert world["a2_element_id"] in a["demotion_candidates"]
 
 
 def test_cli_command_is_registered_with_dry_run_and_revert(app, world):
@@ -216,23 +224,24 @@ def test_archiet_file_gives_55_applications_and_no_components(
     from app.services.archimate_import_service import ArchiMateImportService
 
     org = make_org("appel-archiet")
+    org_id = org.id
     with open(FIXTURE, "r", encoding="utf-8") as fh:
         xml = fh.read()
-    with tenant_ctx(org.id):
+    with tenant_ctx(org_id):
         service = ArchiMateImportService()
         service.execute_import(service.parse_oef_xml(xml), strategy="skip_duplicates")
         db_session.commit()
 
     def count(type_name):
         return ArchiMateElement.query.filter(  # model-safety-ok: explicit org predicate
-            ArchiMateElement.organization_id == org.id,
+            ArchiMateElement.organization_id == org_id,
             ArchiMateElement.type == type_name,
         ).count()
 
     assert ApplicationComponent.query.filter(  # model-safety-ok: explicit org predicate
-        ApplicationComponent.organization_id == org.id
+        ApplicationComponent.organization_id == org_id
     ).count() == 55
     assert count("ApplicationComponent") == 55
-    _run(dry_run=False, organization_ids=[org.id])
+    _run(dry_run=False, organization_ids=[org_id])
     assert count("Application") == 55
     assert count("ApplicationComponent") == 0

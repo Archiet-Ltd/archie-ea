@@ -110,7 +110,9 @@ class TestDerivedRows:
             parent = VALID_RELATIONSHIPS.get((parent_src, parent_tgt), [])
             assert set(rels) <= set(parent), (src, tgt, rels, parent)
             checked += 1
-        assert checked > 100
+        parent_pairs = sum(1 for k in VALID_RELATIONSHIPS if COMP in k and APP not in k)
+        # (COMP, COMP) yields three Application pairs, every other parent pair yields one.
+        assert checked == parent_pairs + 2
 
     def test_no_row_without_application_is_altered(self):
         # Pairs that do not involve Application are exactly the parent module's
