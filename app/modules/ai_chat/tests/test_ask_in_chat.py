@@ -113,15 +113,18 @@ def test_an_element_alone_on_the_ask_address_asks_what_breaks(
 
 
 @pytest.mark.parametrize("query", ["", "?question=strategy&element=3", "?question=compliance"])
-def test_the_ask_page_stays_for_a_bare_visit_and_for_the_lenses_the_chat_does_not_carry(
+def test_the_ask_address_opens_the_chat_in_every_case(
     app, db_session, make_org, client, login_as, query
 ):
-    org = make_org("ask-chat-stays")
+    org = make_org("ask-chat-always")
     login_as(client, _user(db_session, org.id))
 
     response = client.get("/intelligence/ask" + query)
 
-    assert response.status_code == 200
+    assert response.status_code == 302
+    target = urlparse(response.headers["Location"])
+    assert target.path.rstrip("/") == "/ai-chat"
+    assert "starter" not in parse_qs(target.query)
 
 
 @pytest.mark.parametrize("element", ["abc", "0", "-3", "1.5"])
