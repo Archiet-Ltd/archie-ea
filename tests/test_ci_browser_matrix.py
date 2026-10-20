@@ -23,14 +23,13 @@ def test_ci_runs_critical_journeys_in_firefox_and_webkit():
     assert "SMOKE_BROWSER: ${{ matrix.browser }}" in workflow
     job = _ci_jobs()["browser-compatibility"]
     assert "browser" in job["runs-on"] and "self-hosted" in job["runs-on"]
-    runs = "
-".join(step.get("run", "") for step in job["steps"])
+    runs = "\n".join(step.get("run", "") for step in job["steps"])
     # Firefox and WebKit come from the runners' shared Playwright cache: nothing is installed.
     assert "playwright install" not in runs
     check = [s for s in job["steps"] if "shared Playwright cache" in s.get("name", "")]
     assert check and "${{ matrix.browser }}" in check[0]["run"]
     assert job["steps"].index(check[0]) < min(
-        i for i, s in enumerate(job["steps"]) if "pytest" in s.get("run", "")
+        i for i, s in enumerate(job["steps"]) if "pytest -q" in s.get("run", "")
     )
     for suite in (
         "test_accessibility_audit.py",
@@ -857,8 +856,7 @@ def test_browser_jobs_run_on_the_browser_labelled_runners_with_limited_paralleli
         assert '["self-hosted","browser"]' in runs_on, name
         assert "ubuntu-latest" in runs_on, f"{name}: forks keep the hosted runner"
     for name in names[:6]:
-        runs = "
-".join(s.get("run", "") for s in jobs[name]["steps"])
+        runs = "\n".join(s.get("run", "") for s in jobs[name]["steps"])
         assert "playwright install" not in runs, name
     for name in names[:5]:
         service = jobs[name].get("services", {}).get("postgres")
