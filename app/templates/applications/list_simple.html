@@ -727,7 +727,7 @@
           <div class="flex items-center gap-2">
             <label for="page-size-select" class="text-sm text-muted-foreground">Show:</label>
             <select id="page-size-select" data-testid="page-size-select" @change="changePageSize($event.target.value)"
-              class="h-8 w-16 rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="h-9 w-16 rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               {% for sz in [25,50,100] %}<option value="{{ sz }}" {% if page_size==sz %}selected{% endif %}>{{ sz }}</option>{% endfor %}
             </select>
           </div>
@@ -757,7 +757,7 @@
         <div x-show="!aiMap.result" x-cloak class="space-y-3">
           {% call form_group(id='ai-map-max', label='Applications to analyze', help_text='Most recently added applications are analyzed first.') %}
             <input id="ai-map-max" type="number" min="1" max="200" x-model.number="aiMap.maxApplications"
-              class="flex h-10 w-32 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-32 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           {% endcall %}
           <label class="flex items-center gap-2 text-sm">
             <input type="checkbox" x-model="aiMap.mapCapabilities" class="rounded border-input h-4 w-4">
@@ -915,7 +915,7 @@
                 class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" autocomplete="off">
               <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md  max-h-40 overflow-y-auto">
                 <template x-for="u in ures" :key="u.id">
-                  <button type="button" @click="uselect(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
+                  <button type="button" @click="uselect(u)" :aria-label="'Select ' + u.name" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
                     <span x-text="u.name" class="font-medium"></span>
                     <span x-text="u.email" class="text-xs text-muted-foreground"></span>
                   </button>
