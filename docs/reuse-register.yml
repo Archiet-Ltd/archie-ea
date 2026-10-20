@@ -384,6 +384,22 @@ entries:
       - app/modules/solutions_strategic/v2/services/execution_tracking_service.py (_calculate_health_score)
     note: six computations of "health" with different inputs and scales; the product-manager picks the owner.
 
+  - id: model-trust
+    concept: How complete and how fresh each area of the model is (coverage with denominators, newest and median
+      last change per layer and element type; not a health score)
+    status: active
+    canonical:
+      path: app/modules/intelligence/services/model_trust.py
+      symbols: [model_trust, trust_for_answer, resolve_area]
+    reuse: >
+      The Catalogue index, the answer envelope (freshness.model_trust) and the assistant connection tool
+      get_model_trust all call model_trust() and show what it returns. Add a fact or an area there, never a second
+      count of "how many have an owner / how recent is it" for an area. It reports measured fractions with their
+      denominators and is not a weighted grade; the health-score concept above stays separate.
+    must_not_create:
+      - id: model-trust-second-resolver
+        regex: 'def\s+_?(model_trust|area_trust|area_coverage|layer_coverage|coverage_and_freshness|area_freshness)\s*\('
+
   - id: search
     concept: Search across the model
     status: undetermined

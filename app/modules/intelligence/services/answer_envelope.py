@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import decimal
+import logging
 import re
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
@@ -43,6 +44,8 @@ from app.modules.intelligence.services.query_service import (
     SET_IMPACT_MAX_SEEDS,
     IntelligenceQueryService,
 )
+
+logger = logging.getLogger(__name__)
 
 KIND_IMPACT = "impact"
 KIND_SET_IMPACT = "set_impact"
@@ -402,6 +405,24 @@ def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
+def _model_trust_of(org_id: int, params: Dict[str, Any], envelope: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """How complete and how fresh the area(s) the answer is drawn from are --
+    the resolver's own records (``model_trust``), one per layer the question's
+    elements sit in. A failure here never costs the caller their answer."""
+    from app.modules.intelligence.services.model_trust import trust_for_answer
+
+    seeds: List[Any] = list(envelope["summary"].get("seed_element_ids") or [])
+    seeds += list(params.get("element_ids") or [])
+    if params.get("element_id") is not None:
+        seeds.append(params["element_id"])
+    try:
+        with db.session.begin_nested():
+            return trust_for_answer(org_id, seeds)
+    except Exception:  # noqa: BLE001 -- the answer stands without its trust line
+        logger.exception("answer envelope: model trust unavailable for organisation %s", org_id)
+        return []
+
+
 def ask_and_store(kind: str, raw_params: Dict[str, Any], *, user_id: Optional[int] = None):
     """Compute the answer for the caller's active organisation, wrap it and
     store it at a new permanent address. Returns the stored ``AnswerRecord``.
@@ -416,6 +437,7 @@ def ask_and_store(kind: str, raw_params: Dict[str, Any], *, user_id: Optional[in
         raise AnswerNotAskable(NO_TENANT_CONTEXT_REASON)
     params = normalise_params(kind, raw_params)
     envelope = build_envelope(kind, params, _compute(kind, params))
+    envelope["freshness"]["model_trust"] = _model_trust_of(org_id, params, envelope)
     record = AnswerRecord(
         organization_id=org_id,
         address=uuid.uuid4().hex,

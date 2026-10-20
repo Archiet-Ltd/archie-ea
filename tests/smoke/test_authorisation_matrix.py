@@ -1046,6 +1046,25 @@ def test_intelligence_yield_route_rejects_anonymous_browser_session(page, live_s
 
 
 @pytest.mark.parametrize("archetype", ARCHETYPES)
+def test_intelligence_trust_route_authorisation(archetype, page, live_server, seeded):
+    """T-ain-04: GET /api/v1/intelligence/trust (coverage and freshness per area
+    of the caller's own model) carries only ``@login_required``, so every
+    archetype reaches it once authenticated; anonymous is covered below."""
+    _login(page, live_server, seeded["emails"][archetype])
+    path = "/api/v1/intelligence/trust"
+    actual = _observe(page, live_server, path)
+    assert actual == ALLOWED, (
+        f"{archetype} could not reach {path}: expected ALLOWED (login_required only)"
+    )
+
+
+def test_intelligence_trust_route_rejects_anonymous_browser_session(page, live_server):
+    response = page.goto(live_server + "/api/v1/intelligence/trust", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert response is not None
+    assert response.status == 401
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
 def test_intelligence_answers_list_route_authorisation(archetype, page, live_server, seeded):
     """R1-B30 (TB-0106): GET /api/v1/intelligence/answers (the organisation's
     stored answers) carries only ``@login_required`` -- no enterprise-role

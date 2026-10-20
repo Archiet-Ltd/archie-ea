@@ -15,8 +15,6 @@ from __future__ import annotations
 import datetime as _dt
 import uuid
 
-import pytest
-
 
 def _user(db_session, org_id, role="enterprise_architect"):
     from app.models.user import User
@@ -34,15 +32,31 @@ def _user(db_session, org_id, role="enterprise_architect"):
     return user
 
 
-def _element(db_session, org_id, name, type_="ApplicationComponent", layer="application", recorded_days_ago=None):
+def _element(
+    db_session, org_id, name, type_="ApplicationComponent", layer="application", recorded_days_ago=None, undated=False
+):
     from app.models import ArchiMateElement
 
     el = ArchiMateElement(name=name, type=type_, layer=layer, organization_id=org_id)
-    if recorded_days_ago is not None:
-        el.recorded_at = _dt.datetime.utcnow() - _dt.timedelta(days=recorded_days_ago)
     db_session.add(el)
     db_session.flush()
+    if recorded_days_ago is not None or undated:
+        _stamp(db_session, el.id, recorded_days_ago)
     return el
+
+
+def _stamp(db_session, element_id, days_ago):
+    """Set an element's change stamp. Written with triggers off for the one
+    statement: where the history trigger is installed it would otherwise
+    re-stamp the row with the time of the write."""
+    from sqlalchemy import text
+
+    stamp = None if days_ago is None else _dt.datetime.utcnow() - _dt.timedelta(days=days_ago)
+    db_session.execute(text("SET LOCAL session_replication_role = replica"))
+    db_session.execute(
+        text("UPDATE archimate_elements SET recorded_at = :stamp WHERE id = :id"), {"stamp": stamp, "id": element_id}
+    )
+    db_session.execute(text("SET LOCAL session_replication_role = origin"))
 
 
 def _link(db_session, org_id, source, target, type_="Serving"):
@@ -86,7 +100,7 @@ def _estate(db_session, org_id):
         _element(db_session, org_id, "App1", recorded_days_ago=3),
         _element(db_session, org_id, "App2", recorded_days_ago=10),
         _element(db_session, org_id, "App3", recorded_days_ago=20),
-        _element(db_session, org_id, "App4", recorded_days_ago=None),
+        _element(db_session, org_id, "App4", undated=True),
     ]
     comps = [
         _component(db_session, org_id, apps[0], lifecycle="operational", cost=1000),
@@ -288,6 +302,7 @@ def test_the_api_returns_the_resolver_figures_for_the_callers_organisation_only(
     user_a = _user(db_session, org_a.id)
     user_b = _user(db_session, org_b.id)
     db_session.commit()
+    expected_line = _area(model_trust(org_a.id), "application")["line"]
 
     login_as(client, user_a)
     resp_a = client.get("/api/v1/intelligence/trust")
@@ -297,7 +312,7 @@ def test_the_api_returns_the_resolver_figures_for_the_callers_organisation_only(
     assert resp_a.status_code == 200 and resp_b.status_code == 200
     data_a = resp_a.get_json()["data"]
     data_b = resp_b.get_json()["data"]
-    assert _area(data_a, "application")["line"] == _area(model_trust(org_a.id), "application")["line"]
+    assert _area(data_a, "application")["line"] == expected_line
     assert _area(data_a, "application")["elements_total"] == 4
     assert _area(data_b, "application")["elements_total"] == 1
     assert _area(data_b, "application")["coverage"]["owner"]["have"] == 0

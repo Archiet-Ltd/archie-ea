@@ -1,6 +1,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell, section_card %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/trust_meter.html' import trust_meter %}
 
 {% block title %}Answer{% endblock %}
 
@@ -95,6 +96,11 @@
                 <dd class="text-foreground" data-citation-count>{{ answer.citations | length }}</dd>
             </div>
         </dl>
+        {% if answer.freshness.model_trust %}
+        <div class="space-y-1" data-model-trust>
+            {% for area in answer.freshness.model_trust %}{{ trust_meter(area) }}{% endfor %}
+        </div>
+        {% endif %}
         <p class="text-sm text-muted-foreground">Permanent address: <a class="underline" href="{{ answer.page_url }}" data-answer-link>{{ answer.page_url }}</a></p>
     </section>
 

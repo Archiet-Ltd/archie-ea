@@ -43,10 +43,10 @@ from sqlalchemy.pool import NullPool
 # directories up (tests, mcp, modules, app).
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
-ALL_TEN_TOOLS = [
+ALL_TOOLS = [
     "ask_impact", "ask_strategy", "ask_portfolio", "ask_programme",
     "ask_risk", "ask_accountability", "get_element", "search_elements",
-    "list_canvases", "get_canvas",
+    "list_canvases", "get_canvas", "get_model_trust",
 ]
 
 ROLE = "pr455_rls_probe_runtime"
@@ -134,6 +134,7 @@ for eid_tag, eid in (("A", A["element"]), ("B", B["element"])):
         calls.append((f"ask_{lens}", {"element_id": eid}, eid_tag))
     calls.append(("get_element", {"element_id": eid}, eid_tag))
 calls += [("search_elements", {"query": "SECRET", "limit": 200}, "*"),
+          ("get_model_trust", {}, "*"),
           ("list_canvases", {}, "*"),
           ("get_canvas", {"canvas_type": "business_model", "canvas_id": A["bmc"]}, "A"),
           ("get_canvas", {"canvas_type": "business_model", "canvas_id": B["bmc"]}, "B"),
@@ -279,11 +280,11 @@ def test_all_ten_tools_see_zero_rows_from_the_other_organisation_under_rls(
 
         tools_line = next(line for line in out.splitlines() if line.startswith("TOOLS_LIST"))
         listed_tools = json.loads(tools_line.split(" ", 1)[1])
-        assert listed_tools == sorted(ALL_TEN_TOOLS), f"tool list drifted: {listed_tools}"
+        assert listed_tools == sorted(ALL_TOOLS), f"tool list drifted: {listed_tools}"
 
         called_line = next(line for line in out.splitlines() if line.startswith("CALLED"))
         called_tools = set(json.loads(called_line.split(" ", 1)[1]))
-        assert called_tools == set(ALL_TEN_TOOLS), f"not all ten tools were exercised: missing {set(ALL_TEN_TOOLS) - called_tools}"
+        assert called_tools == set(ALL_TOOLS), f"not all tools were exercised: missing {set(ALL_TOOLS) - called_tools}"
 
         bad_status_line = next(line for line in out.splitlines() if line.startswith("BAD_STATUS"))
         bad_status = json.loads(bad_status_line.split(" ", 1)[1])
