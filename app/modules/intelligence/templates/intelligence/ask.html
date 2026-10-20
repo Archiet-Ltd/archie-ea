@@ -222,12 +222,27 @@
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
         <template x-if="strategyState === 'empty'">
-            <p class="text-sm text-muted-foreground">No initiatives recorded against this element.</p>
+            <p class="text-sm text-muted-foreground" x-text="strategyReason === 'no_value_linked' ? 'No value is recorded for this stakeholder.' : 'No initiatives recorded against this element.'"></p>
         </template>
         <template x-if="strategyState === 'error'">
             <p class="text-sm text-destructive">Could not load initiatives for this element.</p>
         </template>
-        <template x-if="strategyState === 'ready'">
+        <template x-if="strategyState === 'ready' && chain.length">
+            <ul class="space-y-3">
+            <template x-for="hop in chain" :key="hop.key">
+                <li class="rounded-lg border border-border bg-card p-4" data-ask-chain-row :data-hop="hop.hop" :class="hop.hop > 1 ? (hop.hop > 2 ? 'ml-8' : 'ml-4') : ''">
+                    <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+                        <h3 class="min-w-0 break-words text-base font-semibold text-foreground" x-text="hop.name || 'Name not available'"></h3>
+                        <span class="inline-flex h-6 items-center rounded-full border border-border px-2 text-xs font-medium text-foreground" x-text="hop.typeLabel"></span>
+                    </div>
+                    <p class="mt-1 text-sm text-muted-foreground" x-text="'From ' + hop.fromName"></p>
+                    <p class="mt-1 text-sm text-muted-foreground"><span x-text="hop.sourceName"></span><span x-show="hop.sourceTime"> — <span x-text="hop.sourceTime"></span></span></p>
+                    <div class="mt-3">{{ why_button('hop.key') }}</div>
+                </li>
+            </template>
+            </ul>
+        </template>
+        <template x-if="strategyState === 'ready' && initiatives.length">
             <ul class="space-y-3">
             <template x-for="initiative in initiatives" :key="initiative.initiativeId">
                 <li class="rounded-lg border border-border bg-card p-4" data-ask-strategy-row>
