@@ -262,12 +262,19 @@ APQC_UNIFIED_GETTER = "app.services.unified_apqc_service.get_unified_apqc_servic
 # ROUTE DEPRECATION UTILITIES (for safe route migration)
 # ============================================================================
 
-from flask import jsonify, redirect, request, url_for
+from flask import jsonify, make_response, redirect, request, url_for
 
 
 class RouteDeprecationWarning:
     """
     Container for route deprecation metadata.
+
+    Holds the deprecation date, canonical endpoint and migration guide for a
+    route, plus the optional ``retires_on`` date and ``replacement_operation_id``
+    set when an administrator marks the operation as retiring. Records are
+    registered in ``_ROUTE_DEPRECATION_REGISTRY`` keyed by
+    ``(normalized_path, method)`` so the admin page and the response-header
+    logic can look them up by operation.
     """
 
     def __init__(
@@ -276,6 +283,8 @@ class RouteDeprecationWarning:
         deprecation_date: str = None,
         migration_guide: str = None,
         sunset_date: str = None,
+        retires_on: str = None,
+        replacement_operation_id: str = None,
     ):
         self.canonical_endpoint = canonical_endpoint
         self.deprecation_date = deprecation_date or datetime.utcnow().strftime(
@@ -284,6 +293,8 @@ class RouteDeprecationWarning:
         self.migration_guide = migration_guide or f"Use {canonical_endpoint} instead"
         self.sunset_date = sunset_date or "2026-06-01"
         self.created_at = datetime.utcnow().isoformat()
+        self.retires_on = retires_on
+        self.replacement_operation_id = replacement_operation_id
 
     def to_dict(self):
         return {
@@ -293,7 +304,140 @@ class RouteDeprecationWarning:
             "sunset_date": self.sunset_date,
             "migration_guide": self.migration_guide,
             "created_at": self.created_at,
+            "retires_on": self.retires_on,
+            "replacement_operation_id": self.replacement_operation_id,
         }
+
+    @property
+    def is_retiring(self) -> bool:
+        """True when an administrator has set a retirement date."""
+        return self.retires_on is not None
+
+
+# One canonical registry of route deprecation records, keyed by
+# (normalized_path, method) so the admin page and the header logic can look
+# an operation up without a second registry.
+_ROUTE_DEPRECATION_REGISTRY: dict = {}
+
+
+def _normalize_path(path: str) -> str:
+    """Strip the /api/v1 prefix and replace path parameters with {}."""
+    import re
+
+    if path == "/api/v1" or path.startswith("/api/v1/"):
+        path = path[len("/api/v1"):] or "/"
+    if len(path) > 1:
+        path = path.rstrip("/")
+    return re.sub(r"\{[^}]+\}", "{}", path)
+
+
+def register_route_deprecation(path: str, method: str, record: RouteDeprecationWarning) -> None:
+    """Register a deprecation record for an operation."""
+    _ROUTE_DEPRECATION_REGISTRY[(_normalize_path(path), method.lower())] = record
+
+
+def get_route_deprecation(path: str, method: str) -> RouteDeprecationWarning | None:
+    """Return the deprecation record for an operation, or None."""
+    return _ROUTE_DEPRECATION_REGISTRY.get((_normalize_path(path), method.lower()))
+
+
+def get_retiring_operations() -> list[RouteDeprecationWarning]:
+    """Return all records that have a retirement date set."""
+    return [r for r in _ROUTE_DEPRECATION_REGISTRY.values() if r.is_retiring]
+
+
+def mark_operation_retiring(
+    path: str, method: str, retires_on: str, replacement_operation_id: str
+) -> RouteDeprecationWarning | None:
+    """Mark an operation as retiring on *retires_on* with the given replacement.
+
+    Creates a record if none exists yet for the operation. Returns the record,
+    or None when the operation is not known to the registry.
+    """
+    key = (_normalize_path(path), method.lower())
+    record = _ROUTE_DEPRECATION_REGISTRY.get(key)
+    if record is None:
+        record = RouteDeprecationWarning(canonical_endpoint=key[0])
+        _ROUTE_DEPRECATION_REGISTRY[key] = record
+    record.retires_on = retires_on
+    record.replacement_operation_id = replacement_operation_id
+    return record
+
+
+def create_retiring_notices(
+    operation_id: str,
+    retires_on: str,
+    replacement_operation_id: str | None,
+    org_id: int,
+) -> int:
+    """Create one deprecation notice per affected client owner in *org_id*.
+
+    Finds every client who called *operation_id* in the organisation, then
+    every token owner for those clients, and creates one
+    ``event_type="deprecation_notice"`` notice per user through
+    ``NotificationService.create``. Users who already have a notice for this
+    operation (matched by event type, entity type and message) are skipped, so
+    a second marking creates no duplicate.
+
+    Returns the number of notices created.
+    """
+    from app import db
+    from app.models.models import Notification
+    from app.modules.oauth_provider.models import ApiOperationCall, OAuthToken
+    from app.services.notification_service import NotificationService
+
+    notified_users = set()
+    clients = (
+        db.session.query(ApiOperationCall.client_id)
+        .filter(
+            ApiOperationCall.organization_id == org_id,
+            ApiOperationCall.operation_id == operation_id,
+        )
+        .distinct()
+        .all()
+    )
+    created = 0
+    for (client_id,) in clients:
+        token_owners = (
+            db.session.query(OAuthToken.user_id)
+            .filter(
+                OAuthToken.client_id == client_id,
+                OAuthToken.organization_id == org_id,
+            )
+            .distinct()
+            .all()
+        )
+        for (user_id,) in token_owners:
+            if user_id in notified_users:
+                continue
+            message = (
+                f"Operation {operation_id} is retiring on {retires_on}. "
+                f"Use {replacement_operation_id or 'the replacement'} instead."
+            )
+            already = (
+                db.session.query(Notification)
+                .filter(
+                    Notification.user_id == user_id,
+                    Notification.event_type == "deprecation_notice",
+                    Notification.entity_type == "operation",
+                    Notification.message == message,
+                )
+                .first()
+            )
+            if already is not None:
+                notified_users.add(user_id)
+                continue
+            NotificationService.create(
+                user_id=user_id,
+                message=message,
+                url="/admin/deprecation",
+                organization_id=org_id,
+                event_type="deprecation_notice",
+                entity_type="operation",
+            )
+            notified_users.add(user_id)
+            created += 1
+    return created
 
 
 def deprecated_route(
@@ -350,6 +494,17 @@ def deprecated_route(
             except Exception as e:
                 logger.debug("Deprecation metrics tracking failed for %s: %s", _deprecated_endpoint, e)
 
+            # Register/lookup the deprecation record for this operation so an
+            # administrator can mark it as retiring at runtime.
+            record = _ROUTE_DEPRECATION_REGISTRY.get(
+                (_normalize_path(request.path), request.method.lower())
+            )
+            if record is None:
+                record = RouteDeprecationWarning(canonical_endpoint=canonical_endpoint)
+                _ROUTE_DEPRECATION_REGISTRY[
+                    (_normalize_path(request.path), request.method.lower())
+                ] = record
+
             # Execute the original function — preserve existing behavior
             result = f(*args, **kwargs)
 
@@ -362,11 +517,18 @@ def deprecated_route(
                 "Sunset": "2026-06-01",
             }
 
+            # When the operation has been marked as retiring, answer with the
+            # RFC 9745 Deprecation header and a Link to the replacement.
+            if record.is_retiring:
+                dep_headers["Deprecation"] = record.retires_on
+                if record.replacement_operation_id:
+                    dep_headers["Link"] = (
+                        f'</api/v1/{record.replacement_operation_id}>; rel="deprecation"'
+                    )
+
             # Attach headers to the response
             try:
-                from flask import make_response as _make_response
-
-                response = _make_response(result)
+                response = make_response(result)
                 for key, value in dep_headers.items():
                     response.headers[key] = value
                 return response
