@@ -1126,6 +1126,64 @@ let ComposerRenderer = (function() {
         return link;
     }
 
+    /* ── Banded layout (opt-in: create(el, {layout:'bands'})) ─────────────────
+     *  Pure geometry, no JointJS: given the elements, the declared bands and the
+     *  container width, return where every node and every band sits. Elements whose
+     *  layer is not one of the declared bands go to a trailing "unplaced" band,
+     *  which only exists when something lands in it. Declared bands with nothing in
+     *  them collapse to their header. Within a band: depth, then name.
+     */
+    let BAND_HEADER = 28, BAND_PAD = 12, BAND_GAP = 12, NODE_H_FULL = 130, NODE_H_COMPACT = 48;
+    let UNPLACED_BAND = { layer: 'unplaced', label: 'Layer not recorded' };
+
+    function bandNodeWidth(width) {
+        return Math.min(168, Math.max(96, width - 24));
+    }
+
+    function computeBandLayout(elements, bands, width, compact) {
+        let nodeW = bandNodeWidth(width);
+        let nodeH = compact ? NODE_H_COMPACT : NODE_H_FULL;
+        let perRow = Math.max(1, Math.floor((width - 2 * BAND_PAD + BAND_GAP) / (nodeW + BAND_GAP)));
+        let declared = (bands || []).map(function(b) { return { layer: String(b.layer || '').toLowerCase(), label: b.label }; });
+        let known = {};
+        declared.forEach(function(b) { known[b.layer] = true; });
+
+        let members = {};
+        let unplaced = [];
+        (elements || []).forEach(function(el) {
+            let layer = String(el.layer || '').toLowerCase();
+            if (known[layer]) { (members[layer] = members[layer] || []).push(el); }
+            else { unplaced.push(el); }
+        });
+        let order = function(a, b) {
+            let da = typeof a.depth === 'number' ? a.depth : 0;
+            let db = typeof b.depth === 'number' ? b.depth : 0;
+            if (da !== db) return da - db;
+            return String(a.name || '').localeCompare(String(b.name || ''));
+        };
+
+        let all = declared.slice();
+        if (unplaced.length) { all.push(UNPLACED_BAND); members[UNPLACED_BAND.layer] = unplaced; }
+
+        let y = 0, placements = {}, zones = [];
+        all.forEach(function(b) {
+            let list = (members[b.layer] || []).slice().sort(order);
+            let rows = Math.ceil(list.length / perRow);
+            let h = list.length ? BAND_HEADER + rows * (nodeH + BAND_GAP) + (BAND_PAD - BAND_GAP) : BAND_HEADER;
+            zones.push({ layer: b.layer, label: b.label, x: 0, y: y, width: width, height: h, count: list.length });
+            list.forEach(function(el, i) {
+                placements[el.id] = {
+                    band: b.layer,
+                    x: BAND_PAD + (i % perRow) * (nodeW + BAND_GAP),
+                    y: y + BAND_HEADER + Math.floor(i / perRow) * (nodeH + BAND_GAP),
+                    width: nodeW, height: nodeH,
+                };
+            });
+            y += h + 4;
+        });
+        return { zones: zones, placements: placements, height: Math.max(y, BAND_HEADER), nodeWidth: nodeW, nodeHeight: nodeH, perRow: perRow };
+    }
+
     /* ── Public factory: create a renderer bound to a container element ── */
     function create(containerEl, opts) {
         opts = opts || {};
@@ -1153,12 +1211,294 @@ let ComposerRenderer = (function() {
 
         let canvasElements = {};
 
+        /* ── Opt-in state: every branch below is dead unless its option was passed ── */
+        let banded = opts.layout === 'bands';
+        let compact = opts.nodeStyle === 'compact';
+        let useTokens = opts.tokens === true;
+        let selectedId = null, centreId = null, highlighted = {};
+        let resizeObserver = null, resizeFrame = 0;
+
+        /* --layer-* custom properties hold bare HSL triples ("263 70% 50%"). */
+        function tokenColour(name, alpha) {
+            let raw = '';
+            try { raw = getComputedStyle(containerEl).getPropertyValue(name).trim(); } catch (e) { raw = ''; }
+            if (!raw) return null;
+            return 'hsl(' + raw + (alpha != null ? ' / ' + alpha : '') + ')';
+        }
+
+        function applyTokens(cell, layer, isZone) {
+            let stroke = tokenColour('--layer-' + layer);
+            if (!stroke) return;
+            if (isZone) {
+                cell.attr('body/fill', tokenColour('--layer-' + layer, 0.14));
+                cell.attr('body/stroke', stroke);
+                cell.attr('label/fill', tokenColour('--layer-' + layer + '-emphasis') || stroke);
+                return;
+            }
+            cell.attr('body/fill', tokenColour('--layer-' + layer, 0.2));
+            cell.attr('body/stroke', stroke);
+            let text = tokenColour('--foreground');
+            if (text) cell.attr('nameLabel/fill', text);
+        }
+
+        function compactify(node, width) {
+            if (SPECIAL_TYPES[node.get('elType')]) return;
+            node.resize(width, NODE_H_COMPACT);
+            ['accentBar', 'iconBox', 'typeIcon', 'typeLabel', 'intelligenceBadge',
+             'resizeHandle', 'resizeHandleTL', 'resizeHandleTR', 'resizeHandleBL',
+             'resizeHandleT', 'resizeHandleR', 'resizeHandleB', 'resizeHandleL'].forEach(function(sel) {
+                node.attr(sel + '/display', 'none');
+            });
+            node.removePorts();
+            node.attr('nameLabel/x', Math.round(width / 2));
+            node.attr('nameLabel/y', Math.round(NODE_H_COMPACT / 2));
+            node.attr('nameLabel/textAnchor', 'middle');
+            node.attr('nameLabel/textVerticalAnchor', 'middle');
+            node.attr('nameLabel/textWrap', { width: -16, maxLineCount: 2, ellipsis: true });
+        }
+
+        /* Provenance styling for one edge. A no-op unless the relationship names a
+           provenance (an existing payload that happens to carry a `key` is untouched).
+           Derived edges are dashed AND carry a text badge; colour never carries the
+           meaning on its own.
+           Platform vocabulary (see derived_relationship.py and intelligence/services/
+           query_service.py): a worked-out fact carries provenance 'derivation' and/or
+           kind 'derived'; a genuinely recorded fact carries provenance 'explicit'. Any
+           other value is unrecognised and must NOT render with the confident "recorded"
+           styling -- it falls back to the safer, dashed "worked out" treatment. */
+        function decorateEdge(link, rel) {
+            if (!rel || !rel.provenance) return;
+            let isDerived = rel.provenance === 'derivation' || rel.kind === 'derived';
+            let isExplicit = rel.provenance === 'explicit';
+            let kind = isDerived ? 'derived' : (isExplicit ? 'recorded' : 'derived');
+            link.set('provenance', kind);
+            link.set('stale', rel.stale === true);
+            link.set('edgeKey', rel.key != null ? rel.key : (rel.id != null ? rel.id : null));
+            link.attr('root/data-kind', kind);
+            if (link.get('edgeKey') != null) link.attr('root/data-edge', String(link.get('edgeKey')));
+            if (kind === 'derived') {
+                link.attr('line/strokeDasharray', '4,4');
+                let text = rel.stale === true ? '◷ Worked out, may be out of date' : 'Worked out';
+                link.appendLabel({
+                    attrs: {
+                        text: { text: text, fontSize: 10, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif', fill: '#1a1a1a' },
+                        rect: { fill: '#fff', stroke: '#1a1a1a', strokeWidth: 0.5, strokeDasharray: '3,2', rx: 3, ry: 3, ref: 'text', refWidth: 8, refHeight: 4, refX: -4, refY: -2 },
+                    },
+                    position: { distance: 0.5, offset: 14 },
+                });
+            }
+        }
+
+        function styleNode(node, layer, width) {
+            if (useTokens) applyTokens(node, layer, false);
+            if (compact) compactify(node, width || 200);
+        }
+
+        function bandWidth() {
+            let w = containerEl.clientWidth || (containerEl.getBoundingClientRect && containerEl.getBoundingClientRect().width) || 0;
+            return Math.max(w, 120);
+        }
+
+        /* A relationship's stable identity for change detection and matching. Most
+           payloads carry `key` or `id`; a relationship that carries neither still gets
+           a deterministic (if not guaranteed-unique across true duplicates) synthetic
+           key from its endpoints and type, so it renders instead of being dropped. */
+        function syntheticEdgeKey(rel) {
+            return 'syn\u0001' + rel.source_id + '\u0001' + rel.target_id + '\u0001' + (rel.type || '');
+        }
+        function edgeKeyOf(rel) {
+            if (rel.key != null) return rel.key;
+            if (rel.id != null) return rel.id;
+            return syntheticEdgeKey(rel);
+        }
+        function linkKey(l) { return l.get('edgeKey') != null ? l.get('edgeKey') : l.get('relId'); }
+
+        function elementSignature(el) {
+            return [el.name, el.type, String(el.layer || ''), el.depth].join('\u0001');
+        }
+        function relSignature(rel) {
+            return [rel.source_id, rel.target_id, rel.type, rel.provenance || '', rel.stale === true].join('\u0001');
+        }
+
+        function nodeCells() {
+            return graph.getElements().filter(function(c) { return c.get('elementId') != null && !c.get('isLayerZone'); });
+        }
+
+        function paintSelection() {
+            nodeCells().forEach(function(c) {
+                let id = c.get('elementId');
+                let isSel = id === selectedId, isCentre = id === centreId;
+                c.attr('root/data-selected', isSel ? 'true' : null);
+                c.attr('root/data-centre', isCentre ? 'true' : null);
+                /* Capture the node's own original stroke width the first time it is
+                   painted (mirrors the link base-width capture below), so clearing
+                   selection restores what the node actually had, not a flat guess. */
+                let base = c.get('baseStrokeWidth');
+                if (base == null) { base = c.attr('body/strokeWidth') || 1; c.set('baseStrokeWidth', base); }
+                c.attr('body/strokeWidth', isCentre ? 4 : (isSel ? 3 : base));
+            });
+            graph.getLinks().forEach(function(l) {
+                let k = linkKey(l);
+                let on = k != null && highlighted[String(k)] === true;
+                l.attr('root/data-highlighted', on ? 'true' : null);
+                let base = l.get('baseStrokeWidth');
+                if (base == null) { base = l.attr('line/strokeWidth') || 2; l.set('baseStrokeWidth', base); }
+                l.attr('line/strokeWidth', on ? base + 1.5 : base);
+            });
+        }
+
+        /* Banded layout: draws the zones and positions every node. Returns nothing. */
+        function layoutBands() {
+            let elements = nodeCells().map(function(c) { return c.get('modelEl'); });
+            let width = bandWidth();
+            let plan = computeBandLayout(elements, opts.bands, width, compact);
+            /* Reuse a zone that is already drawn; only touch what moved or resized. */
+            let drawn = {};
+            graph.getCells().filter(function(c) { return c.get('isLayerZone'); }).forEach(function(z) { drawn[z.get('zoneLayer')] = z; });
+            let wanted = {};
+            plan.zones.forEach(function(z) {
+                wanted[z.layer] = true;
+                let zone = drawn[z.layer];
+                if (zone) {
+                    let pos = zone.position(), size = zone.size();
+                    if (pos.x !== z.x || pos.y !== z.y) zone.position(z.x, z.y);
+                    if (size.width !== z.width || size.height !== z.height) zone.resize(z.width, z.height);
+                    if (zone.attr('label/text') !== z.label && z.label) zone.attr('label/text', z.label);
+                } else {
+                    zone = createLayerZone(z.layer, z.x, z.y, z.width, z.height, { label: z.label });
+                    zone.attr('root/data-band', z.layer);
+                    graph.addCell(zone);
+                    zone.toBack();
+                }
+                if (useTokens) applyTokens(zone, z.layer, true);
+            });
+            Object.keys(drawn).forEach(function(l) { if (!wanted[l]) drawn[l].remove(); });
+            nodeCells().forEach(function(c) {
+                let pl = plan.placements[c.get('elementId')];
+                if (!pl) return;
+                let pos = c.position();
+                if (pos.x !== pl.x || pos.y !== pl.y) c.position(pl.x, pl.y);
+                c.set('band', pl.band);
+                /* Junction/Grouping/Location/Note still get positioned into their band,
+                   but never resized -- the same skip-list compactify uses, so a special
+                   node's own notation size (e.g. the small diamond junction glyph) is
+                   never stretched or squashed to fit the row. */
+                if (SPECIAL_TYPES[c.get('elType')]) return;
+                if (compact) {
+                    if (c.size().width !== pl.width) {
+                        c.resize(pl.width, pl.height);
+                        c.attr('nameLabel/x', Math.round(pl.width / 2));
+                    }
+                } else if (c.size().width !== pl.width) {
+                    c.resize(pl.width, pl.height);
+                }
+            });
+            paper.setDimensions(opts.width || '100%', plan.height);
+        }
+
+        function relayout() {
+            if (!banded) return;
+            layoutBands();
+        }
+
+        function updateModel(model) {
+            model = model || {};
+            let elements = model.elements || [];
+            let relationships = model.relationships || [];
+            let width = banded ? computeBandLayout([], opts.bands, bandWidth(), compact).nodeWidth : 200;
+            let existing = {};
+            nodeCells().forEach(function(c) { existing[c.get('elementId')] = c; });
+            
+            let wantEl = {};
+            elements.forEach(function(el) { wantEl[el.id] = el; });
+            let wantRel = {};
+            relationships.forEach(function(r) { if (edgeKeyOf(r) != null) wantRel[String(edgeKeyOf(r))] = r; });
+
+            /* Remove what is gone or changed. Removing a node removes its links too. */
+            Object.keys(existing).forEach(function(id) {
+                let el = wantEl[id];
+                if (!el || elementSignature(el) !== existing[id].get('signature')) existing[id].remove();
+            });
+            graph.getLinks().forEach(function(l) {
+                let k = linkKey(l);
+                let rel = k != null ? wantRel[String(k)] : null;
+                /* No signature guard here (unlike the old check): a link with no
+                   recorded signature yet (e.g. one created before this engine tracked
+                   signatures) must be treated as changed, not kept as-is, or a relationship
+                   whose visual state changes is never actually replaced on update(). */
+                if (!rel || relSignature(rel) !== l.get('signature')) l.remove();
+            });
+
+            /* Add what is new (or was just removed because it changed). */
+            let cellMap = {};
+            nodeCells().forEach(function(c) { cellMap[c.get('elementId')] = c; });
+            let fresh = 0;
+            elements.forEach(function(el, i) {
+                if (cellMap[el.id]) return;
+                let layer = (el.layer || '').toLowerCase() || guessLayer(el.type);
+                let node = createNode(el.id, el.name, el.type || 'ApplicationComponent', layer, 40 + (i % 4) * 240, 40 + Math.floor(i / 4) * 160);
+                node.set('modelEl', el);
+                node.set('signature', elementSignature(el));
+                styleNode(node, layer, width);
+                node.set('baseStrokeWidth', node.attr('body/strokeWidth') || 1);
+                graph.addCell(node);
+                cellMap[el.id] = node;
+                canvasElements[el.id] = el;
+                fresh++;
+            });
+            Object.keys(canvasElements).forEach(function(id) { if (!wantEl[id]) delete canvasElements[id]; });
+
+            let linked = {};
+            graph.getLinks().forEach(function(l) { if (linkKey(l) != null) linked[String(linkKey(l))] = true; });
+            relationships.forEach(function(rel) {
+                let k = edgeKeyOf(rel);
+                let src = cellMap[rel.source_id], tgt = cellMap[rel.target_id];
+                if (k == null || !src || !tgt || linked[String(k)]) return;
+                let link = createLink(src, tgt, rel.type || 'association', rel.id);
+                decorateEdge(link, rel);
+                if (link.get('edgeKey') == null) link.set('edgeKey', k);
+                link.set('signature', relSignature(rel));
+                graph.addCell(link);
+                linked[String(k)] = true;
+            });
+
+            relayout();
+            paintSelection();
+            return fresh;
+        }
+
+        function scheduleRelayout() {
+            if (resizeFrame) return;
+            resizeFrame = requestAnimationFrame(function() { resizeFrame = 0; relayout(); });
+        }
+
+        if (banded && typeof ResizeObserver !== 'undefined') {
+            resizeObserver = new ResizeObserver(scheduleRelayout);
+            resizeObserver.observe(containerEl);
+        }
+
+        if (typeof opts.onSelect === 'function') {
+            paper.on('element:pointerclick', function(view) {
+                let id = view.model.get('elementId');
+                if (id == null) return;
+                selectedId = id;
+                paintSelection();
+                opts.onSelect(id, view.model.get('modelEl') || canvasElements[id] || null);
+            });
+        }
+
         return {
             graph: graph,
             paper: paper,
             mode: mode,
 
             loadElements: function(elements, relationships) {
+                if (banded) {
+                    graph.clear();
+                    canvasElements = {};
+                    updateModel({ elements: elements || [], relationships: relationships || [] });
+                    return;
+                }
                 graph.clear();
                 canvasElements = {};
                 let cellMap = {};
@@ -1171,6 +1511,12 @@ let ComposerRenderer = (function() {
                     let y = 40 + row * 160;
                     let layer = (el.layer || '').toLowerCase() || guessLayer(el.type);
                     let node = createNode(el.id, el.name, el.type || 'ApplicationComponent', layer, x, y);
+                    if (useTokens || compact) { node.set('modelEl', el); styleNode(node, layer, 200); }
+                    /* Always recorded (not just under useTokens/compact) so a later
+                       update() call -- which is not itself gated on banded/useTokens/
+                       compact -- has a real signature to diff against instead of treating
+                       every node as freshly changed. */
+                    node.set('signature', elementSignature(el));
                     graph.addCell(node);
                     cellMap[el.id] = node;
                     canvasElements[el.id] = el;
@@ -1180,7 +1526,15 @@ let ComposerRenderer = (function() {
                     let src = cellMap[rel.source_id];
                     let tgt = cellMap[rel.target_id];
                     if (!src || !tgt) return;
-                    graph.addCell(createLink(src, tgt, rel.type || 'association', rel.id));
+                    let link = createLink(src, tgt, rel.type || 'association', rel.id);
+                    decorateEdge(link, rel);
+                    /* Same reasoning as the node signature above: give every link a
+                       stable edgeKey (synthetic when the relationship has neither key
+                       nor id) and a signature, so update() can both find it again and
+                       tell whether it changed. */
+                    if (link.get('edgeKey') == null) link.set('edgeKey', edgeKeyOf(rel));
+                    link.set('signature', relSignature(rel));
+                    graph.addCell(link);
                 });
             },
 
@@ -1191,7 +1545,32 @@ let ComposerRenderer = (function() {
             getElementCount: function() { return Object.keys(canvasElements).length; },
             getRelCount: function() { return graph.getLinks().length; },
 
+            update: function(model) { return updateModel(model); },
+
+            setSelected: function(id) { selectedId = id == null ? null : id; paintSelection(); },
+
+            setCentre: function(id) { centreId = id == null ? null : id; paintSelection(); },
+
+            setHighlightedEdges: function(keys) {
+                highlighted = {};
+                (keys instanceof Set ? Array.from(keys) : (keys || [])).forEach(function(k) { highlighted[String(k)] = true; });
+                paintSelection();
+            },
+
+            /* Node rectangles in paper (container-relative) pixels, top-to-bottom then
+               left-to-right, for an overlay that lives outside this engine. */
+            getNodeBounds: function() {
+                return nodeCells().map(function(c) {
+                    let r = paper.localToPaperRect(c.getBBox());
+                    return { id: c.get('elementId'), x: r.x, y: r.y, width: r.width, height: r.height };
+                }).sort(function(a, b) { return (a.y - b.y) || (a.x - b.x); });
+            },
+
+            resize: function() { relayout(); },
+
             destroy: function() {
+                if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
+                if (resizeFrame) { cancelAnimationFrame(resizeFrame); resizeFrame = 0; }
                 graph.clear();
                 paper.remove();
             },
@@ -1223,6 +1602,7 @@ let ComposerRenderer = (function() {
         defineArchiMateShape: defineArchiMateShape,
         createAnnotation: createAnnotation,
         createLayerZone: createLayerZone,
+        computeBandLayout: computeBandLayout,
         ZONE_COLORS: ZONE_COLORS,
         applyZoneStyle: applyZoneStyle,
     };
