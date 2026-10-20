@@ -659,16 +659,35 @@ def main() -> None:
         )
         db.session.add(arch_model)
         db.session.flush()
-        element = ArchiMateElement(
+        element1 = ArchiMateElement(
             organization_id=org_id,
-            name="Cleanup probe element",
+            name="Cleanup probe element 1",
             type="ApplicationComponent",
             layer="Application",
             architecture_id=arch_model.id,
         )
-        db.session.add(element)
+        element2 = ArchiMateElement(
+            organization_id=org_id,
+            name="Cleanup probe element 2",
+            type="ApplicationComponent",
+            layer="Application",
+            architecture_id=arch_model.id,
+        )
+        db.session.add_all([element1, element2])
+        db.session.flush()
+        # Create a relationship between the two elements
+        from app.models.archimate_core import ArchiMateRelationship
+        relationship = ArchiMateRelationship(
+            organization_id=org_id,
+            type="Association",
+            source_id=element1.id,
+            target_id=element2.id,
+        )
+        db.session.add(relationship)
         db.session.commit()
-        element_id = element.id
+        element1_id = element1.id
+        element2_id = element2.id
+        relationship_id = relationship.id
         solution_id_value = solution.id
 
         def _element_exists():
@@ -677,7 +696,18 @@ def main() -> None:
                 return (
                     connection.execute(
                         db.text("SELECT 1 FROM archimate_elements WHERE id = :id"),
-                        {"id": element_id},
+                        {"id": element1_id},
+                    ).first()
+                    is not None
+                )
+
+        def _relationship_exists():
+            with db.engine.connect() as connection:
+                set_database_tenant_context(connection, org_id)
+                return (
+                    connection.execute(
+                        db.text("SELECT 1 FROM archimate_relationships WHERE id = :id"),
+                        {"id": relationship_id},
                     ).first()
                     is not None
                 )
@@ -690,7 +720,7 @@ def main() -> None:
         def _own_org_cleans():
             g.current_org_id = org_id
             _engine_archimate_cleanup([solution_id_value])
-            return not _element_exists()
+            return not _element_exists() and not _relationship_exists()
 
         check("archimate_cleanup_other_org_leaves_rows", _other_org_cannot_clean)
         check("archimate_cleanup_deletes_own_org_rows", _own_org_cleans)
