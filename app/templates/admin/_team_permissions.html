@@ -1,0 +1,147 @@
+{% from 'components/badge.html' import badge %}
+{#
+  Permissions tab of the Team page: who may create, read, edit or delete each kind
+  of object. The grid is the matrix variant of the dense table: sticky header,
+  a row header per role, four cell states shown as badges with a legend above,
+  no pagination. Per-user overrides sit below it.
+#}
+{% macro _state_badge(allowed, is_set) %}
+  {% if allowed and is_set %}{% call badge('info') %}Allowed by grant{% endcall %}
+  {% elif allowed %}{% call badge('success') %}Allowed{% endcall %}
+  {% elif is_set %}{% call badge('warning') %}Withheld{% endcall %}
+  {% else %}{% call badge('neutral') %}Not allowed{% endcall %}
+  {% endif %}
+{% endmacro %}
+
+<section class="mb-8" data-testid="permissions-tab" aria-labelledby="permissions-heading">
+  <h2 id="permissions-heading" class="text-lg font-semibold text-foreground mb-1">Permissions by role</h2>
+  <p class="text-sm text-muted-foreground mb-4">Choose what each role may do. An organisation administrator can always do everything. A change applies to this organisation only and takes effect on the next page the person opens.</p>
+
+  <ul class="flex flex-wrap items-center gap-3 mb-4 text-sm text-muted-foreground" data-testid="permissions-legend" aria-label="Legend">
+    <li class="inline-flex items-center gap-2">{{ _state_badge(true, false) }} the role's default</li>
+    <li class="inline-flex items-center gap-2">{{ _state_badge(true, true) }} switched on for this organisation</li>
+    <li class="inline-flex items-center gap-2">{{ _state_badge(false, false) }} the role's default</li>
+    <li class="inline-flex items-center gap-2">{{ _state_badge(false, true) }} switched off for this organisation</li>
+  </ul>
+
+  {% for object_type in perm_object_types %}
+  <div class="rounded-md border border-border overflow-x-auto mb-6" data-testid="permissions-grid-{{ object_type }}">
+    <table class="dense-table w-full text-sm" data-testid="permissions-table-{{ object_type }}">
+      <caption class="sr-only">Permissions for {{ object_type }}s, one row per role</caption>
+      <thead class="sticky top-0 bg-background">
+        <tr>
+          <th scope="col" class="px-4 py-2 text-left font-medium text-muted-foreground">Role</th>
+          {% for action in perm_actions %}
+          <th scope="col" class="px-4 py-2 text-left font-medium text-muted-foreground capitalize">{{ action }} {{ object_type }}s</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-border">
+        {% for row in perm_rows %}
+        <tr data-testid="perm-row-{{ row.role }}">
+          <th scope="row" class="px-4 py-2 text-left font-medium text-foreground">{{ row.role }}</th>
+          {% for action in perm_actions %}
+          {% set cell = row.cells[object_type][action] %}
+          <td class="px-4 py-2">
+            <form method="POST" action="{{ url_for('team.team_permission_role') }}" class="flex items-center gap-3">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="role" value="{{ row.role }}">
+              <input type="hidden" name="object_type" value="{{ object_type }}">
+              <input type="hidden" name="action" value="{{ action }}">
+              <input type="hidden" name="allowed" value="{{ '0' if cell.allowed else '1' }}">
+              <button type="submit" role="switch"
+                      data-testid="perm-cell-{{ row.role }}-{{ action }}" aria-checked="{{ 'true' if cell.allowed else 'false' }}"
+                      aria-label="{{ row.role }} may {{ action }} {{ object_type }}s"
+                      {% if row.locked %}disabled aria-disabled="true"{% endif %}
+                      class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-transparent transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 {% if cell.allowed %}bg-primary{% else %}bg-input{% endif %}">
+                <span aria-hidden="true" class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background transition-transform {% if cell.allowed %}translate-x-4{% else %}translate-x-0.5{% endif %}"></span>
+              </button>
+              {{ _state_badge(cell.allowed, cell.is_set) }}
+            </form>
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+</section>
+
+<section class="mb-8" data-testid="permission-overrides" aria-labelledby="overrides-heading">
+  <h2 id="overrides-heading" class="text-lg font-semibold text-foreground mb-1">Exceptions for one person</h2>
+  <p class="text-sm text-muted-foreground mb-4">An exception for a person wins over their role.</p>
+
+  <form method="POST" action="{{ url_for('team.team_permission_user') }}" class="flex flex-wrap gap-3 items-end mb-4" data-testid="override-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="object_type" value="application">
+    <div>
+      <label for="override-user" class="block text-sm font-medium text-foreground mb-1">Person</label>
+      <select id="override-user" name="user_id" required data-testid="override-user"
+              class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+        {% for m in members %}
+        <option value="{{ m.id }}">{{ m.full_name() }} ({{ m.email }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="override-action" class="block text-sm font-medium text-foreground mb-1">Action</label>
+      <select id="override-action" name="action" data-testid="override-action"
+              class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+        {% for action in perm_actions %}<option value="{{ action }}">{{ action }} applications</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="override-allowed" class="block text-sm font-medium text-foreground mb-1">Decision</label>
+      <select id="override-allowed" name="allowed" data-testid="override-allowed"
+              class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+        <option value="1">Allow</option>
+        <option value="0">Do not allow</option>
+      </select>
+    </div>
+    <button type="submit" data-testid="override-add"
+            class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+      Save exception
+    </button>
+  </form>
+
+  {% if perm_overrides %}
+  <div class="rounded-md border border-border overflow-x-auto">
+    <table class="dense-table w-full text-sm" data-testid="override-table">
+      <caption class="sr-only">Exceptions for individual people</caption>
+      <thead class="sticky top-0 bg-background">
+        <tr>
+          <th scope="col" class="px-4 py-2 text-left font-medium text-muted-foreground">Person</th>
+          <th scope="col" class="px-4 py-2 text-left font-medium text-muted-foreground">Action</th>
+          <th scope="col" class="px-4 py-2 text-left font-medium text-muted-foreground">Decision</th>
+          <th scope="col" class="px-4 py-2 text-right font-medium text-muted-foreground">Remove</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-border">
+        {% for o in perm_overrides %}
+        <tr data-testid="override-row-{{ o.user_id }}-{{ o.action }}">
+          <th scope="row" class="px-4 py-2 text-left font-medium text-foreground">{{ o.name }}</th>
+          <td class="px-4 py-2">{{ o.action }} {{ o.object_type }}s</td>
+          <td class="px-4 py-2">{{ _state_badge(o.allowed, true) }}</td>
+          <td class="px-4 py-2 text-right">
+            <form method="POST" action="{{ url_for('team.team_permission_user_remove') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="user_id" value="{{ o.user_id }}">
+              <input type="hidden" name="object_type" value="{{ o.object_type }}">
+              <input type="hidden" name="action" value="{{ o.action }}">
+              <button type="submit" data-testid="override-remove-{{ o.user_id }}-{{ o.action }}"
+                      aria-label="Remove the exception for {{ o.name }}: {{ o.action }} {{ o.object_type }}s"
+                      class="inline-flex items-center justify-center rounded-md text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 h-8 px-3">
+                Remove
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-sm text-muted-foreground" data-testid="override-empty">No exceptions yet. Everyone follows their role.</p>
+  {% endif %}
+</section>
