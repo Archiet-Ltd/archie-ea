@@ -1187,7 +1187,15 @@ def sidebar_link_active(link, endpoint, args) -> bool:
 
 def get_launch_sidebar_zones(user=None) -> List[Dict]:
     """The grouped sidebar for `user`: the same tree for every role, minus links whose `requires` guard
-    the user cannot satisfy (Approval Inbox needs write access). New dicts; the constants are shared."""
+    the user cannot satisfy (Approval Inbox needs write access). Inside a request each link carries
+    `active` (it is the page being viewed) and each toggle carries `active` (a child is). New dicts;
+    the module constants are shared and never mutated."""
+    try:
+        from flask import has_request_context, request
+
+        endpoint, args = (request.endpoint, request.args) if has_request_context() else (None, {})
+    except Exception:  # pragma: no cover - flask always importable
+        endpoint, args = None, {}
     zones = []
     for z in SIDEBAR_GROUPS:
         links = []
@@ -1195,7 +1203,14 @@ def get_launch_sidebar_zones(user=None) -> List[Dict]:
             if not link_requires_satisfied(user, link.get("requires")):
                 continue
             if link.get("children"):
-                link = {**link, "children": [c for c in link["children"] if link_requires_satisfied(user, c.get("requires"))]}
+                kids = [
+                    {**c, "active": sidebar_link_active(c, endpoint, args)}
+                    for c in link["children"]
+                    if link_requires_satisfied(user, c.get("requires"))
+                ]
+                link = {**link, "children": kids, "active": any(k["active"] for k in kids)}
+            else:
+                link = {**link, "active": sidebar_link_active(link, endpoint, args)}
             links.append(link)
         zones.append({**z, "links": links})
     return zones
