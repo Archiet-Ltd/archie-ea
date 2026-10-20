@@ -83,7 +83,7 @@ A published price that does not change with application count, the option to sel
 
 ### Can we run LeanIX and Entelim side by side before deciding?
 
-Yes. Import a copy of your model into the free Community plan or a self-hosted copy, ask the same questions in both, and leave LeanIX untouched. The health check puts your own data through Entelim for a fixed price and date.
+Yes. Import a copy of your model into the free Community plan or a self-hosted copy, ask the same questions in both, and leave LeanIX untouched. The health check puts your own data through Entelim for a fixed scope.
 
 ### Is LeanIX pricing public anywhere?
 
