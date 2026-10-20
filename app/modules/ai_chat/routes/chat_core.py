@@ -883,8 +883,17 @@ def _typed_question_without_model(message, incoming_thread_id):
     is_valid, validated, _error = validate_chat_message(message)
     if not is_valid:
         return None
-    from app.modules.ai_chat.services.answer_card import answer_typed_question
+    from app.modules.ai_chat.services.answer_card import (
+        answer_estate_question_without_model,
+        answer_typed_question,
+    )
 
+    answered = answer_estate_question_without_model(current_user.id, validated)
+    if answered is not None:
+        return _direct_stream(_direct_turn(
+            validated, incoming_thread_id, answered["tool"], answered["arguments"],
+            answered["result"], answered["card"], answered["sentence"],
+        ))
     answered = answer_typed_question(current_user.id, validated)
     if answered is None or not answered["card"]:
         return None
