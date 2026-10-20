@@ -135,11 +135,10 @@ def test_procurement_sidebar_excludes_arb_dashboard(app, db_session, make_org):
     )
 
 
-def test_enterprise_architect_sidebar_includes_arb_dashboard(app, db_session, make_org):
+def test_enterprise_architect_sidebar_leaves_arb_dashboard_to_more_tools(app, db_session, make_org):
+    """Launch cut: the ARB dashboard is not one of the twelve; it is on the More tools page."""
     sidebar_html = _sidebar_html(app, db_session, make_org, "enterprise_architect", "ea-arb")
-    assert "ARB Dashboard" in sidebar_html, (
-        "enterprise_architect is a board role and must see the ARB dashboard link"
-    )
+    assert "ARB Dashboard" not in sidebar_html
 
 
 def test_platform_admin_hits_the_link_budget_exactly(app, db_session, make_org):
@@ -177,21 +176,10 @@ def test_platform_admin_hits_the_link_budget_exactly(app, db_session, make_org):
         ("platform_admin", "pa-ask"),
     ],
 )
-def test_ask_link_renders_first_under_my_work_and_the_twin_map_has_none(
-    app, db_session, make_org, role, label
-):
-    """One front door to the Ask page, under My work, before that persona's own
-    links; the Twin map is reached from the Ask page and has no link of its own."""
+def test_ask_link_renders_once_and_the_twin_map_has_none(app, db_session, make_org, role, label):
+    """One front door to the Ask page; the Twin map is reached from the Ask page and has no link of its own."""
     sidebar_html = _sidebar_html(app, db_session, make_org, role, label)
-    ask = sidebar_html.find('href="/intelligence/ask"')
-    assert ask != -1, f"{role}: no Ask a question link in the rendered sidebar"
     assert sidebar_html.count('href="/intelligence/ask"') == 1
-    my_work = sidebar_html.find("My work")
-    library = sidebar_html.find("Library", my_work)
-    assert my_work != -1 and library != -1 and my_work < ask < library
-    # First link of the zone: nothing but the heading sits between them.
-    first_link = sidebar_html.find("<a ", my_work)
-    assert first_link == sidebar_html.rfind("<a ", 0, ask + 1)
     assert "Ask a question" in sidebar_html
     assert "/intelligence/twin-map" not in sidebar_html
 
@@ -211,26 +199,13 @@ def test_platform_admin_applications_link_not_duplicated(app, db_session, make_o
     )
 
 
-def test_platform_admin_governance_and_admin_zones_render_links(app, db_session, make_org):
-    """Evidence review (Wave 1 screenshots): the live sidebar showed a
-    'GOVERNANCE' heading with zero links beneath it and the whole 'ADMIN'
-    zone (11 links) missing outright, despite SIDEBAR_ZONES for
-    platform_admin containing both. This hits the real app/real routes (not
-    a stub) specifically so a future wrong endpoint string in
-    _GOVERNANCE_LINKS / _ADMIN_LINKS fails this test instead of silently
-    rendering an empty or absent zone — which is exactly what let the
-    original defect through."""
+def test_platform_admin_governance_and_admin_zones_are_not_in_the_sidebar(app, db_session, make_org):
+    """Launch cut: the sidebar is the twelve modules for every role, platform_admin included.
+    Admin pages stay reachable from the profile menu and Settings, not the sidebar."""
     sidebar_html = _sidebar_html(app, db_session, make_org, "platform_admin", "pa-gov-admin")
-    assert "Governance" in sidebar_html, "platform_admin must see the Governance zone heading"
-    assert "ARB Dashboard" in sidebar_html
-    assert "Reviews" in sidebar_html
-    assert "Sessions" in sidebar_html
-    assert "Admin" in sidebar_html, "platform_admin must see the Admin zone heading"
-    assert "Command Center" in sidebar_html
-    assert "Users" in sidebar_html
-    assert "Organizations" in sidebar_html
-    assert "Salesforce Integration" in sidebar_html
-    assert "Power Platform" in sidebar_html
+    assert "Command Center" not in sidebar_html
+    assert "Salesforce Integration" not in sidebar_html
+    assert "Governance" not in sidebar_html
 
 
 def test_zone_heading_absent_when_all_its_links_are_guarded_out(app, db_session, make_org, monkeypatch):
@@ -285,7 +260,7 @@ def test_sidebar_includes_all_modules_link(app, db_session, make_org, role, labe
     platform_admin uses the footer fallback — see
     test_platform_admin_hits_the_link_budget_exactly)."""
     sidebar_html = _sidebar_html(app, db_session, make_org, role, label)
-    assert "All modules" in sidebar_html, (
+    assert "More tools" in sidebar_html, (
         f"{role} sidebar has no reachable link to the All-modules directory"
     )
 
@@ -298,40 +273,24 @@ def test_sidebar_includes_all_modules_link(app, db_session, make_org, role, labe
         ("business_architect", "ba-impact"),
     ],
 )
-def test_impact_analysis_is_linked_under_my_work(app, db_session, make_org, role, label):
-    """The reported problem: reachable in one click from the persona's own sidebar, in the zone
-    for their primary jobs (between the "My work" and "Library" headings), not only via All modules."""
+def test_impact_analysis_is_linked_in_the_sidebar(app, db_session, make_org, role, label):
     sidebar_html = _sidebar_html(app, db_session, make_org, role, label)
-    link = sidebar_html.find('href="/strategic/impact-analysis"')
-    assert link != -1, f"{role}: no Impact Analysis link in the rendered sidebar"
-    my_work = sidebar_html.find("My work")
-    library = sidebar_html.find("Library", my_work)
-    assert my_work != -1 and library != -1 and my_work < link < library, (
-        f"{role}: the Impact Analysis link is not under the My work heading"
-    )
+    assert 'href="/strategic/impact-analysis"' in sidebar_html
 
 
 @pytest.mark.parametrize(
     "role,label",
     [
         ("solution_architect", "sa-canvases"),
-        ("enterprise_architect", "ea-canvases"),
         ("business_architect", "ba-canvases"),
         ("procurement", "proc-canvases"),
     ],
 )
-def test_canvases_and_frameworks_in_library_zone(app, db_session, make_org, role, label):
-    """Canvas/framework UI fix: "Canvases" and "Frameworks" must appear in the
-    shared Library zone for every role."""
+def test_canvases_and_frameworks_are_on_more_tools_not_the_sidebar(app, db_session, make_org, role, label):
+    """Launch cut: Canvases and Frameworks are demoted to the More tools page."""
     sidebar_html = _sidebar_html(app, db_session, make_org, role, label)
-    assert "Canvases" in sidebar_html, f"{role}: no Canvases link in sidebar"
-    assert "Frameworks" in sidebar_html, f"{role}: no Frameworks link in sidebar"
-    # Both must be under the Library heading, not My work.
-    library = sidebar_html.find("Library")
-    canvases = sidebar_html.find("Canvases")
-    frameworks = sidebar_html.find("Frameworks")
-    assert library != -1 and library < canvases, f"{role}: Canvases not under Library"
-    assert library != -1 and library < frameworks, f"{role}: Frameworks not under Library"
+    assert "Canvases" not in sidebar_html
+    assert ">Frameworks<" not in sidebar_html
 
 
 def test_framework_management_and_config_reachable_from_admin_dashboard(app, db_session, make_org):
@@ -360,13 +319,6 @@ def test_framework_management_and_config_reachable_from_admin_dashboard(app, db_
     )
 
 
-def test_business_architect_no_duplicate_capability_frameworks(app, db_session, make_org):
-    """Canvas/framework UI fix: business_architect must not have a separate
-    "Capability Frameworks" link — it is now "Frameworks" in the shared Library."""
+def test_business_architect_no_capability_frameworks_link(app, db_session, make_org):
     sidebar_html = _sidebar_html(app, db_session, make_org, "business_architect", "ba-no-dup-cf")
-    assert "Capability Frameworks" not in sidebar_html, (
-        "business_architect must not have a separate Capability Frameworks link"
-    )
-    assert "Frameworks" in sidebar_html, (
-        "business_architect must still see Frameworks in the Library zone"
-    )
+    assert "Capability Frameworks" not in sidebar_html

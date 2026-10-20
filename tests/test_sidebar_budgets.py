@@ -112,8 +112,13 @@ def test_sidebar_link_budget_is_31():
     Agent Registry (R1-B56, 6 Oct 2026): raised 32 -> 33. One new
     platform_admin-only link (owner, charter and delegated limits per
     registered agent); no fold is available for the same reason as above.
+
+    Launch cut (20 Oct 2026): lowered 33 -> 15. The sidebar shows the twelve
+    launch modules for every role; the budget is the rendered total (twelve
+    + header logo + footer All modules + footer logout). The per-role data in
+    SIDEBAR_ZONES is unchanged and feeds the /modules/ page.
     """
-    assert SIDEBAR_LINK_BUDGET == 33
+    assert SIDEBAR_LINK_BUDGET == 15
 
 
 def test_every_role_is_defined():
@@ -122,9 +127,13 @@ def test_every_role_is_defined():
 
 
 def test_every_role_within_link_budget():
+    from app.utils.role_access import get_launch_sidebar_zones
+
     for role in ALL_ROLES:
-        total = len(_all_links(role))
-        assert total <= SIDEBAR_LINK_BUDGET, (
+        total = sum(len(z["links"]) for z in get_launch_sidebar_zones(_StubUser(role)))
+        assert total == 12
+        # twelve modules + header logo + footer All modules + footer logout
+        assert total + 3 <= SIDEBAR_LINK_BUDGET, (
             f"{role} has {total} sidebar links, budget is {SIDEBAR_LINK_BUDGET}"
         )
 
