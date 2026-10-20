@@ -383,3 +383,219 @@ def test_architect_in_org_a_cannot_reach_org_b_records(chat, db_session, make_or
     assert "not found" in generate.get_json()["response"]
     assert _mapping_count(sol_b.id) == b_mappings
     assert _element_count() == b_elements
+
+
+# --- Workbench commands and the automatic decision record --------------------
+
+WORKBENCH_WRITES = [
+    ('/create-element ApplicationComponent "ZZ Viewer Probe" Application', "create-element"),
+    ("/generate-viewpoint", "generate-viewpoint"),
+    ("/generate-sad", "generate-sad"),
+    ("generate governance pack", "generate-governance-pack"),
+    ("/record-decision Adopt event streaming", "record-decision"),
+    ("generate work packages", "generate-work-packages"),
+    ("generate roadmap", "generate-roadmap"),
+    ("confirm scope", "confirm-artifact"),
+]
+
+
+def _raw_count(table):
+    from app import db
+
+    return db.session.execute(db.text(f"SELECT count(*) FROM {table}")).scalar()
+
+
+def _workspace(user):
+    from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel
+
+    result = WorkbenchKernel(user_id=user.id).create_workspace("ZZ workspace")
+    assert result["success"], result
+    return result["workspace_id"]
+
+
+def _workspace_metadata(workspace_id):
+    import copy
+
+    from app import db
+    from app.models.solution_architect_models import SolutionAnalysisSession
+
+    db.session.expire_all()
+    return copy.deepcopy(
+        db.session.get(SolutionAnalysisSession, workspace_id).custom_metadata
+    )
+
+
+def _service(user, org):
+    from flask import g
+
+    from app.modules.ai_chat.services.multi_domain_chat_service import (
+        MultiDomainChatService,
+    )
+
+    g.current_org_id = org.id
+    return MultiDomainChatService(user_id=user.id)
+
+
+@pytest.mark.parametrize("message,tool", WORKBENCH_WRITES)
+def test_viewer_workbench_write_is_refused(app, db_session, make_org, message, tool):
+    org = make_org("gate")
+    viewer = _user(db_session, org, "Viewer", "viewer")
+    architect = _user(db_session, org, "Architect", "architect")
+    _service(architect, org)
+    workspace_id = _workspace(architect)
+    before_meta = _workspace_metadata(workspace_id)
+    before = (
+        _raw_count("archimate_elements"),
+        _raw_count("architecture_decisions"),
+    )
+    seen = _last_audit_id()
+
+    service = _service(viewer, org)
+    with app.test_request_context("/"):
+        result = service._handle_workbench_command(
+            message, {"workspace_id": workspace_id}
+        )
+
+    assert result["success"] is False
+    assert result["permission_denied"] is True
+    assert "write access" in result["response"]
+    assert (
+        _raw_count("archimate_elements"),
+        _raw_count("architecture_decisions"),
+    ) == before
+    assert _workspace_metadata(workspace_id) == before_meta
+    refusals = _refusals_since(seen, viewer)
+    assert len(refusals) == 1
+    assert refusals[0].new_value["via"] == "workbench_command"
+    assert refusals[0].new_value["tool"] == tool
+
+
+def test_viewer_workbench_readiness_check_is_not_refused(app, db_session, make_org):
+    org = make_org("gate")
+    viewer = _user(db_session, org, "Viewer", "viewer")
+    architect = _user(db_session, org, "Architect", "architect")
+    _service(architect, org)
+    workspace_id = _workspace(architect)
+    seen = _last_audit_id()
+
+    service = _service(viewer, org)
+    with app.test_request_context("/"):
+        result = service._handle_workbench_command(
+            "check readiness", {"workspace_id": workspace_id}
+        )
+
+    assert result is not None and result.get("permission_denied") is not True
+    assert _refusals_since(seen, viewer) == []
+
+
+def test_architect_create_element_and_record_decision_still_work(
+    app, db_session, make_org
+):
+    org = make_org("gate")
+    architect = _user(db_session, org, "Architect", "architect")
+    service = _service(architect, org)
+    workspace_id = _workspace(architect)
+    elements = _raw_count("archimate_elements")
+    decisions = _raw_count("architecture_decisions")
+    seen = _last_audit_id()
+
+    with app.test_request_context("/"):
+        created = service._handle_workbench_command(
+            '/create-element ApplicationComponent "ZZ Architect Probe" Application',
+            {"workspace_id": workspace_id},
+        )
+        recorded = service._handle_workbench_command(
+            "/record-decision Adopt event streaming", {"workspace_id": workspace_id}
+        )
+
+    assert created["success"] is True
+    assert recorded["success"] is True
+    assert _raw_count("archimate_elements") == elements + 1
+    assert _raw_count("architecture_decisions") == decisions + 1
+    assert _refusals_since(seen, architect) == []
+
+
+def test_viewer_cannot_start_a_workbench_workflow(app, db_session, make_org):
+    org = make_org("gate")
+    viewer = _user(db_session, org, "Viewer", "viewer")
+    service = _service(viewer, org)
+    before = _raw_count("solution_analysis_sessions")
+    seen = _last_audit_id()
+
+    with app.test_request_context("/"):
+        greenfield = service._start_greenfield_workflow("design a payments platform", {})
+        brownfield = service._start_brownfield_workflow("modernise billing", {})
+
+    assert greenfield["permission_denied"] is True
+    assert brownfield["permission_denied"] is True
+    assert _raw_count("solution_analysis_sessions") == before
+    assert len(_refusals_since(seen, viewer)) == 2
+
+
+def test_viewer_cannot_create_an_automated_action(app, db_session, make_org):
+    org = make_org("gate")
+    viewer = _user(db_session, org, "Viewer", "viewer")
+    service = _service(viewer, org)
+    seen = _last_audit_id()
+
+    result = service.create_automated_action(
+        "bulk_update", {"target_type": "applications"}, viewer.id
+    )
+
+    assert result["success"] is False
+    assert result["permission_denied"] is True
+    refusals = _refusals_since(seen, viewer)
+    assert len(refusals) == 1
+    assert refusals[0].new_value["via"] == "automated_action"
+
+
+def test_viewer_question_does_not_create_a_decision(app, db_session, make_org):
+    org = make_org("gate")
+    viewer = _user(db_session, org, "Viewer", "viewer")
+    service = _service(viewer, org)
+    before = _raw_count("architecture_decisions")
+    seen = _last_audit_id()
+
+    with app.test_request_context("/"):
+        service._detect_and_handle_decision(
+            "How should we host the billing service?",
+            "I recommend the managed container platform because it should cut cost.",
+            {},
+        )
+
+    assert _raw_count("architecture_decisions") == before
+    assert _refusals_since(seen, viewer) == []
+
+
+def test_viewer_explicit_record_decision_in_chat_creates_nothing(
+    app, db_session, make_org
+):
+    org = make_org("gate")
+    viewer = _user(db_session, org, "Viewer", "viewer")
+    service = _service(viewer, org)
+    before = _raw_count("architecture_decisions")
+
+    with app.test_request_context("/"):
+        service._detect_and_handle_decision(
+            "record this decision: use event streaming", "Noted.", {}
+        )
+
+    assert _raw_count("architecture_decisions") == before
+
+
+def test_architect_question_still_records_a_proposed_decision(
+    app, db_session, make_org
+):
+    org = make_org("gate")
+    architect = _user(db_session, org, "Architect", "architect")
+    service = _service(architect, org)
+    before = _raw_count("architecture_decisions")
+
+    with app.test_request_context("/"):
+        service._detect_and_handle_decision(
+            "How should we host the billing service?",
+            "I recommend the managed container platform.",
+            {},
+        )
+
+    assert _raw_count("architecture_decisions") == before + 1

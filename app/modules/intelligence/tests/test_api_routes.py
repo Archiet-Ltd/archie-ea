@@ -753,6 +753,7 @@ def test_strategy_endpoint_returns_initiative_with_its_own_blast_radius(
     b = _make_element(db_session, org.id, "B")
     _make_relationship(db_session, org.id, a, b, "Serving")
     initiative = PortfolioInitiative(
+        organization_id=a.organization_id,
         name="Transform A",
         archimate_element_id=a.id,
         status="Active",
@@ -786,6 +787,7 @@ def test_strategy_endpoint_redacts_budget_for_a_role_without_budget_authority(
     user = _make_user(db_session, org, enterprise_role="business_architect")
     a = _make_element(db_session, org.id, "A")
     db_session.add(PortfolioInitiative(
+        organization_id=a.organization_id,
         name="Transform A", archimate_element_id=a.id, status="Active",
         total_budget=50000.0, spent_to_date=45000.0,
     ))
@@ -807,6 +809,7 @@ def test_strategy_endpoint_does_not_redact_budget_for_portfolio_manager(
     user = _make_user(db_session, org, enterprise_role="portfolio_manager")
     a = _make_element(db_session, org.id, "A")
     db_session.add(PortfolioInitiative(
+        organization_id=a.organization_id,
         name="Transform A", archimate_element_id=a.id, status="Active",
         total_budget=50000.0, spent_to_date=45000.0,
     ))
@@ -829,7 +832,7 @@ def test_strategy_endpoint_cross_tenant_element_is_404_not_leak(
     user_b = _make_user(db_session, org_b)
     a = _make_element(db_session, org_a.id, "A")
     initiative = PortfolioInitiative(
-        name="Tenant A's initiative", archimate_element_id=a.id, status="Active",
+        organization_id=a.organization_id, name="Tenant A's initiative", archimate_element_id=a.id, status="Active",
     )
     db_session.add(initiative)
     db_session.commit()
