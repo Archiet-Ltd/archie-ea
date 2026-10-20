@@ -450,6 +450,42 @@ _SKIP_FIELDS = frozenset(
 )
 
 
+# Columns a person never needs to read; administrators see them under "Technical details".
+_TECHNICAL_FIELDS = frozenset({"color", "auto_generated"})
+_SNAKE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
+_ACRONYMS = ("Acm", "Api", "Id", "Url", "Sap", "Rfc", "Bapi", "Arb")
+
+
+def _plain_label(text):
+    """snake_case key or enum-like value -> words ("gap_kind" -> "Gap kind"); acronyms stay upper case."""
+    words = str(text).replace("_", " ").strip()
+    if not words:
+        return words
+    words = words[0].upper() + words[1:].lower()
+    for acronym in _ACRONYMS:
+        words = re.sub(rf"\b{acronym}\b", acronym.upper(), words, flags=re.I)
+    return words
+
+
+def _plain_value(value):
+    """Enum-like database values (snake_case strings) read as plain words; anything else is unchanged."""
+    return _plain_label(value) if isinstance(value, str) and _SNAKE.match(value) else value
+
+
+def _element_owner_rows(element, element_type, organization_id):
+    """Owner rows for the detail page, through the one ownership record's existing readers."""
+    from app.models.application_owner import ApplicationOwner
+
+    if organization_id is None:
+        return []
+    if element_type == "ApplicationComponent" and element.__class__.__name__ == "ApplicationComponent":
+        return ApplicationOwner.get_display_rows_for_application(element.id, organization_id)
+    slug = {"Capability": "capability"}.get(element_type)
+    if slug in ApplicationOwner.ELEMENT_TYPES:
+        return ApplicationOwner.get_display_rows_for_element(slug, element.id, organization_id)
+    return []
+
+
 def _get_display_fields(element, model_class):
     """Introspect a model instance and return a list of (label, value) tuples
     for all non-empty, non-private, non-FK columns worth displaying."""
@@ -487,9 +523,7 @@ def _get_display_fields(element, model_class):
         # Build a human-readable label from snake_case, correcting acronyms
         # that .title() mangles (Acm -> ACM) rather than leaving the wrong
         # case on a screen a real architect reads.
-        label = col_name.replace("_", " ").title()
-        for acronym in ("Acm", "Api", "Id", "Url", "Sap", "Rfc", "Bapi", "Arb"):
-            label = re.sub(rf"\b{acronym}\b", acronym.upper(), label)
+        label = _plain_label(col_name)
 
         # Format special types
         if isinstance(value, bool):
@@ -502,11 +536,13 @@ def _get_display_fields(element, model_class):
             # A dict column is internal structure, not prose -- render its
             # entries as "key: value" pairs rather than Python's repr(), which
             # leaked as a literal {'source_model': 'Risk'} on real screens.
-            value = "; ".join(f"{k}: {v}" for k, v in value.items())
+            value = "; ".join(f"{_plain_label(k)}: {_plain_value(v)}" for k, v in value.items())
         elif isinstance(value, list):
-            value = ", ".join(str(v) for v in value)
+            value = ", ".join(str(_plain_value(v)) for v in value)
+        else:
+            value = _plain_value(value)
 
-        fields.append({"label": label, "value": str(value)})
+        fields.append({"label": label, "value": str(value), "technical": col_name in _TECHNICAL_FIELDS})
 
     return fields
 
@@ -1168,8 +1204,16 @@ def detail_element(layer, element_type, element_id):
         ae_id = element.id
 
     # Auto-discover displayable fields from the model
-    display_fields = _get_display_fields(element, model_class)
+    all_fields = _get_display_fields(element, model_class)
+    display_fields = [f for f in all_fields if not f["technical"]]
+    technical_fields = [f for f in all_fields if f["technical"]]
     external_links = CrosswalkService.get_links_for_element(ae_id or element.id)
+    owner_rows = _element_owner_rows(element, element_type, getattr(element, "organization_id", None))
+    owner_assign_url = None
+    if element.__class__.__name__ == "ApplicationComponent":
+        owner_assign_url = url_for("unified_applications.application_detail", id=element.id)
+    elif element_type == "Capability":
+        owner_assign_url = url_for("capability_map.index", cap=element.id)
 
     return render_template(
         "archimate_crud/detail.html",
@@ -1179,6 +1223,9 @@ def detail_element(layer, element_type, element_id):
         relationships=relationships,
         source_ae_id=ae_id,
         display_fields=display_fields,
+        technical_fields=technical_fields,
+        owner_rows=owner_rows,
+        owner_assign_url=owner_assign_url,
         external_links=external_links,
         layer_config=LAYER_CONFIG,
     )
