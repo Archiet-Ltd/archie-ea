@@ -101,6 +101,43 @@ def test_the_scrolling_list_is_at_least_730px_tall_at_1440(app, client, browser)
         pg.close()
 
 
+@pytest.mark.parametrize("role", ["solution_architect", "platform_admin"])
+def test_the_last_group_scrolls_fully_into_view_above_the_footer_at_900px(app, client, browser, role):
+    """At 1440x900 with every group open, the list scrolls (the footer strip stays put) and the last link,
+    in the Catalogue group, ends above the footer instead of running under it or being cut off."""
+    login(client, _persona(app, role))
+    path = "/dashboard/overview"
+    document = client.get(path).get_data(as_text=True)
+    pg = _open(browser, client, document, path, width=1440, height=900)
+    try:
+        pg.evaluate(
+            """() => document.querySelectorAll('#sidebar-nav [aria-expanded="false"]').forEach(b => b.click())"""
+        )
+        pg.wait_for_timeout(300)
+        pg.eval_on_selector("#sidebar-nav", "el => { el.scrollTop = el.scrollHeight; }")
+        pg.wait_for_timeout(150)
+        m = pg.evaluate(
+            """() => {
+                const nav = document.querySelector('#sidebar-nav');
+                const links = [...nav.querySelectorAll('a[href]')].filter(a => a.offsetParent !== null);
+                const last = links[links.length - 1].getBoundingClientRect();
+                const navBox = nav.getBoundingClientRect();
+                const footer = document.querySelector('[data-testid="sidebar"] > div:last-child').getBoundingClientRect();
+                return {
+                    overflows: nav.scrollHeight > nav.clientHeight,
+                    overflowY: getComputedStyle(nav).overflowY,
+                    lastBottom: last.bottom, navBottom: navBox.bottom, footerTop: footer.top,
+                    catalogue: !!document.querySelector('#sidebar-nav [data-testid*="catalogue"], #sidebar-nav a[href*="catalogue"]'),
+                };
+            }"""
+        )
+        assert m["overflowY"] in ("auto", "scroll")
+        assert m["lastBottom"] <= m["navBottom"] + 1, m
+        assert m["navBottom"] <= m["footerTop"] + 1, m
+    finally:
+        pg.close()
+
+
 def test_the_search_box_stays_on_screen_when_the_list_is_scrolled(app, client, browser):
     # platform_admin has the longest zone list, most likely to overflow the nav.
     login(client, _persona(app, "platform_admin"))
