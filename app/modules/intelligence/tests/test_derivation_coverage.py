@@ -182,6 +182,50 @@ def test_organisation_b_never_sees_organisation_a_figures(
     assert f'data-element-id="{b2.id}"' in data_b
 
 
+def test_organisation_b_never_sees_organisation_a_figures_with_ids_from_98(
+    app, db_session, make_org, client, login_as
+):
+    """Same isolation as org_b, but element ids start at 98 -- high enough
+    that a bare id substring would match unrelated markup (a '99+'
+    notification badge, say), so only data-element-id assertions are safe."""
+    from app.extensions import db
+
+    db_session.execute(
+        db.text("ALTER SEQUENCE archimate_elements_id_seq RESTART WITH 98")
+    )
+
+    org_a = make_org("coverage-high-a")
+    org_b = make_org("coverage-high-b")
+    user_b = _user(db_session, org_b.id)
+    a1 = _element(db_session, org_a.id, "Alpha", layer="application")
+    a2 = _element(db_session, org_a.id, "Beta", layer="application")
+    _derived(db_session, org_a.id, a1, a2)
+    _run(db_session, org_a.id, derived_count=1)
+    b1 = _element(db_session, org_b.id, "Alpha", layer="application")
+    b2 = _element(db_session, org_b.id, "Beta", layer="application")
+    db_session.commit()
+
+    assert a1.id >= 98
+    assert a2.id >= 98
+    assert b1.id >= 98
+    assert b2.id >= 98
+
+    login_as(client, user_b)
+    data_b = client.get("/intelligence/coverage").get_data(as_text=True)
+    coverage_b = derivation_coverage(org_b.id)
+    assert coverage_b["latest_run"] is None
+    assert coverage_b["derived_count"] == 0
+    assert coverage_b["missing_total"] == 2
+    assert {entry["layer"] for entry in coverage_b["layers"]} == {"application"}
+    assert coverage_b["layers"][0]["missing_count"] == 2
+    missing_ids = {element_id for element_id, _, _ in coverage_b["missing"]}
+    assert missing_ids == {b1.id, b2.id}
+    assert f'data-element-id="{a1.id}"' not in data_b
+    assert f'data-element-id="{a2.id}"' not in data_b
+    assert f'data-element-id="{b1.id}"' in data_b
+    assert f'data-element-id="{b2.id}"' in data_b
+
+
 def test_no_run_shows_none_yield_not_zero(app, db_session, make_org, client, login_as):
     """An organisation with elements but no completed run shows a dash for
     yield: None from the service, never 0."""
@@ -327,4 +371,5 @@ __all__ = [
     "test_layer_filter_shows_only_that_layers_missing_elements",
     "test_coverage_route_rejects_anonymous",
     "test_derivation_coverage_empty_projection_returns_empty_structure",
+    "test_organisation_b_never_sees_organisation_a_figures_with_ids_from_98",
 ]
