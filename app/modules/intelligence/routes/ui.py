@@ -93,20 +93,18 @@ CHAT_STARTERS = ("impact", "risk")
 
 
 def _chat_starter_redirect():
-    """The chat page's address for an Ask address that names an element and/or
-    a question the chat carries, or None when the Ask page should render.
+    """The chat page's address for any Ask address.
 
-    An element alone asks what breaks if it fails, as the Ask page does. A
-    value that is not a whole number is dropped, so the chat opens on its
-    picker rather than carrying a bad id across.
+    An element and/or a question the chat carries becomes a starter that runs on
+    arrival; an element alone asks what breaks if it fails, as the Ask page does.
+    Any other address (no parameters, or a lens the chat does not carry) opens
+    the chat plainly. A value that is not a whole number is dropped.
     """
     asked = request.args.get("question")
     element_raw = request.args.get("element")
-    if asked is None and element_raw is None:
-        return None
-    starter = asked if asked is not None else "impact"
+    starter = asked if asked is not None else ("impact" if element_raw is not None else None)
     if starter not in CHAT_STARTERS:
-        return None
+        return url_for("unified_ai_chat.index")
     params = {"starter": starter}
     element_id = request.args.get("element", type=int)
     if element_id is not None and element_id > 0:
@@ -117,14 +115,15 @@ def _chat_starter_redirect():
 @intelligence_ui.route("/ask", methods=["GET"])
 @login_required
 def ask():
-    """Ask a plain business question about what depends on a chosen element.
+    """The Ask address opens the chat, the one place to ask, whatever it carries.
 
-    With an element and/or a question the chat carries, the person is sent to
-    the chat, which is the one place to ask, with that starter run.
+    The Ask template stays in the repository; nothing renders it from here.
     """
-    chat_address = _chat_starter_redirect()
-    if chat_address is not None:
-        return redirect(chat_address)
+    return redirect(_chat_starter_redirect())
+
+
+def _render_ask_page():
+    """The Ask page itself (kept for a later fold decision; no route reaches it)."""
     workspace_is_empty = _workspace_is_empty()
     return render_template(
         "intelligence/ask.html",
