@@ -2,59 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Palette (design register: north star). Overrides the shadcn defaults in
-   shadcn_tokens.css, which loads before this file. Values are HSL triplets
-   because tailwind.config.js reads hsl(var(--token) / <alpha-value>).
-   Light: navy text, indigo accent, slate surfaces. Dark is designed, not
-   inverted: slate-900 page, slate-800 cards, slate-50 text, slate-400 muted,
-   slate-700 hairlines. --primary is the fill token (white text on it in both
-   themes); --info is the accent-as-text token (links, active nav), lighter in
-   dark so it reads on slate-900 and slate-800. */
 @layer base {
-  :root {
-    --foreground: 222.2 47.4% 11.2%;
-    --card-foreground: 222.2 47.4% 11.2%;
-    --popover-foreground: 222.2 47.4% 11.2%;
-    --primary: 243.4 75.4% 58.6%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 215.3 25% 26.7%;
-    --muted: 210 40% 96.1%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 243.4 75.4% 58.6%;
-    --info: 243.4 75.4% 58.6%;
-    --info-foreground: 0 0% 100%;
-    --info-emphasis: 244.5 57.9% 50.6%;
-    --radius: 0.5rem;
-  }
-  .dark {
-    --background: 222.2 47.4% 11.2%;
-    --foreground: 210 40% 98%;
-    --card: 217.2 32.6% 17.5%;
-    --card-foreground: 210 40% 98%;
-    --popover: 217.2 32.6% 17.5%;
-    --popover-foreground: 210 40% 98%;
-    /* Dark accent is indigo-400 with navy text on fills: 6.0:1 both as text
-       on slate-900 and as a fill under navy, so the many existing text-primary
-       links and badges stay legible without touching their templates. */
-    --primary: 234.5 89.5% 73.9%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --border: 215.3 25% 26.7%;
-    --input: 215.3 25% 26.7%;
-    --ring: 234.5 89.5% 73.9%;
-    --info: 234.5 89.5% 73.9%;
-    --info-foreground: 222.2 47.4% 11.2%;
-    --info-emphasis: 228 96.5% 88.8%;
-  }
   /* Interaction defaults: a visible focus ring everywhere, 150ms ease-out
      colour transitions. Utilities on an element still win. */
   :focus-visible {
@@ -67,7 +15,6 @@
   input,
   select,
   textarea,
-  summary,
   tbody tr {
     transition-property: color, background-color, border-color, opacity;
     transition-duration: 150ms;
@@ -134,14 +81,17 @@
      scopes table rules to #main-content by id, so the pilot geometry needs an
      id-plus-class selector to apply: 40px header, 48px rows, 12px cell
      padding, hairline rows, card-coloured sticky header. */
+  /* reuse-ok: the dense table is the authenticated app's canonical table (design/patterns.json: dense-table), not a copy of the public-site table */
   #main-content .dense-table thead {
     background-color: hsl(var(--card));
   }
+  /* reuse-ok: the dense table is the authenticated app's canonical table (design/patterns.json: dense-table), not a copy of the public-site table */
   #main-content .dense-table th {
     height: 2.5rem;
     padding: 0 0.75rem;
     letter-spacing: 0.06em;
   }
+  /* reuse-ok: the dense table is the authenticated app's canonical table (design/patterns.json: dense-table), not a copy of the public-site table */
   #main-content .dense-table td {
     height: 3rem;
     padding: 0 0.75rem;
