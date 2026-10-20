@@ -134,6 +134,7 @@ else:
     from .regulatory_framework import *  # noqa - FrameworkAdoption (tenant-hybrid framework catalogue)
     from .regulatory_change import *  # noqa - RegulatoryChange, RegulatoryChangeImpact (regulatory change tracker)
     from .cost_fact import *  # noqa - CostFact, ExchangeRate (one cost fact store)
+    from .change_feed_offset import *  # noqa - ChangeFeedOffset (change feed consumer position)
     from .graph_projection_snapshot import *  # noqa - GraphProjectionSnapshot (per-organisation graph projection copy)
     from .cost_intelligence import *  # noqa - CapabilityCostAllocation, VendorContract, SLA (Cost intelligence)
     from .decision_ledger import *  # noqa - DecisionLedger (append-only governance ledger)
