@@ -155,6 +155,7 @@ def test_the_read_only_pages_are_the_only_routes_this_blueprint_serves(app):
     assert rules == {
         "/intelligence/ask": ["GET"],
         "/intelligence/twin-map": ["GET"],
+        "/intelligence/coverage": ["GET"],
         "/intelligence/value-streams-at-risk": ["GET"],
         "/intelligence/traceability": ["GET"],
         "/intelligence/history/as-of": ["GET"],
