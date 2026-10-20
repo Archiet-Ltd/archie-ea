@@ -1,4 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'macros/shadcn_compat.html' import shadcn_select %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
 {% from 'components/card.html' import card, card_content %}
@@ -30,8 +31,7 @@
                     </div>
                     <div class="space-y-2">
                         {% call label(for='vendor_type') %}Vendor Type{% endcall %}
-                        <select id="vendor_type" name="vendor_type"
-                                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Select Type">
+                        {% call shadcn_select('vendor_type', bare=true, id='vendor_type', class='h-10 w-full', attrs='aria-label="Select Type"') %}
                             <option value="">Select Type</option>
                             <option value="software_vendor">Software Vendor</option>
                             <option value="saas_platform">SaaS Platform</option>
@@ -39,7 +39,7 @@
                             <option value="systems_integrator">Systems Integrator</option>
                             <option value="consulting_partner">Consulting Partner</option>
                             <option value="managed_service_provider">Managed Service Provider</option>
-                        </select>
+                        {% endcall %}
                     </div>
                 </div>
 
