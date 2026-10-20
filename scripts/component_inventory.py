@@ -12,7 +12,6 @@ import hashlib
 import importlib.util
 import inspect
 import json
-import os
 import re
 import subprocess
 import sys
@@ -22,7 +21,6 @@ from pathlib import Path
 
 from jinja2 import Environment
 from jinja2 import nodes as jinja_nodes
-from jinja2 import meta as _meta
 
 from html.parser import HTMLParser
 
@@ -786,6 +784,7 @@ def get_route_templates(application):
 
         # Use _render_target to find literal render_template targets
         targets = set()
+        unresolved_targets = set()
         try:
             tree = _ast.parse(view_src)
             for node in _ast.walk(tree):
@@ -794,14 +793,23 @@ def get_route_templates(application):
                 target = _render_target(node)
                 if target:
                     targets.add(target)
-                elif node.args and not isinstance(node.args[0], _ast.Constant):
-                    # Non-literal target
-                    targets.add(("__unresolved__", _ast.unparse(node.args[0]) if hasattr(_ast, 'unparse') else str(node.args[0])))
+                else:
+                    # Check if this is a render_template/stream_template call with non-literal first arg
+                    func = node.func
+                    name = func.attr if isinstance(func, _ast.Attribute) else getattr(func, "id", None)
+                    if name in ("render_template", "stream_template") and node.args and not isinstance(node.args[0], _ast.Constant):
+                        unresolved = _ast.unparse(node.args[0]) if hasattr(_ast, 'unparse') else str(node.args[0])
+                        unresolved_targets.add(unresolved)
         except SyntaxError:
             pass
 
-        if targets:
-            route_templates[rule_str] = [(t, None) if isinstance(t, str) else (None, t[1]) for t in targets]
+        # Sort for determinism
+        sorted_targets = sorted(targets)
+        sorted_unresolved = sorted(unresolved_targets)
+        combined = [(t, None) for t in sorted_targets] + [(None, u) for u in sorted_unresolved]
+
+        if combined:
+            route_templates[rule_str] = combined
         else:
             route_templates[rule_str] = [(None, None)]
 
