@@ -1100,6 +1100,66 @@ def get_vendor_quality(vendor_id):
     )
 
 
+@unified_vendors_api_bp.route("/<int:product_id>/applications", methods=["GET"])
+@login_required
+def get_vendor_product_applications(product_id):
+    """The signed-in organisation's applications, each marked mapped or not to a vendor product.
+
+    This is the second step of the unified mapping modal for a vendor product
+    (the first step lists products, so the id here is a product id). Saving goes
+    through /api/vendors/application-mappings.
+    """
+    from app.middleware.tenant_context import current_org_id
+    from app.models.application_layer import ApplicationComponent
+    from app.models.relationship_tables import application_component_vendor_products as links
+
+    product = require_entity(VendorProduct, product_id, description=f"Vendor product {product_id} not found")
+    org_id = current_org_id()
+    if org_id is None:
+        return jsonify({"success": True, "product": {"id": product.id, "name": product.name},
+                        "applications": [], "total": 0, "mapped_count": 0})
+
+    applications = (
+        ApplicationComponent.query.filter_by(organization_id=org_id)
+        .order_by(ApplicationComponent.name)
+        .limit(500)
+        .all()
+    )
+    rows = db.session.execute(  # tenant-filtered: scoped via parent FK (application_component_id)
+        links.select().where(
+            links.c.vendor_product_id == product_id,
+            links.c.application_component_id.in_([a.id for a in applications] or [0]),
+        )
+    ).fetchall()
+    link_by_app = {r.application_component_id: r for r in rows}
+
+    payload = []
+    for application in applications:
+        link = link_by_app.get(application.id)
+        payload.append(
+            {
+                "id": str(application.id),
+                "name": application.name,
+                "type": application.component_type or "Unknown",
+                "description": application.description or "",
+                "domain": application.business_domain or "Not specified",
+                "owner": application.business_owner or "Not specified",
+                "is_mapped": link is not None,
+                "mapping_id": str(link.id) if link is not None else None,
+                "relationship_type": (link.relationship_type if link is not None and link.relationship_type else "uses"),
+            }
+        )
+    return jsonify(
+        {
+            "success": True,
+            "product": {"id": product.id, "name": product.name},
+            "applications": payload,
+            "total": len(payload),
+            "mapped_count": len(link_by_app),
+        }
+    )
+
+
 # =============================================================================
 # Analytics & Statistics API
 # =============================================================================
