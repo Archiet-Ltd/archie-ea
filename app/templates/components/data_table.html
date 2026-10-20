@@ -40,6 +40,7 @@
 #}
 
 {# ── Script-only macro: call this OUTSIDE any <template x-if/x-for> ── #}
+{% from 'components/button.html' import button %}
 {% macro data_table_script() %}
 <script>
 if (!window._dataTableEngine) {
@@ -203,7 +204,7 @@ if (!window._dataTableEngine) {
             {% if searchable %}
             <input type="text" x-model="search" @input="currentPage = 1"
                    placeholder="{{ search_placeholder }}"
-                   class="flex h-8 w-full max-w-sm rounded-md border border-input bg-background px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Search">
+                   class="flex h-9 w-full max-w-sm rounded-md border border-input bg-background px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Search">
             {% endif %}
 
             {# Faceted filter buttons #}
@@ -224,11 +225,11 @@ if (!window._dataTableEngine) {
                 </button>
                 {# Filter dropdown — Command-style #}
                 <!-- modal-a11y-ok -->
-                <div x-show="open" x-cloak x-transition
+                <div x-show="open" x-cloak x-transition role="dialog" aria-modal="true" aria-label="{{ filter.label }} filter"
                      class="absolute left-0 top-full mt-1 z-50 w-52 rounded-md border border-border bg-popover">
                     <div class="p-1.5">
                         <input aria-label="{{ filter.label }}" type="text" placeholder="{{ filter.label }}..."
-                               class="flex h-8 w-full rounded-md bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground outline-none">
+                               class="flex h-9 w-full rounded-md bg-transparent px-2 py-1 text-sm placeholder:text-muted-foreground outline-none">
                     </div>
                     <div class="border-t border-border max-h-48 overflow-y-auto p-1">
                         {% for opt in filter.options %}
@@ -422,7 +423,7 @@ if (!window._dataTableEngine) {
                                     <i data-lucide="more-horizontal" class="h-4 w-4" aria-hidden="true"></i>
                                 </button>
                                 <!-- modal-a11y-ok -->
-                                <div x-show="menuOpen" x-cloak x-transition
+                                <div x-show="menuOpen" x-cloak x-transition role="dialog" aria-modal="true" aria-label="Row actions"
                                      class="absolute right-0 z-50 mt-1 w-40 rounded-md border border-border bg-popover p-1 text-sm">
                                     {% if on_view %}
                                     <button type="button" @click="{{ on_view }}; menuOpen = false"
@@ -438,10 +439,7 @@ if (!window._dataTableEngine) {
                                     {% endif %}
                                     {% if on_delete %}
                                     <div class="my-1 h-px bg-border"></div>
-                                    <button type="button" @click="{{ on_delete }}; menuOpen = false"
-                                            class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-destructive-emphasis hover:bg-destructive/10 transition-colors">
-                                        <i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i> Delete
-                                    </button>
+                                    {% call button(variant='ghost', size='sm', on_click=on_delete ~ '; menuOpen = false', class='w-full gap-2 !justify-start !px-2 !text-destructive-emphasis hover:!bg-destructive/10') %}<i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i> Delete{% endcall %}
                                     {% endif %}
                                 </div>
                             </div>
@@ -474,7 +472,7 @@ if (!window._dataTableEngine) {
             <div class="flex items-center gap-2">
                 <p class="text-sm font-medium text-muted-foreground hidden sm:block">Rows per page</p>
                 <select x-model.number="perPage" @change="currentPage = 1"
-                        class="flex h-8 w-[70px] items-center justify-between rounded-md border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Per Page">
+                        class="flex h-9 w-[70px] items-center justify-between rounded-md border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Per Page">
                     <option value="10">10</option>
                     <option value="20">20</option>
                     <option value="30">30</option>
@@ -503,16 +501,8 @@ if (!window._dataTableEngine) {
                         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8">
                     <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>
                 </button>
-                <button type="button" @click="nextPage()" :disabled="currentPage >= totalPages"
-                        aria-label="Go to next page"
-                        class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent transition-colors disabled:opacity-50 disabled:pointer-events-none">
-                    <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>
-                </button>
-                <button type="button" @click="lastPage()" :disabled="currentPage >= totalPages"
-                        aria-label="Go to last page"
-                        class="hidden lg:inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent transition-colors disabled:opacity-50 disabled:pointer-events-none">
-                    <i data-lucide="chevrons-right" class="h-4 w-4" aria-hidden="true"></i>
-                </button>
+                {% call button(variant='outline', size='icon', on_click='nextPage()', aria_label='Go to next page', attrs_dict={':disabled': 'currentPage >= totalPages'}) %}<i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>{% endcall %}
+                {% call button(variant='outline', size='icon', class='hidden lg:inline-flex', on_click='lastPage()', aria_label='Go to last page', attrs_dict={':disabled': 'currentPage >= totalPages'}) %}<i data-lucide="chevrons-right" class="h-4 w-4" aria-hidden="true"></i>{% endcall %}
             </div>
         </div>
     </div>

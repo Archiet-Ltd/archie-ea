@@ -3,6 +3,7 @@
 
 {% set resolved_page_guide_context = page_guide_context | default({'enabled': false, 'supported': false}, true) %}
 {% from 'components/switch.html' import switch %}
+{% from 'components/button.html' import button %}
 <header id="admin-header"
         class="sticky top-0 z-30 flex h-12 shrink-0 items-center justify-between pl-14 lg:pl-4 pr-4 bg-background border-b border-border">
     <div class="flex items-center gap-4">
@@ -117,11 +118,7 @@
                  role="menu">
                 <div class="p-3 border-b border-border flex items-center justify-between">
                     <span class="text-sm font-semibold">Notifications</span>
-                    <button type="button" id="notif-mark-read-btn"
-                            class="text-xs text-muted-foreground hover:text-foreground transition-colors hidden"
-                            aria-label="Mark all notifications as read">
-                        Mark all read
-                    </button>
+                    {{ button(text='Mark all read', variant='ghost', size='sm', class='text-xs hidden', aria_label='Mark all notifications as read', attrs_dict={'id': 'notif-mark-read-btn'}) }}
                 </div>
                 <div id="notif-list" class="max-h-72 overflow-y-auto" role="none">
                     <div class="px-4 py-6 text-center text-sm text-muted-foreground">

@@ -213,7 +213,11 @@ def test_help_button_z_index_below_overlays(app, make_user):
         "guided mode trigger must be present in the template"
     )
     # The trigger button must carry z-30, not z-40
-    trigger_match = re.search(r'id="guided-mode-trigger".*?class="([^"]*)"', html, re.DOTALL)
+    # The button macro renders the class before the extra attributes, so read the
+    # class from the same opening tag whichever order the attributes come in.
+    trigger_tag = re.search(r'<button\b[^>]*id="guided-mode-trigger"[^>]*>', html, re.DOTALL)
+    assert trigger_tag, "guided-mode-trigger element not found"
+    trigger_match = re.search(r'class="([^"]*)"', trigger_tag.group(0))
     assert trigger_match, "guided-mode-trigger element not found with class attribute"
     trigger_classes = trigger_match.group(1)
     assert 'z-30' in trigger_classes, (
