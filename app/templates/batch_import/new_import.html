@@ -159,6 +159,24 @@
                                         </div>
                                     </div>
 
+                                    <div class="mt-4 text-sm" data-import-template>
+                                        <p>
+                                            <a href="{{ url_for('static', filename='templates/application_import_template.csv') }}"
+                                               download="application_import_template.csv"
+                                               class="font-medium text-primary underline underline-offset-2">Download the application template (CSV)</a>
+                                        </p>
+                                        <p class="mt-2 text-muted-foreground">
+                                            One row per application. Columns read:
+                                            <strong class="text-foreground">name</strong> (required),
+                                            <strong class="text-foreground">description</strong>,
+                                            <strong class="text-foreground">type</strong>,
+                                            <strong class="text-foreground">vendor</strong>,
+                                            <strong class="text-foreground">lifecycle_status</strong> and
+                                            <strong class="text-foreground">criticality</strong>.
+                                            Common alternatives such as application_name, app_name and vendor_name are accepted. Any other column is kept with the row.
+                                        </p>
+                                    </div>
+
                                     <!-- Selected File Display -->
                                     <div x-show="form.file" x-cloak class="mt-4 p-4 rounded-lg border bg-muted/30">
                                         <div class="flex items-center justify-between">

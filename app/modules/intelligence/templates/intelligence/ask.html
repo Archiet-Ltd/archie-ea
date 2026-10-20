@@ -60,7 +60,7 @@
         actions_caller=_ps_actions
     ) }}
 
-    {% call workspace_gate(home_url) %}
+    {% call workspace_gate(home_url, show_body_when_empty=true) %}
     {% for question in questions %}
     <section class="rounded-xl border border-border bg-card p-6" data-question="{{ question.key }}">
         <button type="button" id="ask-question-{{ question.key }}"
