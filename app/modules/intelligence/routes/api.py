@@ -7,6 +7,7 @@
   GET  /api/v1/intelligence/risk/<element_id>
   GET  /api/v1/intelligence/portfolio/<element_id>
   GET  /api/v1/intelligence/programme/<element_id>
+  GET  /api/v1/intelligence/contents/<element_id>
   GET  /api/v1/intelligence/strategy/<element_id>
   GET  /api/v1/intelligence/accountability/<element_id>
   GET  /api/v1/intelligence/data/<element_id>
@@ -737,6 +738,43 @@ def programme_for_element(element_id: int):
             "work_packages": work_packages,
             "reasons": result.get("reasons") or [],
             "elements": result.get("elements") or {},
+        }
+    )
+
+
+@intelligence_api.route("/contents/<int:element_id>", methods=["GET"])
+@login_required
+def contents_for_element(element_id: int):
+    """"What is in this release, plateau or work package?" Serialises
+    ``IntelligenceQueryService.contents_for_element`` through
+    ``success_response``; same tenant and not-found handling as the lenses
+    above, no business logic here.
+    """
+    organization_id = current_organization_id()
+    if organization_id is None:
+        return error_response(
+            "no tenant context for this request",
+            code="NO_TENANT_CONTEXT",
+            details={"reason": _NO_TENANT_CONTEXT_REASON},
+            status_code=400,
+        )
+
+    from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+    result = IntelligenceQueryService.contents_for_element(element_id)
+    if result["element"] is None:
+        return error_response(
+            "Element not found",
+            code="NOT_FOUND",
+            details={"reason": _ELEMENT_NOT_FOUND_REASON},
+            status_code=404,
+        )
+
+    return success_response(
+        {
+            "element": result["element"],
+            "contents": result["contents"],
+            "reasons": result["reasons"],
         }
     )
 

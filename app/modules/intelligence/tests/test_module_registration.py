@@ -92,10 +92,10 @@ def test_register_mounts_exactly_the_api_and_ui_blueprints():
     # R1-B30 added the three stored-answer routes (POST and GET /answers, GET
     # /answers/<address>): login_required, fenced to the caller's active
     # organisation, with authorisation-matrix rows.
-    assert len(bp.deferred_functions) == 19, (
-        "exactly nineteen routes: POST .../recompute, GET .../derived/<id>, "
+    assert len(bp.deferred_functions) == 20, (
+        "exactly twenty routes: POST .../recompute, GET .../derived/<id>, "
         "GET .../impact/<element_id>, GET .../risk/<element_id>, "
-        "GET .../portfolio/<element_id>, GET .../programme/<element_id>, "
+        "GET .../portfolio/<element_id>, GET .../programme/<element_id>, GET .../contents/<element_id>, "
         "GET .../strategy/<element_id>, GET .../accountability/<element_id>, "
         "GET .../data/<element_id>, GET .../compliance/<element_id>, "
         "GET .../traceability/<element_id>, "
