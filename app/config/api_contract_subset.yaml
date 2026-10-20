@@ -1,7 +1,7 @@
 # API Contract Subset — auto-generated
 # Source: api-model-v1.yaml
 # SHA256: f34b68f30dd7d8e52334a523eae0af7f025f379232f3280754811be6a74204fc
-# Body-SHA256: 24b1ac357fe6b43f1b96e0d13cb7ebcbf2d98e24e00eff46db9082915b55309b
+# Body-SHA256: 0711449cd731af781c388a8a7920a1e276eb335a47be6be97c7e7f1c09096e01
 # Do not edit by hand.
 openapi: 3.1.0
 info:
@@ -49,6 +49,8 @@ security:
 tags:
 - name: Business
   description: Business operations
+- name: Implementation and migration
+  description: Implementation and migration operations
 - name: Model
   description: Model operations
 - name: Motivation
@@ -512,6 +514,148 @@ paths:
       x-entity-id: ENT-0001
       x-entity: Capability
       x-archimate: Capability
+  /deliverables:
+    get:
+      operationId: listDeliverables
+      summary: List Deliverable records
+      tags:
+      - Implementation and migration
+      parameters:
+      - $ref: '#/components/parameters/Filter'
+      - $ref: '#/components/parameters/Q'
+      - $ref: '#/components/parameters/Sort'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/IncludeRetired'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/ScopeParam'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Link:
+              $ref: '#/components/headers/Link'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliverablePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-pagination:
+        style: cursor
+        limit_default: 50
+        limit_max: 200
+        order: stable, by the sort key then id
+      x-personas:
+      - PER-021
+      - PER-025
+      - PER-020
+      - PER-019
+      - PER-022
+      - PER-034
+      - PER-009
+      - PER-024
+      x-use-cases:
+      - Keep deliverable records current and traceable
+      x-entity-id: ENT-0090
+      x-entity: Deliverable
+      x-archimate: Deliverable
+  /deliverables/{id}:
+    get:
+      operationId: getDeliverable
+      summary: Get a Deliverable
+      tags:
+      - Implementation and migration
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deliverable'
+        '304':
+          description: Not modified since the ETag given in If-None-Match.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '410':
+          $ref: '#/components/responses/Gone'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-personas:
+      - PER-021
+      - PER-025
+      - PER-020
+      - PER-019
+      - PER-022
+      - PER-034
+      - PER-009
+      - PER-024
+      x-use-cases:
+      - Keep deliverable records current and traceable
+      x-entity-id: ENT-0090
+      x-entity: Deliverable
+      x-archimate: Deliverable
   /drivers:
     get:
       operationId: listDrivers
@@ -1221,6 +1365,168 @@ paths:
       x-entity-id: ENT-0002
       x-entity: Value Stream
       x-archimate: Value Stream
+  /work-packages:
+    get:
+      operationId: listWorkPackages
+      summary: List Work Package records
+      tags:
+      - Implementation and migration
+      parameters:
+      - $ref: '#/components/parameters/Filter'
+      - $ref: '#/components/parameters/Q'
+      - $ref: '#/components/parameters/Sort'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/IncludeRetired'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/ScopeParam'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Link:
+              $ref: '#/components/headers/Link'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkPackagePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-pagination:
+        style: cursor
+        limit_default: 50
+        limit_max: 200
+        order: stable, by the sort key then id
+      x-personas:
+      - PER-025
+      - PER-024
+      - PER-020
+      - PER-021
+      - PER-009
+      - PER-007
+      - PER-016
+      - PER-012
+      x-use-case-ids:
+      - UC-088
+      - UC-090
+      - UC-095
+      - UC-096
+      - UC-151
+      - UC-184
+      x-use-cases:
+      - Identify owners and approvers of every system my project changes
+      - Trace a strategic goal down to the applications and work packages that realise
+        it
+      - Find gaps not addressed by any work package
+      x-entity-id: ENT-0083
+      x-entity: Work Package
+      x-archimate: Work Package
+  /work-packages/{id}:
+    get:
+      operationId: getWorkPackage
+      summary: Get a Work Package
+      tags:
+      - Implementation and migration
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkPackage'
+        '304':
+          description: Not modified since the ETag given in If-None-Match.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '410':
+          $ref: '#/components/responses/Gone'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-personas:
+      - PER-025
+      - PER-024
+      - PER-020
+      - PER-021
+      - PER-009
+      - PER-007
+      - PER-016
+      - PER-012
+      x-use-case-ids:
+      - UC-088
+      - UC-090
+      - UC-095
+      - UC-096
+      - UC-151
+      - UC-184
+      x-use-cases:
+      - Identify owners and approvers of every system my project changes
+      - Trace a strategic goal down to the applications and work packages that realise
+        it
+      - Find gaps not addressed by any work package
+      x-entity-id: ENT-0083
+      x-entity: Work Package
+      x-archimate: Work Package
 components:
   headers:
     ETag:
@@ -1634,6 +1940,53 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Capability'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    Deliverable:
+      description: 'Deliverable: A defined result of a work package.'
+      allOf:
+      - $ref: '#/components/schemas/EntityBase'
+      - $ref: '#/components/schemas/DeliverableAttributes'
+      - type: object
+        properties:
+          lifecycle_state:
+            type: string
+            enum:
+            - proposed
+            - approved
+            - in-progress
+            - on-hold
+            - completed
+            - cancelled
+            readOnly: true
+            description: States of lifecycle set LC-WORK.
+        additionalProperties: false
+      x-entity-id: ENT-0090
+      x-ontology-class: ONT-0091 Deliverable
+      x-archimate: Deliverable
+      x-scope: tenant
+      x-identity-key: tenant_id + work package + normalised name
+      x-lifecycle-set: LC-WORK
+      unevaluatedProperties: false
+    DeliverableAttributes:
+      type: object
+      properties:
+        due_date:
+          type: string
+          format: date
+        accepted:
+          type: boolean
+      description: Attributes specific to Deliverable (ENT-0090).
+    DeliverablePage:
+      type: object
+      required:
+      - data
+      - page
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Deliverable'
         page:
           $ref: '#/components/schemas/PageInfo'
     Driver:
@@ -2492,5 +2845,71 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ValueStream'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    WorkPackage:
+      description: 'Work Package: A generic unit of change work, the parent form of
+        programme, project, epic and treatment work.'
+      allOf:
+      - $ref: '#/components/schemas/EntityBase'
+      - $ref: '#/components/schemas/WorkPackageAttributes'
+      - type: object
+        properties:
+          lifecycle_state:
+            type: string
+            enum:
+            - proposed
+            - approved
+            - in-progress
+            - on-hold
+            - completed
+            - cancelled
+            readOnly: true
+            description: States of lifecycle set LC-WORK.
+        additionalProperties: false
+      x-entity-id: ENT-0083
+      x-ontology-class: ONT-0086 Work Package
+      x-archimate: Work Package
+      x-scope: tenant
+      x-identity-key: tenant_id + external identifier or normalised name
+      x-lifecycle-set: LC-WORK
+      unevaluatedProperties: false
+    WorkPackageAttributes:
+      type: object
+      properties:
+        work_type:
+          type: string
+          enum:
+          - programme
+          - project
+          - initiative
+          - epic
+          - treatment
+          - workstream
+          - task
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        percent_complete:
+          type: number
+          minimum: 0
+          maximum: 100
+        parent_work_package_id:
+          $ref: '#/components/schemas/EntityRef'
+          x-target-entity: WorkPackage
+      description: Attributes specific to Work Package (ENT-0083).
+    WorkPackagePage:
+      type: object
+      required:
+      - data
+      - page
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkPackage'
         page:
           $ref: '#/components/schemas/PageInfo'

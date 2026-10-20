@@ -601,7 +601,14 @@ RISK_ROUTES = [
     ("/api/v1/risks/<int:risk_id>", ["GET"], "api:read"),
 ]
 
-ALL_ROUTES = ELEMENT_ROUTES + STRATEGY_ROUTES + MOTIVATION_ROUTES + BUSINESS_ROUTES + RISK_ROUTES
+IMPLEMENTATION_ROUTES = [
+    ("/api/v1/work-packages", ["GET"], "api:read"),
+    ("/api/v1/work-packages/<int:package_id>", ["GET"], "api:read"),
+    ("/api/v1/deliverables", ["GET"], "api:read"),
+    ("/api/v1/deliverables/<int:deliverable_id>", ["GET"], "api:read"),
+]
+
+ALL_ROUTES = ELEMENT_ROUTES + STRATEGY_ROUTES + MOTIVATION_ROUTES + BUSINESS_ROUTES + RISK_ROUTES + IMPLEMENTATION_ROUTES
 
 
 def _six_operation_contract() -> dict:
@@ -746,6 +753,46 @@ def _six_operation_contract() -> dict:
             "operationId": "getRisk",
             "summary": "Get a Risk",
             "tags": ["Risk and compliance"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/work-packages"] = {
+        "get": {
+            "operationId": "listWorkPackages",
+            "summary": "List Work Package records",
+            "tags": ["Implementation and migration"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/work-packages/{id}"] = {
+        "get": {
+            "operationId": "getWorkPackage",
+            "summary": "Get a Work Package",
+            "tags": ["Implementation and migration"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/deliverables"] = {
+        "get": {
+            "operationId": "listDeliverables",
+            "summary": "List Deliverable records",
+            "tags": ["Implementation and migration"],
+            "parameters": [],
+            "responses": {"200": {"description": "Success"}},
+            "security": [{"entelimOAuth": ["model:read"]}],
+        }
+    }
+    contract["paths"]["/deliverables/{id}"] = {
+        "get": {
+            "operationId": "getDeliverable",
+            "summary": "Get a Deliverable",
+            "tags": ["Implementation and migration"],
             "parameters": [],
             "responses": {"200": {"description": "Success"}},
             "security": [{"entelimOAuth": ["model:read"]}],

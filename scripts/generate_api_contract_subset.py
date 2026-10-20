@@ -53,6 +53,10 @@ PUBLISHED_OPERATIONS = [
     "getBusinessProcess",
     "listRisks",
     "getRisk",
+    "listWorkPackages",
+    "getWorkPackage",
+    "listDeliverables",
+    "getDeliverable",
 ]
 
 

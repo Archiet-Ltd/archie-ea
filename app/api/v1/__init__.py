@@ -40,6 +40,7 @@ from .dashboard import dashboard_bp
 from .elements import elements_v1_bp
 from .enterprise import enterprise_bp
 from .impact import impact_bp
+from .implementation import implementation_v1_bp
 from .llm import llm_bp
 from .mappings import mappings_bp
 from .motivation import motivation_v1_bp
@@ -61,6 +62,7 @@ api_v1_bp.register_blueprint(motivation_v1_bp, url_prefix="")
 api_v1_bp.register_blueprint(strategy_v1_bp, url_prefix="")
 api_v1_bp.register_blueprint(business_v1_bp, url_prefix="")
 api_v1_bp.register_blueprint(risks_v1_bp, url_prefix="")
+api_v1_bp.register_blueprint(implementation_v1_bp, url_prefix="")
 
 
 # Legacy endpoint redirects with deprecation warnings
