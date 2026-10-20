@@ -1847,32 +1847,59 @@
       </a>
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% set _rec = cost_breakdown.total_tco or 0 %}
+    {% set _calc = cost_breakdown.calculated_total or 0 %}
 
-      {% macro cost_card(label, value, symbol='£') %}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
-        <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">{{ label }}</p>
-        <p class="mt-1 text-2xl font-bold text-foreground">
-          {{ symbol }}{{ '{:,.0f}'.format(value) }}
-        </p>
-      </div>
-      {% endmacro %}
-
-      {{ cost_card('Annual Licence Cost', cost_breakdown.license_annual, currency_symbol) }}
-      {{ cost_card('Monthly Infrastructure', cost_breakdown.infrastructure_monthly, currency_symbol) }}
-      {{ cost_card('Annual Infrastructure', cost_breakdown.infrastructure_annual, currency_symbol) }}
-      {{ cost_card('Annual Development', cost_breakdown.development_annual, currency_symbol) }}
-      {{ cost_card('Annual Maintenance', cost_breakdown.maintenance_annual, currency_symbol) }}
-      {{ cost_card('Total Cost of Ownership', cost_breakdown.total_tco, currency_symbol) }}
-
-    </div>
-
+    {% macro cost_card(label, value, symbol='') %}
     <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
-      <div class="flex items-center justify-between">
-        <p class="text-sm font-medium text-muted-foreground">Calculated Total (Licence + Infrastructure + Development + Maintenance)</p>
-        <p class="text-xl font-bold text-foreground">{{ currency_symbol }}{{ '{:,.0f}'.format(cost_breakdown.calculated_total) }}</p>
-      </div>
+      <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">{{ label }}</p>
+      <p class="mt-1 text-2xl font-bold text-foreground">
+        {{ symbol }}{{ '{:,.0f}'.format(value) }}
+      </p>
     </div>
+    {% endmacro %}
+
+    {% macro total_card(label, value, detail) %}
+    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+      <div class="flex items-center justify-between gap-4">
+        <p class="text-sm font-medium text-foreground">{{ label }}</p>
+        <p class="text-xl font-bold text-foreground">{{ '{:,.0f}'.format(value) }}</p>
+      </div>
+      <p class="mt-1 text-xs text-muted-foreground">{{ detail }}</p>
+    </div>
+    {% endmacro %}
+
+    {% if not _rec and not _calc %}
+    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+      <p class="text-sm font-medium text-foreground">Cost not calculated</p>
+      <p class="mt-1 text-xs text-muted-foreground">No total cost of ownership or component costs are recorded for this application.</p>
+    </div>
+    {% else %}
+    <p class="text-sm text-muted-foreground">Amounts in {{ currency_code }}.</p>
+
+    {% if _calc %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {{ cost_card('Annual Licence Cost', cost_breakdown.license_annual) }}
+      {{ cost_card('Monthly Infrastructure', cost_breakdown.infrastructure_monthly) }}
+      {{ cost_card('Annual Infrastructure', cost_breakdown.infrastructure_annual) }}
+      {{ cost_card('Annual Development', cost_breakdown.development_annual) }}
+      {{ cost_card('Annual Maintenance', cost_breakdown.maintenance_annual) }}
+    </div>
+    {% endif %}
+
+    <div class="space-y-3">
+      {% if _rec and _calc and (_rec | round(0)) == (_calc | round(0)) %}
+        {{ total_card('Total cost of ownership', _rec, 'The recorded total equals the sum of licence, infrastructure, development and maintenance costs.') }}
+      {% else %}
+        {% if _rec %}
+          {{ total_card('Recorded total cost of ownership', _rec, 'Entered or imported on the application record.' ~ (' It is higher than the sum of the components below because it includes cost items that are not broken down.' if _calc and _rec > _calc else (' It is lower than the sum of the components; the recorded total may be out of date.' if _calc else ' No component costs are recorded.'))) }}
+        {% endif %}
+        {% if _calc %}
+          {{ total_card('Sum of recorded components', _calc, 'Licence + annual infrastructure + development + maintenance.' ~ ('' if _rec else ' No total cost of ownership is recorded.')) }}
+        {% endif %}
+      {% endif %}
+    </div>
+    {% endif %}
 
   </div>
   {% endcall %}{# /tab_panel cost #}

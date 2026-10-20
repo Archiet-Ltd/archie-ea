@@ -19,6 +19,7 @@ record that was just read inside the organisation, so it opens a real page.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional
 
 from flask import url_for
@@ -199,6 +200,77 @@ def explain_fact(organization_id: int, fact: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def attach_relationship_sources(organization_id: int, rows: List[Dict[str, Any]]) -> None:
+    """Give every cascade row's ``relation`` the facts the Why dialog shows:
+    ``record_url`` and ``record_name`` (the element the last drawn link was
+    recorded against, which the "Open the record" row links to), ``kindLabel``
+    (the relationship type in plain words), ``derived`` and ``source_confidence``.
+
+    ``source_timestamp`` is the relationship's recorded as-of date
+    (``updated_at``, else ``created_at``) whenever either exists. ``source_name``
+    is the recorder when the model knows one: the person who drew the link
+    ("Drawn by <name>"), and ``None`` when nobody is recorded. The dialog says
+    "Source not recorded" only when both are ``None``, and "Worked out from the
+    model" for a derived row.
+
+    The last id of the row's chain is read inside ``organization_id`` only and
+    its element comes from the same organisation, so a link never crosses
+    organisations; nothing is invented.
+    """
+    from app.models import ArchiMateElement, ArchiMateRelationship
+    from app.utils.tenant_users import user_in_org
+
+    last_ids = {}
+    for index, row in enumerate(rows):
+        chain = (row.get("relation") or {}).get("chain") or []
+        if chain:
+            last_ids[index] = chain[-1]
+    relationships = {}
+    if last_ids:
+        found = db.session.execute(
+            db.select(ArchiMateRelationship).where(
+                ArchiMateRelationship.id.in_(sorted(set(last_ids.values()))),
+                ArchiMateRelationship.organization_id == organization_id,
+            )
+        ).scalars().all()
+        relationships = {r.id: r for r in found}
+    elements = {}
+    element_ids = {r.source_id for r in relationships.values() if r.source_id is not None}
+    if element_ids:
+        found_elements = db.session.execute(
+            db.select(ArchiMateElement).where(
+                ArchiMateElement.id.in_(sorted(element_ids)),
+                ArchiMateElement.organization_id == organization_id,
+            )
+        ).scalars().all()
+        elements = {e.id: e for e in found_elements}
+
+    people: Dict[int, Optional[str]] = {}
+
+    def drawn_by(user_id) -> Optional[str]:
+        if user_id is None:
+            return None
+        if user_id not in people:
+            user = user_in_org(user_id, organization_id)
+            people[user_id] = _user_label(user) if user is not None else None
+        return people[user_id]
+
+    for index, row in enumerate(rows):
+        relation = row.setdefault("relation", {})
+        rel = relationships.get(last_ids.get(index))
+        origin = elements.get(rel.source_id) if rel is not None else None
+        who = drawn_by(rel.created_by_id) if rel is not None else None
+        moment = (rel.updated_at or rel.created_at) if rel is not None else None
+        relation["source_name"] = f"Drawn by {who}" if who else None
+        relation["source_timestamp"] = moment.isoformat() if moment else None
+        relation["record_name"] = origin.name if origin is not None and origin.name else None
+        relation["source_confidence"] = relation.get("confidence")
+        relation["derived"] = relation.get("kind") == "derived"
+        kind = relation.get("type") or (rel.type if rel is not None else None)
+        relation["kindLabel"] = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", kind).lower() if kind else None
+        relation["record_url"] = _element_href(origin.id) if origin is not None else None
+
+
 def expanded_chain(explanation: Dict[str, Any]) -> List[Dict[str, Any]]:
     """The derived row's chain as relationship ids and endpoints, read from its
     explanation's links rather than from a second query.
@@ -237,6 +309,7 @@ def explain_derived_fact(organization_id: int, derived_id: int) -> Optional[Dict
 
 
 __all__ = [
+    "attach_relationship_sources",
     "EXPLANATION_REASON_CODES",
     "expanded_chain",
     "explain_derived_fact",

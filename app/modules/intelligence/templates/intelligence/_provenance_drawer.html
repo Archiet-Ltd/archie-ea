@@ -29,6 +29,41 @@
             <h3 id="drawer-plain-terms-heading" class="text-sm font-semibold text-foreground">In plain terms</h3>
             <p class="mt-1 text-sm text-foreground" data-plain-terms x-text="drawer.plainTerms"></p>
         </section>
+        <section aria-labelledby="drawer-source-heading" data-why-source>
+            <h3 id="drawer-source-heading" class="text-sm font-semibold text-foreground">Where this comes from</h3>
+            <dl class="mt-1 space-y-1 text-sm">
+                <div class="grid gap-x-4 sm:grid-cols-[9rem_1fr]">
+                    <dt class="text-muted-foreground">Source record</dt>
+                    <dd class="min-w-0 break-words text-foreground" data-source-name>
+                        <span x-show="drawer.detail.derived">Worked out from the model</span>
+                        <span x-show="!drawer.detail.derived && drawer.detail.sourceName" x-text="drawer.detail.sourceName"></span>
+                        <span x-show="!drawer.detail.derived && !drawer.detail.sourceName && drawer.detail.asOf">Recorded in the model</span>
+                        <span x-show="!drawer.detail.derived && !drawer.detail.sourceName && !drawer.detail.asOf" class="inline-flex flex-wrap items-center gap-1.5">Source not recorded {{ provenance_badge('missing') }}</span>
+                    </dd>
+                </div>
+                <div class="grid gap-x-4 sm:grid-cols-[9rem_1fr]">
+                    <dt class="text-muted-foreground">Relationship type</dt>
+                    <dd class="min-w-0 break-words text-foreground" data-source-type>
+                        <span x-show="drawer.detail.relationshipType" x-text="drawer.detail.relationshipType"></span>
+                        <span x-show="!drawer.detail.relationshipType">Type not recorded</span>
+                    </dd>
+                </div>
+                <div class="grid gap-x-4 sm:grid-cols-[9rem_1fr]">
+                    <dt class="text-muted-foreground">As of</dt>
+                    <dd class="min-w-0 break-words text-foreground" data-source-as-of>
+                        <span x-show="drawer.detail.asOf" x-text="drawer.detail.asOf"></span>
+                        <span x-show="!drawer.detail.asOf">Date not recorded</span>
+                    </dd>
+                </div>
+                <div class="grid gap-x-4 sm:grid-cols-[9rem_1fr]">
+                    <dt class="text-muted-foreground">Record</dt>
+                    <dd class="min-w-0 break-words text-foreground" data-source-link>
+                        <a x-show="drawer.detail.sourceUrl" :href="drawer.detail.sourceUrl" class="font-medium text-primary hover:underline" x-text="drawer.detail.recordName ? 'Open ' + drawer.detail.recordName : 'Open the record'"></a>
+                        <span x-show="!drawer.detail.sourceUrl">No record to open</span>
+                    </dd>
+                </div>
+            </dl>
+        </section>
         <section x-show="drawer.why.state !== 'idle'" x-cloak aria-labelledby="drawer-why-heading" data-why-chain>
             <h3 id="drawer-why-heading" class="text-sm font-semibold text-foreground">The links behind this</h3>
             <div x-show="drawer.why.state === 'loading'" x-cloak class="mt-2">

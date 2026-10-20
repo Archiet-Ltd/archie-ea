@@ -479,6 +479,12 @@ def cross_layer_impact(element_id: int):
     if result.get("rows") is None:
         return not_found_response("Element")
 
+    # The Why dialog's source, type, date and record link, from the one
+    # explanation reader (tenant-scoped); a row without a source says so.
+    from app.modules.intelligence.services.explanation import attach_relationship_sources
+
+    attach_relationship_sources(organization_id, result["rows"])
+
     return success_response(
         {
             "rows": result["rows"],
