@@ -14,8 +14,9 @@ The decorator also resolves the request to its contract operation id. A bearer
 call is recorded once per (organisation, consumer, operation), so the
 deprecation admin page can name the consumers of an operation before it
 retires, and an operation an organisation administrator has marked as retiring
-answers with the retirement headers. Recording runs in its own short
-transaction after the gate has passed and can never fail or alter the request.
+answers with the retirement headers. Recording runs after the response has been
+sent, in its own short transaction, and can never fail, slow or alter the
+request.
 """
 
 from __future__ import annotations
@@ -118,6 +119,7 @@ _UPSERT_CALL = db.text(
     "DO UPDATE SET last_called_at = now(), "
     "call_count = api_operation_calls.call_count + 1"
 )
+_RELAXED_COMMIT = db.text("SET LOCAL synchronous_commit = off")
 _SELECT_RETIREMENT = db.text(
     "SELECT retires_on, replacement_operation_id, marked_at "
     "FROM api_operation_retirements "
@@ -125,37 +127,64 @@ _SELECT_RETIREMENT = db.text(
 )
 
 
-def _note_call(org_id: int, consumer_key: str | None, operation_id: str):
-    """Record a bearer call and look up the operation's retirement; never raises.
+def _find_retirement(org_id: int, operation_id: str):
+    """The organisation's retirement record for an operation, or None; never raises.
 
-    Runs in its own short transaction, separate from the request's, so the
-    record is committed whatever the view does, and a failure of either step
-    (a missing table, a lock, a dropped connection) is logged and leaves the
-    request untouched. A personal API token has no ``oauth_clients`` row; it is
-    recorded under its own identifier with ``client_id`` empty. Pass
-    ``consumer_key=None`` to look the retirement up without recording a call
-    (a signed-in session). Returns the retirement row or None.
+    One indexed read on the request's own connection, before the view has done
+    anything. If it fails (a missing table, a dropped connection) the request's
+    transaction is rolled back to a clean state and the call goes on without
+    retirement headers.
+    """
+    try:
+        return db.session.execute(
+            _SELECT_RETIREMENT, {"org_id": org_id, "operation_id": operation_id}
+        ).first()
+    except Exception as exc:
+        logger.warning("Retirement lookup skipped for %s: %s", operation_id, exc)
+        db.session.rollback()
+        return None
+
+
+def _write_call(app, org_id: int, consumer_key: str, operation_id: str) -> None:
+    """Upsert one call record in its own transaction; never raises.
+
+    Runs once the response has been handed back (see ``_record_after_response``),
+    so it adds nothing to the caller's wait, and in a transaction of its own, so
+    the record is committed whatever the view did and a failure (a missing
+    table, a lock, a dropped connection) is logged and touches nothing else. A
+    personal API token has no ``oauth_clients`` row; it is recorded under its
+    own identifier with ``client_id`` empty.
     """
     from sqlalchemy.orm import Session
 
     from app.middleware.tenant_isolation import set_database_tenant_context
 
-    retirement = None
     try:
-        with Session(bind=db.session.get_bind(), join_transaction_mode="create_savepoint") as own:
-            set_database_tenant_context(own.connection(), org_id)
-            retirement = own.execute(
-                _SELECT_RETIREMENT, {"org_id": org_id, "operation_id": operation_id}
-            ).first()
-            if consumer_key is not None:
+        with app.app_context():
+            with Session(bind=db.session.get_bind(), join_transaction_mode="create_savepoint") as own:
+                set_database_tenant_context(own.connection(), org_id)
+                # A usage counter does not need the commit to wait for the disk
+                # flush; losing the last few increments in a crash is harmless.
+                own.execute(_RELAXED_COMMIT)
                 own.execute(
                     _UPSERT_CALL,
                     {"org_id": org_id, "consumer_key": consumer_key, "operation_id": operation_id},
                 )
-            own.commit()
-    except Exception as exc:  # the record must never cost the caller a response
+                own.commit()
+    except Exception as exc:  # the record must never cost anyone a response
         logger.warning("API call record skipped for %s: %s", operation_id, exc)
-    return retirement
+
+
+def _record_after_response(org_id: int, consumer_key: str, operation_id: str) -> None:
+    """Schedule the call record for when the response has been sent."""
+    from flask import current_app
+
+    app = current_app._get_current_object()
+
+    @after_this_request
+    def _schedule(response):
+        response.call_on_close(lambda: _write_call(app, org_id, consumer_key, operation_id))
+        return response
 
 
 def retirement_headers(retirement) -> dict:
@@ -226,15 +255,16 @@ def require_api_scope(required_scope: str):
                     return forbidden_response("This token belongs to another organisation")
                 operation_id = _request_operation_id()
                 if operation_id is not None:
-                    retirement = _note_call(token.organization_id, token.client_id, operation_id)
+                    retirement = _find_retirement(token.organization_id, operation_id)
                     if retirement is not None:
                         _announce_retirement(retirement)
+                    _record_after_response(token.organization_id, token.client_id, operation_id)
                 return view(*args, **kwargs)
             if current_user.is_authenticated:
                 org_id = getattr(g, "current_org_id", None)
                 operation_id = _request_operation_id()
                 if operation_id is not None and org_id is not None:
-                    retirement = _note_call(org_id, None, operation_id)
+                    retirement = _find_retirement(org_id, operation_id)
                     if retirement is not None:
                         _announce_retirement(retirement)
                 return view(*args, **kwargs)

@@ -56,8 +56,13 @@ def _reset_identity():
 
 
 def _bearer_get(app, path, token):
+    """GET with a bearer token and end the request: the call is recorded once the
+    response has been sent, which a test client only does when told to close."""
     _reset_identity()
-    return app.test_client().get(path, headers={"Authorization": f"Bearer {token}"})
+    response = app.test_client().get(path, headers={"Authorization": f"Bearer {token}"})
+    response.get_data()
+    response.close()
+    return response
 
 
 def _fresh_session():
@@ -199,6 +204,21 @@ def test_both_token_families_are_recorded_and_the_row_is_committed(app, db_sessi
     assert personal.token_kind == "api_token"
     assert personal.client_id is None
     assert (client_a.client_id, "getElement") in by_key, "an operation with a path parameter resolves too"
+
+
+def test_the_record_is_written_after_the_response_not_during_it(app, db_session, make_org):
+    from sqlalchemy import text
+
+    org_a, _b, _sa, _sb, _ca, _cb, tokens = _consumers(db_session, make_org)
+    _reset_identity()
+    response = app.test_client().get("/api/v1/elements", headers={"Authorization": f"Bearer {tokens['client_a']}"})
+    response.get_data()
+    count = "SELECT count(*) FROM api_operation_calls WHERE organization_id = :o"
+    with _fresh_session() as session:
+        assert session.execute(text(count), {"o": org_a.id}).scalar() == 0, "written before the response was sent"
+    response.close()
+    with _fresh_session() as session:
+        assert session.execute(text(count), {"o": org_a.id}).scalar() == 1
 
 
 def test_a_failing_recorder_never_costs_the_caller_a_response(app, db_session, make_org, monkeypatch, caplog):
