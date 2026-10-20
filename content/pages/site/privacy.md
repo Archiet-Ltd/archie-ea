@@ -14,9 +14,7 @@ source: app/models/user.py, app/models/waitlist_signup.py, app/main/views.py (wa
 your password — never the password itself.
 
 **What you and your team enter.** Everything you record in your organisation's model — applications,
-risks, roadmaps and the rest of what Entelim covers — is stored so it can answer your questions. It
-belongs to your organisation and is scoped to it; other organisations on the same instance cannot
-read it.
+risks, roadmaps and the rest of what Entelim covers — is stored so it can answer your questions.
 
 **The waiting list.** If you join the waiting list from the home page, we store your email address
 and the fact that you agreed to it, and use it only to tell you about the Entelim launch.
