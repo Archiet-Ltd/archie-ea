@@ -10,6 +10,20 @@ with Tailwind/shadcn tokens and Alpine.js on the front end.
 **Read `DESIGN.md` before editing any template, CSS, or front-end JS file.** It is the authoritative
 UI contract (color tokens, base templates, component macros, Alpine rules) and is not repeated here.
 
+## The checklist and the component inventory are read first — standing instruction from the owner (20 Oct 2026)
+
+Before any audit, any fix or any implementation: read `docs/launch-checklist.md` in the sdlc-orchestrator
+repository (the seven-phase definition of done, ordered by severity of failure) and `docs/component-inventory.json`
+here (every button, form, modal, table and endpoint, generated from `app/templates/` by
+`scripts/component_inventory.py`; until it exists, producing it is the first Phase 0 task). State which phase of
+the checklist the task serves; if it serves none, stop and report. After the work: update the checklist (checked,
+unchecked, or a new line with its evidence path), regenerate the inventory if any button, form or modal was added
+or changed, and report against the phase.
+
+Why: every earlier audit crawled pages, so a button that only exists once clicked was never tested. The inventory
+turns an audit into an enumeration: for every button in it, click it and record the outcome. Nothing is hidden to
+pass a line: a no-op button is a fix candidate, never a hide candidate.
+
 ## SDLC orchestration subagents — execution mechanism, not a second role system
 
 `.claude/agents/*.md` defines 27 Claude Code subagents (business-analyst,
