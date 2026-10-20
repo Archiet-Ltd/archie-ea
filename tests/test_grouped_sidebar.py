@@ -242,7 +242,8 @@ def test_tier1_routes_and_their_old_sidebar_urls_answer(app, db_session, make_or
     "url,parent,leaf",
     [
         ("/capability-map/hierarchy", "Capability Map", "Hierarchy"),
-        ("/architecture/business/actors", "Business architecture", "Actors"),
+        ("/architecture/dashboard?layer=business&element_type=Business%20Actor", "Business architecture", "All business elements"),
+        ("/batch-import/", "Import", "Import a spreadsheet"),
         ("/architecture/dashboard?layer=technology", "Technology architecture", "All technology elements"),
     ],
 )
