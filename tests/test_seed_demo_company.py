@@ -781,10 +781,10 @@ def test_portfolio_screen_has_initiatives_with_recorded_figures(app, db_session,
     from app.models.vendor.vendor_organization import EnterpriseInitiative
 
     stats = _seed_once()
-    assert stats["initiatives_created"] == 5
+    assert stats["initiatives_created"] == 7
     org_id = _get_lantern_org_id()
     rows = EnterpriseInitiative.query.filter_by(organization_id=org_id).all()
-    assert len(rows) == 5
+    assert len(rows) == 7
     for row in rows:
         assert row.current_phase and row.health_status and row.executive_sponsor
         assert row.approved_budget and row.spent_to_date is not None
@@ -792,7 +792,7 @@ def test_portfolio_screen_has_initiatives_with_recorded_figures(app, db_session,
     assert {r.health_status for r in rows} >= {"green", "yellow"}
     again = _seed_once()
     assert again["initiatives_created"] == 0
-    assert EnterpriseInitiative.query.filter_by(organization_id=org_id).count() == 5
+    assert EnterpriseInitiative.query.filter_by(organization_id=org_id).count() == 7
 
 
 def test_work_packages_have_owner_initiative_and_connections(app, db_session, make_org):
