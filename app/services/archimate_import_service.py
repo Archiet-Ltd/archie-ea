@@ -159,7 +159,9 @@ class ArchiMateImportService:
     # DOGFOOD-001: the parser checks these so preview reports what execute
     # will refuse, instead of one over-long name aborting the whole import
     # with a raw ``StringDataRightTruncation`` from the database.
-    MAX_NAME_LENGTH = 100
+    # The element name column holds 500 characters; 255 is the import limit so a
+    # long Open Exchange name no longer blocks its element.
+    MAX_NAME_LENGTH = 255
     MAX_TYPE_LENGTH = 50
 
     # DOGFOOD-003 (relationship-validity authority audit): this class used to
