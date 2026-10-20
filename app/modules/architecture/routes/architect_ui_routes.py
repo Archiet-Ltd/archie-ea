@@ -339,8 +339,16 @@ def import_oef():
             "No file uploaded. POST multipart/form-data with a field named 'oef_file'.", 400
         )
 
+    # Get filename for provenance (Task 01)
+    source_label = None
+    for field in ("oef_file", "file"):
+        uploaded = request.files.get(field) if request.files else None
+        if uploaded is not None and uploaded.filename:
+            source_label = uploaded.filename
+            break
+
     try:
-        result = ArchiMateImportService().import_xml(content, strategy=strategy)
+        result = ArchiMateImportService().import_xml(content, strategy=strategy, source_label=source_label)
     except ImportRequestError as exc:
         return _refuse(str(exc), exc.status_code)
 
