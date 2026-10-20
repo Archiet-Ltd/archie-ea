@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from app.modules.intelligence.services.derived_facts import (
     derived_fact_aggregates,
     latest_derivation_run,
-    list_derived_facts,
+    list_derived_element_ids,
 )
 from app.modules.intelligence.services.graph_projection import get_projection
 
@@ -74,11 +74,7 @@ def derivation_coverage(
     aggregates = derived_fact_aggregates(organization_id)
     latest_run = latest_derivation_run(organization_id)
 
-    facts = list_derived_facts(organization_id)
-    derived_element_ids: set[int] = set()
-    for fact in facts:
-        derived_element_ids.add(int(fact["source_element_id"]))
-        derived_element_ids.add(int(fact["target_element_id"]))
+    derived_element_ids = list_derived_element_ids(organization_id)
 
     missing: List[Tuple[int, Optional[str], Optional[str]]] = []
     for element_id, type_, node_layer in sorted(nodes):
