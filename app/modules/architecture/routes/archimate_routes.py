@@ -22,8 +22,9 @@ from flask import Blueprint, Response, abort, current_app, g, jsonify, redirect,
 from flask_login import current_user, login_required
 from sqlalchemy.orm import joinedload
 
-from app import db
 from app.core.auth.decorators import require_permission
+
+from app import db
 from app.models.constants import ArchiMateRelationshipType
 from app.modules.architecture.routes.lucidchart_import_routes import (
     register_lucidchart_import_routes,
@@ -7156,6 +7157,7 @@ def api_composer_element_metrics():
 
 
 @archimate_bp.route("/api/import/oef", methods=["POST"])
+@require_permission("create", "relationship")
 @login_required
 def api_import_oef():
     """Import an OEF XML model and answer in the composer's shape.
