@@ -70,7 +70,7 @@
                 <option value="{{ gap_type }}">{{ gap_type.replace('_', ' ').title() }}</option>
                 {% endfor %}
               </select>
-              <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+              <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Raise Gap
               </button>
             </form>
@@ -135,7 +135,7 @@
               <label for="wp-hours-{{ gap.id }}" class="sr-only">Estimated hours</label>
               <input id="wp-hours-{{ gap.id }}" type="number" name="estimated_effort_hours" placeholder="Estimated hours" step="1" min="0" max="2147483647" class="flex h-9 w-32 rounded-md border border-input bg-transparent px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             </div>
-            <button type="submit" :disabled="submitting" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+            <button type="submit" :disabled="submitting" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
               <span x-show="!submitting">Attach work package</span>
               <span x-show="submitting" x-cloak role="status" aria-live="polite">Attaching…</span>
             </button>

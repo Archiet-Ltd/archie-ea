@@ -8,7 +8,7 @@
             <button type="button"
                     @click="refresh()"
                     :disabled="loading"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 <i data-lucide="refresh-cw" class="h-4 w-4 mr-2" aria-hidden="true"></i>Refresh
             </button>
         </div>
@@ -81,7 +81,7 @@
                         </button>
                         <template x-if="openSnapshots.includes(index)">
                             <div class="mt-2 overflow-x-auto rounded-md border border-border bg-muted p-3">
-                                <pre class="text-[11px] font-mono text-foreground" x-text="JSON.stringify(version.snapshot, null, 2)"></pre>
+                                <pre class="text-2xs font-mono text-foreground" x-text="JSON.stringify(version.snapshot, null, 2)"></pre>
                             </div>
                         </template>
                     </div>
@@ -98,11 +98,11 @@
                                 <div class="mt-2 space-y-2">
                                     <div class="rounded-md border border-border bg-muted p-3">
                                         <p class="text-xs font-medium text-muted-foreground mb-1">Previous version</p>
-                                        <pre class="text-[11px] font-mono text-foreground" x-text="JSON.stringify(version.previous_snapshot, null, 2)"></pre>
+                                        <pre class="text-2xs font-mono text-foreground" x-text="JSON.stringify(version.previous_snapshot, null, 2)"></pre>
                                     </div>
                                     <div class="rounded-md border border-border bg-muted p-3">
                                         <p class="text-xs font-medium text-muted-foreground mb-1">Current version</p>
-                                        <pre class="text-[11px] font-mono text-foreground" x-text="JSON.stringify(version.snapshot, null, 2)"></pre>
+                                        <pre class="text-2xs font-mono text-foreground" x-text="JSON.stringify(version.snapshot, null, 2)"></pre>
                                     </div>
                                 </div>
                             </template>

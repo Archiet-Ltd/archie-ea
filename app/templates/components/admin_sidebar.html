@@ -79,7 +79,7 @@ DEPENDENCIES:
             <div class="w-8 h-8 flex items-center justify-center">
                 <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" class="w-8 h-8">
             </div>
-            <span class="text-[15px] font-semibold tracking-[-0.01em] text-foreground sidebar-app-name">{{ config.APP_NAME }}</span>
+            <span class="text-15 font-semibold tracking-[-0.01em] text-foreground sidebar-app-name">{{ config.APP_NAME }}</span>
         </a>
         <button type="button" @click="$store.sidebar.open = false"
                 class="lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
@@ -145,7 +145,7 @@ DEPENDENCIES:
                     @focus="searchFocused = true"
                     @blur="searchFocused = false"
                     placeholder="Search navigation..."
-                    class="w-full h-8 pl-8 pr-8 rounded-md border border-input bg-background text-[13px] placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
+                    class="w-full h-8 pl-8 pr-8 rounded-md border border-input bg-background text-13 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
                  aria-label="Search navigation..."/>
                 <button type="button"
                     x-cloak x-show="searchQuery"
@@ -208,7 +208,7 @@ DEPENDENCIES:
         {% set visible_links = zone.links | selectattr('endpoint', 'in', flask.current_app.view_functions) | list %}
         {% if visible_links %}
         <div class="px-2 pb-1">
-            <div class="mb-1 mt-4 px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground" role="heading" aria-level="3">
+            <div class="mb-1 mt-4 px-2 text-10 font-semibold uppercase tracking-[0.08em] text-muted-foreground" role="heading" aria-level="3">
                 {{ zone.title }}
             </div>
             <div class="space-y-0.5">
@@ -219,7 +219,7 @@ DEPENDENCIES:
                    tooltip is the only way to learn what this link is. #}
                 <a href="{{ url_for(link.endpoint, **(link.query_params or {})) }}"
                    title="{{ link.label }}"
-                   class="flex h-8 items-center gap-2 rounded-md px-2 text-[13px] transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 {% if request.endpoint == link.endpoint %}bg-slate-100 text-info font-medium dark:bg-slate-800{% else %}text-muted-foreground{% endif %}" {%- if request.endpoint == link.endpoint -%} aria-current="page"{%- endif -%}>
+                   class="flex h-8 items-center gap-2 rounded-md px-2 text-13 transition-colors hover:bg-accent hover:text-foreground {% if request.endpoint == link.endpoint %}bg-muted text-info font-medium dark:bg-card{% else %}text-muted-foreground{% endif %}" {%- if request.endpoint == link.endpoint -%} aria-current="page"{%- endif -%}>
                     <i data-lucide="{{ link.icon }}" class="h-4 w-4 flex-shrink-0"></i>
                     <span class="flex-1 truncate">{{ link.label }}</span>
                 </a>

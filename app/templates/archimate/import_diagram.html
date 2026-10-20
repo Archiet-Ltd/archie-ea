@@ -107,7 +107,7 @@
 
         <div class="mt-6 flex flex-wrap items-center gap-3">
             <button type="button" @click="preview()" :disabled="!file || busy"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <span x-show="!busy || mode !== 'preview'">Preview</span>
                 <span x-show="busy && mode === 'preview'" x-cloak>Reading…</span>
             </button>
@@ -239,7 +239,7 @@
                 <template x-for="v in ['created','changed','linked','skipped']" :key="v">
                     <button type="button" @click="filter = (filter === v ? '' : v)"
                             :class="filter === v ? 'ring-1 ring-primary' : ''"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                         <span class="verdict-dot" :class="'verdict-' + v"></span>
                         <span x-text="v"></span>
                         <span class="opacity-60" x-text="countOf(v)"></span>

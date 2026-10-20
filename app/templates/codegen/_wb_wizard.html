@@ -276,7 +276,7 @@
                     <p class="text-xs text-muted-foreground mb-2">Or use AI enrichment for deeper UML diagrams (requires LLM API key):</p>
                     <div class="flex items-center gap-3">
                         <button type="button" @click="enrich()"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <i data-lucide="sparkles" class="h-3 w-3"></i> AI Enrich
                         </button>
                     </div>
@@ -302,7 +302,7 @@
                             <span x-text="nlGenerating ? 'Generating…' : 'Generate Elements'"></span>
                         </button>
                         <button type="button" x-show="nlResult" x-cloak @click="generateArchitecture(true)" :disabled="nlGenerating || !nlDescription.trim()"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <i data-lucide="plus" class="h-3 w-3"></i> Append More
                         </button>
                     </div>
@@ -402,7 +402,7 @@
                             </span>
                         </template>
                     </span>
-                    <button type="button" @click="skipToConfig()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                    <button type="button" @click="skipToConfig()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         Skip field review <i data-lucide="arrow-right" class="h-3.5 w-3.5"></i>
                     </button>
                 </div>
@@ -478,10 +478,10 @@
                     </div>
                 </div>
                 <div class="mt-4 pt-4 border-t border-border flex items-center gap-3">
-                    <button type="button" @click="resetUml()" :disabled="resetting" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                    <button type="button" @click="resetUml()" :disabled="resetting" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i><span x-text="resetting ? 'Resetting…' : 'Re-enrich from ArchiMate'"></span>
                     </button>
-                    <a :href="'/solutions/' + solutionId + '/codegen/openapi.yaml'" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                    <a :href="'/solutions/' + solutionId + '/codegen/openapi.yaml'" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="file-json" class="h-3.5 w-3.5"></i> Export OpenAPI
                     </a>
                 </div>

@@ -8,7 +8,7 @@
     <div class="flex items-center gap-2">
       <button @click="autoSequence()" type="button"
         :disabled="roadmap.workPackages.length === 0"
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="git-branch" class="h-4 w-4"></i> Auto-sequence
       </button>
       <button @click="generateRoadmap()" type="button"
@@ -64,7 +64,7 @@
     <div class="flex items-center justify-between mb-3">
       <span class="text-sm font-medium text-foreground">Work Packages (<span x-text="roadmap.workPackages.length"></span>)</span>
       <button @click="addWorkPackage()" type="button"
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="plus" class="h-3 w-3"></i> Add
       </button>
     </div>
@@ -99,7 +99,7 @@
   {# Add plateau button #}
   <div x-show="!roadmapLoading" x-cloak class="flex gap-2">
     <button @click="addPlateau()" type="button"
-      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
       <i data-lucide="plus" class="h-3 w-3"></i> Add Plateau
     </button>
   </div>

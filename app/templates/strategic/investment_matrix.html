@@ -273,7 +273,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                 </div>
                 <div class="flex items-center gap-2">
                     <button type="button" @click="currentPage--; syncSelectAll()" :disabled="currentPage === 1"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                         aria-label="Previous page">
                         <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>
                         Previous
@@ -281,7 +281,7 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                     <span class="inline-flex items-center px-3 text-sm text-muted-foreground"
                           x-text="currentPage + ' / ' + totalPages"></span>
                     <button type="button" @click="currentPage++; syncSelectAll()" :disabled="currentPage === totalPages"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                         aria-label="Next page">
                         Next
                         <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>

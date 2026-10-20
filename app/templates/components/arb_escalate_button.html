@@ -47,7 +47,7 @@
      data-solution="{{ solution_id }}"
      class="shrink-0">
     <button type="button" x-show="!done" @click="go()" :disabled="busy"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="gavel" class="h-3 w-3"></i>
         <span x-text="busy ? 'Escalating…' : 'Escalate to ARB'"></span>
     </button>

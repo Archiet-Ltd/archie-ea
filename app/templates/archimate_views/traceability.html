@@ -119,13 +119,13 @@
         </button>
         {% if current_search or current_scope %}
         <a href="{{ url_for('architect_ui.traceability_matrix', direction=direction, pivot_type=current_pivot_type) }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="x" class="h-3.5 w-3.5"></i>
             Clear
         </a>
         {% endif %}
         <a href="/api/archimate/traceability/export"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="download" class="h-4 w-4"></i>
             Export CSV
         </a>
@@ -181,7 +181,7 @@
                 type="button"
                 @click="gapOpen = !gapOpen"
                 :aria-expanded="gapOpen.toString()"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
             >
                 <i data-lucide="list-tree" class="h-4 w-4"></i>
                 <span x-text="gapOpen ? 'Hide gap panel' : 'Show gap panel'"></span>
@@ -505,7 +505,7 @@
             <div class="flex items-center gap-1">
                 {% if current_page > 1 %}
                 <a href="{{ url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=current_page - 1) }}"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="chevron-left" class="h-4 w-4"></i>
                 </a>
                 {% endif %}
@@ -514,14 +514,14 @@
                 <span class="inline-flex items-center rounded-md bg-primary px-2.5 py-1.5 text-sm font-medium text-primary-foreground">{{ p }}</span>
                 {% elif p <= 3 or p >= total_pages - 2 or (p >= current_page - 1 and p <= current_page + 1) %}
                 <a href="{{ url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=p) }}"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">{{ p }}</a>
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">{{ p }}</a>
                 {% elif p == 4 or p == total_pages - 3 %}
                 <span class="px-1 text-muted-foreground">…</span>
                 {% endif %}
                 {% endfor %}
                 {% if current_page < total_pages %}
                 <a href="{{ url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=current_page + 1) }}"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="chevron-right" class="h-4 w-4"></i>
                 </a>
                 {% endif %}

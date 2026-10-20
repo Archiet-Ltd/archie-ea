@@ -33,7 +33,7 @@
             {% if instance.status == 'running' or instance.status == 'waiting_approval' %}
                 <form action="{{ url_for('integration.cancel_workflow', instance_id=instance.id) }}" method="post" @submit.prevent="Platform.modal.confirmSubmit($event, 'Are you sure you want to cancel this workflow?')">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Submit">
+                    <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Submit">
                         Cancel Workflow
                     </button>
                 </form>

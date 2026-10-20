@@ -320,7 +320,7 @@ function userSearchWidget(getVal, setVal) {
             </p>
             {# duplicate-breadcrumb-ok: table-pagination nav, not a breadcrumb -- flagged only because its Prev/Next buttons use chevron icons, the same shape heuristic keys on; real breadcrumb is the block above. #}
             <nav class="flex items-center gap-1" aria-label="Pagination">
-                <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                         :disabled="!hasPrev" @click="prevPage()" aria-label="Previous page">
                     <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>
                 </button>
@@ -333,7 +333,7 @@ function userSearchWidget(getVal, setVal) {
                         <span x-show="pg === '...'" x-cloak class="min-w-[2rem] h-8 inline-flex items-center justify-center text-sm text-muted-foreground">&hellip;</span>
                     </span>
                 </template>
-                <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                         :disabled="!hasNext" @click="nextPage()" aria-label="Next page">
                     <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>
                 </button>
@@ -447,7 +447,7 @@ function userSearchWidget(getVal, setVal) {
         <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
             <button type="button"
                     data-modal-close="edit-governance-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Cancel
             </button>
             <button type="button"
@@ -475,7 +475,7 @@ function userSearchWidget(getVal, setVal) {
         <div class="flex justify-end gap-3">
             <button type="button"
                     data-modal-close="bulk-delete-confirm-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Cancel
             </button>
             <button type="button"

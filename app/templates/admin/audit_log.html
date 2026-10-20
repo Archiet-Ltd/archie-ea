@@ -67,7 +67,7 @@
                 <i data-lucide="search" class="h-4 w-4 mr-1.5"></i> Filter
             </button>
             <a href="{{ url_for('admin.audit_log_viewer') }}"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Clear
             </a>
             <a href="{{ url_for('admin.audit_log_viewer', action='tool_refused') }}" data-testid="audit-refused-tool-calls"
@@ -76,7 +76,7 @@
                 <i data-lucide="shield-x" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Refused AI tool calls
             </a>
             <a id="audit-export" href="{{ url_for('admin.audit_log_viewer', date_from=date_from, date_to=date_to, user_email=user_email, action=action_filter, entity_type=entity_type_filter, q=search_q, export='csv') }}"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center ml-auto">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center ml-auto">
                 <i data-lucide="download" class="h-4 w-4 mr-1.5"></i> Export CSV
             </a>
         </div>
@@ -112,7 +112,7 @@
             <form method="post" action="{{ url_for('admin.audit_log_viewer', date_from=date_from, date_to=date_to, user_email=user_email, action=action_filter, entity_type=entity_type_filter, q=search_q) }}" class="shrink-0">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button id="audit-verify" type="submit"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <i data-lucide="shield-check" class="h-4 w-4 mr-1.5"></i> Verify integrity
                 </button>
             </form>
@@ -266,14 +266,14 @@
     <nav class="flex items-center justify-center gap-1 mt-6" aria-label="Audit log pagination">
         {% if page > 1 %}
         <a href="{{ url_for('admin.audit_log_viewer', page=page-1, date_from=date_from, date_to=date_to, user_email=user_email, action=action_filter, entity_type=entity_type_filter, q=search_q) }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             Previous
         </a>
         {% endif %}
         <span class="px-3 py-1.5 text-sm text-muted-foreground">Page {{ page }} of {{ total_pages }}</span>
         {% if page < total_pages %}
         <a href="{{ url_for('admin.audit_log_viewer', page=page+1, date_from=date_from, date_to=date_to, user_email=user_email, action=action_filter, entity_type=entity_type_filter, q=search_q) }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             Next
         </a>
         {% endif %}

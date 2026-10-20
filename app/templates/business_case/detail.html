@@ -133,7 +133,7 @@
         <span class="text-sm font-medium text-foreground">Export &amp; share</span>
       </div>
       <button type="button" @click="exportImage()" data-testid="bc-export-image"
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
         <i data-lucide="image" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Export as image
       </button>
       <select aria-label="File export format" x-model="exportFormat" data-testid="bc-export-format"
@@ -143,12 +143,12 @@
         <option value="archi">Archi (.archimate)</option>
       </select>
       <a :href="exportFileUrl" data-testid="bc-export-file"
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
         <i data-lucide="download" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Download file
       </a>
       <template x-if="shareUrl">
         <a :href="shareUrl" target="_blank" rel="noopener" data-testid="bc-share-link"
-          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
           <i data-lucide="link" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Share
         </a>
       </template>
@@ -313,7 +313,7 @@
       {% call card.card_content() %}
         <div class="flex justify-end mb-4">
           <button type="button" @click="pullFinancials()" :disabled="pullingFinancials" data-testid="bc-pull-financials"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <span x-show="pullingFinancials" x-cloak class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block mr-2"></span>
             <i data-lucide="download-cloud" class="h-4 w-4 mr-2" aria-hidden="true" x-show="!pullingFinancials"></i>
             Pull financials from links

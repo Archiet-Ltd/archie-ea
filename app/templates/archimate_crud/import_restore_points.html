@@ -16,7 +16,7 @@
 <div class="p-6 space-y-6 mx-auto max-w-4xl">
     {% macro _ps_actions() %}
 <a href="{{ url_for('architect_ui.import_oef') }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
             <i data-lucide="arrow-left" class="h-4 w-4" aria-hidden="true"></i> Back to import
         </a>
     {% endmacro %}
@@ -56,7 +56,7 @@
                     <td class="px-3 py-2 text-right">
                         <a href="{{ url_for('architect_ui.import_restore_preview', log_id=point.id) }}"
                            data-testid="btn-review-restore"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             Review restore
                         </a>
                     </td>

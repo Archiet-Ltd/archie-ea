@@ -224,8 +224,8 @@
             </td>
             <td class="px-4 py-3 text-right">
               <div class="flex gap-2 justify-end min-w-[120px]">
-                <a href="{{ url_for('application_mgmt.vendor_detail', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap">View</a>
-                <a href="{{ url_for('application_mgmt.edit_vendor', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap">Edit</a>
+                <a href="{{ url_for('application_mgmt.vendor_detail', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap">View</a>
+                <a href="{{ url_for('application_mgmt.edit_vendor', vendor_id=vendor.id) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap">Edit</a>
               </div>
             </td>
           </tr>
@@ -371,7 +371,7 @@
           <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
           Add Vendor
         </a>
-        <a href="{{ url_for('admin.abacus_settings') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+        <a href="{{ url_for('admin.abacus_settings') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
           <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i>
           Sync from Abacus
         </a>

@@ -20,7 +20,7 @@
     {% if reg.status != 'active' %}
     <form method="post" action="{{ url_for('agent_registry.activate', registration_id=reg.id) }}" class="mt-3">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" data-testid="activate-button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">Activate</button>
+      <button type="submit" data-testid="activate-button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">Activate</button>
     </form>
     {% endif %}
   </div>

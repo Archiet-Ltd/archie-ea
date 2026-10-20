@@ -67,7 +67,7 @@
                 <div class="flex items-center space-x-4">
                     {{ header_items(current_user, mobile=True) }}
                 </div>
-                <button @click="mobileMenuOpen = !mobileMenuOpen" @keydown.escape.window="mobileMenuOpen = false" type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center" aria-label="Open">
+                <button @click="mobileMenuOpen = !mobileMenuOpen" @keydown.escape.window="mobileMenuOpen = false" type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center" aria-label="Open">
                     <span class="sr-only">Open main menu</span>
                     <!-- Hamburger icon -->
                     <i data-lucide="menu" class="h-5 w-5" x-show="!mobileMenuOpen" x-cloak></i>
