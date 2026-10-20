@@ -95,6 +95,9 @@ SEED_LIMIT_REACHED_REASON = validate_reason_code("seed_limit_reached")
 ROWS_TRUNCATED_REASON = validate_reason_code("rows_truncated")
 SET_IMPACT_MAX_SEEDS = 25
 SET_IMPACT_MAX_ROWS = 1000
+# Single points of failure walks once per value stream; at most this many
+# streams are walked (the same bound as the set-impact seed limit).
+SPOF_MAX_VALUE_STREAMS = SET_IMPACT_MAX_SEEDS
 
 # T-005 (D1): the NFR-5 measurement point is this exact, PINNED series --
 # never widened, never aggregated across label values.
@@ -3226,12 +3229,19 @@ class IntelligenceQueryService:
                 "truncated": False,
             }
 
-        # Get all value streams for the organisation that have an archimate_element_id
+        # Value streams of the organisation that have an archimate element, in
+        # a stable order; at most SPOF_MAX_VALUE_STREAMS are walked.
+        vs_filter = (
+            ValueStream.organization_id == org_id,
+            ValueStream.archimate_element_id.is_not(None),
+        )
+        streams_existing = db.session.execute(
+            db.select(db.func.count()).select_from(ValueStream).where(*vs_filter)
+        ).scalar() or 0
         value_streams = db.session.execute(
-            db.select(ValueStream)
-            .where(ValueStream.organization_id == org_id)
-            .where(ValueStream.archimate_element_id.is_not(None))
+            db.select(ValueStream).where(*vs_filter).order_by(ValueStream.id).limit(SPOF_MAX_VALUE_STREAMS)
         ).scalars().all()
+        streams_capped = streams_existing > len(value_streams)
 
         if not value_streams:
             return {
@@ -3255,6 +3265,7 @@ class IntelligenceQueryService:
         #   element_to_row: dict[element_id] = row from the walk (first row seen for the element)
         all_elements: Dict[int, Dict[str, Any]] = {}
         element_to_value_streams: Dict[int, Set[int]] = defaultdict(set)
+        stream_by_id: Dict[int, Dict[str, Any]] = {}
         element_to_row: Dict[int, Dict[str, Any]] = {}
 
         # We will also track the latency using the existing record_query_latency
@@ -3265,6 +3276,8 @@ class IntelligenceQueryService:
                 vs_element_id = vs.archimate_element_id
                 if vs_element_id is None:
                     continue
+
+                stream_by_id[vs.id] = {"id": vs.id, "name": vs.name}
 
                 # Walk upstream from the value stream element
                 result = IntelligenceQueryService.cross_layer_impact(
@@ -3283,7 +3296,7 @@ class IntelligenceQueryService:
                 # Process each row in the walk
                 for row in result.get("rows", []):
                     eid = row["element_id"]
-                    element_to_value_streams[eid].add(vs_element_id)
+                    element_to_value_streams[eid].add(vs.id)
                     if eid not in element_to_row:
                         element_to_row[eid] = row
 
@@ -3312,18 +3325,24 @@ class IntelligenceQueryService:
 
         # Sort by count descending, then by element name ascending
         elements_list.sort(
-            key=lambda x: (-x[1], all_elements[x[0]]["name"].lower() if x[0] in all_elements else "")
+            key=lambda x: (
+                -x[1],
+                ((all_elements.get(str(x[0])) or {}).get("name") or "").lower(),
+                x[0],
+            )
         )
 
         # Apply truncation limit
         total_before_truncation = len(elements_list)
         truncated = False
+        reasons = []
         if total_before_truncation > SET_IMPACT_MAX_ROWS:
             elements_list = elements_list[:SET_IMPACT_MAX_ROWS]
             truncated = True
-            reasons = [ROWS_TRUNCATED_REASON]
-        else:
-            reasons = []
+            reasons.append(ROWS_TRUNCATED_REASON)
+        if streams_capped:
+            truncated = True
+            reasons.append(SEED_LIMIT_REACHED_REASON)
 
         # Build the final rows list and compute summary counts
         final_rows: List[Dict[str, Any]] = []
@@ -3332,6 +3351,11 @@ class IntelligenceQueryService:
         stale_count = 0
         for position, (eid, count, row) in enumerate(elements_list, start=1):
             row["rank"] = position
+            row["value_stream_count"] = count
+            row["value_streams"] = sorted(
+                (stream_by_id[v] for v in element_to_value_streams[eid]),
+                key=lambda v: ((v["name"] or "").lower(), v["id"]),
+            )
             final_rows.append(row)
             # Update summary counts based on the row's relation
             relation_kind = row.get("relation", {}).get("kind")
@@ -3369,6 +3393,13 @@ class IntelligenceQueryService:
             "stale_count": stale_count,
             "derivation_state": derivation_state,
             "total": len(final_rows),  # Number of rows after truncation
+            "value_streams_considered": len(value_streams),
+            "value_streams_existing": streams_existing,
+            "include_derived": include_derived,
+            "statement": (
+                f"{len(value_streams)} of {streams_existing} value streams considered; "
+                f"relationships derived from drawn facts are {'included' if include_derived else 'excluded'}."
+            ),
             # We can also add latency_ms from the scope
             "latency_ms": scope.latency_ms,
         }

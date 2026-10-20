@@ -938,3 +938,95 @@ def test_single_points_of_failure_truncated_walk_is_marked(
     assert data["truncated"] is True
     assert len(data["rows"]) == 50
     assert data["summary"]["total"] > 50
+
+
+def test_single_points_of_failure_rows_state_count_and_names_of_streams(
+    app, db_session, make_org, client, login_as
+):
+    """Each row carries the number of distinct value streams and names them;
+    two paths from one stream count once."""
+    org = make_org("spof-count")
+    user = _user(db_session, org.id)
+    login_as(client, user)
+    vse1 = _element(db_session, org.id, "VS1 element", type_="BusinessService", layer="business")
+    vse2 = _element(db_session, org.id, "VS2 element", type_="BusinessService", layer="business")
+    vs1 = _value_stream(db_session, org.id, "Order to Cash", "VS1", vse1.id)
+    vs2 = _value_stream(db_session, org.id, "Procure to Pay", "VS2", vse2.id)
+    both = _element(db_session, org.id, "Shared platform", type_="ApplicationComponent", layer="application")
+    twice = _element(db_session, org.id, "Billing", type_="ApplicationComponent", layer="application")
+    relay = _element(db_session, org.id, "Relay", type_="ApplicationComponent", layer="application")
+    _link(db_session, org.id, both, vse1)
+    _link(db_session, org.id, both, vse2)
+    _link(db_session, org.id, twice, vse1)
+    _link(db_session, org.id, twice, relay)
+    _link(db_session, org.id, relay, vse1)
+    db_session.commit()
+
+    rows = {
+        r["element_id"]: r
+        for r in _ask(client, question="single_points_of_failure").get_json()["data"]["rows"]
+    }
+    assert rows[both.id]["value_stream_count"] == 2
+    assert rows[both.id]["value_streams"] == [
+        {"id": vs1.id, "name": "Order to Cash"},
+        {"id": vs2.id, "name": "Procure to Pay"},
+    ]
+    assert rows[twice.id]["value_stream_count"] == 1
+    assert rows[twice.id]["value_streams"] == [{"id": vs1.id, "name": "Order to Cash"}]
+
+
+def test_single_points_of_failure_equal_counts_order_by_name_then_id(
+    app, db_session, make_org, client, login_as
+):
+    """Equal counts order by name, the same on consecutive runs."""
+    org = make_org("spof-tie")
+    user = _user(db_session, org.id)
+    login_as(client, user)
+    vse = _element(db_session, org.id, "VS element", type_="BusinessService", layer="business")
+    _value_stream(db_session, org.id, "Stream", "VS", vse.id)
+    # Created in an order that is not alphabetical.
+    for name in ("Zeta", "Mid", "Alpha"):
+        _link(
+            db_session,
+            org.id,
+            _element(db_session, org.id, name, type_="ApplicationComponent", layer="application"),
+            vse,
+        )
+    db_session.commit()
+
+    orders = []
+    for _ in range(2):
+        data = _ask(client, question="single_points_of_failure").get_json()["data"]
+        orders.append([data["elements"][str(r["element_id"])]["name"] for r in data["rows"]])
+    assert orders[0] == orders[1]
+    assert orders[0] == ["Alpha", "Mid", "Zeta"]
+
+
+def test_single_points_of_failure_stream_walks_are_capped_and_reported(
+    app, db_session, make_org, client, login_as
+):
+    """With one more value stream than the cap, the answer is marked truncated
+    and the summary reports streams considered of streams existing."""
+    import app.modules.intelligence.services.query_service as qs
+
+    cap = qs.SPOF_MAX_VALUE_STREAMS
+    org = make_org("spof-cap")
+    user = _user(db_session, org.id)
+    login_as(client, user)
+    for i in range(cap + 1):
+        vse = _element(db_session, org.id, f"VS element {i:02d}", type_="BusinessService", layer="business")
+        _value_stream(db_session, org.id, f"Stream {i:02d}", f"VS{i:02d}", vse.id)
+        _link(
+            db_session,
+            org.id,
+            _element(db_session, org.id, f"Dep {i:02d}", type_="ApplicationComponent", layer="application"),
+            vse,
+        )
+    db_session.commit()
+
+    data = _ask(client, question="single_points_of_failure").get_json()["data"]
+    assert data["truncated"] is True
+    assert data["summary"]["value_streams_considered"] == cap
+    assert data["summary"]["value_streams_existing"] == cap + 1
+    assert f"{cap} of {cap + 1} value streams" in data["summary"]["statement"]
+    assert len(data["rows"]) == cap

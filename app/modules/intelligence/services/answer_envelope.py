@@ -409,9 +409,6 @@ def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
             max_depth=params["max_depth"],
             include_derived=params["include_derived"],
         )
-        if result.get("next_cursor") is not None:
-            result["truncated"] = True
-            result["reasons"] = list(result.get("reasons") or []) + [ROWS_TRUNCATED_REASON]
         return result
     if kind == KIND_RISK_PROPAGATION:
         result = IntelligenceQueryService.risk_propagation(
