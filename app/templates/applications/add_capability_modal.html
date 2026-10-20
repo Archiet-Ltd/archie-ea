@@ -1,3 +1,4 @@
+{% from 'macros/shadcn_compat.html' import shadcn_select %}
 {% from 'components/modal_form.html' import modal_form %}
 
 {% call modal_form(
@@ -14,24 +15,22 @@
 <div class="space-y-4">
     <div>
         <label for="cap-select" class="block text-sm font-medium mb-1.5">Capability <span class="text-destructive-emphasis">*</span></label>
-        <select id="cap-select" name="capability_id" required
-                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+        {% call shadcn_select('capability_id', bare=true, id='cap-select', class='h-9 w-full', attrs='required') %}
             <option value="">Select a capability...</option>
             {% for opt in capability_form_config.capability_options %}
             <option value="{{ opt.id }}"{% if opt.disabled %} disabled{% endif %}>{{ opt.label }}</option>
             {% endfor %}
-        </select>
+        {% endcall %}
     </div>
 
     <div>
         <label for="cap-support" class="block text-sm font-medium mb-1.5">Support Level</label>
-        <select id="cap-support" name="support_level"
-                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+        {% call shadcn_select('support_level', bare=true, id='cap-support', class='h-9 w-full') %}
             <option value="">Select...</option>
             {% for val, label in capability_form_config.support_levels %}
             <option value="{{ val }}">{{ label }}</option>
             {% endfor %}
-        </select>
+        {% endcall %}
     </div>
 
     <div class="grid grid-cols-2 gap-4">
@@ -42,13 +41,12 @@
         </div>
         <div>
             <label for="cap-maturity" class="block text-sm font-medium mb-1.5">Maturity Level</label>
-            <select id="cap-maturity" name="maturity_level"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+            {% call shadcn_select('maturity_level', bare=true, id='cap-maturity', class='h-9 w-full') %}
                 <option value="">Select...</option>
                 {% for val, label in capability_form_config.maturity_levels %}
                 <option value="{{ val }}">{{ label }}</option>
                 {% endfor %}
-            </select>
+            {% endcall %}
         </div>
     </div>
 
