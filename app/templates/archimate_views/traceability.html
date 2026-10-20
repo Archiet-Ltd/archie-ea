@@ -2,6 +2,7 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/provenance.html' import answer_envelope %}
 
 {# DEF-032, Capgemini dry-run: the browser tab title said "Requirements
    Traceability" while the page's own H1 (page_header below) and
@@ -40,6 +41,8 @@
         title="Cross-Layer Traceability Matrix",
         description="Shows how ApplicationComponent elements trace upward to Strategy/Business and downward to Technology layers"
     ) }}
+
+    <div class="mt-1">{{ answer_envelope() }}</div>
 
     {# ADR-0008: orphan ids are ArchiMateElement ids (this page reads the ArchiMate
        backbone), so every orphan links to its element traceability view. #}
