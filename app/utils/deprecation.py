@@ -820,22 +820,34 @@ def mark_operation_retiring(
     replacement_operation_id: str | None,
     user_id: int | None = None,
 ):
-    """Create or update the retirement record for an operation.
+    """Create or update the retirement record for an operation (one upsert).
 
-    Flushes so the record has its id; the caller commits.
+    The caller commits.
     """
     from app import db
     from app.modules.oauth_provider.models import ApiOperationRetirement
 
-    row = db.session.query(ApiOperationRetirement).filter_by(operation_id=operation_id).first()
-    if row is None:
-        row = ApiOperationRetirement(operation_id=operation_id)
-        db.session.add(row)
-    row.retires_on = retires_on
-    row.replacement_operation_id = replacement_operation_id
-    row.marked_by_user_id = user_id
-    row.marked_at = db.func.now()
-    db.session.flush()
+    from sqlalchemy.dialects.postgresql import insert
+
+    values = {
+        "retires_on": retires_on,
+        "replacement_operation_id": replacement_operation_id,
+        "marked_by_user_id": user_id,
+        "marked_at": db.func.now(),
+    }
+    # One atomic upsert on the operation id: two first markings at once cannot
+    # both insert and fail the unique constraint.
+    db.session.execute(
+        insert(ApiOperationRetirement.__table__)
+        .values(operation_id=operation_id, **values)
+        .on_conflict_do_update(index_elements=["operation_id"], set_=values)
+    )
+    row = (
+        db.session.query(ApiOperationRetirement)
+        .filter_by(operation_id=operation_id)
+        .populate_existing()
+        .one()
+    )
     return row
 
 

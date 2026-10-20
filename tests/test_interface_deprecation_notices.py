@@ -495,3 +495,44 @@ def test_every_owner_in_every_organisation_is_notified_once_and_an_earlier_date_
             text("SELECT count(*) FROM (SELECT retirement_id, user_id FROM api_retirement_notices GROUP BY 1, 2 HAVING count(*) > 1) d")
         ).scalar()
     assert duplicates == 0
+
+
+def test_marking_the_same_operation_twice_in_a_row_is_an_upsert(app, db_session):
+    from sqlalchemy import text
+
+    from app.utils.deprecation import mark_operation_retiring
+    import datetime
+
+    first = mark_operation_retiring("listElements", datetime.date(2027, 6, 1), None)
+    second = mark_operation_retiring("listElements", datetime.date(2027, 3, 1), "getElement")
+    assert first.id == second.id
+    assert second.retires_on == datetime.date(2027, 3, 1) and second.replacement_operation_id == "getElement"
+    count = db_session.execute(
+        text("SELECT count(*) FROM api_operation_retirements WHERE operation_id = 'listElements'")
+    ).scalar()
+    assert count == 1
+
+
+def test_an_unreadable_contract_never_fails_a_read(app, db_session, make_org, monkeypatch, caplog):
+    from sqlalchemy import text
+
+    from app.modules.oauth_provider import scopes
+
+    org_a, _b, _sa, _sb, _ca, _cb, tokens = _consumers(db_session, make_org)
+
+    def missing(*args, **kwargs):
+        raise FileNotFoundError("api_contract_subset.yaml")
+
+    monkeypatch.setattr(scopes, "load_subset", missing)
+    monkeypatch.setattr(scopes, "_operation_index", None)
+    monkeypatch.setattr(scopes, "_operation_paths", None)
+    with caplog.at_level(logging.WARNING):
+        first = _bearer_get(app, "/api/v1/elements", tokens["client_a"])
+        second = _bearer_get(app, "/api/v1/elements", tokens["client_a"])
+    assert first.status_code == 200 and second.status_code == 200
+    assert "Deprecation" not in first.headers
+    assert sum("API contract could not be read" in r.getMessage() for r in caplog.records) == 1, "logged once"
+    count = db_session.execute(
+        text("SELECT count(*) FROM api_operation_calls WHERE organization_id = :o"), {"o": org_a.id}
+    ).scalar()
+    assert count == 0, "nothing is recorded when every operation is unknown"

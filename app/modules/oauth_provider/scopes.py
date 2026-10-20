@@ -13,7 +13,7 @@ blueprint), and the consent flow stays exactly as it is.
 The decorator also resolves the request to its contract operation id. A bearer
 call is recorded once per (organisation, consumer, operation), so the
 deprecation admin page can name the consumers of an operation before it
-retires, and an operation an organisation administrator has marked as retiring
+retires, and an operation a platform administrator has marked as retiring
 answers with the retirement headers. Recording runs after the response has been
 sent, in its own short transaction, and can never fail, slow or alter the
 request.
@@ -55,17 +55,27 @@ _operation_paths: dict | None = None
 
 
 def _load_contract() -> tuple[dict, dict]:
-    """Build the lookups from the contract subset once; later calls are free."""
+    """Build the lookups from the contract subset once; later calls are free.
+
+    If the contract file is missing or unreadable the failure is logged once and
+    every operation is treated as unknown: nothing is recorded, no headers are
+    added, and the request is not affected.
+    """
     global _operation_index, _operation_paths
     if _operation_index is not None and _operation_paths is not None:
         return _operation_index, _operation_paths
-    subset = load_subset()
-    _operation_index = {
-        key: operation["operationId"]
-        for key, operation in build_route_index(subset).items()
-        if operation.get("operationId")
-    }
-    _operation_paths = build_operation_paths(subset)
+    try:
+        subset = load_subset()
+        index = {
+            key: operation["operationId"]
+            for key, operation in build_route_index(subset).items()
+            if operation.get("operationId")
+        }
+        paths = build_operation_paths(subset)
+    except Exception as exc:
+        logger.warning("API contract could not be read; operations are treated as unknown: %s", exc)
+        index, paths = {}, {}
+    _operation_index, _operation_paths = index, paths
     return _operation_index, _operation_paths
 
 
