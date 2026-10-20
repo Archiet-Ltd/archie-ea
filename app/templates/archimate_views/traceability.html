@@ -76,7 +76,7 @@
             >
                 {% for pt in pivot_types %}
                 <option value="{{ pt.type }}" {% if pt.type == current_pivot_type %}selected{% endif %}>
-                    {{ pt.type | plain_name(current_user) }} ({{ pt.layer | plain_layer(current_user) }}, {{ pt.count }})
+                    {{ pt.type | plain_name(current_user) }} ({{ pt.layer | plain_layer(current_user) }}, {{ pt.count }}{% if pt.type == 'Gap' %} gap elements modelled{% endif %})
                 </option>
                 {% endfor %}
             </select>
