@@ -1072,11 +1072,11 @@ def get_launch_sidebar_zones(user=None) -> List[Dict]:
     return SIDEBAR_LAUNCH_ZONES
 
 
-# Pages that are not ready for the soft launch. One list, one switch
-# (config HIDE_NOT_READY_MODULES, on by default): while it is on, get_sidebar_zones()
-# drops these links and the All-modules directory and global search (which build
-# on the same link data) leave them out. Nothing is deleted: the routes stay, and
-# switching the setting off lists them again. The value says why each is held back.
+# Pages that are not ready for the soft launch. This list is the one source of the reason shown as
+# the one-line limit under each of these modules on the All modules page. It no longer hides anything
+# from that page or from global search: they list these modules like any other. The setting
+# HIDE_NOT_READY_MODULES (off by default) is kept for an operator and now only affects the legacy
+# per-role get_sidebar_zones(); the sidebar itself renders the launch zone only. The routes stay.
 NOT_READY_ENDPOINTS = {
     "implementation_planning.implementation_dashboard": "not available yet",
     "main.integrations": "refused for the demonstration user",
@@ -1090,15 +1090,15 @@ NOT_READY_ENDPOINTS = {
 
 
 def is_hidden_not_ready(endpoint: str) -> bool:
-    """True when `endpoint` is on NOT_READY_ENDPOINTS and the hide switch is on."""
+    """True when `endpoint` is on NOT_READY_ENDPOINTS and the (default-off) legacy hide switch is on."""
     if endpoint not in NOT_READY_ENDPOINTS:
         return False
     try:
         from flask import current_app
 
-        return bool(current_app.config.get("HIDE_NOT_READY_MODULES", True))
+        return bool(current_app.config.get("HIDE_NOT_READY_MODULES", False))
     except RuntimeError:  # no application context
-        return True
+        return False
 
 
 def get_sidebar_zones(user) -> List[Dict]:
