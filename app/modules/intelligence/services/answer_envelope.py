@@ -158,7 +158,7 @@ def normalise_params(kind: str, raw: Dict[str, Any]) -> Dict[str, Any]:
     max_depth = raw.get("max_depth", 3)
     if isinstance(max_depth, bool) or not isinstance(max_depth, int) or not (1 <= max_depth <= 10):
         raise AnswerParamError("max_depth must be a whole number between 1 and 10")
-    include_derived = _as_bool(raw.get("include_derived"), "include_derived", True)
+    include_derived = _as_bool(raw.get("include_derived"), "include_derived", False)
 
     if kind == KIND_IMPACT:
         return {
@@ -168,66 +168,67 @@ def normalise_params(kind: str, raw: Dict[str, Any]) -> Dict[str, Any]:
             "direction": _direction(raw),
         }
 
-    if kind == KIND_SET_IMPACT:
-        element_ids_raw = raw.get("element_ids")
-        element_ids: List[int] = []
-        if element_ids_raw is not None:
-            if not isinstance(element_ids_raw, list):
-                raise AnswerParamError("element_ids must be a list of element ids")
-            seen: set = set()
-            for item in element_ids_raw:
-                value = _as_int(item, "element_ids")
-                if value in seen:
-                    continue
-                seen.add(value)
-                element_ids.append(value)
-                if len(element_ids) > SET_IMPACT_MAX_SEEDS:
-                    # Stop reading: an answer covers at most this many elements, so
-                    # a longer list is refused without being walked to its end.
-                    raise AnswerParamError(
-                        f"name at most {SET_IMPACT_MAX_SEEDS} elements in one question"
-                    )
-        element_filter = raw.get("filter")
-        cleaned_filter: Optional[Dict[str, str]] = None
-        if element_filter is not None:
-            if not isinstance(element_filter, dict):
-                raise AnswerParamError("filter must be an object with a type and/or a layer")
-            cleaned_filter = {}
-            for key in ("type", "layer"):
-                value = element_filter.get(key)
-                if value is None or value == "":
-                    continue
-                if not isinstance(value, str) or len(value) > 64:
-                    raise AnswerParamError(f"filter.{key} must be a short piece of text")
-                cleaned_filter[key] = value
-            if not cleaned_filter:
-                raise AnswerParamError("filter needs an element type or a layer")
-        if not element_ids and not cleaned_filter:
-            raise AnswerParamError("name at least one element, or a filter")
-        params: Dict[str, Any] = {
-            "element_ids": element_ids,
-            "max_depth": max_depth,
-            "include_derived": include_derived,
-            "direction": _direction(raw),
-        }
-        if cleaned_filter:
-            params["filter"] = cleaned_filter
-        return params
-
     if kind == KIND_RISK_PROPAGATION:
         return {
+            "element_id": _as_int(raw.get("element_id"), "element_id"),
             "max_depth": max_depth,
             "include_derived": include_derived,
         }
 
     if kind == KIND_SINGLE_POINTS_OF_FAILURE:
+        # The single-points-of-failure walk always includes derived
+        # relationships: a system reached only through a derived link is still
+        # a single point of failure for the value streams that reach it.
+        include_derived = True
         return {
             "max_depth": max_depth,
             "include_derived": include_derived,
         }
 
-    # Should not happen because of the kind check above, but kept for safety.
-    raise AnswerParamError(f"unsupported question kind: {kind}")
+    element_ids_raw = raw.get("element_ids")
+    element_ids: List[int] = []
+    if element_ids_raw is not None:
+        if not isinstance(element_ids_raw, list):
+            raise AnswerParamError("element_ids must be a list of element ids")
+        seen: set = set()
+        for item in element_ids_raw:
+            value = _as_int(item, "element_ids")
+            if value in seen:
+                continue
+            seen.add(value)
+            element_ids.append(value)
+            if len(element_ids) > SET_IMPACT_MAX_SEEDS:
+                # Stop reading: an answer covers at most this many elements, so
+                # a longer list is refused without being walked to its end.
+                raise AnswerParamError(
+                    f"name at most {SET_IMPACT_MAX_SEEDS} elements in one question"
+                )
+    element_filter = raw.get("filter")
+    cleaned_filter: Optional[Dict[str, str]] = None
+    if element_filter is not None:
+        if not isinstance(element_filter, dict):
+            raise AnswerParamError("filter must be an object with a type and/or a layer")
+        cleaned_filter = {}
+        for key in ("type", "layer"):
+            value = element_filter.get(key)
+            if value is None or value == "":
+                continue
+            if not isinstance(value, str) or len(value) > 64:
+                raise AnswerParamError(f"filter.{key} must be a short piece of text")
+            cleaned_filter[key] = value
+        if not cleaned_filter:
+            raise AnswerParamError("filter needs an element type or a layer")
+    if not element_ids and not cleaned_filter:
+        raise AnswerParamError("name at least one element, or a filter")
+    params: Dict[str, Any] = {
+        "element_ids": element_ids,
+        "max_depth": max_depth,
+        "include_derived": include_derived,
+        "direction": _direction(raw),
+    }
+    if cleaned_filter:
+        params["filter"] = cleaned_filter
+    return params
 
 
 def _direction(raw: Dict[str, Any]) -> str:
@@ -408,10 +409,6 @@ def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
             max_depth=params["max_depth"],
             include_derived=params["include_derived"],
         )
-        # We assume the query service function returns a dict with the same structure
-        # as the other kinds: rows, summary, reasons, elements, total, next_cursor, truncated.
-        # We will check for element not found? But our kind doesn't have an element id.
-        # We will check for no value streams? We'll let the query service handle that.
         if result.get("next_cursor") is not None:
             result["truncated"] = True
             result["reasons"] = list(result.get("reasons") or []) + [ROWS_TRUNCATED_REASON]
