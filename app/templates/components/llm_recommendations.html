@@ -107,7 +107,7 @@ function llmRecommendationsComponent(dashboard) {
         showToast(title, message, type) {
             const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             const toast = document.createElement('div');
-            toast.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${type === 'success' ? 'bg-success' : 'bg-destructive'} text-primary-foreground max-w-md`;
+ toast.className = `fixed top-4 right-4 z-50 p-4 rounded-lg ${type ==='success' ?'bg-success' :'bg-destructive'} text-primary-foreground max-w-md`;
             toast.innerHTML = `<strong>${esc(title)}:</strong> ${esc(message)}`;
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 4000);
