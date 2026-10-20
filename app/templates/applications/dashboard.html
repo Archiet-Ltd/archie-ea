@@ -374,7 +374,7 @@
                 <button type="button" @click="Platform.fetch.post('/dashboard/api/archimate-elements/{{ archimate_info.id }}/correct', {action:'correct', name, type}).then(function () { correcting = false; confirmed = true; }).catch(function (e) { Platform.toast.error('Could not save the correction: ' + e.message); })"
                   class="text-xs bg-primary text-primary-foreground rounded px-2 py-1">Save</button>
                 <button type="button" @click="correcting=false"
-                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
               </div>
             </template>
             <span x-show="confirmed" class="inline-flex items-center gap-1 text-xs text-success-emphasis">

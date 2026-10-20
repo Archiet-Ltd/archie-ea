@@ -116,7 +116,7 @@
     <div
         x-show="editOpen" x-cloak
         x-transition
-        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50"
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-risk-title"
@@ -129,7 +129,7 @@
         >
             <button
                 type="button"
-                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring absolute right-3 top-3"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring absolute right-3 top-3"
                 @click="editOpen = false"
                 aria-label="Close edit risk modal"
             >

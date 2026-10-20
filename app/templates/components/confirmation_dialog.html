@@ -38,7 +38,7 @@
      data-modal="confirm-dialog-{{ id }}">
 
    <!-- Backdrop -->
-   <div class="modal-backdrop fixed inset-0 transition-opacity duration-200 bg-slate-900/50"
+   <div class="modal-backdrop fixed inset-0 transition-opacity duration-200 bg-overlay/50"
         style="z-index: var(--modal-z, 1000);"
         data-modal-backdrop="confirm-dialog-{{ id }}" aria-hidden="true"></div>
 
@@ -82,13 +82,13 @@
             <!-- Actions -->
             <div class="flex justify-end gap-3">
                 <button data-modal-close="confirm-dialog-{{ id }}" 
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         type="button" aria-label="Close">
                     {{ cancel_text }}
                 </button>
                 
                 <button @click="if (callback) callback();" data-modal-close="confirm-dialog-{{ id }}" 
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         type="button" aria-label="Close">
                     {{ confirm_text }}
                 </button>

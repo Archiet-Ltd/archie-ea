@@ -39,7 +39,7 @@ MODAL_FILES = [
 
 # The canonical backdrop, taken from components/modal.html. Semantic token, and
 # compiled into app/static/css/tailwind-output.css.
-CANONICAL_BACKDROP = "bg-background/80"
+CANONICAL_BACKDROP = "bg-overlay/50"
 
 
 def _read(rel: str) -> str:

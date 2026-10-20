@@ -812,7 +812,7 @@
 
     {# SAD-11: Explainability modal — shared across all AI values #}
     <div x-show="explainOpen" x-cloak
-         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50"
          role="dialog" aria-modal="true" aria-label="AI Reasoning Explainability"
          @keydown.escape.window="explainOpen = false">
         <div class="relative w-full max-w-lg rounded-lg border border-border bg-card"
@@ -824,7 +824,7 @@
                     <h3 class="text-sm font-semibold text-foreground">AI Reasoning</h3>
                 </div>
                 <button type="button" @click="explainOpen = false"
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
                     <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
                 </button>
             </div>

@@ -372,7 +372,7 @@
 
     <!-- GLB-059 / TRC-027: Edit modal. Option B: in-place PATCH only for Technology layer; others show redirect. -->
     <div x-show="editModalOpen" x-cloak class="fixed inset-0 z-50 flex items-start justify-center pt-20" @keydown.escape.window="editModalOpen = false" role="dialog" aria-modal="true" aria-labelledby="edit-element-title"><!-- modal-a11y-ok -->
-        <div class="fixed inset-0 bg-slate-900/50" @click="editModalOpen = false"></div>
+        <div class="fixed inset-0 bg-overlay/50" @click="editModalOpen = false"></div>
         <div class="relative z-10 w-full max-w-md rounded-lg border border-border bg-card p-6">
             <h2 id="edit-element-title" class="text-lg font-semibold mb-4">Edit Element</h2>
             <div class="flex gap-2 mb-4">
@@ -429,7 +429,7 @@
 
     <!-- TRC-028: Gap link modal (picker for linking orphan to goal/application) -->
     <div x-show="linkModalOpen" x-cloak class="fixed inset-0 z-50 flex items-start justify-center pt-20" @keydown.escape.window="closeLinkModal()" role="dialog" aria-modal="true" aria-labelledby="link-modal-title"><!-- modal-a11y-ok -->
-        <div class="fixed inset-0 bg-slate-900/50" @click="closeLinkModal()"></div>
+        <div class="fixed inset-0 bg-overlay/50" @click="closeLinkModal()"></div>
         <div class="relative z-10 w-full max-w-md rounded-lg border border-border bg-card p-6">
             <h2 id="link-modal-title" class="text-base font-semibold text-foreground text-foreground mb-2" x-text="linkType === 'driver-goal' ? 'Link Driver to Goal' : 'Link Capability to Application'"></h2>
             <p class="text-sm text-muted-foreground mb-3" x-show="linkSource" x-cloak><span x-text="'Linking: ' + (linkSource && linkSource.name)"></span></p>

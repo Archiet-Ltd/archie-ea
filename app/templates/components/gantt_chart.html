@@ -313,7 +313,7 @@ ArchiMate 3.2 Compatible with 5-year timeline support
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
-         class="modal-root flex items-center justify-center fixed inset-0 overflow-y-auto z-50 bg-slate-900/50" @click.self="showAddModal = false">
+         class="modal-root flex items-center justify-center fixed inset-0 overflow-y-auto z-50 bg-overlay/50" @click.self="showAddModal = false">
         <div class="bg-card border border-border rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <h3 class="text-lg font-semibold text-foreground mb-4">
                 <span x-text="editingWorkPackage ? 'Edit Work Package' : 'Add Work Package'"></span>
@@ -392,7 +392,7 @@ ArchiMate 3.2 Compatible with 5-year timeline support
                 
                 <div class="flex justify-end gap-2 mt-6">
                     <button type="button" @click="showAddModal = false"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" aria-label="Cancel">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" aria-label="Cancel">
                         Cancel
                     </button>
                     <button type="submit"

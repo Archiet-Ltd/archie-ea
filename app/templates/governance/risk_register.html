@@ -413,7 +413,7 @@
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
              @click.self="panelOpen = false"
-             class="fixed inset-0 z-40 bg-slate-900/50"></div>
+             class="fixed inset-0 z-40 bg-overlay/50"></div>
 
         <div x-show="panelOpen" x-cloak role="dialog" aria-modal="true" aria-label="Risk detail"
              x-transition:enter="transition ease-out duration-200"
@@ -424,7 +424,7 @@
 
             <div class="flex items-center justify-between px-4 py-3 border-b border-border">
                 <h2 class="text-sm font-semibold text-foreground truncate" x-text="selectedRisk ? selectedRisk.title : 'Risk detail'"></h2>
-                <button type="button" @click="panelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close risk detail">
+                <button type="button" @click="panelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close risk detail">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>

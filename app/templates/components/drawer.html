@@ -52,7 +52,7 @@
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0"
         @click="drawerOpen = false"
-        class="modal-backdrop fixed inset-0 transition-opacity duration-200 overflow-y-auto bg-slate-900/50"
+        class="modal-backdrop fixed inset-0 transition-opacity duration-200 overflow-y-auto bg-overlay/50"
         style="z-index: var(--modal-z, 1000);" aria-hidden="true"
     ></div>
 
@@ -93,7 +93,7 @@
             </div>
             <button type="button"
                 @click="drawerOpen = false"
-                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-4 shrink-0"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-4 shrink-0"
                 aria-label="Close drawer"
             >
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>

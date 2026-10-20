@@ -246,7 +246,7 @@
 
 {# Issue Detail Modal (to be included separately) #}
 <div id="issue-detail-modal" hidden role="dialog" aria-modal="true" class="fixed inset-0 z-50 flex items-end sm:items-center">
-  <div class="fixed inset-0 bg-slate-900/50" @click="showDetailModal = false"></div>
+  <div class="fixed inset-0 bg-overlay/50" @click="showDetailModal = false"></div>
   <div class="bg-background rounded-t-lg sm:rounded-lg w-full sm:w-full max-w-2xl max-h-[80vh] overflow-y-auto relative border border-border">
     <div class="sticky top-0 bg-background border-b p-4 flex items-center justify-between">
       <h2 class="text-xl font-bold" x-text="selectedIssue?.title || 'Issue Details'"></h2>

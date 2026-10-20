@@ -264,7 +264,7 @@
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-req-modal-title"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50"
         @keydown.escape.window="showCreateModal = false"
     >
         <div
@@ -275,7 +275,7 @@
             <div class="flex items-start justify-between mb-5">
                 <h2 id="create-req-modal-title" class="text-base font-semibold text-foreground text-foreground">Add Requirement</h2>
                 <button type="button"
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     @click="showCreateModal = false"
                     aria-label="Close modal"
                 ><i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i></button>
@@ -441,7 +441,7 @@
         x-cloak
         x-show="!!activeReq" x-cloak
         x-trap="!!activeReq"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50"
         @keydown.escape.window="activeReq = null"
     >
         <div
@@ -457,7 +457,7 @@
                             <h2 id="req-modal-title" class="text-base font-semibold text-foreground text-foreground">Edit Requirement</h2>
                         </div>
                         <button type="button"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             @click="activeReq = null"
                             aria-label="Close modal"
                         ><i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i></button>

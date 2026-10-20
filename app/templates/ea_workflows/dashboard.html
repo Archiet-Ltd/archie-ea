@@ -613,14 +613,14 @@
 <!-- Start Workflow Modal (two-panel) -->
 <div id="startWorkflowModal" class="modal-root hidden fixed inset-0 z-50"
      role="dialog" aria-modal="true" aria-labelledby="startWorkflowTitle">
-    <div class="modal-backdrop fixed inset-0 bg-slate-900/50" @click="closeWorkflowModal()" aria-hidden="true" role="dialog"></div>
+    <div class="modal-backdrop fixed inset-0 bg-overlay/50" @click="closeWorkflowModal()" aria-hidden="true" role="dialog"></div>
     <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] bg-background rounded-lg border-2 border-input overflow-hidden border">
         <div class="flex items-center justify-between px-6 py-4 border-b border-input">
             <div>
                 <h3 class="text-lg font-semibold" id="startWorkflowTitle">Start Workflow</h3>
                 <p class="text-sm text-muted-foreground mt-0.5" id="startWorkflowDesc"></p>
             </div>
-            <button type="button" @click="closeWorkflowModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
+            <button type="button" @click="closeWorkflowModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
                 <i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>
             </button>
         </div>
@@ -644,7 +644,7 @@
 
                     <div class="flex gap-2">
                         <button type="button" @click="closeWorkflowModal()"
-                                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
+                                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
                             Cancel
                         </button>
                         <button type="submit" id="startWorkflowBtn"

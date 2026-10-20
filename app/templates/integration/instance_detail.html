@@ -45,7 +45,7 @@
                 </button>
                 
                 <div id="approval-modal" hidden role="dialog" aria-modal="true" aria-labelledby="approval-modal-title" class="modal-root fixed inset-0 z-50 items-center justify-center p-4">
-                    <div data-modal-backdrop="approval-modal" class="absolute inset-0 bg-slate-900/50" aria-hidden="true"></div>
+                    <div data-modal-backdrop="approval-modal" class="absolute inset-0 bg-overlay/50" aria-hidden="true"></div>
                     <div data-modal-panel class="relative w-full max-w-md bg-background border border-border rounded-lg p-6">
                         <h3 id="approval-modal-title" class="text-base font-semibold text-foreground text-foreground mb-2">Approve Workflow Step</h3>
                         <p class="text-sm text-muted-foreground mb-4">Provide optional comments for this approval.</p>
@@ -53,7 +53,7 @@
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <textarea name="comments" class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mb-4" placeholder="Approval comments..." aria-label="Approval comments..."></textarea>
                             <div class="flex justify-end gap-2">
-                                <button type="button" data-modal-close="approval-modal" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" aria-label="Action">Cancel</button>
+                                <button type="button" data-modal-close="approval-modal" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" aria-label="Action">Cancel</button>
                                 <button type="submit" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2" aria-label="Submit">Approve & Resume</button>
                             </div>
                         </form>

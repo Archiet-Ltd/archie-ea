@@ -1,6 +1,6 @@
 <!-- APQC Hierarchy Tree Browser Component -->
 <!-- Professional EA tool for APQC PCF navigation with full parent/child context -->
-<div id="apqc-tree-browser" hidden class="modal-root fixed inset-0 bg-foreground bg-opacity-50 items-center justify-center bg-slate-900/50" style="z-index:1000;">
+<div id="apqc-tree-browser" hidden class="modal-root fixed inset-0 bg-foreground bg-opacity-50 items-center justify-center bg-overlay/50" style="z-index:1000;">
   <div class="bg-background rounded-lg w-full max-w-6xl h-5/6 flex flex-col border border-border">
     <!-- Header -->
     <div class="flex items-center justify-between p-6 border-b border-border">
@@ -8,7 +8,7 @@
         <h2 class="text-2xl font-bold text-foreground">APQC PCF Hierarchy Browser</h2>
         <p class="text-sm text-muted-foreground mt-1">Navigate the complete APQC Process Classification Framework</p>
       </div>
-      <button type="button" @click="closeAPQCBrowser()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close APQC browser">
+      <button type="button" @click="closeAPQCBrowser()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close APQC browser">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
         </svg>

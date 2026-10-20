@@ -9,7 +9,7 @@
      x-transition:leave="transition ease-in duration-150"
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0"
-     class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
+     class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50">
 
   <div class="bg-card border border-border rounded-lg w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col"
        @click.outside="$store.autocomplete.dismiss()">
@@ -27,7 +27,7 @@
           </p>
         </div>
         <button aria-label="Close suggestions" type="button" @click="$store.autocomplete.dismiss()"
-                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>
