@@ -50,7 +50,7 @@ _FALLBACK = _READ
 LOCKED_ROLES = ("org_admin",)
 
 
-def _organization_id(user, organization_id: Optional[int]) -> Optional[int]:
+def _matrix_org(user, organization_id: Optional[int]) -> Optional[int]:
     if organization_id is not None:
         return int(organization_id)
     from app.middleware.tenant_context import current_org_id
@@ -84,7 +84,7 @@ def role_key(user, organization_id: Optional[int] = None) -> str:
     """The role name the matrix uses for ``user`` in the organisation."""
     from app.models.org_role import OrgRole
 
-    org_id = _organization_id(user, organization_id)
+    org_id = _matrix_org(user, organization_id)
     key = None
     if org_id is not None and getattr(user, "id", None) is not None:
         key = OrgRole.get_role(org_id, user.id)
@@ -135,7 +135,7 @@ def can(user, action: str, object_type: str, organization_id: Optional[int] = No
         return False
     if action not in ACTIONS or object_type not in OBJECT_TYPES:
         return False
-    org_id = _organization_id(user, organization_id)
+    org_id = _matrix_org(user, organization_id)
     if _is_administrator(user, org_id):
         return True
     if org_id is not None:
