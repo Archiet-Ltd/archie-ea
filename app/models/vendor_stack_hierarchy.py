@@ -14,15 +14,30 @@ from datetime import datetime
 
 from app import db
 from app.models.mixins import TenantMixin
+from app.models.mixins.core import _default_org_id
 
 
-class VendorCapabilityHierarchy(db.Model):
+class VendorCapabilityHierarchy(TenantMixin, db.Model):
     """
     Hierarchical capability decomposition (L0 - L4).
     Enables gap analysis, heat maps, and build-vs-buy decisions at different abstraction levels.
     """
 
     __tablename__ = "vendor_capability_hierarchy"
+
+    # Override TenantMixin's normally non-nullable column for an ADD-only
+    # rollout: the 20261018_tree_models_org_id migration adds this to an
+    # existing table and leaves a row NULL when no organisation is
+    # derivable from its linked vendor stack template or parent capability.
+    # The mixin is still essential: tenant middleware identifies
+    # tenant-owned models by it and applies the automatic query fence.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     template_id = db.Column(
@@ -169,13 +184,27 @@ class VendorServiceCatalog(TenantMixin, db.Model):
         return f"<VendorServiceCatalog {self.service_code}: {self.service_name}>"
 
 
-class VendorProcessHierarchy(db.Model):
+class VendorProcessHierarchy(TenantMixin, db.Model):
     """
     Business process hierarchy with BPMN decomposition (L0 - L4).
     Enables process mining, optimization, and automation opportunities.
     """
 
     __tablename__ = "vendor_process_hierarchy"
+
+    # Override TenantMixin's normally non-nullable column for an ADD-only
+    # rollout: the 20261018_tree_models_org_id migration adds this to an
+    # existing table and leaves a row NULL when no organisation is
+    # derivable from its linked vendor stack template or parent process.
+    # The mixin is still essential: tenant middleware identifies
+    # tenant-owned models by it and applies the automatic query fence.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     template_id = db.Column(
