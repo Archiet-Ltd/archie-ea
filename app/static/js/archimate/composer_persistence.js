@@ -227,6 +227,8 @@ let ComposerPersistence = (function() {
              * localStorage remains an additional crash-recovery fallback
              * (see the 10s snapshot below), never the system of record. */
             let self = this;
+            /* An unsaved focus-mode view is saved only by its own Save as diagram action. */
+            if (self.focusView) return;
             if (!self.viewpointDirty || self._creatingAutosave) return;
             /* BA-01: a payload the server rejected on its merits (4xx) will be
                rejected identically on every retry. Stop the loop rather than
@@ -684,6 +686,87 @@ let ComposerPersistence = (function() {
             .catch(function() { /* swallow-ok: the tab strip is a convenience shortcut; loadSavedViewpoints() fetches the same endpoint for the primary list and toasts its own failure, so reporting here would double-toast */ });
         },
 
+        /* The one canvas loader: adds elements and their relationships to the graph.
+           loadSavedViewpoint and the focus-mode loader both call it. decorateLink,
+           when given, runs on each new link with its relationship row. */
+        _addCanvasCells: function(elements, relationships, decorateLink) {
+            let self = this;
+            let cellMap = {};
+            let elementMap = {};
+            elements.forEach(function(el) {
+                let layer = (el.layer || '').toLowerCase() || guessLayer(el.type);
+                let renderMode = el.rendering_mode || 'black_box';
+                let node;
+                if (renderMode === 'white_box' && isContainerType(el.type)) {
+                    node = createContainerNode(el.id, el.name, el.type || 'ApplicationComponent', layer,
+                                               el.x || 0, el.y || 0, el.width || 320, el.height || 220);
+                } else {
+                    node = createNode(el.id, el.name, el.type || 'ApplicationComponent', layer,
+                                      el.x || 0, el.y || 0);
+                    /* Auto-migrate pre-v4 nodes saved at the old 200×70 default */
+                    if (el.width && el.height && el.height > 75) {
+                        node.resize(el.width, el.height);
+                    }
+                }
+                /* GAP-INT-002: Restore zone type for Grouping/Location */
+                if (el.zone_type) {
+                    node.set('zoneType', el.zone_type);
+                }
+                self.graph.addCell(node);
+                cellMap[el.id] = node;
+                elementMap[el.id] = el;
+                self.canvasElements[el.id] = el;
+            });
+
+            /* Restore parent-child embedding from composition/aggregation relationships */
+            relationships.forEach(function(rel) {
+                let srcCell = cellMap[rel.source_id];
+                let tgtCell = cellMap[rel.target_id];
+                if (!srcCell || !tgtCell) return;
+                let link = createLink(srcCell, tgtCell, rel.type || 'association', rel.id);
+                /* Restore saved waypoints if present */
+                if (rel.waypoints && Array.isArray(rel.waypoints) && rel.waypoints.length > 0) {
+                    link.vertices(rel.waypoints);
+                }
+                /* Restore custom annotation label if present */
+                if (rel.label) {
+                    link.set('customLabel', rel.label);
+                    applyCustomLabel(link, rel.label);
+                }
+                /* BUG-CMP-002: Restore relationship metadata from API */
+                if (rel.description) link.set('description', rel.description);
+                if (rel.access_mode) link.set('accessMode', rel.access_mode);
+                if (rel.flow_label) link.set('flowLabel', rel.flow_label);
+                /* Label the reloaded link the way it was labelled when drawn: what a
+                   flow carries, or the access mode, not just the bare type. */
+                if (rel.flow_label) link.label(0, { attrs: { text: { text: rel.flow_label } } });
+                else if (rel.access_mode && (rel.type || '').toLowerCase() === 'access') link.label(0, { attrs: { text: { text: 'access (' + rel.access_mode + ')' } } });
+                if (rel.custom_label) {
+                    link.set('customLabel', rel.custom_label);
+                    applyCustomLabel(link, rel.custom_label);
+                }
+                /* Sequence View step number (see composer.js layoutSequence) */
+                if (rel.sequence_order != null) link.set('sequenceOrder', rel.sequence_order);
+                if (rel.created_at) link.set('createdAt', Date.parse(rel.created_at) || 0);
+                /* Restore saved routing style if not manhattan (default) */
+                let savedRouting = rel.routing_style || 'manhattan';
+                if (savedRouting === 'smooth' || savedRouting === 'normal') {
+                    link.router('normal');
+                    link.connector('smooth');
+                    link.set('routingStyle', savedRouting);
+                }
+                if (decorateLink) decorateLink(link, rel);
+                self.graph.addCell(link);
+
+                /* Auto-embed for composition/aggregation */
+                let rType = (rel.type || '').toLowerCase();
+                if ((rType === 'composition' || rType === 'aggregation') && srcCell.get('renderingMode') === 'white_box') {
+                    srcCell.embed(tgtCell);
+                }
+            });
+            return { cellMap: cellMap, elementMap: elementMap };
+        },
+
         loadSavedViewpoint: function(vpId, vpName) {
             let self = this;
             self.savedVpOpen = false;
@@ -714,78 +797,9 @@ let ComposerPersistence = (function() {
                     return;
                 }
 
-                let cellMap = {};
-                let elementMap = {};
-                elements.forEach(function(el) {
-                    let layer = (el.layer || '').toLowerCase() || guessLayer(el.type);
-                    let renderMode = el.rendering_mode || 'black_box';
-                    let node;
-                    if (renderMode === 'white_box' && isContainerType(el.type)) {
-                        node = createContainerNode(el.id, el.name, el.type || 'ApplicationComponent', layer,
-                                                   el.x || 0, el.y || 0, el.width || 320, el.height || 220);
-                    } else {
-                        node = createNode(el.id, el.name, el.type || 'ApplicationComponent', layer,
-                                          el.x || 0, el.y || 0);
-                        /* Auto-migrate pre-v4 nodes saved at the old 200×70 default */
-                        if (el.width && el.height && el.height > 75) {
-                            node.resize(el.width, el.height);
-                        }
-                    }
-                    /* GAP-INT-002: Restore zone type for Grouping/Location */
-                    if (el.zone_type) {
-                        node.set('zoneType', el.zone_type);
-                    }
-                    self.graph.addCell(node);
-                    cellMap[el.id] = node;
-                    elementMap[el.id] = el;
-                    self.canvasElements[el.id] = el;
-                });
-
-                /* Restore parent-child embedding from composition/aggregation relationships */
-                relationships.forEach(function(rel) {
-                    let srcCell = cellMap[rel.source_id];
-                    let tgtCell = cellMap[rel.target_id];
-                    if (!srcCell || !tgtCell) return;
-                    let link = createLink(srcCell, tgtCell, rel.type || 'association', rel.id);
-                    /* Restore saved waypoints if present */
-                    if (rel.waypoints && Array.isArray(rel.waypoints) && rel.waypoints.length > 0) {
-                        link.vertices(rel.waypoints);
-                    }
-                    /* Restore custom annotation label if present */
-                    if (rel.label) {
-                        link.set('customLabel', rel.label);
-                        applyCustomLabel(link, rel.label);
-                    }
-                    /* BUG-CMP-002: Restore relationship metadata from API */
-                    if (rel.description) link.set('description', rel.description);
-                    if (rel.access_mode) link.set('accessMode', rel.access_mode);
-                    if (rel.flow_label) link.set('flowLabel', rel.flow_label);
-                    /* Label the reloaded link the way it was labelled when drawn: what a
-                       flow carries, or the access mode, not just the bare type. */
-                    if (rel.flow_label) link.label(0, { attrs: { text: { text: rel.flow_label } } });
-                    else if (rel.access_mode && (rel.type || '').toLowerCase() === 'access') link.label(0, { attrs: { text: { text: 'access (' + rel.access_mode + ')' } } });
-                    if (rel.custom_label) {
-                        link.set('customLabel', rel.custom_label);
-                        applyCustomLabel(link, rel.custom_label);
-                    }
-                    /* Sequence View step number (see composer.js layoutSequence) */
-                    if (rel.sequence_order != null) link.set('sequenceOrder', rel.sequence_order);
-                    if (rel.created_at) link.set('createdAt', Date.parse(rel.created_at) || 0);
-                    /* Restore saved routing style if not manhattan (default) */
-                    let savedRouting = rel.routing_style || 'manhattan';
-                    if (savedRouting === 'smooth' || savedRouting === 'normal') {
-                        link.router('normal');
-                        link.connector('smooth');
-                        link.set('routingStyle', savedRouting);
-                    }
-                    self.graph.addCell(link);
-
-                    /* Auto-embed for composition/aggregation */
-                    let rType = (rel.type || '').toLowerCase();
-                    if ((rType === 'composition' || rType === 'aggregation') && srcCell.get('renderingMode') === 'white_box') {
-                        srcCell.embed(tgtCell);
-                    }
-                });
+                let loaded = self._addCanvasCells(elements, relationships);
+                let cellMap = loaded.cellMap;
+                let elementMap = loaded.elementMap;
 
                 self.elementCount = elements.length;
                 self.relCount = relationships.length;
