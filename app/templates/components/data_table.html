@@ -279,7 +279,7 @@ if (!window._dataTableEngine) {
             <thead class="[&_tr]:border-b sticky top-0 z-20">
                 <tr class="border-b border-border bg-muted/50">
                     {% if row_selection %}
-                    <th class="h-10 w-10 px-3 align-middle bg-card">
+                    <th scope="col" class="h-10 w-10 px-3 align-middle bg-card">
                         <span class="flex h-4 w-4 items-center justify-center rounded-sm border border-input cursor-pointer"
                               :class="allSelected ? 'bg-primary border-primary text-primary-foreground' : ''"
                               @click="toggleSelectAll()" role="checkbox" :aria-checked="allSelected" tabindex="0">
@@ -288,7 +288,7 @@ if (!window._dataTableEngine) {
                     </th>
                     {% endif %}
                     {% for col in columns %}
-                    <th class="h-10 px-3 text-left align-middle font-medium text-muted-foreground text-xs bg-card {{ col.get('class', '') }}">
+                    <th scope="col" class="h-10 px-3 text-left align-middle font-medium text-muted-foreground text-xs bg-card {{ col.get('class', '') }}">
                         {% if sortable and col.get('sortable', false) %}
                         <button type="button" @click="sortBy('{{ col.key }}')"
                                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center data-[state=open]:bg-accent"
@@ -310,7 +310,7 @@ if (!window._dataTableEngine) {
                     </th>
                     {% endfor %}
                     {% if actions %}
-                    <th class="h-10 w-10 px-3 text-right align-middle font-medium text-muted-foreground text-xs bg-card">
+                    <th scope="col" class="h-10 w-10 px-3 text-right align-middle font-medium text-muted-foreground text-xs bg-card">
                         <span class="sr-only">Actions</span>
                     </th>
                     {% endif %}
