@@ -339,6 +339,8 @@ jobs:
         run: python -m playwright install --with-deps chromium
       - name: Compile + lint ratchets + design tokens + air-gap
         run: python scripts/verify.py --tag static
+      - name: Design pattern conformance
+        run: python scripts/check_design_patterns.py
       - name: Dependency CVE gate
         # Run the scan an enterprise security review would run, before they do.
         run: python scripts/verify.py --gate dependency-cves

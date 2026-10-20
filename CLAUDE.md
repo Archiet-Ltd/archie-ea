@@ -921,3 +921,12 @@ gates, workforces, Claude, Codex or Kilo as authors or operators. Provenance liv
 files (models, ledgers, gate code, bucket working copies). Never name the founder's current employer. Never
 self-undermine. Reason: the EIC Accelerator proposal 101357426 was rejected 0/4 on 17 Sep 2026 and the evaluators
 quoted our own labels, hedges and placeholders back at us. Full rule: archiet-strategy AGENTS.md Rule 1f.
+
+## Design conformance
+
+Before any template change:
+1. Run `python scripts/check_design_patterns.py --tier 1`.
+2. If the change introduces a new violation, do not proceed. Fix it or update `design/patterns.json` first (and if you update patterns.json, say why in the commit message).
+3. The conformance checker is the enforcement. `patterns.json` is the rulebook. Neither is optional.
+
+Do not introduce a new shadow, a raw `<button>` without a canonical variant class, a raw `<table>` without `dense-table`, a hardcoded hex, a multi-column form, a banned pattern, or a `rounded-xl` card without a written decision recorded in `patterns.json`.
