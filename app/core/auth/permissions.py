@@ -22,7 +22,7 @@ from __future__ import annotations
 from typing import Optional
 
 ACTIONS = ("create", "read", "edit", "delete")
-OBJECT_TYPES = ("application",)
+OBJECT_TYPES = ("application", "relationship")
 
 _ALL = frozenset(ACTIONS)
 _READ = frozenset({"read"})
@@ -42,7 +42,16 @@ DEFAULTS = {
         "admin": _ALL,
         "architect": _ALL,
         "viewer": _READ,
-    }
+    },
+    # Relationships between elements: administrators and architects create and
+    # edit, everyone else reads (the route carried only a sign-in check before).
+    "relationship": {
+        "org_admin": _ALL,
+        "administrator": _ALL,
+        "admin": _ALL,
+        "architect": _ALL,
+        "viewer": _READ,
+    },
 }
 _FALLBACK = _READ
 
