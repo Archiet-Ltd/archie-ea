@@ -231,6 +231,7 @@
                             sources: ev.sources,
                             actions: ev.actions_taken || [],
                             pendingApprovals: ev.pending_approvals || [],
+                            answerCards: ev.answer_cards || [],
                             error: ev.error || null
                         };
                     } else if (ev.error) {
@@ -267,6 +268,7 @@
             sources: meta.sources,
             actions: meta.actions || [],
             pendingApprovals: meta.pendingApprovals || [],
+            answerCards: meta.answerCards || [],
             error: meta.error || null
         });
         return true;
