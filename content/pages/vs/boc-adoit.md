@@ -78,7 +78,7 @@ BOC offers a free ADOIT:Community Edition and paid multi-user Enterprise Edition
 
 ### What would we give up by leaving BOC Group ADOIT?
 
-You would give up BOC's marketed route to ask ChatGPT, Copilot or another AI tool about your architecture with answers pulled from ADOIT. Entelim's AI Chat works inside Entelim, and connecting an outside assistant to your model is not something you can do today. There is no one-click transfer, since Entelim imports files.
+You would give up BOC's marketed route to ask ChatGPT, Copilot or another AI tool about your architecture with answers pulled from ADOIT. Entelim's AI Chat works inside Entelim, and an outside assistant such as Claude can also connect to your model through Entelim's MCP server, read-only and scoped to your organisation. There is no one-click transfer, since Entelim imports files.
 
 ### What would we gain by moving from BOC Group ADOIT to Entelim?
 
@@ -86,7 +86,7 @@ A published price, free self-hosting, and ArchiMate 3.2 modelling. Entelim's AI 
 
 ### Can we run BOC Group ADOIT and Entelim side by side before deciding?
 
-Yes. Import a copy of your model into the free Community plan or a self-hosted copy, ask the same questions in both, and leave BOC Group ADOIT untouched. The health check puts your own data through Entelim for a fixed price and date.
+Yes. Import a copy of your model into the free Community plan or a self-hosted copy, ask the same questions in both, and leave BOC Group ADOIT untouched. The health check puts your own data through Entelim for a fixed scope.
 
 ### Is there a free way to try ADOIT?
 
