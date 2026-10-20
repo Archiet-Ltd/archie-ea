@@ -1125,6 +1125,38 @@ def _resolve_users(org_id):
     return {r.email: r for r in rows}
 
 
+_ADMIN_EMAIL = "ivo.reed@lantern-quay.example.com"      # IT Operations Lead
+_ARCHITECT_EMAIL = "sage.itops@lantern-quay.example.com"  # transformation-lead persona
+
+
+def _seed_demo_roles(org_id, User, Role) -> None:
+    """One organisation administrator and one architect; everyone else stays a viewer.
+
+    Uses the same paths the team page and the admin role-change pages use:
+    ``apply_admin_role_change`` (Administrator boundary through
+    ``User.grant_org_admin`` plus the OrgRole row; any other Role assigned to
+    the user) and ``OrgRole.set_role`` for the per-organisation grant. No role
+    column is written here directly. Idempotent.
+    """
+    from app.models.org_role import OrgRole, apply_admin_role_change
+
+    admin = User.query.filter_by(email=_ADMIN_EMAIL, organization_id=org_id).first()
+    architect = User.query.filter_by(email=_ARCHITECT_EMAIL, organization_id=org_id).first()
+    admin_role = Role.query.filter_by(name="Administrator").first()
+    architect_role = Role.query.filter_by(name="Architect").first()
+    if admin is not None and admin_role is not None and not admin.is_admin():
+        apply_admin_role_change(admin, admin_role)
+    if architect is not None and architect_role is not None:
+        if architect.role is None or architect.role.name != "Architect":
+            apply_admin_role_change(architect, architect_role)
+        if OrgRole.get_role(org_id, architect.id) != "architect":
+            OrgRole.set_role(
+                org_id, architect.id, "architect",
+                granted_by_id=admin.id if admin is not None else None,
+            )
+    db.session.flush()
+
+
 def seed_demo_company() -> dict:
     """Create the Lantern Quay Systems demonstration organisation.
 
@@ -1318,6 +1350,8 @@ def seed_demo_company() -> dict:
             owner_users_created += 1
         if owner_users_created:
             db.session.flush()
+
+        _seed_demo_roles(org_id, User, Role)
 
         apps = _resolve_apps(org_id)
         users = _resolve_users(org_id)
