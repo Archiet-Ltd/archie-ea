@@ -5,8 +5,6 @@ an organisation.
 
 from __future__ import annotations
 
-import pytest
-
 from app.models.archimate_core import ArchiMateElement
 
 
@@ -32,9 +30,9 @@ def test_search_returns_only_the_calling_organisation_s_elements(
     _make_element(db_session, org_a.id, "Alpha One")
     _make_element(db_session, org_b.id, "Beta Two")
 
-    from tests.api.conftest import clear_identity
+    from .conftest import clear_identity
 
-    clear_identity(app)
+    clear_identity(app, client)
     response = client.get(
         "/api/v1/elements/search?q=Alpha",
         headers={"Authorization": "Bearer %s" % token_a},
@@ -42,7 +40,7 @@ def test_search_returns_only_the_calling_organisation_s_elements(
     assert response.status_code == 200
     assert _names(response.get_json()) == ["Alpha One"]
 
-    clear_identity(app)
+    clear_identity(app, client)
     response = client.get(
         "/api/v1/elements/search?q=Alpha",
         headers={"Authorization": "Bearer %s" % token_b},
@@ -50,7 +48,7 @@ def test_search_returns_only_the_calling_organisation_s_elements(
     assert response.status_code == 200
     assert _names(response.get_json()) == []
 
-    clear_identity(app)
+    clear_identity(app, client)
     response = client.get(
         "/api/v1/elements/search?q=Beta",
         headers={"Authorization": "Bearer %s" % token_b},
@@ -68,9 +66,9 @@ def test_search_filters_by_type_and_layer(
     _make_element(db_session, org_a.id, "Alpha One", type_="ApplicationComponent", layer="application")
     _make_element(db_session, org_a.id, "Alpha Two", type_="Group", layer="motivation")
 
-    from tests.api.conftest import clear_identity
+    from .conftest import clear_identity
 
-    clear_identity(app)
+    clear_identity(app, client)
     response = client.get(
         "/api/v1/elements/search?q=Alpha&type=ApplicationComponent",
         headers={"Authorization": "Bearer %s" % token_a},
@@ -78,7 +76,7 @@ def test_search_filters_by_type_and_layer(
     assert response.status_code == 200
     assert _names(response.get_json()) == ["Alpha One"]
 
-    clear_identity(app)
+    clear_identity(app, client)
     response = client.get(
         "/api/v1/elements/search?q=Alpha&layer=motivation",
         headers={"Authorization": "Bearer %s" % token_a},

@@ -8,10 +8,6 @@ from __future__ import annotations
 
 import datetime as _dt
 
-import pytest
-
-from app.modules.intelligence.services import answer_envelope as envelope
-
 
 def _make_answer(db_session, org_id, address):
     """Store one answer row directly, bypassing the question computation."""
@@ -52,9 +48,9 @@ def test_list_answers_returns_only_the_calling_organisation_s_answers(
     _make_answer(db_session, org_a.id, "a1" * 16)
     _make_answer(db_session, org_b.id, "b1" * 16)
 
-    from tests.api.conftest import clear_identity
+    from .conftest import clear_identity
 
-    clear_identity(app)
+    clear_identity(app, client)
     response = client.get(
         "/api/v1/answers",
         headers={"Authorization": "Bearer %s" % token_a},
@@ -63,7 +59,7 @@ def test_list_answers_returns_only_the_calling_organisation_s_answers(
     assert response.status_code == 200
     assert _addresses(response.get_json()) == ["a1" * 16]
 
-    clear_identity(app)
+    clear_identity(app, client)
     response = client.get(
         "/api/v1/answers",
         headers={"Authorization": "Bearer %s" % token_b},
@@ -78,9 +74,9 @@ def test_fetch_answer_returns_own_answer(app, db_session, client, org_pair, read
 
     _make_answer(db_session, org_a.id, "a2" * 16)
 
-    from tests.api.conftest import clear_identity
+    from .conftest import clear_identity
 
-    clear_identity(app)
+    clear_identity(app, client)
     response = client.get(
         "/api/v1/answers/%s" % ("a2" * 16),
         headers={"Authorization": "Bearer %s" % token_a},
@@ -100,9 +96,9 @@ def test_fetch_answer_returns_404_for_another_organisation_s_address(
 
     _make_answer(db_session, org_a.id, "a3" * 16)
 
-    from tests.api.conftest import clear_identity
+    from .conftest import clear_identity
 
-    clear_identity(app)
+    clear_identity(app, client)
     response = client.get(
         "/api/v1/answers/%s" % ("a3" * 16),
         headers={"Authorization": "Bearer %s" % token_b},
@@ -120,9 +116,9 @@ def test_fetch_answer_returns_404_for_a_malformed_address(
     org_a, _org_b = org_pair
     token_a = reader_tokens[org_a.id]
 
-    from tests.api.conftest import clear_identity
+    from .conftest import clear_identity
 
-    clear_identity(app)
+    clear_identity(app, client)
     response = client.get(
         "/api/v1/answers/not-an-address",
         headers={"Authorization": "Bearer %s" % token_a},
