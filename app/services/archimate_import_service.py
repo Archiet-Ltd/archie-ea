@@ -641,11 +641,21 @@ class ArchiMateImportService:
 
         return _default_org_id()
 
+    @classmethod
+    def _require_organization_id(cls, explicit: Optional[int]) -> int:
+        org_id = cls._importing_organization_id(explicit)
+        if org_id is None:
+            raise ImportRequestError(
+                "Name the organisation to import into: several exist and none was given."
+            )
+        return org_id
+
     @staticmethod
     def _in_organization(model_cls, org_id: Optional[int]) -> list:
         """Explicit organisation predicate; the ORM fence is a no-op with no
         ambient tenant (CLI), so every read here states its own."""
-        return [] if org_id is None else [model_cls.organization_id == org_id]
+        assert org_id is not None, "an import always names its organisation"
+        return [model_cls.organization_id == org_id]
 
     def preview_import(
         self, parsed_data: Dict[str, Any], organization_id: Optional[int] = None
@@ -674,7 +684,7 @@ class ArchiMateImportService:
         """
         from app.models.archimate_core import ArchiMateElement
 
-        org_id = self._importing_organization_id(organization_id)
+        org_id = self._require_organization_id(organization_id)
         elements = parsed_data.get("elements", [])
         preview_elements: List[Dict[str, Any]] = []
         counts = {"new": 0, "exists": 0, "conflict": 0, "invalid": 0}
@@ -825,7 +835,7 @@ class ArchiMateImportService:
         if strategy not in STRATEGIES:
             raise ValueError(f"Invalid strategy: {strategy}")
 
-        org_id = self._importing_organization_id(organization_id)
+        org_id = self._require_organization_id(organization_id)
         org_kw = {} if org_id is None else {"organization_id": org_id}
         elements = parsed_data.get("elements", [])
         created = 0

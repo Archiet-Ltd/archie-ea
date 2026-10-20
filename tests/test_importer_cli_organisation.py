@@ -61,3 +61,32 @@ def test_two_organisations_import_the_same_file_from_the_cli(app, db_session, ma
     assert not set(a_rows[1]) & set(b_rows[1])
     # the second import changed nothing of the first organisation's
     assert _rows(db_session, a_id) == a_rows
+
+
+def test_no_organisation_named_refuses_and_touches_nothing(app, db_session, make_org):
+    from sqlalchemy import text
+
+    from app.services.archimate_import_service import (
+        ArchiMateImportService,
+        ImportRequestError,
+    )
+
+    make_org("none-a"), make_org("none-b")
+    db_session.commit()
+
+    def counts():
+        return tuple(
+            db_session.execute(text(f"select count(*) from {t}")).scalar()
+            for t in ("archimate_elements", "archimate_relationships", "architecture_models")
+        )
+
+    with open(FIXTURE, "rb") as fh:
+        content = fh.read()
+    before = counts()
+    with app.app_context():
+        service = ArchiMateImportService()
+        with pytest.raises(ImportRequestError, match="[Nn]ame the organisation to import into"):
+            service.preview_xml(content)
+        with pytest.raises(ImportRequestError, match="[Nn]ame the organisation to import into"):
+            service.import_xml(content, strategy="skip_duplicates")
+    assert counts() == before
