@@ -80,7 +80,7 @@ A published price, free self-hosting, and ArchiMate 3.2 as the modelling standar
 
 ### Can we run Ardoq and Entelim side by side before deciding?
 
-Yes. Import a copy of your model into the free Community plan or a self-hosted copy, ask the same questions in both, and leave Ardoq untouched. The health check puts your own data through Entelim for a fixed price and date.
+Yes. Import a copy of your model into the free Community plan or a self-hosted copy, ask the same questions in both, and leave Ardoq untouched. The health check puts your own data through Entelim for a fixed scope.
 
 ### Is Ardoq pricing public anywhere?
 
