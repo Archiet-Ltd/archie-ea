@@ -41,7 +41,7 @@ def _login(page, base, email):
 @pytest.mark.smoke
 @pytest.mark.journey
 def test_duplicate_detection_run_persists_after_reload(browser, live_server, seeded):
-    """A platform admin (running detection is platform-admin only) opens the
+    """A platform admin opens the
     Duplicate Detection dashboard, runs detection through the real modal, sees the completion feedback panel,
     then reloads the page and confirms the run is recorded server-side (not
     just held in the page's own Alpine state)."""
@@ -97,5 +97,38 @@ def test_duplicate_detection_run_persists_after_reload(browser, live_server, see
             f"run {run_id} not found in persisted run history {run_ids} "
             "-- detection reported success but nothing survived the reload"
         )
+    finally:
+        context.close()
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+def test_organisation_admin_runs_detection_and_it_persists(browser, live_server, seeded, org_admin_email):
+    """An organisation's own administrator, who is not a platform admin, runs
+    detection through the real modal and finds the run in the history after a
+    fresh page load."""
+    context = browser.new_context(ignore_https_errors=True)
+    page = context.new_page()
+    page.on("dialog", lambda d: d.accept())
+    try:
+        _login(page, live_server, org_admin_email)
+        dashboard_url = live_server + "/duplicate-detection/simple"
+        page.goto(dashboard_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.get_by_role("button", name="Run duplicate detection", exact=True).click()
+        expect(page.locator("#run-detection-modal-title")).to_be_visible(timeout=PAGE_TIMEOUT)
+        with page.expect_response(
+            lambda r: "/duplicate-detection/simple/api/run-detection" in r.url
+            and r.request.method == "POST",
+            timeout=PAGE_TIMEOUT,
+        ) as detection:
+            page.get_by_role("button", name="Start duplicate detection").click()
+        assert detection.value.status == 200, f"run-detection POST: {detection.value.status}"
+        run_id = detection.value.json().get("run_id")
+        assert run_id
+
+        page.goto(dashboard_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        runs = page.request.get(live_server + "/duplicate-detection/simple/runs?limit=20")
+        assert runs.ok, f"runs API failed: {runs.status}"
+        assert run_id in [r.get("id") for r in runs.json().get("runs", [])]
     finally:
         context.close()
