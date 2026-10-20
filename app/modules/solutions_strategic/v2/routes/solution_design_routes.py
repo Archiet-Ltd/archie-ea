@@ -4975,7 +4975,7 @@ def _safe_model_delete(model_class, solution_id):
         logger.debug("cascade skip %s", model_class, exc_info=True)
 
 
-def _engine_archimate_cleanup(solution_ids):
+def _engine_archimate_cleanup(solution_ids, organization_id=None):
     """Delete ALL archimate/architecture child records for a set of solutions.
 
     Runs via db.engine.begin() in its OWN committed transaction BEFORE any
@@ -4992,6 +4992,20 @@ def _engine_archimate_cleanup(solution_ids):
 
     By committing this engine transaction first (before any session savepoints),
     all archimate data is cleanly gone before the session tries to delete solutions.
+
+    ``organization_id`` is the organisation recorded on the solution row being
+    deleted, read by the caller before the row is gone.  When it is None the
+    ambient request organisation (``g.current_org_id``) is used, so a command
+    line or background job that passes the solution's own organisation works
+    with no request context at all.  When neither exists the deletes are
+    skipped and a WARNING is logged with the solution ids: every table below
+    is row-level-security fenced, so with no organisation they would match
+    nothing.
+
+    ``organization_id`` may also be a mapping of solution id to organisation
+    id, in which case the solutions are grouped by their own organisation and
+    each group is cleaned up under that organisation's tenant context -- the
+    organisation used is always the solution's own, never the ambient one.
     """
     if not solution_ids:
         return
@@ -5000,7 +5014,19 @@ def _engine_archimate_cleanup(solution_ids):
     sids = [int(i) for i in solution_ids]
     _ids = {"sids": sids}
 
-    organization_id = getattr(g, "current_org_id", None)
+    # Resolve the organisation: the solution's own row wins (the caller reads
+    # it before the row is gone); fall back to the ambient request
+    # organisation; delete nothing and warn when neither exists.
+    if isinstance(organization_id, dict):
+        by_org = {}
+        for sid in sids:
+            by_org.setdefault(organization_id.get(sid), []).append(sid)
+        for org_id, org_sids in by_org.items():
+            _engine_archimate_cleanup(org_sids, organization_id=org_id)
+        return
+
+    if organization_id is None:
+        organization_id = getattr(g, "current_org_id", None)
     if organization_id is None:
         # Every table below is row-level-security fenced: with no organisation
         # the deletes would match nothing. Say so instead of doing nothing.
@@ -5800,9 +5826,13 @@ def delete_solution(solution_id: int):
         except Exception as e:
             logger.warning(f"Could not delete process mappings: {e}")
 
-        # Engine-level archimate cleanup must run before session savepoints
+        # Engine-level archimate cleanup must run before session savepoints.
+        # The organisation comes from the solution row itself, not the ambient
+        # context, so this works from a request, a command line or a job.
         try:
-            _engine_archimate_cleanup([solution_id])
+            _engine_archimate_cleanup(
+                [solution_id], organization_id=solution.organization_id
+            )
         except Exception:
             logger.warning("engine archimate cleanup failed for solution %s", solution_id, exc_info=True)
             db.session.rollback()
@@ -5987,7 +6017,15 @@ def bulk_delete_solutions():
             # Non-fatal: no DB-level FK constraints exist on the solutions table,
             # so a cleanup failure just leaves orphaned archimate rows.
             try:
-                _engine_archimate_cleanup(deletable_ids)
+                # Each solution's own organisation: an org admin may delete
+                # solutions across organisations, so the cleanup runs once per
+                # organisation under that organisation's tenant context.
+                _engine_archimate_cleanup(
+                    deletable_ids,
+                    organization_id={
+                        sid: solutions_map[sid].organization_id for sid in deletable_ids
+                    },
+                )
             except Exception:
                 logger.warning(
                     "engine archimate cleanup failed (continuing with delete) — "
@@ -6662,7 +6700,9 @@ def api_delete_solution(solution_id: int):
         # Run engine-level archimate/architecture cleanup first (before session savepoints)
         # to handle cross-solution FK references that _cascade_delete_solution misses.
         try:
-            _engine_archimate_cleanup([solution_id])
+            _engine_archimate_cleanup(
+                [solution_id], organization_id=solution.organization_id
+            )
         except Exception:
             logger.warning("engine archimate cleanup failed for solution %s", solution_id, exc_info=True)
             db.session.rollback()

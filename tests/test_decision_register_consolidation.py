@@ -589,7 +589,7 @@ def test_solution_teardown_deletes_the_paired_canonical_row_too(app):
         )
 
         try:
-            _engine_archimate_cleanup([solution_id])
+            _engine_archimate_cleanup([solution_id], organization_id=org_id)
             db.session.expire_all()
 
             remaining_record = db.session.get(ArchitectureDecisionRecord, record_id)
