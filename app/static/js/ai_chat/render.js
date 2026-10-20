@@ -208,12 +208,17 @@
         var o = opts || {};
         var ran = Array.isArray(trail) && trail.length > 0;
         var cited = Array.isArray(sources) && sources.length > 0;
+        var carded = (o.cardCount || 0) > 0;
 
         var state, summary;
         if (ran) {
             state = 'retrieved';
             summary = trail.length + (trail.length === 1 ? ' lookup' : ' lookups')
                     + (cited ? ', ' + sources.length + ' record' + (sources.length === 1 ? '' : 's') + ' cited' : '');
+        } else if (carded) {
+            // The answer card under the reply carries its own sources.
+            state = 'retrieved';
+            summary = 'Answered from the recorded model; the sources are shown on the card.';
         } else if (o.contextUsed) {
             state = 'context';
             summary = 'No lookup ran. Answered from the ' +
@@ -434,6 +439,7 @@
                renderApiSettingsNotice(m.error) +
                renderEvidence(m.trail, m.sources, {
                    contextUsed: m.contextUsed,
+                   cardCount: Array.isArray(m.answerCards) ? m.answerCards.length : 0,
                    domainLabel: m.domain
                }) +
                renderReceipts(m.actions) +
