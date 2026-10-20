@@ -266,3 +266,65 @@ def test_layer_filter_shows_only_that_layers_missing_elements(
 def test_coverage_route_rejects_anonymous(app, client):
     response = client.get("/intelligence/coverage")
     assert response.status_code in (301, 302, 401)
+
+
+def test_derivation_coverage_empty_projection_returns_empty_structure(
+    app, db_session, make_org, monkeypatch
+):
+    """When get_projection returns None or a projection with no nodes,
+    the service returns the empty structure (no layers, latest_run from readers).
+    """
+    org = make_org("empty-projection-org")
+    db_session.commit()
+
+    # First, test when get_projection returns None
+    def mock_get_projection_none(_org_id):
+        return None
+
+    monkeypatch.setattr(
+        "app.modules.intelligence.services.derivation_coverage_service.get_projection",
+        mock_get_projection_none,
+    )
+
+    coverage = derivation_coverage(org.id)
+    assert coverage["organization_id"] == org.id
+    assert coverage["layers"] == []
+    assert coverage["derived_count"] == 0
+    assert coverage["latest_run"] is None
+    assert coverage["missing_total"] == 0
+    assert coverage["missing"] == []
+
+    # Second, test when get_projection returns a projection with no nodes
+    class MockProjection:
+        def nodes(self):
+            return []
+
+    def mock_get_projection_empty_nodes(_org_id):
+        return MockProjection()
+
+    monkeypatch.setattr(
+        "app.modules.intelligence.services.derivation_coverage_service.get_projection",
+        mock_get_projection_empty_nodes,
+    )
+
+    coverage = derivation_coverage(org.id)
+    assert coverage["organization_id"] == org.id
+    assert coverage["layers"] == []
+    assert coverage["derived_count"] == 0
+    assert coverage["latest_run"] is None
+    assert coverage["missing_total"] == 0
+    assert coverage["missing"] == []
+
+
+# The following line is to prevent pytest from collecting the MockProjection class
+# as a test. It is not a test function.
+__all__ = [
+    "test_coverage_report_shows_elements_per_layer_and_yield_from_stored_rows",
+    "test_organisation_b_never_sees_organisation_a_figures",
+    "test_no_run_shows_none_yield_not_zero",
+    "test_missing_list_count_matches_direct_query",
+    "test_missing_list_is_bounded_to_fifty",
+    "test_layer_filter_shows_only_that_layers_missing_elements",
+    "test_coverage_route_rejects_anonymous",
+    "test_derivation_coverage_empty_projection_returns_empty_structure",
+]

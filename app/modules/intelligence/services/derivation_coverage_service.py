@@ -39,7 +39,29 @@ def derivation_coverage(
     """
     organization_id = int(organization_id)
     projection = get_projection(organization_id)
+    if projection is None:
+        # No projection: return empty structure with latest_run from readers
+        latest_run = latest_derivation_run(organization_id)
+        return {
+            "organization_id": organization_id,
+            "layers": [],
+            "derived_count": 0,
+            "latest_run": latest_run,
+            "missing_total": 0,
+            "missing": [],
+        }
     nodes = projection.nodes()
+    if not nodes:
+        # Projection with no nodes: return empty structure
+        latest_run = latest_derivation_run(organization_id)
+        return {
+            "organization_id": organization_id,
+            "layers": [],
+            "derived_count": 0,
+            "latest_run": latest_run,
+            "missing_total": 0,
+            "missing": [],
+        }
 
     by_layer: Dict[str, int] = {}
     missing_by_layer: Dict[str, int] = {}
