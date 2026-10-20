@@ -60,7 +60,7 @@ Export the card statement and the contract register, sort by vendor, and look fo
 - Detection works on the application records you hold. A duplicate recorded under a different name and description may not be found, and every group needs a person's review.
 - Savings are estimates. They need costs on the application records, and a group with none shows 0.
 - Spend reads the vendor contracts recorded in Entelim, not your card or ledger data. It does not match contracts to applications.
-- Spend Recommendations (AI) are suggestions. Read them as prompts for a conversation.
+- Spend shows the contracts you recorded, by type and by vendor.
 
 ## Frequently asked questions
 
