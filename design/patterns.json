@@ -51,6 +51,30 @@
         "hairline-border",
         "8px-radius"
       ]
+    },
+    "matrix": {
+      "pattern": "dense-table-matrix",
+      "parent": "dense-table",
+      "spec": {
+        "sticky_header": true,
+        "sticky_left_column": true,
+        "pagination": false,
+        "cell_states": [
+          "empty",
+          "single-value",
+          "multiple-count",
+          "not-recorded"
+        ],
+        "legend_required": true,
+        "filters": "form_field"
+      },
+      "banned": [
+        "observable",
+        "d3-chord",
+        "d3-sankey",
+        "composer-matrix",
+        "paginated-matrix"
+      ]
     }
   },
   "banned_patterns": [
@@ -66,6 +90,11 @@
     "page-level-d3",
     "side-drawers",
     "full-screen-modals",
-    "floating-labels"
+    "floating-labels",
+    "observable",
+    "d3-chord",
+    "d3-sankey",
+    "composer-matrix",
+    "paginated-matrix"
   ]
 }
