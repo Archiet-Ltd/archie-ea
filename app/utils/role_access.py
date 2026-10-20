@@ -478,7 +478,12 @@ def get_all_roles_with_access(section: str) -> List[str]:
 # link + the footer logout link = 15. Nothing was removed: every other module
 # keeps its entry in SIDEBAR_ZONES / the More tools list and is listed on the
 # /modules/ page under "Not in the launch cut".
-SIDEBAR_LINK_BUDGET = 15
+#
+# Grouped sidebar (20 Oct 2026, navigation specification v1 section 2.4): the budget now counts LEVEL-1
+# entries only (links and collapsible items): 21 in the tree + the header logo + the footer "All modules"
+# link + the footer logout link = 24. Level-2 links (the sub-menus) are capped separately by
+# SIDEBAR_SUBLINK_BUDGET (35); they are rendered closed, not left out, so keyboard order is preserved.
+SIDEBAR_LINK_BUDGET = 24
 
 _ZONE_TITLES = {
     "home": "Home",

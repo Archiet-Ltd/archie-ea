@@ -46,8 +46,12 @@ _HREF_RE = re.compile(r'<a\s[^>]*?href="([^"]+)"')
 def test_launch_module_list_is_the_twelve_in_order():
     assert [m["label"] for m in LAUNCH_MODULES] == EXPECTED_LABELS
     assert len(LAUNCH_ENDPOINTS) == 12
-    assert [z["zone"] for z in get_launch_sidebar_zones(None)] == ["launch"]
-    assert SIDEBAR_LINK_BUDGET == 15  # twelve modules + logo + All modules + logout
+    # Grouped sidebar (T-nav-01): the twelve are still the launch modules; they sit in five groups.
+    assert [z["zone"] for z in get_launch_sidebar_zones(None)] == [
+        "overview", "answers", "model", "change", "catalogue"
+    ]
+    # 21 level-1 entries + logo + All modules + logout; the sub-menus are capped separately (35).
+    assert SIDEBAR_LINK_BUDGET == 24
 
 
 def test_every_demoted_module_keeps_its_role_data_entry():
@@ -59,14 +63,16 @@ def test_every_demoted_module_keeps_its_role_data_entry():
 
 
 @pytest.mark.parametrize("role", sorted(SIDEBAR_ZONES))
-def test_sidebar_lists_exactly_the_twelve_routes(app, db_session, make_org, role):
-    html = _sidebar_html(app, db_session, make_org, role, f"launch-{role}"[:30])
-    nav = _NAV_RE.search(_TEMPLATE_RE.sub("", html))
+def test_sidebar_lists_all_twelve_routes_and_all_modules_in_the_footer(app, db_session, make_org, role):
+    """The twelve launch routes are all still in the sidebar (some now as sub-menu items), and the
+    way to the All modules page is the footer link. The full tree is pinned in test_grouped_sidebar.py."""
+    html = _TEMPLATE_RE.sub("", _sidebar_html(app, db_session, make_org, role, f"launch-{role}"[:30]))
+    nav = _NAV_RE.search(html)
     assert nav, "sidebar nav not found"
     hrefs = _HREF_RE.findall(nav.group(0))
-    # The one extra link is the way to the More tools page, not a module.
-    assert hrefs[-1] == "/modules/"
-    assert hrefs[:-1] == EXPECTED_ROUTES, f"{role}: {hrefs}"
+    missing = [route for route in EXPECTED_ROUTES if route not in hrefs]
+    assert not missing, f"{role}: {missing}"
+    assert 'href="/modules/"' in html[html.index("</nav>"):]
 
 
 @pytest.mark.parametrize("role", ["enterprise_architect", "platform_admin", "procurement"])
