@@ -1,0 +1,172 @@
+"""One permission matrix per organisation: who may do what to which object.
+
+``can(user, action, object_type)`` is the single answer the server (through
+``require_permission``) and the templates (through the ``can`` Jinja global)
+both read. Resolution order:
+
+1. the platform ``ADMINISTER`` permission (always allowed);
+2. a per-user override row in this organisation;
+3. a per-role row in this organisation (role from ``OrgRole``, falling back to
+   the platform role name);
+4. the defaults in ``DEFAULTS`` below.
+
+Rows live in ``permission_grants``, which is tenant-scoped: every ORM query on
+it is filtered to the ambient organisation by the tenant hook. The organisation
+is also named in the query (taken from the ambient binding, then from the
+account itself, never from request input), so a query made outside a request
+cannot read across organisations.
+"""
+
+from __future__ import annotations
+
+from typing import Optional
+
+ACTIONS = ("create", "read", "edit", "delete")
+OBJECT_TYPES = ("application",)
+
+_ALL = frozenset(ACTIONS)
+_READ = frozenset({"read"})
+
+# Defaults per object type and role key. For ``application`` these are what the
+# route gates allowed before the matrix existed: create, edit and delete were
+# ``require_roles("admin", "architect")``, reading was open to every signed-in
+# account. The changes: the architect role may also delete in bulk (bulk delete
+# was administrators only), and the organisation's own role strings
+# (``org_admin``, ``architect``, ``viewer``) are what the matrix keys on. Any
+# role key not listed gets ``_FALLBACK`` (read only), which is what
+# ``require_roles`` gave it.
+DEFAULTS = {
+    "application": {
+        "org_admin": _ALL,
+        "administrator": _ALL,
+        "admin": _ALL,
+        "architect": _ALL,
+        "viewer": _READ,
+    }
+}
+_FALLBACK = _READ
+
+# Role keys shown on the Permissions tab that the matrix cannot restrict.
+LOCKED_ROLES = ("org_admin",)
+
+
+def _organization_id(user, organization_id: Optional[int]) -> Optional[int]:
+    if organization_id is not None:
+        return int(organization_id)
+    from app.middleware.tenant_context import current_org_id
+
+    org_id = current_org_id()
+    if org_id is not None:
+        return int(org_id)
+    value = getattr(user, "organization_id", None)
+    return int(value) if value is not None else None
+
+
+def role_key(user, organization_id: Optional[int] = None) -> str:
+    """The role name the matrix uses for ``user`` in the organisation."""
+    from app.models.org_role import OrgRole
+
+    org_id = _organization_id(user, organization_id)
+    key = None
+    if org_id is not None and getattr(user, "id", None) is not None:
+        key = OrgRole.get_role(org_id, user.id)
+    if key:
+        return str(key).lower()
+    names = {str(getattr(user, "role_name", "") or "").lower()}
+    archetype = getattr(user, "role_archetype", None)
+    if archetype:
+        names.add(str(archetype).lower())
+    if "architect" in names:
+        return "architect"
+    names.discard("")
+    names.discard("anonymous")
+    return sorted(names)[0] if names else "viewer"
+
+
+def default_allowed(role: str, action: str, object_type: str) -> bool:
+    table = DEFAULTS.get(object_type, {})
+    return action in table.get(str(role).lower(), _FALLBACK)
+
+
+def _grant(org_id, subject_type, subject_key, object_type, action):
+    from app.models.permission_grant import PermissionGrant
+
+    return PermissionGrant.query.filter_by(
+        organization_id=org_id,
+        subject_type=subject_type,
+        subject_key=str(subject_key),
+        object_type=object_type,
+        action=action,
+    ).first()
+
+
+def can(user, action: str, object_type: str, organization_id: Optional[int] = None) -> bool:
+    """Whether ``user`` may ``action`` an ``object_type`` in the organisation."""
+    if user is None or not getattr(user, "is_authenticated", False):
+        return False
+    if action not in ACTIONS or object_type not in OBJECT_TYPES:
+        return False
+    try:
+        if user.is_admin():
+            return True
+    except Exception:  # fabricated-ok: an account object without is_admin is not an administrator
+        pass
+
+    org_id = _organization_id(user, organization_id)
+    if org_id is not None:
+        row = _grant(org_id, "user", user.id, object_type, action)
+        if row is not None:
+            return bool(row.allowed)
+    key = role_key(user, org_id)
+    if org_id is not None:
+        row = _grant(org_id, "role", key, object_type, action)
+        if row is not None:
+            return bool(row.allowed)
+    return default_allowed(key, action, object_type)
+
+
+def role_cell(org_id: int, role: str, action: str, object_type: str):
+    """(allowed, is_set) for one role cell: ``is_set`` when a row decides it."""
+    row = _grant(org_id, "role", role, object_type, action)
+    if row is not None:
+        return bool(row.allowed), True
+    return default_allowed(role, action, object_type), False
+
+
+def set_grant(org_id, subject_type, subject_key, object_type, action, allowed, granted_by=None):
+    """Upsert one matrix row. The caller commits."""
+    from app import db
+    from app.models.permission_grant import PermissionGrant
+
+    if (
+        subject_type not in ("role", "user")
+        or action not in ACTIONS
+        or object_type not in OBJECT_TYPES
+    ):
+        raise ValueError("unknown subject, action or object type")
+    row = _grant(org_id, subject_type, subject_key, object_type, action)
+    if row is None:
+        row = PermissionGrant(
+            organization_id=org_id,
+            subject_type=subject_type,
+            subject_key=str(subject_key),
+            object_type=object_type,
+            action=action,
+        )
+        db.session.add(row)
+    row.allowed = bool(allowed)
+    row.granted_by = granted_by
+    db.session.flush()
+    return row
+
+
+def clear_grant(org_id, subject_type, subject_key, object_type, action) -> bool:
+    """Remove one matrix row. The caller commits. True when a row existed."""
+    from app import db
+
+    row = _grant(org_id, subject_type, subject_key, object_type, action)
+    if row is None:
+        return False
+    db.session.delete(row)
+    db.session.flush()
+    return True
