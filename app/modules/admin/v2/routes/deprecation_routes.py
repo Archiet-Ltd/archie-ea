@@ -8,30 +8,28 @@ Uses the new architecture:
 URL prefix preserved: /admin/deprecation (set on blueprint directly)
 Blueprint name: deprecation (same as v1 — no cross-module url_for refs found)
 
-All 7 routes preserved exactly from v1 deprecation_routes.py, plus:
-- GET /api/clients — clients who called API operations in the current org
-- POST /api/mark-retiring — mark an operation as retiring, one notice per
-  affected client owner through the notification store
+All 7 routes preserved from v1 deprecation_routes.py, plus the interface
+consumer list and the mark-retiring route, which share their handlers with the
+live module so both answer alike.
 """
 import logging
 import os
 from datetime import datetime
 
 import requests
-from flask import Blueprint, g, jsonify, render_template, request
+from flask import Blueprint, jsonify, render_template, request
 from flask_login import login_required
 
 from app.decorators import admin_required, audit_log
-from app.extensions import db
-from app.middleware.tenant_decorators import platform_admin_required
+from app.middleware.tenant_decorators import org_admin_required, platform_admin_required
 
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
-from app.utils.deprecation import (
-    create_retiring_notices,
-    get_deprecation_metrics,
-    mark_operation_retiring,
+from app.modules.admin.routes.deprecation_routes import (
+    clients_response,
+    mark_retiring_response,
 )
+from app.utils.deprecation import get_deprecation_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -169,13 +167,10 @@ def send_opsgenie_alert(alert_data):
 @deprecation_bp_v2.route("/")
 @timed_route
 @login_required
-# get_deprecation_metrics() is process-wide, deployment-level API usage
-# telemetry (not tenant data), and the webhook routes below send alerts to
-# PagerDuty/Slack/OpsGenie using shared, platform-level credentials.
-# admin_required alone let any tenant's own admin reach all of this
-# (R1 admin-rbac systemic fix).
-@platform_admin_required
-@admin_required
+# The page shows only the active organisation's interface consumers (counts
+# for a platform administrator), so an organisation administrator may open it.
+# The metrics, alert and webhook routes below stay platform-only.
+@org_admin_required
 def dashboard():
     """Render the deprecation status dashboard."""
     return render_template("admin/deprecation_status.html")
@@ -184,119 +179,20 @@ def dashboard():
 @deprecation_bp_v2.route("/api/clients")
 @timed_route
 @login_required
-@platform_admin_required
-@admin_required
+@org_admin_required
 def api_clients():
-    """List clients who called API operations in the current organisation.
-
-    Organisation admins see their own clients with names, last call and call
-    count. Platform administrators see per-organisation counts only, no client
-    names. Always filtered by g.current_org_id -- organisation B never sees
-    organisation A's clients.
-    """
-    from app.middleware.tenant_decorators import is_platform_admin
-    from app.modules.oauth_provider.models import ApiOperationCall, OAuthClient
-    from flask_login import current_user
-
-    if is_platform_admin(current_user):
-        # Per-organisation counts only, no client names.
-        rows = (
-            db.session.query(
-                ApiOperationCall.organization_id,
-                db.func.count(db.distinct(ApiOperationCall.client_id)).label(
-                    "client_count"
-                ),
-                db.func.sum(ApiOperationCall.call_count).label("total_calls"),
-            )
-            .group_by(ApiOperationCall.organization_id)
-            .all()
-        )
-        return jsonify(
-            {
-                "organisations": [
-                    {
-                        "organization_id": row.organization_id,
-                        "client_count": row.client_count,
-                        "total_calls": row.total_calls,
-                    }
-                    for row in rows
-                ]
-            }
-        )
-
-    rows = (
-        db.session.query(
-            ApiOperationCall.client_id,
-            OAuthClient.client_name,
-            ApiOperationCall.operation_id,
-            db.func.max(ApiOperationCall.last_called_at).label("last_called_at"),
-            db.func.sum(ApiOperationCall.call_count).label("call_count"),
-        )
-        .join(OAuthClient, ApiOperationCall.client_id == OAuthClient.client_id)
-        .group_by(
-            ApiOperationCall.client_id,
-            OAuthClient.client_name,
-            ApiOperationCall.operation_id,
-        )
-        .all()
-    )
-
-    return jsonify(
-        {
-            "clients": [
-                {
-                    "client_id": row.client_id,
-                    "client_name": row.client_name,
-                    "operation_id": row.operation_id,
-                    "last_called_at": (
-                        row.last_called_at.isoformat() if row.last_called_at else None
-                    ),
-                    "call_count": row.call_count,
-                }
-                for row in rows
-            ]
-        }
-    )
+    """Interface consumers of the active organisation (counts only for a platform admin)."""
+    return clients_response()
 
 
 @deprecation_bp_v2.route("/api/mark-retiring", methods=["POST"])
 @timed_route
 @login_required
-@platform_admin_required
-@admin_required
+@org_admin_required
 @audit_log("mark_operation_retiring")
 def api_mark_retiring():
-    """Mark an operation as retiring on a date, with a replacement operation.
-
-    Creates exactly one deprecation notice per affected client owner in the
-    current organisation through the notification store. A second marking of
-    the same operation creates no duplicate notice.
-    """
-    data = request.get_json() or {}
-    operation_id = data.get("operation_id")
-    retires_on = data.get("retires_on")
-    replacement_operation_id = data.get("replacement_operation_id")
-
-    if not operation_id or not retires_on:
-        return jsonify({"error": "operation_id and retires_on are required"}), 400
-
-    mark_operation_retiring(
-        f"/{operation_id}", "GET", retires_on, replacement_operation_id
-    )
-
-    notices_created = create_retiring_notices(
-        operation_id, retires_on, replacement_operation_id, g.current_org_id
-    )
-
-    return jsonify(
-        {
-            "status": "marked",
-            "operation_id": operation_id,
-            "retires_on": retires_on,
-            "replacement_operation_id": replacement_operation_id,
-            "notices_created": notices_created,
-        }
-    )
+    """Mark an operation as retiring and notify its consumers' owners once."""
+    return mark_retiring_response()
 
 
 @deprecation_bp_v2.route("/api/stats")

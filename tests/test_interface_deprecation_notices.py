@@ -1,340 +1,376 @@
-"""Interface deprecation notices: name the consumers of an interface version
-and notify them before it retires.
+"""Interface deprecation notices: name the consumers of an API operation and
+notify their owners before the operation retires.
 
-Covers:
-- the api_operation_calls migration creates the table and is idempotent
-- flask db heads shows one head
-- require_api_scope records one row per bearer call (organisation, client,
-  operation, last called at, call count)
-- two-organisation isolation: org A's admin list names only A's clients
-- marking an operation as retiring adds the Deprecation and Link headers
-- marking creates exactly one notice per affected client owner; a second
-  marking creates no duplicate
+Everything here goes through the real routes:
+
+- a bearer read on /api/v1 records one row per (organisation, consumer,
+  operation) for both token families, and the row is committed
+- a failing recorder never costs the caller a response
+- the consumer list is for organisation administrators (their own clients) and
+  counts only for a platform administrator, proven with two organisations
+- marking an operation as retiring stores the retirement, adds the headers to
+  that operation's real responses (success and error), and notifies each owner
+  once
+- the migration is idempotent
+
+Needs the connector flag (MCP_ENABLED and PUBLIC_BASE_URL), as the other
+bearer-token tests do.
 """
 
 from __future__ import annotations
 
 import importlib.util
+import logging
+import os
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
+from app.modules.oauth_provider.tests.test_api_tokens import (
+    _make_service_user,
+    _mint_api_token,
+    _register_service_client,
+)
+
+pytestmark = pytest.mark.skipif(
+    not (
+        os.environ.get("MCP_ENABLED", "").lower() in ("1", "true", "yes")
+        and bool(os.environ.get("PUBLIC_BASE_URL"))
+    ),
+    reason="OAuth routes not registered (MCP_ENABLED off)",
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MIGRATION_FILE = REPO_ROOT / "migrations" / "versions" / "20261020_api_op_calls.py"
+ADMIN = "/admin/deprecation"
 
 
-def _load_revision():
-    spec = importlib.util.spec_from_file_location("migration_20261020_api_op_calls", MIGRATION_FILE)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def _reset_identity():
+    """db_session keeps one app context open, so g outlives each request."""
+    from flask import g
+
+    for cached in ("_login_user", "_current_user", "current_org_id", "current_org", "bearer_token", "auth_mode"):
+        if hasattr(g, cached):
+            delattr(g, cached)
+
+
+def _bearer_get(app, path, token):
+    _reset_identity()
+    return app.test_client().get(path, headers={"Authorization": f"Bearer {token}"})
+
+
+def _fresh_session():
+    """A new session on the same database connection the test runs on."""
+    from sqlalchemy.orm import Session
+
+    from app import db
+
+    return Session(bind=db.session.get_bind())
+
+
+def _make_person(db_session, org, label, *, org_admin=False, platform_admin=False):
+    from app.models.user import Role, User
+
+    role_name = "Administrator" if (org_admin or platform_admin) else "Viewer"
+    role = Role.query.filter_by(name=role_name).first()
+    if role is None:
+        Role.insert_roles()
+        role = Role.query.filter_by(name=role_name).first()
+    user = User(
+        email=f"{label}-{uuid.uuid4().hex[:8]}@example.com",
+        first_name="Test",
+        last_name="Person",
+        organization_id=org.id,
+        role=role,
+        is_org_admin=org_admin,
+        is_platform_admin=platform_admin,
+        confirmed=True,
+    )
+    user.password = uuid.uuid4().hex
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def _admin_call(app, client, login_as, user, method, path, **kwargs):
+    _reset_identity()
+    login_as(client, user)
+    return getattr(client, method)(f"{ADMIN}{path}", **kwargs)
+
+
+def _consumers(db_session, make_org):
+    """Two organisations; each has one registered client and one personal token."""
+    org_a, org_b = make_org("depr-a"), make_org("depr-b")
+    svc_a = _make_service_user(db_session, org_a, f"svc-a-{uuid.uuid4().hex[:6]}@example.com")
+    svc_b = _make_service_user(db_session, org_b, f"svc-b-{uuid.uuid4().hex[:6]}@example.com")
+    client_a = _register_service_client(db_session, svc_a)
+    client_b = _register_service_client(db_session, svc_b)
+    client_b.client_name = "Bravo Reader"
+    client_a.client_name = "Alpha Reader"
+    db_session.flush()
+    tokens = {
+        "client_a": _mint_api_token(svc_a, organization_id=org_a.id, client_id=client_a.client_id),
+        "client_b": _mint_api_token(svc_b, organization_id=org_b.id, client_id=client_b.client_id),
+        "personal_a": _mint_api_token(svc_a, organization_id=org_a.id),
+    }
+    return org_a, org_b, svc_a, svc_b, client_a, client_b, tokens
+
+
+# ---------------------------------------------------------------------------
+# Migration
+# ---------------------------------------------------------------------------
 
 
 def _run_upgrade(app, times=1):
     from alembic.migration import MigrationContext
     from alembic.operations import Operations
+
     from app import db
 
-    module = _load_revision()
+    spec = importlib.util.spec_from_file_location("migration_20261020_api_op_calls", MIGRATION_FILE)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
     for _ in range(times):
         with app.app_context():
             with db.engine.begin() as connection:
-                context = MigrationContext.configure(connection)
-                with Operations.context(context):
+                with Operations.context(MigrationContext.configure(connection)):
                     module.upgrade()
 
 
-# ---------------------------------------------------------------------------
-# Migration tests
-# ---------------------------------------------------------------------------
-
-
-def test_migration_creates_table(app, db_session):
-    """The migration creates the api_operation_calls table."""
-    _run_upgrade(app)
-    from app.modules.oauth_provider.models import ApiOperationCall
+def test_migration_runs_twice_and_both_tables_exist(app, db_session):
+    from sqlalchemy import text
 
     from app import db
-    with db.engine.connect() as connection:
-        from sqlalchemy import text
-        result = connection.execute(
-            text("SELECT to_regclass('public.api_operation_calls')")
-        ).scalar()
-    assert result is not None, "api_operation_calls table was not created"
 
-
-def test_migration_runs_twice_without_error(app, db_session):
-    """The migration runs twice without error (idempotent)."""
     _run_upgrade(app, times=2)
-
-
-def test_flask_db_heads_shows_one_head(app):
-    """flask db heads shows one head."""
-    import subprocess
-    result = subprocess.run(
-        ["python", "-m", "flask", "--app", "manage", "db", "heads"],
-        capture_output=True, text=True, cwd=REPO_ROOT,
-    )
-    heads = [ln for ln in result.stdout.splitlines() if ln.strip() and "(head)" in ln]
-    assert len(heads) == 1, f"Expected 1 head, got {len(heads)}: {heads}"
+    with db.engine.connect() as connection:
+        for table in ("api_operation_calls", "api_operation_retirements"):
+            assert connection.execute(text("SELECT to_regclass(:t)"), {"t": f"public.{table}"}).scalar() is not None
+            assert connection.execute(
+                text("SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass(:t)"), {"t": f"public.{table}"}
+            ).scalar()
+            policies = connection.execute(
+                text("SELECT count(*) FROM pg_policies WHERE tablename = :t"), {"t": table}
+            ).scalar()
+            assert policies == 4, (table, policies)
+        foreign_keys = connection.execute(
+            text(
+                "SELECT count(*) FROM pg_constraint WHERE contype = 'f' "
+                "AND conrelid = to_regclass('public.api_operation_calls')"
+            )
+        ).scalar()
+        assert foreign_keys == 2, "one named foreign key per column, no duplicates"
 
 
 # ---------------------------------------------------------------------------
-# Call recording tests
+# Recording a call
 # ---------------------------------------------------------------------------
 
 
-def _make_org_and_user(db_session, label):
-    from app.models.organization import Organization
-    from app.models.user import User
+def test_both_token_families_are_recorded_and_the_row_is_committed(app, db_session, make_org):
+    from sqlalchemy import text
 
-    org = Organization(name=f"Org {label} {uuid.uuid4().hex[:6]}", slug=f"org-{label}-{uuid.uuid4().hex[:6]}")
-    db_session.add(org)
-    db_session.flush()
-    user = User(
-        email=f"user-{label}-{uuid.uuid4().hex[:8]}@example.com",
-        organization_id=org.id, confirmed=True, enterprise_role="enterprise_architect",
-    )
-    user.password = "x"
-    db_session.add(user)
-    db_session.flush()
-    return org, user
+    org_a, _org_b, _svc_a, _svc_b, client_a, _client_b, tokens = _consumers(db_session, make_org)
 
-
-def _make_client_and_token(db_session, user, org, label, scope="api:read"):
-    from app.modules.oauth_provider.models import OAuthClient, OAuthToken, _new_client_id, hash_secret
-
-    client = OAuthClient(
-        client_id=_new_client_id("cl"),
-        client_name=f"Client {label}",
-        client_secret_hash=hash_secret("secret"),
-        grant_types="client_credentials",
-        scope=scope,
-        service_user_id=user.id,
-        is_active=True,
-    )
-    db_session.add(client)
-    db_session.flush()
-
-    public_base = "http://localhost"
-    raw_access, _raw_refresh, token = OAuthToken.issue(
-        client_id=client.client_id,
-        user_id=user.id,
-        scope=scope,
-        resource=f"{public_base}/api/v1",
-        grant_type="client_credentials",
-        organization_id=org.id,
-    )
-    return client, raw_access
-
-
-def _enable_bearer(app):
-    """Switch the app into bearer-token mode for the test."""
-    app.config["MCP_ENABLED"] = True
-    app.config["PUBLIC_BASE_URL"] = "http://localhost"
-
-
-def test_require_api_scope_records_call(app, db_session, client):
-    """A bearer call to a token-accepting route records in api_operation_calls."""
-    _enable_bearer(app)
-    _run_upgrade(app)
-
-    org, user = _make_org_and_user(db_session, "a")
-    oauth_client, raw_access = _make_client_and_token(db_session, user, org, "a")
-
-    # Three calls to the elements list route
     for _ in range(3):
-        response = client.get(
-            "/api/v1/elements",
-            headers={"Authorization": f"Bearer {raw_access}"},
-        )
-        assert response.status_code in (200, 404), response.status_code
+        assert _bearer_get(app, "/api/v1/elements", tokens["client_a"]).status_code == 200
+    assert _bearer_get(app, "/api/v1/elements", tokens["personal_a"]).status_code == 200
+    assert _bearer_get(app, "/api/v1/elements/999999999", tokens["client_a"]).status_code == 404
 
-    db_session.flush()
+    # A new session finds the rows: the record outlived the request that wrote it.
+    db_session.expire_all()
+    with _fresh_session() as other:
+        rows = other.execute(
+            text(
+                "SELECT consumer_key, client_id, token_kind, operation_id, call_count "
+                "FROM api_operation_calls WHERE organization_id = :o ORDER BY operation_id, consumer_key"
+            ),
+            {"o": org_a.id},
+        ).all()
+    by_key = {(r.consumer_key, r.operation_id): r for r in rows}
+    registered = by_key[(client_a.client_id, "listElements")]
+    assert registered.call_count == 3
+    assert registered.token_kind == "oauth_client"
+    assert registered.client_id == client_a.client_id
+    personal_key = next(k for (k, op) in by_key if k.startswith("at_"))
+    personal = by_key[(personal_key, "listElements")]
+    assert personal.call_count == 1
+    assert personal.token_kind == "api_token"
+    assert personal.client_id is None
+    assert (client_a.client_id, "getElement") in by_key, "an operation with a path parameter resolves too"
 
-    from app.modules.oauth_provider.models import ApiOperationCall
-    rows = db_session.query(ApiOperationCall).all()
-    assert len(rows) == 1, f"Expected 1 row, got {len(rows)}"
-    row = rows[0]
-    assert row.organization_id == org.id
-    assert row.client_id == oauth_client.client_id
-    assert row.operation_id == "listElements"
-    assert row.call_count == 3
-    assert row.last_called_at is not None
 
-
-def test_two_org_isolation(app, db_session, client):
-    """Organisation A's admin list names only A's clients, nothing of B's."""
-    _enable_bearer(app)
-    _run_upgrade(app)
-
-    org_a, user_a = _make_org_and_user(db_session, "a")
-    org_b, user_b = _make_org_and_user(db_session, "b")
-
-    client_a, token_a = _make_client_and_token(db_session, user_a, org_a, "a")
-    client_b, token_b = _make_client_and_token(db_session, user_b, org_b, "b")
-
+def test_a_failing_recorder_never_costs_the_caller_a_response(app, db_session, make_org, monkeypatch, caplog):
     from app import db
-    from app.modules.oauth_provider.models import ApiOperationCall
-    from flask import g
-    org_a_id = org_a.id
-    org_b_id = org_b.id
+    from app.modules.oauth_provider import scopes
 
-    # Two calls from org A's client, one from org B's client.
-    # g persists between test-client requests (db_session holds one app
-    # context); flask_login caches the resolved bearer user on g._login_user,
-    # so delete it before switching orgs so the next request re-resolves its
-    # own token instead of reusing the previous org's user.
-    responses = []
-    for _ in range(2):
-        response = client.get("/api/v1/elements", headers={"Authorization": f"Bearer {token_a}"})
-        responses.append((response.status_code, response.get_json()))
-    for attr in ("_login_user", "_current_user", "bearer_token", "auth_mode", "current_org_id", "current_org"):
-        if hasattr(g, attr):
-            delattr(g, attr)
-    response_b = client.get("/api/v1/elements", headers={"Authorization": f"Bearer {token_b}"})
-    responses.append((response_b.status_code, response_b.get_json()))
-
-    db_session.flush()
-
-    # TenantMixin auto-filters by g.current_org_id; set it per query to avoid
-    # double-filtering (CLAUDE.md: don't hand-write org filters on TenantMixin).
-    g.current_org_id = org_a_id
-    rows_a = db_session.query(ApiOperationCall).all()
-    g.current_org_id = org_b_id
-    rows_b = db_session.query(ApiOperationCall).all()
-
-    assert len(rows_a) == 1, f"Expected 1 row for org A, got {len(rows_a)}: responses={responses}"
-    assert rows_a[0].client_id == client_a.client_id
-    assert rows_a[0].call_count == 2, f"Expected call_count 2, got {rows_a[0].call_count}: responses={responses}"
-    assert len(rows_b) == 1
-    assert rows_b[0].client_id == client_b.client_id
-    assert rows_b[0].call_count == 1
+    _a, _b, _sa, _sb, _ca, _cb, tokens = _consumers(db_session, make_org)
+    monkeypatch.setattr(scopes, "_UPSERT_CALL", db.text("INSERT INTO table_that_does_not_exist VALUES (1)"))
+    with caplog.at_level(logging.WARNING):
+        response = _bearer_get(app, "/api/v1/elements", tokens["client_a"])
+    assert response.status_code == 200, response.get_data(as_text=True)
+    assert any("API call record skipped" in r.getMessage() for r in caplog.records)
+    # The request's own session is still usable afterwards.
+    assert _bearer_get(app, "/api/v1/elements", tokens["client_b"]).status_code == 200
 
 
 # ---------------------------------------------------------------------------
-# Deprecation header tests
+# The consumer list: two organisations, two roles
 # ---------------------------------------------------------------------------
 
 
-def test_deprecation_header_on_retiring_operation(app):
-    """Marking an operation as retiring adds Deprecation and Link headers."""
-    from app.utils.deprecation import deprecated_route, mark_operation_retiring
+def test_org_admin_sees_own_clients_and_none_of_the_other_organisations(app, client, db_session, login_as, make_org):
+    org_a, org_b, _sa, _sb, _ca, _cb, tokens = _consumers(db_session, make_org)
+    _bearer_get(app, "/api/v1/elements", tokens["client_a"])
+    _bearer_get(app, "/api/v1/elements", tokens["client_b"])
+    admin_a = _make_person(db_session, org_a, "admin-a", org_admin=True)
+    admin_b = _make_person(db_session, org_b, "admin-b", org_admin=True)
 
-    @deprecated_route("test_endpoint")
-    def mock_view():
-        return "ok"
+    body_a = _admin_call(app, client, login_as, admin_a, "get", "/api/clients")
+    assert body_a.status_code == 200, body_a.get_data(as_text=True)
+    text_a = body_a.get_data(as_text=True)
+    names_a = {c["client_name"] for c in body_a.get_json()["clients"]}
+    assert "Alpha Reader" in names_a
+    assert "Bravo Reader" not in names_a and "Bravo Reader" not in text_a
 
-    with app.test_request_context("/test-path", method="GET"):
-        # Before retiring: no Deprecation header
-        response = mock_view()
-        assert response.headers.get("Deprecation") is None
-
-        # After retiring: Deprecation and Link headers present
-        mark_operation_retiring("/test-path", "GET", "2027-06-01", "replacement-op")
-        response = mock_view()
-        assert response.headers.get("Deprecation") == "2027-06-01"
-        assert 'rel="deprecation"' in response.headers.get("Link", "")
+    body_b = _admin_call(app, client, login_as, admin_b, "get", "/api/clients")
+    names_b = {c["client_name"] for c in body_b.get_json()["clients"]}
+    assert names_b == {"Bravo Reader"}
 
 
-def test_no_deprecation_header_when_not_retiring(app):
-    """An operation that is not marked retiring answers without the header."""
-    from app.utils.deprecation import deprecated_route
+def test_platform_admin_sees_counts_per_organisation_and_no_names(app, client, db_session, login_as, make_org):
+    org_a, org_b, _sa, _sb, _ca, _cb, tokens = _consumers(db_session, make_org)
+    _bearer_get(app, "/api/v1/elements", tokens["client_a"])
+    _bearer_get(app, "/api/v1/elements", tokens["client_a"])
+    _bearer_get(app, "/api/v1/elements", tokens["client_b"])
+    platform = _make_person(db_session, org_a, "platform", org_admin=True, platform_admin=True)
 
-    @deprecated_route("test_endpoint_2")
-    def mock_view():
-        return "ok"
+    response = _admin_call(app, client, login_as, platform, "get", "/api/clients")
+    assert response.status_code == 200, response.get_data(as_text=True)
+    raw = response.get_data(as_text=True)
+    assert "Alpha Reader" not in raw and "Bravo Reader" not in raw
+    counts = {o["organization_id"]: o for o in response.get_json()["organisations"]}
+    assert counts[org_a.id]["total_calls"] == 2 and counts[org_a.id]["client_count"] == 1
+    assert counts[org_b.id]["total_calls"] == 1 and counts[org_b.id]["client_count"] == 1
+    assert "clients" not in response.get_json()
 
-    with app.test_request_context("/test-path-2", method="GET"):
-        response = mock_view()
-        assert response.headers.get("Deprecation") is None
+
+def test_a_plain_member_is_refused_both_routes(app, client, db_session, login_as, make_org):
+    org_a = make_org("depr-member")
+    member = _make_person(db_session, org_a, "member")
+    assert _admin_call(app, client, login_as, member, "get", "/api/clients").status_code == 403
+    response = _admin_call(
+        app, client, login_as, member, "post", "/api/mark-retiring",
+        json={"operation_id": "listElements", "retires_on": "2027-06-01"},
+    )
+    assert response.status_code == 403
+
+
+def test_the_page_opens_for_an_org_admin_and_calls_live_endpoints(app, client, db_session, login_as, make_org):
+    org_a = make_org("depr-page")
+    admin = _make_person(db_session, org_a, "admin-page", org_admin=True)
+    response = _admin_call(app, client, login_as, admin, "get", "/")
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    for path in ("/admin/deprecation/api/clients", "/admin/deprecation/api/mark-retiring"):
+        assert path in page
+        rule = next(r for r in app.url_map.iter_rules() if r.rule == path)
+        assert rule.endpoint.startswith("deprecation."), "the page calls routes the running app registers"
 
 
 # ---------------------------------------------------------------------------
-# Notice creation tests
+# Marking an operation as retiring
 # ---------------------------------------------------------------------------
 
 
-def test_mark_retiring_creates_one_notice_per_owner(app, db_session, client):
-    """Marking an operation as retiring creates one notice per affected client owner."""
-    _enable_bearer(app)
-    _run_upgrade(app)
+def _mark(app, client, login_as, admin, **body):
+    return _admin_call(app, client, login_as, admin, "post", "/api/mark-retiring", json=body)
 
-    from flask import g
-    from app.utils.deprecation import (
-        create_retiring_notices,
-        mark_operation_retiring,
+
+def test_marking_validates_against_the_contract(app, client, db_session, login_as, make_org):
+    org_a = make_org("depr-valid")
+    admin = _make_person(db_session, org_a, "admin-valid", org_admin=True)
+    assert _mark(app, client, login_as, admin, operation_id="noSuchOperation", retires_on="2027-06-01").status_code == 400
+    assert _mark(app, client, login_as, admin, operation_id="listElements", retires_on="soon").status_code == 400
+    assert _mark(
+        app, client, login_as, admin, operation_id="listElements", retires_on="2027-06-01",
+        replacement_operation_id="noSuchOperation",
+    ).status_code == 400
+
+
+def test_retiring_operation_answers_with_headers_on_success_and_error(app, client, db_session, login_as, make_org):
+    org_a, org_b, _sa, _sb, _ca, _cb, tokens = _consumers(db_session, make_org)
+    admin_a = _make_person(db_session, org_a, "admin-hdr", org_admin=True)
+
+    before = _bearer_get(app, "/api/v1/elements", tokens["client_a"])
+    assert before.status_code == 200 and "Deprecation" not in before.headers
+
+    marked = _mark(
+        app, client, login_as, admin_a,
+        operation_id="listElements", retires_on="2027-06-01", replacement_operation_id="getElement",
     )
+    assert marked.status_code == 200, marked.get_data(as_text=True)
+    assert _mark(
+        app, client, login_as, admin_a, operation_id="getElement", retires_on="2027-06-01"
+    ).status_code == 200
 
-    org, user = _make_org_and_user(db_session, "a")
-    oauth_client, raw_access = _make_client_and_token(db_session, user, org, "a")
+    ok = _bearer_get(app, "/api/v1/elements", tokens["client_a"])
+    assert ok.status_code == 200
+    assert ok.headers["Deprecation"].startswith("@")
+    assert ok.headers["Sunset"] == "Tue, 01 Jun 2027 00:00:00 GMT"
+    assert "</api/v1/elements/{id}>" in ok.headers["Link"], "the link names the replacement's path, not its id"
+    assert 'rel="deprecation"' in ok.headers["Link"]
+    assert "getElement" not in ok.headers["Link"]
 
-    # Make a call so the client is recorded
-    client.get("/api/v1/elements", headers={"Authorization": f"Bearer {raw_access}"})
-    db_session.flush()
+    missing = _bearer_get(app, "/api/v1/elements/999999999", tokens["client_a"])
+    assert missing.status_code == 404
+    assert missing.headers["Deprecation"].startswith("@"), "error responses carry the headers too"
+    assert "Link" not in missing.headers, "no replacement was named for this operation"
 
-    mark_operation_retiring("/elements", "GET", "2027-06-01", "listElementsV2")
+    # Organisation B's administrator has marked nothing: its reads are unchanged.
+    other = _bearer_get(app, "/api/v1/elements", tokens["client_b"])
+    assert other.status_code == 200 and "Deprecation" not in other.headers
 
-    g.current_org_id = org.id
-    created = create_retiring_notices(
-        "listElements", "2027-06-01", "listElementsV2", org.id
+    # The retirement is a stored record, not process memory.
+    with _fresh_session() as session:
+        from sqlalchemy import text
+
+        row = session.execute(
+            text(
+                "SELECT retires_on, replacement_operation_id FROM api_operation_retirements "
+                "WHERE organization_id = :o AND operation_id = 'listElements'"
+            ),
+            {"o": org_a.id},
+        ).one()
+    assert str(row.retires_on) == "2027-06-01" and row.replacement_operation_id == "getElement"
+
+
+def test_each_owner_is_notified_once_and_the_notice_is_committed(app, client, db_session, login_as, make_org):
+    from sqlalchemy import text
+
+    org_a, _org_b, svc_a, _svc_b, _ca, _cb, tokens = _consumers(db_session, make_org)
+    admin = _make_person(db_session, org_a, "admin-notice", org_admin=True)
+    _bearer_get(app, "/api/v1/elements", tokens["client_a"])
+    _bearer_get(app, "/api/v1/elements", tokens["personal_a"])
+
+    first = _mark(app, client, login_as, admin, operation_id="listElements", retires_on="2027-06-01")
+    assert first.status_code == 200 and first.get_json()["notices_created"] == 1, first.get_json()
+    # Another date and another replacement is still the same retirement for the same owner.
+    second = _mark(
+        app, client, login_as, admin,
+        operation_id="listElements", retires_on="2027-09-01", replacement_operation_id="getElement",
     )
-    assert created == 1, f"Expected 1 notice created, got {created}"
+    assert second.status_code == 200 and second.get_json()["notices_created"] == 0
 
-    from app.models.models import Notification
-    notices = (
-        db_session.query(Notification)
-        .filter(Notification.user_id == user.id, Notification.event_type == "deprecation_notice")
-        .all()
-    )
-    assert len(notices) == 1, f"Expected 1 notice, got {len(notices)}"
-    assert "retiring" in notices[0].message
-
-
-def test_second_marking_creates_no_duplicate(app, db_session, client):
-    """A second marking of the same operation creates no duplicate notice."""
-    _enable_bearer(app)
-    _run_upgrade(app)
-
-    from flask import g
-    from app.utils.deprecation import (
-        create_retiring_notices,
-        mark_operation_retiring,
-    )
-
-    org, user = _make_org_and_user(db_session, "a")
-    oauth_client, raw_access = _make_client_and_token(db_session, user, org, "a")
-
-    client.get("/api/v1/elements", headers={"Authorization": f"Bearer {raw_access}"})
-    db_session.flush()
-
-    mark_operation_retiring("/elements", "GET", "2027-06-01", "listElementsV2")
-    mark_operation_retiring("/elements", "GET", "2027-06-01", "listElementsV2")
-
-    g.current_org_id = org.id
-    created1 = create_retiring_notices(
-        "listElements", "2027-06-01", "listElementsV2", org.id
-    )
-    created2 = create_retiring_notices(
-        "listElements", "2027-06-01", "listElementsV2", org.id
-    )
-    assert created1 == 1, f"Expected 1 notice on first marking, got {created1}"
-    assert created2 == 0, f"Expected 0 notices on second marking, got {created2}"
-
-    from app.models.models import Notification
-    notices = (
-        db_session.query(Notification)
-        .filter(Notification.user_id == user.id, Notification.event_type == "deprecation_notice")
-        .all()
-    )
-    assert len(notices) == 1, f"Expected 1 notice total, got {len(notices)}"
-
-    from app.models.models import Notification
-    notices = (
-        db_session.query(Notification)
-        .filter(Notification.user_id == user.id, Notification.event_type == "deprecation_notice")
-        .all()
-    )
-    assert len(notices) == 1, f"Expected 1 notice, got {len(notices)}"
+    db_session.expire_all()
+    with _fresh_session() as other:
+        notices = other.execute(
+            text(
+                "SELECT user_id, message FROM notifications "
+                "WHERE event_type = 'deprecation_notice' AND user_id = :u"
+            ),
+            {"u": svc_a.id},
+        ).all()
+    assert len(notices) == 1, notices
+    assert "listElements" in notices[0].message

@@ -8,8 +8,9 @@
   <div class="max-w-4xl mx-auto">
     <h2 class="text-lg font-semibold">Interface consumers</h2>
     <p class="text-sm text-muted-foreground">
-      Clients whose tokens called an interface version in the last ninety days,
-      with their last call and call count. Organisation {{ g.current_org_id }} only.
+      Clients whose tokens called an interface operation, with their last call
+      and call count, for your organisation only. A platform administrator sees
+      the number of clients and calls per organisation, without names.
     </p>
 
     <div class="rounded-xl border bg-card">
@@ -18,7 +19,7 @@
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
-          <thead>
+          <thead id="clients-table-head">
             <tr class="border-b">
               <th class="text-left p-3 text-muted-foreground font-medium">Client</th>
               <th class="text-left p-3 text-muted-foreground font-medium">Operation</th>
@@ -81,6 +82,29 @@
       .then(function (data) {
         var body = document.getElementById('clients-table-body');
         body.innerHTML = '';
+        if (data.organisations) {
+          document.getElementById('clients-table-head').innerHTML =
+            '<tr class="border-b">' +
+            '<th class="text-left p-3 text-muted-foreground font-medium">Organisation</th>' +
+            '<th class="text-left p-3 text-muted-foreground font-medium">Clients</th>' +
+            '<th class="text-left p-3 text-muted-foreground font-medium"></th>' +
+            '<th class="text-right p-3 text-muted-foreground font-medium">Calls</th></tr>';
+          if (data.organisations.length === 0) {
+            body.innerHTML = '<tr><td colspan="4" class="p-3 text-muted-foreground text-center">No calls recorded.</td></tr>';
+            return;
+          }
+          data.organisations.forEach(function (o) {
+            var tr = document.createElement('tr');
+            tr.className = 'border-b';
+            tr.innerHTML =
+              '<td class="p-3 text-foreground">' + escapeHtml(o.organization_id) + '</td>' +
+              '<td class="p-3 text-muted-foreground">' + escapeHtml(o.client_count) + '</td>' +
+              '<td class="p-3"></td>' +
+              '<td class="p-3 text-muted-foreground text-right">' + escapeHtml(o.total_calls) + '</td>';
+            body.appendChild(tr);
+          });
+          return;
+        }
         var clients = data.clients || [];
         if (clients.length === 0) {
           body.innerHTML = '<tr><td colspan="4" class="p-3 text-muted-foreground text-center">No clients recorded.</td></tr>';

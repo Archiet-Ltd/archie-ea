@@ -453,6 +453,8 @@ class OAuthToken(db.Model):
 
 def _revoke_connector_tokens_on_organisation_change(mapper, connection, target):
     """A person moved to another organisation takes no assistant with them.
+
+    The bearer loader already refuses a token whose organisation no longer
     matches the user's, but a person moved out and later back in would find
     the old token working again. Revoking at the moment of the move closes
     that. Runs inside the same flush as the move itself.
@@ -481,12 +483,15 @@ _register_user_listeners()
 
 
 class ApiOperationCall(TenantMixin, db.Model):
-    """One row per (organisation, client, operation): last call and call count.
+    """One row per (organisation, consumer, operation): last call and call count.
 
-    Written from ``require_api_scope`` with one upsert per request so the
-    deprecation admin page can name the consumers of an interface version
-    before it retires. TenantMixin injects the organization_id column and the
-    tenant before-flush listener auto-stamps it from the request context.
+    Written once per bearer call from ``require_api_scope`` so the deprecation
+    admin page can name the consumers of an interface operation before it
+    retires. ``consumer_key`` is the token's own client identifier, so both
+    token families fit one table: a registered OAuth client (``token_kind``
+    ``oauth_client``, ``client_id`` set) and a personal API token (``api_token``,
+    whose ``at_`` identifier has no ``oauth_clients`` row, so ``client_id`` is
+    null). TenantMixin supplies the organization_id column.
     """
 
     __tablename__ = "api_operation_calls"
@@ -495,9 +500,11 @@ class ApiOperationCall(TenantMixin, db.Model):
     client_id = db.Column(
         db.String(128),
         db.ForeignKey("oauth_clients.client_id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
+    consumer_key = db.Column(db.String(128), nullable=False, index=True)
+    token_kind = db.Column(db.String(16), nullable=False, server_default="oauth_client")
     operation_id = db.Column(db.String(255), nullable=False, index=True)
     last_called_at = db.Column(
         db.DateTime(timezone=True), nullable=False, server_default=db.func.now()
@@ -507,8 +514,40 @@ class ApiOperationCall(TenantMixin, db.Model):
     __table_args__ = (
         db.UniqueConstraint(
             "organization_id",
-            "client_id",
+            "consumer_key",
             "operation_id",
-            name="uq_api_operation_calls_org_client_operation",
+            name="uq_api_operation_calls_org_consumer_operation",
+        ),
+    )
+
+
+class ApiOperationRetirement(TenantMixin, db.Model):
+    """An operation an organisation administrator has marked as retiring.
+
+    One row per (organisation, operation). Kept in the database rather than in
+    process memory so every worker answers with the same headers and a restart
+    forgets nothing. ``require_api_scope`` reads it to add the retirement
+    headers to the operation's real responses; ``id`` is the stable key of the
+    owner notices, so marking twice notifies each owner once.
+    """
+
+    __tablename__ = "api_operation_retirements"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    operation_id = db.Column(db.String(255), nullable=False, index=True)
+    retires_on = db.Column(db.Date, nullable=False)
+    replacement_operation_id = db.Column(db.String(255), nullable=True)
+    marked_by_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    marked_at = db.Column(
+        db.DateTime(timezone=True), nullable=False, server_default=db.func.now()
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "organization_id",
+            "operation_id",
+            name="uq_api_operation_retirements_org_operation",
         ),
     )
