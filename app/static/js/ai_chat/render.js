@@ -421,9 +421,17 @@
 
     /* One call site for everything that hangs below an answer, so the completed
        and streamed paths cannot render different things. */
+    /* Ask's answer cards for the estate answers a turn's tools returned. The
+       markup is rendered on the server from the stored answer (never from the
+       model's text), so it is inserted as it arrived. */
+    function renderAnswerCards(cards) {
+        return Array.isArray(cards) ? cards.filter(function (c) { return typeof c === 'string'; }).join('') : '';
+    }
+
     function renderAnswerFooter(meta) {
         var m = meta || {};
-        return renderApiSettingsNotice(m.error) +
+        return renderAnswerCards(m.answerCards) +
+               renderApiSettingsNotice(m.error) +
                renderEvidence(m.trail, m.sources, {
                    contextUsed: m.contextUsed,
                    domainLabel: m.domain
