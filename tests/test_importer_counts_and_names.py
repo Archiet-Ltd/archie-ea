@@ -71,11 +71,12 @@ def test_serving_after_association_on_same_pair_is_created(app, org_ctx):
     from app.models.archimate_core import ArchiMateRelationship
 
     xml = _xml(
-        [("a", "ApplicationComponent", "App"), ("b", "BusinessProcess", "Proc")],
+        [("a", "BusinessActor", "Actor"), ("b", "Capability", "Cap")],
         [("r1", "Association", "a", "b"), ("r2", "Serving", "a", "b")],
     )
     res = _run(xml)
     assert res["relationships_created"] == 2
+    assert res["relationships_softened"] == 1
     assert res["relationships_skipped"] == 0
     assert ArchiMateRelationship.query.count() == 2
 

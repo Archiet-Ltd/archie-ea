@@ -22,6 +22,7 @@ against the ``archimate_elements`` table.
 """
 
 from app.utils import safe_xml  # untrusted XML: entity-expansion safe
+import re
 import logging
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional, Union
@@ -76,6 +77,16 @@ def read_xml_from_request(req, file_fields=("oef_file", "file")) -> Optional[Uni
             return raw
 
     return None
+
+
+_MODELLED_NOTE = re.compile(r"As modelled: ([A-Za-z]+)\.")
+
+
+def _modelled_note_type(description):
+    """The relationship type recorded in an "As modelled: <Type>." note, lower
+    case, or None when the description carries no such note."""
+    match = _MODELLED_NOTE.search(description or "")
+    return match.group(1).lower() if match else None
 
 
 class ArchiMateImportService:
@@ -153,13 +164,20 @@ class ArchiMateImportService:
         "ImplementationEvent": "Implementation",
         "Plateau": "Implementation",
         "Gap": "Implementation",
+        # Concepts that belong to no layer. They are known types; the layer
+        # "Other" is their stored layer, so no unknown-type warning is logged.
+        "Grouping": "Other",
+        "Location": "Other",
+        "Junction": "Other",
     }
 
     # Column widths on ``archimate_elements`` (app/models/archimate_core.py).
     # DOGFOOD-001: the parser checks these so preview reports what execute
     # will refuse, instead of one over-long name aborting the whole import
     # with a raw ``StringDataRightTruncation`` from the database.
-    MAX_NAME_LENGTH = 100
+    # The element name column holds 500 characters; 255 is the import limit so a
+    # long Open Exchange name no longer blocks its element.
+    MAX_NAME_LENGTH = 255
     MAX_TYPE_LENGTH = 50
 
     # DOGFOOD-003 (relationship-validity authority audit): this class used to
@@ -257,7 +275,7 @@ class ArchiMateImportService:
                         "layer": "Business",
                         "description": "..." | None,
                         "properties": {"status": "RULED", ...},
-                        "invalid": "name_too_long (269 chars > 100)",  # only when present
+                        "invalid": "name_too_long (269 chars > 255)",  # only when present
                     }, ...
                 ],
                 "relationships": [
@@ -543,6 +561,7 @@ class ArchiMateImportService:
 
             normalized_type = _normalize_rel_type(rel_type_raw)
             entry["type"] = normalized_type
+            entry["modelled_type"] = normalized_type
             result = validator.validate_relationship(
                 source_type, target_type, normalized_type
             )
@@ -559,6 +578,7 @@ class ArchiMateImportService:
                 prior = (entry.get("description") or "").strip()
                 entry["description"] = f"{prior} {note}".strip()
                 entry["type"] = "association"
+                entry["softened"] = True
                 entry["notice"] = (
                     f"{modelled} between {source_type} and {target_type} is not "
                     f"in the ArchiMate 3.2 matrix; stored as Association "
@@ -935,6 +955,7 @@ class ArchiMateImportService:
 
         relationships_created = 0
         relationships_skipped = 0
+        relationships_softened = 0
         relationships_failed: List[Dict[str, Any]] = []
         relationship_notices: List[str] = []
 
@@ -967,9 +988,21 @@ class ArchiMateImportService:
                 # takes the rest of the relationships (or the elements
                 # already flushed) down with it.
                 with db.session.begin_nested():
-                    existing_rel = ArchiMateRelationship.query.filter_by(
+                    # Identity is (source, target, modelled type), checked
+                    # before softening: a softened row is told apart from a
+                    # modelled Association by its "As modelled: <Type>." note.
+                    existing_rel = None
+                    for cand in ArchiMateRelationship.query.filter_by(
                         source_id=source_db_id, target_id=target_db_id, type=rel["type"],
-                    ).first()
+                    ).all():
+                        cand_note = _modelled_note_type(cand.description)
+                        if rel.get("softened"):
+                            if cand_note == rel["modelled_type"]:
+                                existing_rel = cand
+                                break
+                        elif cand_note is None:
+                            existing_rel = cand
+                            break
                     if existing_rel is not None:
                         relationships_skipped += 1
                         stored_rel, rel_status = existing_rel, "skipped"
@@ -990,6 +1023,7 @@ class ArchiMateImportService:
                         created_relationship_ids.append(new_rel.id)
                         stored_rel, rel_status = new_rel, "created"
                         if rel.get("notice"):
+                            relationships_softened += 1
                             relationship_notices.append(rel["notice"])
                 relationship_results.append({
                     "identifier": rel["identifier"],
@@ -1053,6 +1087,7 @@ class ArchiMateImportService:
             "errors": errors,
             "relationships_created": relationships_created,
             "relationships_skipped": relationships_skipped,
+            "relationships_softened": relationships_softened,
             "relationships_failed": relationships_failed,
             "relationship_notices": relationship_notices,
             "created_ids": created_ids,
