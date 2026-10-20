@@ -223,12 +223,10 @@ Your own AI system register, with a proposed EU AI Act risk class for each syste
 
 <h3 id="enterprise-intelligence">Enterprise Intelligence</h3>
 
-Ask the model a question and get an answer that cites its sources, explains itself and shows what it
-does not know. Then let the platform raise what matters before you ask.
+Ask the model a question and get an answer built from the records you entered. Then let the platform raise what matters before you ask.
 
 **Today:** pick any element and ask four questions: what breaks if it fails, which strategy it
-serves, which programmes touch it and which risks reach it. Every row shows its source and how it was
-derived, and you can see the model as it stood on any past date.
+serves, which programmes touch it and which risks reach it. You can see the model as it stood on any past date.
 
 Organisation-wide questions with cited, shareable answers arrive in Q4 2026, and the platform will start raising insights without being asked in Q1 2027, with forecasts and recommendations tracked to outcomes following through 2027.
 
@@ -250,7 +248,7 @@ delegate, act on it, with one permission check, one approval queue and a full au
 **Today:** the in-product assistant works through the same permission check and approval inbox every
 agent will use.
 
-Your own AI assistants will be able to read the model securely from Q1 2027, with multi-step agent workflows following in 2027.
+Your own AI assistants can read the model securely today, read-only and scoped to your organisation, with multi-step agent workflows following in 2027.
 
 Delivered today by: [AI Chat](/modules/ai-chat).
 
@@ -260,10 +258,7 @@ Delivered today by: [AI Chat](/modules/ai-chat).
 
 <h3 id="collaboration-and-communication">Collaboration and Communication</h3>
 
-Make every answer shareable, reviewable and deliverable, and give every person one place for their
-work.
-
-**Today:** diagrams and the audit trail export now.
+Export diagrams and the audit trail today; sharing answers arrives in Q4 2026.
 
 Answers you can save, share, subscribe to and export arrive in Q4 2026, with comments and reviews following in 2027.
 
@@ -281,11 +276,10 @@ Delivered today by: [Architecture Model](/modules/architecture-model) (file impo
 
 <h3 id="administration-and-trust">Administration and Trust</h3>
 
-Enterprise sign-in, access control, proven tenant isolation, audit and billing, so the platform
+Access control and an audit log, so the platform
 passes the checks your security team runs first.
 
-**Today:** single sign-on through SAML or OpenID Connect, every record scoped to your organisation, a
-verifiable audit log, and plans you can change and cancel yourself.
+**Today:** a verifiable audit log.
 
 For certifications and what we do and do not claim today, see [Security](/security).
 

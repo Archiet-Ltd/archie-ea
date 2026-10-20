@@ -84,7 +84,7 @@ A free plan to start, where Sparx offers no free version or trial, a published p
 
 ### Can we run Sparx Enterprise Architect and Entelim side by side before deciding?
 
-Yes. Import a copy of your model into the free Community plan or a self-hosted copy, ask the same questions in both, and leave Sparx Enterprise Architect untouched. The health check puts your own data through Entelim for a fixed price and date.
+Yes. Import a copy of your model into the free Community plan or a self-hosted copy, ask the same questions in both, and leave Sparx Enterprise Architect untouched. The health check puts your own data through Entelim for a fixed scope.
 
 ### Does Sparx Enterprise Architect have a free trial?
 

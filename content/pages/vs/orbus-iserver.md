@@ -92,7 +92,7 @@ A published price, free self-hosting, and one product name throughout, in place 
 
 ### Can we run Orbus iServer or OrbusInfinity and Entelim side by side before deciding?
 
-Yes. Import a copy of your model into the free Community plan or a self-hosted copy, ask the same questions in both, and leave Orbus iServer or OrbusInfinity untouched. The health check puts your own data through Entelim for a fixed price and date.
+Yes. Import a copy of your model into the free Community plan or a self-hosted copy, ask the same questions in both, and leave Orbus iServer or OrbusInfinity untouched. The health check puts your own data through Entelim for a fixed scope.
 
 ### Is Capsifi a separate product to compare against?
 

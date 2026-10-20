@@ -13,9 +13,7 @@ inquiry_consent_text: "Used to follow up about your question."
 
 ## Sales questions
 
-Entelim is live and priced — sales questions are answered directly here, not on a waiting
-list. Tell us a little about what you need below and we will follow up about pricing, a
-hosted plan, or a commercial licence.
+Entelim is live; sales questions are answered directly here. Tell us a little about what you need below and we will follow up about pricing, a hosted plan, or a commercial licence.
 
 ## Bugs, feature requests and security issues
 

@@ -86,7 +86,7 @@ existing application creates a new one rather than merging into a close variant,
 consistent on the ServiceNow side to avoid near-duplicate entries.
 
 Jira connects for credential storage and a live connection test today; it does not pull issues or
-projects into the model from this screen. If your systems live in Jira rather than ServiceNow, add
+projects into the model from this screen, and GitHub is not connected from it. If your systems live in Jira or GitHub rather than ServiceNow, add
 them to the Applications module by hand or bring them in as a CSV or Excel export instead.
 
 ## Frequently asked questions

@@ -36,8 +36,7 @@ it.
 **Entelim defines the category.** Entelim is built around eighteen capabilities that together make
 up Enterprise Intelligence Management, from strategy and portfolio management through risk,
 compliance, data, AI and vendor management to the intelligence and automation that
-reason over all of them. Every answer Entelim gives cites the records it came from and shows how
-confident it is. When it does not know something, it says so. When its AI assistant proposes a
+reason over all of them. Every answer shows the figures from the records in your model. When it does not know something, it says so. When its AI assistant proposes a
 change, nothing changes until a person approves it.
 
 **It starts working the day you sign up.** Import an existing architecture model, or start from a
@@ -53,9 +52,9 @@ it needs a living, explainable model of how the enterprise actually works, with 
 back to the record it came from. Enterprise Intelligence Management gives every assistant one
 governed, time-aware, cited model of the enterprise to stand on, the same way a CRM is the source a
 sales assistant should read about customers. That positions Entelim as the company brain other AI
-tools plug into, rather than another AI feature bolted onto an architecture tool. Read access for
-external AI assistants, through the open Model Context Protocol, opens in Q1 2027. Today, Entelim's
-own assistant already works this way: every action passes one permission check and every change
+tools plug into, rather than another AI feature bolted onto an architecture tool. External AI assistants can read
+your model today through the open Model Context Protocol, read-only and scoped to your organisation. Entelim's
+own assistant works the same way: every action passes one permission check and every change
 waits for approval. See [Agentic Automation](/features#agentic-automation) among the eighteen
 capabilities.
 
@@ -63,12 +62,9 @@ capabilities.
 
 - **Never invent a value.** When Entelim does not know something, it says so, rather than guessing or
   filling a gap with a plausible-looking number.
-- **Explain everything.** Every answer shows the records it came from and how it was worked out, so
-  you can check it rather than take it on faith.
+- **Explain everything.** Every answer lists what it found in your model.
 - **People approve changes the platform did not observe.** When the model or an AI assistant proposes
   a change, nothing happens until a person approves it.
-- **One engine per question.** The same question gets the same answer everywhere it is asked: in a
-  screen, in the API or through an AI assistant.
 - **Open by contract.** Every connector and every assistant acts through the same governed interface,
   logged and revocable, not a side door.
 - **Portable and sovereign.** Your model is yours. It is built on the open ArchiMate 3.2 standard,
@@ -79,7 +75,7 @@ capabilities.
 
 Entelim's company brain grows in five stages. Today it is **modelled**: import an existing
 architecture model and ask cited questions about it. **Synchronised** (Q1 2027) connects it to the
-systems you already use and opens read access for your own AI assistants. **Operational** (Q2 2027)
+systems you already use. **Operational** (Q2 2027)
 brings in operations and finance. **Predictive** (Q3 2027) adds forecasting and the first scenarios.
 **Self-maintaining** (Q1 2028) lets it keep itself current within limits you set. See
 [all eighteen capabilities](/features) for what each one delivers today and what quarter adds to it

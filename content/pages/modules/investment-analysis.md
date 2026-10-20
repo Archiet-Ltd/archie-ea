@@ -13,8 +13,7 @@ icon: trending-up
 
 # Investment Analysis
 
-*A ranked view of where to invest across your business capabilities — scored on strategic
-importance, coverage, maturity gap and risk, with real initiative budgets used wherever one is linked.*
+*Capabilities are listed with the data held against them.*
 
 ## What this module does
 
