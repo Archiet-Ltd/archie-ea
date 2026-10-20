@@ -1,4 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'macros/shadcn_compat.html' import shadcn_select %}
 {% from "components/card.html" import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/data_card.html" import data_card %}
@@ -290,8 +291,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label for="cv-type" class="block text-sm font-medium mb-1">Vendor Type</label>
-            <select id="cv-type" name="vendor_type" x-model="formData.vendor_type"
-                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {% call shadcn_select('vendor_type', bare=true, id='cv-type', class='h-10 w-full', attrs='x-model="formData.vendor_type"') %}
               <option value="">Select type...</option>
               <option value="software_vendor">Software Vendor</option>
               <option value="saas_platform">SaaS Platform</option>
@@ -299,7 +299,7 @@
               <option value="systems_integrator">Systems Integrator</option>
               <option value="consulting_partner">Consulting Partner</option>
               <option value="managed_service_provider">Managed Service Provider</option>
-            </select>
+            {% endcall %}
           </div>
           <div>
             <label for="cv-country" class="block text-sm font-medium mb-1">Country</label>
