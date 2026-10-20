@@ -182,4 +182,26 @@ def traceability():
     )
 
 
+@intelligence_ui.route("/coverage", methods=["GET"])
+@login_required
+def coverage():
+    """Derivation coverage report: elements per ArchiMate layer, the derived
+    relationship count, the latest run's yield, and the elements that still
+    have no derived relationship -- all read from stored rows for the
+    caller's organisation.
+
+    ``layer`` (optional) restricts the missing list to one layer, so a thin
+    layer can reach the elements that still have no derived relationship.
+    """
+    org_id = getattr(g, "current_org_id", None)
+    if org_id is None:
+        return render_template("intelligence/coverage.html", coverage=None)
+    from app.modules.intelligence.services.derivation_coverage_service import (
+        derivation_coverage,
+    )
+
+    coverage = derivation_coverage(int(org_id), layer=request.args.get("layer"))
+    return render_template("intelligence/coverage.html", coverage=coverage)
+
+
 __all__ = ["intelligence_ui"]
