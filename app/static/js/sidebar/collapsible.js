@@ -21,7 +21,7 @@
         try {
             window.localStorage.setItem(KEY + id, open ? '1' : '0');
         } catch (e) {
-            /* private mode or blocked storage: the state lives for the page only */
+            /* swallow-ok: private mode or blocked storage; the open state lives for the page only and nothing else depends on it */
         }
     }
 
