@@ -37,10 +37,9 @@ def test_command_runs_the_batch_inside_platform_scope(monkeypatch):
         command_module.ARBWaiverExpiryBatchService, "run", staticmethod(fake_run)
     )
     command_module.init_app(app)
-    with app.app_context():
-        result = app.test_cli_runner().invoke(
-            args=["process-arb-waiver-expiries", "--organization-id", "7"]
-        )
+    result = app.test_cli_runner().invoke(
+        args=["process-arb-waiver-expiries", "--organization-id", "7"]
+    )
 
     assert result.exit_code == 0, result.output
     assert seen["scope"], "batch ran outside platform_scope"
