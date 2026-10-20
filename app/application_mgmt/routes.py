@@ -33,6 +33,7 @@ from sqlalchemy import or_, select, text  # dead-code-ok: func
 from sqlalchemy.orm import joinedload
 
 from config import CurrencyConfig
+from app.services.application_cost_accessor import get_reporting_currency
 from .. import db  # dead-code-ok
 from ..models.application_layer import (
     ApplicationInterface,
@@ -2401,6 +2402,7 @@ def render_application_detail(id):
         application_documents=application_documents,
         arch_elements_by_layer={},
         currency_symbol=CurrencyConfig.get_currency_config()["symbol"],
+        currency_code=get_reporting_currency(),
         active_tab_id=request.args.get("tab", "overview"),
         linked_solutions=linked_solutions,
         archimate_info=archimate_info,
