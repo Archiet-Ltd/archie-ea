@@ -16,6 +16,7 @@ from __future__ import annotations
 from flask import Blueprint, g, request
 
 from app.modules.oauth_provider.scopes import API_READ_SCOPE, require_api_scope
+from app.modules.architecture.services.architecture_search_service import apply_element_search_filters
 from app.utils.api_response import not_found_response, success_response
 from app.utils.pagination import get_pagination_params, safe_int_arg
 
@@ -97,12 +98,7 @@ def search_elements():
     limit = safe_int_arg("limit", 30, minimum=1, maximum=200)
 
     query = ArchiMateElement.query.filter_by(organization_id=g.current_org_id)
-    if name:
-        query = query.filter(ArchiMateElement.name.ilike(f"%{name}%"))
-    if elem_type:
-        query = query.filter(ArchiMateElement.type == elem_type)
-    if layer:
-        query = query.filter(ArchiMateElement.layer.ilike(layer))
+    query = apply_element_search_filters(query, name, elem_type, layer)
 
     elements = query.order_by(ArchiMateElement.name).limit(limit).all()
     return success_response(

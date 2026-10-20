@@ -2464,20 +2464,15 @@ def api_elements_search():
         solution_id - restrict to elements linked to this solution
     """
     from app.models.archimate_core import ArchiMateElement
+    from app.modules.architecture.services.architecture_search_service import apply_element_search_filters
 
     query = ArchiMateElement.query
-
-    elem_type = request.args.get("type", "").strip()
-    if elem_type:
-        query = query.filter(ArchiMateElement.type == elem_type)
-
-    layer = request.args.get("layer", "").strip()
-    if layer:
-        query = query.filter(ArchiMateElement.layer.ilike(layer))
-
-    search_q = request.args.get("q", "").strip()
-    if search_q:
-        query = query.filter(ArchiMateElement.name.ilike(f"%{search_q}%"))
+    query = apply_element_search_filters(
+        query,
+        name=request.args.get("q", "").strip(),
+        elem_type=request.args.get("type", "").strip(),
+        layer=request.args.get("layer", "").strip(),
+    )
 
     solution_id = request.args.get("solution_id", type=int)
     if solution_id:
