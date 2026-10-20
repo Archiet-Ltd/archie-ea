@@ -10,7 +10,7 @@ Idempotent: a column that already exists is left as it is, so a re-run, or a
 database that reconcile-schema already extended, upgrades without error.
 
 Revision ID: 20261020_provenance_origin
-Revises: 20261019_reference_counters
+Revises: 20261020_permission_grants
 Create Date: 2026-10-20
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "20261020_provenance_origin"
-down_revision = "20261019_reference_counters"
+down_revision = "20261020_permission_grants"
 branch_labels = None
 depends_on = None
 
