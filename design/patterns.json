@@ -75,6 +75,30 @@
         "composer-matrix",
         "paginated-matrix"
       ]
+    },
+    "sidebar": {
+      "pattern": "sidebar-group",
+      "children": [
+        "sidebar-collapsible"
+      ],
+      "macros": "components/sidebar_nav.html: sidebar_group, sidebar_item, sidebar_collapsible, sidebar_subitem",
+      "spec": {
+        "levels": 2,
+        "group_heading": "10px, weight 600, uppercase, 0.08em tracking, muted, role=heading level 3",
+        "item": "32px row, 13px, 16px icon, 8px horizontal padding, 6px radius",
+        "item_active": "muted surface, info text, weight 500, aria-current=page",
+        "collapsible": "the item row as a button with a 14px chevron that turns 90 degrees when open; aria-expanded and aria-controls; opening one never closes another",
+        "subitem": "28px row, 13px, no icon, indented 32px under the parent icon, aria-current=page when active",
+        "count": "right-aligned 11px tabular figure, muted",
+        "pending": "right-aligned 16px primary badge with the figure, aria-label '<n> pending'; replaces the count",
+        "open_state": "persisted per item id in localStorage (archie_sidebar_group_<id>); a collapsible whose child is the current page is always open",
+        "collapsed_rail": "the existing 4rem collapsed state hides labels, counts and sub-lists; the rail with flyouts is sidebar-rail (P2), not this pattern"
+      },
+      "banned": [
+        "sidebar-third-level",
+        "exclusive-accordion",
+        "hover-flyout-on-desktop"
+      ]
     }
   },
   "banned_patterns": [
@@ -95,6 +119,8 @@
     "d3-chord",
     "d3-sankey",
     "composer-matrix",
-    "paginated-matrix"
+    "paginated-matrix",
+    "sidebar-third-level",
+    "exclusive-accordion"
   ]
 }

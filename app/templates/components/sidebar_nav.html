@@ -1,0 +1,106 @@
+{# Canonical sidebar navigation macros (design/patterns.json: sidebar-group,
+   sidebar-collapsible; north star).
+
+   Four macros, two levels, nothing deeper:
+
+     {% from 'components/sidebar_nav.html' import sidebar_group, sidebar_item,
+                                                   sidebar_collapsible, sidebar_subitem %}
+
+     {% call sidebar_group('Model') %}
+       {{ sidebar_item(url_for('applications.index'), 'Applications', icon='layers',
+                       active=request.endpoint == 'applications.index', count=42) }}
+       {% call sidebar_collapsible('catalogues', 'Catalogues', icon='library',
+                                   open=False, active=False, count=6) %}
+         {{ sidebar_subitem(url_for('catalogues.index'), 'All catalogues', active=False) }}
+         {{ sidebar_subitem(url_for('catalogues.layer', layer='application'), 'Application',
+                            active=True, pending=3) }}
+       {% endcall %}
+     {% endcall %}
+
+   sidebar_group(title)          a zone: 10px uppercase heading, role=heading level 3,
+                                 then the call block (items and collapsibles).
+   sidebar_item(href, label, icon, active, count, pending, title)
+                                 level 1 link: 32px row, 13px, icon 16px. count is a
+                                 muted right-aligned tabular figure; pending is a
+                                 small primary badge and wins over count.
+   sidebar_collapsible(id, label, icon, open, active, count, pending)
+                                 level 1 toggle: the same row with a chevron that
+                                 turns 90 degrees when open; the call block holds
+                                 the level 2 items. Open state is persisted per id
+                                 in localStorage (key archie_sidebar_group_<id>);
+                                 active=True (a child is the current page) forces it
+                                 open and marks the row. Needs the component in
+                                 static/js/sidebar/collapsible.js, loaded once by
+                                 components/admin_sidebar.html.
+   sidebar_subitem(href, label, active, count, pending, title)
+                                 level 2 link: 28px row, 13px, indented under the
+                                 parent icon, no icon of its own.
+
+   A collapsible inside a collapsible is a banned pattern (sidebar-third-level):
+   the design has two levels. Opening one collapsible never closes another
+   (exclusive-accordion is banned too). No shadows, no raw colours. #}
+
+{% macro _trailing(count, pending) -%}
+{%- if pending is not none and pending != '' -%}
+<span class="ml-auto inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-2xs font-medium tabular-nums text-primary-foreground" data-slot="sidebar-pending" aria-label="{{ pending }} pending">{{ pending }}</span>
+{%- elif count is not none and count != '' -%}
+<span class="ml-auto text-2xs tabular-nums text-muted-foreground" data-slot="sidebar-count">{{ count }}</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro sidebar_group(title, class='') -%}
+<div class="px-2 pb-1 {{ class }}" data-slot="sidebar-group">
+    <div class="mb-1 mt-4 px-2 text-10 font-semibold uppercase tracking-[0.08em] text-muted-foreground" role="heading" aria-level="3">{{ title }}</div>
+    <div class="space-y-0.5">
+        {{ caller() }}
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro sidebar_item(href, label, icon=None, active=false, count=None, pending=None, title=None, class='') -%}
+<a href="{{ href }}"
+   title="{{ title or label }}"
+   data-slot="sidebar-item"
+   class="flex h-8 items-center gap-2 rounded-md px-2 text-13 transition-colors hover:bg-accent hover:text-foreground {% if active %}bg-muted text-info font-medium dark:bg-card{% else %}text-muted-foreground{% endif %} {{ class }}"{% if active %} aria-current="page"{% endif %}>
+    {% if icon %}<i data-lucide="{{ icon }}" class="h-4 w-4 flex-shrink-0" aria-hidden="true"></i>{% endif %}
+    <span class="flex-1 truncate">{{ label }}</span>
+    {{ _trailing(count, pending) }}
+</a>
+{%- endmacro %}
+
+{% macro sidebar_collapsible(id, label, icon=None, open=false, active=false, count=None, pending=None, class='') -%}
+<div data-slot="sidebar-collapsible"
+     data-sidebar-group-id="{{ id }}"
+     x-data="sidebarCollapsible('{{ id }}', {{ 'true' if open else 'false' }}, {{ 'true' if active else 'false' }})"
+     class="{{ class }}">
+    <button type="button"
+            @click="toggle()"
+            :aria-expanded="open ? 'true' : 'false'"
+            aria-expanded="{{ 'true' if (open or active) else 'false' }}"
+            aria-controls="sidebar-sub-{{ id }}"
+            title="{{ label }}"
+            class="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-13 transition-colors hover:bg-accent hover:text-foreground {% if active %}text-foreground font-medium{% else %}text-muted-foreground{% endif %}">
+        {% if icon %}<i data-lucide="{{ icon }}" class="h-4 w-4 flex-shrink-0" aria-hidden="true"></i>{% endif %}
+        <span class="flex-1 truncate">{{ label }}</span>
+        {{ _trailing(count, pending) }}
+        <i data-lucide="chevron-right" class="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground transition-transform duration-150" :class="open ? 'rotate-90' : ''" aria-hidden="true"></i>
+    </button>
+    <div id="sidebar-sub-{{ id }}"
+         x-show="open"
+         {% if not (open or active) %}x-cloak{% endif %}
+         class="mt-0.5 space-y-0.5"
+         data-slot="sidebar-sublist">
+        {{ caller() }}
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro sidebar_subitem(href, label, active=false, count=None, pending=None, title=None, class='') -%}
+<a href="{{ href }}"
+   title="{{ title or label }}"
+   data-slot="sidebar-subitem"
+   class="flex h-7 items-center gap-2 rounded-md py-0 pl-8 pr-2 text-13 transition-colors hover:bg-accent hover:text-foreground {% if active %}bg-muted text-info font-medium dark:bg-card{% else %}text-muted-foreground{% endif %} {{ class }}"{% if active %} aria-current="page"{% endif %}>
+    <span class="flex-1 truncate">{{ label }}</span>
+    {{ _trailing(count, pending) }}
+</a>
+{%- endmacro %}
