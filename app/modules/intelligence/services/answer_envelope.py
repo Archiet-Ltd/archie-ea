@@ -262,6 +262,37 @@ def _row_truth_class(kind: str, row: Dict[str, Any]) -> str:
     return TRUTH_CLASS_DRAWN if "explicit" in kinds else TRUTH_CLASS_DERIVED
 
 
+NOT_RECORDED = "not recorded"
+
+
+def relationship_origins(relationship_ids: List[int]) -> Dict[int, Dict[str, Optional[str]]]:
+    """Where each relationship came from: ``source_name`` (the file, connector or
+    person the row recorded) and ``source_timestamp`` (when that was recorded,
+    else when the row was created). A relationship with nothing recorded reads
+    ``"not recorded"`` with no timestamp; a source is never invented. Only the
+    active organisation's relationships are read, so an id from another
+    organisation reads as not recorded too. Every asked-for id has an entry."""
+    from app.models import ArchiMateRelationship
+
+    found: Dict[int, Dict[str, Optional[str]]] = {}
+    ids = sorted({i for i in relationship_ids if isinstance(i, int)})
+    org_id = current_org_id()
+    for start in range(0, len(ids), 1000):
+        rows = db.session.execute(
+            db.select(ArchiMateRelationship).where(
+                ArchiMateRelationship.id.in_(ids[start:start + 1000]),
+                ArchiMateRelationship.organization_id == org_id,
+            )
+        ).scalars()
+        for rel in rows:
+            stamp = rel.source_recorded_at or rel.created_at
+            found[rel.id] = {
+                "source_name": (rel.source_label or "").strip() or NOT_RECORDED,
+                "source_timestamp": stamp.isoformat() if stamp else None,
+            }
+    return {i: found.get(i, {"source_name": NOT_RECORDED, "source_timestamp": None}) for i in ids}
+
+
 def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     cited: Dict[Tuple[str, int], None] = {}
 
@@ -282,7 +313,12 @@ def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             for relationship_id in relation.get("chain") or []:
                 cite("relationship", relationship_id)
             cite("derived_relationship", relation.get("derived_id"))
-    return [{"type": t, "id": i} for (t, i) in sorted(cited)][:MAX_CITATIONS]
+    out = [{"type": t, "id": i} for (t, i) in sorted(cited)][:MAX_CITATIONS]
+    origins = relationship_origins([c["id"] for c in out if c["type"] == "relationship"])
+    for citation in out:
+        if citation["type"] == "relationship":
+            citation.update(origins[citation["id"]])
+    return out
 
 
 def build_envelope(
