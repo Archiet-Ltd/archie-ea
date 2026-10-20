@@ -24,8 +24,12 @@
 {%- endmacro %}
 
 {% set answers = submission_answers or {} %}
-{% set impact_answer = answers.get('set_impact') %}
-{% set risk_answer = answers.get('risk_propagation') %}
+{% set impact_raw = answers.get('set_impact') %}
+{% set risk_raw = answers.get('risk_propagation') %}
+{% set impact_missing = impact_raw is not none and impact_raw.get('not_found') %}
+{% set risk_missing = risk_raw is not none and risk_raw.get('not_found') %}
+{% set impact_answer = none if impact_missing else impact_raw %}
+{% set risk_answer = none if risk_missing else risk_raw %}
 
 {% set ns = namespace(names=[]) %}
 {% if impact_answer %}
@@ -40,7 +44,11 @@
 
 <div class="space-y-6" data-submission-review-panel data-answer-addresses="{{ impact_answer.address if impact_answer else '' }}{{ ' ' if impact_answer and risk_answer else '' }}{{ risk_answer.address if risk_answer else '' }}">
     {% if impact_answer is none and risk_answer is none %}
+        {% if impact_missing or risk_missing %}
+        <p class="text-sm text-muted-foreground" data-elements-not-found data-not-found-reason="{{ impact_missing or risk_missing }}">The elements this review names were not found in your model.</p>
+        {% else %}
         <p class="text-sm text-muted-foreground">This review names no elements, so there is nothing to show here.</p>
+        {% endif %}
     {% else %}
         <p class="text-sm text-foreground">Elements in scope: {{ ns.names | join(', ') or '—' }}</p>
 
@@ -89,8 +97,16 @@
         {% endcall %}
         {% endif %}
 
+        {% if risk_missing %}
+        {% call section_card(title='Risks reaching the first element listed') %}
+            <p class="text-sm text-muted-foreground" data-elements-not-found data-not-found-reason="{{ risk_missing }}">The first element this review names was not found in your model, so the risks reaching it cannot be shown. The risks of the other elements are not included yet.</p>
+        {% endcall %}
+        {% endif %}
+
         {% if risk_answer %}
-        {% call section_card(title='Risks that reach this change') %}
+        {% set risk_seed = risk_answer.elements.get(risk_answer.params.element_id | string) %}
+        {% call section_card(title='Risks reaching ' ~ (risk_seed.name if risk_seed else 'the first element listed')) %}
+            <p class="mb-4 text-sm text-muted-foreground" data-risk-scope>This covers the first element listed. The risks of the other elements are not included yet.</p>
             {% if risk_answer.rows %}
             <ul class="space-y-4" data-answer-rows>
                 {% for row in risk_answer.rows %}

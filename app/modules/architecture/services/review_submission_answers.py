@@ -39,7 +39,9 @@ def submission_review_answers(review):
 
     Returns ``{"set_impact": <envelope or None>, "risk_propagation": <envelope or None>}``,
     each envelope the presented stored answer with its permanent address, or
-    None when the review names no elements or an answer cannot be asked.
+    None when the review names no elements, or ``{"not_found": <reason>}`` when
+    the answer cannot be asked (for example none of the named elements exists
+    in the active organisation); the reason is the envelope's own.
     """
     board = review.arb_session
     element_ids = list(board.impacted_element_ids or []) if board is not None else []
@@ -62,8 +64,9 @@ def submission_review_answers(review):
         if record is None:
             try:
                 record = ask_and_store(kind, raw_params)
-            except AnswerNotAskable:
-                record = None
+            except AnswerNotAskable as exc:
+                answers[kind] = {"not_found": exc.reason}
+                continue
         if record is not None:
             answers[kind] = present(open_answer(record.address))
     return answers
@@ -81,4 +84,6 @@ def _stored_today(org_id, kind, params, today):
             AnswerRecord.created_at >= start,
             AnswerRecord.created_at < start + _dt.timedelta(days=1),
         )
-    ).scalar_one_or_none()
+        .order_by(AnswerRecord.created_at.desc())
+        .limit(1)
+    ).scalars().first()

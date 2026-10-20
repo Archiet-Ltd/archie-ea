@@ -131,7 +131,7 @@ def test_review_shows_stored_submission_answers(app, db_session, make_org, clien
     assert "Order service" in html and "Payment service" in html and "Catalogue service" in html
     assert "What breaks if these fail together" in html
     assert "Customer database" in html
-    assert "Risks that reach this change" in html
+    assert "Risks reaching Order service" in html
     assert "Network outage" in html
     assert "/intelligence/answers/" in html
 
@@ -261,3 +261,111 @@ def test_service_returns_stored_answers_with_addresses(app, db_session, make_org
     assert answers["risk_propagation"]["page_url"].startswith("/intelligence/answers/")
     assert answers["set_impact"]["question_kind"] == "set_impact"
     assert answers["risk_propagation"]["question_kind"] == "risk_propagation"
+
+
+# --- fix round: what the risk card covers, unresolved elements, same-day rows --
+
+
+def test_other_organisations_element_ids_show_the_not_found_sentence(
+    app, db_session, make_org, client, login_as
+):
+    org_a = make_org("org-a")
+    org_b = make_org("org-b")
+    user = _user(db_session, org_a.id)
+    foreign = _element(db_session, org_b.id, "Foreign service")
+    db_session.commit()
+    review, _board = _review(db_session, org_a.id, user, [foreign.id])
+    db_session.commit()
+    login_as(client, user)
+
+    resp = client.get(f"/arb/reviews/{review.id}")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    assert "The elements this review names were not found in your model" in html
+    assert "This review names no elements" not in html
+    assert "Foreign service" not in html
+
+
+def test_risk_card_names_the_element_it_covers(app, db_session, make_org, client, login_as):
+    org = make_org("org-a")
+    user = _user(db_session, org.id)
+    e1 = _element(db_session, org.id, "Order service")
+    e2 = _element(db_session, org.id, "Payment service")
+    _link(db_session, org.id, e1, e2)
+    db_session.commit()
+    review, _board = _review(db_session, org.id, user, [e1.id, e2.id])
+    db_session.commit()
+    login_as(client, user)
+
+    html = client.get(f"/arb/reviews/{review.id}").get_data(as_text=True)
+
+    assert "Risks reaching Order service" in html
+    assert "Risks that reach this change" not in html
+    assert "The risks of the other elements are not included yet" in html
+
+
+def test_first_element_not_found_is_said_in_the_risk_card(
+    app, db_session, make_org, client, login_as
+):
+    org_a = make_org("org-a")
+    org_b = make_org("org-b")
+    user = _user(db_session, org_a.id)
+    foreign = _element(db_session, org_b.id, "Foreign service")
+    own = _element(db_session, org_a.id, "Order service")
+    db_session.commit()
+    review, _board = _review(db_session, org_a.id, user, [foreign.id, own.id])
+    db_session.commit()
+    login_as(client, user)
+
+    html = client.get(f"/arb/reviews/{review.id}").get_data(as_text=True)
+
+    assert "What breaks if these fail together" in html
+    assert "The first element this review names was not found in your model" in html
+    assert "Foreign service" not in html
+
+
+def test_two_same_day_stored_answers_do_not_blank_the_panel(
+    app, db_session, make_org, client, login_as
+):
+    from app.models.answer_record import AnswerRecord
+
+    org = make_org("org-a")
+    user = _user(db_session, org.id)
+    e1 = _element(db_session, org.id, "Order service")
+    e2 = _element(db_session, org.id, "Payment service")
+    _link(db_session, org.id, e1, e2)
+    db_session.commit()
+    review, _board = _review(db_session, org.id, user, [e1.id, e2.id])
+    db_session.commit()
+    login_as(client, user)
+
+    client.get(f"/arb/reviews/{review.id}")
+    for record in db_session.query(AnswerRecord).all():
+        db_session.add(
+            AnswerRecord(
+                organization_id=record.organization_id,
+                address=uuid.uuid4().hex,
+                question_kind=record.question_kind,
+                params=record.params,
+                truth_class=record.truth_class,
+                confidence=record.confidence,
+                confidence_basis=record.confidence_basis,
+                rows=record.rows,
+                summary=record.summary,
+                reasons=record.reasons,
+                elements=record.elements,
+                citations=record.citations,
+                freshness=record.freshness,
+                truncated=record.truncated,
+                computed_at=record.computed_at,
+            )
+        )
+    db_session.commit()
+    assert _answer_count(db_session) == 4
+
+    resp = client.get(f"/arb/reviews/{review.id}")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert "What breaks if these fail together" in html
+    assert "Risks reaching Order service" in html
