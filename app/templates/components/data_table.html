@@ -225,7 +225,7 @@ if (!window._dataTableEngine) {
                 </button>
                 {# Filter dropdown — Command-style #}
                 <!-- modal-a11y-ok -->
-                <div x-show="open" x-cloak x-transition role="dialog" aria-modal="true" aria-label="{{ filter.label }} filter"
+                <div x-show="open" x-cloak x-transition
                      class="absolute left-0 top-full mt-1 z-50 w-52 rounded-md border border-border bg-popover">
                     <div class="p-1.5">
                         <input aria-label="{{ filter.label }}" type="text" placeholder="{{ filter.label }}..."
@@ -423,7 +423,7 @@ if (!window._dataTableEngine) {
                                     <i data-lucide="more-horizontal" class="h-4 w-4" aria-hidden="true"></i>
                                 </button>
                                 <!-- modal-a11y-ok -->
-                                <div x-show="menuOpen" x-cloak x-transition role="dialog" aria-modal="true" aria-label="Row actions"
+                                <div x-show="menuOpen" x-cloak x-transition
                                      class="absolute right-0 z-50 mt-1 w-40 rounded-md border border-border bg-popover p-1 text-sm">
                                     {% if on_view %}
                                     <button type="button" @click="{{ on_view }}; menuOpen = false"
