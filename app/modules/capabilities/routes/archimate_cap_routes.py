@@ -454,6 +454,84 @@ def api_save_apqc_mappings():
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
+def _link_applications_to_archimate_element(data):
+    """The unified mapping modal's ArchiMate save: one element, many applications.
+
+    Each application's own ArchiMate element is linked to the chosen element with
+    a relationship, which is what the application's detail page lists on its
+    Architecture and Dependencies tabs. Only the signed-in organisation's
+    applications and elements are used.
+    """
+    from flask_login import current_user
+
+    from app.middleware.tenant_context import current_org_id
+    from app.models.application_layer import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+    from app.services.archimate_backbone import ensure_archimate_element
+    from app.utils.role_access import can_edit_capabilities
+
+    if not can_edit_capabilities(current_user):
+        return jsonify(
+            {"success": False, "error": "Your role can view mappings but cannot change them."}
+        ), 403
+
+    org_id = current_org_id()
+    try:
+        element_id = int(data.get("element_id"))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "element_id is required"}), 400
+    element = (
+        ArchiMateElement.query.filter_by(id=element_id, organization_id=org_id).first()
+        if org_id is not None
+        else None
+    )
+    if element is None:
+        return jsonify({"success": False, "error": "ArchiMate element not found"}), 404
+
+    created = 0
+    skipped = []
+    for entry in data.get("applications") or []:
+        try:
+            application_id = int(entry.get("application_id"))
+        except (TypeError, ValueError):
+            continue
+        application = ApplicationComponent.query.filter_by(
+            id=application_id, organization_id=org_id
+        ).first()
+        if application is None:
+            skipped.append("Application %s was not found." % application_id)
+            continue
+        application_element = ensure_archimate_element(application)
+        if application_element is None or application_element.id == element.id:
+            skipped.append("%s could not be linked." % application.name)
+            continue
+        # An association is valid between any two ArchiMate elements.
+        relationship_type = "association"
+        if ArchiMateRelationship.query.filter_by(
+            source_id=application_element.id, target_id=element.id, type=relationship_type
+        ).first():
+            continue
+        db.session.add(
+            ArchiMateRelationship(
+                type=relationship_type,
+                architecture_id=application_element.architecture_id,
+                source_id=application_element.id,
+                target_id=element.id,
+            )
+        )
+        created += 1
+    db.session.commit()
+    return jsonify(
+        {
+            "success": created > 0 or not skipped,
+            "created": created,
+            "updated": 0,
+            "error": " ".join(skipped) if skipped and created == 0 else None,
+            "skipped": skipped,
+        }
+    )
+
+
 @capability_map.route("/api/save-archimate-mappings", methods=["POST"])
 @login_required
 @audit_log("save_archimate_mappings")
@@ -479,6 +557,8 @@ def api_save_archimate_mappings():
         from app.models.capability_archimate_mapping import CapabilityArchiMateClassification
 
         data = request.get_json()
+        if data and "mappings" not in data and "element_id" in data and "applications" in data:
+            return _link_applications_to_archimate_element(data)
         if not data or "mappings" not in data:
             return jsonify({"success": False, "error": "Missing mappings data"}), 400
 
