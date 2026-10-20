@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 import click
+from flask.cli import with_appcontext
 
 from app.jobs.tenant_safe_job import platform_scope
 
@@ -28,6 +29,7 @@ from app.modules.transformation_room.arb_waiver_expiry_batch_service import (
     default=ARBWaiverExpiryBatchService.DEFAULT_BATCH_SIZE,
     show_default=True,
 )
+@with_appcontext
 def process_arb_waiver_expiries(organization_ids, batch_size):
     """Expire due typed ARB condition waivers for explicit organizations."""
     # One locked batch over the named organisations; every statement in it names
