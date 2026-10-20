@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 DRAWER = REPO_ROOT / "app" / "modules" / "intelligence" / "templates" / "intelligence" / "_provenance_drawer.html"
 CORE = REPO_ROOT / "app" / "static" / "js" / "intelligence" / "core.js"
 
-FIELDS = ("source_record", "relationship_type", "as_of", "record_url")
+FIELDS = ("source_name", "kindLabel", "source_timestamp", "record_url")
 
 
 def _user(db_session, org_id):
@@ -64,9 +64,11 @@ def test_cascade_row_with_a_recorded_source_carries_the_four_fields(app, db_sess
     relation = rows[0]["relation"]
     for field in FIELDS:
         assert field in relation, field
-    assert relation["source_record"]["name"] == "Calibration Ledger"
-    assert relation["relationship_type"] == "Serving"
-    assert relation["as_of"]
+    assert relation["source_name"] == "Calibration Ledger"
+    assert relation["kindLabel"] == "serving"
+    assert relation["source_timestamp"]
+    assert relation["derived"] is False
+    assert "source_confidence" in relation
     assert relation["record_url"] and relation["record_url"].startswith("/")
 
 
@@ -78,10 +80,11 @@ def test_cascade_row_without_a_source_carries_a_null_source_record(app, db_sessi
                                             "computed_at": None}}]
     attach_relationship_sources(org.id, rows)
     relation = rows[0]["relation"]
-    assert relation["source_record"] is None
+    assert relation["source_name"] is None
     assert relation["record_url"] is None
-    assert relation["relationship_type"] == "Serving"
-    assert "as_of" in relation
+    assert relation["kindLabel"] == "serving"
+    assert "source_timestamp" in relation
+    assert relation["derived"] is True
 
 
 def test_another_organisations_relationship_is_never_named(app, db_session, make_org):
@@ -95,7 +98,7 @@ def test_another_organisations_relationship_is_never_named(app, db_session, make
     db_session.commit()
     rows = [{"element_id": b.id, "relation": {"kind": "explicit", "type": "Serving", "chain": [rel.id]}}]
     attach_relationship_sources(mine.id, rows)
-    assert rows[0]["relation"]["source_record"] is None
+    assert rows[0]["relation"]["source_name"] is None
     assert rows[0]["relation"]["record_url"] is None
 
 
