@@ -518,7 +518,22 @@ class ImportOrchestrator:
             seen_names = set()
 
             # Batch-load all existing application names to avoid N+1 queries in the loop
-            all_apps = ApplicationComponent.query.all()
+            # Scoped to the importing organisation, so a same-named application
+            # in another organisation is never matched or modified.
+            from app.models.user import User
+
+            importer = db.session.get(User, user_id)
+            import_org_id = getattr(importer, "organization_id", None)
+            if import_org_id is None:
+                from app.utils.tenant import current_organization_id
+
+                import_org_id = current_organization_id()
+            all_apps_query = ApplicationComponent.query
+            if import_org_id is not None:
+                all_apps_query = all_apps_query.filter(
+                    ApplicationComponent.organization_id == import_org_id
+                )
+            all_apps = all_apps_query.all()
             app_name_lookup = {a.name.lower(): a for a in all_apps if a.name}
 
             for row in rows:
@@ -657,11 +672,10 @@ class ImportOrchestrator:
                 conflict_resolution=conflict_resolution,
             )
 
-        # Success means something was created or updated; an empty file with no
-        # errors is also a clean run. Every row failing is a failure.
-        succeeded = (created_count + updated_count > 0) or (
-            file_stats.total_rows == 0 and not errors
-        )
+        # Success means something was created or updated, or the run was clean
+        # (rows skipped as duplicates, or an empty file, with nothing erroring).
+        # Rows failing with nothing created or updated is a failure.
+        succeeded = (created_count + updated_count > 0) or not errors
 
         return QuickImportResult(
             success=succeeded,

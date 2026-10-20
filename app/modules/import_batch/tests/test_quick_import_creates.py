@@ -116,4 +116,92 @@ def test_route_answers_400_when_every_row_fails(
         content_type="multipart/form-data",
     )
     assert resp.status_code == 400, resp.get_data(as_text=True)
-    assert resp.get_json()["success"] is False
+    payload = resp.get_json()
+    assert payload["success"] is False
+    assert any("row cannot be created" in e and "Alpha" in e for e in payload["errors"])
+
+
+def test_reimport_with_skip_is_success_with_every_row_skipped(
+    app, db_session, make_org, tenant_ctx
+):
+    from app.modules.import_batch.services.import_orchestrator import ImportOrchestrator
+
+    org = make_org("qiskip")
+    user = _user(db_session, org)
+    db_session.commit()
+    suffix = uuid.uuid4().hex[:6]
+    rows = [
+        f"Skip One {suffix},a,Web,V,active,high\n",
+        f"Skip Two {suffix},b,Web,V,active,low\n",
+    ]
+    with tenant_ctx(org.id):
+        first = ImportOrchestrator().start_quick_import(
+            _csv(rows), user_id=user.id, enable_ai=False
+        )
+        assert first.success is True and first.applications_created == 2
+        again = ImportOrchestrator().start_quick_import(
+            _csv(rows), user_id=user.id, enable_ai=False, conflict_resolution="skip"
+        )
+    assert again.errors == []
+    assert again.success is True
+    assert again.applications_created == 0
+    assert again.applications_skipped == 2
+
+
+def test_route_reimport_with_skip_answers_200(app, db_session, make_org, login_as):
+    org = make_org("qiskiproute")
+    user = _user(db_session, org)
+    db_session.commit()
+    client = app.test_client()
+    login_as(client, user)
+    body = HEADER + f"Route Skip {uuid.uuid4().hex[:6]},a,Web,V,active,high\n"
+
+    def _post():
+        return client.post(
+            "/api/import/quick",
+            data={
+                "file": (io.BytesIO(body.encode()), "apps.csv"),
+                "enable_ai": "false",
+                "conflict_resolution": "skip",
+            },
+            content_type="multipart/form-data",
+        )
+
+    assert _post().status_code == 200
+    resp = _post()
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    data = resp.get_json()
+    assert data["success"] is True
+    assert data["applications_skipped"] == 1
+
+
+def test_same_name_in_another_org_is_not_matched_or_touched(
+    app, db_session, make_org, tenant_ctx
+):
+    from app.models.application_portfolio import ApplicationComponent
+    from app.modules.import_batch.services.import_orchestrator import ImportOrchestrator
+
+    org_a, org_b = make_org("qixa"), make_org("qixb")
+    user = _user(db_session, org_a)
+    db_session.commit()
+    name = f"Shared Name {uuid.uuid4().hex[:6]}"
+    with tenant_ctx(org_b.id):
+        other = ApplicationComponent(name=name, description="org b original")
+        db_session.add(other)
+        db_session.commit()
+        other_id = other.id
+    with tenant_ctx(org_a.id):
+        result = ImportOrchestrator().start_quick_import(
+            _csv([f"{name},org a description,Web,V,active,high\n"]),
+            user_id=user.id,
+            enable_ai=False,
+            conflict_resolution="overwrite",
+        )
+        assert result.errors == []
+        assert result.applications_created == 1
+        assert result.applications_updated == 0
+        assert _names(org_a.id) == [name]
+    with tenant_ctx(org_b.id):
+        row = ApplicationComponent.query.filter_by(id=other_id).one()
+        assert row.organization_id == org_b.id
+        assert row.description == "org b original"
