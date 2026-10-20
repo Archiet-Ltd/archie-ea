@@ -62,6 +62,24 @@ def _organization_id(user, organization_id: Optional[int]) -> Optional[int]:
     return int(value) if value is not None else None
 
 
+def _is_administrator(user, org_id) -> bool:
+    """Platform administrator, or administrator of THIS organisation.
+
+    The same two checks ``require_roles("admin")`` makes (a global
+    ``Permission.ADMINISTER`` flag alone must not make someone an administrator
+    of an organisation they only belong to as a viewer).
+    """
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.services.rbac_service import rbac_service
+
+    try:
+        return bool(is_platform_admin(user)) or bool(
+            rbac_service.is_org_admin(user, org_id)
+        )
+    except Exception:  # fabricated-ok: an unreadable role is not administrator authority
+        return False
+
+
 def role_key(user, organization_id: Optional[int] = None) -> str:
     """The role name the matrix uses for ``user`` in the organisation."""
     from app.models.org_role import OrgRole
@@ -78,6 +96,17 @@ def role_key(user, organization_id: Optional[int] = None) -> str:
         names.add(str(archetype).lower())
     if "architect" in names:
         return "architect"
+    # An account whose persona ends in "_architect" and whose platform role
+    # carries write permission was admitted by require_roles("architect").
+    persona = str(getattr(user, "enterprise_role", "") or "").lower()
+    if persona.endswith("_architect"):
+        try:
+            from app.models.user import Permission
+
+            if user.can(Permission.GENERAL):
+                return "architect"
+        except Exception:  # fabricated-ok: unreadable permission means no write persona
+            pass
     names.discard("")
     names.discard("anonymous")
     return sorted(names)[0] if names else "viewer"
@@ -106,13 +135,9 @@ def can(user, action: str, object_type: str, organization_id: Optional[int] = No
         return False
     if action not in ACTIONS or object_type not in OBJECT_TYPES:
         return False
-    try:
-        if user.is_admin():
-            return True
-    except Exception:  # fabricated-ok: an account object without is_admin is not an administrator
-        pass
-
     org_id = _organization_id(user, organization_id)
+    if _is_administrator(user, org_id):
+        return True
     if org_id is not None:
         row = _grant(org_id, "user", user.id, object_type, action)
         if row is not None:
