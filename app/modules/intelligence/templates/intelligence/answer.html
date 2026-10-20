@@ -14,13 +14,7 @@
 {{ known.name if known else '—' }}
 {%- endmacro %}
 
-{% macro basis_badge(truth_class) -%}
-{%- if truth_class == 'derived' -%}
-<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/40" data-truth-class="derived">Worked out from recorded links</span>
-{%- else -%}
-<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30" data-truth-class="drawn">Recorded by people</span>
-{%- endif -%}
-{%- endmacro %}
+{% from 'components/four_properties_footer.html' import basis_badge %}
 
 {% macro owner_text(row) -%}
 {%- if row.owners -%}{{ row.owners | map(attribute='name') | select | join(', ') or 'No owner recorded' }}

@@ -68,6 +68,12 @@ class CapabilityHealthService:
         - Batches application queries
         - 60-second result cache to avoid redundant recomputation
         """
+        return self.get_capability_health_metrics_with_time()[1]
+
+    def get_capability_health_metrics_with_time(self) -> Tuple[float, Dict[str, Any]]:
+        """The same result as ``get_capability_health_metrics`` together with the
+        epoch time it was worked out (the cache entry's own time on a hit), so a
+        caller can state when the figures were worked out rather than when it asked."""
         from flask import g, has_app_context
 
         # Outside a request there is no tenant, and a cache entry with no owner is
@@ -84,20 +90,20 @@ class CapabilityHealthService:
                         "Capability health metrics served from cache for org %s (age=%.1fs)",
                         tenant, time.time() - cached_time,
                     )
-                    return cached_result
+                    return cached_time, cached_result
 
         start = time.time()
         result = self._compute_health_metrics()
-        elapsed = time.time() - start
-        logger.info("Capability health metrics computed in %.2fs", elapsed)
+        computed_time = time.time()
+        logger.info("Capability health metrics computed in %.2fs", computed_time - start)
 
         if tenant is not None:
             if len(_health_metrics_cache) >= _CACHE_MAX_TENANTS:
                 # Drop the oldest rather than let the map grow unbounded.
                 oldest = min(_health_metrics_cache, key=lambda k: _health_metrics_cache[k][0])
                 _health_metrics_cache.pop(oldest, None)
-            _health_metrics_cache[tenant] = (time.time(), result)
-        return result
+            _health_metrics_cache[tenant] = (computed_time, result)
+        return computed_time, result
 
     def _compute_health_metrics(self) -> Dict[str, Any]:
         """

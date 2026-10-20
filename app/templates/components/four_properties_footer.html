@@ -1,0 +1,50 @@
+{#
+  The four properties under a list or figure: where it comes from, when it was
+  worked out, how sure it is, and where to follow it. The words and fields are
+  the answer envelope's own (computed_at, confidence, confidence_basis,
+  confidence_percent, truth_class); the Ask answer page imports basis_badge
+  from here, so there is one way to show them.
+
+  Usage: import four_properties_footer from this file, then call
+  four_properties_footer('gaps') for the fields from the screen's helper, or
+  four_properties_footer(props=a_dict) to pass the fields directly.
+
+  A missing field renders an em dash, never 0 and never an invented figure.
+#}
+{% macro basis_badge(truth_class) -%}
+{%- if truth_class == 'derived' -%}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/40" data-truth-class="derived">Worked out from recorded links</span>
+{%- else -%}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30" data-truth-class="drawn">Recorded by people</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro four_properties_footer(screen=none, props=none) -%}
+{% set p = props if props is not none else (four_properties(screen) if (screen and four_properties is defined) else {}) %}
+{% if p %}
+<section class="mt-6 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm" aria-label="Where these figures come from" data-four-properties="{{ screen or 'custom' }}">
+    <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+            <dt class="text-muted-foreground">Comes from</dt>
+            <dd class="text-foreground" data-fp="source">{{ p.source or '—' }}</dd>
+        </div>
+        <div>
+            <dt class="text-muted-foreground">Worked out</dt>
+            <dd class="text-foreground" data-fp="computed">{% if p.computed_at %}<time datetime="{{ p.computed_at }}">{{ p.computed_label or p.computed_at }}</time>{% else %}—{% endif %}</dd>
+        </div>
+        <div>
+            <dt class="text-muted-foreground">How sure</dt>
+            <dd class="text-foreground" data-fp="confidence">
+                {%- if p.confidence_percent is not none and p.confidence_basis == 'lowest_derived_row' %}{{ p.confidence_percent }}% (the lowest of the worked-out connections)
+                {%- elif p.confidence_basis == 'drawn_facts_only' %}Counted from recorded data
+                {%- else %}—{% endif -%}
+            </dd>
+        </div>
+        <div>
+            <dt class="text-muted-foreground">Follow it</dt>
+            <dd data-fp="trail">{% if p.trail_url %}<a class="font-medium text-primary underline" href="{{ p.trail_url }}">{{ p.trail_label or 'Open the records' }}</a>{% else %}—{% endif %}</dd>
+        </div>
+    </dl>
+</section>
+{% endif %}
+{%- endmacro %}

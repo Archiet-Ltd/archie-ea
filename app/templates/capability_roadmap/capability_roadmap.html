@@ -596,6 +596,7 @@
     </div>
   </div>
 </div>
+{% from 'components/four_properties_footer.html' import four_properties_footer %}{{ four_properties_footer('roadmap') }}
 {% endblock %}
 
 {% block scripts %}
@@ -604,6 +605,24 @@
   'use strict';
 
   const CSRF = () => document.getElementById('rdm-csrf-token')?.value || '';
+
+  // The footer under the page counts recorded gaps and work packages on the
+  // server. After a change that succeeded, fetch the page again and swap in the
+  // fresh footer so it never disagrees with the lists above it.
+  async function refreshFooter() {
+    const current = document.querySelector('[data-four-properties="roadmap"]');
+    if (!current) return;
+    try {
+      const html = await Platform.fetch(window.location.pathname, { silent: true });
+      if (typeof html !== 'string') throw new Error('The page did not come back.');
+      const fresh = new DOMParser().parseFromString(html, 'text/html')
+        .querySelector('[data-four-properties="roadmap"]');
+      if (!fresh) throw new Error('The figures were not on the page.');
+      current.replaceWith(fresh);
+    } catch (e) {
+      Platform.toast.error('The figures under the page could not be refreshed. Reload the page to see them.');
+    }
+  }
 
   // ── Alpine Store: shared state between page and modal sub-components ──
   document.addEventListener('alpine:init', () => {
@@ -706,6 +725,7 @@
           const d = await Platform.fetch.post('/capability-map/api/roadmap/gaps/detect', undefined, { silent: true });
           if (!d.success) throw new Error(d.error || 'Detection failed');
           await this.loadGaps();
+          refreshFooter();
           Platform.alert(`Detection complete: ${d.created} gap(s) created, ${d.updated} updated.`);
         } catch (e) {
           this.errorMessage = e.message || 'Gap detection failed.';
@@ -762,6 +782,7 @@
           if (!d.success) throw new Error(d.error || 'Delete failed');
           this.gaps = this.gaps.filter(g => g.id !== gap.id);
           Alpine.store('rdm').gaps = this.gaps;
+          refreshFooter();
         } catch (e) {
           this.errorMessage = e.message || 'Failed to delete gap.';
         }
@@ -776,6 +797,7 @@
           if (!d.success) throw new Error(d.error || 'Delete failed');
           this.workPackages = this.workPackages.filter(w => w.id !== wp.id);
           Alpine.store('rdm').workPackages = this.workPackages;
+          refreshFooter();
         } catch (e) {
           this.errorMessage = e.message || 'Failed to delete work package.';
         }
@@ -868,6 +890,7 @@
             store.gaps = [saved, ...store.gaps];
           }
           Platform.modal.close('rdm-create-gap-modal');
+          refreshFooter();
         } catch (e) {
           Platform.alert(e.message || 'Failed to save gap.');
         } finally {
@@ -997,6 +1020,7 @@
             store.workPackages = [saved, ...store.workPackages];
           }
           Platform.modal.close('rdm-create-wp-modal');
+          refreshFooter();
         } catch (e) {
           Platform.alert(e.message || 'Failed to save work package.');
         } finally {
@@ -1056,6 +1080,7 @@
           const store = Alpine.store('rdm');
           store.workPackages = [...created.filter(Boolean), ...store.workPackages];
           Platform.modal.close('rdm-ai-generate-modal');
+          refreshFooter();
           Platform.alert(`${created.length} work package(s) created from AI suggestions.`);
         } catch (e) {
           Platform.alert(e.message || 'Failed to create work packages.');
