@@ -1,10 +1,10 @@
 """An organisation cannot write a comment onto another organisation's element.
 
-``archimate_element_comments`` has no organisation column, so the element is
-the only tenant anchor. The list route already refuses a foreign element; the
-create route accepted any element id and wrote the row. The comment routes are
-list (GET) and create (POST) only; there is no edit, delete, like or reply
-route to fence.
+``archimate_element_comments`` carries an organisation column stamped from the
+commented element's organisation, so ownership is the element's. The list route
+already refuses a foreign element; the create route writes only into the
+element's own organisation. The comment routes are list (GET) and create (POST)
+only; there is no edit, delete, like or reply route to fence.
 """
 
 from __future__ import annotations
@@ -145,7 +145,7 @@ def test_own_organisation_lists_its_comments(scene, client, login_as):
     }
 
 
-def test_foreign_organisation_cannot_comment_on_its_own_element(scene, client, login_as):
+def test_organisation_cannot_see_another_organisations_comment(scene, client, login_as):
     """Organisation B can still comment on its own element; organisation A's
     session cannot see that comment."""
     from app import db
