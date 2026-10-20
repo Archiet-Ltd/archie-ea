@@ -7156,8 +7156,16 @@ def api_import_oef():
     else:
         strategy = request.form.get("strategy") or "skip_duplicates"
 
+    # Get filename for provenance (Task 01)
+    source_label = None
+    for field in ("file", "oef_file"):
+        uploaded = request.files.get(field) if request.files else None
+        if uploaded is not None and uploaded.filename:
+            source_label = uploaded.filename
+            break
+
     try:
-        result = ArchiMateImportService().import_xml(content, strategy=strategy)
+        result = ArchiMateImportService().import_xml(content, strategy=strategy, source_label=source_label)
     except ImportRequestError as exc:
         return jsonify({"error": str(exc)}), exc.status_code
 

@@ -808,6 +808,7 @@ def strategy_for_element(element_id: int):
     return success_response(
         {
             "initiatives": initiatives,
+            "chain": result.get("chain") or [],
             "reasons": result.get("reasons") or [],
             "elements": result.get("elements") or {},
         }

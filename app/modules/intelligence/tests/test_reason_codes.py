@@ -80,6 +80,7 @@ _EXPECTED = {
     "no_risk_recorded",
     "no_realising_element",
     "no_initiative_linked",
+    "no_value_linked",
     "initiative_not_linked_to_model",
     "review_item_not_visible",
     "insufficient_samples_for_p95",
@@ -123,8 +124,8 @@ _EXPECTED = {
 }
 
 
-def test_reason_codes_has_exactly_fifty_two_members():
-    assert len(REASON_CODES) == 52
+def test_reason_codes_has_exactly_fifty_three_members():
+    assert len(REASON_CODES) == 53
     assert REASON_CODES == frozenset(_EXPECTED)
 
 

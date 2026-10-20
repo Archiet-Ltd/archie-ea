@@ -19,6 +19,12 @@ import uuid
 import pytest
 
 
+
+def _cited(citations):
+    """The records cited, without the origin fields each relationship also carries."""
+    return [{"type": c["type"], "id": c["id"]} for c in citations]
+
+
 def _user(db_session, org_id, role="enterprise_architect"):
     from app.models.user import User
 
@@ -108,8 +114,8 @@ def test_asking_stores_the_answer_and_returns_the_envelope(app, db_session, make
     assert data["summary"]["total"] == 2
     assert data["freshness"]["computed_at"] == data["computed_at"]
     assert data["freshness"]["derivation_state"] in ("current", "not_computed", "stale", "partial")
-    assert {"type": "relationship", "id": rels[0].id} in data["citations"]
-    assert {"type": "relationship", "id": rels[2].id} in data["citations"]
+    assert {"type": "relationship", "id": rels[0].id} in _cited(data["citations"])
+    assert {"type": "relationship", "id": rels[2].id} in _cited(data["citations"])
     assert _count(db_session, org.id) == 1
 
 
@@ -466,8 +472,8 @@ def test_a_risk_propagation_answer_is_stored_with_its_path_and_renders(app, db_s
 
     assert data["rows"][0]["title"] == "Supplier insolvency"
     assert data["rows"][0]["path_elements"] == [service.id, supplier.id]
-    assert {"type": "relationship", "id": rel.id} in data["citations"]
-    assert {"type": "risk", "id": data["rows"][0]["risk_id"]} in data["citations"]
+    assert {"type": "relationship", "id": rel.id} in _cited(data["citations"])
+    assert {"type": "risk", "id": data["rows"][0]["risk_id"]} in _cited(data["citations"])
     login_as(client, user)
     html = client.get(data["page_url"]).get_data(as_text=True)
     assert "Supplier insolvency" in html
@@ -546,8 +552,8 @@ def test_a_derived_row_makes_the_answer_derived_with_the_lowest_confidence(app, 
     assert built["confidence"] == 0.6 and built["confidence_basis"] == "lowest_derived_row"
     assert built["freshness"]["stale_rows"] == 1
     assert built["freshness"]["oldest_derived_computed_at"] == "2026-10-01T09:00:00"
-    assert {"type": "derived_relationship", "id": 77} in built["citations"]
-    assert {"type": "relationship", "id": 11} in built["citations"]
+    assert {"type": "derived_relationship", "id": 77} in _cited(built["citations"])
+    assert {"type": "relationship", "id": 11} in _cited(built["citations"])
     assert [r["truth_class"] for r in built["rows"]] == ["derived", "derived"]
 
 

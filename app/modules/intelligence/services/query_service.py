@@ -48,6 +48,7 @@ NO_APPLICATION_COMPONENT_REASON = validate_reason_code("no_application_component
 NO_WORK_PACKAGE_RECORDED_REASON = validate_reason_code("no_work_package_recorded")
 NOT_COSTED_REASON = validate_reason_code("not_costed")
 NO_INITIATIVE_LINKED_REASON = validate_reason_code("no_initiative_linked")
+NO_VALUE_LINKED_REASON = validate_reason_code("no_value_linked")
 NO_BUDGET_RECORDED_REASON = validate_reason_code("no_budget_recorded")
 # Distinct from NO_OWNERSHIP_REASON above ("no_ownership_recorded") -- that
 # one describes a single impact row with no owner; this one describes the L4
@@ -515,14 +516,85 @@ def _explicit_row(rel, depth: int, chain: List[int], chain_elements: List[int], 
     }
 
 
-def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[str, Any]]:
+def _walk_typed_path(root_id: int, steps: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """The typed-path form of ``_walk_explicit`` (see its ``steps``)."""
+    from app.models import ArchiMateElement, ArchiMateRelationship
+
+    frontier: Dict[int, Dict[str, List[int]]] = {root_id: {"chain": [], "chain_elements": [root_id]}}
+    rows: List[Dict[str, Any]] = []
+    for depth, step in enumerate(steps, start=1):
+        if not frontier:
+            break
+        wanted_rels = {t.lower() for t in step["relationship_types"]}
+        wanted_elements = {t.lower() for t in step["element_types"]}
+        ids = list(frontier)
+        rels = (
+            db.session.execute(
+                db.select(ArchiMateRelationship).where(
+                    db.or_(
+                        ArchiMateRelationship.source_id.in_(ids),
+                        ArchiMateRelationship.target_id.in_(ids),
+                    )
+                ).order_by(ArchiMateRelationship.id)
+            )
+            .scalars()
+            .all()
+        )
+        wanted = []
+        for rel in rels:
+            if (rel.type or "").lower() not in wanted_rels:
+                continue
+            for here, there in ((rel.source_id, rel.target_id), (rel.target_id, rel.source_id)):
+                if here in frontier and there not in frontier:
+                    wanted.append((rel, here, there))
+        types = {}
+        if wanted:
+            types = dict(
+                db.session.execute(
+                    db.select(ArchiMateElement.id, ArchiMateElement.type).where(
+                        ArchiMateElement.id.in_({there for _, _, there in wanted})
+                    )
+                ).all()
+            )
+        next_frontier: Dict[int, Dict[str, List[int]]] = {}
+        seen = set()
+        for rel, here, there in wanted:
+            if (types.get(there) or "").lower() not in wanted_elements or (rel.id, there) in seen:
+                continue
+            seen.add((rel.id, there))
+            prior = frontier[here]
+            chain = prior["chain"] + [rel.id]
+            chain_elements = prior["chain_elements"] + [there]
+            rows.append(_explicit_row(rel, depth, chain, chain_elements, there))
+            next_frontier[there] = {"chain": chain, "chain_elements": chain_elements}
+        frontier = next_frontier
+    return rows
+
+
+def _walk_explicit(
+    root_id: int,
+    max_depth: int,
+    direction: str,
+    steps: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
     """BFS over ``ArchiMateRelationship`` (TenantMixin-fenced, no hand-written
     predicate needed) up to ``max_depth`` hops, in the requested direction.
 
     Cycle-safe: a node already visited is never re-queued, so this
     terminates even on a cyclic graph within ``max_depth`` iterations.
+
+    ``steps`` turns the walk into a typed path: one entry per depth, each with
+    ``relationship_types`` and ``element_types`` (compared without regard to
+    case). At depth ``n`` only a relationship of one of the step's types, in
+    either direction, to an element of one of the step's types is followed, and
+    ``max_depth`` is the number of steps. A node may then be reached through
+    more than one relationship (an application realizing two capabilities
+    appears under each), since every depth holds a different element type.
     """
     from app.models import ArchiMateRelationship
+
+    if steps is not None:
+        return _walk_typed_path(root_id, steps)
 
     frontier: Dict[int, Dict[str, List[int]]] = {root_id: {"chain": [], "chain_elements": [root_id]}}
     visited = {root_id}
@@ -569,6 +641,75 @@ def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[st
         frontier = next_frontier
 
     return rows
+
+
+# The strategy chain: which relationship types and element types each hop of
+# Stakeholder -> Value -> Capability -> Application Component may follow. A
+# modelled realization is stored as an association, so association is a hop
+# wherever realization is; the walk reads either direction because exchange
+# files draw these links both ways round.
+_VALUE_CHAIN_STEPS = [
+    {"relationship_types": ["Association", "Influence"], "element_types": ["Value"]},
+    {"relationship_types": ["Realization", "Association"], "element_types": ["Capability"]},
+    {"relationship_types": ["Realization", "Association"], "element_types": ["ApplicationComponent"]},
+]
+
+
+def _value_chain(stakeholder_id: int) -> Tuple[List[Dict[str, Any]], Dict[str, Dict[str, Any]]]:
+    """The strategy chain of one stakeholder as ordered hop rows (each value,
+    then under it each capability that delivers it, then under that each
+    application that realizes it), and the elements they name. Walks with
+    ``_walk_explicit``; each hop's origin comes from the answer envelope's
+    ``relationship_origins``, the function that cites impact rows."""
+    from app.models import ArchiMateElement, ArchiMateRelationship
+    from app.modules.intelligence.services.answer_envelope import relationship_origins
+
+    walked = _walk_explicit(stakeholder_id, len(_VALUE_CHAIN_STEPS), "both", steps=_VALUE_CHAIN_STEPS)
+    if not walked:
+        return [], {}
+    ids = {eid for row in walked for eid in row["relation"]["chain_elements"]}
+    found = db.session.execute(
+        db.select(ArchiMateElement).where(ArchiMateElement.id.in_(ids))
+    ).scalars().all()
+    elements = {
+        str(e.id): {"id": e.id, "name": e.name, "type": e.type, "layer": e.layer} for e in found
+    }
+    origins = relationship_origins([row["relation"]["chain"][-1] for row in walked])
+
+    children: Dict[int, List[Dict[str, Any]]] = {}
+    for row in walked:
+        parent = row["relation"]["chain_elements"][-2]
+        children.setdefault(parent, []).append(row)
+    for kids in children.values():
+        kids.sort(key=lambda r: ((elements.get(str(r["element_id"])) or {}).get("name") or "", r["element_id"]))
+
+    rels = {
+        r.id: r.type
+        for r in db.session.execute(
+            db.select(ArchiMateRelationship).where(
+                ArchiMateRelationship.id.in_(list(origins))
+            )
+        ).scalars()
+    }
+    ordered: List[Dict[str, Any]] = []
+
+    def emit(parent_id: int) -> None:
+        for row in children.get(parent_id, []):
+            rel_id = row["relation"]["chain"][-1]
+            ordered.append(
+                {
+                    "hop": row["relation"]["depth"],
+                    "from": elements.get(str(parent_id)),
+                    "to": elements.get(str(row["element_id"])),
+                    "relationship_id": rel_id,
+                    "relationship_type": rels.get(rel_id),
+                    **origins[rel_id],
+                }
+            )
+            emit(row["element_id"])
+
+    emit(stakeholder_id)
+    return ordered, elements
 
 
 def _filter_explicit_by_layer(rows: List[Dict[str, Any]], layer: str) -> List[Dict[str, Any]]:
@@ -2989,7 +3130,12 @@ class IntelligenceQueryService:
         max_depth: int = 3,
         include_derived: bool = True,
     ) -> Dict[str, Any]:
-        """L2, "what are we trying to achieve, and how's it tracking?": every
+        """L2, "what are we trying to achieve, and how's it tracking?".
+
+        A picked Stakeholder is answered with its value chain instead (``chain``:
+        Stakeholder to Value to Capability to Application Component, each hop a
+        cited relationship), or the ``no_value_linked`` reason when it has no
+        Value. Any other element is answered as below: every
         ``PortfolioInitiative`` seeded directly on the picked element
         (``archimate_element_id`` FK), each with the SAME blast-radius
         traversal L1/L5/L6 already run -- no second traversal algorithm.
@@ -3026,6 +3172,7 @@ class IntelligenceQueryService:
             if org_id is None:
                 return {
                     "initiatives": [],
+                    "chain": [],
                     "reasons": [NO_TENANT_CONTEXT_REASON],
                     "elements": {},
                 }
@@ -3036,8 +3183,18 @@ class IntelligenceQueryService:
             if element is None:
                 return {
                     "initiatives": [],
+                    "chain": [],
                     "reasons": [ELEMENT_NOT_FOUND_REASON],
                     "elements": {},
+                }
+
+            if (element.type or "") == "Stakeholder":
+                chain, chain_elements = _value_chain(element_id)
+                return {
+                    "initiatives": [],
+                    "chain": chain,
+                    "reasons": [] if chain else [NO_VALUE_LINKED_REASON],
+                    "elements": chain_elements,
                 }
 
             seed_initiatives = (
@@ -3053,6 +3210,7 @@ class IntelligenceQueryService:
             if not seed_initiatives:
                 return {
                     "initiatives": [],
+                    "chain": [],
                     "reasons": [NO_INITIATIVE_LINKED_REASON],
                     "elements": {},
                 }
@@ -3120,6 +3278,7 @@ class IntelligenceQueryService:
 
         return {
             "initiatives": initiative_payloads,
+            "chain": [],
             "reasons": [],
             "elements": all_elements,
         }
