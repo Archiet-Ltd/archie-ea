@@ -66,11 +66,35 @@ def _relationship(db_session, org, a, b):
     return rel
 
 
-def _count(db_session, org_id=None):
-    from app.models.archimate_core import ArchiMateRelationship
+def _count(db_session, *elements):
+    """Relationships touching the given elements (this test's own rows only).
+
+    Plain SQL by id, so neither the ambient tenant filter nor rows left by
+    other tests can change the answer.
+    """
+    from sqlalchemy import text
+
+    ids = [e.id for e in elements]
+    db_session.expire_all()
+    return db_session.execute(
+        text(
+            "SELECT count(*) FROM archimate_relationships "
+            "WHERE source_id = ANY(:ids) OR target_id = ANY(:ids)"
+        ),
+        {"ids": ids},
+    ).scalar_one()
+
+
+def _row(db_session, rel_id):
+    """(exists, description) for one relationship by id, by plain SQL."""
+    from sqlalchemy import text
 
     db_session.expire_all()
-    return db_session.query(ArchiMateRelationship).count()
+    row = db_session.execute(
+        text("SELECT description FROM archimate_relationships WHERE id = :i"),
+        {"i": rel_id},
+    ).first()
+    return (row is not None), (row[0] if row else None)
 
 
 def _payload(a, b):
@@ -87,22 +111,22 @@ class TestCreate:
         viewer = _user(db_session, org, "viewer")
         a, b = _element(db_session, org, "A"), _element(db_session, org, "B")
         db_session.commit()
-        before = _count(db_session)
+        before = _count(db_session, a, b)
         login_as(client, viewer)
         resp = client.post("/archimate/api/relationships", json=_payload(a, b))
         assert resp.status_code == 403
-        assert _count(db_session) == before
+        assert _count(db_session, a, b) == before
 
     def test_architect_create_succeeds(self, app, db_session, login_as, client):
         org = _org(db_session, "ac")
         architect = _user(db_session, org, "architect")
         a, b = _element(db_session, org, "A"), _element(db_session, org, "B")
         db_session.commit()
-        before = _count(db_session)
+        before = _count(db_session, a, b)
         login_as(client, architect)
         resp = client.post("/archimate/api/relationships", json=_payload(a, b))
         assert resp.status_code == 201, resp.get_data(as_text=True)
-        assert _count(db_session) == before + 1
+        assert _count(db_session, a, b) == before + 1
 
     def test_create_across_organisations_is_not_found(
         self, app, db_session, login_as, client
@@ -112,7 +136,7 @@ class TestCreate:
         mine = _element(db_session, org_a, "mine")
         theirs = _element(db_session, org_b, "theirs")
         db_session.commit()
-        before = _count(db_session)
+        before = _count(db_session, mine, theirs)
         login_as(client, architect)
         # B's element is already in the session's identity map.
         from app.models.archimate_core import ArchiMateElement
@@ -121,7 +145,7 @@ class TestCreate:
         for src, tgt in ((mine, theirs), (theirs, mine)):
             resp = client.post("/archimate/api/relationships", json=_payload(src, tgt))
             assert resp.status_code == 404, resp.get_data(as_text=True)
-        assert _count(db_session) == before
+        assert _count(db_session, mine, theirs) == before
 
 
 class TestEdit:
@@ -134,8 +158,7 @@ class TestEdit:
         login_as(client, viewer)
         resp = client.put(f"/archimate/api/relationships/{rel.id}", json={"description": "x"})
         assert resp.status_code == 403
-        db_session.expire_all()
-        assert rel.description != "x"
+        assert _row(db_session, rel.id)[1] != "x"
 
     def test_architect_edit_succeeds(self, app, db_session, login_as, client):
         org = _org(db_session, "ae")
@@ -168,17 +191,13 @@ class TestEdit:
                 f"/archimate/api/relationships/{rel.id}", json={"description": "taken"}
             )
             assert resp.status_code == 404, resp.get_data(as_text=True)
-        db_session.expire_all()
-        assert foreign.description != "taken"
-        assert mixed.description != "taken"
+        assert _row(db_session, foreign.id)[1] != "taken"
+        assert _row(db_session, mixed.id)[1] != "taken"
 
 
 class TestDelete:
     def _exists(self, db_session, rel_id):
-        from app.models.archimate_core import ArchiMateRelationship
-
-        db_session.expire_all()
-        return db_session.get(ArchiMateRelationship, rel_id) is not None
+        return _row(db_session, rel_id)[0]
 
     def test_viewer_delete_is_refused(self, app, db_session, login_as, client):
         org = _org(db_session, "vd")
