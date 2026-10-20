@@ -229,16 +229,19 @@ class ArchiMateImportService:
         except ValueError as exc:
             raise ImportRequestError(str(exc)) from exc
 
-    def preview_xml(self, content: Union[bytes, str]) -> Dict[str, Any]:
+    def preview_xml(
+        self, content: Union[bytes, str], organization_id: Optional[int] = None
+    ) -> Dict[str, Any]:
         """What ``import_xml`` would do with this document, writing nothing."""
         parsed = self.load(content)
-        preview = self.preview_import(parsed)
+        preview = self.preview_import(parsed, organization_id=organization_id)
         return {"model_name": parsed.get("model_name", ""), **preview}
 
     def import_xml(
         self,
         content: Union[bytes, str],
         strategy: str = "skip_duplicates",
+        organization_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Import an OEF document under ``strategy``.
 
@@ -253,7 +256,9 @@ class ArchiMateImportService:
         parsed = self.load(content)
         if not parsed["elements"]:
             raise ImportRequestError("No valid elements found in the XML file.")
-        result = self.execute_import(parsed, strategy=strategy)
+        result = self.execute_import(
+            parsed, strategy=strategy, organization_id=organization_id
+        )
         return {"model_name": parsed.get("model_name", ""), **result}
 
     # ------------------------------------------------------------------
@@ -614,8 +619,36 @@ class ArchiMateImportService:
     # Preview (diff against existing DB)
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _importing_organization_id(explicit: Optional[int]) -> Optional[int]:
+        """The organisation a run reads and writes.
+
+        An explicit id wins (CLI and programme setup have no ambient tenant);
+        then the request's tenant; then the single organisation of a
+        single-tenant install. ``None`` only when none of these exist.
+        """
+        if explicit is not None:
+            return int(explicit)
+        try:
+            from app.utils.tenant import current_organization_id
+
+            ambient = current_organization_id()
+            if ambient is not None:
+                return ambient
+        except Exception:
+            pass
+        from app.models.mixins.core import _default_org_id
+
+        return _default_org_id()
+
+    @staticmethod
+    def _in_organization(model_cls, org_id: Optional[int]) -> list:
+        """Explicit organisation predicate; the ORM fence is a no-op with no
+        ambient tenant (CLI), so every read here states its own."""
+        return [] if org_id is None else [model_cls.organization_id == org_id]
+
     def preview_import(
-        self, parsed_data: Dict[str, Any]
+        self, parsed_data: Dict[str, Any], organization_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """Compare parsed elements against the DB and classify each element.
 
@@ -641,6 +674,7 @@ class ArchiMateImportService:
         """
         from app.models.archimate_core import ArchiMateElement
 
+        org_id = self._importing_organization_id(organization_id)
         elements = parsed_data.get("elements", [])
         preview_elements: List[Dict[str, Any]] = []
         counts = {"new": 0, "exists": 0, "conflict": 0, "invalid": 0}
@@ -663,6 +697,7 @@ class ArchiMateImportService:
             existing = ArchiMateElement.query.filter(  # model-safety-ok: bounded by XML element count
                 db.func.lower(ArchiMateElement.name) == name_lower,
                 ArchiMateElement.type == elem_type,
+                *self._in_organization(ArchiMateElement, org_id),
             ).first()
 
             entry = {**elem}
@@ -723,6 +758,7 @@ class ArchiMateImportService:
         self,
         parsed_data: Dict[str, Any],
         strategy: str = "skip_duplicates",
+        organization_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Create/update ArchiMate elements from parsed OEF data.
 
@@ -789,6 +825,8 @@ class ArchiMateImportService:
         if strategy not in STRATEGIES:
             raise ValueError(f"Invalid strategy: {strategy}")
 
+        org_id = self._importing_organization_id(organization_id)
+        org_kw = {} if org_id is None else {"organization_id": org_id}
         elements = parsed_data.get("elements", [])
         created = 0
         updated = 0
@@ -812,7 +850,7 @@ class ArchiMateImportService:
         snapshot = import_snapshot_service.begin(
             strategy=strategy, model_name=(parsed_data.get("model_name") or "")[:100]
         )
-        model_id = self._record_model(ArchitectureModel, parsed_data)
+        model_id = self._record_model(ArchitectureModel, parsed_data, org_id)
         if snapshot is not None:
             snapshot.note_model(model_id)
         created_relationship_ids: List[int] = []
@@ -875,6 +913,7 @@ class ArchiMateImportService:
                         existing = ArchiMateElement.query.filter(  # model-safety-ok: bounded by XML element count
                             db.func.lower(ArchiMateElement.name) == name_lower,
                             ArchiMateElement.type == elem_type,
+                            *self._in_organization(ArchiMateElement, org_id),
                         ).first()
 
                     if existing is None:
@@ -884,6 +923,7 @@ class ArchiMateImportService:
                             layer=layer,
                             description=description,
                             architecture_id=model_id,
+                            **org_kw,
                         )
                         db.session.add(new_elem)
                         _write_properties(new_elem, props, merge=False)
@@ -992,8 +1032,11 @@ class ArchiMateImportService:
                     # before softening: a softened row is told apart from a
                     # modelled Association by its "As modelled: <Type>." note.
                     existing_rel = None
-                    for cand in ArchiMateRelationship.query.filter_by(
-                        source_id=source_db_id, target_id=target_db_id, type=rel["type"],
+                    for cand in ArchiMateRelationship.query.filter(
+                        ArchiMateRelationship.source_id == source_db_id,
+                        ArchiMateRelationship.target_id == target_db_id,
+                        ArchiMateRelationship.type == rel["type"],
+                        *self._in_organization(ArchiMateRelationship, org_id),
                     ).all():
                         cand_note = _modelled_note_type(cand.description)
                         if rel.get("softened"):
@@ -1016,6 +1059,7 @@ class ArchiMateImportService:
                             # exists, and it must survive the import.
                             description=rel.get("description"),
                             architecture_id=model_id,
+                            **org_kw,
                         )
                         db.session.add(new_rel)
                         db.session.flush()
@@ -1101,7 +1145,9 @@ class ArchiMateImportService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _record_model(model_cls, parsed_data: Dict[str, Any]) -> Optional[int]:
+    def _record_model(
+        model_cls, parsed_data: Dict[str, Any], org_id: Optional[int] = None
+    ) -> Optional[int]:
         """Record this import run as an ArchitectureModel; return its id.
 
         A refused row costs the provenance record only, never the import.
@@ -1117,6 +1163,7 @@ class ArchiMateImportService:
                     name=name[:100],
                     version="1.0",
                     model_data=parsed_data.get("source_xml"),
+                    **({} if org_id is None else {"organization_id": org_id}),
                 )
                 db.session.add(record)
                 db.session.flush()
@@ -1203,6 +1250,7 @@ class ArchiMateImportService:
                         name=element.name,
                         description=element.description,
                         archimate_element_id=element.id,
+                        organization_id=org_id,
                     )
                 else:
                     row = cls(
