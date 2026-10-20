@@ -244,6 +244,42 @@
         return (payload.initiatives || []).map(initiativeModel);
     }
 
+    /* A stakeholder's strategy chain: one model per hop (value, capability,
+       application), in the order the server sent them. Each carries where the
+       relationship came from and when, as recorded; the Why drawer reads the
+       same model through `key`, `name`, `plainTerms` and `detail`. */
+    var HOP_TYPE_LABELS = { Value: 'Value', Capability: 'Capability', ApplicationComponent: 'Application' };
+
+    function hopModel(hop, index) {
+        var from = hop.from || {};
+        var to = hop.to || {};
+        var when = timeText(hop.source_timestamp);
+        var detail = emptyDetail();
+        detail.type = to.type || null;
+        detail.layer = to.layer || null;
+        detail.depth = hop.hop;
+        detail.chain = [from.name || null, to.name || null];
+        return {
+            key: 'hop-' + hop.relationship_id + '-' + index,
+            hop: hop.hop,
+            fromName: from.name || null,
+            name: to.name || null,
+            typeLabel: HOP_TYPE_LABELS[to.type] || to.type || null,
+            relationshipType: hop.relationship_type || null,
+            sourceName: hop.source_name || 'not recorded',
+            sourceTime: when,
+            derived: false,
+            plainTerms: (from.name || 'Unnamed') + ' is linked to ' + (to.name || 'unnamed') +
+                '. Recorded by: ' + (hop.source_name || 'not recorded') + (when ? ', ' + when : '') + '.',
+            staleLine: null,
+            detail: detail
+        };
+    }
+
+    function buildChain(payload) {
+        return (payload.chain || []).map(hopModel);
+    }
+
     /* L4: the element's own owners first, then the owners of the elements it
        affects. Resolves ApplicationOwner records through the tenant-safe
        batch reader and returns them as the owners array. No max_depth/include_derived --
@@ -614,6 +650,7 @@
         buildWorkPackages: buildWorkPackages,
         fetchStrategy: fetchStrategy,
         buildInitiatives: buildInitiatives,
+        buildChain: buildChain,
         fetchAccountability: fetchAccountability,
         buildOwners: buildOwners,
         fetchData: fetchData,
