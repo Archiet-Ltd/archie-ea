@@ -37,7 +37,7 @@ _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "[::1]"}
 # dropped rather than granted — an allow-list, not a denylist. Every tool is
 # read-only, so read is the only scope that exists; a write scope is added
 # together with the first write tool, not before.
-ALLOWED_SCOPES = ("mcp:read", "api:read")
+ALLOWED_SCOPES = ("mcp:read",)
 
 # A scope that requires more than "a token exists" to grant maps to the
 # permission it needs here. Empty while read is the only scope.
@@ -140,12 +140,9 @@ def authorize():
         return jsonify({"error": "invalid_request", "error_description": "code_challenge must be 43 to 128 base64url characters"}), 400
 
     expected_resource = _mcp_resource_url()
-    api_resource = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/") + "/api/v1"
-    if not requested_resource or (expected_resource is None and not api_resource):
+    if not requested_resource or expected_resource is None or requested_resource.rstrip("/") != expected_resource:
         return jsonify({"error": "invalid_target", "error_description": "resource does not match this server"}), 400
-    if requested_resource.rstrip("/") not in (expected_resource, api_resource):
-        return jsonify({"error": "invalid_target", "error_description": "resource does not match this server"}), 400
-    validated_resource = requested_resource.rstrip("/")
+    validated_resource = expected_resource
 
     if request.method == "GET":
         scopes = _filter_granted_scopes(requested_scope, current_user)
@@ -229,15 +226,11 @@ def token():
     resource = request.form.get("resource", "")
 
     expected_resource = _mcp_resource_url()
-    api_resource = _api_resource_url()
-    if not resource or (expected_resource is None and api_resource is None):
+    if not resource or expected_resource is None or resource.rstrip("/") != expected_resource:
         return jsonify({"error": "invalid_target", "error_description": "resource does not match this server"}), 400
-    if resource.rstrip("/") not in (expected_resource, api_resource):
-        return jsonify({"error": "invalid_target", "error_description": "resource does not match this server"}), 400
-    validated_resource = resource.rstrip("/")
 
     if grant_type == "authorization_code":
-        return _token_authorization_code(validated_resource)
+        return _token_authorization_code(expected_resource)
     if grant_type == "refresh_token":
         return _token_refresh(expected_resource)
     return jsonify({"error": "unsupported_grant_type"}), 400
