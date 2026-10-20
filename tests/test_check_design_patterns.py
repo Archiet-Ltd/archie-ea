@@ -240,3 +240,26 @@ def test_a_missing_conformance_section_exits_2(monkeypatch, tmp_path):
     bad.write_text(json.dumps({"pilot_patterns": {}}), encoding="utf-8")
     monkeypatch.setattr(cdp, "PATTERNS_PATH", bad)
     assert cdp.main(["--report", str(tmp_path / "r.json")]) == 2
+
+
+def test_raw_modal_still_catches_a_screen_overlay_shown_on_an_open_flag():
+    src = '<div x-show="showModal" class="fixed inset-0 z-50 flex items-center">body</div>'
+    assert one(cdp.rule_raw_modal, src).rule == "RAW_MODAL"
+
+
+def test_raw_modal_still_catches_role_dialog_and_alertdialog():
+    for role in ("dialog", "alertdialog"):
+        src = f'<div role="{role}" class="p-4">body</div>'
+        assert one(cdp.rule_raw_modal, src).rule == "RAW_MODAL"
+
+
+def test_raw_modal_leaves_a_popover_and_a_menu_beside_their_trigger():
+    popover = '<div x-show="filtersOpen" class="absolute right-0 mt-2 w-64 rounded-md border bg-popover">f</div>'
+    menu = '<div x-show="open" @click.away="open = false" class="absolute z-10 mt-1 rounded-md border">m</div>'
+    assert run(cdp.rule_raw_modal, popover) == []
+    assert run(cdp.rule_raw_modal, menu) == []
+
+
+def test_raw_modal_leaves_a_backdrop_hidden_from_assistive_technology():
+    src = '<div x-show="sidebarOpen" aria-hidden="true" class="fixed inset-0 bg-overlay/50"></div>'
+    assert run(cdp.rule_raw_modal, src) == []

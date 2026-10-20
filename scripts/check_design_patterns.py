@@ -192,6 +192,19 @@ def rule_raw_table(src: str, ctx: Ctx) -> list[Violation]:
 
 
 X_SHOW_DIALOG = re.compile(r'\bx-show\s*=\s*"[^"]*(?:[Oo]pen|[Mm]odal)[^"]*"')
+ROLE_DIALOG = re.compile(r'\brole\s*=\s*"(?:alert)?dialog"')
+OVERLAY_CLASS = re.compile(
+    r'\bclass\s*=\s*"[^"]*\bfixed\b[^"]*\binset-0\b|\bclass\s*=\s*"[^"]*\binset-0\b[^"]*\bfixed\b')
+
+
+def _covers_the_screen(tag: str) -> bool:
+    """An element shown on an open flag is a dialog only when it takes over the screen (fixed and
+    full-inset) or says it is modal. A filter popover or a row-actions menu opens on the same kind
+    of flag but sits beside its trigger, and a backdrop hidden from assistive technology is
+    decoration; giving either dialog semantics would be wrong."""
+    if 'aria-hidden="true"' in tag:
+        return False
+    return 'aria-modal="true"' in tag or OVERLAY_CLASS.search(tag) is not None
 
 
 def rule_raw_modal(src: str, ctx: Ctx) -> list[Violation]:
@@ -203,7 +216,8 @@ def rule_raw_modal(src: str, ctx: Ctx) -> list[Violation]:
     out = []
     for m in opening_tags(src, "div"):
         tag = m.group(0)
-        is_dialog = 'role="dialog"' in tag or X_SHOW_DIALOG.search(tag) is not None
+        is_dialog = bool(ROLE_DIALOG.search(tag)) or (
+            X_SHOW_DIALOG.search(tag) is not None and _covers_the_screen(tag))
         if not is_dialog:
             continue
         if all(tok in tag for tok in ctx.dialog_required):
