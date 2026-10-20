@@ -56,11 +56,11 @@
                 <i data-lucide="search" class="h-4 w-4 mr-1.5"></i> Filter
             </button>
             <a href="{{ url_for('admin.report_builder') }}"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Clear
             </a>
             <a href="{{ url_for('admin.report_builder', q=search_q, lifecycle=lifecycle, date_from=date_from, date_to=date_to, vendor=vendor_filter, export='csv') }}"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center ml-auto">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center ml-auto">
                 <i data-lucide="download" class="h-4 w-4 mr-1.5"></i> Export CSV
             </a>
         </div>
@@ -134,14 +134,14 @@
     <nav class="flex items-center justify-center gap-1 mt-6" aria-label="Report pagination">
         {% if page > 1 %}
         <a href="{{ url_for('admin.report_builder', page=page-1, q=search_q, lifecycle=lifecycle, date_from=date_from, date_to=date_to, vendor=vendor_filter) }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             Previous
         </a>
         {% endif %}
         <span class="px-3 py-1.5 text-sm text-muted-foreground">Page {{ page }} of {{ total_pages }}</span>
         {% if page < total_pages %}
         <a href="{{ url_for('admin.report_builder', page=page+1, q=search_q, lifecycle=lifecycle, date_from=date_from, date_to=date_to, vendor=vendor_filter) }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             Next
         </a>
         {% endif %}

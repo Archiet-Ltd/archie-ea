@@ -187,13 +187,13 @@ input:checked + .slider:before {
     <!-- Header -->
     {% macro _ps_actions() %}
 <div class="flex gap-3">
-            <button type="button" id="btn-export-settings" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" data-testid="btn-export-settings" aria-label="Export settings to file">
+            <button type="button" id="btn-export-settings" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" data-testid="btn-export-settings" aria-label="Export settings to file">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
                 Export Settings
             </button>
-            <button type="button" id="btn-import-settings" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" data-testid="btn-import-settings" aria-label="Import settings from file">
+            <button type="button" id="btn-import-settings" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" data-testid="btn-import-settings" aria-label="Import settings from file">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                 </svg>
@@ -589,7 +589,7 @@ input:checked + .slider:before {
             <h3 class="text-lg font-medium text-foreground mt-4">Reset to Defaults</h3>
             <p class="text-sm text-muted-foreground mt-2">This will reset all settings to their default values. Your data will not be affected, but custom configurations will be lost.</p>
             <div class="flex justify-center gap-3 mt-6">
-                <button type="button" id="btn-cancel-reset" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" data-testid="btn-cancel-reset" aria-label="Cancel reset operation">Cancel</button>
+                <button type="button" id="btn-cancel-reset" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" data-testid="btn-cancel-reset" aria-label="Cancel reset operation">Cancel</button>
                 <button type="button" id="btn-confirm-reset" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" data-testid="btn-confirm-reset" aria-label="Confirm and reset all settings">Reset Settings</button>
             </div>
         </div>

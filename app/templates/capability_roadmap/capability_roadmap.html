@@ -66,7 +66,7 @@
     ) }}
     <div class="flex flex-wrap items-center gap-2">
       <button type="button"
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
         @click="detectGaps()"
         :disabled="isDetecting">
         <i data-lucide="scan-search" class="h-4 w-4"></i>
@@ -74,7 +74,7 @@
         <span x-show="isDetecting" x-cloak>Detecting…</span>
       </button>
       <button type="button"
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
         @click="openCreatePlateauModal()">
         <i data-lucide="layers" class="h-4 w-4"></i>
         Add Plateau
@@ -181,7 +181,7 @@
       <div class="flex items-center gap-3">
         <template x-if="selectedGapIds.length > 0">
           <button type="button"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
             @click="openAiGenerateModal()">
             <i data-lucide="sparkles" class="h-3.5 w-3.5"></i>
             AI Generate (<span x-text="selectedGapIds.length"></span> gaps)

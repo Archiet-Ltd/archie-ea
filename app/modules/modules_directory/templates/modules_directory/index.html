@@ -55,7 +55,7 @@
                 {% for link in section.links %}
                 <li x-show='matches({{ link.label | tojson }})'>
                     <a href="{{ link.href }}"
-                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                         <i data-lucide="{{ link.icon }}" class="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true"></i>
                         <span class="flex-1 truncate">{{ link.label }}</span>
                     </a>
@@ -79,7 +79,7 @@
                 {% for link in more_tools %}
                 <li x-show='matches({{ link.label | tojson }})'>
                     <a href="{{ link.href }}"
-                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                         <i data-lucide="{{ link.icon }}" class="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true"></i>
                         <span class="flex-1 truncate">{{ link.label }}</span>
                     </a>

@@ -126,7 +126,7 @@
                                     </button>
                                     <template x-if="openSnapshots.includes('element_' + element.id)">
                                         <div class="mt-2 overflow-x-auto rounded-md border border-border bg-muted p-3">
-                                            <pre class="text-[11px] font-mono text-foreground" x-text="JSON.stringify(element.snapshot, null, 2)"></pre>
+                                            <pre class="text-2xs font-mono text-foreground" x-text="JSON.stringify(element.snapshot, null, 2)"></pre>
                                         </div>
                                     </template>
                                 </div>
@@ -178,7 +178,7 @@
                                     </button>
                                     <template x-if="openSnapshots.includes('relationship_' + rel.id)">
                                         <div class="mt-2 overflow-x-auto rounded-md border border-border bg-muted p-3">
-                                            <pre class="text-[11px] font-mono text-foreground" x-text="JSON.stringify(rel.snapshot, null, 2)"></pre>
+                                            <pre class="text-2xs font-mono text-foreground" x-text="JSON.stringify(rel.snapshot, null, 2)"></pre>
                                         </div>
                                     </template>
                                 </div>

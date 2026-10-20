@@ -348,7 +348,7 @@
                             <span x-text="suggestingElements && aiSuggestPhase === 'E' ? 'Suggesting...' : 'AI Suggest'"></span>
                         </button>
                         {% endif %}
-                        <button type="button" @click="toggleComments('phase_e')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" title="Comments">
+                        <button type="button" @click="toggleComments('phase_e')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" title="Comments">
                             <i data-lucide="message-square" class="w-3.5 h-3.5" aria-hidden="true"></i>
                             <span x-show="commentCount('phase_e') > 0" x-text="commentCount('phase_e')" class="text-xs bg-primary text-primary-foreground rounded-full px-1 min-w-[16px] text-center" x-cloak></span>
                         </button>
@@ -364,7 +364,7 @@
                             <span x-text="analyzingOptions ? 'Analyzing...' : 'Run Options Analysis'"></span>
                         </button>
                         <button type="button" @click="loadArchitectureVariants()" :disabled="generatingVariants"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                             title="Generate cost / timeline / risk variants">
                             <i data-lucide="git-branch" class="w-3.5 h-3.5" aria-hidden="true" x-show="!generatingVariants" x-cloak></i>
                             <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin" aria-hidden="true" x-show="generatingVariants" x-cloak></i>
@@ -404,7 +404,7 @@
                         <div class="flex items-center justify-between">
                             <p class="text-xs text-muted-foreground italic">No evaluated options yet. Use "Add Option" below to score Build / Buy / Reuse alternatives.</p>
                             <button type="button" @click="loadSolutionOptions()"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                                 <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i> Run MCDA
                             </button>
                         </div>

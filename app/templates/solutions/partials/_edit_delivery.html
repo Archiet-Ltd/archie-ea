@@ -7,7 +7,7 @@
     <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
             <h2 class="text-lg font-semibold text-foreground">Transition Plateaus</h2>
-            <button type="button" @click="toggleComments('phase_f')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" title="Comments">
+            <button type="button" @click="toggleComments('phase_f')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" title="Comments">
                 <i data-lucide="message-square" class="w-3.5 h-3.5" aria-hidden="true"></i>
                 <span x-show="commentCount('phase_f') > 0" x-text="commentCount('phase_f')" class="text-xs bg-primary text-primary-foreground rounded-full px-1 min-w-[16px] text-center" x-cloak></span>
             </button>
@@ -101,11 +101,11 @@
                 Gate: {% if phase_gate.valid %}Passed{% else %}Not Met{% endif %}
             </span>
             {% endif %}
-            <button type="button" @click="toggleComments('archimate')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" title="Comments">
+            <button type="button" @click="toggleComments('archimate')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" title="Comments">
                 <i data-lucide="message-square" class="w-3.5 h-3.5" aria-hidden="true"></i>
                 <span x-show="commentCount('archimate') > 0" x-text="commentCount('archimate')" class="text-xs bg-primary text-primary-foreground rounded-full px-1 min-w-[16px] text-center" x-cloak></span>
             </button>
-            <button type="button" @click="openManageModal('archimate_element')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Browse ArchiMate repository">
+            <button type="button" @click="openManageModal('archimate_element')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Browse ArchiMate repository">
                 <i data-lucide="library" class="w-3.5 h-3.5" aria-hidden="true"></i> Browse Repository
             </button>
             <button type="button" @click="syncArchimate()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
@@ -231,7 +231,7 @@
                 <i data-lucide="shield-check" class="w-3.5 h-3.5" aria-hidden="true"></i>
                 <span x-text="checkingReadiness ? 'Checking...' : 'Check Readiness'"></span>
             </button>
-            <button type="button" @click="toggleComments('phase_g')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" title="Comments">
+            <button type="button" @click="toggleComments('phase_g')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" title="Comments">
                 <i data-lucide="message-square" class="w-3.5 h-3.5" aria-hidden="true"></i>
                 <span x-show="commentCount('phase_g') > 0" x-text="commentCount('phase_g')" class="text-xs bg-primary text-primary-foreground rounded-full px-1 min-w-[16px] text-center" x-cloak></span>
             </button>
@@ -496,7 +496,7 @@
                     <button type="button"
                             @click="startWorkflow(wf.workflow_code)"
                             :disabled="wfStarting !== null"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center">
                         <i x-show="wfStarting === wf.workflow_code" x-cloak data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i>
                         <i x-show="wfStarting !== wf.workflow_code" x-cloak data-lucide="play" class="h-3 w-3" aria-hidden="true"></i>
                         <span x-text="wfStarting === wf.workflow_code ? 'Starting…' : 'Start'"></span>
@@ -520,7 +520,7 @@
     <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
             <h2 class="text-lg font-semibold text-foreground">Success Metrics</h2>
-            <button type="button" @click="toggleComments('phase_h')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" title="Comments">
+            <button type="button" @click="toggleComments('phase_h')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" title="Comments">
                 <i data-lucide="message-square" class="w-3.5 h-3.5" aria-hidden="true"></i>
                 <span x-show="commentCount('phase_h') > 0" x-text="commentCount('phase_h')" class="text-xs bg-primary text-primary-foreground rounded-full px-1 min-w-[16px] text-center" x-cloak></span>
             </button>

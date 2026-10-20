@@ -254,7 +254,7 @@
                     <div class="flex items-center justify-between px-2 py-4">
                         <div class="flex items-center gap-2">
                             <button type="button" @click="prevPage()" :disabled="pagination.cursor === 0"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
                                     aria-label="Previous page">
                                 <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>
                             </button>
@@ -262,7 +262,7 @@
                                 Page <span x-text="pagination.currentPage"></span> of <span x-text="Math.ceil(analysisResult.total / pagination.pageSize)"></span>
                             </span>
                             <button type="button" @click="nextPage()" :disabled="pagination.nextCursor === null"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
                                     aria-label="Next page">
                                 <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>
                             </button>

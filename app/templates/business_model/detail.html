@@ -96,7 +96,7 @@
         <span class="text-sm font-medium text-foreground">Export &amp; share</span>
       </div>
       <button type="button" @click="exportImage()" data-testid="bmc-export-image"
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
         <i data-lucide="image" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Export as image
       </button>
       <select aria-label="File export format" x-model="exportFormat" data-testid="bmc-export-format"
@@ -106,12 +106,12 @@
         <option value="archi">Archi (.archimate)</option>
       </select>
       <a :href="exportFileUrl" data-testid="bmc-export-file"
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
         <i data-lucide="download" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Download file
       </a>
       <template x-if="shareUrl">
         <a :href="shareUrl" target="_blank" rel="noopener" data-testid="bmc-share-link"
-          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
           <i data-lucide="link" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Share
         </a>
       </template>
@@ -210,7 +210,7 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="flex justify-end gap-3 pt-2">
     <button type="button" data-modal-close="bmc-delete-modal"
-      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
       Cancel
     </button>
     <button type="submit" data-testid="bmc-delete-submit"

@@ -5,7 +5,7 @@
 <div class="mt-7">
     <div class="flex items-center justify-between mb-3">
         <h3 class="text-sm font-semibold text-foreground flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-destructive inline-block"></span>Risk Snapshots</h3>
-        <div class="sad-actions"><button type="button" @click="openEntityModal('risk_snapshot')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">+ Snapshot</button></div>
+        <div class="sad-actions"><button type="button" @click="openEntityModal('risk_snapshot')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">+ Snapshot</button></div>
     </div>
     <template x-if="sadRiskSnapshots.length > 0">
         <div class="overflow-x-auto">

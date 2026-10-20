@@ -6,7 +6,7 @@
     {# Toolbar: Add Risk + Link ArchiMate + Comments #}
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
-            <button type="button" @click="toggleComments('risks')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" title="Comments">
+            <button type="button" @click="toggleComments('risks')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" title="Comments">
                 <i data-lucide="message-square" class="w-3.5 h-3.5" aria-hidden="true"></i>
                 <span x-show="commentCount('risks') > 0" x-text="commentCount('risks')" class="text-xs bg-primary text-primary-foreground rounded-full px-1 min-w-[16px] text-center" x-cloak></span>
             </button>

@@ -80,7 +80,7 @@
                 {% call button(type='submit', variant='default', icon='filter') %}
                     Apply Filters
                 {% endcall %}
-                <a href="{{ url_for('admin.feature_flags') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                <a href="{{ url_for('admin.feature_flags') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <i data-lucide="x" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                     Clear
                 </a>
@@ -138,7 +138,7 @@
                             <span x-text="(toggleStates[{{ group.section.id }}]?.enabled ?? {{ 'true' if group.section.enabled else 'false' }}) ? 'Active' : 'Disabled'"></span>
                         </button>
                         <a href="{{ url_for('admin.feature_flag_edit', id=group.section.id) }}"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-7"
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-7"
                            title="Edit section">
                             <i data-lucide="edit" class="w-3.5 h-3.5" aria-hidden="true"></i>
                         </a>
@@ -174,7 +174,7 @@
                                     <span x-text="(toggleStates[{{ child.id }}]?.enabled ?? {{ 'true' if child.enabled else 'false' }}) ? 'Enabled' : 'Disabled'"></span>
                                 </button>
                                 <a href="{{ url_for('admin.feature_flag_edit', id=child.id) }}"
-                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-7"
+                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-7"
                                    title="Edit">
                                     <i data-lucide="edit" class="w-3.5 h-3.5" aria-hidden="true"></i>
                                 </a>
@@ -226,7 +226,7 @@
                             <span x-text="(toggleStates[{{ feature.id }}]?.enabled ?? {{ 'true' if feature.enabled else 'false' }}) ? 'Enabled' : 'Disabled'"></span>
                         </button>
                         <a href="{{ url_for('admin.feature_flag_edit', id=feature.id) }}"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-7"
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-7"
                            title="Edit">
                             <i data-lucide="edit" class="w-3.5 h-3.5" aria-hidden="true"></i>
                         </a>
@@ -336,7 +336,7 @@
                                         </button>
 
                                         <a href="{{ url_for('admin.feature_flag_edit', id=feature.id) }}"
-                                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
+                                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
                                            title="Edit">
                                             <i data-lucide="edit" class="w-4 h-4" aria-hidden="true"></i>
                                         </a>
@@ -364,7 +364,7 @@
                     <div class="flex gap-1">
                         {% if pagination.has_prev %}
                         <a href="{{ url_for('admin.feature_flags', page=pagination.prev_num, search=search, type=filter_type, state=filter_state, status=filter_status) }}"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                             <i data-lucide="chevron-left" class="w-4 h-4" aria-hidden="true"></i>
                             Previous
                         </a>
@@ -376,7 +376,7 @@
                                 <span class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground h-9 w-9">{{ page_num }}</span>
                                 {% else %}
                                 <a href="{{ url_for('admin.feature_flags', page=page_num, search=search, type=filter_type, state=filter_state, status=filter_status) }}"
-                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9">{{ page_num }}</a>
+                                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9">{{ page_num }}</a>
                                 {% endif %}
                             {% else %}
                             <span class="inline-flex items-center justify-center h-9 w-9">...</span>
@@ -385,7 +385,7 @@
 
                         {% if pagination.has_next %}
                         <a href="{{ url_for('admin.feature_flags', page=pagination.next_num, search=search, type=filter_type, state=filter_state, status=filter_status) }}"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                             Next
                             <i data-lucide="chevron-right" class="w-4 h-4 ml-1" aria-hidden="true"></i>
                         </a>

@@ -24,7 +24,7 @@
 {% set home_url = url_for('dashboard.overview') if 'dashboard.overview' in flask.current_app.view_functions else none %}
 {% macro _ps_actions() %}
 <a href="{{ url_for('intelligence_ui.ask') }}"
-   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
     <i data-lucide="search" class="mr-2 h-4 w-4" aria-hidden="true"></i>Ask
 </a>
 {% endmacro %}
@@ -70,7 +70,7 @@
                 <button type="button" id="twin-rail-toggle"
                         aria-expanded="true" :aria-expanded="railOpen ? 'true' : 'false'"
                         aria-controls="twin-rail" @click="toggleRail()"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="panel-right" class="h-4 w-4" aria-hidden="true"></i>Selected element
                 </button>
             </div>

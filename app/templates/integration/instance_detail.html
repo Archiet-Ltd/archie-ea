@@ -33,7 +33,7 @@
             {% if instance.status == 'running' or instance.status == 'waiting_approval' %}
                 <form action="{{ url_for('integration.cancel_workflow', instance_id=instance.id) }}" method="post" @submit.prevent="Platform.modal.confirmSubmit($event, 'Are you sure you want to cancel this workflow?')">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Submit">
+                    <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Submit">
                         Cancel Workflow
                     </button>
                 </form>
@@ -53,7 +53,7 @@
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <textarea name="comments" class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mb-4" placeholder="Approval comments..." aria-label="Approval comments..."></textarea>
                             <div class="flex justify-end gap-2">
-                                <button type="button" data-modal-close="approval-modal" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Action">Cancel</button>
+                                <button type="button" data-modal-close="approval-modal" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Action">Cancel</button>
                                 <button type="submit" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2" aria-label="Submit">Approve & Resume</button>
                             </div>
                         </form>

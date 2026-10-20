@@ -28,7 +28,7 @@
                 Resume Analysis
             </button>
             <button type="button" @click="exportSession"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Export">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Export">
                 <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>
                 Export
             </button>
@@ -476,7 +476,7 @@
                            x-text="analysisResults.length + ' options analyzed and ranked by score'"></p>
                     </div>
                     <button type="button" @click="runOptionsAnalysis()"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Re-run options analysis">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Re-run options analysis">
                         <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i>
                         Re-run Analysis
                     </button>
@@ -845,7 +845,7 @@
                     <button type="button" @click="applyElements()"
                             :disabled="applyingElements || !APP_CONFIG.solutionId"
                             x-cloak
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                             aria-label="Apply elements to solution">
                         <span x-show="applyingElements" x-cloak>Applying...</span>
                         <span x-show="!applyingElements" x-cloak>Apply to Solution</span>
@@ -1027,7 +1027,7 @@
                     <button type="button" @click="applyRequirements()"
                             :disabled="applyingRequirements"
                             x-cloak
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                             aria-label="Apply requirements to problem definition">
                         <span x-show="applyingRequirements" x-cloak>Applying...</span>
                         <span x-show="!applyingRequirements" x-cloak>Apply to Problem Definition</span>
@@ -1135,7 +1135,7 @@
                     <button type="button" @click="applyRoadmap()"
                             :disabled="applyingRoadmap || !APP_CONFIG.solutionId"
                             x-cloak
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                             aria-label="Apply roadmap to solution">
                         <span x-show="applyingRoadmap" x-cloak>Applying...</span>
                         <span x-show="!applyingRoadmap" x-cloak>Apply to Solution</span>

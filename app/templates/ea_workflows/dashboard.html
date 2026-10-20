@@ -9,11 +9,11 @@
 
 {% macro _ea_workflows_actions() %}
 <div class="flex flex-wrap items-center gap-2" data-testid="page-actions">
-    <button type="button" @click="seedWorkflows()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Seed default workflows">
+    <button type="button" @click="seedWorkflows()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Seed default workflows">
         <i data-lucide="database" class="h-4 w-4" aria-hidden="true"></i>
         <span class="hidden sm:inline">Seed Defaults</span>
     </button>
-    <a href="{{ url_for('main.ea_workflows_approvals') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+    <a href="{{ url_for('main.ea_workflows_approvals') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
         <i data-lucide="check-square" class="h-4 w-4" aria-hidden="true"></i>
         <span class="hidden sm:inline">Pending Approvals</span>
         {% if status_counts.waiting_approval %}

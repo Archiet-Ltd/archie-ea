@@ -470,7 +470,7 @@
                     {# Download + Regenerate row #}
                     <div class="flex items-center gap-2 pt-1">
                         <button type="button" @click="downloadCode()"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 flex-1 items-center justify-center">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 flex-1 items-center justify-center">
                             <i data-lucide="download" class="w-4 h-4" aria-hidden="true"></i>
                             Download ZIP
                         </button>
@@ -545,7 +545,7 @@
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <a :href="deployUrl" target="_blank" rel="noopener"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                             <i data-lucide="globe" class="w-4 h-4 text-primary" aria-hidden="true"></i>
                             <div>
                                 <p class="text-xs font-medium text-foreground">Your App</p>
@@ -553,7 +553,7 @@
                             </div>
                         </a>
                         <a :href="deployUrl + '/docs'" target="_blank" rel="noopener"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                             <i data-lucide="book-open" class="w-4 h-4 text-primary" aria-hidden="true"></i>
                             <div>
                                 <p class="text-xs font-medium text-foreground">API Docs</p>
@@ -561,7 +561,7 @@
                             </div>
                         </a>
                         <a :href="deployUrl ? deployUrl + '/admin' : '#'" target="_blank" rel="noopener"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                             <i data-lucide="settings" class="w-4 h-4 text-primary" aria-hidden="true"></i>
                             <div>
                                 <p class="text-xs font-medium text-foreground">Admin Panel</p>

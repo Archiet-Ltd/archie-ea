@@ -1,8 +1,8 @@
 {# Quiet inline alert (design/patterns.json: quiet-alert).
    One line, tinted hairline box, 12px text, optional link on the right.
    Call shapes:
-     {% call alert('warning', title='Data quality') %}20 of 20 have an owner{% endcall %}
-     {{ alert('success', text='Saved.') }}
+     {% call alert('warning', title='Data quality') %}20 of 20 have an owner{% endcall %}  (ui-contract-ok: documentation example, the macro, not a native dialog)
+     {{ alert('success', text='Saved.') }}  (ui-contract-ok: documentation example, the macro, not a native dialog)
    kind: info | success | warning | danger | neutral
    link_href / link_text: an action on the right edge.
    Never a full-width block: it sits in the header area of the thing it is about. #}

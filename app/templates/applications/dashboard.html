@@ -72,7 +72,7 @@
 {% macro _app_detail_actions() %}
   {% if edit_mode %}
   <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}?tab={{ resolved_tab }}"
-     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
+     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
     Cancel
   </a>
   <button type="submit" form="overview-edit-form"
@@ -81,7 +81,7 @@
   </button>
   {% else %}
   <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}?edit=1&tab={{ resolved_tab }}"
-     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
+     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
     <i data-lucide="pencil" class="w-4 h-4 mr-2" aria-hidden="true"></i>Edit
   </a>
   {% if can_retire_applications(current_user) %}
@@ -562,7 +562,7 @@
         </form>
         {# A95-005: deep link to AI chat with generate-archimate context #}
         <a href="{{ url_for('unified_ai_chat.index') }}?action=generate_archimate&element_id={{ app.id }}&context_type=application&domain=architecture"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
            aria-label="Generate ArchiMate elements with AI for {{ app.name }}">
           <i data-lucide="bot" class="w-4 h-4 text-primary" aria-hidden="true"></i>Generate ArchiMate with AI
         </a>
@@ -703,7 +703,7 @@
           <p class="text-sm text-muted-foreground">Explicit relationships managed for this component</p>
         </div>
         <a href="{{ url_for('unified_ai_chat.index') }}?action=generate_archimate&element_id={{ app.id }}&context_type=application&domain=architecture"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
            aria-label="Generate ArchiMate elements with AI for {{ app.name }}">
           <i data-lucide="bot" class="h-4 w-4 text-primary" aria-hidden="true"></i>Generate ArchiMate with AI
         </a>
@@ -902,7 +902,7 @@
                             <i data-lucide="check" class="h-3 w-3" aria-hidden="true"></i> Accept
                         </button>
                         <button aria-label="Dismiss suggestion" type="button" @click="suggestions.splice(idx, 1)"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center shrink-0">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center shrink-0">
                             <i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>
                         </button>
                     </div>
@@ -1091,7 +1091,7 @@
         <form method="POST" action="{{ url_for('unified_applications.generate_application_archimate', id=app.id) }}" class="inline">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit"
-                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                   title="Generate an ArchiMate element to enable vendor mapping">
             <i data-lucide="cpu" class="h-4 w-4" aria-hidden="true"></i> Generate ArchiMate Element
           </button>
@@ -1177,7 +1177,7 @@
   <div class="space-y-6">
     <div class="flex justify-end">
       <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
-         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Technology Details
       </a>
     </div>
@@ -1282,7 +1282,7 @@
   <div class="space-y-6">
     <div class="flex justify-end">
       <a href="{{ url_for('main.application_roadmap', id=app.id) }}"
-         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="calendar-check" class="h-4 w-4" aria-hidden="true"></i> Manage in Roadmap Workspace
       </a>
     </div>
@@ -1464,7 +1464,7 @@
       <p class="text-sm text-muted-foreground">Motivation elements are populated from linked ArchiMate architecture models.</p>
       {% if app.archimate_element_id %}
       <!-- inline-event-ok --><button type="button" @click="openUnifiedMappingModalDiscovery({context:'archimate', ids:[{{ app.id }}]})"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="link" class="h-4 w-4" aria-hidden="true"></i> Link ArchiMate Elements
       </button>
       {% endif %}
@@ -1549,7 +1549,7 @@
   <div class="space-y-6">
     <div class="flex justify-end">
       <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
-         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Compliance Settings
       </a>
     </div>
@@ -1698,7 +1698,7 @@
   <div class="space-y-6">
     <div class="flex justify-end">
       <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
-         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Health & Quality Metrics
       </a>
     </div>
@@ -1842,7 +1842,7 @@
   <div class="space-y-6">
     <div class="flex justify-end">
       <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
-         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Cost Details
       </a>
     </div>
@@ -1886,7 +1886,7 @@
       <p class="text-sm text-muted-foreground">Dependencies are derived from ArchiMate relationships and integration mappings.</p>
       {% if app.archimate_element_id %}
       <!-- inline-event-ok --><button type="button" @click="openUnifiedMappingModalDiscovery({context:'archimate', ids:[{{ app.id }}]})"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="link" class="h-4 w-4" aria-hidden="true"></i> Link Dependencies
       </button>
       {% endif %}

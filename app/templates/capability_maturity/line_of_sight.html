@@ -141,7 +141,7 @@
             No assessment date is recorded, so no maturity level is shown — not even a provisional one.
             An unassessed capability is not a Level 1 capability, and this page will not imply that it is.
           </p>
-          <a class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+          <a class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
              href="{{ url_for('maturity_management.edit_capability_maturity', capability_id=capability.id) }}">
             Record an assessment
           </a>

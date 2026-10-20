@@ -418,7 +418,7 @@
                 {% endfor %}
                   {% if pagination.has_next %}
                   <a href="?page={{ pagination.next_num }}&per_page={{ per_page|default(20) }}&search={{ search|default('') }}&status={{ selected_status|default('') }}&domain={{ selected_domain|default('') }}&type={{ selected_type|default('') }}&created_after={{ created_after|default('') }}&created_before={{ created_before|default('') }}"
-                     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Next<i data-lucide="chevron-right" class="h-4 w-4 ml-1"></i>
                   </a>
                   {% endif %}
@@ -824,7 +824,7 @@
   <p id="sol-bulk-delete-msg" class="text-sm text-muted-foreground">You are about to permanently delete the selected solutions. This action cannot be undone.</p>
   <div class="flex justify-end gap-2">
     <button type="button" data-modal-close="sol-bulk-delete-confirm"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Cancel">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Cancel">
       Cancel
     </button>
     <button type="button" data-action="execute-bulk-delete" id="sol-bulk-delete-btn"

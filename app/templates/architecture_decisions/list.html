@@ -28,7 +28,7 @@
         <span class="text-foreground">That element is not recorded in your organisation.</span>
         {% endif %}
         <a href="{{ url_for('arch_decisions.list_decisions') }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
             <i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>Show all decisions
         </a>
     </div>
@@ -103,7 +103,7 @@
                     <td class="px-4 py-3">
                         {% if d.adm_phase %}
                         <a href="{{ url_for('arch_decisions.list_decisions', status=status_filter, phase=d.adm_phase) }}"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             Phase {{ d.adm_phase }}
                         </a>
                         {% else %}

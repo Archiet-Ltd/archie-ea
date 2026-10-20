@@ -25,34 +25,34 @@
             </button>
             <div class="hidden h-6 border-l border-input sm:block" aria-hidden="true"></div>
             <a href="{{ url_for('architect_ui.import_oef') }}" data-testid="btn-import-oef"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                aria-label="Import model file">
                 <i data-lucide="upload" class="h-4 w-4" aria-hidden="true"></i>Import model file
             </a>
             <a href="{{ url_for('architect_ui.export_oef') }}" data-testid="btn-export-oef"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                aria-label="Export architecture as Open Exchange Format">
                 <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export
             </a>
             <div class="hidden h-6 border-l border-input sm:block" aria-hidden="true"></div>
             <button type="button" data-testid="btn-run-validation" @click="runValidation()" :disabled="validating"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                     aria-label="Validate ArchiMate repository">
                 <i data-lucide="shield-check" class="h-4 w-4" aria-hidden="true"></i>
                 <span x-text="validating ? 'Validating…' : 'Validate'">Validate</span>
             </button>
             <a href="{{ url_for('archimate_crud.repository_health') }}" data-testid="btn-repository-health"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                aria-label="Open repository health">
                 <i data-lucide="activity" class="h-4 w-4" aria-hidden="true"></i>Health
             </a>
             <a href="{{ url_for('architecture.vendor_templates') }}" data-testid="btn-vendor-templates"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                aria-label="Open vendor architecture templates">
                 <i data-lucide="building-2" class="h-4 w-4" aria-hidden="true"></i>Templates
             </a>
             <button type="button" data-testid="btn-ai-generate-element" @click="openAiGenerateModal()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                     aria-label="Generate architecture element with AI">
                 <i data-lucide="sparkles" class="h-4 w-4" aria-hidden="true"></i>Generate with AI
             </button>
@@ -135,7 +135,7 @@
                        that went nowhere (browser-audit "dead-link"). #}
                     <template x-if="detailElement">
                         <a :href="detailUrl(detailElement)"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" aria-label="View full detail">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" aria-label="View full detail">
                             Full Detail &rarr;
                         </a>
                     </template>
@@ -239,7 +239,7 @@
                      class="space-y-2">
                     <template x-for="sol in (detailData && detailData.solutions || [])" :key="sol.solution_id">
                         <a :href="'/solutions/' + sol.solution_id"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                             <i data-lucide="link" class="h-3 w-3 text-muted-foreground" aria-hidden="true"></i>
                             <span x-text="sol.solution_name"></span>
                             <span x-cloak x-show="sol.element_role"
