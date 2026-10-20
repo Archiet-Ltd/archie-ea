@@ -66,6 +66,45 @@
 {% endmacro %}
 
 
+{% macro answer_envelope(source=None, kind='measured', confidence=None, as_of=None, href=None, label=None, class='', x_source=None, x_as_of=None, x_confidence=None, x_kind=None) %}
+{# One line of provenance under a Tier 1 result: badge, source, as-of, confidence.
+
+   Five states:
+     measured   neutral   a count or figure over the named column. `source` is the column.
+     missing    warning   no source recorded at all — badge('missing') + "Source not recorded".
+     ai         primary   generated text. Always advisory, never a fact.
+     unavailable destructive the query failed — no number is shown.
+
+   Field names: source, kind, confidence, as_of, href. The x_* parameters carry
+   Alpine expressions for client-rendered results (the cascade, Ask): when given,
+   bind with x-text / x-show; otherwise render server-side.
+
+   Confidence formatting: a number <= 1 renders as a percentage with no decimals
+   (0.85 -> "85%"), a number > 1 renders as itself, a word renders as itself.
+#}
+{% set _has_source = source is not none and source != '' %}
+{% set _display = label if label is not none else source %}
+<div class="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 {{ class }}">
+    {% if _has_source %}
+        {{ provenance_badge(kind) }}
+        {% if href %}
+        <a href="{{ href }}" class="hover:underline"{% if x_source %} x-text="{{ x_source }}"{% endif %}>{% if not x_source %}{{ _display }}{% endif %}</a>
+        {% else %}
+        <span{% if x_source %} x-text="{{ x_source }}"{% endif %}>{% if not x_source %}{{ _display }}{% endif %}</span>
+        {% endif %}
+        {% if as_of or x_as_of %}
+        <span>as of {% if x_as_of %}<span x-text="{{ x_as_of }}"></span>{% else %}{{ as_of }}{% endif %}</span>
+        {% endif %}
+        {% if confidence is not none or x_confidence is not none %}
+        <span>confidence {% if x_confidence %}<span x-text="{{ x_confidence }}"></span>{% elif confidence is string %}{{ confidence }}{% elif confidence <= 1 %}{{ (confidence * 100)|int }}%{% else %}{{ confidence }}{% endif %}</span>
+        {% endif %}
+    {% else %}
+        {{ provenance_badge('missing') }}Source not recorded
+    {% endif %}
+</div>
+{% endmacro %}
+
+
 {% macro measure_row(entry) %}
 {# One measured or missing fact.
 

@@ -24,6 +24,7 @@
    a vertical hairline for siblings, an SVG elbow from the parent column for
    children. The 6px source pin sits right of the name; its tooltip is an
    Alpine x-show. No shadows anywhere. #}
+{% from 'components/provenance.html' import answer_envelope %}
 {% macro answer_cascade(id, question, rows, ask=None, save=None, row_attrs='', root=None) %}
 <section id="{{ id }}" class="cascade" data-cascade
          x-data="{ tip: null, selected: null, shared: false, saved: false,
@@ -74,9 +75,12 @@
                             aria-label="Source of this connection"></button>
                     <div x-show="tip === node.key" x-cloak role="tooltip"
                          class="absolute left-0 top-full z-20 mt-1 w-72 rounded-md border border-border bg-popover p-2 text-xs leading-5 text-popover-foreground">
-                        <p class="font-medium" x-text="node.source_name || node.sourceName || (node.derived ? (node.kindLabel || 'Worked out from the model') : 'Recorded in the model')"></p>
-                        <p class="text-muted-foreground" x-show="node.source_timestamp || node.sourceTimestamp || node.staleLine" x-text="node.source_timestamp || node.sourceTimestamp || node.staleLine"></p>
-                        <p class="text-muted-foreground" x-show="node.source_confidence != null || node.sourceConfidence != null" x-text="'Confidence ' + (node.source_confidence != null ? node.source_confidence : node.sourceConfidence)"></p>
+                        {{ answer_envelope(
+                            x_source="node.source_name || node.sourceName || (node.derived ? (node.kindLabel || 'Worked out from the model') : 'Recorded in the model')",
+                            x_as_of="node.source_timestamp || node.sourceTimestamp || node.staleLine",
+                            x_confidence="'Confidence ' + (node.source_confidence != null ? node.source_confidence : node.sourceConfidence)",
+                            x_kind="node.derived ? 'ai' : 'measured'"
+                        ) }}
                     </div>
                     <span class="ml-auto shrink-0 truncate text-xs text-muted-foreground" x-text="node.owner || node.ownerName || 'No owner recorded'"></span>
                     {% if caller %}{{ caller() }}{% endif %}
