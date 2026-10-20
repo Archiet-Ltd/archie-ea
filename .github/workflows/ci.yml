@@ -1133,11 +1133,11 @@ jobs:
   smoke-main:
     name: Browser journeys — main shard ${{ matrix.shard }}
     needs: [changes, fast_gate]
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","browser"]') || 'ubuntu-latest' }}
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     strategy:
       fail-fast: false
-      max-parallel: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON(vars.CI_SHARD_MAX_PARALLEL || '6') || 3 }}
+      max-parallel: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 4 || 3 }}
       matrix:
         shard: [0, 1, 2]
     services:
@@ -1181,17 +1181,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install playwright pytest-timeout
-      - name: Install Chromium
-        run: |
-          for attempt in $(seq 1 10); do
-            if flock /tmp/archie-ci-browser-install.lock \
-                python -m playwright install --with-deps chromium; then
-              exit 0
-            fi
-            echo "Browser install attempt $attempt failed; retrying in 60 seconds."
-            sleep 60
-          done
-          exit 1
       - name: Create schema
         id: smoke-schema
         run: |
@@ -1231,7 +1220,7 @@ jobs:
   smoke-adversarial:
     name: Browser journeys — adversarial
     needs: [changes, fast_gate]
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","browser"]') || 'ubuntu-latest' }}
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     services:
       postgres:
@@ -1273,17 +1262,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install playwright pytest-timeout
-      - name: Install Chromium
-        run: |
-          for attempt in $(seq 1 10); do
-            if flock /tmp/archie-ci-browser-install.lock \
-                python -m playwright install --with-deps chromium; then
-              exit 0
-            fi
-            echo "Browser install attempt $attempt failed; retrying in 60 seconds."
-            sleep 60
-          done
-          exit 1
       - name: Create schema
         id: smoke-schema
         run: |
@@ -1322,7 +1300,7 @@ jobs:
   smoke-other:
     name: Browser journeys — other
     needs: [changes, fast_gate]
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","browser"]') || 'ubuntu-latest' }}
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     services:
       postgres:
@@ -1364,17 +1342,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install playwright pytest-timeout
-      - name: Install Chromium
-        run: |
-          for attempt in $(seq 1 10); do
-            if flock /tmp/archie-ci-browser-install.lock \
-                python -m playwright install --with-deps chromium; then
-              exit 0
-            fi
-            echo "Browser install attempt $attempt failed; retrying in 60 seconds."
-            sleep 60
-          done
-          exit 1
       - name: Create schema
         id: smoke-schema
         run: |
@@ -1433,7 +1400,7 @@ jobs:
     name: Browser journeys (one per archetype)
     needs: [smoke-main, smoke-adversarial, smoke-other, changes, fast_gate]
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","browser"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -1488,7 +1455,7 @@ jobs:
     name: Browser compatibility (${{ matrix.browser }})
     needs: [changes, fast_gate]
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","browser"]') || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -1533,17 +1500,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install playwright pytest-timeout
-      - name: Install ${{ matrix.browser }}
-        run: |
-          for attempt in $(seq 1 10); do
-            if flock /tmp/archie-ci-browser-install.lock \
-                python -m playwright install --with-deps ${{ matrix.browser }}; then
-              exit 0
-            fi
-            echo "Browser install attempt $attempt failed; retrying in 60 seconds."
-            sleep 60
-          done
-          exit 1
       - name: Create schema
         id: compatibility-schema
         run: |
@@ -1602,7 +1558,7 @@ jobs:
     name: Level 10 archetype walkthrough
     needs: [changes, fast_gate]
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_FAST_RUNNER && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci-fast') && vars.CI_FAST_RUNNER || vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","browser"]') || 'ubuntu-latest' }}
     # docs/TESTING_STANDARD.md level 10: not "does it break?" but "can this
     # archetype do their job, and could they have FOUND the page?". It runs as a
     # non-admin per persona, measures geometry at a fixed viewport rather than
@@ -1648,17 +1604,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install playwright
-      - name: Install Chromium
-        run: |
-          for attempt in $(seq 1 10); do
-            if flock /tmp/archie-ci-browser-install.lock \
-                python -m playwright install --with-deps chromium; then
-              exit 0
-            fi
-            echo "Browser install attempt $attempt failed; retrying in 60 seconds."
-            sleep 60
-          done
-          exit 1
       - name: Create schema and seed the tenant
         run: |
           python -m flask --app manage init-db
@@ -1718,7 +1663,8 @@ jobs:
       - browser-compatibility
       - walkthrough
       - dependency-audit
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","browser"]') || 'ubuntu-latest' }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only != 'true') && needs.fast_gate.result != 'failure' && needs.changes.outputs.lane != 'fast' }}
     permissions:
       contents: read
       packages: write
