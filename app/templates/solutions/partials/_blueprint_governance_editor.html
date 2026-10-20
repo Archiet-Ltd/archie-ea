@@ -9,8 +9,8 @@
    openEntityModal() are NOT handled here — see docs/qa/claude-governance-result.md. #}
 {% from 'components/modal.html' import modal %}
 <p x-show="entityNotice" x-cloak role="status" class="text-sm text-muted-foreground" x-text="entityNotice"></p>
-{% set _gov_input = 'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50' %}
-{% set _gov_textarea = 'flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-y' %}
+{% set _gov_input ='flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50' %}
+{% set _gov_textarea ='flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-y' %}
 {% set _gov_label = 'block text-xs font-medium text-muted-foreground mb-1.5' %}
 
 {% call modal(id='bp-governance-editor', size='lg', labelledby='bp-governance-editor-heading') %}
