@@ -7,6 +7,7 @@
 {% from 'intelligence/_parts.html' import element_name, owner_field, health_field, derived_note, stale_line, why_button with context %}
 {% from 'intelligence/_full_detail.html' import full_detail with context %}
 {% from 'components/answer_cascade.html' import answer_cascade %}
+{% from 'components/provenance.html' import answer_envelope %}
 {% from 'intelligence/_provenance_drawer.html' import provenance_drawer with context %}
 
 {% block title %}Ask{% endblock %}
@@ -448,6 +449,9 @@
                         <td class="px-2">{{ run.explicit_count if run.explicit_count is not none else '—' }}</td>
                         <td class="px-2">{{ run.derived_count if run.derived_count is not none else '—' }}</td>
                         <td class="px-2">{{ (run.duration_ms ~ ' ms') if run.duration_ms is not none else '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="5" class="px-2 pt-1 text-xs">{{ answer_envelope() }}</td>
                     </tr>
                     {% endfor %}
                 {% endcall %}

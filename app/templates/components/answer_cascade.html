@@ -39,6 +39,7 @@
                 <span class="truncate text-sm font-semibold text-foreground" x-text="{{ root }}"></span>
                 <span class="ml-auto shrink-0 text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Asked about</span>
             </div>
+            <div class="mt-1">{{ answer_envelope() }}</div>
         </li>
         {% endif %}
         <template x-for="(node, i) in ({{ rows }})" :key="node.key || i">
