@@ -15,6 +15,7 @@ from sqlalchemy import func, or_, select, text, tuple_
 from sqlalchemy.orm import Session
 
 from app import db
+from app.middleware.tenant_isolation import set_database_tenant_context
 from app.models.business_capabilities import BusinessCapability
 from app.models.transformation_decision import (
     OPTION_EXCEPTION_TYPES,
@@ -374,6 +375,7 @@ class TransformationOptionService:
     @classmethod
     def load_option_for_tenant(cls, actor: ActorContext, option_id: int):
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             option = session.scalar(
                 select(TransformationOption).where(
                     TransformationOption.id == option_id,
@@ -390,6 +392,8 @@ class TransformationOptionService:
         owns_session = session is None
         session = session or Session(db.engine)
         try:
+            if owns_session:
+                set_database_tenant_context(session.connection(), actor.organization_id)
             programme, workstream = _programme_for_workstream(
                 session, actor, option.workstream_id, lock=False
             )
@@ -692,6 +696,7 @@ class TransformationOptionService:
     def load_versions_for_tenant(cls, actor, option_version_ids):
         requested = _id_sequence(option_version_ids, "option_version_ids")
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             rows = session.scalars(
                 select(TransformationOptionVersion).where(
                     TransformationOptionVersion.organization_id == actor.organization_id,
@@ -967,6 +972,7 @@ class DecisionBriefService:
     def load_brief_for_tenant(cls, actor, brief_id):
         brief_id = _positive_id(brief_id, "brief_id")
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             brief = session.scalar(
                 select(DecisionBrief).where(
                     DecisionBrief.id == brief_id,
@@ -996,6 +1002,7 @@ class DecisionBriefService:
         if organization_id is None:
             raise NotFound("decision_brief_not_found")
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), organization_id)
             version = session.scalar(
                 select(DecisionBriefVersion)
                 .where(
@@ -1018,6 +1025,7 @@ class DecisionBriefService:
         """Load one immutable brief version without disclosing foreign IDs."""
         version_id = _positive_id(version_id, "version_id")
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             version = session.scalar(
                 select(DecisionBriefVersion).where(
                     DecisionBriefVersion.id == version_id,
@@ -1032,6 +1040,7 @@ class DecisionBriefService:
     @classmethod
     def current_option_version_ids(cls, brief, *, actor):
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             candidate_scope = (
                 TransformationOptionVersion.candidate_id.is_(None)
                 if brief.candidate_id is None
@@ -1063,6 +1072,7 @@ class DecisionBriefService:
     @classmethod
     def current_evidence_ids(cls, brief, *, actor):
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             candidates = session.scalars(
                 select(TransformationCandidate).where(
                     TransformationCandidate.organization_id == actor.organization_id,

@@ -16,6 +16,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app import db
+from app.middleware.tenant_isolation import set_database_tenant_context
 from app.models.strategic import StrategicInitiative
 from app.models.transformation_decision import (
     DecisionBrief,
@@ -206,6 +207,7 @@ class TransformationRoomReadModel:
         except KeyError as exc:
             raise NotFound("stage_not_found") from exc
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             workstream = session.scalar(
                 select(ProgrammeWorkstream).where(
                     ProgrammeWorkstream.id == workstream_id,
@@ -584,6 +586,7 @@ class TransformationRoomReadModel:
             actor=actor, programme_id=programme_id
         )
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             programme = session.scalar(
                 select(StrategicInitiative).where(
                     StrategicInitiative.id == programme_id,
@@ -796,6 +799,7 @@ class ChiefArchitectTransformationReadModel:
     @staticmethod
     def load_programmes(actor):
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             ids = session.scalars(
                 select(StrategicInitiative.id)
                 .where(
@@ -822,6 +826,7 @@ class ChiefArchitectTransformationReadModel:
         if not workstream_ids:
             return {"value": None, "reason": "No programme workstreams are in scope."}
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), actor.organization_id)
             requests = session.scalars(
                 select(EvidenceRequest).where(
                     EvidenceRequest.organization_id == actor.organization_id,
