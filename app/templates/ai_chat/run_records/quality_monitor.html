@@ -9,8 +9,36 @@
 {{ page_shell(
     title='Answer Quality',
     breadcrumb=[('Home', '/'), ('Agent Run Records', url_for('unified_ai_chat.run_record_list')), ('Answer Quality', none)],
-    subtitle='Citation rate and citation-gate refusals for ' ~ start_time.strftime('%Y-%m-%d') ~ ' to ' ~ end_time.strftime('%Y-%m-%d') ~ ', against the prior period of the same length (' ~ prior_start.strftime('%Y-%m-%d') ~ ' to ' ~ prior_end.strftime('%Y-%m-%d') ~ ').'
+    subtitle='Citation rate and citation-gate decisions from ' ~ start_time.strftime('%Y-%m-%d') ~ ' up to ' ~ end_time.strftime('%Y-%m-%d') ~ ', against the prior period of the same length (' ~ prior_start.strftime('%Y-%m-%d') ~ ' up to ' ~ prior_end.strftime('%Y-%m-%d') ~ ').'
 ) }}
+
+{% macro decision_rows(label, key, rate, prior_rate, run_ids, persona_rates, prior_persona_rates, persona_run_ids) %}
+<tr>
+    <td class="px-4 py-3">
+        {{ label }} (per thousand run records)
+        <p class="text-xs text-muted-foreground">Counted per thousand run records, not per reply. Each is linked to the nearest run record for the same user within five minutes. Counted by the user's current organisation.</p>
+    </td>
+    <td class="px-4 py-3" data-figure="{{ key }}-rate">{{ fig(rate, '{:.1f}') }}</td>
+    <td class="px-4 py-3">{{ fig(prior_rate, '{:.1f}') }}</td>
+    <td class="px-4 py-3">
+        {% if run_ids %}
+        <a class="text-primary hover:underline" href="{{ url_for('unified_ai_chat.run_record_list', ids=run_ids|join(',')) }}">{{ run_ids|length }} runs</a>
+        {% else %}—{% endif %}
+    </td>
+</tr>
+{% for persona, prate in persona_rates.items()|sort %}
+<tr>
+    <td class="px-4 py-3 pl-8">{{ label }}, {{ persona }} (per thousand run records)</td>
+    <td class="px-4 py-3" data-figure="{{ key }}-persona-{{ persona }}">{{ fig(prate, '{:.1f}') }}</td>
+    <td class="px-4 py-3">{{ fig(prior_persona_rates.get(persona), '{:.1f}') }}</td>
+    <td class="px-4 py-3">
+        {% if persona_run_ids.get(persona) %}
+        <a class="text-primary hover:underline" href="{{ url_for('unified_ai_chat.run_record_list', ids=persona_run_ids[persona]|join(',')) }}">{{ persona_run_ids[persona]|length }} runs</a>
+        {% else %}—{% endif %}
+    </td>
+</tr>
+{% endfor %}
+{% endmacro %}
 
 <div class="overflow-x-auto rounded-md border">
     <table class="w-full text-sm">
@@ -35,28 +63,8 @@
                     {% else %}—{% endif %}
                 </td>
             </tr>
-            <tr>
-                <td class="px-4 py-3">Replies refused by the citation gate (per thousand runs)</td>
-                <td class="px-4 py-3" data-figure="refusal-rate">{{ fig(refusal_rate, '{:.1f}') }}</td>
-                <td class="px-4 py-3">{{ fig(prior_refusal_rate, '{:.1f}') }}</td>
-                <td class="px-4 py-3">
-                    {% if refusal_ids %}
-                    <a class="text-primary hover:underline" href="{{ url_for('unified_ai_chat.run_record_list', ids=refusal_ids|join(',')) }}">{{ refusal_ids|length }} runs</a>
-                    {% else %}—{% endif %}
-                </td>
-            </tr>
-            {% for persona, rate in persona_rates.items()|sort %}
-            <tr>
-                <td class="px-4 py-3 pl-8">Refusals, {{ persona }} (per thousand runs)</td>
-                <td class="px-4 py-3" data-figure="persona-{{ persona }}">{{ fig(rate, '{:.1f}') }}</td>
-                <td class="px-4 py-3">{{ fig(prior_persona_rates.get(persona), '{:.1f}') }}</td>
-                <td class="px-4 py-3">
-                    {% if persona_run_ids.get(persona) %}
-                    <a class="text-primary hover:underline" href="{{ url_for('unified_ai_chat.run_record_list', ids=persona_run_ids[persona]|join(',')) }}">{{ persona_run_ids[persona]|length }} runs</a>
-                    {% else %}—{% endif %}
-                </td>
-            </tr>
-            {% endfor %}
+            {{ decision_rows('Refused', 'refused', refused.rate, refused.prior_rate, refused.run_ids, refused.persona_rates, refused.prior_persona_rates, refused.persona_run_ids) }}
+            {{ decision_rows('Would have refused', 'would-refuse', would.rate, would.prior_rate, would.run_ids, would.persona_rates, would.prior_persona_rates, would.persona_run_ids) }}
         </tbody>
     </table>
 </div>

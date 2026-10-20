@@ -5,6 +5,7 @@ Every organisation administrator can view and replay the agent run records for
 their organisation. Records from other organisations are never returned.
 """
 import logging
+import re
 from datetime import datetime, timedelta
 
 from flask import abort, jsonify, render_template, request
@@ -17,6 +18,8 @@ from app.modules.ai_chat.services.agent_quality_monitor import (
     get_citation_rate,
     get_refusal_rate,
     get_refusal_rate_per_persona,
+    REFUSED,
+    WOULD_REFUSE,
     get_refusal_run_ids_by_persona,
 )
 
@@ -55,9 +58,13 @@ def register_run_record_routes(bp):
             AgentRunRecord.created_at.desc()
         )
         # Drill-through from the quality monitor: only the listed run records.
-        ids_param = request.args.get("ids", "")
-        id_list = [int(i) for i in ids_param.split(",") if i.strip().isdigit()]
-        if id_list:
+        # A supplied filter with no valid id matches nothing.
+        ids_param = request.args.get("ids")
+        if ids_param is not None:
+            id_list = [
+                int(tok) for tok in ids_param.split(",")
+                if re.fullmatch(r"[0-9]{1,18}", tok.strip())
+            ]
             query = query.filter(AgentRunRecord.id.in_(id_list))
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         records = pagination.items
@@ -166,11 +173,24 @@ def register_run_record_routes(bp):
 
         citation_rate, uncited_ids = get_citation_rate(org_id, start_time, end_time)
         prior_citation_rate, _ = get_citation_rate(org_id, prior_start, prior_end)
-        refusal_rate, refusal_ids = get_refusal_rate(org_id, start_time, end_time)
-        prior_refusal_rate, _ = get_refusal_rate(org_id, prior_start, prior_end)
-        persona_rates, _ = get_refusal_rate_per_persona(org_id, start_time, end_time)
-        prior_persona_rates, _ = get_refusal_rate_per_persona(org_id, prior_start, prior_end)
-        persona_run_ids = get_refusal_run_ids_by_persona(org_id, start_time, end_time)
+
+        def decisions(status):
+            rate, run_ids = get_refusal_rate(org_id, start_time, end_time, status)
+            prior_rate, _ = get_refusal_rate(org_id, prior_start, prior_end, status)
+            persona_rates, _ = get_refusal_rate_per_persona(org_id, start_time, end_time, status)
+            prior_persona_rates, _ = get_refusal_rate_per_persona(
+                org_id, prior_start, prior_end, status
+            )
+            return {
+                "rate": rate,
+                "prior_rate": prior_rate,
+                "run_ids": run_ids,
+                "persona_rates": persona_rates,
+                "prior_persona_rates": prior_persona_rates,
+                "persona_run_ids": get_refusal_run_ids_by_persona(
+                    org_id, start_time, end_time, status
+                ),
+            }
 
         uncited_addresses = []
         if uncited_ids:
@@ -191,10 +211,6 @@ def register_run_record_routes(bp):
             citation_rate=citation_rate,
             prior_citation_rate=prior_citation_rate,
             uncited_addresses=uncited_addresses,
-            refusal_rate=refusal_rate,
-            prior_refusal_rate=prior_refusal_rate,
-            refusal_ids=refusal_ids,
-            persona_rates=persona_rates,
-            prior_persona_rates=prior_persona_rates,
-            persona_run_ids=persona_run_ids,
+            refused=decisions(REFUSED),
+            would=decisions(WOULD_REFUSE),
         )

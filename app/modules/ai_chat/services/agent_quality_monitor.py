@@ -8,6 +8,12 @@ Every figure is scoped to the caller's organisation. A period with nothing
 to measure returns None -- never a literal, never a "total or 1"
 denominator. The prior period is the same length of time immediately
 before the chosen one and is computed by the caller with a second call.
+
+A period includes its start and excludes its end, so a row exactly on the
+boundary between a period and the prior one is counted once.
+
+Refusals that happened ("refused") and replies the gate would have refused
+("would have refused") are separate figures and are never added together.
 """
 from __future__ import annotations
 
@@ -21,9 +27,11 @@ from app.models.ai_chat_audit_log import AIChatAuditLog
 from app.models.user import User
 from sqlalchemy import func
 
-REFUSAL_STATUSES = ("would_refuse_uncited", "refused_uncited")
-# How far an answer record or audit row may be from a run record to be
-# treated as that run's drill-through target.
+REFUSED = "refused_uncited"
+WOULD_REFUSE = "would_refuse_uncited"
+REFUSAL_STATUSES = (WOULD_REFUSE, REFUSED)
+# How far an audit row may be from a run record to be treated as that run's
+# drill-through target.
 MATCH_WINDOW = timedelta(minutes=5)
 
 
@@ -38,19 +46,32 @@ def _unique(ids: List[int]) -> List[int]:
     return unique
 
 
-def _closest_run_record(user_id: int, timestamp: datetime) -> Optional[int]:
-    """Id of the run record closest to *timestamp* for *user_id*, or None.
+def _check_status(status: str) -> None:
+    if status not in REFUSAL_STATUSES:
+        raise ValueError(f"unknown refusal status: {status!r}")
 
-    A user belongs to one organisation, so matching by user id is already
-    organisation-scoped.
-    """
-    start = timestamp - MATCH_WINDOW
-    end = timestamp + MATCH_WINDOW
+
+def _runs(org_id: int, start_time: datetime, end_time: datetime) -> List[AgentRunRecord]:
+    return (
+        AgentRunRecord.query.filter(
+            AgentRunRecord.organization_id == org_id,
+            AgentRunRecord.created_at >= start_time,
+            AgentRunRecord.created_at < end_time,
+        )
+        .all()
+    )
+
+
+def _closest_run_record(org_id: int, user_id: int, timestamp: datetime) -> Optional[int]:
+    """Id of the run record of *org_id* closest to *timestamp* for *user_id*,
+    within the match window, or None. The organisation is part of the match so
+    a user who moved organisation cannot pull a run from the old one."""
     run = (
         AgentRunRecord.query.filter(
+            AgentRunRecord.organization_id == org_id,
             AgentRunRecord.user_id == user_id,
-            AgentRunRecord.created_at >= start,
-            AgentRunRecord.created_at <= end,
+            AgentRunRecord.created_at >= timestamp - MATCH_WINDOW,
+            AgentRunRecord.created_at <= timestamp + MATCH_WINDOW,
         )
         .order_by(
             func.abs(
@@ -64,11 +85,13 @@ def _closest_run_record(user_id: int, timestamp: datetime) -> Optional[int]:
     return run.id if run else None
 
 
-def _refusal_logs(org_id: int, start_time: datetime, end_time: datetime) -> List[AIChatAuditLog]:
-    """Refusal audit rows for the organisation in the period.
+def _refusal_logs(
+    org_id: int, start_time: datetime, end_time: datetime, status: str
+) -> List[AIChatAuditLog]:
+    """Audit rows of one refusal status for the organisation in the period.
 
     The audit log has no organisation column of its own, so the fence goes
-    through the writing user's organisation.
+    through the writing user's current organisation.
     """
     return (
         db.session.query(AIChatAuditLog)
@@ -76,11 +99,20 @@ def _refusal_logs(org_id: int, start_time: datetime, end_time: datetime) -> List
         .filter(
             User.organization_id == org_id,
             AIChatAuditLog.created_at >= start_time,
-            AIChatAuditLog.created_at <= end_time,
-            AIChatAuditLog.validation_status.in_(REFUSAL_STATUSES),
+            AIChatAuditLog.created_at < end_time,
+            AIChatAuditLog.validation_status == status,
         )
         .all()
     )
+
+
+def _run_ids(org_id: int, logs: List[AIChatAuditLog]) -> List[int]:
+    ids: List[int] = []
+    for log in logs:
+        run_id = _closest_run_record(org_id, log.user_id, log.created_at)
+        if run_id is not None:
+            ids.append(run_id)
+    return _unique(ids)
 
 
 def get_citation_rate(
@@ -96,7 +128,7 @@ def get_citation_rate(
         AnswerRecord.query.filter(
             AnswerRecord.organization_id == org_id,
             AnswerRecord.computed_at >= start_time,
-            AnswerRecord.computed_at <= end_time,
+            AnswerRecord.computed_at < end_time,
         )
         .order_by(AnswerRecord.computed_at.asc())
         .all()
@@ -112,92 +144,62 @@ def get_citation_rate(
 
 
 def get_refusal_rate(
-    org_id: int, start_time: datetime, end_time: datetime
+    org_id: int, start_time: datetime, end_time: datetime, status: str
 ) -> Tuple[Optional[float], List[int]]:
-    """Refusals per thousand run records for the period.
+    """Gate decisions of one status ("refused_uncited" or
+    "would_refuse_uncited") per thousand run records for the period.
 
     Returns (rate, run_ids). rate is None when the period holds no run
     records for the organisation. run_ids are the run records behind the
-    refusals, for drill-through to the run-record list.
+    decisions, for drill-through to the run-record list.
     """
-    runs = (
-        AgentRunRecord.query.filter(
-            AgentRunRecord.organization_id == org_id,
-            AgentRunRecord.created_at >= start_time,
-            AgentRunRecord.created_at <= end_time,
-        )
-        .all()
-    )
+    _check_status(status)
+    runs = _runs(org_id, start_time, end_time)
     if not runs:
         return None, []
-
-    total_runs = len(runs)
-    logs = _refusal_logs(org_id, start_time, end_time)
-    rate = (len(logs) / total_runs) * 1000.0
-
-    run_ids: List[int] = []
-    for log in logs:
-        run_id = _closest_run_record(log.user_id, log.created_at)
-        if run_id is not None:
-            run_ids.append(run_id)
-
-    return rate, _unique(run_ids)
+    logs = _refusal_logs(org_id, start_time, end_time, status)
+    return (len(logs) / len(runs)) * 1000.0, _run_ids(org_id, logs)
 
 
 def get_refusal_rate_per_persona(
-    org_id: int, start_time: datetime, end_time: datetime
+    org_id: int, start_time: datetime, end_time: datetime, status: str
 ) -> Tuple[Dict[str, Optional[float]], List[int]]:
-    """Refusal rate per persona for the period.
+    """Gate decisions of one status per thousand run records, per persona.
 
     Returns (rates, run_ids). rates maps every persona with a run in the
-    period to refusals per thousand, or None when the persona has no runs.
-    Personas with refusals but no runs also appear as None. run_ids are the
-    run records behind the refusals, for drill-through.
+    period to its rate, or None when a persona has decisions but no runs.
     """
-    runs = (
-        AgentRunRecord.query.filter(
-            AgentRunRecord.organization_id == org_id,
-            AgentRunRecord.created_at >= start_time,
-            AgentRunRecord.created_at <= end_time,
-        )
-        .all()
-    )
-
+    _check_status(status)
     run_counts: Dict[str, int] = {}
-    for record in runs:
+    for record in _runs(org_id, start_time, end_time):
         persona = record.persona or "unknown"
         run_counts[persona] = run_counts.get(persona, 0) + 1
 
-    logs = _refusal_logs(org_id, start_time, end_time)
-    refusal_counts: Dict[str, int] = {}
+    logs = _refusal_logs(org_id, start_time, end_time, status)
+    decision_counts: Dict[str, int] = {}
     for log in logs:
         persona = log.persona or "unknown"
-        refusal_counts[persona] = refusal_counts.get(persona, 0) + 1
+        decision_counts[persona] = decision_counts.get(persona, 0) + 1
 
     rates: Dict[str, Optional[float]] = {}
-    for persona in set(run_counts) | set(refusal_counts):
+    for persona in set(run_counts) | set(decision_counts):
         run_count = run_counts.get(persona, 0)
         if run_count == 0:
             rates[persona] = None
         else:
-            rates[persona] = (refusal_counts.get(persona, 0) / run_count) * 1000.0
+            rates[persona] = (decision_counts.get(persona, 0) / run_count) * 1000.0
 
-    run_ids: List[int] = []
-    for log in logs:
-        run_id = _closest_run_record(log.user_id, log.created_at)
-        if run_id is not None:
-            run_ids.append(run_id)
-
-    return rates, _unique(run_ids)
+    return rates, _run_ids(org_id, logs)
 
 
 def get_refusal_run_ids_by_persona(
-    org_id: int, start_time: datetime, end_time: datetime
+    org_id: int, start_time: datetime, end_time: datetime, status: str
 ) -> Dict[str, List[int]]:
-    """Run record ids behind each persona's refusals in the period."""
+    """Run record ids behind each persona's decisions of one status."""
+    _check_status(status)
     by_persona: Dict[str, List[int]] = {}
-    for log in _refusal_logs(org_id, start_time, end_time):
-        run_id = _closest_run_record(log.user_id, log.created_at)
+    for log in _refusal_logs(org_id, start_time, end_time, status):
+        run_id = _closest_run_record(org_id, log.user_id, log.created_at)
         if run_id is not None:
             by_persona.setdefault(log.persona or "unknown", []).append(run_id)
     return {persona: _unique(ids) for persona, ids in by_persona.items()}
