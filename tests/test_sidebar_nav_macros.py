@@ -93,7 +93,10 @@ def test_collapsible_toggle_controls_its_sublist(app):
     assert 'aria-expanded="false"' in html
     assert ':aria-expanded="open' in html
     assert 'data-lucide="chevron-right"' in html
-    assert "rotate-90" in html
+    # the rotation binds on the wrapper span, not on the <i> the icon library replaces
+    chevron = re.search(r'<span[^>]*data-slot="sidebar-chevron"[^>]*>', html)
+    assert chevron and ":class=\"open ? 'rotate-90' : ''\"" in chevron.group(0)
+    assert not re.search(r'<i[^>]*data-lucide="chevron-right"[^>]*:class=', html)
     # closed by default: the sub-list is cloaked until Alpine applies x-show
     sub = html[html.index('id="sidebar-sub-catalogues"') :]
     assert "x-cloak" in sub.split(">", 1)[0]
@@ -126,9 +129,12 @@ def test_collapsible_open_or_active_renders_expanded(app):
 def test_subitem_is_indented_and_shorter_than_a_level_one_item(app):
     item = _render(app, "{{ sidebar_item('/a', 'A') }}")
     sub = _render(app, "{{ sidebar_subitem('/a/b', 'B') }}")
-    assert "h-8" in item and "px-2" in item
-    assert "h-7" in sub and "pl-8" in sub
+    assert "min-h-8" in item and "px-2" in item
+    assert "min-h-7" in sub and "pl-8" in sub
     assert "data-lucide" not in sub
+    # long labels wrap to a second line instead of being cut with an ellipsis
+    assert "truncate" not in item and "truncate" not in sub
+    assert "[overflow-wrap:anywhere]" in item and "[overflow-wrap:anywhere]" in sub
 
 
 @pytest.mark.parametrize(
