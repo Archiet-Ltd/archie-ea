@@ -96,3 +96,21 @@ class ArchitectureSearchService:
             "by_layer": by_layer,
             "by_type": by_type,
         }
+
+
+def apply_element_search_filters(query, name="", elem_type="", layer=""):
+    """Apply the shared element search filter chain: name ilike, type exact,
+    layer ilike. Returns the query with filters applied.
+
+    Both the /api/v1/elements/search route and the session-backed
+    /api/elements/search route use this one chain so the two routes can never
+    diverge on what "search" means. The session route's solution_id filter is
+    applied by the caller after this function returns.
+    """
+    if name:
+        query = query.filter(ArchitectureElement.name.ilike(f"%{name}%"))
+    if elem_type:
+        query = query.filter(ArchitectureElement.type == elem_type)
+    if layer:
+        query = query.filter(ArchitectureElement.layer.ilike(layer))
+    return query
