@@ -471,66 +471,67 @@ class CommandService:
         natural_key_resolver: OperationNaturalKeyResolver | None = None,
     ) -> CommandResult:
         command_result = None
-        with _FencedSession(db.engine, expire_on_commit=False) as session, session.begin():
-            session.configure_fence(actor, claim)
-            cls._scope_session(session, actor)
-            if authorizer is not None:
-                authorizer(session, actor, operation, claim.natural_key)
-            # This preflight is intentionally non-locking. A handler may run for
-            # minutes; heartbeat/reclaim must remain able to advance the lease.
-            # The result/outbox/finalisation boundary takes the row lock below.
-            cls.assert_fence(session, actor=actor, claim=claim, lock=False)
-            mutation = cls.resolve_materialisation(
-                session,
-                actor=actor,
-                operation=operation,
-                claim=claim,
-            )
-            recovered_from_materialisation = mutation is not None
-            if mutation is None and natural_key_resolver is not None:
-                mutation = natural_key_resolver(
-                    session, actor, claim.natural_key, claim
+        with bind_tenant(actor.organization_id):
+            with _FencedSession(db.engine, expire_on_commit=False) as session, session.begin():
+                session.configure_fence(actor, claim)
+                cls._scope_session(session, actor)
+                if authorizer is not None:
+                    authorizer(session, actor, operation, claim.natural_key)
+                # This preflight is intentionally non-locking. A handler may run for
+                # minutes; heartbeat/reclaim must remain able to advance the lease.
+                # The result/outbox/finalisation boundary takes the row lock below.
+                cls.assert_fence(session, actor=actor, claim=claim, lock=False)
+                mutation = cls.resolve_materialisation(
+                    session,
+                    actor=actor,
+                    operation=operation,
+                    claim=claim,
                 )
-            reconciled = mutation is not None
-            if mutation is None:
-                mutation = handler(session, claim)
-            if not isinstance(mutation, DomainMutationResult):
-                source = "natural-key resolver" if reconciled else "command handler"
-                raise TypeError(f"{source} must return DomainMutationResult")
-            mutation = cls.canonicalize_outbox_events(
-                actor=actor,
-                operation=operation,
-                claim=claim,
-                mutation=mutation,
-                preserve_event_ids=recovered_from_materialisation,
-            )
-            session._ensure_locked_fence()
-            result_was_present = cls._find_result(
-                session,
-                organization_id=actor.organization_id,
-                actor_id=actor.user_id,
-                operation=operation,
-                natural_key=claim.natural_key,
-            )
-            result = cls.persist_command_envelope(
-                session,
-                actor=actor,
-                operation=operation,
-                claim=claim,
-                mutation=mutation,
-            )
-            created = result_was_present is None
-            cls.finalise_succeeded(
-                session,
-                actor=actor,
-                claim=claim,
-                result_id=result.id,
-            )
-            command_result = cls.to_command_result(
-                result,
-                created=created and not reconciled,
-                idempotent=reconciled,
-            )
+                recovered_from_materialisation = mutation is not None
+                if mutation is None and natural_key_resolver is not None:
+                    mutation = natural_key_resolver(
+                        session, actor, claim.natural_key, claim
+                    )
+                reconciled = mutation is not None
+                if mutation is None:
+                    mutation = handler(session, claim)
+                if not isinstance(mutation, DomainMutationResult):
+                    source = "natural-key resolver" if reconciled else "command handler"
+                    raise TypeError(f"{source} must return DomainMutationResult")
+                mutation = cls.canonicalize_outbox_events(
+                    actor=actor,
+                    operation=operation,
+                    claim=claim,
+                    mutation=mutation,
+                    preserve_event_ids=recovered_from_materialisation,
+                )
+                session._ensure_locked_fence()
+                result_was_present = cls._find_result(
+                    session,
+                    organization_id=actor.organization_id,
+                    actor_id=actor.user_id,
+                    operation=operation,
+                    natural_key=claim.natural_key,
+                )
+                result = cls.persist_command_envelope(
+                    session,
+                    actor=actor,
+                    operation=operation,
+                    claim=claim,
+                    mutation=mutation,
+                )
+                created = result_was_present is None
+                cls.finalise_succeeded(
+                    session,
+                    actor=actor,
+                    claim=claim,
+                    result_id=result.id,
+                )
+                command_result = cls.to_command_result(
+                    result,
+                    created=created and not reconciled,
+                    idempotent=reconciled,
+                )
         return command_result
 
     @classmethod
