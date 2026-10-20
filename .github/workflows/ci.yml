@@ -1184,7 +1184,8 @@ jobs:
       - name: Install Chromium
         run: |
           for attempt in $(seq 1 10); do
-            if flock /tmp/archie-ci-browser-install.lock \n                python -m playwright install --with-deps chromium; then
+            if flock /tmp/archie-ci-browser-install.lock \
+                python -m playwright install --with-deps chromium; then
               exit 0
             fi
             echo "Browser install attempt $attempt failed; retrying in 60 seconds."
@@ -1275,7 +1276,8 @@ jobs:
       - name: Install Chromium
         run: |
           for attempt in $(seq 1 10); do
-            if flock /tmp/archie-ci-browser-install.lock \n                python -m playwright install --with-deps chromium; then
+            if flock /tmp/archie-ci-browser-install.lock \
+                python -m playwright install --with-deps chromium; then
               exit 0
             fi
             echo "Browser install attempt $attempt failed; retrying in 60 seconds."
@@ -1365,7 +1367,8 @@ jobs:
       - name: Install Chromium
         run: |
           for attempt in $(seq 1 10); do
-            if flock /tmp/archie-ci-browser-install.lock \n                python -m playwright install --with-deps chromium; then
+            if flock /tmp/archie-ci-browser-install.lock \
+                python -m playwright install --with-deps chromium; then
               exit 0
             fi
             echo "Browser install attempt $attempt failed; retrying in 60 seconds."
@@ -1533,7 +1536,8 @@ jobs:
       - name: Install ${{ matrix.browser }}
         run: |
           for attempt in $(seq 1 10); do
-            if flock /tmp/archie-ci-browser-install.lock \n                python -m playwright install --with-deps ${{ matrix.browser }}; then
+            if flock /tmp/archie-ci-browser-install.lock \
+                python -m playwright install --with-deps ${{ matrix.browser }}; then
               exit 0
             fi
             echo "Browser install attempt $attempt failed; retrying in 60 seconds."
@@ -1647,7 +1651,8 @@ jobs:
       - name: Install Chromium
         run: |
           for attempt in $(seq 1 10); do
-            if flock /tmp/archie-ci-browser-install.lock \n                python -m playwright install --with-deps chromium; then
+            if flock /tmp/archie-ci-browser-install.lock \
+                python -m playwright install --with-deps chromium; then
               exit 0
             fi
             echo "Browser install attempt $attempt failed; retrying in 60 seconds."
