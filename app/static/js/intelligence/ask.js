@@ -48,6 +48,8 @@ function askSurface() {
         strategyState: 'idle',
         strategyBusy: false,
         initiatives: [],
+        chain: [],
+        strategyReason: null,
         accountabilityState: 'idle',
         accountabilityBusy: false,
         owners: [],
@@ -258,10 +260,15 @@ function askSurface() {
                 var payload = await Intelligence.fetchStrategy(elementId, { maxDepth: 3, includeDerived: true });
                 if (seq !== this._strategyLoadSeq) return;
                 this.initiatives = Intelligence.buildInitiatives(payload);
-                this.strategyState = this.initiatives.length ? 'ready' : 'empty';
+                this.chain = Intelligence.buildChain(payload);
+                this.strategyReason = (payload.reasons || [])[0] || null;
+                // The Why drawer finds a hop among `rows`, as it finds an impact row.
+                this.rows = this.chain;
+                this.strategyState = (this.initiatives.length || this.chain.length) ? 'ready' : 'empty';
             } catch (err) {
                 if (seq !== this._strategyLoadSeq) return;
                 this.initiatives = [];
+                this.chain = [];
                 this.strategyState = 'error';
             }
             this.strategyBusy = false;
