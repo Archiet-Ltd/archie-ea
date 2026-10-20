@@ -245,7 +245,7 @@
               </div>
             </div>
 
-{% call dense_table(columns=[('APP ID', ''), ('Name *', ''), ('Type', ''), ('Status', ''), ('Actions', '')], id='manual-entry-table') %}
+{% call dense_table(columns=[('APP ID', ''), ('Name *', ''), ('Type', ''), ('Status', ''), ('Actions', '')], id='manual-entry-table', tbody_id='manual-entry-tbody') %}
                   <!-- Rows will be added dynamically -->
                 {% endcall %}
 
@@ -264,7 +264,7 @@
         <div id="tab-content-history" class="tab-content hidden">
           <div class="space-y-4">
             <h3 class="text-lg font-medium">Import History</h3>
-{% call dense_table(columns=[('Date', ''), ('Imported By', ''), ('Source', ''), ('File', ''), ('Created', ''), ('Updated', ''), ('Failed', ''), ('Status', '')]) %}
+{% call dense_table(columns=[('Date', ''), ('Imported By', ''), ('Source', ''), ('File', ''), ('Created', ''), ('Updated', ''), ('Failed', ''), ('Status', '')], tbody_id='import-history-tbody') %}
                   <!-- Will be populated by JavaScript -->
                 {% endcall %}
         </div>

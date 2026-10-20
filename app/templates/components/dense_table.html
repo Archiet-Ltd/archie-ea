@@ -30,11 +30,13 @@
    flush       true when the table sits inside a card that already draws the
                border: the wrapper then has no border or radius of its own.
    attrs       extra attributes for the <table> element (data hooks).
+   tbody_id    id for the <tbody> when a page script fills the rows
+               (document.getElementById(...) hooks); tbody_attrs for data-*.
 
    Spec: wrapper 8px radius + hairline border, header row 40px / 11px / 500 /
    uppercase / muted on the card surface, sticky inside the scroll container,
    cells 8px padding, rows 48px, tabular figures everywhere, no shadows. #}
-{% macro dense_table(columns=[], header=None, rows=None, empty_text='Nothing recorded yet.', empty_caller=None, caption=None, testid=None, max_height=None, flush=false, class='', table_class='', id=None, attrs='') %}
+{% macro dense_table(columns=[], header=None, rows=None, empty_text='Nothing recorded yet.', empty_caller=None, caption=None, testid=None, max_height=None, flush=false, class='', table_class='', id=None, attrs='', tbody_id=None, tbody_attrs='') %}
 <div class="{% if flush %}bg-card{% else %}rounded-lg border border-border bg-card{% endif %} {{ class }}" role="region"{% if caption %} aria-label="{{ caption }}"{% endif %}{% if id %} id="{{ id }}"{% endif %}>
     <div class="overflow-x-auto overflow-y-auto"{% if max_height %} style="max-height: {{ max_height }}"{% endif %}>
         <table class="dense-table w-full border-collapse text-sm {{ table_class }}"{% if testid %} data-testid="{{ testid }}"{% endif %}{% if attrs %} {{ attrs|safe }}{% endif %}>
@@ -59,7 +61,7 @@
                 </tr>
             </tbody>
             {% else %}
-            <tbody class="divide-y divide-border">
+            <tbody class="divide-y divide-border"{% if tbody_id %} id="{{ tbody_id }}"{% endif %}{% if tbody_attrs %} {{ tbody_attrs|safe }}{% endif %}>
                 {{ caller() }}
             </tbody>
             {% endif %}

@@ -282,7 +282,7 @@
                                     </th>
                                 
 {% endset %}
-{% call dense_table(header=_dt_header_17648) %}
+{% call dense_table(header=_dt_header_17648, tbody_id='unified-table-body') %}
                                 <tr>
                                     <td colspan="11" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
@@ -569,7 +569,7 @@
                                     </th>
                                 
 {% endset %}
-{% call dense_table(header=_dt_header_39335) %}
+{% call dense_table(header=_dt_header_39335, tbody_id='manufacturing-table-body') %}
                                 <tr>
                                     <td colspan="11" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
@@ -717,7 +717,7 @@
                                     </th>
                                 
 {% endset %}
-{% call dense_table(header=_dt_header_50200) %}
+{% call dense_table(header=_dt_header_50200, tbody_id='application-table-body') %}
                                 <tr>
                                     <td colspan="11" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
@@ -864,7 +864,7 @@
                                     </th>
                                 
 {% endset %}
-{% call dense_table(header=_dt_header_60937) %}
+{% call dense_table(header=_dt_header_60937, tbody_id='gap-table-body') %}
                                 <tr>
                                     <td colspan="11" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
@@ -1018,7 +1018,7 @@
                                 <span id="acm-gap-showing">0</span> capabilities
                             </div>
                         </div>
-{% call dense_table(columns=[('Capability', ''), ('Domain', ''), ('Level', ''), ('Applications', ''), ('Vendors', ''), ('Status', '')]) %}
+{% call dense_table(columns=[('Capability', ''), ('Domain', ''), ('Level', ''), ('Applications', ''), ('Vendors', ''), ('Status', '')], tbody_id='acm-gap-table-body') %}
                                     <tr>
                                         <td colspan="6" class="px-2 dense-empty text-center text-muted-foreground">
                                             <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-info mx-auto mb-4" aria-hidden="true"></i>
@@ -1335,7 +1335,7 @@
                                     </th>
                                 
 {% endset %}
-{% call dense_table(header=_dt_header_97593) %}
+{% call dense_table(header=_dt_header_97593, tbody_id='process-gap-table-body') %}
                                 <tr>
                                     <td colspan="10" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
@@ -1621,7 +1621,7 @@
                             </select>
                         </div>
                     </div>
-{% call dense_table(columns=[('Code', ''), ('Name', ''), ('Domain', ''), ('Level', ''), ('Apps', ''), ('Status', ''), ('Actions', '')]) %}
+{% call dense_table(columns=[('Code', ''), ('Name', ''), ('Domain', ''), ('Level', ''), ('Apps', ''), ('Status', ''), ('Actions', '')], tbody_id='acm-capabilities-table') %}
                                 <tr>
                                     <td colspan="7" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2" aria-hidden="true"></i>
