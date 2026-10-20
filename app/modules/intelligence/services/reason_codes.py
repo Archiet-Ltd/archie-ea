@@ -33,6 +33,7 @@ REASON_CODES = frozenset(
         "no_risk_recorded",
         "no_realising_element",
         "no_initiative_linked",
+        "no_value_linked",
         "initiative_not_linked_to_model",
         "review_item_not_visible",
         "insufficient_samples_for_p95",
