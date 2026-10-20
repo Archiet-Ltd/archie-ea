@@ -14,6 +14,9 @@ from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
+from flask import has_request_context
+
+from app.utils.tenant import current_organization_id
 from app.modules.import_batch.v2.services.unified_import.cost_estimator_v2 import CostEstimate, CostEstimator
 from app.modules.import_batch.v2.services.unified_import.duplicate_detector_v2 import (
     DuplicateAnalysisResult,
@@ -517,23 +520,35 @@ class ImportOrchestrator:
 
             seen_names = set()
 
-            # Batch-load all existing application names to avoid N+1 queries in the loop
             # Scoped to the importing organisation, so a same-named application
-            # in another organisation is never matched or modified.
-            from app.models.user import User
-
-            importer = db.session.get(User, user_id)
-            import_org_id = getattr(importer, "organization_id", None)
-            if import_org_id is None:
-                from app.utils.tenant import current_organization_id
-
+            # in another organisation is never matched or modified. The request's
+            # organisation decides; the importing user's organisation is used only
+            # when there is no request. With neither, nothing is matched.
+            import_org_id = None
+            if has_request_context():
                 import_org_id = current_organization_id()
-            all_apps_query = ApplicationComponent.query
-            if import_org_id is not None:
-                all_apps_query = all_apps_query.filter(
-                    ApplicationComponent.organization_id == import_org_id
+            if import_org_id is None:
+                from app.models.user import User
+
+                importer = db.session.get(User, user_id)
+                import_org_id = getattr(importer, "organization_id", None)
+            if import_org_id is None:
+                db.session.rollback()
+                return QuickImportResult(
+                    success=False,
+                    applications_created=0,
+                    applications_updated=0,
+                    applications_skipped=file_stats.total_rows,
+                    elements_generated=0,
+                    total_cost_usd=Decimal("0"),
+                    processing_time_seconds=time.time() - start_time,
+                    errors=["Import failed: the importing organisation could not be determined"],
+                    conflict_resolution=conflict_resolution,
                 )
-            all_apps = all_apps_query.all()
+            all_apps = ApplicationComponent.query.filter(
+                ApplicationComponent.organization_id == import_org_id
+            ).all()
+            # Batch-load all existing application names to avoid N+1 queries in the loop
             app_name_lookup = {a.name.lower(): a for a in all_apps if a.name}
 
             for row in rows:

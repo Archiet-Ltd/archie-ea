@@ -15,8 +15,8 @@ Endpoints:
 
 import logging
 
-from flask import Blueprint, current_app, jsonify, request
-from flask_login import login_required
+from flask import Blueprint, jsonify, request
+from flask_login import current_user, login_required
 
 from app.services.unified_import import ImportOrchestrator
 
@@ -91,7 +91,7 @@ def analyze_import():
 
         result = orchestrator.analyze_import(
             file_storage=file,
-            user_id=current_app.config.get("CURRENT_USER_ID", 1),  # From auth context
+            user_id=current_user.id,
             archimate_mode=archimate_mode,
             enable_ai=enable_ai,
             budget_limit_usd=budget_limit,
@@ -164,7 +164,7 @@ def quick_import():
 
         result = orchestrator.start_quick_import(
             file_storage=file,
-            user_id=current_app.config.get("CURRENT_USER_ID", 1),
+            user_id=current_user.id,
             archimate_mode=archimate_mode,
             enable_ai=enable_ai,
             update_existing=update_existing,
@@ -243,7 +243,7 @@ def governed_import():
 
         job = orchestrator.start_governed_import(
             file_storage=file,
-            user_id=current_app.config.get("CURRENT_USER_ID", 1),
+            user_id=current_user.id,
             job_name=job_name,
             archimate_mode=archimate_mode,
             enable_ai=enable_ai,

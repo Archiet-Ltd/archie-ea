@@ -205,3 +205,62 @@ def test_same_name_in_another_org_is_not_matched_or_touched(
         row = ApplicationComponent.query.filter_by(id=other_id).one()
         assert row.organization_id == org_b.id
         assert row.description == "org b original"
+
+
+def test_route_scopes_the_import_to_the_signed_in_user_not_a_configured_user(
+    app, db_session, make_org, tenant_ctx, login_as, caplog
+):
+    import logging
+
+    from app.models.application_portfolio import ApplicationComponent
+
+    org_x, org_y = make_org("qiscopex"), make_org("qiscopey")
+    user_x = _user(db_session, org_x)
+    user_y = _user(db_session, org_y)
+    db_session.commit()
+    suffix = uuid.uuid4().hex[:6]
+    x_name, y_name = f"X-app {suffix}", f"Y-app {suffix}"
+    with tenant_ctx(org_x.id):
+        db_session.add(ApplicationComponent(name=x_name, description="x original"))
+        db_session.commit()
+    with tenant_ctx(org_y.id):
+        db_session.add(ApplicationComponent(name=y_name, description="y original"))
+        db_session.commit()
+
+    # A configured user from another organisation must not decide the scope.
+    previous = app.config.get("CURRENT_USER_ID")
+    app.config["CURRENT_USER_ID"] = user_x.id
+    try:
+        client = app.test_client()
+        login_as(client, user_y)
+        body = HEADER + f"{y_name},y new,Web,V,active,high\n"
+        with caplog.at_level(logging.INFO):
+            resp = client.post(
+                "/api/import/quick",
+                data={
+                    "file": (io.BytesIO(body.encode()), "apps.csv"),
+                    "enable_ai": "false",
+                    "conflict_resolution": "overwrite",
+                },
+                content_type="multipart/form-data",
+            )
+    finally:
+        if previous is None:
+            app.config.pop("CURRENT_USER_ID", None)
+        else:
+            app.config["CURRENT_USER_ID"] = previous
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    data = resp.get_json()
+    assert data["applications_created"] == 0
+    assert data["applications_updated"] == 1
+    assert f"user={user_y.id} " in caplog.text
+    with tenant_ctx(org_y.id):
+        assert (
+            ApplicationComponent.query.filter_by(name=y_name).one().description
+            == "y new"
+        )
+    with tenant_ctx(org_x.id):
+        assert (
+            ApplicationComponent.query.filter_by(name=x_name).one().description
+            == "x original"
+        )
