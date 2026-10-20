@@ -1039,7 +1039,7 @@ def test_comment_table_delete_is_fenced(rls, world):
     a, b = world.org("a"), world.org("b")
     user_a = _make_user(world, a, "cmt-a", role="Architect")
 
-    el_a_id = el_b_id = comment_b_id = None
+    el_a_id = el_b_id = comment_a_id = comment_b_id = None
     with rls.owner.begin() as connection:
         el_a_id = connection.execute(
             text(
@@ -1055,6 +1055,14 @@ def test_comment_table_delete_is_fenced(rls, world):
             ),
             {"o": b},
         ).scalar_one()
+        comment_a_id = connection.execute(
+            text(
+                "INSERT INTO archimate_element_comments "
+                "(element_id, user_id, comment_text, organization_id, created_at) "
+                "VALUES (:e, :u, :t, :o, now()) RETURNING id"
+            ),
+            {"e": el_a_id, "u": user_a, "t": "A's comment", "o": a},
+        ).scalar_one()
         comment_b_id = connection.execute(
             text(
                 "INSERT INTO archimate_element_comments "
@@ -1063,18 +1071,23 @@ def test_comment_table_delete_is_fenced(rls, world):
             ),
             {"e": el_b_id, "u": user_a, "t": "B's comment", "o": b},
         ).scalar_one()
-    world.extra_deletes.append(("archimate_element_comments", "id", [comment_b_id]))
+    world.extra_deletes.append(("archimate_element_comments", "id", [comment_a_id, comment_b_id]))
     world.extra_deletes.append(("archimate_elements", "id", [el_a_id, el_b_id]))
 
-    # Organisation A's runtime session tries to delete organisation B's comment row.
+    # Organisation A's runtime session can delete its own comment ...
     with rls.runtime_tx(a, commit=True) as connection:
         result = connection.execute(
-            text("DELETE FROM archimate_element_comments WHERE id = :c"),
-            {"c": comment_b_id},
+            text("DELETE FROM archimate_element_comments WHERE id = :c"), {"c": comment_a_id}
+        )
+    assert result.rowcount == 1
+
+    # ... but deleting organisation B's comment row affects zero rows and B's row remains.
+    with rls.runtime_tx(a, commit=True) as connection:
+        result = connection.execute(
+            text("DELETE FROM archimate_element_comments WHERE id = :c"), {"c": comment_b_id}
         )
     assert result.rowcount == 0
 
-    # Organisation B's comment row remains.
     with rls.owner.begin() as connection:
         remaining = connection.execute(
             text("SELECT count(*) FROM archimate_element_comments WHERE id = :c"),
