@@ -61,9 +61,9 @@
 <a href="{{ href }}"
    title="{{ title or label }}"
    data-slot="sidebar-item"
-   class="flex h-8 items-center gap-2 rounded-md px-2 text-13 transition-colors hover:bg-accent hover:text-foreground {% if active %}bg-muted text-info font-medium dark:bg-card{% else %}text-muted-foreground{% endif %} {{ class }}"{% if active %} aria-current="page"{% endif %}>
+   class="flex min-h-8 items-center gap-2 rounded-md px-2 py-1 text-13 leading-tight transition-colors hover:bg-accent hover:text-foreground {% if active %}bg-muted text-info font-medium dark:bg-card{% else %}text-muted-foreground{% endif %} {{ class }}"{% if active %} aria-current="page"{% endif %}>
     {% if icon %}<i data-lucide="{{ icon }}" class="h-4 w-4 flex-shrink-0" aria-hidden="true"></i>{% endif %}
-    <span class="flex-1 truncate">{{ label }}</span>
+    <span class="min-w-0 flex-1 [overflow-wrap:anywhere]">{{ label }}</span>
     {{ _trailing(count, pending) }}
 </a>
 {%- endmacro %}
@@ -79,11 +79,13 @@
             aria-expanded="{{ 'true' if (open or active) else 'false' }}"
             aria-controls="sidebar-sub-{{ id }}"
             title="{{ label }}"
-            class="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-13 transition-colors hover:bg-accent hover:text-foreground {% if active %}text-foreground font-medium{% else %}text-muted-foreground{% endif %}">
+            class="flex min-h-8 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-13 leading-tight transition-colors hover:bg-accent hover:text-foreground {% if active %}text-foreground font-medium{% else %}text-muted-foreground{% endif %}">
         {% if icon %}<i data-lucide="{{ icon }}" class="h-4 w-4 flex-shrink-0" aria-hidden="true"></i>{% endif %}
-        <span class="flex-1 truncate">{{ label }}</span>
+        <span class="min-w-0 flex-1 [overflow-wrap:anywhere]">{{ label }}</span>
         {{ _trailing(count, pending) }}
-        <i data-lucide="chevron-right" class="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground transition-transform duration-150" :class="open ? 'rotate-90' : ''" aria-hidden="true"></i>
+        {# The rotation binds on a wrapper span: the icon library replaces the
+           <i> element with an <svg>, which would drop a binding placed on it. #}
+        <span class="inline-flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center text-muted-foreground transition-transform duration-150" :class="open ? 'rotate-90' : ''" data-slot="sidebar-chevron" aria-hidden="true"><i data-lucide="chevron-right" class="h-3.5 w-3.5"></i></span>
     </button>
     <div id="sidebar-sub-{{ id }}"
          x-show="open"
@@ -99,8 +101,8 @@
 <a href="{{ href }}"
    title="{{ title or label }}"
    data-slot="sidebar-subitem"
-   class="flex h-7 items-center gap-2 rounded-md py-0 pl-8 pr-2 text-13 transition-colors hover:bg-accent hover:text-foreground {% if active %}bg-muted text-info font-medium dark:bg-card{% else %}text-muted-foreground{% endif %} {{ class }}"{% if active %} aria-current="page"{% endif %}>
-    <span class="flex-1 truncate">{{ label }}</span>
+   class="flex min-h-7 items-center gap-2 rounded-md py-0.5 pl-8 pr-2 text-13 leading-tight transition-colors hover:bg-accent hover:text-foreground {% if active %}bg-muted text-info font-medium dark:bg-card{% else %}text-muted-foreground{% endif %} {{ class }}"{% if active %} aria-current="page"{% endif %}>
+    <span class="min-w-0 flex-1 [overflow-wrap:anywhere]">{{ label }}</span>
     {{ _trailing(count, pending) }}
 </a>
 {%- endmacro %}
