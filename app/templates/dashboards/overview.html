@@ -121,7 +121,7 @@
     <section aria-labelledby="architecture-health-heading" class="rounded-lg border border-border bg-card" data-testid="architecture-health">
         <div class="flex items-center justify-between border-b border-border px-4 py-2">
             <h2 id="architecture-health-heading" class="text-base font-semibold text-foreground">Architecture health</h2>
-            <span class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">What the score is weighted from</span>
+            <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">What the score is weighted from</span>
         </div>
         <div class="grid grid-cols-2 gap-px bg-border md:grid-cols-4">
             {% for key, label in [
@@ -199,7 +199,7 @@
                 <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ gap_count }} gap{{ 's' if gap_count != 1 else '' }} of {{ ch|length }}</span>
             </div>
 {% call dense_table(columns=[('Capability', ''), ('Applications', 'text-right'), ('Coverage', ''), ('', 'text-right')], rows=(ch)|length, empty_text='No capabilities recorded yet.', max_height='480px', flush=true) %}{% for cap in ch %}
-                        <tr class="group transition-colors hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <tr class="group transition-colors hover:bg-muted/50">
                             <td class="px-2 align-middle font-medium text-foreground">{{ cap.name }}</td>
                             <td class="px-2 text-right align-middle tabular-nums text-muted-foreground">{{ cap.app_count }}</td>
                             <td class="px-2 align-middle">
@@ -208,7 +208,7 @@
                                 {% else %}<span class="text-destructive-emphasis">Gap</span>{% endif %}
                             </td>
                             <td class="px-2 text-right align-middle">
-                                <a href="{{ url_for('capability_map.index') }}?cap={{ cap.id }}" class="inline-flex h-8 items-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground opacity-0 transition-opacity hover:bg-slate-100 hover:text-info group-hover:opacity-100 focus-visible:opacity-100 dark:hover:bg-slate-700">View</a>
+                                <a href="{{ url_for('capability_map.index') }}?cap={{ cap.id }}" class="inline-flex h-8 items-center rounded-md px-2.5 text-13 font-medium text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-info group-hover:opacity-100 focus-visible:opacity-100">View</a>
                             </td>
                         </tr>
                         {% endfor %}{% endcall %}

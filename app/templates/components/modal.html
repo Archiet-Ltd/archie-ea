@@ -71,7 +71,7 @@
     <!-- Backdrop -->
     <div
         data-modal-backdrop="{{ id }}" aria-hidden="true"
-        class="modal-backdrop absolute inset-0 bg-slate-900/50
+        class="modal-backdrop absolute inset-0 bg-overlay/50
                transition-opacity duration-200"
     ></div>
 
@@ -92,8 +92,8 @@
             data-modal-close="{{ id }}"
             aria-label="Close"
             class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-md
-                   text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground
-                   dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                   text-muted-foreground transition-colors hover:bg-accent hover:text-foreground
+                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
             <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
         </button>

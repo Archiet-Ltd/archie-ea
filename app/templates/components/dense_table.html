@@ -11,7 +11,7 @@
                          empty_text='No applications yet.', caption='Applications', testid='applications-table',
                          rows=applications|length, max_height='calc(100vh - 280px)') %}
        {% for app in applications %}
-       <tr class="group h-12 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800">
+       <tr class="group h-12 transition-colors hover:bg-muted/50">
          <td class="px-2 align-middle font-medium text-foreground">{{ app.name }}</td>
          ...
        </tr>

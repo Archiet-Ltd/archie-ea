@@ -38,10 +38,10 @@
  {% if selected_phase == phase_code %}ring-2 ring-primary bg-primary text-primary-foreground{% else %}bg-muted hover:bg-muted/80 text-foreground{% endif %}"
                aria-current="{% if selected_phase == phase_code %}page{% endif %}"
                title="{{ phase_name }}">
-                <span class="flex h-6 w-6 items-center justify-center rounded-full {% if selected_phase == phase_code %}bg-primary-foreground/20{% else %}bg-background/80{% endif %} text-xs font-bold">{{ phase_code }}</span>
+                <span class="flex h-6 w-6 items-center justify-center rounded-full {% if selected_phase == phase_code %}bg-primary-foreground/20{% else %}bg-overlay/50{% endif %} text-xs font-bold">{{ phase_code }}</span>
                 <span class="hidden sm:inline">{{ phase_name }}</span>
                 {% if count > 0 %}
-                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-xs {% if selected_phase == phase_code %}bg-primary-foreground/20{% else %}bg-background/80{% endif %}">({{ count }})</span>
+                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-xs {% if selected_phase == phase_code %}bg-primary-foreground/20{% else %}bg-overlay/50{% endif %}">({{ count }})</span>
                 {% endif %}
             </a>
             {% endfor %}
