@@ -148,7 +148,7 @@
     height: 3rem;
     padding: 0 0.5rem;
   }
-  /* Empty, loading and error rows keep room to breathe. */
+  /* reuse-ok: the dense table is the authenticated app's canonical table (design/patterns.json: dense-table), not a copy of the public-site table; this is its empty-row spacing */
   #main-content .dense-table td.dense-empty {
     height: auto;
     padding: 2rem 0.5rem;
