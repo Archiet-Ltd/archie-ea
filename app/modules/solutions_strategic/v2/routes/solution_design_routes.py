@@ -5020,7 +5020,7 @@ def _engine_archimate_cleanup(solution_ids):
         set_database_tenant_context(conn, organization_id)
 
         def _sp_exe(sql):
-            keys = [k for k in ("sids", "mids", "eids") if ":{k}" in sql]
+            keys = [k for k in ("sids", "mids", "eids") if f":{k}" in sql]
             stmt = text(sql).bindparams(*[bindparam(k, expanding=True) for k in keys])
             sp = conn.begin_nested()
             try:
