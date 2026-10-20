@@ -464,7 +464,7 @@ class Config:
     # Pages not ready for the soft launch are left out of the sidebar, the
     # All-modules directory and search while this is on (the pages stay
     # reachable by address). Turn it off to list them again.
-    HIDE_NOT_READY_MODULES = _env_bool("HIDE_NOT_READY_MODULES", True)
+    HIDE_NOT_READY_MODULES = _env_bool("HIDE_NOT_READY_MODULES", False)
 
     # North Star Navigation Phase 2 (NORTH-STAR-002)
     # Complete ArchiMate 3.2 layer-based navigation with all 55 element types.

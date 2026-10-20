@@ -64,7 +64,10 @@
                     <a href="{{ link.href }}"
                        class="flex items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors">
                         <i data-lucide="{{ link.icon }}" class="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true"></i>
-                        <span class="flex-1 truncate">{{ link.label }}</span>
+                        <span class="flex min-w-0 flex-1 flex-col">
+                            <span class="flex-1 truncate">{{ link.label }}</span>
+                            {% if link.limit %}<span class="text-xs text-muted-foreground" data-testid="module-limit">{{ link.limit }}</span>{% endif %}
+                        </span>
                         <span class="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-10 font-medium text-muted-foreground" data-testid="not-in-launch-cut-badge">Not in the launch cut</span>
                     </a>
                 </li>
@@ -89,7 +92,10 @@
                     <a href="{{ link.href }}"
                        class="flex items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors">
                         <i data-lucide="{{ link.icon }}" class="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true"></i>
-                        <span class="flex-1 truncate">{{ link.label }}</span>
+                        <span class="flex min-w-0 flex-1 flex-col">
+                            <span class="flex-1 truncate">{{ link.label }}</span>
+                            {% if link.limit %}<span class="text-xs text-muted-foreground" data-testid="module-limit">{{ link.limit }}</span>{% endif %}
+                        </span>
                         <span class="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-10 font-medium text-muted-foreground" data-testid="not-in-launch-cut-badge">Not in the launch cut</span>
                     </a>
                 </li>
