@@ -89,7 +89,7 @@
       <button @click="generateProblemStatement()" type="button"
         :disabled="!llmAvailable || problemLoading"
         :title="llmAvailable ? 'Generate with AI' : 'Requires LLM configuration'"
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 absolute top-2 right-2 items-center">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 absolute top-2 right-2 items-center">
         <i data-lucide="sparkles" class="h-3 w-3" x-show="!problemLoading" x-cloak></i>
         <i data-lucide="loader-2" class="h-3 w-3 animate-spin" x-show="problemLoading" x-cloak></i>
         <span x-text="problemLoading ? 'Generating...' : 'AI Generate'"></span>

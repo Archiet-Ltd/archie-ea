@@ -27,7 +27,7 @@
 
 {% macro _journey_actions() %}
   <a href="{{ url_for('architecture_journey.index') }}"
-     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
     All journeys
   </a>
 {% endmacro %}
@@ -299,7 +299,7 @@
                     {% if link.note %}<p class="mt-1 text-xs text-muted-foreground">{{ link.note }}</p>{% endif %}
                   </div>
                   <button type="button" @click="unlinkLink({{ link.id }})" :disabled="unlinkingLinkId === {{ link.id }}"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center justify-center"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center justify-center"
                     aria-label="Unlink {{ target_label or (entity_type|replace('_', ' ')) }}">
                     <i data-lucide="unlink" class="h-4 w-4" aria-hidden="true"></i>
                     <span x-text="unlinkingLinkId === {{ link.id }} ? 'Unlinking…' : 'Unlink'"></span>
@@ -347,7 +347,7 @@
               </div>
               {% if deliverable_tool_urls.get(value) %}
               <a href="{{ deliverable_tool_urls[value] }}"
-                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center justify-center">Open tool</a>
+                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center justify-center">Open tool</a>
               {% else %}
               {# The tool's blueprint did not register. Say so: silently omitting the
                  link would leave the user believing the deliverable has no tool. #}

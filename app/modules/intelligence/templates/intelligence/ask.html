@@ -49,7 +49,7 @@
 ] %}
 {% macro _ps_actions() %}
 <a href="{{ url_for('intelligence_ui.twin_map') }}"
-   class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+   class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-13 font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
     <i data-lucide="network" class="mr-2 h-4 w-4" aria-hidden="true"></i>Twin map
 </a>
 {% endmacro %}
@@ -82,8 +82,8 @@
             } %}
             {% for question in questions %}
             <button type="button" id="ask-question-{{ question.key }}" data-question="{{ question.key }}"
-                    class="inline-flex h-8 items-center rounded-md border px-3 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    :class="(openKey || 'impact') === '{{ question.key }}' ? 'border-ring bg-slate-100 text-info dark:bg-slate-800' : 'border-input bg-background text-muted-foreground hover:bg-slate-50 hover:text-foreground dark:hover:bg-slate-800'"
+                    class="inline-flex h-8 items-center rounded-md border px-3 text-13 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    :class="(openKey || 'impact') === '{{ question.key }}' ? 'border-ring bg-muted text-info dark:bg-card' : 'border-input bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground'"
                     :aria-pressed="(openKey || 'impact') === '{{ question.key }}' ? 'true' : 'false'"
                     @click="openKey = '{{ question.key }}'; $nextTick(() => $refs.pickerInput && $refs.pickerInput.focus())">
                 {{ chip_labels[question.key] }}
@@ -101,7 +101,7 @@
             {% call answer_cascade('ask-cascade', question="'What breaks if ' + (centreName || '…') + ' fails or is under-resourced?'", rows='rows', ask='load(node.elementId)', save="Platform.fetch('/api/v1/intelligence/answers', { method: 'POST', body: { question: 'impact', element_id: centreId }, silent: true }).catch(function () {})", row_attrs='data-ask-row', root='centreName') %}
                 {{ derived_note('node.derived') }}
                 {{ why_button('node.key') }}
-                <a :href="twinMapHref(node)" class="inline-flex h-8 items-center justify-center rounded-md px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-slate-50 hover:text-info dark:hover:bg-slate-800">Map</a>
+                <a :href="twinMapHref(node)" class="inline-flex h-8 items-center justify-center rounded-md px-2 text-13 font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-info">Map</a>
             {% endcall %}
             <div class="mt-4 space-y-2">
                 <template x-for="row in rows" :key="'detail-' + row.key">

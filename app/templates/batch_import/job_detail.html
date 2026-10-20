@@ -54,7 +54,7 @@
                 <div class="flex items-center gap-2">
                     <button type="button"
                         @click="refreshJob()"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                      aria-label="Refresh">
                         <i data-lucide="refresh-cw" class="mr-2 h-4 w-4" :class="{ 'animate-spin': refreshing }"></i>
                         Refresh
@@ -392,7 +392,7 @@
                                 <td class="p-4 align-middle text-right">
                                     <a
                                         :href="'/batch-import/batches/' + batch.id + '/review'"
-                                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                                         x-show="['ready_for_review', 'approved'].includes(_normStatus(batch.status))"
                                     >
                                         <i data-lucide="eye" class="mr-2 h-4 w-4" aria-hidden="true"></i>
@@ -447,7 +447,7 @@
         class="modal-root fixed inset-0 z-50 flex items-center justify-center"
         x-cloak
      role="dialog">
-        <div class="modal-root fixed inset-0 bg-slate-900/50" @click="showCancelModal = false"></div>
+        <div class="modal-root fixed inset-0 bg-overlay/50" @click="showCancelModal = false"></div>
         <div class="relative z-50 w-full max-w-md rounded-lg border bg-background p-6 border-border" role="alertdialog" aria-modal="true" tabindex="-1">
             <button type="button" @click="showCancelModal = false" class="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100" aria-label="Cancel">
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
@@ -468,7 +468,7 @@
             <div class="flex justify-end gap-2">
                 <button type="button"
                     @click="showCancelModal = false"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                  aria-label="Cancel">
                     Keep Job
                 </button>

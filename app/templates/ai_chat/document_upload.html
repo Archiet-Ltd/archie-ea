@@ -16,7 +16,7 @@
                 </div>
                 <button type="button"
                     @click="document.getElementById('document-upload-panel').classList.add('hidden')"
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                  aria-label="Close document upload panel">
                     <i data-lucide="x" class="h-4 w-4"></i>
                 </button>
@@ -34,7 +34,7 @@
                 </button>
                 <button type="button"
                     @click="showHistory = !showHistory; if(showHistory) loadDocumentHistory()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 flex-1 items-center justify-center"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 flex-1 items-center justify-center"
                  aria-label="Toggle document history">
                     <i data-lucide="history" class="h-3.5 w-3.5"></i>
                     <span>History</span>
@@ -395,7 +395,7 @@
                             <span class="text-xs bg-warning/10 text-warning-emphasis px-2 py-0.5 rounded-full"
                                   x-text="previewElements.length + ' elements found'"></span>
                         </div>
-                        <button type="button" @click="clearPreview()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close preview mode">
+                        <button type="button" @click="clearPreview()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close preview mode">
                             <i data-lucide="x" class="h-4 w-4"></i>
                         </button>
                     </div>
@@ -581,7 +581,7 @@
                         ></span>
                         <button type="button"
                             @click="clearResults()"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                          aria-label="Close analysis results">
                             <i data-lucide="x" class="h-3.5 w-3.5"></i>
                         </button>
@@ -659,7 +659,7 @@
                             </div>
                             <button type="button" @click="creationDetails = null"
                                      x-show="creationDetails" x-cloak
-                                     class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close creation details">
+                                     class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close creation details">
                                 <i data-lucide="x" class="h-3.5 w-3.5"></i>
                             </button>
                         </div>
@@ -929,7 +929,7 @@
                     </button>
                     <button type="button"
                         @click="analyzeWithDifferentProvider()"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                      aria-label="Re-analyze with different provider">
                         <i data-lucide="refresh-cw" class="mr-1.5 h-3.5 w-3.5"></i>
                         Re-analyze

@@ -189,7 +189,7 @@
          class="fixed inset-0 z-50"
          role="dialog" aria-modal="true" :aria-labelledby="editingGate ? 'modal-title-edit' : 'modal-title-create'">
         <!-- Backdrop -->
-        <div class="fixed inset-0 bg-slate-900/50" @click="dismissModal()"></div>
+        <div class="fixed inset-0 bg-overlay/50" @click="dismissModal()"></div>
         <!-- Panel -->
         <div class="fixed inset-0 flex items-center justify-center p-4">
             <div class="bg-card rounded-lg border border-border w-full max-w-lg max-h-[90vh] overflow-y-auto"
@@ -204,7 +204,7 @@
                         </p>
                     </div>
                     <button type="button" @click="dismissModal()"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close dialog">
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close dialog">
                         <i data-lucide="x" class="h-5 w-5"></i>
                     </button>
                 </div>
@@ -324,7 +324,7 @@
                     <!-- Actions -->
                     <div class="flex justify-end gap-3 pt-2 border-t">
                         <button type="button" @click="dismissModal()"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
                             Cancel
                         </button>
                         <button type="submit"

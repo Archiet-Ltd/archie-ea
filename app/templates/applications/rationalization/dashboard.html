@@ -107,7 +107,7 @@
                 <p class="text-sm font-medium text-foreground mb-1">Review Duplicates</p>
                 <p class="text-xs text-muted-foreground mb-3">{{ stats.duplicate_groups|dash }} duplicate groups detected. Review them.</p>
                 <a href="{{ url_for('unified_applications.rationalization_workbench') }}"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Open Workbench
                 </a>
             </div>
@@ -116,7 +116,7 @@
                 <p class="text-sm font-medium text-foreground mb-1">Add Dependencies</p>
                 <p class="text-xs text-muted-foreground mb-3">Import dependency data to plan retirements safely.</p>
                 <a href="{{ url_for('unified_applications.rationalization_tracking') }}#dependencies"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Import Dependencies
                 </a>
             </div>
@@ -125,7 +125,7 @@
                 <p class="text-sm font-medium text-foreground mb-1">Plan Consolidations</p>
                 <p class="text-xs text-muted-foreground mb-3">Create consolidation plans to realize savings.</p>
                 <a href="/consolidation-list"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Consolidation List
                 </a>
             </div>
@@ -250,7 +250,7 @@
                     <i data-lucide="bar-chart" class="h-10 w-10 text-muted-foreground/40 mb-3"></i>
                     <p class="text-sm text-muted-foreground mb-3">No applications scored yet. Score your portfolio to see health distribution.</p>
                     <button type="button" @click="scorePortfolio()" :disabled="isScoring"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         <span x-show="isScoring" x-cloak class="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block mr-2"></span>
                         Score Portfolio
                     </button>
@@ -295,7 +295,7 @@
                     <i data-lucide="pie-chart" class="h-10 w-10 text-muted-foreground/40 mb-3"></i>
                     <p class="text-sm text-muted-foreground mb-3">Score your portfolio to see disposition breakdown.</p>
                     <button type="button" @click="scorePortfolio()" :disabled="isScoring"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Score Portfolio
                     </button>
                 </div>
@@ -330,7 +330,7 @@
                 <i data-lucide="scatter-chart" class="h-12 w-12 text-muted-foreground/40 mb-4"></i>
                 <p class="text-sm text-muted-foreground mb-3">Score your portfolio to see the TIME quadrant visualization.</p>
                 <button type="button" @click="scorePortfolio()" :disabled="isScoring"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Score Portfolio
                 </button>
             </div>
@@ -575,7 +575,7 @@
     <div x-show="showExportModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center"
          @keydown.escape.window="showExportModal = false"
          role="dialog" aria-modal="true" aria-labelledby="export-title">
-        <div class="absolute inset-0 bg-slate-900/50" @click="showExportModal = false"></div>
+        <div class="absolute inset-0 bg-overlay/50" @click="showExportModal = false"></div>
         <div class="relative bg-card rounded-lg border border-border w-full max-w-sm mx-4 p-6">
             <h3 id="export-title" class="text-base font-semibold text-foreground mb-4">Export Business Case</h3>
             <div class="space-y-3">

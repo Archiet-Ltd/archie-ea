@@ -63,7 +63,7 @@
     <!-- TRC-002: Clear selection button -->
     <div x-show="selected.layer" x-cloak class="flex justify-end">
         <button @click="clearSelection()" type="button"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="x" class="h-3.5 w-3.5"></i> Clear selection
         </button>
     </div>
@@ -372,7 +372,7 @@
 
     <!-- GLB-059 / TRC-027: Edit modal. Option B: in-place PATCH only for Technology layer; others show redirect. -->
     <div x-show="editModalOpen" x-cloak class="fixed inset-0 z-50 flex items-start justify-center pt-20" @keydown.escape.window="editModalOpen = false" role="dialog" aria-modal="true" aria-labelledby="edit-element-title"><!-- modal-a11y-ok -->
-        <div class="fixed inset-0 bg-slate-900/50" @click="editModalOpen = false"></div>
+        <div class="fixed inset-0 bg-overlay/50" @click="editModalOpen = false"></div>
         <div class="relative z-10 w-full max-w-md rounded-lg border border-border bg-card p-6">
             <h2 id="edit-element-title" class="text-lg font-semibold mb-4">Edit Element</h2>
             <div class="flex gap-2 mb-4">
@@ -402,7 +402,7 @@
                            class="text-xs text-muted-foreground hover:text-foreground underline">Edit in Composer</a>
                         <div class="flex gap-2">
                             <button type="button" @click="editModalOpen = false"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
                             <button type="button" @click="saveEdit()" :disabled="editSaving"
                                     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                                 <span x-show="!editSaving" x-cloak>Save</span>
@@ -420,7 +420,7 @@
                         <a href="/archimate/composer"
                            class="text-sm font-medium text-primary hover:underline">Edit in Composer</a>
                         <button type="button" @click="editModalOpen = false"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Close</button>
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Close</button>
                     </div>
                 </div>
             </template>
@@ -429,7 +429,7 @@
 
     <!-- TRC-028: Gap link modal (picker for linking orphan to goal/application) -->
     <div x-show="linkModalOpen" x-cloak class="fixed inset-0 z-50 flex items-start justify-center pt-20" @keydown.escape.window="closeLinkModal()" role="dialog" aria-modal="true" aria-labelledby="link-modal-title"><!-- modal-a11y-ok -->
-        <div class="fixed inset-0 bg-slate-900/50" @click="closeLinkModal()"></div>
+        <div class="fixed inset-0 bg-overlay/50" @click="closeLinkModal()"></div>
         <div class="relative z-10 w-full max-w-md rounded-lg border border-border bg-card p-6">
             <h2 id="link-modal-title" class="text-base font-semibold text-foreground text-foreground mb-2" x-text="linkType === 'driver-goal' ? 'Link Driver to Goal' : 'Link Capability to Application'"></h2>
             <p class="text-sm text-muted-foreground mb-3" x-show="linkSource" x-cloak><span x-text="'Linking: ' + (linkSource && linkSource.name)"></span></p>
@@ -444,7 +444,7 @@
             </div>
             <div x-show="linkError" x-cloak class="text-destructive-emphasis text-xs mb-3" x-text="linkError"></div>
             <div class="flex justify-end gap-2">
-                <button type="button" @click="closeLinkModal()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
+                <button type="button" @click="closeLinkModal()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
                 <button type="button" @click="submitLink()" :disabled="!linkTargetId || linkSaving" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <span x-show="!linkSaving" x-cloak>Link</span>
                     <span x-show="linkSaving" x-cloak>Saving...</span>

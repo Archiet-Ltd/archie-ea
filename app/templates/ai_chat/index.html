@@ -184,7 +184,7 @@
              class="flex items-center justify-between gap-3">
             <!-- Left: mobile rail toggle + merged assistant/scope control -->
             <div class="flex items-center gap-2 min-w-0 flex-1">
-                <button type="button" id="sidebar-toggle" @click="toggleSidebar()" aria-label="Toggle context panel" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 lg:hidden shrink-0 w-9 items-center justify-center">
+                <button type="button" id="sidebar-toggle" @click="toggleSidebar()" aria-label="Toggle context panel" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 lg:hidden shrink-0 w-9 items-center justify-center">
                     <i data-lucide="panel-left" class="h-4 w-4" aria-hidden="true"></i>
                 </button>
 
@@ -257,7 +257,7 @@
                 <div class="relative">
                     <button type="button" @click="showAdvanced = !showAdvanced" :aria-expanded="showAdvanced.toString()" aria-haspopup="true"
                         :class="showAdvanced ? 'bg-accent border-primary/40' : ''"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                         title="Role, model settings" aria-label="Toggle advanced settings">
                         <i data-lucide="sliders-horizontal" class="h-4 w-4" aria-hidden="true"></i>
                         <span class="hidden lg:inline">Settings</span>
@@ -295,7 +295,7 @@
                 <!-- Overflow menu: Docs / Match / Export / Approvals -->
                 <div class="relative" data-testid="chat-overflow-menu">
                     <button type="button" @click="menuOpen = !menuOpen" :aria-expanded="menuOpen.toString()" aria-haspopup="true" aria-label="More actions" title="More actions"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 w-9 items-center justify-center">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 w-9 items-center justify-center">
                         <i data-lucide="more-horizontal" class="h-4 w-4" aria-hidden="true"></i>
                     </button>
 
@@ -374,7 +374,7 @@
              :inert="!railOpen"
              class="absolute lg:relative inset-y-0 left-0 z-40 border-r bg-muted/30 flex flex-col transform -translate-x-full lg:translate-x-0 transition-all duration-200 ease-in-out max-h-full overflow-hidden">
             {# Mobile Close Button #}
-            <button type="button" @click="toggleSidebar()" aria-label="Close sidebar" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden absolute top-2 right-2 z-50">
+            <button type="button" @click="toggleSidebar()" aria-label="Close sidebar" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden absolute top-2 right-2 z-50">
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
             </button>
             {# Sidebar Tabs #}
@@ -447,12 +447,12 @@
                     <div class="space-y-2">
                         <p class="text-xs font-medium text-muted-foreground">Quick queries:</p>
                         <div class="flex flex-wrap gap-1">
-                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="Show all applications without an assigned owner" aria-label="Quick query: Apps without owner">Apps without owner</button>
-                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="List capabilities with maturity below 3" aria-label="Quick query: Low maturity caps">Low maturity caps</button>
-                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="Show vendors with contracts expiring in the next 90 days" aria-label="Quick query: Expiring vendors">Expiring vendors</button>
-                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="List applications with risk score above 70" aria-label="Quick query: High-risk apps">High-risk apps</button>
-                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="Create a new business capability" aria-label="Quick query: Create capability">Create capability</button>
-                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="/map-apqc" aria-label="Quick query: Map APQC framework">Map APQC framework</button>
+                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="Show all applications without an assigned owner" aria-label="Quick query: Apps without owner">Apps without owner</button>
+                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="List capabilities with maturity below 3" aria-label="Quick query: Low maturity caps">Low maturity caps</button>
+                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="Show vendors with contracts expiring in the next 90 days" aria-label="Quick query: Expiring vendors">Expiring vendors</button>
+                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="List applications with risk score above 70" aria-label="Quick query: High-risk apps">High-risk apps</button>
+                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="Create a new business capability" aria-label="Quick query: Create capability">Create capability</button>
+                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="/map-apqc" aria-label="Quick query: Map APQC framework">Map APQC framework</button>
                         </div>
                     </div>
                     <div class="mt-3 pt-3 border-t border-border">
@@ -554,7 +554,7 @@
            The bare role="dialog" is also dropped: an element with that role and
            no accessible name is an aria-dialog-name violation once visible, and
            this element is decorative — the sidebar it reveals carries the meaning. #}
-        <div id="sidebar-backdrop" @click="toggleSidebar()" class="hidden modal-root lg:hidden fixed inset-0 overflow-y-auto z-30 bg-slate-900/50"></div>
+        <div id="sidebar-backdrop" @click="toggleSidebar()" class="hidden modal-root lg:hidden fixed inset-0 overflow-y-auto z-30 bg-overlay/50"></div>
 
         <!-- Chat Message Area -->
         <div class="flex-1 flex flex-col min-w-0">
@@ -926,7 +926,7 @@
 </div>
 
 {# Create Solution Modal — MUST be outside overflow-hidden containers (CLAUDE.md rule) #}
-<div id="ai-chat-create-solution-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50" role="dialog" aria-modal="true" aria-labelledby="ai-chat-create-solution-heading">
+<div id="ai-chat-create-solution-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-overlay/50" role="dialog" aria-modal="true" aria-labelledby="ai-chat-create-solution-heading">
     <div class="w-full max-w-lg rounded-lg bg-background p-6 mx-4 border border-border">
         <h2 id="ai-chat-create-solution-heading" class="text-lg font-semibold mb-4">Create solution from brief</h2>
         <form id="ai-chat-create-solution-form">
@@ -937,7 +937,7 @@
                 <textarea id="ai-chat-solution-brief" rows="4" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Describe the problem, current state, budget, and timeline..." required></textarea>
             {% endcall %}
             <div class="flex justify-end gap-2">
-                <button type="button" id="ai-chat-create-solution-cancel" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" aria-label="Cancel">Cancel</button>
+                <button type="button" id="ai-chat-create-solution-cancel" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" aria-label="Cancel">Cancel</button>
                 <button type="submit" id="ai-chat-create-solution-submit" class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90" aria-label="Create solution and generate draft">Create solution</button>
             </div>
         </form>
@@ -958,7 +958,7 @@
          aria-modal="true"
          aria-label="Approvals for review">
         <!-- Backdrop -->
-        <div class="absolute inset-0 bg-slate-900/50" data-modal-close="ai-chat-approvals-modal"></div>
+        <div class="absolute inset-0 bg-overlay/50" data-modal-close="ai-chat-approvals-modal"></div>
         <!-- Panel — no @click.stop: the backdrop is a separate sibling element
              (not an ancestor of the panel), so a click inside the panel would
              never hit the backdrop's own data-modal-close handler regardless.
@@ -974,7 +974,7 @@
             <div class="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
                 <h2 class="text-lg font-semibold text-foreground">Approvals for review</h2>
                 <button type="button" data-modal-close="ai-chat-approvals-modal" aria-label="Close modal"
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
                 </button>
             </div>
@@ -991,7 +991,7 @@
                      class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis flex items-center justify-between gap-3">
                     <span x-text="$store.approvals.error"></span>
                     <button type="button" @click="$store.approvals.fetchPending()" aria-label="Retry approval queue"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Retry
                     </button>
                 </div>
@@ -1066,7 +1066,7 @@
                                         Confirm Reject
                                     </button>
                                     <button type="button" @click="$store.approvals.cancelReject()"
-                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                         Cancel
                                     </button>
                                 </div>
@@ -1096,7 +1096,7 @@
             <!-- Footer -->
             <div class="px-6 py-3 border-t border-border shrink-0 flex justify-end">
                 <button type="button" data-modal-close="ai-chat-approvals-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     Close
                 </button>
             </div>

@@ -18,7 +18,7 @@
         class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="Search business capabilities..." aria-label="Add Capabilities">
       <button @click="openCapabilityModal()" type="button"
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center whitespace-nowrap">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center whitespace-nowrap">
         <i data-lucide="layout-grid" class="h-4 w-4"></i> Browse
       </button>
     </div>
@@ -84,7 +84,7 @@
     <div x-show="capabilities.filter(function(c) { return !capFilter || c.name.toLowerCase().indexOf(capFilter.toLowerCase()) !== -1; }).length > capShowCount" x-cloak
          x-cloak class="mt-4 text-center">
       <button @click="capShowCount += capPageSize" type="button"
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="chevrons-down" class="h-4 w-4"></i>
         Load More
         <span class="text-muted-foreground text-xs"

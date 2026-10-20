@@ -118,7 +118,7 @@
     <div
         x-show="activeRisk !== null" x-cloak
         x-transition
-        class="fixed inset-0 z-40 flex items-center justify-center hidden bg-slate-900/50"
+        class="fixed inset-0 z-40 flex items-center justify-center hidden bg-overlay/50"
         role="dialog"
         aria-modal="true"
         aria-label="Risk detail"
@@ -130,7 +130,7 @@
         >
             <button
                 type="button"
-                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring absolute right-3 top-3"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring absolute right-3 top-3"
                 @click="activeRisk = null"
                 aria-label="Close risk detail"
             >
@@ -203,7 +203,7 @@
     <div
         x-show="showAddForm" x-cloak
         x-transition
-        class="fixed inset-0 z-40 flex items-center justify-center hidden bg-slate-900/50"
+        class="fixed inset-0 z-40 flex items-center justify-center hidden bg-overlay/50"
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-risk-title"
@@ -215,7 +215,7 @@
         >
             <button
                 type="button"
-                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring absolute right-3 top-3"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring absolute right-3 top-3"
                 @click="showAddForm = false"
                 aria-label="Close add risk form"
             >
@@ -298,7 +298,7 @@
                 <div class="flex justify-end gap-2 pt-1">
                     <button
                         type="button"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"
                         @click="showAddForm = false"
                     >Cancel</button>
                     <button

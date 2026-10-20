@@ -290,7 +290,7 @@
                 <p class="text-xs font-medium text-destructive-emphasis">Readiness is unavailable</p>
                 <p class="mt-1 text-xs text-muted-foreground">No submission decision has been made. Try the check again.</p>
                 <button type="button" @click="load()" :disabled="loading"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-2 items-center justify-center">Try readiness check again</button>
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-2 items-center justify-center">Try readiness check again</button>
             </div>
 
             <div x-show="submission.state === 'blocked'" x-cloak data-testid="arb-missing-evidence"
@@ -318,7 +318,7 @@
                 <p class="text-xs font-semibold text-success-emphasis">Submitted to the Architecture Review Board</p>
                 <p class="mt-1 font-mono text-xs text-foreground" x-text="submission.reviewNumber"></p>
                 <a :href="'/arb/reviews/' + submission.reviewItemId"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-2 items-center justify-center">Open canonical review</a>
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-2 items-center justify-center">Open canonical review</a>
             </div>
         </div>
         <script>

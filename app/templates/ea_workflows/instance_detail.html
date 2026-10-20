@@ -75,13 +75,13 @@
         <!-- T3-1: Export and print actions (visible on all instances) -->
         <div class="flex items-center gap-2 shrink-0">
             <a href="/api/ea-workflows/instances/{{ instance.id }}/artifacts/export"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                download>
                 <i data-lucide="download" class="h-3.5 w-3.5" aria-hidden="true"></i>
                 Export JSON
             </a>
             <button type="button" @click="window.print()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="printer" class="h-3.5 w-3.5" aria-hidden="true"></i>
                 Print
             </button>
@@ -716,7 +716,7 @@
                         <i data-lucide="terminal" class="h-5 w-5 text-muted-foreground" aria-hidden="true"></i>
                         <h2 class="text-base font-semibold text-muted-foreground">Execution Log</h2>
                     </div>
-                    <button type="button" @click="showLog = !showLog" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                    <button type="button" @click="showLog = !showLog" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="chevron-down" class="h-3 w-3 transition-transform" :class="showLog ? 'rotate-180' : ''" aria-hidden="true"></i>
                         <span x-text="showLog ? 'Hide' : 'Show Steps'"></span>
                     </button>
@@ -817,21 +817,21 @@
                 <h3 class="text-sm font-semibold mb-3">Quick links</h3>
                 <div class="flex flex-wrap gap-2">
                     {% if _ns.app_id %}
-                    <a href="{{ url_for('unified_applications.application_detail', id=_ns.app_id, edit='1') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                    <a href="{{ url_for('unified_applications.application_detail', id=_ns.app_id, edit='1') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="external-link" class="h-3 w-3" aria-hidden="true"></i> Edit application
                     </a>
                     {% endif %}
                     {% if _ns.app_id and _ns.has_elements %}
-                    <a href="{{ url_for('unified_applications.application_detail', id=_ns.app_id, tab='architecture') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                    <a href="{{ url_for('unified_applications.application_detail', id=_ns.app_id, tab='architecture') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="layout-template" class="h-3 w-3" aria-hidden="true"></i> View ArchiMate model
                     </a>
                     {% elif _ns.has_elements %}
-                    <a href="{{ url_for('archimate_crud.dashboard') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                    <a href="{{ url_for('archimate_crud.dashboard') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="layout-template" class="h-3 w-3" aria-hidden="true"></i> View ArchiMate model
                     </a>
                     {% endif %}
                     {% if instance.workflow_code == 'GAP_REMEDIATION' and _ns.wp_ids %}
-                    <a href="{{ url_for('unified_low_priority.capability_map_dashboard', tab='roadmap') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" title="View {{ _ns.wp_ids|length }} remediation work package(s) in roadmap">
+                    <a href="{{ url_for('unified_low_priority.capability_map_dashboard', tab='roadmap') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" title="View {{ _ns.wp_ids|length }} remediation work package(s) in roadmap">
                         <i data-lucide="map" class="h-3 w-3" aria-hidden="true"></i> View in Roadmap
                     </a>
                     {% endif %}
@@ -843,16 +843,16 @@
             <div class="rounded-xl border-2 border-input bg-background p-5 no-print" x-data="deliverablesPanel()">
                 <h3 class="text-sm font-semibold mb-3">Export & Share</h3>
                 <div class="grid grid-cols-2 gap-1.5 mb-3">
-                    <button type="button" @click="printReport()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" title="Print or save as PDF">
+                    <button type="button" @click="printReport()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" title="Print or save as PDF">
                         <i data-lucide="printer" class="h-3.5 w-3.5" aria-hidden="true"></i> Print / PDF
                     </button>
-                    <button type="button" @click="exportJSON()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" title="Export as JSON">
+                    <button type="button" @click="exportJSON()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" title="Export as JSON">
                         <i data-lucide="braces" class="h-3.5 w-3.5" aria-hidden="true"></i> JSON
                     </button>
-                    <button type="button" @click="exportCSV()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" title="Export as CSV">
+                    <button type="button" @click="exportCSV()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" title="Export as CSV">
                         <i data-lucide="table-2" class="h-3.5 w-3.5" aria-hidden="true"></i> CSV
                     </button>
-                    <button type="button" @click="copyShareLink()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                    <button type="button" @click="copyShareLink()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         <i data-lucide="link" class="h-3.5 w-3.5" aria-hidden="true"></i>
                         <span x-text="copied ? 'Copied!' : 'Share'"></span>
                     </button>
@@ -2219,16 +2219,16 @@
                 <h3 class="text-sm font-semibold mb-3">Quick links</h3>
                 <div class="flex flex-wrap gap-2">
                     {% if app_id %}
-                    <a href="{{ url_for('unified_applications.application_detail', id=app_id, edit='1') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                    <a href="{{ url_for('unified_applications.application_detail', id=app_id, edit='1') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="external-link" class="h-3 w-3" aria-hidden="true"></i> Edit application
                     </a>
                     {% endif %}
                     {% if app_id and has_elements %}
-                    <a href="{{ url_for('unified_applications.application_detail', id=app_id, tab='architecture') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                    <a href="{{ url_for('unified_applications.application_detail', id=app_id, tab='architecture') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="layout-template" class="h-3 w-3" aria-hidden="true"></i> View ArchiMate model
                     </a>
                     {% elif has_elements %}
-                    <a href="{{ url_for('archimate_crud.dashboard') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
+                    <a href="{{ url_for('archimate_crud.dashboard') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="layout-template" class="h-3 w-3" aria-hidden="true"></i> View ArchiMate model
                     </a>
                     {% endif %}
@@ -2654,7 +2654,7 @@ function instancePage() {
         <textarea id="reject-reason-detail" x-model="rejectReason" rows="3" required class="w-full rounded-md border-2 border-input p-3 text-sm bg-background focus:border-primary focus:outline-none" placeholder="Explain why this workflow step is being rejected..."></textarea>
     </div>
     <div class="flex justify-end gap-3">
-        <button type="button" data-modal-close="reject-workflow" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
+        <button type="button" data-modal-close="reject-workflow" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
         <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" :disabled="!rejectReason.trim()">
             <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i> Reject Workflow
         </button>

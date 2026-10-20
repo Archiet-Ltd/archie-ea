@@ -3,7 +3,7 @@
             <div id="phase-bcd" class="bg-card rounded-lg border border-border p-6 transition-all relative"
                  x-show="isSectionActive('B')" x-cloak
                  :class="isSectionActive('B') ? 'ring-1 ring-primary/10' : ''">
-                <div x-show="isSectionFuture('B')" x-cloak class="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-slate-900/50">
+                <div x-show="isSectionFuture('B')" x-cloak class="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-overlay/50">
                     <p class="text-sm text-muted-foreground font-medium">Complete Phase <span x-text="currentPhase"></span> to unlock</p>
                 </div>
                 <div class="flex items-center justify-between mb-4">
@@ -37,7 +37,7 @@
                             <span x-text="generateLoading === 'B' ? 'Generating...' : 'Generate Missing'"></span>
                         </button>
                         {% endif %}
-                        <button type="button" @click="toggleComments('phase_bcd')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" title="Comments">
+                        <button type="button" @click="toggleComments('phase_bcd')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" title="Comments">
                             <i data-lucide="message-square" class="w-3.5 h-3.5" aria-hidden="true"></i>
                             <span x-show="commentCount('phase_bcd') > 0" x-text="commentCount('phase_bcd')" class="text-xs bg-primary text-primary-foreground rounded-full px-1 min-w-[16px] text-center" x-cloak></span>
                         </button>

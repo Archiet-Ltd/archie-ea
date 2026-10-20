@@ -46,7 +46,7 @@
             <div class="flex items-center gap-2">
                 {# RATA-012: Import Dependencies button #}
                 <button type="button" @click="showImportModal = true"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <i data-lucide="upload" class="h-3.5 w-3.5"></i> Import
                 </button>
                 <select x-model="depRiskFilter" @change="loadDependencyRisk()"
@@ -162,7 +162,7 @@
     <div x-show="showImportModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center"
          @keydown.escape.window="showImportModal = false"
          role="dialog" aria-modal="true" aria-labelledby="import-deps-title">
-        <div class="absolute inset-0 bg-slate-900/50" @click="showImportModal = false"></div>
+        <div class="absolute inset-0 bg-overlay/50" @click="showImportModal = false"></div>
         <div class="relative bg-card rounded-lg border border-border w-full max-w-lg mx-4 p-6">
             <h3 id="import-deps-title" class="text-base font-semibold text-foreground mb-4">Import Dependencies</h3>
 

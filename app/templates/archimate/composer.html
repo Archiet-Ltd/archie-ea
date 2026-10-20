@@ -603,7 +603,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                       @keydown.escape.prevent="$el.textContent = tab.name; $el.blur()"
                       class="outline-none"></span>
                 <button type="button" @click.stop="closeViewpointTab(tab)"
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-1"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-1"
                         aria-label="Close tab"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-width="2"/></svg></button>
             </div>
         </template>
@@ -814,7 +814,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div class="flex items-center gap-2 mb-3">
                         <i data-lucide="info" class="w-4 h-4 text-primary"></i>
                         <span class="font-semibold text-sm">Diagram Metadata</span>
-                        <button aria-label="Close metadata panel" type="button" @click="metadataPanelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-auto">
+                        <button aria-label="Close metadata panel" type="button" @click="metadataPanelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-auto">
                             <i data-lucide="x" class="w-3 h-3"></i>
                         </button>
                     </div>
@@ -849,7 +849,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
 
                 {# Loading state #}
                 <div x-show="viewpointLoading" x-cloak
-                     class="absolute inset-0 flex items-center justify-center z-20 bg-slate-900/50">
+                     class="absolute inset-0 flex items-center justify-center z-20 bg-overlay/50">
                     <div class="flex items-center gap-3 px-5 py-3 rounded-lg bg-card border border-border text-sm text-muted-foreground">
                         <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg"
                              fill="none" viewBox="0 0 24 24" aria-hidden="true">
@@ -964,7 +964,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div class="explain-panel">
                         <div class="explain-panel-header">
                             <h3 class="text-sm font-semibold">Diagram Explanation</h3>
-                            <button type="button" @click="explanationPanelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close explanation panel">&times;</button>
+                            <button type="button" @click="explanationPanelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close explanation panel">&times;</button>
                         </div>
                         <div class="explain-tabs">
                             <button type="button" class="explain-tab" :class="explanationAudience === 'technical' ? 'active' : ''"
@@ -996,7 +996,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div class="explain-panel">
                         <div class="explain-panel-header">
                             <h3 class="text-sm font-semibold">Impact Analysis</h3>
-                            <button type="button" @click="impactPanelOpen = false; _clearImpactHighlight()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close impact panel">&times;</button>
+                            <button type="button" @click="impactPanelOpen = false; _clearImpactHighlight()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close impact panel">&times;</button>
                         </div>
                         <div class="explain-content">
                             <template x-if="!impactData">
@@ -1033,7 +1033,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                                 <i data-lucide="shield-check" class="w-4 h-4"></i>
                                 Diagram Quality
                             </h3>
-                            <button type="button" @click="compliancePanelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close compliance panel">&times;</button>
+                            <button type="button" @click="compliancePanelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close compliance panel">&times;</button>
                         </div>
                         <div class="p-4">
                             {# Score display #}
@@ -1123,7 +1123,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div class="absolute right-0 top-0 bottom-0 w-80 bg-card border-l border-border z-40 overflow-y-auto">
                         <div class="p-3 border-b border-border flex items-center justify-between">
                             <h3 class="text-sm font-semibold">Validation Report</h3>
-                            <button type="button" @click="validationPanelOpen = false; _clearValidationHighlight()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close validation panel">&times;</button>
+                            <button type="button" @click="validationPanelOpen = false; _clearValidationHighlight()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close validation panel">&times;</button>
                         </div>
                         {# Phase selector #}
                         <div class="px-3 pt-2 pb-1">
@@ -1198,7 +1198,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                         <div class="p-3 border-b border-border flex items-center justify-between">
                             <h3 class="text-sm font-semibold">Migration Plateaus</h3>
                             <button type="button" @click="plateauSuggestions = []; _applyDeltaStyling()"
-                                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     aria-label="Close plateau panel">&times;</button>
                         </div>
                         <div class="p-3 space-y-2">
@@ -1229,7 +1229,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div class="absolute right-0 top-0 bottom-0 w-72 bg-card border-l border-border z-40 flex flex-col">
                         <div class="p-3 border-b border-border flex items-center justify-between">
                             <h3 class="text-sm font-semibold">Comments</h3>
-                            <button type="button" @click="closeComments()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close comments panel">&times;</button>
+                            <button type="button" @click="closeComments()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close comments panel">&times;</button>
                         </div>
                         <div class="flex-1 overflow-y-auto p-3 space-y-2">
                             <template x-if="commentsLoading">
@@ -1266,7 +1266,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     <div class="absolute right-0 top-0 bottom-0 w-80 bg-card border-l border-border z-40 flex flex-col">
                         <div class="p-3 border-b border-border flex items-center justify-between">
                             <h3 class="text-sm font-semibold">Change History</h3>
-                            <button type="button" @click="auditPanelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close audit panel">&times;</button>
+                            <button type="button" @click="auditPanelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close audit panel">&times;</button>
                         </div>
                         <div class="flex-1 overflow-y-auto p-3 space-y-1.5">
                             <template x-if="auditLoading">
@@ -1426,7 +1426,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     Components
                 </h3>
                 <div class="flex items-center gap-1">
-                    <button type="button" @click="componentsPanelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close components panel">
+                    <button type="button" @click="componentsPanelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close components panel">
                         <i data-lucide="panel-right-close" class="w-4 h-4"></i>
                     </button>
                 </div>
@@ -1519,7 +1519,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                     x-text="selectedNode ? 'Element Detail' : 'Relationship Detail'"></h3>
                 <button type="button"
                         @click="selectedNode = null; selectedEdge = null"
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         aria-label="Close detail panel">&times;</button>
             </div>
 
@@ -2085,7 +2085,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
 
 
     <div x-show="annotEditOpen" x-cloak x-transition
-         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50"
          role="dialog" aria-modal="true" aria-label="Edit Annotation"
          @keydown.escape.window="cancelAnnotationEdit()"
          @keydown.tab.prevent>
@@ -2109,7 +2109,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
 
     {# ── CMP-070: Keyboard shortcut help modal ── #}
     <div x-show="showShortcutsModal" x-cloak x-transition
-         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50"
          role="dialog" aria-modal="true" aria-label="Keyboard Shortcuts"
          @keydown.escape.window="showShortcutsModal = false"
          @click.self="showShortcutsModal = false">
@@ -2168,7 +2168,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
 
     {# ── CMP-040: Link element to viewpoint modal ── #}
     <div x-show="linkViewpointModalOpen" x-cloak x-transition
-         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50"
          role="dialog" aria-modal="true" aria-label="Link to Sub-Diagram"
          @keydown.escape.window="linkViewpointModalOpen = false"
          @keydown.tab.prevent>
@@ -2202,7 +2202,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
 
     {# ── CMP-055: Save style template dialog ── #}
     <div x-show="styleTemplateSaveOpen" x-cloak x-transition
-         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50"
          role="dialog" aria-modal="true" aria-label="Save Style Template"
          @keydown.escape.window="styleTemplateSaveOpen = false"
          @keydown.tab.prevent>
@@ -2237,7 +2237,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
             <div class="flex-1"></div>
             <span class="text-2xs text-muted-foreground" x-show="srMatches.length > 0" x-cloak
                   x-text="(srCurrentIndex + 1) + ' / ' + srMatches.length"></span>
-            <button aria-label="Close" type="button" @click="closeSearchReplace()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <button aria-label="Close" type="button" @click="closeSearchReplace()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <i data-lucide="x" class="w-3.5 h-3.5"></i>
             </button>
         </div>

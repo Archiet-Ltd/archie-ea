@@ -202,7 +202,7 @@
   <!-- Delete Confirmation Modal -->
   <div x-show="deleteTarget" x-cloak class="fixed inset-0 z-50 flex items-center justify-center"
     @keydown.escape.window="deleteTarget = null" role="dialog" aria-modal="true" aria-label="Confirm deletion">
-    <div class="fixed inset-0 bg-slate-900/50" @click="deleteTarget = null"></div>
+    <div class="fixed inset-0 bg-overlay/50" @click="deleteTarget = null"></div>
     <div class="relative bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4 z-10">
       <h3 class="text-lg font-semibold text-foreground mb-2">Delete Analysis</h3>
       <p class="text-sm text-muted-foreground mb-4">

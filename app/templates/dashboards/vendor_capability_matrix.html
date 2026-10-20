@@ -292,7 +292,7 @@ document.addEventListener('alpine:init', () => {
             <i data-lucide="alert-triangle" class="h-10 w-10 text-destructive" aria-hidden="true"></i>
             <p class="text-sm text-muted-foreground" x-text="error"></p>
             <button type="button" @click="loadData()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-1 items-center">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-1 items-center">
                 <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i> Retry
             </button>
         </div>
@@ -391,7 +391,7 @@ document.addEventListener('alpine:init', () => {
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0"
      @keydown.escape.window="$store.matrixModal.open = false"
-     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50"
+     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50"
      role="dialog" aria-modal="true" aria-labelledby="matrix-modal-title"
      style="display:none"> <!-- inline-style-ok -->
     <div @click.outside="$store.matrixModal.open = false"
@@ -417,7 +417,7 @@ document.addEventListener('alpine:init', () => {
                 </div>
             </div>
             <button type="button" @click="$store.matrixModal.open = false" aria-label="Close"
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0">
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0">
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
             </button>
         </div>

@@ -68,19 +68,19 @@
                 <i data-lucide="calculator" class="h-4 w-4" aria-hidden="true"></i>
                 <span x-text="recalcInProgress ? 'Recalculating...' : 'Recalculate Savings'"></span>
             </button>
-            <button type="button" @click="bulkAction('decommission')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Bulk decommission selected entries">
+            <button type="button" @click="bulkAction('decommission')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Bulk decommission selected entries">
                 Bulk: Decommission
             </button>
-            <button type="button" @click="bulkAction('retire')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Bulk retire selected entries">
+            <button type="button" @click="bulkAction('retire')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Bulk retire selected entries">
                 Bulk: Retire
             </button>
-            <button type="button" @click="bulkAction('add_to_roadmap')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Bulk add selected entries to roadmap">
+            <button type="button" @click="bulkAction('add_to_roadmap')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Bulk add selected entries to roadmap">
                 Bulk: Add to Roadmap
             </button>
-            <button type="button" @click="bulkAction('set_wave')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Set wave for selected entries">
+            <button type="button" @click="bulkAction('set_wave')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Set wave for selected entries">
                 Bulk: Set Wave
             </button>
-            <button type="button" @click="bulkAction('assign_owner')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Assign owner to selected entries">
+            <button type="button" @click="bulkAction('assign_owner')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Assign owner to selected entries">
                 Bulk: Assign Owner
             </button>
             <div class="flex items-center gap-2 ml-auto">
@@ -563,7 +563,7 @@
 
                 {# duplicate-breadcrumb-ok: table-pagination nav, not a breadcrumb -- flagged only because its Prev/Next buttons use chevron icons, the same shape heuristic keys on; real breadcrumb is the header-arg above. #}
                 <nav class="flex items-center gap-1" aria-label="Pagination">
-                    <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                    <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                             :disabled="!hasPrev" @click="prevPage()" aria-label="Previous page">
                         <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>
                     </button>
@@ -578,7 +578,7 @@
                         </span>
                     </template>
 
-                    <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                    <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                             :disabled="!hasNext" @click="nextPage()" aria-label="Next page">
                         <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>
                     </button>

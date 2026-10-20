@@ -18,11 +18,11 @@
     <!-- Header -->
     {% macro _ps_actions() %}
 <a href="{{ url_for('archimate_crud.dashboard') }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
             <i data-lucide="arrow-left" class="h-4 w-4" aria-hidden="true"></i> Back to Dashboard
         </a>
 <a href="{{ url_for('architect_ui.import_restore_points') }}" data-testid="link-restore-points"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
             <i data-lucide="history" class="h-4 w-4" aria-hidden="true"></i> Restore before an import
         </a>
     {% endmacro %}
@@ -143,7 +143,7 @@
             <div class="flex flex-col gap-2 sm:flex-row">
                 <button type="button" data-testid="btn-preview-import"
                     @click="runPreview()" :disabled="!fileName || previewing"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center sm:flex-1">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center sm:flex-1">
                     <span x-show="previewing" x-cloak class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block"></span>
                     <i x-show="!previewing" x-cloak data-lucide="eye" class="h-4 w-4" aria-hidden="true"></i>
                     Preview import

@@ -76,7 +76,7 @@
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
-         class="modal-root fixed inset-0 flex items-center justify-center z-50 bg-slate-900/50"
+         class="modal-root fixed inset-0 flex items-center justify-center z-50 bg-overlay/50"
          @click.self="showExportModal = false" role="dialog">
         <div class="bg-card border border-border rounded-lg p-6 w-full max-w-md"
              role="dialog" aria-modal="true" x-trap="showExportModal">
@@ -367,7 +367,7 @@ function implementationPlanningDashboard() {
   <div x-show="errorMsg" x-cloak class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
   <div class="flex justify-end gap-3 pt-2 border-t border-border">
     <button type="button" data-modal-close="create-work-package"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" aria-label="Action">Cancel</button>
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" aria-label="Action">Cancel</button>
     <button type="submit" :disabled="submitting"
             class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit">
       <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak></i>

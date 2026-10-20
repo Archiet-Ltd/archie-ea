@@ -14,7 +14,7 @@
       <div class="flex items-center gap-2">
         {% if 'unified_duplicate.ai_dashboard' in flask.current_app.view_functions %}
         <a href="{{ url_for('unified_duplicate.ai_dashboard') }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="View AI-enhanced detection dashboard">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="View AI-enhanced detection dashboard">
           <i data-lucide="sparkles" class="w-4 h-4 mr-2" aria-hidden="true"></i>
           AI-enhanced detection
         </a>
@@ -81,7 +81,7 @@
         </div>
         <button type="button" x-show="runFeedback.status !== 'running'" x-cloak
                 @click="clearRunFeedback()"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                 aria-label="Dismiss run feedback">
           Dismiss
         </button>
@@ -168,7 +168,7 @@
           <p class="text-sm font-medium text-destructive-emphasis" x-text="elementGroupsError"></p>
           <p class="mt-1 text-sm text-muted-foreground">The scan result is unavailable. Previously loaded results may be stale.</p>
           <button type="button" @click="loadElementGroups()"
-                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-3 items-center justify-center">
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-3 items-center justify-center">
             Retry scan
           </button>
         </div>
@@ -233,11 +233,11 @@
               Add to Consolidation List
             </button>
             <button type="button" @click="bulkDismiss()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Dismiss selected groups">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Dismiss selected groups">
               Dismiss Selected
             </button>
             <button type="button" @click="clearSelection()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center" aria-label="Clear selection">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center" aria-label="Clear selection">
               <i data-lucide="x" class="w-3.5 h-3.5" aria-hidden="true"></i>
             </button>
           </div>
@@ -399,7 +399,7 @@
                     <td class="px-4 py-3 text-right">
                       <div class="flex gap-1 justify-end">
                         <a :href="`/duplicate-detection/simple/group/${group.id}`"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center whitespace-nowrap">
                           View
                         </a>
                         <button type="button" @click.stop="addToConsolidation(group.id)"
@@ -407,7 +407,7 @@
                           Add to List
                         </button>
                         <button type="button" @click.stop="dismissGroup(group.id)"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" :aria-label="`Dismiss group ${group.name || group.id}`">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" :aria-label="`Dismiss group ${group.name || group.id}`">
                           Dismiss
                         </button>
                       </div>
@@ -472,7 +472,7 @@
                     Consolidate
                   </button>
                   <button type="button" @click.stop="dismissGroup(group.id)"
-                          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" :aria-label="`Dismiss group ${group.name || group.id}`">
+                          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" :aria-label="`Dismiss group ${group.name || group.id}`">
                     Dismiss
                   </button>
                 </div>
@@ -498,7 +498,7 @@
                 </select>
                 <div class="flex items-center gap-1 ml-2">
                   <button type="button" @click="currentPage = Math.max(1, currentPage - 1)" :disabled="currentPage <= 1"
-                          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 w-8 items-center justify-center" aria-label="Go to previous page">
+                          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 w-8 items-center justify-center" aria-label="Go to previous page">
                     <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>
                   </button>
                   <span class="text-sm text-muted-foreground px-2 min-w-[80px] text-center">
@@ -528,7 +528,7 @@
     <div data-slot="card" class="relative rounded-lg border border-border bg-card max-w-lg w-full p-6" tabindex="-1">
       <div class="flex items-center justify-between mb-6">
         <h3 id="run-detection-modal-title" class="text-base font-semibold text-foreground text-foreground text-foreground">Run Detection</h3>
-        <button type="button" @click="showRunDetectionModal = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close detection modal">
+        <button type="button" @click="showRunDetectionModal = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close detection modal">
           <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
         </button>
       </div>
@@ -579,7 +579,7 @@
           </span>
         </button>
         <button type="button" @click="showRunDetectionModal = false"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Cancel and close detection modal">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Cancel and close detection modal">
           Cancel
         </button>
       </div>
