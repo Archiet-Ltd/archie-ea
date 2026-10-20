@@ -648,7 +648,7 @@ _logger = logging.getLogger(__name__)
 # running after it would need a restart to pick up the index -- true of every
 # other process-lifetime cache in this codebase and an acceptable tradeoff
 # against a query per write.
-_provenance_index_cache: dict[str, bool] = {}
+_provenance_index_cache: dict[str, bool] = {}  # cache-tenancy-ok: keyed by database URL; records whether a schema index exists and holds no organisation data
 
 
 def _provenance_index_available(connection) -> bool:
