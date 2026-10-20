@@ -7130,7 +7130,7 @@ def api_import_oef():
     else:
         strategy = request.form.get("strategy") or "skip_duplicates"
 
-    # Get filename for provenance (Task 01)
+    # The uploaded file name is the origin recorded on each row
     source_label = None
     for field in ("file", "oef_file"):
         uploaded = request.files.get(field) if request.files else None
