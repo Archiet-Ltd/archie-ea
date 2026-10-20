@@ -137,3 +137,56 @@ def test_rows_written_before_the_columns_stay_null(app, db_session, make_org, te
         db_session.flush()
         assert (one.source_kind, one.source_label, one.source_recorded_at) == (None, None, None)
         assert (rel.source_kind, rel.source_label, rel.source_recorded_at) == (None, None, None)
+
+
+def _signed_in(db_session, org, role_name):
+    from app.models.user import Role, User
+
+    role = Role.query.filter_by(name=role_name).first()
+    if role is None:
+        Role.insert_roles()
+        role = Role.query.filter_by(name=role_name).first()
+    user = User(
+        email=f"prov-{role_name.lower()}-{uuid.uuid4().hex[:8]}@example.com",
+        first_name=role_name, last_name="Person", organization_id=org.id,
+        confirmed=True, role=role,
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def test_only_writers_can_import_an_exchange_file(app, db_session, make_org, tenant_ctx, client, login_as):
+    import io
+
+    from flask import url_for
+
+    org = make_org("prov-gate")
+    viewer = _signed_in(db_session, org, "Viewer")
+    architect = _signed_in(db_session, org, "Architect")
+    db_session.commit()
+    with app.test_request_context():
+        targets = [
+            (url_for("archimate.api_import_oef"), "file"),
+            (url_for("architect_ui.import_oef"), "oef_file"),
+            (url_for("architect_ui.import_oef_preview"), "oef_file"),
+        ]
+    xml = FIXTURE.read_bytes()
+
+    def post(path, field):
+        return client.post(
+            path, data={field: (io.BytesIO(xml), FILE_NAME)}, content_type="multipart/form-data",
+            headers={"Accept": "application/json"},
+        )
+
+    for path, field in targets:
+        login_as(client, viewer)
+        assert post(path, field).status_code == 403, path
+    with tenant_ctx(org.id):
+        assert ArchiMateElement.query.filter_by(organization_id=org.id).count() == 0
+
+    for path, field in targets[:2]:
+        login_as(client, architect)
+        assert post(path, field).status_code in (200, 201), path
+    with tenant_ctx(org.id):
+        assert ArchiMateElement.query.filter_by(organization_id=org.id).count() == ELEMENTS
