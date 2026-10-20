@@ -19,7 +19,8 @@ response carries a ``no_ownership_records`` reason.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from collections import defaultdict
 
 from app.extensions import db
 from app.middleware.tenant_context import current_org_id
@@ -3122,6 +3123,175 @@ class IntelligenceQueryService:
             "initiatives": initiative_payloads,
             "reasons": [],
             "elements": all_elements,
+        }
+
+    @staticmethod
+    def single_points_of_failure(*, max_depth: int = 3, include_derived: bool = True) -> Dict[str, Any]:
+        """R1-B83 slice 1: which systems would stop the business trading.
+        Returns elements ranked by the number of distinct value streams that reach them.
+        """
+        from app.models.unified_capability import ValueStream  # Adjust the import if needed
+
+        org_id = current_org_id()
+        if org_id is None:
+            return {
+                "rows": [],
+                "summary": {
+                    "explicit_count": 0,
+                    "derived_count": 0,
+                    "stale_count": 0,
+                    "derivation_state": "not_computed",
+                },
+                "reasons": [NO_TENANT_CONTEXT_REASON],
+                "elements": {},
+                "total": 0,
+                "next_cursor": None,
+                "truncated": False,
+            }
+
+        # Get all value streams for the organisation that have an archimate_element_id
+        value_streams = db.session.execute(
+            db.select(ValueStream)
+            .where(ValueStream.organization_id == org_id)
+            .where(ValueStream.archimate_element_id.is_not(None))
+        ).scalars().all()
+
+        if not value_streams:
+            return {
+                "rows": [],
+                "summary": {
+                    "explicit_count": 0,
+                    "derived_count": 0,
+                    "stale_count": 0,
+                    "derivation_state": "not_computed",
+                },
+                "reasons": [NO_DATA_RECORDED_REASON],  # Using existing reason for no data
+                "elements": {},
+                "total": 0,
+                "next_cursor": None,
+                "truncated": False,
+            }
+
+        # We will collect:
+        #   all_elements: dict[element_id] = {id, name, type, layer}
+        #   element_to_value_streams: dict[element_id] = set of value_stream_element_ids
+        #   element_to_row: dict[element_id] = row from the walk (first row seen for the element)
+        all_elements: Dict[int, Dict[str, Any]] = {}
+        element_to_value_streams: Dict[int, Set[int]] = defaultdict(set)
+        element_to_row: Dict[int, Dict[str, Any]] = {}
+
+        # We will also track the latency using the existing record_query_latency
+        with record_query_latency("single_points_of_failure") as scope:
+            scope.organization_id = org_id
+
+            for vs in value_streams:
+                vs_element_id = vs.archimate_element_id
+                if vs_element_id is None:
+                    continue
+
+                # Walk upstream from the value stream element
+                result = IntelligenceQueryService.cross_layer_impact(
+                    element_id=vs_element_id,
+                    direction="upstream",
+                    max_depth=max_depth,
+                    include_derived=include_derived,
+                    with_owner=True,
+                )
+
+                # Merge elements from this walk
+                elements_map = result.get("elements", {})
+                for eid, elem_info in elements_map.items():
+                    all_elements[eid] = elem_info
+
+                # Process each row in the walk
+                for row in result.get("rows", []):
+                    eid = row["element_id"]
+                    element_to_value_streams[eid].add(vs_element_id)
+                    if eid not in element_to_row:
+                        element_to_row[eid] = row
+
+        # If we have no elements after processing, return empty
+        if not element_to_row:
+            return {
+                "rows": [],
+                "summary": {
+                    "explicit_count": 0,
+                    "derived_count": 0,
+                    "stale_count": 0,
+                    "derivation_state": "not_computed",
+                },
+                "reasons": [NO_DATA_RECORDED_REASON],
+                "elements": all_elements,
+                "total": 0,
+                "next_cursor": None,
+                "truncated": False,
+            }
+
+        # Prepare list of elements for sorting: (element_id, count, row)
+        elements_list: List[Tuple[int, int, Dict[str, Any]]] = []
+        for eid, row in element_to_row.items():
+            count = len(element_to_value_streams[eid])
+            elements_list.append((eid, count, row))
+
+        # Sort by count descending, then by element name ascending
+        elements_list.sort(
+            key=lambda x: (-x[1], all_elements[x[0]]["name"].lower() if x[0] in all_elements else "")
+        )
+
+        # Apply truncation limit
+        total_before_truncation = len(elements_list)
+        truncated = False
+        if total_before_truncation > SET_IMPACT_MAX_ROWS:
+            elements_list = elements_list[:SET_IMPACT_MAX_ROWS]
+            truncated = True
+            reasons = [ROWS_TRUNCATED_REASON]
+        else:
+            reasons = []
+
+        # Build the final rows list and compute summary counts
+        final_rows: List[Dict[str, Any]] = []
+        explicit_count = 0
+        derived_count = 0
+        stale_count = 0
+        for eid, count, row in elements_list:
+            final_rows.append(row)
+            # Update summary counts based on the row's relation
+            relation_kind = row.get("relation", {}).get("kind")
+            if relation_kind == "explicit":
+                explicit_count += 1
+            elif relation_kind == "derived":
+                derived_count += 1
+            if row.get("relation", {}).get("stale"):
+                stale_count += 1
+
+        # Determine derivation_state
+        if not final_rows:
+            derivation_state = "not_computed"
+        elif stale_count > 0:
+            derivation_state = "stale"
+        elif derived_count > 0:
+            derivation_state = "current"
+        else:
+            derivation_state = "drawn_facts_only"
+
+        summary = {
+            "explicit_count": explicit_count,
+            "derived_count": derived_count,
+            "stale_count": stale_count,
+            "derivation_state": derivation_state,
+            "total": len(final_rows),  # Number of rows after truncation
+            # We can also add latency_ms from the scope
+            "latency_ms": scope.latency_ms,
+        }
+
+        return {
+            "rows": final_rows,
+            "summary": summary,
+            "reasons": reasons,
+            "elements": all_elements,
+            "total": total_before_truncation,
+            "next_cursor": None,
+            "truncated": truncated,
         }
 
 __all__ = ["IntelligenceQueryService"]
