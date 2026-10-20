@@ -657,8 +657,14 @@ class ImportOrchestrator:
                 conflict_resolution=conflict_resolution,
             )
 
+        # Success means something was created or updated; an empty file with no
+        # errors is also a clean run. Every row failing is a failure.
+        succeeded = (created_count + updated_count > 0) or (
+            file_stats.total_rows == 0 and not errors
+        )
+
         return QuickImportResult(
-            success=True,
+            success=succeeded,
             applications_created=created_count,
             applications_updated=updated_count,
             applications_skipped=skipped_count,
@@ -775,7 +781,6 @@ class ImportOrchestrator:
             vendor_name=context.get("vendor"),
             lifecycle_status=context.get("status", "active"),
             business_criticality=context.get("criticality"),
-            created_by_id=user_id,
         )
 
         # Apply cost fields through the accessor
