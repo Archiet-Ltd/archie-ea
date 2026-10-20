@@ -21,6 +21,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app.extensions import db
+from app.models.mixins.core import TenantMixin
 
 
 def _new_client_id(prefix: str = "cl") -> str:
@@ -452,8 +453,6 @@ class OAuthToken(db.Model):
 
 def _revoke_connector_tokens_on_organisation_change(mapper, connection, target):
     """A person moved to another organisation takes no assistant with them.
-
-    The bearer loader already refuses a token whose organisation no longer
     matches the user's, but a person moved out and later back in would find
     the old token working again. Revoking at the moment of the move closes
     that. Runs inside the same flush as the move itself.
@@ -479,3 +478,37 @@ def _register_user_listeners() -> None:
 
 
 _register_user_listeners()
+
+
+class ApiOperationCall(TenantMixin, db.Model):
+    """One row per (organisation, client, operation): last call and call count.
+
+    Written from ``require_api_scope`` with one upsert per request so the
+    deprecation admin page can name the consumers of an interface version
+    before it retires. TenantMixin injects the organization_id column and the
+    tenant before-flush listener auto-stamps it from the request context.
+    """
+
+    __tablename__ = "api_operation_calls"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    client_id = db.Column(
+        db.String(128),
+        db.ForeignKey("oauth_clients.client_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    operation_id = db.Column(db.String(255), nullable=False, index=True)
+    last_called_at = db.Column(
+        db.DateTime(timezone=True), nullable=False, server_default=db.func.now()
+    )
+    call_count = db.Column(db.Integer, nullable=False, server_default="0")
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "organization_id",
+            "client_id",
+            "operation_id",
+            name="uq_api_operation_calls_org_client_operation",
+        ),
+    )
