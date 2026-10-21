@@ -737,21 +737,43 @@ jobs:
             echo "No test file is affected by this change."
             exit 0
           fi
-          # One pytest run, so one junit file. Exit 5 means everything selected was
-          # quarantined (deselected), which is a pass here.
-          mapfile -t files < fast-tests.txt
-          status=0
-          pytest -q --maxfail=20 -o xfail_strict=true \
-            --junitxml=fast-tests.xml -p scripts.ci.quarantine "${files[@]}" || status=$?
-          if [ "$status" -ne 0 ] && [ "$status" -ne 5 ]; then
-            exit "$status"
+          # Two pytest runs: the assistant connector's tests (mcp, oauth_provider) need the
+          # connector switched on at app creation, as in the full run's connector step; every
+          # other file runs as before. Exit 5 means everything selected was quarantined
+          # (deselected), which is a pass here.
+          mapfile -t all < fast-tests.txt
+          files=(); connector=()
+          for f in "${all[@]}"; do
+            case "$f" in
+              app/modules/mcp/*|app/modules/oauth_provider/*) connector+=("$f") ;;
+              *) files+=("$f") ;;
+            esac
+          done
+          if [ "${#files[@]}" -gt 0 ]; then
+            status=0
+            pytest -q --maxfail=20 -o xfail_strict=true \
+              --junitxml=fast-tests.xml -p scripts.ci.quarantine "${files[@]}" || status=$?
+            if [ "$status" -ne 0 ] && [ "$status" -ne 5 ]; then
+              exit "$status"
+            fi
+          fi
+          if [ "${#connector[@]}" -gt 0 ]; then
+            status=0
+            MCP_ENABLED=true PUBLIC_BASE_URL=https://mcp-test.example \
+              pytest -q --maxfail=20 -o xfail_strict=true \
+              --junitxml=fast-tests-connector.xml -p scripts.ci.quarantine "${connector[@]}" || status=$?
+            if [ "$status" -ne 0 ] && [ "$status" -ne 5 ]; then
+              exit "$status"
+            fi
           fi
       - uses: actions/upload-artifact@v6
         continue-on-error: true
         if: always()
         with:
           name: fast-tests-junit
-          path: fast-tests.xml
+          path: |
+            fast-tests.xml
+            fast-tests-connector.xml
           if-no-files-found: ignore
 
   # Quarantined tests (scripts/ci/quarantine.txt): deselected from the blocking
