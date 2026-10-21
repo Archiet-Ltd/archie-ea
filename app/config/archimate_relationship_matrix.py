@@ -358,6 +358,8 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ("Resource", "Resource"): ["composition", "aggregation", "specialization", "association"],
     ("Resource", "Capability"): ["assignment", "association"],
     ("Resource", "CourseOfAction"): ["association"],
+    # Resource assigned to a Business Function: derivable per ArchiMate 3.2 Appendix B.
+    ("Resource", "BusinessFunction"): ["assignment", "association"],
     ("Resource", "ValueStream"): ["association"],
     # Capability relationships
     ("Capability", "Resource"): ["association"],
@@ -370,6 +372,12 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     # Course of Action relationships
     ("CourseOfAction", "Resource"): ["association"],
     ("CourseOfAction", "Capability"): ["association"],
+    # Application elements realize a Capability (ArchiMate 3.2 section 7.2): forward direction.
+    ("ApplicationComponent", "Capability"): ["realization", "association"],
+    ("ApplicationCollaboration", "Capability"): ["realization", "association"],
+    ("ApplicationFunction", "Capability"): ["realization", "association"],
+    ("ApplicationProcess", "Capability"): ["realization", "association"],
+    ("ApplicationService", "Capability"): ["realization", "association"],
     ("CourseOfAction", "CourseOfAction"): [
         "composition",
         "aggregation",
@@ -378,6 +386,8 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ],
     ("CourseOfAction", "ValueStream"): ["association"],
     ("CourseOfAction", "Goal"): ["realization", "association"],
+    # Course of Action realizes Outcome (ArchiMate 3.2 section 7).
+    ("CourseOfAction", "Outcome"): ["realization", "association"],
     ("CourseOfAction", "Requirement"): ["realization", "association"],
     # Value Stream relationships
     ("ValueStream", "Resource"): ["association"],
@@ -1427,6 +1437,58 @@ for _pair, _types in VALID_RELATIONSHIPS.items():
         _types.remove("realization")
 
 del _pair, _types, _tgt
+
+# Association may connect any two concepts (ArchiMate 3.2 section 5.4.3 and
+# Appendix B). Applied last, over the finished table, and only ever added: no
+# existing entry is removed or reordered.
+for _src in ALL_ELEMENTS:
+    for _dst in ALL_ELEMENTS:
+        _assoc = VALID_RELATIONSHIPS.setdefault((_src, _dst), [])
+        if "association" not in _assoc:
+            _assoc.append("association")
+
+del _src, _dst, _assoc
+
+
+# Entelim extension (ADR-0014): the rows for ``Application`` are copied from the finished
+# ``ApplicationComponent`` rows, after every other generated pass, so an Application is
+# valid wherever a component is. Never hand-written. Three narrowings then apply to the
+# pairs between the two kinds; each only removes relationships, so the relationships
+# allowed for any pair with an Application are always a subset of the same pair with
+# ApplicationComponent in its place, which is what keeps an exported model valid
+# ArchiMate 3.2.
+_APPLICATION = "Application"
+_COMPONENT = "ApplicationComponent"
+
+for (_src, _tgt), _types in list(VALID_RELATIONSHIPS.items()):
+    if _COMPONENT not in (_src, _tgt):
+        continue
+    _new_src = _APPLICATION if _src == _COMPONENT else _src
+    _new_tgt = _APPLICATION if _tgt == _COMPONENT else _tgt
+    _add_rule(_new_src, _new_tgt, list(_types))
+    if _src == _COMPONENT and _tgt == _COMPONENT:
+        # Both ends are components: the copy above made (Application, Application).
+        # The two mixed pairs start from the same finished row.
+        _add_rule(_APPLICATION, _COMPONENT, list(_types))
+        _add_rule(_COMPONENT, _APPLICATION, list(_types))
+
+# Application -> ApplicationComponent: a component is composed or aggregated, never
+# specialised (different types).
+VALID_RELATIONSHIPS[(_APPLICATION, _COMPONENT)] = [
+    r for r in VALID_RELATIONSHIPS[(_APPLICATION, _COMPONENT)] if r != "specialization"
+]
+# Application -> Application: an Application may aggregate another, never compose it.
+VALID_RELATIONSHIPS[(_APPLICATION, _APPLICATION)] = [
+    r for r in VALID_RELATIONSHIPS[(_APPLICATION, _APPLICATION)] if r != "composition"
+]
+# ApplicationComponent -> Application: a component never contains an Application.
+VALID_RELATIONSHIPS[(_COMPONENT, _APPLICATION)] = [
+    r
+    for r in VALID_RELATIONSHIPS[(_COMPONENT, _APPLICATION)]
+    if r not in ("composition", "aggregation", "specialization")
+]
+
+del _src, _tgt, _types, _new_src, _new_tgt
 
 
 # Entelim extension (ADR-0014): the rows for ``Application`` are copied from the finished
