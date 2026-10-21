@@ -7,6 +7,7 @@ Handles variations in naming (spaces, case, abbreviations) and maps to correct t
 
 import logging
 from typing import Dict, Optional
+from app.models.archimate_element_types import StandardTypeTable
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ class ElementTypeNormalizer:
     }
 
     # Layer inference from element type
-    LAYER_MAP = {
+    LAYER_MAP = StandardTypeTable({
         "ApplicationComponent": "application",
         "ApplicationInterface": "application",
         "ApplicationService": "application",
@@ -179,7 +180,7 @@ class ElementTypeNormalizer:
         "ImplementationEvent": "implementation",
         "Plateau": "implementation",
         "Gap": "implementation",
-    }
+    })
 
     @classmethod
     def normalize_type(cls, element_type: str) -> Optional[str]:

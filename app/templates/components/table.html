@@ -1,7 +1,7 @@
 {# shadcn/ui Table Component #}
 {% macro table(class='') %}
     <div class="relative w-full overflow-auto" aria-live="polite" aria-atomic="false">
-        <table class="w-full caption-bottom text-sm {{ class }}">
+        <table class="dense-table w-full caption-bottom text-sm {{ class }}">
             {{ caller() }}
         </table>
     </div>

@@ -22,7 +22,7 @@
     <!-- Capabilities Grid -->
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {% for cap in capabilities|default([]) %}
-        <div data-slot="card" class="rounded-xl border bg-card p-6 hover:shadow-md transition-shadow">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-6 transition-shadow">
             <div class="flex items-start justify-between mb-4">
                 <h3 class="font-semibold">{{ cap.name|default('Unnamed') }}</h3>
                 <span class="px-2 py-1 text-xs rounded-full
@@ -44,7 +44,7 @@
             </div>
         </div>
         {% else %}
-        <div data-slot="card" class="col-span-full p-12 text-center text-muted-foreground rounded-xl border bg-card">
+        <div data-slot="card" class="col-span-full p-12 text-center text-muted-foreground rounded-lg border border-border bg-card">
             <i data-lucide="heart" class="h-12 w-12 mx-auto mb-4 opacity-50" aria-hidden="true"></i>
             <p>No capabilities found</p>
         </div>

@@ -134,12 +134,12 @@
     <input type="hidden" name="command_key" value="{{ _keys.get('decision') or '' }}">
 
     <div>
-        <label for="arb-rationale-{{ outcome }}" class="mb-1.5 block text-sm font-medium text-foreground">
+        <label for="arb-rationale-{{ outcome }}" class="block text-sm font-medium text-muted-foreground mb-1">
             Rationale <span class="text-destructive" aria-hidden="true">*</span>
         </label>
         <textarea id="arb-rationale-{{ outcome }}" name="rationale" rows="4" required maxlength="4000"
                   aria-describedby="arb-rationale-help-{{ outcome }}"
-                  class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                  class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
         <p id="arb-rationale-help-{{ outcome }}" class="mt-1 text-xs text-muted-foreground">
             Required. Up to 4,000 characters. Recorded permanently against this cycle.
         </p>
@@ -155,28 +155,28 @@
         <template x-for="(row, index) in rows" :key="row">
             <div class="mb-3 space-y-2 rounded-md border border-border p-3">
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-foreground"
+                    <label class="block text-sm font-medium text-muted-foreground mb-1"
                            :for="'arb-condition-description-' + row">
                         Condition <span x-text="index + 1"></span> description
                         <span class="text-destructive" aria-hidden="true">*</span>
                     </label>
                     <textarea :id="'arb-condition-description-' + row" name="condition_description" rows="2" required maxlength="2000"
-                              class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                              class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
                 </div>
-                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div class="grid grid-cols-1 gap-2 grid-cols-1">
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-foreground" :for="'arb-condition-category-' + row">
+                        <label class="block text-sm font-medium text-muted-foreground mb-1" :for="'arb-condition-category-' + row">
                             Condition <span x-text="index + 1"></span> category (optional)
                         </label>
                         <input type="text" :id="'arb-condition-category-' + row" name="condition_category" maxlength="120"
-                               class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                               class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-foreground" :for="'arb-condition-due-' + row">
+                        <label class="block text-sm font-medium text-muted-foreground mb-1" :for="'arb-condition-due-' + row">
                             Condition <span x-text="index + 1"></span> due date (optional)
                         </label>
                         <input type="date" :id="'arb-condition-due-' + row" name="condition_due_date"
-                               class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                               class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     </div>
                 </div>
                 <div class="flex justify-end">
@@ -190,7 +190,7 @@
             </div>
         </template>
         <button type="button" @click="rows.push(next); next = next + 1;"
-                class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <i data-lucide="plus" class="mr-1.5 h-3.5 w-3.5" aria-hidden="true"></i>Add another condition
         </button>
     </fieldset>
@@ -198,7 +198,7 @@
 
     <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <button type="button" data-modal-close="arb-decision-{{ outcome }}"
-                class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
             Cancel
         </button>
         <button type="submit"

@@ -1,3 +1,136 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  /* Interaction defaults: a visible focus ring everywhere, 150ms ease-out
+     colour transitions. Utilities on an element still win. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+  a,
+  button,
+  [role="button"],
+  input,
+  select,
+  textarea,
+  tbody tr {
+    transition-property: color, background-color, border-color, opacity;
+    transition-duration: 150ms;
+    transition-timing-function: ease-out;
+  }
+}
+
+/* Type scale (design register: typography). Element defaults live in the base
+   layer so a utility on the element still wins; the scripted class map in the
+   templates carries the same values where a utility was already present. */
+@layer base {
+  body {
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+  h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  small {
+    font-size: 0.75rem;
+    font-weight: 400;
+  }
+  thead th {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: hsl(var(--muted-foreground));
+  }
+  /* Numbers line up in columns: tables, anything flagged numeric, chart text. */
+  table,
+  [data-numeric],
+  svg text {
+    font-variant-numeric: tabular-nums;
+  }
+  /* IDs, codes, references and element tags are monospace. */
+  code,
+  kbd,
+  samp,
+  pre,
+  [data-id],
+  [data-code],
+  [data-ref] {
+    font-family: theme(fontFamily.mono);
+  }
+}
+
+@layer components {
+  /* The one modal z-index scale, as stylesheet rules: an inline style attribute and a nonce-scoped
+     <style> block are both refused by the content security policy when a template imports the
+     modal without context, which left the backdrop below the sidebar. Every modal shell carries
+     modal-root or modal-backdrop on its base layer and modal-panel one above it. */
+  .modal-root,
+  .modal-backdrop {
+    z-index: var(--modal-z, 1000);
+  }
+  .modal-panel {
+    z-index: calc(var(--modal-z, 1000) + 1);
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Dense table (design/patterns.json: dense-table). shadcn-components.css
+     scopes table rules to #main-content by id, so the pilot geometry needs an
+     id-plus-class selector to apply: 40px header at weight 500, 48px rows,
+     8px cell padding, hairline rows, card-coloured sticky header. */
+  /* reuse-ok: the dense table is the authenticated app's canonical table (design/patterns.json: dense-table), not a copy of the public-site table */
+  #main-content .dense-table thead {
+    background-color: hsl(var(--card));
+  }
+  /* reuse-ok: the dense table is the authenticated app's canonical table (design/patterns.json: dense-table), not a copy of the public-site table */
+  #main-content .dense-table th {
+    height: 2.5rem;
+    padding: 0 0.5rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    background-color: hsl(var(--card));
+  }
+  /* reuse-ok: matrix row headers are names, not column labels; this undoes the legacy #main-content th rule in shadcn-components.css */
+  #main-content .dense-table.matrix tbody th[scope="row"] {
+    text-transform: none;
+    letter-spacing: normal;
+    white-space: normal;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: hsl(var(--foreground));
+    padding: 0 0.5rem;
+  }
+  /* reuse-ok: the dense table is the authenticated app's canonical table (design/patterns.json: dense-table), not a copy of the public-site table */
+  #main-content .dense-table td {
+    height: 3rem;
+    padding: 0 0.5rem;
+  }
+  /* reuse-ok: the dense table is the authenticated app's canonical table (design/patterns.json: dense-table), not a copy of the public-site table; this is its empty-row spacing */
+  #main-content .dense-table td.dense-empty {
+    height: auto;
+    padding: 2rem 0.5rem;
+  }
+  /* The question line above an answer cascade. */
+  .question-line {
+    font-family: theme(fontFamily.serif);
+    font-style: italic;
+    font-size: 1.125rem;
+    letter-spacing: 0;
+    color: hsl(var(--muted-foreground));
+  }
+}
