@@ -1448,7 +1448,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                                      draggable="true"
                                      @dragstart="onPaletteDragStart($event, t)"
                                      @dragend="onPaletteDragEnd($event)">
-                                    <span class="truncate" x-text="t.label"></span>
+                                    <span class="truncate" :title="t.label" x-text="t.label"></span>
                                 </div>
                             </template>
                         </div>
@@ -2341,11 +2341,13 @@ window.__COMPOSER_CONFIG__ = {
     startBlank: {{ ('true' if request.args.get('blank') else 'false') }},
     initialViewpoint: {{ initial_viewpoint|tojson }},
     initialLayer: {{ initial_layer|tojson }},
+    typeRegistry: {{ type_registry|tojson }},
 {% if focus %}    focusElement: {{ focus.element|tojson }},
     focusName: {{ focus.name|tojson }},
     focusDepth: {{ focus.depth|tojson }},
     focusDerived: {{ focus.derived|tojson }},
 {% endif %}};
+ComposerRenderer.applyTypeRegistry(window.__COMPOSER_CONFIG__.typeRegistry);
 document.addEventListener('DOMContentLoaded', function() {
     if (window.lucide) lucide.createIcons();
 });

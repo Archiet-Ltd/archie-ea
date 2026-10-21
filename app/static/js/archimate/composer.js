@@ -112,7 +112,7 @@ function composerApp() {
     };
 
     function isContainerType(elType) {
-        return CONTAINER_TYPES[elType] === true;
+        return CONTAINER_TYPES[ComposerRenderer.baseTypeOf(elType)] === true;
     }
 
     /* ── Built-in starter templates ────────────────────────────── */
@@ -768,7 +768,7 @@ function composerApp() {
         quickAddQuery: '',
         quickAddResults: [],
         quickAddLoading: false,
-        _quickAddNewType: 'ApplicationComponent',
+        _quickAddNewType: 'Application',
 
         /* Canvas tracking */
         canvasElements: {},
@@ -935,14 +935,14 @@ function composerApp() {
         /* CMP-053: Landscape map view */
         landscapeViewOpen: false,
         landscapeRowType: 'Capability',
-        landscapeColType: 'ApplicationComponent',
+        landscapeColType: 'Application',
         landscapeData: null,
         landscapeLoading: false,
 
         /* CMP-041: Matrix cross-reference view state */
         matrixViewOpen: false,
         matrixRowType: 'BusinessProcess',
-        matrixColType: 'ApplicationComponent',
+        matrixColType: 'Application',
         matrixRows: [],
         matrixCols: [],
         matrixLoading: false,
@@ -5226,7 +5226,7 @@ function composerApp() {
             let ACTIVE = { ApplicationComponent: true, ApplicationFunction: true, BusinessActor: true, BusinessRole: true, Node: true, Device: true, SystemSoftware: true };
 
             /* Mistake 1: Assignment from passive to active (should be Access) */
-            if (relType === 'assignment' && PASSIVE[srcType] && ACTIVE[tgtType]) {
+            if (relType === 'assignment' && PASSIVE[srcType] && ACTIVE[ComposerRenderer.baseTypeOf(tgtType)]) {
                 return 'Assignment from ' + srcType + ' to ' + tgtType + ' — did you mean Access (read/write)?';
             }
 

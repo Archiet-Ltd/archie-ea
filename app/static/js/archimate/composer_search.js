@@ -208,7 +208,7 @@ let ComposerSearch = (function() {
             if (!name) return;
 
             let self = this;
-            let type = this.searchTypeFilter || 'ApplicationComponent';
+            let type = this.searchTypeFilter || 'Application';
             let layer = guessLayer(type);
 
             self.closeSearch();
@@ -474,7 +474,7 @@ let ComposerSearch = (function() {
         relMatrixOpen: false,
         matrixViewOpen: false,
         matrixRowType: 'BusinessProcess',
-        matrixColType: 'ApplicationComponent',
+        matrixColType: 'Application',
         matrixRows: [],
         matrixCols: [],
         matrixCells: {},
