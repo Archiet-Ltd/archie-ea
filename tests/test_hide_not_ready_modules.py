@@ -4,8 +4,10 @@ Walks, as several personas, every link in the sidebar zones and every row of the
 All-modules directory and global search, requests it with a signed-in client and
 asserts the answer is a real page: not an error, not 404 or 403, and not a page
 that says it is still being built or needs setup. Pages that are not ready for
-the soft launch are hidden (unlinked and unlisted) by the one switch
-``HIDE_NOT_READY_MODULES``; their routes stay.
+the soft launch are listed on the All-modules page with their recorded reason as a
+one-line limit (T-launch-02): they are excluded from the "opens a ready page" walk
+because the page states they are not ready. ``HIDE_NOT_READY_MODULES`` defaults off
+and no longer drops them from the directory or search; their routes stay.
 """
 
 from __future__ import annotations
@@ -91,8 +93,14 @@ def _offered_urls(app, user):
 @pytest.mark.parametrize("label,role,role_name", PERSONAS, ids=[p[0] for p in PERSONAS])
 def test_every_offered_entry_opens_a_ready_page(app, db_session, make_org, label, role, role_name):
     client, user = _client_for(app, db_session, make_org, role, role_name)
+    from app.utils.role_access import NOT_READY_ENDPOINTS
+
     bad = []
     for endpoint, url in sorted(_offered_urls(app, user).items()):
+        if endpoint in NOT_READY_ENDPOINTS:
+            continue  # listed with its limit line, not claimed as ready
+        if endpoint == "modules_directory.index":
+            continue  # this page prints those limit lines, so the "not ready" wording is expected here
         resp = client.get(url, follow_redirects=True)
         body = resp.get_data(as_text=True)
         if resp.status_code != 200:
@@ -102,30 +110,22 @@ def test_every_offered_entry_opens_a_ready_page(app, db_session, make_org, label
     assert not bad, "offered but not ready:\n" + "\n".join(bad)
 
 
-def test_hidden_entries_are_not_in_the_directory_or_search(app, db_session, make_org):
+def test_not_ready_entries_are_listed_in_the_directory_and_search(app, db_session, make_org):
     from app.utils.role_access import NOT_READY_ENDPOINTS
 
     client, user = _client_for(app, db_session, make_org, "platform_admin", "Administrator")
     offered = _offered_urls(app, user)
-    assert not (set(offered) & set(NOT_READY_ENDPOINTS))
+    assert set(NOT_READY_ENDPOINTS) & set(app.view_functions) <= set(offered)
     html = client.get("/modules").get_data(as_text=True)
     for label in ("Agentic Gaps", "Model Registry", "Implementation Planning"):
-        assert label not in html
+        assert label in html
 
 
-def test_switch_off_restores_the_entries_and_routes_stay(app, db_session, make_org):
+def test_switch_defaults_off_and_routes_stay(app, db_session, make_org):
     from app.utils.role_access import NOT_READY_ENDPOINTS, is_hidden_not_ready
 
     assert NOT_READY_ENDPOINTS
-    for endpoint in NOT_READY_ENDPOINTS:
-        assert is_hidden_not_ready(endpoint)
-    old = app.config.get("HIDE_NOT_READY_MODULES")
-    app.config["HIDE_NOT_READY_MODULES"] = False
-    try:
-        with app.test_request_context("/"):
-            assert not any(is_hidden_not_ready(e) for e in NOT_READY_ENDPOINTS)
-    finally:
-        app.config["HIDE_NOT_READY_MODULES"] = old
-    # Hidden means unlinked: the routes are still registered.
+    with app.test_request_context("/"):
+        assert not any(is_hidden_not_ready(e) for e in NOT_READY_ENDPOINTS)
     registered = [e for e in NOT_READY_ENDPOINTS if e in app.view_functions]
     assert registered

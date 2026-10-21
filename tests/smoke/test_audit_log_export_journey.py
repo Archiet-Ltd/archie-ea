@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT
+from .conftest import PAGE_TIMEOUT, all_modules_link
 from .test_archetype_journeys import _login
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
@@ -57,7 +57,7 @@ def test_security_architect_exports_and_verifies_the_audit_log(browser, live_ser
         _login(page, live_server, seeded["emails"]["security_architect"])
 
         # Reached from the persona's own sidebar, not by typing the URL.
-        page.get_by_test_id("sidebar").get_by_role("link", name="Audit Log", exact=True).click()
+        all_modules_link(page, "Audit Log").click()
         page.wait_for_url("**/admin/audit-log**", timeout=PAGE_TIMEOUT)
 
         page.fill("#date_from", _DAY.strftime("%Y-%m-%d"))

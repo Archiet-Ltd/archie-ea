@@ -62,12 +62,19 @@ def test_sidebar_offers_interface_register_link(
     user = _make_user(db_session, make_org, enterprise_role=enterprise_role)
     login_as(client, user)
 
+    # Grouped sidebar (20 Oct 2026): the interface register is not one of the twelve launch modules,
+    # so it moved from the per-role sidebar to the All modules page. The role must still reach it:
+    # the rendered sidebar links to All modules, and that page lists the interface register.
     response = client.get("/", follow_redirects=True)
     assert response.status_code == 200, response.get_data(as_text=True)[:400]
+    assert 'href="/modules/"' in response.get_data(as_text=True), (
+        f"{enterprise_role}'s rendered sidebar carries no link to the All modules page"
+    )
+    response = client.get("/modules/")
+    assert response.status_code == 200, response.get_data(as_text=True)[:400]
     body = response.get_data(as_text=True)
-    assert "/interface-register" in body, (
-        f"{enterprise_role}'s rendered dashboard/sidebar carries no link to "
-        "the interface register module"
+    assert 'href="/interface-register/"' in body, (
+        f"{enterprise_role}'s All modules page carries no link to the interface register module"
     )
 
 

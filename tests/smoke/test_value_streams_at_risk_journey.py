@@ -32,7 +32,7 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import ARCHETYPES, PAGE_TIMEOUT, PASSWORD
+from .conftest import ARCHETYPES, PAGE_TIMEOUT, PASSWORD, all_modules_link
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -242,7 +242,7 @@ def test_business_architect_reaches_the_page_from_the_sidebar_and_sees_the_apis_
     try:
         _login(page, live_server, seeded["emails"]["business_architect"])
         page.goto(live_server + "/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        link = page.get_by_test_id("sidebar").get_by_role("link", name=SIDEBAR_LABEL, exact=True)
+        link = all_modules_link(page, SIDEBAR_LABEL)
         assert link.count() == 1
         with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
             link.click()
@@ -403,8 +403,12 @@ def test_who_reaches_the_page_and_whose_sidebar_carries_it(browser, live_server,
         assert response.status == 200
         _assert_path_and_threshold(page, PAGE_PATH, 3)
         expect(page.get_by_role("heading", level=1, name="Value streams at risk")).to_be_visible()
-        links = page.get_by_test_id("sidebar").get_by_role("link", name=SIDEBAR_LABEL, exact=True)
-        assert links.count() == (1 if archetype == "business_architect" else 0)
+        # Not a launch module, so no role has it in the sidebar; every role is offered it on the All
+        # modules page (the directory lists every module a role may open), the business architect
+        # included, who used to be the only role with a sidebar entry.
+        assert page.get_by_test_id("sidebar").get_by_role("link", name=SIDEBAR_LABEL, exact=True).count() == 0
+        links = all_modules_link(page, SIDEBAR_LABEL)
+        assert links.count() == 1
     finally:
         ctx.close()
 

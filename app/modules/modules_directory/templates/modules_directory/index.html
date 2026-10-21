@@ -44,6 +44,13 @@
         </p>
     </div>
 
+    <div>
+        <h2 class="text-sm font-semibold text-foreground" data-testid="not-in-launch-cut-heading">Not in the launch cut</h2>
+        <p class="mt-1 text-xs text-muted-foreground max-w-[60ch]">
+            The sidebar shows the twelve launch modules. Everything else is still here and still works.
+        </p>
+    </div>
+
     <div class="space-y-8" data-testid="modules-directory">
         {% for section in sections %}
         {% set section_labels = section.links | map(attribute='label') | list %}
@@ -55,9 +62,14 @@
                 {% for link in section.links %}
                 <li x-show='matches({{ link.label | tojson }})'>
                     <a href="{{ link.href }}"
+                       aria-label="{{ link.label }}"
                        class="flex items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors">
                         <i data-lucide="{{ link.icon }}" class="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true"></i>
-                        <span class="flex-1 truncate">{{ link.label }}</span>
+                        <span class="flex min-w-0 flex-1 flex-col">
+                            <span class="flex-1 truncate">{{ link.label }}</span>
+                            {% if link.limit %}<span class="text-xs text-muted-foreground" data-testid="module-limit">{{ link.limit }}</span>{% endif %}
+                        </span>
+                        <span aria-hidden="true" class="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-10 font-medium text-muted-foreground" data-testid="not-in-launch-cut-badge">Not in the launch cut</span>
                     </a>
                 </li>
                 {% endfor %}
@@ -79,9 +91,14 @@
                 {% for link in more_tools %}
                 <li x-show='matches({{ link.label | tojson }})'>
                     <a href="{{ link.href }}"
+                       aria-label="{{ link.label }}"
                        class="flex items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors">
                         <i data-lucide="{{ link.icon }}" class="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true"></i>
-                        <span class="flex-1 truncate">{{ link.label }}</span>
+                        <span class="flex min-w-0 flex-1 flex-col">
+                            <span class="flex-1 truncate">{{ link.label }}</span>
+                            {% if link.limit %}<span class="text-xs text-muted-foreground" data-testid="module-limit">{{ link.limit }}</span>{% endif %}
+                        </span>
+                        <span aria-hidden="true" class="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-10 font-medium text-muted-foreground" data-testid="not-in-launch-cut-badge">Not in the launch cut</span>
                     </a>
                 </li>
                 {% endfor %}

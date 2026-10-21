@@ -16,7 +16,7 @@ from flask import Flask, render_template_string
 from playwright.sync_api import expect, sync_playwright
 from werkzeug.serving import make_server
 
-from app.utils.role_access import get_sidebar_zones
+from app.utils.role_access import get_launch_sidebar_zones, get_sidebar_zones, iter_sidebar_links
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -44,10 +44,9 @@ def brand_shell(request):
     shell.add_url_rule("/admin/", "admin.index", lambda: (
         ("<h1>Command Center</h1>", 200) if administrator else ("Forbidden", 403)))
     shell.add_url_rule("/account/logout", "account.logout", lambda: "Signed out")
-    for zone in get_sidebar_zones(user):
-        for link in zone["links"]:
-            if link["endpoint"] not in shell.view_functions:
-                shell.add_url_rule("/fixture/" + link["endpoint"], link["endpoint"], lambda: "Fixture destination")
+    for link in list(iter_sidebar_links(get_sidebar_zones(user))) + list(iter_sidebar_links(get_launch_sidebar_zones(user))):
+        if link["endpoint"] not in shell.view_functions:
+            shell.add_url_rule("/fixture/" + link["endpoint"], link["endpoint"], lambda: "Fixture destination")
 
     @shell.get("/fixture/start")
     def start():
@@ -56,6 +55,7 @@ def brand_shell(request):
         return render_template_string(
             '<!doctype html><html><body>{% include "components/admin_sidebar.html" %}</body></html>',
             current_user=user, flask=flask, get_sidebar_zones=get_sidebar_zones,
+            get_launch_sidebar_zones=get_launch_sidebar_zones,
         )
 
     server = make_server("127.0.0.1", 0, shell, threaded=True)
@@ -77,6 +77,8 @@ def test_brand_click_returns_to_shared_home_without_removing_admin_navigation(br
         assert page.goto(base + "/fixture/start").status == 200
         sidebar = page.get_by_test_id("sidebar")
         command_center = sidebar.get_by_role("link", name="Command Center", exact=True)
+        # Launch cut: the grouped tree is the same for every role; a platform administrator keeps
+        # Command Center as a footer link beside All modules.
         expect(command_center).to_have_count(1 if administrator else 0)
         if administrator:
             expect(command_center).to_have_attribute("href", "/admin/")

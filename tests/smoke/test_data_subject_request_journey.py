@@ -11,7 +11,7 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT
+from .conftest import PAGE_TIMEOUT, all_modules_link
 from .test_archetype_journeys import _login
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
@@ -60,7 +60,7 @@ def test_dpo_scopes_assigns_and_erases_with_evidence(browser, live_server, seede
     try:
         _login(page, live_server, seeded["emails"]["security_architect"])
 
-        page.get_by_test_id("sidebar").get_by_role("link", name="Data Subject Requests", exact=True).click()
+        all_modules_link(page, "Data Subject Requests").click()
         page.wait_for_url("**/compliance/data-subject-requests", timeout=PAGE_TIMEOUT)
 
         # 1. Enter a request type and see the scoped system list.

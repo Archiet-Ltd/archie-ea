@@ -31,7 +31,7 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
-from tests.smoke.conftest import PASSWORD
+from tests.smoke.conftest import PASSWORD, all_modules_link
 
 PAGE_TIMEOUT = 30000
 
@@ -130,7 +130,7 @@ def test_diagrams_library_lists_and_opens_diagrams(browser, live_server, seeded,
 
     # Found from the sidebar, not a typed URL -- this is the real discovery path.
     page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    sidebar_link = page.get_by_role("link", name=re.compile("^Diagrams$"))
+    sidebar_link = all_modules_link(page, "Diagrams")
     expect(sidebar_link).to_be_visible(timeout=PAGE_TIMEOUT)
     sidebar_link.click()
     page.wait_for_url(re.compile(r"/archimate/diagrams"), timeout=PAGE_TIMEOUT)

@@ -55,14 +55,21 @@ def test_composer_sidebar_link_carries_viewpoint_query_param(app, db_session, ma
     client = app.test_client()
     login_as(client, user)
 
+    # Grouped sidebar (20 Oct 2026): the Composer is not one of the twelve launch modules, so it
+    # moved from the sidebar to the All modules page ("Architect tools", listed first). The link
+    # a user clicks there must still carry the layered viewpoint.
     resp = client.get("/dashboard/overview")
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:2000]
+    assert 'href="/modules/"' in resp.get_data(as_text=True)
+
+    resp = client.get("/modules/")
     assert resp.status_code == 200, resp.get_data(as_text=True)[:2000]
     html = resp.get_data(as_text=True)
 
     assert 'href="/archimate/composer?viewpoint=layered"' in html, (
-        "the rendered sidebar's ArchiMate Composer link must carry "
+        "the All modules page's ArchiMate Composer link must carry "
         "?viewpoint=layered -- otherwise clicking it still lands on the "
-        "blank canvas the founder reported. Sidebar HTML did not contain "
+        "blank canvas the founder reported. The page did not contain "
         "the expected href."
     )
 

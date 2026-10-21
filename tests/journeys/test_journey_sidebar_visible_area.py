@@ -101,6 +101,43 @@ def test_the_scrolling_list_is_at_least_730px_tall_at_1440(app, client, browser)
         pg.close()
 
 
+@pytest.mark.parametrize("role", ["solution_architect", "platform_admin"])
+def test_the_last_group_scrolls_fully_into_view_above_the_footer_at_900px(app, client, browser, role):
+    """At 1440x900 with every group open, the list scrolls (the footer strip stays put) and the last link,
+    in the Catalogue group, ends above the footer instead of running under it or being cut off."""
+    login(client, _persona(app, role))
+    path = "/dashboard/overview"
+    document = client.get(path).get_data(as_text=True)
+    pg = _open(browser, client, document, path, width=1440, height=900)
+    try:
+        pg.evaluate(
+            """() => document.querySelectorAll('#sidebar-nav [aria-expanded="false"]').forEach(b => b.click())"""
+        )
+        pg.wait_for_timeout(300)
+        pg.eval_on_selector("#sidebar-nav", "el => { el.scrollTop = el.scrollHeight; }")
+        pg.wait_for_timeout(150)
+        m = pg.evaluate(
+            """() => {
+                const nav = document.querySelector('#sidebar-nav');
+                const links = [...nav.querySelectorAll('a[href]')].filter(a => a.offsetParent !== null);
+                const last = links[links.length - 1].getBoundingClientRect();
+                const navBox = nav.getBoundingClientRect();
+                const footer = document.querySelector('[data-testid="sidebar"] > div:last-child').getBoundingClientRect();
+                return {
+                    overflows: nav.scrollHeight > nav.clientHeight,
+                    overflowY: getComputedStyle(nav).overflowY,
+                    lastBottom: last.bottom, navBottom: navBox.bottom, footerTop: footer.top,
+                    catalogue: !!document.querySelector('#sidebar-nav [data-testid*="catalogue"], #sidebar-nav a[href*="catalogue"]'),
+                };
+            }"""
+        )
+        assert m["overflowY"] in ("auto", "scroll")
+        assert m["lastBottom"] <= m["navBottom"] + 1, m
+        assert m["navBottom"] <= m["footerTop"] + 1, m
+    finally:
+        pg.close()
+
+
 def test_the_search_box_stays_on_screen_when_the_list_is_scrolled(app, client, browser):
     # platform_admin has the longest zone list, most likely to overflow the nav.
     login(client, _persona(app, "platform_admin"))
@@ -143,7 +180,7 @@ def test_a_long_label_wraps_instead_of_being_cut(app, client, browser):
     document = client.get(path).get_data(as_text=True)
     pg = _open(browser, client, document, path)
     try:
-        link = pg.locator('#sidebar-nav a[title="Transformation programmes"] span.flex-1')
+        link = pg.locator('#sidebar-nav a[title="Traceability Matrix"] span.flex-1')
         link.wait_for(state="visible", timeout=10000)
         info = link.evaluate("""el => ({
             wraps: getComputedStyle(el).whiteSpace !== 'nowrap',
@@ -151,7 +188,7 @@ def test_a_long_label_wraps_instead_of_being_cut(app, client, browser):
             clipped: el.scrollWidth > el.clientWidth && getComputedStyle(el).textOverflow === 'ellipsis',
         })""")
         assert info["wraps"], "the label still forces a single line (white-space: nowrap)"
-        assert info["fullText"] == "Transformation programmes"
+        assert info["fullText"] == "Traceability Matrix"
         assert not info["clipped"], "the label still ellipsis-clips instead of wrapping"
     finally:
         pg.close()
@@ -220,14 +257,14 @@ def test_a_long_label_wraps_in_the_mobile_drawer_too(app, client, browser):
     document = client.get(path).get_data(as_text=True)
     pg = _open(browser, client, document, path, width=390, height=844)
     try:
-        link = pg.locator('#sidebar-nav a[title="Transformation programmes"] span.flex-1')
+        link = pg.locator('#sidebar-nav a[title="Traceability Matrix"] span.flex-1')
         link.wait_for(state="attached", timeout=10000)
         info = link.evaluate("""el => ({
             wraps: getComputedStyle(el).whiteSpace !== 'nowrap',
             fullText: el.textContent.trim(),
         })""")
         assert info["wraps"], "the label still forces a single line at 390x844"
-        assert info["fullText"] == "Transformation programmes"
+        assert info["fullText"] == "Traceability Matrix"
     finally:
         pg.close()
 
@@ -243,7 +280,8 @@ def test_no_zone_link_or_label_changed_for_any_persona(app, client, role):
     import html as html_module
     import re
 
-    from app.utils.role_access import get_sidebar_zones
+    from app.utils.role_access import get_launch_sidebar_zones as get_sidebar_zones
+    from app.utils.role_access import iter_sidebar_links
 
     class _StubUser:
         """Same shape get_sidebar_zones() reads: enterprise_role, is_admin(), is_platform_admin, is_org_admin, can()."""
@@ -276,9 +314,10 @@ def test_no_zone_link_or_label_changed_for_any_persona(app, client, role):
     rendered_labels = [html_module.unescape(label) for _, label in rendered_hrefs]
 
     expected_labels = []
-    for zone in get_sidebar_zones(_StubUser(role)):
-        for link in zone["links"]:
-            if link["endpoint"] in app.view_functions:
-                expected_labels.append(link["label"])
+    # Grouped sidebar: every level-1 link and every sub-menu item, in tree order. The toggles have no
+    # link of their own, and All modules sits in the footer, outside the nav.
+    for link in iter_sidebar_links(get_sidebar_zones(_StubUser(role))):
+        if link["endpoint"] in app.view_functions:
+            expected_labels.append(link["label"])
 
     assert rendered_labels == expected_labels, (role, rendered_labels, expected_labels)

@@ -18,7 +18,7 @@ import json
 
 import pytest
 
-from .conftest import ARCHETYPES, PAGE_TIMEOUT, PASSWORD
+from .conftest import ARCHETYPES, PAGE_TIMEOUT, PASSWORD, all_modules_link
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -780,14 +780,12 @@ def test_solution_architect_full_interface_register_journey_from_sidebar(
     # rendered control -- not a direct URL visit -- so this actually proves
     # the sidebar entry reaches the module (US-7's own acceptance criterion).
     _visit(page, live_server, "/")
-    sidebar_link = page.get_by_test_id("sidebar").get_by_role(
-        "link", name="Interface Register", exact=True
-    )
+    sidebar_link = all_modules_link(page, "Interface Register")
     with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
         sidebar_link.click()
     page.wait_for_timeout(500)
     assert "/interface-register" in page.url, (
-        "the sidebar's Interface Register link did not reach the module"
+        "the All modules page's Interface Register link did not reach the module"
     )
 
     # The picker/register list without an initiative selected -- navigate to
@@ -921,11 +919,11 @@ def test_non_solution_architect_reaches_interface_register_from_own_sidebar(
     _login(page, live_server, seeded["emails"][archetype])
 
     _visit(page, live_server, "/")
-    sidebar_link = page.get_by_test_id("sidebar").get_by_role(
-        "link", name="Interface Register", exact=True
-    )
+    # The interface register is not one of the twelve launch modules: it is reached from the All
+    # modules page, which the sidebar footer links to for every role.
+    sidebar_link = all_modules_link(page, "Interface Register")
     assert sidebar_link.count() == 1, (
-        "%s's rendered sidebar has no 'Interface Register' link" % archetype
+        "%s's All modules page has no 'Interface Register' link" % archetype
     )
     with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
         sidebar_link.click()

@@ -143,12 +143,19 @@ def test_the_persona_can_reach_their_own_work(archetype, live_server, seeded, br
         page.goto(base + LANDING, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_timeout(800)  # let the sidebar and icons render
         reachable = page.evaluate(REACHABLE)
+        # The sidebar shows the twelve launch modules; every other module is one click further, on the
+        # All modules page the sidebar footer links to. Both screens are "what is on the screen".
+        entry = page.get_by_test_id("sidebar").get_by_role("link", name="All modules", exact=True)
+        with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
+            entry.click()
+        page.wait_for_timeout(800)
+        reachable_from_directory = page.evaluate(REACHABLE)
     finally:
         page.close()
 
     unreachable = []
     for description, needles in TASKS[archetype]:
-        if not any(any(n in entry for n in needles) for entry in reachable):
+        if not any(any(n in entry for n in needles) for entry in reachable + reachable_from_directory):
             unreachable.append(description)
 
     allowed = _load_baseline().get(archetype, 0)
