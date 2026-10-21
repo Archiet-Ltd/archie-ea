@@ -259,7 +259,20 @@ else:
 
         # In fast-init/test contexts we may define a lightweight ArchiMateElement
         # in app.models.archimate_core. Allow the table definition to be reused.
-        __table_args__ = {"extend_existing": True}
+        #
+        # One element per compliance control per organisation: control_to_element finds or
+        # makes it, and this index refuses a second made by a concurrent first link. The
+        # revision 20261021_control_element_unique creates the same index on a deployed database.
+        __table_args__ = (
+            db.Index(
+                "uq_archimate_elements_org_control",
+                "organization_id",
+                db.text("(custom_properties ->> 'compliance_control_id')"),
+                unique=True,
+                postgresql_where=db.text("(custom_properties ->> 'compliance_control_id') IS NOT NULL"),
+            ),
+            {"extend_existing": True},
+        )
 
         id = db.Column(db.Integer, primary_key=True)
         # Width 500 per migrations/versions/20260926_widen_element_name.py

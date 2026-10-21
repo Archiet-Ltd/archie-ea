@@ -22,6 +22,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy.exc import IntegrityError
+
 from app import db
 from app.models import ArchiMateElement, ArchiMateRelationship
 from app.models.archimate_relationship_sync import _ensure_relationship
@@ -78,6 +80,20 @@ def control_to_element(control: ComplianceControl, organization_id: int) -> Arch
     framework_code = framework.code if framework is not None else None
     element_type = element_type_for(control)
     label = f"{framework_code} {control.control_code}" if framework_code else control.control_code
+    try:
+        # A savepoint, so losing a race rolls back only this insert.
+        with db.session.begin_nested():
+            return _create_element(control, organization_id, element_type, label, framework, framework_code)
+    except IntegrityError:
+        # A concurrent first link made the element between our read and our insert: the
+        # unique index on (organization, control) refused the second, so it is already there.
+        existing = _existing_element(control.id, organization_id)
+        if existing is None:
+            raise
+        return existing
+
+
+def _create_element(control, organization_id, element_type, label, framework, framework_code):
     return create_backbone_element(
         element_type=element_type,
         layer=MOTIVATION_LAYER,
@@ -133,6 +149,11 @@ def link_control_to_element(
     if requirement.id == element.id:
         raise ValueError("A control's own element cannot realise itself")
 
+    # Two first links of the same pair would both find no link and both insert one. The
+    # control's element row is the lock they queue on, so the second sees the first.
+    db.session.execute(
+        db.select(ArchiMateElement.id).where(ArchiMateElement.id == requirement.id).with_for_update()
+    )
     relationship = _existing_link(element.id, requirement.id, organization_id)
     if relationship is None:
         relationship = _ensure_relationship(

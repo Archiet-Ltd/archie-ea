@@ -287,6 +287,77 @@ def test_a_control_links_to_any_core_element_by_realisation(db_session, make_org
     assert db_session.query(ArchiMateRelationship).filter_by(source_id=target.id).count() == 1
 
 
+def test_two_first_links_in_a_row_make_one_element_and_one_relationship(db_session, make_org):
+    from app.models import ArchiMateElement, ArchiMateRelationship
+    from app.modules.compliance.services.control_model_service import CONTROL_PROPERTY, link_control_to_element
+
+    org = make_org("twice")
+    target = _element(db_session, org.id, "Twice")
+    control = _control(db_session)
+
+    first = link_control_to_element(control.id, target.id, org.id)
+    second = link_control_to_element(control.id, target.id, org.id)
+
+    assert first.id == second.id
+    assert db_session.query(ArchiMateRelationship).filter_by(source_id=target.id).count() == 1
+    made = [
+        e for e in db_session.query(ArchiMateElement).filter_by(organization_id=org.id)
+        if (e.custom_properties or {}).get(CONTROL_PROPERTY) == control.id
+    ]
+    assert len(made) == 1
+
+
+def test_the_database_refuses_a_second_element_for_one_control_in_one_organisation(db_session, make_org):
+    from sqlalchemy.exc import IntegrityError
+
+    from app.models import ArchiMateElement
+    from app.modules.compliance.services.control_model_service import CONTROL_PROPERTY, control_to_element
+
+    org, other = make_org("uniq-a"), make_org("uniq-b")
+    control = _control(db_session)
+    control_to_element(control, org.id)
+
+    def duplicate(org_id):
+        return ArchiMateElement(
+            name="dup", type="Requirement", layer="Motivation", organization_id=org_id,
+            custom_properties={CONTROL_PROPERTY: control.id},
+        )
+
+    with pytest.raises(IntegrityError):
+        with db_session.begin_nested():
+            db_session.add(duplicate(org.id))
+            db_session.flush()
+    with db_session.begin_nested():  # another organisation may hold its own element for the control
+        db_session.add(duplicate(other.id))
+        db_session.flush()
+
+
+def test_losing_the_race_to_make_the_element_reads_as_already_linked(db_session, make_org, monkeypatch):
+    from app.models import ArchiMateElement
+    from app.modules.compliance.services import control_model_service as service
+
+    org = make_org("race")
+    control = _control(db_session)
+    first = service.control_to_element(control, org.id)
+
+    real = service._existing_element
+    reads = []
+
+    def stale_first_read(control_id, organization_id):
+        reads.append(control_id)
+        return None if len(reads) == 1 else real(control_id, organization_id)
+
+    monkeypatch.setattr(service, "_existing_element", stale_first_read)
+    second = service.control_to_element(control, org.id)
+
+    assert second.id == first.id
+    made = [
+        e for e in db_session.query(ArchiMateElement).filter_by(organization_id=org.id)
+        if (e.custom_properties or {}).get(service.CONTROL_PROPERTY) == control.id
+    ]
+    assert len(made) == 1
+
+
 def test_a_link_to_another_organisations_element_is_refused(db_session, make_org):
     from app.modules.compliance.services.control_model_service import link_control_to_element
 
