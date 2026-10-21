@@ -516,6 +516,35 @@ class TestElementTools:
         assert len(mcp_result["data"]) == 1
         assert rest_data["data"][0]["name"] == mcp_result["data"][0]["name"]
 
+    def test_search_elements_carries_type_label_and_base_type(self, client, db_session, make_org, login_as):
+        """tools/call on search_elements returns type, type_label and base_type for an Application and a component."""
+        from app.models.archimate_element_types import base_type, plain_name_for
+
+        org = make_org("mcp")
+        user = _make_user(db_session, org, "mcp-type-label@example.com")
+        application = _make_element(db_session, org.id, "type-label-term-app", type_="Application")
+        component = _make_element(db_session, org.id, "type-label-term-comp", type_="ApplicationComponent")
+
+        token = _mint_oauth_token(client, db_session, org, user, login_as)
+        mcp_resp = _mcp_call(client, token, "search_elements",
+                             {"query": "type-label-term", "limit": 10})
+        rows = {r["id"]: r for r in json.loads(mcp_resp["result"]["content"][0]["text"])["data"]}
+
+        for element, stored in ((application, "Application"), (component, "ApplicationComponent")):
+            assert rows[element.id]["type"] == stored
+            assert rows[element.id]["type_label"] == plain_name_for(stored)
+            assert rows[element.id]["base_type"] == base_type(stored)
+
+    def test_element_tool_descriptions_explain_the_three_type_fields(self, client, db_session, make_org, login_as):
+        org = make_org("mcp")
+        user = _make_user(db_session, org, "mcp-type-desc@example.com")
+        token = _mint_oauth_token(client, db_session, org, user, login_as)
+        tools = {t["name"]: t for t in _mcp_tools_list(client, token)}
+        sentence = ("type is Entelim's element type; base_type is the ArchiMate standard type; "
+                    "type_label is the name to show a person.")
+        for name in ("search_elements", "get_element"):
+            assert sentence in tools[name]["description"]
+
     def test_get_element_detail(self, client, db_session, make_org, login_as):
         """get_element returns element detail."""
         org = make_org("mcp")

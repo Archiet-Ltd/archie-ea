@@ -34,6 +34,7 @@ from app.utils.pagination import MAX_PAGE_SIZE, safe_int_arg
 from app.models.archimate_element_types import (
     StandardTypeTable,
     application_kind_types,
+    type_fields,
     type_registry_for_page,
 )
 
@@ -2642,7 +2643,7 @@ def api_elements_search():
             {
                 "id": el.id,
                 "name": el.name,
-                "type": el.type,
+                **type_fields(el.type),
                 "layer": el.layer or "",
                 "description": el.description or "",
                 "relationship_count": rel_map.get(el.id, 0),
@@ -2774,7 +2775,7 @@ def api_element_detail(element_id):
             other = db.session.get(ArchiMateElement, other_id)
             if other:
                 connected.append({
-                    "id": other.id, "name": other.name, "type": other.type,
+                    "id": other.id, "name": other.name, **type_fields(other.type),
                     "rel_type": r.type, "direction": direction,
                 })
     except Exception as exc:  # noqa: BLE001
@@ -2793,7 +2794,7 @@ def api_element_detail(element_id):
                 linked_requirements.append({
                     "id": source.id,
                     "name": source.name,
-                    "type": source.type,
+                    **type_fields(source.type),
                 })
     except Exception as exc:  # noqa: BLE001
         current_app.logger.debug("Requirements link query failed for element %s: %s", element_id, exc)
@@ -2821,7 +2822,7 @@ def api_element_detail(element_id):
     return jsonify({
         "id": el.id,
         "name": el.name,
-        "type": el.type,
+        **type_fields(el.type),
         "layer": el.layer,
         "description": el.description or "",
         "scope": getattr(el, "scope", "") or "",

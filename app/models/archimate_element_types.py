@@ -2004,6 +2004,20 @@ def is_application_kind(element_type: Optional[str]) -> bool:
     return base_type(element_type) == "ApplicationComponent"
 
 
+def type_fields(element_type: Optional[str]) -> Dict[str, Optional[str]]:
+    """The three type fields every element in an answer carries (ADR-0014 Decision 9).
+
+    ``type`` is the stored string, ``type_label`` the plain name from ``plain_name_for``
+    (read as it stands, so changing that one name changes every label) and ``base_type``
+    the standard ArchiMate type. Answers, the envelope and the element routes all call this.
+    """
+    return {
+        "type": element_type,
+        "type_label": plain_name_for(element_type),
+        "base_type": base_type(element_type),
+    }
+
+
 def application_kind_types() -> Tuple[str, ...]:
     """Every stored type for which ``is_application_kind`` is true.
 

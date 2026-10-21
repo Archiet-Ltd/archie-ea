@@ -18,6 +18,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 from app.datetime_helpers import utcnow
+from app.models.archimate_element_types import plain_name_for
 
 import pytest
 
@@ -683,9 +684,10 @@ def test_the_impact_answer_carries_the_names_and_derived_fields_the_pages_read(
     assert set(data) >= {"rows", "summary", "reasons", "elements"}
     assert set(data["elements"]) == {str(a.id), str(b.id), str(c.id)}
     for entry in data["elements"].values():
-        assert set(entry) == {"id", "name", "type", "layer"}
+        assert set(entry) == {"id", "name", "type", "type_label", "base_type", "layer"}
     assert data["elements"][str(b.id)] == {
-        "id": b.id, "name": "Beta", "type": "BusinessActor", "layer": "business",
+        "id": b.id, "name": "Beta", "type": "BusinessActor", "type_label": plain_name_for("BusinessActor"),
+        "base_type": "BusinessActor", "layer": "business",
     }
 
     derived = [r for r in data["rows"] if r["relation"]["kind"] == "derived"]

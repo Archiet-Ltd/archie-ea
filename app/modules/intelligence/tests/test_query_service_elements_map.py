@@ -22,10 +22,13 @@ import uuid
 import pytest
 from sqlalchemy import event
 
+from app.models.archimate_element_types import type_fields
+
 # Fixtures (app, db_session, make_org, tenant_ctx, client, login_as) come from
 # app/modules/conftest.py's import of tests.conftest.
 
-FOUR_KEYS = {"id", "name", "type", "layer"}
+# Four identity keys plus the two type fields (ADR-0014 Decision 9); still no sensitive column.
+FOUR_KEYS = {"id", "name", "type", "type_label", "base_type", "layer"}
 
 # The row and relation shapes the impact endpoint returns. Every row carries
 # an ``owners`` list, empty when the element has no ApplicationOwner record.
@@ -210,7 +213,7 @@ def test_map_covers_every_row_and_chain_element_and_nothing_else(app, db_session
     assert with_derived["elements"][str(b.id)] == {
         "id": b.id,
         "name": "Bravo",
-        "type": "BusinessProcess",
+        **type_fields("BusinessProcess"),
         "layer": "business",
     }
     assert str(bystander.id) not in with_derived["elements"]
@@ -352,7 +355,7 @@ def test_layer_is_plain_canonical_lower_case_or_null_and_type_may_be_null(app, d
     assert a_entry["layer"] == "business"
     assert type(a_entry["layer"]) is str  # not the case-insensitive str subclass
     untyped_entry = result["elements"][str(untyped.id)]
-    assert untyped_entry == {"id": untyped.id, "name": "Untyped", "type": None, "layer": None}
+    assert untyped_entry == {"id": untyped.id, "name": "Untyped", **type_fields(None), "layer": None}
 
 
 def test_a_null_named_element_is_absent_not_a_null_entry(app, monkeypatch):
@@ -380,7 +383,7 @@ def test_a_null_named_element_is_absent_not_a_null_entry(app, monkeypatch):
         got = query_service._resolve_elements_batch([1, 2], 7)
 
     assert set(got) == {"2"}
-    assert got["2"] == {"id": 2, "name": "Real", "type": "Node", "layer": "technology"}
+    assert got["2"] == {"id": 2, "name": "Real", **type_fields("Node"), "layer": "technology"}
 
 
 # --- one query, not N -------------------------------------------------------

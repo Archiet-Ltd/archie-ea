@@ -1934,7 +1934,7 @@ TOOL_SCHEMAS.extend([
         "GET /archimate/api/elements/search",
         "Search ArchiMate elements by name. Returns matching elements "
         "with their id, name, type, and layer — the identifiers the "
-        "lens tools need as input.",
+        "lens tools need as input. type is Entelim's element type; base_type is the ArchiMate standard type; type_label is the name to show a person.",
         {
             "type": "object",
             "properties": {
@@ -1954,7 +1954,7 @@ TOOL_SCHEMAS.extend([
         "get_element",
         "GET /archimate/api/elements/<element_id>/detail",
         "Get the full detail for one ArchiMate element: its type, "
-        "layer, description, linked solutions and capabilities.",
+        "layer, description, linked solutions and capabilities. type is Entelim's element type; base_type is the ArchiMate standard type; type_label is the name to show a person.",
         {
             "type": "object",
             "properties": {

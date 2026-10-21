@@ -28,7 +28,7 @@ from app.modules.intelligence.services.derived_facts import list_derived_facts
 from app.modules.intelligence.services.latency_probe import record_query_latency
 from app.modules.intelligence.services.plain_terms import plain_terms_sentence
 from app.modules.intelligence.services.reason_codes import validate_reason_code
-from app.models.archimate_element_types import is_application_kind
+from app.models.archimate_element_types import is_application_kind, type_fields
 
 VALID_DIRECTIONS = {"downstream", "upstream", "both"}
 
@@ -442,7 +442,7 @@ def _resolve_elements_batch(element_ids: Iterable[int], org_id: Optional[int]) -
         elements[str(element_id)] = {
             "id": element_id,
             "name": name,
-            "type": element_type,
+            **type_fields(element_type),
             # ``layer`` comes back as a case-insensitive ``str`` subclass
             # (canonical lower case); hand callers a plain ``str``.
             "layer": str(layer) if layer is not None else None,
@@ -2424,7 +2424,7 @@ class IntelligenceQueryService:
         elements[str(element_id)] = {
             "id": element.id,
             "name": element.name,
-            "type": element.type,
+            **type_fields(element.type),
             "layer": element.layer,
         }
         # Add other elements from flows
@@ -2438,7 +2438,7 @@ class IntelligenceQueryService:
                 elements[str(other_id)] = {
                     "id": other_element.id,
                     "name": other_element.name,
-                    "type": other_element.type,
+                    **type_fields(other_element.type),
                     "layer": other_element.layer,
                 }
 
