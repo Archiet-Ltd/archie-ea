@@ -60,7 +60,7 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {% for tree in trees %}
         <a href="{{ url_for('capability_map.generic_tree_view', key=tree.key) }}"
-           class="group block rounded-lg border border-border bg-card p-5 hover:border-primary/50 hover:shadow-sm transition-all">
+           class="group block rounded-lg border border-border bg-card p-5 hover:border-primary/50 transition-all">
             <div class="flex items-start justify-between">
                 <div>
                     <h2 class="text-base font-semibold group-hover:text-primary transition-colors">{{ tree.label }}</h2>

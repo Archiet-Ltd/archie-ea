@@ -21,6 +21,7 @@ from app.services.application_architecture_mapper import ApplicationArchitecture
 from app.services.apqc_classification_service import classify_apqc_text
 from app.services.comprehensive_archimate_service import ComprehensiveArchiMateService
 from app.services.confidence_review_service import ConfidenceReviewService, ReviewQueueItemData
+from app.models.archimate_element_types import StandardTypeTable
 
 logger = logging.getLogger(__name__)
 
@@ -275,7 +276,7 @@ class ArchitectWorkflowService:
 
     def _infer_layer(self, element_type: str) -> str:
         """Infer ArchiMate layer from element type."""
-        mapping = {
+        mapping = StandardTypeTable({
             "BusinessProcess": "Business",
             "BusinessFunction": "Business",
             "BusinessService": "Business",
@@ -299,7 +300,7 @@ class ArchitectWorkflowService:
             "Principle": "Motivation",
             "WorkPackage": "Implementation",
             "Deliverable": "Implementation",
-        }
+        })
         return mapping.get(element_type, "Application")
 
     def _get_apqc_hierarchy(self, process: APQCProcess) -> str:

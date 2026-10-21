@@ -77,6 +77,65 @@ def _first_url(*endpoints: str) -> Optional[str]:
     return None
 
 
+#: One plain sentence per measurement basis. The raw basis (model, column,
+#: predicate) stays in ``source`` for machine readers; a person reads
+#: ``source_text``. A basis with no entry here is derived from its field name by
+#: ``plain_source`` so a new measure never prints a raw predicate.
+SOURCE_LABELS: Dict[str, str] = {
+    "BusinessCapability.current_maturity_level": "Counted from the maturity level recorded on each capability",
+    "BusinessCapability.maturity_gap > 0": "Capabilities whose current maturity is below target",
+    "ValueStream.current_cycle_time + target_cycle_time": "Value streams with both a current and a target cycle time recorded",
+    "BusinessCapability.current_maturity_level IS NULL": "No maturity level recorded",
+    "BusinessCapability.business_owner IS NULL": "No business owner recorded",
+    "ValueStream.current_cycle_time IS NULL": "No current cycle time recorded",
+    "ApplicationComponent.end_of_life_date < today": "End-of-life date has already passed",
+    "ApplicationComponent.end_of_life_date <= today + 365d": "End-of-life date falls within the next year",
+    "ApplicationComponent.lifecycle_status": "Counted from the lifecycle status recorded on each application",
+    "ApplicationComponent.criticality": "Counted from the criticality recorded on each application",
+    "ApplicationComponent.end_of_life_date IS NULL": "No end-of-life date recorded",
+    "ApplicationComponent.lifecycle_status IS NULL": "No lifecycle status recorded",
+    "ApplicationComponent.application_owner IS NULL": "No owner recorded",
+    "TechnologyStandard.review_date < today": "Review date has already passed",
+    "TechnologyStandard.sunset_date < today": "Sunset date has already passed",
+    "ARBException.status='approved' AND revoked_at IS NULL": "Approved and not withdrawn",
+    "ARBException.expires_at": "Counted from the expiry date recorded on each exception",
+    "TechnologyStandard.review_date IS NULL": "No review date recorded",
+    "TechnologyStandard.owner_id IS NULL": "No owner recorded",
+    "ARBException.expires_at IS NULL": "No expiry date recorded",
+    "WorkPackage.target_date < today AND completed_date IS NULL": "Target date has passed and the work is not complete",
+    "Plateau.target_date": "Counted from the target date recorded on each plateau",
+    "Gap.resolution_status NOT IN (resolved, closed, complete, completed)": "Gaps that are still open",
+    "Gap.target_resolution_date < today": "Target resolution date has already passed",
+    "WorkPackage.target_date IS NULL": "No target date recorded",
+    "Plateau.target_date IS NULL": "No target date recorded",
+    "Gap.owner IS NULL": "No owner recorded",
+    "ArchitectureDecision.status = 'accepted'": "Decisions recorded as accepted",
+    "ArchitectureDecision.status = 'proposed'": "Decisions recorded as proposed",
+    "ArchitectureDecision.superseded_by_id": "Decisions that have been replaced by a later decision",
+    "ArchitectureDecision.rationale IS NULL": "No rationale recorded",
+    "ArchitectureDecision.consequences IS NULL": "No consequences recorded",
+    "ArchitectureDecision.decided_at IS NULL": "No decision date recorded",
+}
+
+
+def plain_source(source: Optional[str]) -> str:
+    """The sentence a person reads for a measurement basis.
+
+    Looked up once in ``SOURCE_LABELS``; otherwise derived from the field name
+    ("business_owner IS NULL" reads "No business owner recorded").
+    """
+    if not source:
+        return ""
+    if source in SOURCE_LABELS:
+        return SOURCE_LABELS[source]
+    first = source.split(" ")[0]
+    field = first.split(".")[-1]
+    words = field.replace("_id", "").replace("_", " ").strip() or "value"
+    if " IS NULL" in source:
+        return f"No {words} recorded"
+    return f"Counted from the {words} recorded on each record"
+
+
 def _measure(
     label: str,
     value: Optional[int],
@@ -97,6 +156,7 @@ def _measure(
         "value": value,
         "of": of,
         "source": source,
+        "source_text": plain_source(source),
         "hint": hint,
         "href": href,
     }
@@ -117,6 +177,7 @@ def _missing(
         "value": count,
         "of": of,
         "source": source,
+        "source_text": plain_source(source),
         "hint": None,
         "href": href,
     }
