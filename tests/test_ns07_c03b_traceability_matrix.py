@@ -161,3 +161,24 @@ def test_matrix_shows_the_true_count_when_there_are_more_than_three(
     assert rows["Beta portal"]["business"] == ("multiple-count", 6)
     assert rows["Beta portal"]["technology"] == ("multiple-count", 4)
     assert rows["Alpha ledger"]["business"] == ("multiple-count", 2)
+
+
+def test_single_relationship_cell_shows_one_and_title_names_the_type(
+        app, db_session, make_org, tenant_ctx, client, login_as):
+    """A matrix shows one kind of value per grid: a lone relationship is 1, never an abbreviation."""
+    org_a, _org_b, user = _seed_two_layers(app, db_session, make_org, tenant_ctx)
+    login_as(client, user)
+    html = client.get("/architecture/traceability").get_data(as_text=True)
+    page = BeautifulSoup(html, "html.parser")
+    for tr in page.select("#matrix-view tbody tr"):
+        if "Alpha ledger" not in tr.get_text():
+            continue
+        tech = tr.select("td")[3]
+        assert tech.get("data-state") == "single-value"
+        badge = tech.select_one(".badge")
+        assert badge.get_text(strip=True) == "1"
+        assert "Serving" in badge.get("title") and "Core server" in badge.get("title")
+        break
+    else:
+        raise AssertionError("Alpha ledger row missing")
+    assert not re.search(r">\s*(Srv|Rlz|Asgn|Cmp|Agg|Asc|Acc)\s*<", html)

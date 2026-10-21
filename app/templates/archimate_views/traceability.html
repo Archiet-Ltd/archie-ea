@@ -26,15 +26,6 @@
     #matrix-view tbody tr:hover td { background-color: hsl(var(--accent)); }
     #matrix-view tbody tr:hover td .inline-flex { transform: scale(1.02); transition: transform 0.15s; }
 </style>
-{% set rel_abbrev = {
-    'RealizationRelationship': 'Rlz',
-    'ServingRelationship': 'Srv',
-    'AssignmentRelationship': 'Asgn',
-    'CompositionRelationship': 'Cmp',
-    'AggregationRelationship': 'Agg',
-    'AssociationRelationship': 'Asc',
-    'AccessRelationship': 'Acc'
-} %}
 <div class="space-y-6">
     {{ page_header(
         title="Cross-Layer Traceability Matrix",
@@ -223,7 +214,7 @@
     {# The matrix is the dense-table matrix variant (design/patterns.json: matrix). Rows are the
        application components (the source layer), columns the target layers, and each cell is the
        number of relationships the data source returns for that row and layer, written in
-       matrix_cell's four states: none, one (its relationship), several (the count) and not
+       matrix_cell's four states: none, one (shown as 1, the type in its title), several (the count) and not
        recorded. The names behind a cell are in its title. It is read whole, so no pagination. #}
     <div id="matrix-view" class="rounded-lg border border-border bg-card overflow-hidden">
         {% if matrix %}
@@ -258,8 +249,8 @@
                         {% set only = items[0] %}
                         {% set rel_label = (only.relationship_type | replace('Relationship', '')) if only.relationship_type else '' %}
                         {{ matrix_cell('single-value',
-                                       rel_abbrev.get(only.relationship_type, rel_label) if only.relationship_type else '1',
-                                       title=only.name ~ (' (' ~ rel_label ~ ')' if rel_label else '')) }}
+                                       '1',
+                                       title=(rel_label ~ ': ' if rel_label else '') ~ only.name) }}
                         {% else %}
                         {{ matrix_cell('multiple-count', n, title=(items | map(attribute='name') | join(', ')) ~ (' and ' ~ (n - items | length) ~ ' more' if n > items | length else '')) }}
                         {% endif %}
