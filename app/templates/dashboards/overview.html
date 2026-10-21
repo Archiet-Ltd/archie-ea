@@ -2,6 +2,7 @@
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'macros/page_shell.html' import page_shell, section_card %}
 {% from 'components/answer_cascade.html' import answer_cascade %}
+{% from 'components/empty_state.html' import empty_state %}
 {% block title %}Dashboard{% endblock %}
 {% block guided_mode_steps %}
 <script id="guided-mode-steps-data" type="application/json">
@@ -134,6 +135,13 @@
             <p class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
             <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
             {% if line %}<p class="mt-1 truncate text-xs text-muted-foreground tabular-nums" title="{{ line }}">{{ line }}</p>{% endif %}
+            {% if testid == 'health-kpi-applications' %}
+            {# Owner and cost coverage, read from their one store (portfolio_figures): the
+               same counts the application list and the cost screens show. A dash when unknown. #}
+            {% set cov = data_coverage if data_coverage is defined and data_coverage else {} %}
+            <p class="mt-1 text-xs text-muted-foreground tabular-nums" data-testid="owner-count">{{ cov.owner_count|dash }} of {{ cov.application_count|dash }} have an owner</p>
+            <p class="text-xs text-muted-foreground tabular-nums" data-testid="cost-count">{{ cov.cost_count|dash }} of {{ cov.application_count|dash }} have a cost · {{ (cov.total_annual_cost|currency(cov.currency) if cov.total_annual_cost is not none and cov.total_annual_cost is defined else none)|dash }} a year</p>
+            {% endif %}
         </div>
         {% endfor %}
     </section>
@@ -300,7 +308,7 @@
         <section aria-labelledby="capability-coverage-heading" class="mt-8 rounded-lg border border-border bg-card" data-testid="capability-health-widget">
             <div class="flex items-center justify-between border-b border-border px-4 py-2">
                 <h2 id="capability-coverage-heading" class="text-base font-semibold text-foreground">Capability coverage</h2>
-                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ gap_count }} gap{{ 's' if gap_count != 1 else '' }} of {{ ch|length }}</span>
+                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ gap_count }} of {{ ch|length }} uncovered</span>
             </div>
 {% call dense_table(columns=[('Capability', ''), ('Applications', 'text-right'), ('Coverage', ''), ('', 'text-right')], rows=(ch)|length, empty_text='No capabilities recorded yet.', max_height='480px', flush=true) %}{% for cap in ch %}
                         <tr class="group transition-colors hover:bg-muted/50">
@@ -422,7 +430,7 @@
         <section aria-label="CFO key figures" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {% for label, value, testid, href in [
                 ('Applications', metrics.applications|dash, 'cfo-kpi-applications', '/applications/'),
-                ('Vendors', metrics.vendors|dash, 'cfo-kpi-vendors', '/applications/vendors'),
+                ('Vendors', (metrics.vendors if metrics.vendors else none)|dash, 'cfo-kpi-vendors', '/applications/vendors'),
                 ('Health score', health_score_text|default('—'), 'cfo-health-score-value', '/dashboard/health'),
                 ('Solutions', nav_stats.solutions|dash, 'cfo-kpi-solutions', '/solutions/')
             ] %}
@@ -433,26 +441,39 @@
             {% endfor %}
         </section>
 
+        {% if not cfo.get('tco_by_application') %}
+        <section aria-label="Total cost of ownership" class="rounded-lg border border-border bg-card" data-testid="cfo-empty-state">
+            {{ empty_state(
+                icon='circle-dollar-sign',
+                title='No cost figures yet',
+                description='Total cost of ownership has nothing to add up. Costs for each application are added from the consolidation list, and vendor contracts come from the vendor pages.',
+                cta_text='Open the consolidation list',
+                cta_href='/consolidation-list/',
+                secondary_cta_text='Open vendors',
+                secondary_cta_href='/applications/vendors'
+            ) }}
+        </section>
+        {% else %}
         <section aria-labelledby="tco-heading" class="rounded-lg border border-border bg-card">
             <div class="flex items-center justify-between border-b border-border px-4 py-2">
                 <h2 id="tco-heading" class="text-base font-semibold text-foreground">Total cost of ownership</h2>
-                {% if cfo.get('total_tco') %}
-                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">Total ${{ '{:,.0f}'.format(cfo.get('total_tco')) }}</span>
+                {% if cfo.get('total_tco') is not none %}
+                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">Total {{ cfo.get('total_tco')|currency(cfo.get('currency')) }}</span>
                 {% endif %}
             </div>
             <table class="dense-table w-full border-collapse text-sm" data-testid="cfo-tco-by-category">
-                <caption class="sr-only">Total cost of ownership by category</caption>
+                <caption class="sr-only">Total cost of ownership by application</caption>
                 <thead class="bg-card">
                     <tr class="border-b border-border">
-                        <th scope="col" class="h-10 px-4 text-left align-middle">Category</th>
+                        <th scope="col" class="h-10 px-4 text-left align-middle">Application</th>
                         <th scope="col" class="h-10 px-4 text-right align-middle">Total cost</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for cat, amount in (cfo.get('tco_by_category') or {}).items() %}
+                    {% for name, amount in cfo.get('tco_by_application') or [] %}
                     <tr class="h-12 border-b border-border last:border-b-0">
-                        <td class="px-4 align-middle capitalize text-foreground">{{ cat }}</td>
-                        <td class="px-4 text-right align-middle font-medium tabular-nums text-foreground">${{ '{:,.0f}'.format(amount) }}</td>
+                        <td class="px-4 align-middle text-foreground">{{ name }}</td>
+                        <td class="px-4 text-right align-middle font-medium tabular-nums text-foreground">{{ amount|currency(cfo.get('currency')) }}</td>
                     </tr>
                     {% else %}
                     <tr><td colspan="2" class="h-12 px-4 text-sm text-muted-foreground">No TCO data recorded yet.</td></tr>
@@ -460,6 +481,7 @@
                 </tbody>
             </table>
         </section>
+        {% endif %}
     </div>
 
     {# ══════════════════════════════════════════════════════════════════════

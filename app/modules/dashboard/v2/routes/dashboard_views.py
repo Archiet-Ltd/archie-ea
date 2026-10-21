@@ -49,6 +49,8 @@ def overview():
     from app.modules.dashboard.v2.services.executive_dashboard_service import (
         format_health_score,
     )
+    from app.services import portfolio_figures
+    from app.services.application_cost_accessor import get_reporting_currency
 
     metrics = {
         "applications": 0,
@@ -60,9 +62,7 @@ def overview():
         metrics["applications"] = (
             db.session.query(db.func.count(ApplicationComponent.id)).scalar() or 0
         )
-        metrics["vendors"] = (
-            db.session.query(db.func.count(VendorOrganization.id)).scalar() or 0
-        )
+        metrics["vendors"] = portfolio_figures.vendor_count()
         metrics["users"] = (
             db.session.query(db.func.count(User.id))
             .filter(User.organization_id == g.current_org_id)
@@ -285,18 +285,18 @@ def overview():
                 "sol_ids_with_risks": _sol_ids_with_risks,
             }
 
-            # CFO metrics: TCO aggregation by category
-            tco_by_category = {}
-            try:
-                from app.models.solution_lifecycle_models import SolutionTCOItem
-                for item in SolutionTCOItem.query.all():
-                    cat = item.cost_category or "other"
-                    tco_by_category[cat] = tco_by_category.get(cat, 0) + float(item.amount or 0)
-            except Exception as exc:
-                logger.warning("ENT-017: SolutionTCOItem unavailable: %s", exc)
+            # CFO metrics: read from the one cost store (portfolio_figures), the same
+            # source as the Applications card's cost line, so the two cannot disagree.
+            _cfo_org = getattr(current_user, "organization_id", None)
+            _cfo_cost = portfolio_figures.cost_figure(_cfo_org)
             persona_metrics["cfo"] = {
-                "tco_by_category": tco_by_category,
-                "total_tco": sum(tco_by_category.values()),
+                "tco_by_application": portfolio_figures.cost_by_application(_cfo_org),
+                "total_tco": (
+                    float(_cfo_cost["total_annual_cost"])
+                    if _cfo_cost["total_annual_cost"] is not None
+                    else None
+                ),
+                "currency": get_reporting_currency(_cfo_org),
             }
 
             # Architect metrics: ArchiMate catalog size and solution maturity
@@ -548,12 +548,8 @@ def overview():
     # Single aggregate query; percentages match DATA_REALITY.md definitions.
     data_coverage = {}
     try:
-        _nonempty = lambda col: db.func.sum(  # noqa: E731
-            db.case((db.and_(col.isnot(None), col != ""), 1), else_=0)
-        )
         cov_row = db.session.query(
             db.func.count(ApplicationComponent.id),
-            _nonempty(ApplicationComponent.business_owner),
             db.func.sum(
                 db.case(
                     (
@@ -571,26 +567,49 @@ def overview():
             ),
             db.func.sum(
                 db.case(
-                    (
-                        db.or_(
-                            ApplicationComponent.license_cost.isnot(None),
-                            ApplicationComponent.total_cost_of_ownership.isnot(None),
-                        ),
-                        1,
-                    ),
+                    (db.and_(ApplicationComponent.technical_risk.isnot(None), ApplicationComponent.technical_risk != ""), 1),
                     else_=0,
                 )
             ),
-            _nonempty(ApplicationComponent.technical_risk),
-            _nonempty(ApplicationComponent.business_criticality),
+            db.func.sum(
+                db.case(
+                    (db.and_(ApplicationComponent.business_criticality.isnot(None), ApplicationComponent.business_criticality != ""), 1),
+                    else_=0,
+                )
+            ),
         ).one()
         cov_total = cov_row[0] or 1
+        # Owner and cost are read from their one store (portfolio_figures): the
+        # same figures every other screen shows, not the text columns on the
+        # application that the owner picker and the cost accessor do not write.
+        _org = getattr(current_user, "organization_id", None)
+        _owners = portfolio_figures.owner_figure(_org)
+        _cost = portfolio_figures.cost_figure(_org)
         data_coverage = {
-            "owner": round((cov_row[1] or 0) / cov_total * 100),
-            "vendor": round((cov_row[2] or 0) / cov_total * 100),
-            "cost": round((cov_row[3] or 0) / cov_total * 100),
-            "risk": round((cov_row[4] or 0) / cov_total * 100),
-            "criticality": round((cov_row[5] or 0) / cov_total * 100),
+            "owner": portfolio_figures.percent(
+                _owners["applications_with_owner"], _owners["application_count"]
+            ),
+            # Same vendor population as the Vendors tile: with an empty catalogue
+            # there is nothing to measure against, so a dash rather than a percentage.
+            "vendor": (
+                round((cov_row[1] or 0) / cov_total * 100)
+                if portfolio_figures.vendor_count()
+                else None
+            ),
+            "cost": portfolio_figures.percent(
+                _cost["applications_with_cost"], _cost["application_count"]
+            ),
+            "risk": round((cov_row[2] or 0) / cov_total * 100),
+            "criticality": round((cov_row[3] or 0) / cov_total * 100),
+            "owner_count": _owners["applications_with_owner"],
+            "cost_count": _cost["applications_with_cost"],
+            "application_count": _owners["application_count"],
+            "currency": get_reporting_currency(_org),
+            "total_annual_cost": (
+                float(_cost["total_annual_cost"])
+                if _cost["total_annual_cost"] is not None
+                else None
+            ),
         }
     except Exception as exc:
         logger.warning("data coverage strip unavailable: %s", exc)

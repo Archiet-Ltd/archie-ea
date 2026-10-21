@@ -548,7 +548,9 @@ def _vendors_impl(
             (VendorOrganization.status == "active", VendorOrganization.id),
         )).label("active"),
     ).one()
-    total_vendors = stats_row.total
+    from app.services import portfolio_figures
+
+    total_vendors = portfolio_figures.vendor_count()
     active_vendors = stats_row.active
 
     # "Strategic" = vendor with >5 apps linked via vendor products.

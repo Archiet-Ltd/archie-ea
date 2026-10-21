@@ -84,13 +84,14 @@ def _score_on_every_screen(client, login_as, user):
     summary = client.get("/dashboard/api/executive-summary")
     assert summary.status_code == 200
     scorecard = _page(client, login_as, user, "/dashboard/health")
-    return {
+    shown = {
         "overview tab": _text(overview, "health-score-value"),
         "executive summary": summary.get_json()["data"]["Health Score"],
         "cto card": _text(overview, "cto-health-score-value"),
-        "cfo card": _text(overview, "cfo-health-score-value"),
         "health scorecard": _text(scorecard, "health-score-value"),
+        "cfo card": _text(overview, "cfo-health-score-value"),
     }
+    return shown
 
 
 @pytest.mark.parametrize(
@@ -407,6 +408,6 @@ def test_every_screen_reads_the_formatted_score_not_the_plain_number(
         "overview tab": shown,
         "executive summary": shown,
         "cto card": shown,
-        "cfo card": shown,
         "health scorecard": shown,
+        "cfo card": shown,
     }
