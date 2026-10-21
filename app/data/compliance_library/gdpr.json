@@ -1,7 +1,7 @@
 {
  "code": "GDPR",
  "name": "General Data Protection Regulation (EU) 2016/679",
- "description": "All 99 articles of the Regulation, each with its title. Articles 5 to 50, the obligations on controllers and processors and the rights of data subjects, carry a one-line summary; the remaining articles carry their chapter only.",
+ "description": "All 99 articles of the Regulation with their titles and chapters. Articles 5 to 50, the obligations on controllers and processors and the rights of data subjects, also carry a one-line summary; the other articles carry a title only. The text of the articles is not loaded.",
  "category": "privacy",
  "jurisdiction": "EU",
  "enforcement_level": "mandatory",
@@ -12,12 +12,12 @@
  "official_url": "https://eur-lex.europa.eu/eli/reg/2016/679/oj",
  "standard_version": "2016/679",
  "total_controls": 99,
- "content_level": "full",
+ "content_level": "titles",
  "controls": [
   {
    "control_code": "Art. 1",
    "title": "Subject-matter and objectives",
-   "description": "Chapter I, General provisions. Article 1.",
+   "description": null,
    "category": "Chapter I: General provisions",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 1"
@@ -25,7 +25,7 @@
   {
    "control_code": "Art. 2",
    "title": "Material scope",
-   "description": "Chapter I, General provisions. Article 2.",
+   "description": null,
    "category": "Chapter I: General provisions",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 2"
@@ -33,7 +33,7 @@
   {
    "control_code": "Art. 3",
    "title": "Territorial scope",
-   "description": "Chapter I, General provisions. Article 3.",
+   "description": null,
    "category": "Chapter I: General provisions",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 3"
@@ -41,7 +41,7 @@
   {
    "control_code": "Art. 4",
    "title": "Definitions",
-   "description": "Chapter I, General provisions. Article 4.",
+   "description": null,
    "category": "Chapter I: General provisions",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 4"
@@ -417,7 +417,7 @@
   {
    "control_code": "Art. 51",
    "title": "Supervisory authority",
-   "description": "Chapter VI, Independent supervisory authorities. Article 51.",
+   "description": null,
    "category": "Chapter VI: Independent supervisory authorities",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 51"
@@ -425,7 +425,7 @@
   {
    "control_code": "Art. 52",
    "title": "Independence",
-   "description": "Chapter VI, Independent supervisory authorities. Article 52.",
+   "description": null,
    "category": "Chapter VI: Independent supervisory authorities",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 52"
@@ -433,7 +433,7 @@
   {
    "control_code": "Art. 53",
    "title": "General conditions for the members of the supervisory authority",
-   "description": "Chapter VI, Independent supervisory authorities. Article 53.",
+   "description": null,
    "category": "Chapter VI: Independent supervisory authorities",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 53"
@@ -441,7 +441,7 @@
   {
    "control_code": "Art. 54",
    "title": "Rules on the establishment of the supervisory authority",
-   "description": "Chapter VI, Independent supervisory authorities. Article 54.",
+   "description": null,
    "category": "Chapter VI: Independent supervisory authorities",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 54"
@@ -449,7 +449,7 @@
   {
    "control_code": "Art. 55",
    "title": "Competence",
-   "description": "Chapter VI, Independent supervisory authorities. Article 55.",
+   "description": null,
    "category": "Chapter VI: Independent supervisory authorities",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 55"
@@ -457,7 +457,7 @@
   {
    "control_code": "Art. 56",
    "title": "Competence of the lead supervisory authority",
-   "description": "Chapter VI, Independent supervisory authorities. Article 56.",
+   "description": null,
    "category": "Chapter VI: Independent supervisory authorities",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 56"
@@ -465,7 +465,7 @@
   {
    "control_code": "Art. 57",
    "title": "Tasks",
-   "description": "Chapter VI, Independent supervisory authorities. Article 57.",
+   "description": null,
    "category": "Chapter VI: Independent supervisory authorities",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 57"
@@ -473,7 +473,7 @@
   {
    "control_code": "Art. 58",
    "title": "Powers",
-   "description": "Chapter VI, Independent supervisory authorities. Article 58.",
+   "description": null,
    "category": "Chapter VI: Independent supervisory authorities",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 58"
@@ -481,7 +481,7 @@
   {
    "control_code": "Art. 59",
    "title": "Activity reports",
-   "description": "Chapter VI, Independent supervisory authorities. Article 59.",
+   "description": null,
    "category": "Chapter VI: Independent supervisory authorities",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 59"
@@ -489,7 +489,7 @@
   {
    "control_code": "Art. 60",
    "title": "Cooperation between the lead supervisory authority and the other supervisory authorities concerned",
-   "description": "Chapter VII, Cooperation and consistency. Article 60.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 60"
@@ -497,7 +497,7 @@
   {
    "control_code": "Art. 61",
    "title": "Mutual assistance",
-   "description": "Chapter VII, Cooperation and consistency. Article 61.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 61"
@@ -505,7 +505,7 @@
   {
    "control_code": "Art. 62",
    "title": "Joint operations of supervisory authorities",
-   "description": "Chapter VII, Cooperation and consistency. Article 62.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 62"
@@ -513,7 +513,7 @@
   {
    "control_code": "Art. 63",
    "title": "Consistency mechanism",
-   "description": "Chapter VII, Cooperation and consistency. Article 63.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 63"
@@ -521,7 +521,7 @@
   {
    "control_code": "Art. 64",
    "title": "Opinion of the Board",
-   "description": "Chapter VII, Cooperation and consistency. Article 64.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 64"
@@ -529,7 +529,7 @@
   {
    "control_code": "Art. 65",
    "title": "Dispute resolution by the Board",
-   "description": "Chapter VII, Cooperation and consistency. Article 65.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 65"
@@ -537,7 +537,7 @@
   {
    "control_code": "Art. 66",
    "title": "Urgency procedure",
-   "description": "Chapter VII, Cooperation and consistency. Article 66.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 66"
@@ -545,7 +545,7 @@
   {
    "control_code": "Art. 67",
    "title": "Exchange of information",
-   "description": "Chapter VII, Cooperation and consistency. Article 67.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 67"
@@ -553,7 +553,7 @@
   {
    "control_code": "Art. 68",
    "title": "European Data Protection Board",
-   "description": "Chapter VII, Cooperation and consistency. Article 68.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 68"
@@ -561,7 +561,7 @@
   {
    "control_code": "Art. 69",
    "title": "Independence of the Board",
-   "description": "Chapter VII, Cooperation and consistency. Article 69.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 69"
@@ -569,7 +569,7 @@
   {
    "control_code": "Art. 70",
    "title": "Tasks of the Board",
-   "description": "Chapter VII, Cooperation and consistency. Article 70.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 70"
@@ -577,7 +577,7 @@
   {
    "control_code": "Art. 71",
    "title": "Reports of the Board",
-   "description": "Chapter VII, Cooperation and consistency. Article 71.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 71"
@@ -585,7 +585,7 @@
   {
    "control_code": "Art. 72",
    "title": "Procedure of the Board",
-   "description": "Chapter VII, Cooperation and consistency. Article 72.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 72"
@@ -593,7 +593,7 @@
   {
    "control_code": "Art. 73",
    "title": "Chair of the Board",
-   "description": "Chapter VII, Cooperation and consistency. Article 73.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 73"
@@ -601,7 +601,7 @@
   {
    "control_code": "Art. 74",
    "title": "Tasks of the Chair",
-   "description": "Chapter VII, Cooperation and consistency. Article 74.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 74"
@@ -609,7 +609,7 @@
   {
    "control_code": "Art. 75",
    "title": "Secretariat of the Board",
-   "description": "Chapter VII, Cooperation and consistency. Article 75.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 75"
@@ -617,7 +617,7 @@
   {
    "control_code": "Art. 76",
    "title": "Confidentiality of the Board",
-   "description": "Chapter VII, Cooperation and consistency. Article 76.",
+   "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 76"
@@ -625,7 +625,7 @@
   {
    "control_code": "Art. 77",
    "title": "Right to lodge a complaint with a supervisory authority",
-   "description": "Chapter VIII, Remedies, liability and penalties. Article 77.",
+   "description": null,
    "category": "Chapter VIII: Remedies, liability and penalties",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 77"
@@ -633,7 +633,7 @@
   {
    "control_code": "Art. 78",
    "title": "Right to an effective judicial remedy against a supervisory authority",
-   "description": "Chapter VIII, Remedies, liability and penalties. Article 78.",
+   "description": null,
    "category": "Chapter VIII: Remedies, liability and penalties",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 78"
@@ -641,7 +641,7 @@
   {
    "control_code": "Art. 79",
    "title": "Right to an effective judicial remedy against a controller or processor",
-   "description": "Chapter VIII, Remedies, liability and penalties. Article 79.",
+   "description": null,
    "category": "Chapter VIII: Remedies, liability and penalties",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 79"
@@ -649,7 +649,7 @@
   {
    "control_code": "Art. 80",
    "title": "Representation of data subjects",
-   "description": "Chapter VIII, Remedies, liability and penalties. Article 80.",
+   "description": null,
    "category": "Chapter VIII: Remedies, liability and penalties",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 80"
@@ -657,7 +657,7 @@
   {
    "control_code": "Art. 81",
    "title": "Suspension of proceedings",
-   "description": "Chapter VIII, Remedies, liability and penalties. Article 81.",
+   "description": null,
    "category": "Chapter VIII: Remedies, liability and penalties",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 81"
@@ -665,7 +665,7 @@
   {
    "control_code": "Art. 82",
    "title": "Right to compensation and liability",
-   "description": "Chapter VIII, Remedies, liability and penalties. Article 82.",
+   "description": null,
    "category": "Chapter VIII: Remedies, liability and penalties",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 82"
@@ -673,7 +673,7 @@
   {
    "control_code": "Art. 83",
    "title": "General conditions for imposing administrative fines",
-   "description": "Chapter VIII, Remedies, liability and penalties. Article 83.",
+   "description": null,
    "category": "Chapter VIII: Remedies, liability and penalties",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 83"
@@ -681,7 +681,7 @@
   {
    "control_code": "Art. 84",
    "title": "Penalties",
-   "description": "Chapter VIII, Remedies, liability and penalties. Article 84.",
+   "description": null,
    "category": "Chapter VIII: Remedies, liability and penalties",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 84"
@@ -689,7 +689,7 @@
   {
    "control_code": "Art. 85",
    "title": "Processing and freedom of expression and information",
-   "description": "Chapter IX, Provisions relating to specific processing situations. Article 85.",
+   "description": null,
    "category": "Chapter IX: Provisions relating to specific processing situations",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 85"
@@ -697,7 +697,7 @@
   {
    "control_code": "Art. 86",
    "title": "Processing and public access to official documents",
-   "description": "Chapter IX, Provisions relating to specific processing situations. Article 86.",
+   "description": null,
    "category": "Chapter IX: Provisions relating to specific processing situations",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 86"
@@ -705,7 +705,7 @@
   {
    "control_code": "Art. 87",
    "title": "Processing of the national identification number",
-   "description": "Chapter IX, Provisions relating to specific processing situations. Article 87.",
+   "description": null,
    "category": "Chapter IX: Provisions relating to specific processing situations",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 87"
@@ -713,7 +713,7 @@
   {
    "control_code": "Art. 88",
    "title": "Processing in the context of employment",
-   "description": "Chapter IX, Provisions relating to specific processing situations. Article 88.",
+   "description": null,
    "category": "Chapter IX: Provisions relating to specific processing situations",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 88"
@@ -721,7 +721,7 @@
   {
    "control_code": "Art. 89",
    "title": "Safeguards and derogations for archiving, research and statistical purposes",
-   "description": "Chapter IX, Provisions relating to specific processing situations. Article 89.",
+   "description": null,
    "category": "Chapter IX: Provisions relating to specific processing situations",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 89"
@@ -729,7 +729,7 @@
   {
    "control_code": "Art. 90",
    "title": "Obligations of secrecy",
-   "description": "Chapter IX, Provisions relating to specific processing situations. Article 90.",
+   "description": null,
    "category": "Chapter IX: Provisions relating to specific processing situations",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 90"
@@ -737,7 +737,7 @@
   {
    "control_code": "Art. 91",
    "title": "Existing data protection rules of churches and religious associations",
-   "description": "Chapter IX, Provisions relating to specific processing situations. Article 91.",
+   "description": null,
    "category": "Chapter IX: Provisions relating to specific processing situations",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 91"
@@ -745,7 +745,7 @@
   {
    "control_code": "Art. 92",
    "title": "Exercise of the delegation",
-   "description": "Chapter X, Delegated acts and implementing acts. Article 92.",
+   "description": null,
    "category": "Chapter X: Delegated acts and implementing acts",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 92"
@@ -753,7 +753,7 @@
   {
    "control_code": "Art. 93",
    "title": "Committee procedure",
-   "description": "Chapter X, Delegated acts and implementing acts. Article 93.",
+   "description": null,
    "category": "Chapter X: Delegated acts and implementing acts",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 93"
@@ -761,7 +761,7 @@
   {
    "control_code": "Art. 94",
    "title": "Repeal of Directive 95/46/EC",
-   "description": "Chapter XI, Final provisions. Article 94.",
+   "description": null,
    "category": "Chapter XI: Final provisions",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 94"
@@ -769,7 +769,7 @@
   {
    "control_code": "Art. 95",
    "title": "Relationship with Directive 2002/58/EC",
-   "description": "Chapter XI, Final provisions. Article 95.",
+   "description": null,
    "category": "Chapter XI: Final provisions",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 95"
@@ -777,7 +777,7 @@
   {
    "control_code": "Art. 96",
    "title": "Relationship with previously concluded agreements",
-   "description": "Chapter XI, Final provisions. Article 96.",
+   "description": null,
    "category": "Chapter XI: Final provisions",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 96"
@@ -785,7 +785,7 @@
   {
    "control_code": "Art. 97",
    "title": "Commission reports",
-   "description": "Chapter XI, Final provisions. Article 97.",
+   "description": null,
    "category": "Chapter XI: Final provisions",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 97"
@@ -793,7 +793,7 @@
   {
    "control_code": "Art. 98",
    "title": "Review of other Union legal acts on data protection",
-   "description": "Chapter XI, Final provisions. Article 98.",
+   "description": null,
    "category": "Chapter XI: Final provisions",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 98"
@@ -801,7 +801,7 @@
   {
    "control_code": "Art. 99",
    "title": "Entry into force and application",
-   "description": "Chapter XI, Final provisions. Article 99.",
+   "description": null,
    "category": "Chapter XI: Final provisions",
    "subcategory": null,
    "official_reference": "Regulation (EU) 2016/679, Article 99"

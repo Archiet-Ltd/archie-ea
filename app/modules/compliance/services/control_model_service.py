@@ -19,6 +19,7 @@ and names the old row on it, so the two stores agree and the old evidence still 
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any, Dict, List, Optional
 
@@ -27,6 +28,8 @@ from app.models import ArchiMateElement, ArchiMateRelationship
 from app.models.archimate_relationship_sync import _ensure_relationship
 from app.models.compliance_models import ComplianceControl
 from app.services.archimate_backbone import create_backbone_element
+
+logger = logging.getLogger(__name__)
 
 REQUIREMENT_TYPE = "Requirement"
 CONSTRAINT_TYPE = "Constraint"
@@ -160,16 +163,21 @@ def fold_legacy_mapping(mapping) -> bool:
         origin=ORIGIN_FOLD,
     )
     spec = dict(relationship.connection_spec or {})
-    if spec.get("legacy_mapping_id") == mapping.id:
+    if spec.get("legacy_mapping_id") is not None:
+        # Already recorded: this row, or an earlier row for the same link, which is kept.
         return False
     relationship.connection_spec = {**spec, "legacy_mapping_id": mapping.id}
     db.session.flush()
     return True
 
 
-def fold_legacy_mappings(organization_id: Optional[int] = None) -> int:
+def fold_legacy_mappings(
+    organization_id: Optional[int] = None, skipped: Optional[List[Dict[str, Any]]] = None
+) -> int:
     """Fold every old application-only row (one organisation's, or all). Returns how many
-    folds were newly recorded; running it again records none."""
+    folds were newly recorded; running it again records none. A row that cannot be folded is
+    skipped, the rest carry on, and each skipped row is appended to *skipped* (when given) as
+    ``{"mapping_id", "reason"}``."""
     from app.models.application_compliance import ApplicationComplianceControl
 
     query = db.select(ApplicationComplianceControl).where(
@@ -178,9 +186,17 @@ def fold_legacy_mappings(organization_id: Optional[int] = None) -> int:
     if organization_id is not None:
         query = query.where(ApplicationComplianceControl.organization_id == organization_id)
     folded = 0
-    for mapping in db.session.execute(query.order_by(ApplicationComplianceControl.id)).scalars():
-        if fold_legacy_mapping(mapping):
-            folded += 1
+    mappings = db.session.execute(query.order_by(ApplicationComplianceControl.id)).scalars().all()
+    for mapping in mappings:
+        mapping_id = mapping.id
+        try:
+            with db.session.begin_nested():
+                if fold_legacy_mapping(mapping):
+                    folded += 1
+        except Exception as exc:  # one bad row must not stop the rest
+            logger.warning("control row %s not folded: %s", mapping_id, exc)
+            if skipped is not None:
+                skipped.append({"mapping_id": mapping_id, "reason": str(exc) or type(exc).__name__})
     return folded
 
 

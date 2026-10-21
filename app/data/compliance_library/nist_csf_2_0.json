@@ -24,7 +24,7 @@
   },
   {
    "control_code": "GV.OC-02",
-   "title": "Internal and external stakeholders are understood, and their needs and expectations regarding cybersecurity risk...",
+   "title": "Internal and external stakeholders are understood, and their needs and expectations regarding cybersecurity risk management are understood and considered",
    "description": "Internal and external stakeholders are understood, and their needs and expectations regarding cybersecurity risk management are understood and considered",
    "category": "GV.OC Organizational Context",
    "subcategory": "GOVERN",
@@ -32,7 +32,7 @@
   },
   {
    "control_code": "GV.OC-03",
-   "title": "Legal, regulatory, and contractual requirements regarding cybersecurity, including privacy and civil liberties...",
+   "title": "Legal, regulatory, and contractual requirements regarding cybersecurity, including privacy and civil liberties obligations, are understood and managed",
    "description": "Legal, regulatory, and contractual requirements regarding cybersecurity, including privacy and civil liberties obligations, are understood and managed",
    "category": "GV.OC Organizational Context",
    "subcategory": "GOVERN",
@@ -40,7 +40,7 @@
   },
   {
    "control_code": "GV.OC-04",
-   "title": "Critical objectives, capabilities, and services that external stakeholders depend on or expect from the organization...",
+   "title": "Critical objectives, capabilities, and services that external stakeholders depend on or expect from the organization are understood and communicated",
    "description": "Critical objectives, capabilities, and services that external stakeholders depend on or expect from the organization are understood and communicated",
    "category": "GV.OC Organizational Context",
    "subcategory": "GOVERN",
@@ -88,7 +88,7 @@
   },
   {
    "control_code": "GV.RM-05",
-   "title": "Lines of communication across the organization are established for cybersecurity risks, including risks from...",
+   "title": "Lines of communication across the organization are established for cybersecurity risks, including risks from suppliers and other third parties",
    "description": "Lines of communication across the organization are established for cybersecurity risks, including risks from suppliers and other third parties",
    "category": "GV.RM Risk Management Strategy",
    "subcategory": "GOVERN",
@@ -96,7 +96,7 @@
   },
   {
    "control_code": "GV.RM-06",
-   "title": "A standardized method for calculating, documenting, categorizing, and prioritizing cybersecurity risks is...",
+   "title": "A standardized method for calculating, documenting, categorizing, and prioritizing cybersecurity risks is established and communicated",
    "description": "A standardized method for calculating, documenting, categorizing, and prioritizing cybersecurity risks is established and communicated",
    "category": "GV.RM Risk Management Strategy",
    "subcategory": "GOVERN",
@@ -104,7 +104,7 @@
   },
   {
    "control_code": "GV.RM-07",
-   "title": "Strategic opportunities (that is, positive risks) are characterized and are included in organizational cybersecurity...",
+   "title": "Strategic opportunities (that is, positive risks) are characterized and are included in organizational cybersecurity risk discussions",
    "description": "Strategic opportunities (that is, positive risks) are characterized and are included in organizational cybersecurity risk discussions",
    "category": "GV.RM Risk Management Strategy",
    "subcategory": "GOVERN",
@@ -112,7 +112,7 @@
   },
   {
    "control_code": "GV.RR-01",
-   "title": "Organizational leadership is responsible and accountable for cybersecurity risk and fosters a culture that is...",
+   "title": "Organizational leadership is responsible and accountable for cybersecurity risk and fosters a culture that is risk-aware, ethical, and continually improving",
    "description": "Organizational leadership is responsible and accountable for cybersecurity risk and fosters a culture that is risk-aware, ethical, and continually improving",
    "category": "GV.RR Roles, Responsibilities, and Authorities",
    "subcategory": "GOVERN",
@@ -120,7 +120,7 @@
   },
   {
    "control_code": "GV.RR-02",
-   "title": "Roles, responsibilities, and authorities related to cybersecurity risk management are established, communicated,...",
+   "title": "Roles, responsibilities, and authorities related to cybersecurity risk management are established, communicated, understood, and enforced",
    "description": "Roles, responsibilities, and authorities related to cybersecurity risk management are established, communicated, understood, and enforced",
    "category": "GV.RR Roles, Responsibilities, and Authorities",
    "subcategory": "GOVERN",
@@ -128,7 +128,7 @@
   },
   {
    "control_code": "GV.RR-03",
-   "title": "Adequate resources are allocated commensurate with the cybersecurity risk strategy, roles, responsibilities, and...",
+   "title": "Adequate resources are allocated commensurate with the cybersecurity risk strategy, roles, responsibilities, and policies",
    "description": "Adequate resources are allocated commensurate with the cybersecurity risk strategy, roles, responsibilities, and policies",
    "category": "GV.RR Roles, Responsibilities, and Authorities",
    "subcategory": "GOVERN",
@@ -144,7 +144,7 @@
   },
   {
    "control_code": "GV.PO-01",
-   "title": "Policy for managing cybersecurity risks is established based on organizational context, cybersecurity strategy, and...",
+   "title": "Policy for managing cybersecurity risks is established based on organizational context, cybersecurity strategy, and priorities and is communicated and enforced",
    "description": "Policy for managing cybersecurity risks is established based on organizational context, cybersecurity strategy, and priorities and is communicated and enforced",
    "category": "GV.PO Policy",
    "subcategory": "GOVERN",
@@ -152,7 +152,7 @@
   },
   {
    "control_code": "GV.PO-02",
-   "title": "Policy for managing cybersecurity risks is reviewed, updated, communicated, and enforced to reflect changes in...",
+   "title": "Policy for managing cybersecurity risks is reviewed, updated, communicated, and enforced to reflect changes in requirements, threats, technology, and organizational mission",
    "description": "Policy for managing cybersecurity risks is reviewed, updated, communicated, and enforced to reflect changes in requirements, threats, technology, and organizational mission",
    "category": "GV.PO Policy",
    "subcategory": "GOVERN",
@@ -168,7 +168,7 @@
   },
   {
    "control_code": "GV.OV-02",
-   "title": "The cybersecurity risk management strategy is reviewed and adjusted to ensure coverage of organizational...",
+   "title": "The cybersecurity risk management strategy is reviewed and adjusted to ensure coverage of organizational requirements and risks",
    "description": "The cybersecurity risk management strategy is reviewed and adjusted to ensure coverage of organizational requirements and risks",
    "category": "GV.OV Oversight",
    "subcategory": "GOVERN",
@@ -184,7 +184,7 @@
   },
   {
    "control_code": "GV.SC-01",
-   "title": "A cybersecurity supply chain risk management program, strategy, objectives, policies, and processes are established...",
+   "title": "A cybersecurity supply chain risk management program, strategy, objectives, policies, and processes are established and agreed to by organizational stakeholders",
    "description": "A cybersecurity supply chain risk management program, strategy, objectives, policies, and processes are established and agreed to by organizational stakeholders",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
@@ -192,7 +192,7 @@
   },
   {
    "control_code": "GV.SC-02",
-   "title": "Cybersecurity roles and responsibilities for suppliers, customers, and partners are established, communicated, and...",
+   "title": "Cybersecurity roles and responsibilities for suppliers, customers, and partners are established, communicated, and coordinated internally and externally",
    "description": "Cybersecurity roles and responsibilities for suppliers, customers, and partners are established, communicated, and coordinated internally and externally",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
@@ -200,7 +200,7 @@
   },
   {
    "control_code": "GV.SC-03",
-   "title": "Cybersecurity supply chain risk management is integrated into cybersecurity and enterprise risk management, risk...",
+   "title": "Cybersecurity supply chain risk management is integrated into cybersecurity and enterprise risk management, risk assessment, and improvement processes",
    "description": "Cybersecurity supply chain risk management is integrated into cybersecurity and enterprise risk management, risk assessment, and improvement processes",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
@@ -216,7 +216,7 @@
   },
   {
    "control_code": "GV.SC-05",
-   "title": "Requirements to address cybersecurity risks in supply chains are established, prioritized, and integrated into...",
+   "title": "Requirements to address cybersecurity risks in supply chains are established, prioritized, and integrated into contracts and other types of agreements with suppliers and other relevant third parties",
    "description": "Requirements to address cybersecurity risks in supply chains are established, prioritized, and integrated into contracts and other types of agreements with suppliers and other relevant third parties",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
@@ -224,7 +224,7 @@
   },
   {
    "control_code": "GV.SC-06",
-   "title": "Planning and due diligence are performed to reduce risks before entering into formal supplier or other third-party...",
+   "title": "Planning and due diligence are performed to reduce risks before entering into formal supplier or other third-party relationships",
    "description": "Planning and due diligence are performed to reduce risks before entering into formal supplier or other third-party relationships",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
@@ -232,7 +232,7 @@
   },
   {
    "control_code": "GV.SC-07",
-   "title": "The risks posed by a supplier, their products and services, and other third parties are understood, recorded,...",
+   "title": "The risks posed by a supplier, their products and services, and other third parties are understood, recorded, prioritized, assessed, responded to, and monitored over the course of the relationship",
    "description": "The risks posed by a supplier, their products and services, and other third parties are understood, recorded, prioritized, assessed, responded to, and monitored over the course of the relationship",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
@@ -248,7 +248,7 @@
   },
   {
    "control_code": "GV.SC-09",
-   "title": "Supply chain security practices are integrated into cybersecurity and enterprise risk management programs, and their...",
+   "title": "Supply chain security practices are integrated into cybersecurity and enterprise risk management programs, and their performance is monitored throughout the technology product and service life cycle",
    "description": "Supply chain security practices are integrated into cybersecurity and enterprise risk management programs, and their performance is monitored throughout the technology product and service life cycle",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
@@ -256,7 +256,7 @@
   },
   {
    "control_code": "GV.SC-10",
-   "title": "Cybersecurity supply chain risk management plans include provisions for activities that occur after the conclusion...",
+   "title": "Cybersecurity supply chain risk management plans include provisions for activities that occur after the conclusion of a partnership or service agreement",
    "description": "Cybersecurity supply chain risk management plans include provisions for activities that occur after the conclusion of a partnership or service agreement",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
@@ -280,7 +280,7 @@
   },
   {
    "control_code": "ID.AM-03",
-   "title": "Representations of the organization's authorized network communication and internal and external network data flows...",
+   "title": "Representations of the organization's authorized network communication and internal and external network data flows are maintained",
    "description": "Representations of the organization's authorized network communication and internal and external network data flows are maintained",
    "category": "ID.AM Asset Management",
    "subcategory": "IDENTIFY",
@@ -352,7 +352,7 @@
   },
   {
    "control_code": "ID.RA-05",
-   "title": "Threats, vulnerabilities, likelihoods, and impacts are used to understand inherent risk and inform risk response...",
+   "title": "Threats, vulnerabilities, likelihoods, and impacts are used to understand inherent risk and inform risk response prioritization",
    "description": "Threats, vulnerabilities, likelihoods, and impacts are used to understand inherent risk and inform risk response prioritization",
    "category": "ID.RA Risk Assessment",
    "subcategory": "IDENTIFY",
@@ -408,7 +408,7 @@
   },
   {
    "control_code": "ID.IM-02",
-   "title": "Improvements are identified from security tests and exercises, including those done in coordination with suppliers...",
+   "title": "Improvements are identified from security tests and exercises, including those done in coordination with suppliers and relevant third parties",
    "description": "Improvements are identified from security tests and exercises, including those done in coordination with suppliers and relevant third parties",
    "category": "ID.IM Improvement",
    "subcategory": "IDENTIFY",
@@ -424,7 +424,7 @@
   },
   {
    "control_code": "ID.IM-04",
-   "title": "Incident response plans and other cybersecurity plans that affect operations are established, communicated,...",
+   "title": "Incident response plans and other cybersecurity plans that affect operations are established, communicated, maintained, and improved",
    "description": "Incident response plans and other cybersecurity plans that affect operations are established, communicated, maintained, and improved",
    "category": "ID.IM Improvement",
    "subcategory": "IDENTIFY",
@@ -464,7 +464,7 @@
   },
   {
    "control_code": "PR.AA-05",
-   "title": "Access permissions, entitlements, and authorizations are defined in a policy, managed, enforced, and reviewed, and...",
+   "title": "Access permissions, entitlements, and authorizations are defined in a policy, managed, enforced, and reviewed, and incorporate the principles of least privilege and separation of duties",
    "description": "Access permissions, entitlements, and authorizations are defined in a policy, managed, enforced, and reviewed, and incorporate the principles of least privilege and separation of duties",
    "category": "PR.AA Identity Management, Authentication, and Access Control",
    "subcategory": "PROTECT",
@@ -480,7 +480,7 @@
   },
   {
    "control_code": "PR.AT-01",
-   "title": "Personnel are provided with awareness and training so that they possess the knowledge and skills to perform general...",
+   "title": "Personnel are provided with awareness and training so that they possess the knowledge and skills to perform general tasks with cybersecurity risks in mind",
    "description": "Personnel are provided with awareness and training so that they possess the knowledge and skills to perform general tasks with cybersecurity risks in mind",
    "category": "PR.AT Awareness and Training",
    "subcategory": "PROTECT",
@@ -488,7 +488,7 @@
   },
   {
    "control_code": "PR.AT-02",
-   "title": "Individuals in specialized roles are provided with awareness and training so that they possess the knowledge and...",
+   "title": "Individuals in specialized roles are provided with awareness and training so that they possess the knowledge and skills to perform relevant tasks with cybersecurity risks in mind",
    "description": "Individuals in specialized roles are provided with awareness and training so that they possess the knowledge and skills to perform relevant tasks with cybersecurity risks in mind",
    "category": "PR.AT Awareness and Training",
    "subcategory": "PROTECT",
@@ -568,7 +568,7 @@
   },
   {
    "control_code": "PR.PS-06",
-   "title": "Secure software development practices are integrated, and their performance is monitored throughout the software...",
+   "title": "Secure software development practices are integrated, and their performance is monitored throughout the software development life cycle",
    "description": "Secure software development practices are integrated, and their performance is monitored throughout the software development life cycle",
    "category": "PR.PS Platform Security",
    "subcategory": "PROTECT",
@@ -832,7 +832,7 @@
   },
   {
    "control_code": "RC.RP-05",
-   "title": "The integrity of restored assets is verified, systems and services are restored, and normal operating status is...",
+   "title": "The integrity of restored assets is verified, systems and services are restored, and normal operating status is confirmed",
    "description": "The integrity of restored assets is verified, systems and services are restored, and normal operating status is confirmed",
    "category": "RC.RP Incident Recovery Plan Execution",
    "subcategory": "RECOVER",
@@ -848,7 +848,7 @@
   },
   {
    "control_code": "RC.CO-03",
-   "title": "Recovery activities and progress in restoring operational capabilities are communicated to designated internal and...",
+   "title": "Recovery activities and progress in restoring operational capabilities are communicated to designated internal and external stakeholders",
    "description": "Recovery activities and progress in restoring operational capabilities are communicated to designated internal and external stakeholders",
    "category": "RC.CO Incident Recovery Communication",
    "subcategory": "RECOVER",

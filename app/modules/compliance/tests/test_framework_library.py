@@ -112,7 +112,26 @@ def test_nist_csf_and_gdpr_are_loaded_in_full_and_the_counts_say_so(db_session, 
     counts = {row["code"]: row for row in seeded.library_counts()}
     nist, gdpr = counts["NIST-CSF"], counts["GDPR"]
     assert (nist["loaded"], nist["total"], nist["content_level"]) == (106, 106, "full")
-    assert (gdpr["loaded"], gdpr["total"], gdpr["content_level"]) == (99, 99, "full")
+    assert (gdpr["loaded"], gdpr["total"]) == (99, 99)
+
+
+def test_gdpr_says_titles_for_all_and_summaries_for_some_not_full_text(db_session, seeded):
+    counts = {row["code"]: row for row in seeded.library_counts()}
+    gdpr = counts["GDPR"]
+    assert gdpr["content_level"] == "titles"
+    assert gdpr["with_summary"] == 46, "articles 5 to 50 carry a summary; the rest carry a title only"
+    said = seeded.describe_count(gdpr)
+    assert "99 of 99" in said and "titles" in said and "46 summaries" in said
+    assert "full" not in said.lower()
+    assert "106 of 106" in seeded.describe_count(counts["NIST-CSF"])
+
+
+def test_no_library_title_is_cut_short(seeded):
+    for pack in seeded.load_library_packs():
+        for control in pack["controls"]:
+            assert not control["title"].rstrip().endswith(("...", "\u2026")), (pack["code"], control["control_code"])
+    nist = {c["control_code"]: c for pack in seeded.load_library_packs() if pack["code"] == "NIST-CSF" for c in pack["controls"]}
+    assert nist["GV.OC-02"]["title"] == nist["GV.OC-02"]["description"]
 
 
 def test_licensed_standards_are_identifiers_titles_and_a_link_only(db_session, seeded):
@@ -461,3 +480,82 @@ def test_the_security_persona_controls_figure_reads_the_organisations_mappings(a
 
     assert "controls: unavailable" not in text
     assert "1/1 mapped controls implemented" in text
+
+
+# --------------------------------------------------------------------------- #
+# Wording, and the fold loop                                                   #
+# --------------------------------------------------------------------------- #
+
+
+def test_nothing_a_person_reads_calls_a_control_unmet(app, db_session, make_org, client, login_as):
+    from app.modules.ai_chat.tools.registry import TOOL_SCHEMA_BY_NAME
+
+    schema = TOOL_SCHEMA_BY_NAME["answer"]
+    assert "unmet" not in schema["description"].lower()
+    assert "unmet" not in str(schema["parameters"]).lower()
+
+    org = make_org("wording")
+    user = _user(db_session, org.id)
+    node, _control = _linked_estate(app, db_session, org)
+    login_as(client, user)
+    data = client.post("/api/v1/intelligence/answers", json={"question": "compliance", "element_id": node.id}).get_json()["data"]
+    login_as(client, user)
+    page = client.get(data["page_url"]).get_data(as_text=True)
+    assert "no evidence recorded" in page.lower()
+    assert "unmet" not in page.lower()
+    login_as(client, user)
+    assert "unmet" not in client.get("/intelligence/answers").get_data(as_text=True).lower()
+
+
+def _legacy(db_session, org_id, element, control, name):
+    from app.models.application_compliance import ApplicationComplianceControl
+    from app.models.application_portfolio import ApplicationComponent
+
+    component = ApplicationComponent(name=name, organization_id=org_id, archimate_element_id=element.id)
+    db_session.add(component)
+    db_session.flush()
+    row = ApplicationComplianceControl(
+        organization_id=org_id, application_id=component.id, control_id=control.id, implementation_status="planned",
+    )
+    db_session.add(row)
+    db_session.flush()
+    return row
+
+
+def test_a_bad_row_is_skipped_and_reported_and_the_rest_are_folded(db_session, make_org):
+    from app.models import ArchiMateRelationship
+    from app.modules.compliance.services.control_model_service import fold_legacy_mappings
+
+    org, other = make_org("fold-bad"), make_org("fold-other")
+    foreign = _element(db_session, other.id, "Foreign element")
+    good_element = _element(db_session, org.id, "Good element")
+    control = _control(db_session)
+    bad = _legacy(db_session, org.id, foreign, control, "Points at a foreign element")
+    good = _legacy(db_session, org.id, good_element, control, "Good app")
+    db_session.commit()
+
+    skipped = []
+    assert fold_legacy_mappings(org.id, skipped=skipped) == 1
+    assert [row["mapping_id"] for row in skipped] == [bad.id]
+    assert skipped[0]["reason"]
+    rel = db_session.query(ArchiMateRelationship).filter_by(source_id=good_element.id, type="realization").one()
+    assert rel.connection_spec["legacy_mapping_id"] == good.id
+    assert db_session.query(ArchiMateRelationship).filter_by(source_id=foreign.id).count() == 0
+
+
+def test_two_old_rows_for_one_link_keep_the_first_legacy_id(db_session, make_org):
+    from app.models import ArchiMateRelationship
+    from app.modules.compliance.services.control_model_service import fold_legacy_mappings
+
+    org = make_org("fold-twice")
+    element = _element(db_session, org.id, "Shared element")
+    control = _control(db_session)
+    first = _legacy(db_session, org.id, element, control, "App one")
+    _legacy(db_session, org.id, element, control, "App two")
+    db_session.commit()
+
+    fold_legacy_mappings(org.id)
+    fold_legacy_mappings(org.id)
+
+    rel = db_session.query(ArchiMateRelationship).filter_by(source_id=element.id, type="realization").one()
+    assert rel.connection_spec["legacy_mapping_id"] == first.id

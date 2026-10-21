@@ -738,9 +738,9 @@ TOOL_SCHEMAS = [
             "element_id), 'what breaks if these fail together' (question=set_impact, "
             "with element_ids or a filter) and 'which risks reach X' "
             "(question=risk_propagation, with element_id), and 'which controls protect "
-            "X, and which are unmet' (question=compliance, with element_id; the "
-            "controls the element is bound to, each cited, with those that have no "
-            "evidence recorded counted as unmet). Read-only: the answer is "
+            "X, and which have no evidence recorded' (question=compliance, with "
+            "element_id; the controls the element is bound to, each cited, with a "
+            "count of those that have no evidence recorded). Read-only: the answer is "
             "stored as an immutable snapshot, nothing in the model changes. State "
             "only what the returned rows say, and name the records they name."
         ),

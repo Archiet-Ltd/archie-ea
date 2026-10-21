@@ -1113,17 +1113,19 @@ def register_cli_commands(app):
         seeded = RegulatoryFrameworkService.seed_manufacturing_frameworks()
         print(f"Framework catalogue: {seeded} frameworks seeded")
         for row in RegulatoryFrameworkService.library_counts():
-            of_total = f"{row['loaded']} of {row['total']}" if row["total"] else f"{row['loaded']} (sample)"
-            print(f"  {row['code']}: {of_total} controls loaded, {row['content_level']}")
+            print(f"  {row['code']}: {RegulatoryFrameworkService.describe_count(row)}")
 
     @app.cli.command("fold-application-compliance-controls")
     def fold_application_compliance_controls():
         """Record each old application-only control row as a realisation link. The old rows stay. Safe to run multiple times."""
         from app import db
         from app.modules.compliance.services.control_model_service import fold_legacy_mappings
-        folded = fold_legacy_mappings()
+        skipped = []
+        folded = fold_legacy_mappings(skipped=skipped)
         db.session.commit()
         print(f"Control rows folded onto realisation links: {folded}")
+        for row in skipped:
+            print(f"  skipped row {row['mapping_id']}: {row['reason']}")
 
     # ===== BUSINESS CAPABILITY SEEDING =====
 

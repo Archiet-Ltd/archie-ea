@@ -929,6 +929,21 @@ class RegulatoryFrameworkService:
         return seeded_count
 
     @staticmethod
+    def describe_count(row: Dict) -> str:
+        """One line saying how much of a standard is loaded, without claiming more:
+        "99 of 99 titles, 46 summaries" for a framework with titles for every control and
+        summaries for some, "106 of 106 controls" only where the full set is loaded."""
+        loaded, total, level = row["loaded"], row.get("total"), row["content_level"]
+        of_total = f"{loaded} of {total}" if total else f"{loaded}"
+        if level == "full":
+            return f"{of_total} controls, titles and summaries"
+        if level == "titles":
+            return f"{of_total} titles, {row.get('with_summary', 0)} summaries"
+        if level == "identifiers":
+            return f"{of_total} identifiers and short titles, no standard text"
+        return f"{of_total} controls (sample)"
+
+    @staticmethod
     def library_counts() -> List[Dict]:
         """How much of each library framework is loaded: ``loaded`` controls of
         ``total`` (None when the standard's size is not recorded), and the content
@@ -939,12 +954,20 @@ class RegulatoryFrameworkService:
             .group_by(ComplianceControl.framework_id)
             .all()
         )
+        summarised = dict(
+            db.session.query(ComplianceControl.framework_id, db.func.count(ComplianceControl.id))
+            .filter(ComplianceControl.is_active.isnot(False))
+            .filter(ComplianceControl.description.isnot(None), ComplianceControl.description != "")
+            .group_by(ComplianceControl.framework_id)
+            .all()
+        )
         return [
             {
                 "framework_id": f.id,
                 "code": f.code,
                 "name": f.name,
                 "loaded": counts.get(f.id, 0),
+                "with_summary": summarised.get(f.id, 0),
                 "total": f.total_controls,
                 "content_level": f.content_level or "sample",
                 "official_url": f.official_url,

@@ -40,7 +40,7 @@
     'no_ownership_recorded': 'Some rows have no owner recorded.',
     'no_seed_elements': 'No element was named.',
     'no_compliance_controls_recorded': 'No control is bound to this element yet.',
-    'no_control_evidence': 'Some controls have no evidence recorded, so they are counted as unmet.',
+    'no_control_evidence': 'Some controls have no evidence recorded.',
     'no_application_component': 'This is not an application, and no control is bound to it.',
     'no_policy_scan_recorded': 'No policy scan has been recorded for this element.',
 } %}
@@ -118,7 +118,7 @@
         {% endif %}
     {% elif kind == 'compliance' %}
     {% call section_card(title='Controls') %}
-        <p class="text-sm text-foreground" data-compliance-summary>{{ answer.summary.total }} control{{ '' if answer.summary.total == 1 else 's' }} bound; {{ answer.summary.unmet }} with no evidence recorded (unmet).</p>
+        <p class="text-sm text-foreground" data-compliance-summary>{{ answer.summary.total }} control{{ '' if answer.summary.total == 1 else 's' }} bound; {{ answer.summary.unmet }} with no evidence recorded.</p>
         <div class="overflow-x-auto">
             <table class="w-full text-sm" data-answer-rows>
                 <caption class="sr-only">Controls bound to this element and whether evidence is recorded</caption>
@@ -132,7 +132,7 @@
                 </thead>
                 <tbody>
                     {% for row in answer.rows %}
-                    <tr class="border-t border-border" data-control-id="{{ row.control_id }}" data-unmet="{{ 'true' if row.no_evidence else 'false' }}">
+                    <tr class="border-t border-border" data-control-id="{{ row.control_id }}" data-no-evidence="{{ 'true' if row.no_evidence else 'false' }}">
                         <td class="py-2 pr-4 text-foreground">{{ row.framework_name or row.framework_code or '—' }}</td>
                         <th scope="row" class="py-2 pr-4 text-left font-medium text-foreground">{{ row.code or '—' }} {{ row.name or '' }}</th>
                         <td class="py-2 pr-4 text-foreground">{{ (row.implementation_status or 'not stated') | replace('_', ' ') }}</td>
