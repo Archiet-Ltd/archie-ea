@@ -208,7 +208,7 @@
             <i data-lucide="git-compare" class="h-5 w-5 text-primary"></i>
         </div>
         <div>
-            <h3 id="modal-scenario-comparison-title" class="text-lg font-semibold">Investment Scenario Comparison</h3>
+            <h3 id="modal-scenario-comparison-title" class="text-base font-semibold text-foreground text-foreground">Investment Scenario Comparison</h3>
             <p class="text-sm text-muted-foreground">Compare up to 3 investment scenarios side-by-side</p>
         </div>
     </div>
@@ -225,7 +225,7 @@
                             <select
                                 x-model="selectedIds[index]"
                                 @change="addScenario(index)"
-                                class="flex-1 px-3 py-2 text-sm border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                                class="flex-1 px-3 py-2 text-sm border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                              aria-label="Select capability...">
                                 <option value="">Select capability...</option>
                                 <template x-for="cap in capabilities" :key="cap.id">
@@ -252,7 +252,7 @@
 
         <!-- Comparison Table -->
         <div class="overflow-x-auto" x-show="scenarios.filter(s => s).length > 0" x-cloak>
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
                 <thead class="bg-muted/50">
                     <tr>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase">Metric</th>
@@ -390,7 +390,7 @@
             </button>
             <button type="button"
                 @click="Platform.modal.close('scenario-comparison')"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-colors"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
              aria-label="Close">
                 Close
             </button>

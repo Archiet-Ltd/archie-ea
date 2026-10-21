@@ -30,7 +30,7 @@
             {% set _ = by_status.update({r.status: (by_status.get(r.status, 0) + 1)}) %}
         {% endfor %}
         {% for label, color in [('Draft','bg-muted text-muted-foreground'), ('Refined','bg-primary/10 text-primary'), ('Approved','bg-success/10 text-success-emphasis'), ('Implemented','bg-primary/10 text-primary')] %}
-        <div data-slot="card" class="rounded-xl border bg-card p-5 flex items-center gap-4">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-5 flex items-center gap-4">
             <span class="flex h-10 w-10 items-center justify-center rounded-full {{ color }} text-lg font-bold shrink-0">
                 {{ by_status.get(label, 0) }}
             </span>
@@ -43,14 +43,14 @@
     </div>
 
     <!-- Traceability table -->
-    <div data-slot="card" class="rounded-xl border bg-card overflow-hidden">
+    <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
         <div class="px-5 py-4 border-b flex items-center justify-between">
             <h2 class="font-semibold">Traceability Matrix</h2>
             <span class="text-sm text-muted-foreground">{{ total }} requirements</span>
         </div>
         {% if requirements %}
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
                 <thead>
                     <tr class="border-b bg-muted/50 text-muted-foreground">
                         <th class="px-4 py-3 text-left font-medium text-xs">Driver</th>
@@ -117,7 +117,7 @@
                         </td>
                         <td class="px-4 py-3 text-xs">
                             {% if req.togaf_phase %}
-                            <span class="inline-flex items-center rounded-full bg-primary/10 text-primary px-2 py-0.5 text-2xs font-medium">Phase {{ req.togaf_phase }}</span>
+                            <span class="inline-flex items-center rounded-full bg-primary/10 text-info-emphasis px-2 py-0.5 text-2xs font-medium">Phase {{ req.togaf_phase }}</span>
                             {% else %}
                             <span class="text-muted-foreground">—</span>
                             {% endif %}
@@ -154,7 +154,7 @@
             <i data-lucide="git-branch" class="h-12 w-12 mx-auto mb-4 opacity-40" aria-hidden="true"></i>
             <p class="mb-3">No requirements with traceability data yet.</p>
             <a href="/enterprise/capabilities"
-               class="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
                 Generate from Capability Map
             </a>
@@ -163,17 +163,17 @@
     </div>
 
     <!-- Architecture context -->
-    <div data-slot="card" class="rounded-xl border bg-card p-5">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-5">
         <h3 class="font-semibold mb-3 flex items-center gap-2">
             <i data-lucide="info" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
             Traceability Chain (TOGAF 9.2 / ArchiMate 3.2)
         </h3>
         <div class="flex flex-wrap gap-2 items-center text-sm text-muted-foreground">
-            <span class="rounded-full bg-primary/10 text-primary px-3 py-1 font-medium">Business Capability</span>
+            <span class="rounded-full bg-primary/10 text-info-emphasis px-3 py-1 font-medium">Business Capability</span>
             <i data-lucide="arrow-right" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
             <span class="rounded-full bg-violet-100 text-violet-700 px-3 py-1 font-medium">Requirement (Motivation)</span> {# token-migration-ok: violet is the app-wide AI-generated indicator colour, matching the AI badge this legend describes below #}
             <i data-lucide="arrow-right" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
-            <span class="rounded-full bg-primary/10 text-primary px-3 py-1 font-medium">Solution Architecture</span>
+            <span class="rounded-full bg-primary/10 text-info-emphasis px-3 py-1 font-medium">Solution Architecture</span>
             <i data-lucide="arrow-right" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
             <span class="rounded-full bg-success/10 text-success-emphasis px-3 py-1 font-medium">ADM Kanban Card</span>
         </div>
@@ -186,14 +186,14 @@
     <!-- ── Link-to-capability modal (AP-9: data-modal-close, hidden) ────────────────────────────────────── -->
     <div id="requirements-link-capability-modal"
          hidden
-         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50"
          aria-modal="true" role="dialog" aria-labelledby="trc-modal-title">
-        <div class="bg-card rounded-xl border shadow-xl w-full max-w-md"
+        <div class="bg-card rounded-lg border border-border w-full max-w-md"
              @click.stop>
             <div class="flex items-center justify-between px-5 py-4 border-b">
-                <h2 id="trc-modal-title" class="font-semibold text-base">Link Capability</h2>
+                <h2 id="trc-modal-title" class="text-base font-semibold text-foreground text-foreground">Link Capability</h2>
                 <button type="button" data-modal-close="requirements-link-capability-modal"
-                        class="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         aria-label="Close">
                     <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
                 </button>
@@ -239,7 +239,7 @@
                 </button>
                 <button type="button" @click="saveLink()"
                         :disabled="saving"
-                        class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="save" class="h-4 w-4" x-show="!saving" x-cloak aria-hidden="true"></i>
                     <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="saving" x-cloak aria-hidden="true"></i>
                     <span x-text="saving ? 'Saving…' : 'Save link'"></span>

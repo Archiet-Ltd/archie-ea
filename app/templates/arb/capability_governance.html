@@ -113,7 +113,7 @@
                     <template x-if="data && data.active_tactical_decisions && data.active_tactical_decisions.length > 0">
                         <div class="space-y-3">
                             <template x-for="d in data.active_tactical_decisions" :key="d.id">
-                                <div class="flex flex-wrap items-center gap-3 border border-border rounded-md px-4 py-3 bg-muted/10 hover:bg-muted/30 transition-colors">
+                                <div class="flex flex-wrap items-center gap-3 border border-border rounded-md px-4 py-2 bg-muted/10 hover:bg-muted/30 transition-colors">
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary/90">
                                         Tactical
                                     </span>
@@ -144,7 +144,7 @@
                 </div>
                 <template x-if="data && data.open_change_requests && data.open_change_requests.length > 0">
                     <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
+                        <table class="dense-table w-full text-sm">
                             <thead class="bg-muted/50 border-b border-border">
                                 <tr>
                                     <th class="px-4 py-3 text-left font-medium text-muted-foreground">Reference</th>

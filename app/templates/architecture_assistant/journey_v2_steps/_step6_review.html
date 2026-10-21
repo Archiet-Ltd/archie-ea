@@ -14,7 +14,7 @@
         <button type="button" @click="loadArbPackage()"
                 :disabled="arbLoading || readinessScore() < 100"
                 x-show="domainsPopulated && !arbPackage"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <template x-if="!arbLoading">
                 <span class="flex items-center gap-2">
                     <i data-lucide="file-check" class="w-4 h-4" aria-hidden="true"></i>
@@ -37,7 +37,7 @@
     </div>
 
     {# ── ARB Readiness Checklist (domains mode only, before package is built) ── #}
-    <div x-show="domainsPopulated && !arbPackage && !arbLoading" x-cloak class="rounded-xl border border-border bg-card p-5 space-y-4">
+    <div x-show="domainsPopulated && !arbPackage && !arbLoading" x-cloak class="rounded-lg border border-border bg-card p-5 space-y-4">
         <div class="flex items-center justify-between">
             <p class="text-2xs font-medium text-muted-foreground uppercase tracking-wider">ARB Readiness</p>
             <span class="text-sm font-bold"
@@ -105,7 +105,7 @@
 
         {# Recommendation detail #}
         <template x-if="reasoningRecommendation">
-            <div class="rounded-md border border-success/30 bg-success/5 px-4 py-3 space-y-2">
+            <div class="rounded-md border border-success/40 bg-success/10 px-4 py-2 space-y-2">
                 <div class="flex items-center gap-2">
                     <svg class="w-5 h-5 text-success" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
@@ -209,7 +209,7 @@
                         Generate Code
                     </button>
                     <a :href="'/solutions/' + solutionId"
-                       class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="external-link" class="w-4 h-4" aria-hidden="true"></i>
                         View Blueprint
                     </a>
@@ -346,7 +346,7 @@
         {# Already submitted — shown when returning to Step 6 after a prior submission (detected from governance_status) #}
         <div x-show="arbPackage.solution && arbPackage.solution.governance_status === 'arb_review' && !arbSubmitResult"
              x-cloak class="pt-2 border-t border-border">
-            <div class="rounded-md border border-success/30 bg-success/5 px-4 py-3 flex items-center gap-3">
+            <div class="rounded-md border border-success/40 bg-success/10 px-4 py-2 flex items-center gap-3">
                 <svg class="w-5 h-5 text-success shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
                 </svg>
@@ -416,7 +416,7 @@
                     <label class="block max-w-md text-xs text-muted-foreground">
                         Cost provenance <span class="font-normal">(required when estimated cost is non-zero)</span>
                         <select x-model="costSource" aria-label="Cost provenance"
-                                class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                                class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                             <option value="">Select when applicable</option>
                             <option value="manual_override">I confirm the estimate was manually reviewed</option>
                         </select>
@@ -437,14 +437,14 @@
                                 <label class="block text-xs text-muted-foreground">
                                     Evidence note
                                     <input type="text" x-model.trim="directEvidence[item.key].evidence" :aria-label="item.label + ' evidence note'" placeholder="Record what was checked and where the evidence is held"
-                                           class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                                           class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                                 </label>
                             </div>
                         </template>
                     </fieldset>
                 <button type="button" @click="submitEvidenceDossier()"
                         :disabled="arbSubmitting || !humanReviewed || !directEvidenceReady()"
-                        class="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:pointer-events-none disabled:opacity-50">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <template x-if="!arbSubmitting">
                         <span class="flex items-center gap-2">
                             <i data-lucide="send" class="w-4 h-4" aria-hidden="true"></i>
@@ -462,7 +462,7 @@
             </div>
 
             <div x-show="arbSubmissionError" x-cloak data-testid="arb-submission-error"
-                 class="rounded-md border border-warning/30 bg-warning/5 p-4" role="alert">
+                 class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2" role="alert">
                 <p class="text-sm font-semibold text-warning-emphasis" x-text="arbSubmissionError ? arbSubmissionError.title : ''"></p>
                 <p class="mt-1 text-xs text-muted-foreground" x-text="arbSubmissionError ? arbSubmissionError.message : ''"></p>
                 <ul x-show="arbSubmissionError && arbSubmissionError.kind === 'blocked' && arbSubmissionError.body && arbSubmissionError.body.missing_evidence && arbSubmissionError.body.missing_evidence.length"
@@ -475,7 +475,7 @@
                     </template>
                 </ul>
             </div>
-            <div x-show="!arbPackage.ready_for_arb && !arbSubmitResult" x-cloak class="rounded-md border border-warning/30 bg-warning/5 px-4 py-3 space-y-2">
+            <div x-show="!arbPackage.ready_for_arb && !arbSubmitResult" x-cloak class="rounded-md border border-warning/40 bg-warning/10 px-4 py-2 space-y-2">
                 <p class="text-sm font-medium text-warning-emphasis">Not ready for submission</p>
                 {# Surface specific gaps returned by the server so users know exactly what to fix #}
                 <template x-if="arbPackage.readiness_gaps && arbPackage.readiness_gaps.length > 0">
@@ -496,7 +496,7 @@
             {# ARB submission success + post-submit actions #}
             <div x-show="arbSubmitResult && arbSubmitResult.review_item_id && arbSubmitResult.review_number" x-cloak
                  role="status" aria-live="polite" aria-atomic="true" class="space-y-3">
-                <div class="rounded-md border border-success/30 bg-success/5 px-4 py-3">
+                <div class="rounded-md border border-success/40 bg-success/10 px-4 py-2">
                     <div class="flex items-center justify-between flex-wrap gap-3">
                         <div class="flex items-center gap-2">
                             <svg class="w-5 h-5 text-success flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -517,7 +517,7 @@
                 {# Post-submit action row #}
                 <div class="flex flex-wrap items-center gap-2">
                     <a :href="'/arb/reviews/' + arbSubmitResult.review_item_id"
-                       class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         <i data-lucide="external-link" class="h-3.5 w-3.5" aria-hidden="true"></i>
                         Open canonical review
                     </a>
@@ -538,7 +538,7 @@
                         ARB Package
                     </a>
                     <button type="button" @click="currentStep = 7"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="code-2" class="w-3.5 h-3.5" aria-hidden="true"></i>
                         Generate Code
                     </button>
@@ -560,7 +560,7 @@
                     Print ARB Package
                 </a>
                 <button type="button" @click="currentStep = 7"
-                        class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="code-2" class="w-3 h-3" aria-hidden="true"></i>
                     Generate Code
                 </button>
