@@ -42,12 +42,14 @@ from app.modules.intelligence.services.query_service import (
     SET_IMPACT_MAX_ROWS,
     SET_IMPACT_MAX_SEEDS,
     IntelligenceQueryService,
+    _resolve_elements_batch,
 )
 
 KIND_IMPACT = "impact"
 KIND_SET_IMPACT = "set_impact"
 KIND_RISK_PROPAGATION = "risk_propagation"
-ANSWER_KINDS = (KIND_IMPACT, KIND_SET_IMPACT, KIND_RISK_PROPAGATION)
+KIND_COMPLIANCE = "compliance"
+ANSWER_KINDS = (KIND_IMPACT, KIND_SET_IMPACT, KIND_RISK_PROPAGATION, KIND_COMPLIANCE)
 
 CONFIDENCE_LOWEST_DERIVED = "lowest_derived_row"
 CONFIDENCE_DRAWN_ONLY = "drawn_facts_only"
@@ -152,6 +154,10 @@ def normalise_params(kind: str, raw: Dict[str, Any]) -> Dict[str, Any]:
         raise AnswerParamError(f"question must be one of {list(ANSWER_KINDS)}")
     if not isinstance(raw, dict):
         raise AnswerParamError("the question must be an object")
+
+    if kind == KIND_COMPLIANCE:
+        # Which controls protect this element, and which are unmet: one element, no walk.
+        return {"element_id": _as_int(raw.get("element_id"), "element_id")}
 
     max_depth = raw.get("max_depth", 3)
     if isinstance(max_depth, bool) or not isinstance(max_depth, int) or not (1 <= max_depth <= 10):
@@ -258,6 +264,9 @@ def _row_truth_class(kind: str, row: Dict[str, Any]) -> str:
     derived ones do."""
     if kind == KIND_RISK_PROPAGATION:
         return TRUTH_CLASS_DERIVED if row.get("path_kind") == "derived" else TRUTH_CLASS_DRAWN
+    if kind == KIND_COMPLIANCE:
+        # A control row rests on a recorded link or a recorded mapping, never on inference.
+        return TRUTH_CLASS_DRAWN
     kinds = {rel.get("kind") for rel in _relations_of(kind, row)}
     return TRUTH_CLASS_DRAWN if "explicit" in kinds else TRUTH_CLASS_DERIVED
 
@@ -270,6 +279,10 @@ def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             cited.setdefault((source, ident), None)
 
     for row in rows:
+        if kind == KIND_COMPLIANCE:
+            cite("compliance_control", row.get("control_id"))
+            cite("relationship", row.get("relationship_id"))
+            continue
         if kind == KIND_RISK_PROPAGATION:
             cite("risk", row.get("risk_id"))
             for relationship_id in row.get("path_relationships") or []:
@@ -363,7 +376,34 @@ def build_envelope(
 # --------------------------------------------------------------------------- #
 
 
+def _compute_compliance(params: Dict[str, Any]) -> Dict[str, Any]:
+    """The compliance question, from the one compliance reader. The rows are the
+    controls the element is bound to; ``unmet`` counts those with no evidence recorded."""
+    result = IntelligenceQueryService.compliance_for_element(params["element_id"])
+    reasons = list(result.get("reasons") or [])
+    if NO_TENANT_CONTEXT_REASON in reasons:
+        raise AnswerNotAskable(NO_TENANT_CONTEXT_REASON)
+    if ELEMENT_NOT_FOUND_REASON in reasons:
+        raise AnswerNotAskable(ELEMENT_NOT_FOUND_REASON)
+    rows = list(result["controls"])
+    frameworks = sorted({row["framework_code"] for row in rows if row.get("framework_code")})
+    return {
+        "rows": rows,
+        "total": len(rows),
+        "summary": {
+            "unmet": sum(1 for row in rows if row.get("no_evidence")),
+            "frameworks": frameworks,
+            "open_violations": len(result.get("open_violations") or []),
+            "last_scan_at": result.get("last_scan_at"),
+        },
+        "reasons": reasons,
+        "elements": _resolve_elements_batch([params["element_id"]], current_org_id()),
+    }
+
+
 def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    if kind == KIND_COMPLIANCE:
+        return _compute_compliance(params)
     if kind == KIND_IMPACT:
         result = IntelligenceQueryService.cross_layer_impact(
             params["element_id"],

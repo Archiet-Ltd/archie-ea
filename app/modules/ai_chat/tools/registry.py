@@ -724,7 +724,7 @@ TOOL_SCHEMAS = [
     },
     {
         "name": "answer",
-        "surfaces": ["chat"],
+        "surfaces": ["chat", "mcp"],
         "route": "answer_envelope.ask_and_store",
         "fenced_fields": [],
         "risk_class": "read",
@@ -737,7 +737,10 @@ TOOL_SCHEMAS = [
             "address. Use this for 'what breaks if X fails' (question=impact, with "
             "element_id), 'what breaks if these fail together' (question=set_impact, "
             "with element_ids or a filter) and 'which risks reach X' "
-            "(question=risk_propagation, with element_id). Read-only: the answer is "
+            "(question=risk_propagation, with element_id), and 'which controls protect "
+            "X, and which are unmet' (question=compliance, with element_id; the "
+            "controls the element is bound to, each cited, with those that have no "
+            "evidence recorded counted as unmet). Read-only: the answer is "
             "stored as an immutable snapshot, nothing in the model changes. State "
             "only what the returned rows say, and name the records they name."
         ),
@@ -746,12 +749,12 @@ TOOL_SCHEMAS = [
             "properties": {
                 "question": {
                     "type": "string",
-                    "enum": ["impact", "set_impact", "risk_propagation"],
+                    "enum": ["impact", "set_impact", "risk_propagation", "compliance"],
                     "description": "Which question to answer",
                 },
                 "element_id": {
                     "type": "integer",
-                    "description": "The ArchiMate element id (impact, risk_propagation)",
+                    "description": "The ArchiMate element id (impact, risk_propagation, compliance)",
                 },
                 "element_ids": {
                     "type": "array",

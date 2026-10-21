@@ -2485,9 +2485,11 @@ class IntelligenceQueryService:
     @staticmethod
     def compliance_for_element(element_id: int) -> Dict[str, Any]:
         """"Which regulations and controls apply to this, and which controls have no evidence
-        of being met?": the controls the element's application is mapped to
-        (``ApplicationComplianceControl``, the tenant bridge), their global control and
-        framework names reached ONLY by the ids on those rows, the open policy violations
+        of being met?": the controls the element realises (an ordinary realisation link to
+        the control's Requirement element, for an element of any core type) and the controls
+        its application is mapped to in the older application-only rows
+        (``ApplicationComplianceControl``, still read, folded onto the links); their global
+        control and framework names reached ONLY by the ids on those rows, the open policy violations
         against the application, and when it was last scanned.
 
         Nothing is inferred and no stored aggregate is shown: ``ComplianceStatus`` percentages
@@ -2505,6 +2507,7 @@ class IntelligenceQueryService:
         from app.models.application_portfolio import ApplicationComponent
         from app.models.compliance_models import ComplianceControl, RegulatoryFramework
         from app.models.policy_monitoring import ArchitecturePolicy, ComplianceStatus, PolicyViolation
+        from app.modules.compliance.services.control_model_service import controls_realised_by
 
         predicate = IntelligenceQueryService._compliance_tenant_predicate
         as_of = datetime.now(timezone.utc).isoformat()
@@ -2535,21 +2538,29 @@ class IntelligenceQueryService:
                 .where(ApplicationComponent.archimate_element_id == element_id)
                 .where(predicate(ApplicationComponent, org_id))
             ).scalars().first()
-        if component_id is None:
+        realised = controls_realised_by(element_id, org_id)
+        if component_id is None and not realised:
             return {**empty, "reasons": [NO_APPLICATION_COMPONENT_REASON]}
 
-        rows = db.session.execute(
-            db.select(ApplicationComplianceControl, ComplianceControl, RegulatoryFramework)
-            .outerjoin(ComplianceControl, ComplianceControl.id == ApplicationComplianceControl.control_id)
-            .outerjoin(RegulatoryFramework, RegulatoryFramework.id == ComplianceControl.framework_id)
-            .where(ApplicationComplianceControl.application_id == component_id)
-            .where(predicate(ApplicationComplianceControl, org_id))
-            .order_by(RegulatoryFramework.code, ComplianceControl.control_code, ApplicationComplianceControl.id)
-            .limit(IntelligenceQueryService._COMPLIANCE_LIMIT)
-        ).all()
+        limit = IntelligenceQueryService._COMPLIANCE_LIMIT
+        rows = []
+        if component_id is not None:
+            rows = db.session.execute(
+                db.select(ApplicationComplianceControl, ComplianceControl, RegulatoryFramework)
+                .outerjoin(ComplianceControl, ComplianceControl.id == ApplicationComplianceControl.control_id)
+                .outerjoin(RegulatoryFramework, RegulatoryFramework.id == ComplianceControl.framework_id)
+                .where(ApplicationComplianceControl.application_id == component_id)
+                .where(predicate(ApplicationComplianceControl, org_id))
+                .order_by(RegulatoryFramework.code, ComplianceControl.control_code, ApplicationComplianceControl.id)
+                .limit(limit)
+            ).all()
 
+        # A control can be bound to any core element by a realisation link; an old
+        # application-only row for the same control keeps its status and evidence.
+        link_for_control = {link["control_id"]: link for link in realised}
         controls = []
         any_missing_evidence = False
+        seen_controls = set()
         for mapping, control, framework in rows:
             status = mapping.implementation_status
             has_url = bool((mapping.evidence_url or "").strip())
@@ -2559,6 +2570,8 @@ class IntelligenceQueryService:
                 and status not in IntelligenceQueryService._EVIDENCE_NOT_REQUIRED
             )
             any_missing_evidence = any_missing_evidence or missing
+            seen_controls.add(mapping.control_id)
+            link = link_for_control.get(mapping.control_id)
             controls.append({
                 "control_id": mapping.control_id,
                 "code": control.control_code if control else None,
@@ -2570,9 +2583,44 @@ class IntelligenceQueryService:
                 "verified": verified,
                 "verified_date": mapping.verified_date.isoformat() if mapping.verified_date else None,
                 "no_evidence": missing,
+                "relationship_id": link["relationship_id"] if link else None,
             })
 
-        violations = db.session.execute(
+        linked_only = [link for link in realised if link["control_id"] not in seen_controls]
+        if linked_only:
+            details = {
+                control.id: (control, framework)
+                for control, framework in db.session.execute(
+                    db.select(ComplianceControl, RegulatoryFramework)
+                    .outerjoin(RegulatoryFramework, RegulatoryFramework.id == ComplianceControl.framework_id)
+                    .where(ComplianceControl.id.in_([link["control_id"] for link in linked_only]))
+                ).all()
+            }
+            for link in linked_only:
+                control, framework = details.get(link["control_id"], (None, None))
+                if control is None:
+                    continue
+                # A control the element is bound to and that has no evidence record is
+                # unmet: nothing is inferred about it being met.
+                any_missing_evidence = True
+                seen_controls.add(link["control_id"])
+                controls.append({
+                    "control_id": control.id,
+                    "code": control.control_code,
+                    "name": control.title,
+                    "framework_code": framework.code if framework else None,
+                    "framework_name": framework.name if framework else None,
+                    "implementation_status": None,
+                    "evidence_url_recorded": False,
+                    "verified": False,
+                    "verified_date": None,
+                    "no_evidence": True,
+                    "relationship_id": link["relationship_id"],
+                })
+        controls.sort(key=lambda c: (c["framework_code"] or "", c["code"] or "", c["control_id"]))
+        controls = controls[:limit]
+
+        violations = [] if component_id is None else db.session.execute(
             db.select(PolicyViolation, ArchitecturePolicy.name)
             .outerjoin(ArchitecturePolicy, ArchitecturePolicy.id == PolicyViolation.policy_id)
             .where(PolicyViolation.entity_type == "application")
@@ -2592,7 +2640,7 @@ class IntelligenceQueryService:
             for violation, name in violations
         ]
 
-        last_scan = db.session.execute(
+        last_scan = None if component_id is None else db.session.execute(
             db.select(db.func.max(ComplianceStatus.last_scan_at))
             .where(ComplianceStatus.entity_type == "application")
             .where(ComplianceStatus.entity_id == component_id)
