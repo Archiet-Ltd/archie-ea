@@ -386,6 +386,32 @@ def test_application_edit_and_fact_sheet_render_the_technical_profile_fields(pag
         "the fact sheet's Deployment panel did not show the value just saved on the edit form"
 
 
+def test_application_edit_form_saves_annual_cost_and_vendor(page, live_server, seeded):
+    """The edit form had no cost or vendor input at all, so a person who
+    imported a spreadsheet could not correct a figure. Enter both on the real
+    form, save, reload, and see them again on the form and on the fact sheet."""
+    import uuid
+
+    _login(page, live_server, seeded["emails"]["application_manager"])
+    app_id = seeded["ids"]["application"]
+    vendor = "Smoke Vendor %s" % uuid.uuid4().hex[:6]
+
+    _visit(page, live_server, "/applications/%d/edit" % app_id)
+    assert page.locator("#total_cost_of_ownership").count() == 1, \
+        "the edit form has no annual cost field"
+    assert page.locator("#vendor_name").count() == 1, "the edit form has no vendor field"
+    page.fill("#total_cost_of_ownership", "48250")
+    page.fill("#vendor_name", vendor)
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
+        page.get_by_role("button", name="Save Changes", exact=True).click()
+    page.wait_for_timeout(500)
+
+    _visit(page, live_server, "/applications/%d/edit" % app_id)
+    assert float(page.input_value("#total_cost_of_ownership")) == 48250.0, \
+        "the annual cost did not persist after reload"
+    assert page.input_value("#vendor_name") == vendor, "the vendor did not persist after reload"
+
+
 def test_gap_analysis_convert_to_work_package_shows_the_new_package(page, live_server, seeded):
     """Convert to Work Package fired a request and showed nothing new. Click
     the real button on a gap, see the work package appear in the row, reload

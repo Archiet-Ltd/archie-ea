@@ -182,6 +182,17 @@
                  placeholder="e.g. Java, Spring Boot, PostgreSQL"
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         {% endcall %}
+        {% call form_group(id='vendor_name', label='Vendor') %}
+          <input type="text" id="vendor_name" name="vendor_name" value="{{ application.vendor_name or '' }}"
+                 placeholder="e.g. Microsoft, SAP, in-house"
+                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        {% endcall %}
+        {% call form_group(id='total_cost_of_ownership', label='Annual cost') %}
+          <input type="number" id="total_cost_of_ownership" name="total_cost_of_ownership" min="0" step="0.01"
+                 value="{{ annual_cost if annual_cost is not none else '' }}"
+                 placeholder="Total yearly cost to run this application"
+                 class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+        {% endcall %}
         {# F-08(c), Capgemini dry-run: applications had no way to record where
            they sit in the baseline/target architecture — the Traceability
            Matrix's plateau filters had nothing to find for ApplicationComponent

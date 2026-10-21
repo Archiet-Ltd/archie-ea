@@ -435,6 +435,39 @@ def apply_cost_to_application(
                 sync_cost_fact(app, field_name)
 
 
+def sync_cost_columns(app: ApplicationComponent, columns) -> None:
+    """Record the named cost columns of an application as cost facts.
+
+    For import paths that set a cost column on the model directly: the column
+    stays the value, and this makes the cost fact agree with it, the same as
+    ``set_annual_cost`` does. Columns that are not cost columns are ignored.
+    """
+    for column in columns:
+        if column in FACT_COLUMNS:
+            sync_cost_fact(app, column)
+
+
+def apply_imported_row_costs(app: ApplicationComponent, row: Dict[str, Any]) -> Dict[str, Any]:
+    """Detect, parse and write the cost columns of one imported row.
+
+    The one step every file-import path takes for cost: header spellings are
+    recognised by ``detect_cost_columns``, cells are parsed (currency, period,
+    thousands separators) by ``map_import_cost_columns`` and written through
+    ``apply_cost_to_application``. A blank or unparseable cell leaves the stored
+    value alone. Returns the parse result so a caller can report warnings.
+    """
+    clean = {str(key).strip(): value for key, value in row.items() if key is not None}
+    mapping = detect_cost_columns(list(clean))
+    if not mapping:
+        return {"cost_fields": {}, "cost_warnings": [], "cost_errors": {}}
+    org_id = app.organization_id
+    if org_id is None and has_request_context():
+        org_id = getattr(g, "current_org_id", None)
+    parsed = map_import_cost_columns(clean, mapping, reporting_currency=get_reporting_currency(org_id))
+    apply_cost_to_application(app, parsed["cost_fields"])
+    return parsed
+
+
 # Cost column variant definitions for case-insensitive header detection.
 # Each logical field maps to a list of recognised column-name spellings.
 _COST_COLUMN_VARIANTS: Dict[str, List[str]] = {
