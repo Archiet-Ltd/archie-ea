@@ -1,6 +1,6 @@
 ﻿{# smoke-coverage-ok: plain-language filter wiring — el.type, pt.type, pt.layer, row.application.type now use |plain_name and |plain_layer filters #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/dense_table.html' import dense_table %}
+{% from 'components/dense_table.html' import dense_table, matrix_row_header, matrix_cell %}
 {% from 'components/page_header.html' import page_header %}
 
 {# DEF-032, Capgemini dry-run: the browser tab title said "Requirements
@@ -220,240 +220,52 @@
         </div>
     </section>
 
-    <!-- View toggle -->
-    {# T-03 (2 Sep 2026 audit): this page defaulted to the Sankey DIAGRAM, with the
-       actual 43-row matrix TABLE hidden (style="display:none") until a user found
-       and clicked this "Matrix" toggle. At a narrow viewport a Sankey diagram — a
-       flow visualisation designed for a wide canvas — read as "hides its table and
-       shows an unreadable diagram instead", because the audited pass never found
-       the toggle. A table works at ANY width via horizontal scroll (T-01 restored
-       that); a Sankey diagram genuinely does not. Default to Matrix; Sankey stays
-       one click away for anyone who wants the flow view. #}
-    <div class="flex items-center gap-2">
-        <div class="inline-flex rounded-lg border border-border p-1 bg-muted/30" x-data="{ view: 'matrix' }">
-            <button type="button" @click="view = 'sankey'; document.getElementById('sankey-view').style.display = ''; document.getElementById('matrix-view').style.display = 'none'; if (window.createTraceabilitySankey) window.createTraceabilitySankey('#sankey-container', '/architecture/api/traceability/sankey?direction={{ direction }}&plateau={{ current_plateau or '' }}');"
-                    :class="view === 'sankey' ? 'bg-background text-foreground' : 'text-muted-foreground'"
-                    class="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors">
-                <i data-lucide="git-merge" class="h-4 w-4" aria-hidden="true"></i>
-                Sankey
-            </button>
-            <button type="button" @click="view = 'matrix'; document.getElementById('sankey-view').style.display = 'none'; document.getElementById('matrix-view').style.display = '';"
-                    :class="view === 'matrix' ? 'bg-background text-foreground' : 'text-muted-foreground'"
-                    class="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors">
-                <i data-lucide="table" class="h-4 w-4" aria-hidden="true"></i>
-                Matrix
-            </button>
-        </div>
-    </div>
-
-    <!-- Sankey view (hidden by default — see T-03 note above) -->
-    <div id="sankey-view" style="display: none; min-height: 500px;" class="rounded-lg border border-border bg-card overflow-hidden">
-        <div id="sankey-container" style="width: 100%; min-height: 500px;"></div>
-    </div>
-
-    <!-- Matrix table (visible by default) -->
+    {# The matrix is the dense-table matrix variant (design/patterns.json: matrix). Rows are the
+       application components (the source layer), columns the target layers, and each cell is the
+       number of relationships the data source returns for that row and layer, written in
+       matrix_cell's four states: none, one (its relationship), several (the count) and not
+       recorded. The names behind a cell are in its title. It is read whole, so no pagination. #}
     <div id="matrix-view" class="rounded-lg border border-border bg-card overflow-hidden">
         {% if matrix %}
-{% set _dt_header_16428 %}
-                        <th scope="col" class="h-10 px-2 align-middle text-left">{{ 'Technology Element' if direction == 'inverse' else 'Application Component' }}</th>
-                        <th scope="col" class="h-10 px-2 align-middle text-left">
-                            <span class="inline-flex items-center gap-1.5">
-                                <span class="h-2.5 w-2.5 rounded-full bg-fuchsia-500"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                Motivation / Goals
-                            </span>
-                        </th>
-                        <th scope="col" class="h-10 px-2 align-middle text-left">
-                            <span class="inline-flex items-center gap-1.5">
-                                <span class="h-2.5 w-2.5 rounded-full bg-violet-500"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                Strategy Layer
-                            </span>
-                        </th>
-                        <th scope="col" class="h-10 px-2 align-middle text-left">
-                            <span class="inline-flex items-center gap-1.5">
-                                <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                Business Layer
-                            </span>
-                        </th>
-                        <th scope="col" class="h-10 px-2 align-middle text-left">
-                            <span class="inline-flex items-center gap-1.5">
-                                <span class="h-2.5 w-2.5 rounded-full bg-amber-500"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                {{ 'Impact Assessment' if direction == 'inverse' else 'Technology Layer' }}
-                            </span>
-                        </th>
-                        <th scope="col" class="h-10 px-2 align-middle text-left">
-                            <span class="inline-flex items-center gap-1.5">
-                                <span class="h-2.5 w-2.5 rounded-full bg-sky-500"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                Data Objects
-                            </span>
-                        </th>
-                    
-{% endset %}
-{% call dense_table(header=_dt_header_16428, flush=true) %}
+        {% set layer_keys = ['motivation', 'strategy', 'business', 'technology', 'data'] %}
+        {% call dense_table(variant='matrix', flush=true, caption='Cross-layer traceability matrix',
+                columns=[
+                    ('Technology Element' if direction == 'inverse' else 'Application Component', ''),
+                    ('Motivation / Goals', 'text-center'),
+                    ('Strategy Layer', 'text-center'),
+                    ('Business Layer', 'text-center'),
+                    ('Impact Assessment' if direction == 'inverse' else 'Technology Layer', 'text-center'),
+                    ('Data Objects', 'text-center')]) %}
                     {% for row in matrix %}
-                    <tr class="hover:bg-muted/30 transition-colors">
-                        <!-- Application Component -->
-                        <td class="px-2">
-                            <a href="{{ url_for('architect_ui.element_traceability', element_id=row.application.id) }}"
-                               class="inline-flex items-center gap-1.5 font-medium text-foreground hover:text-primary transition-colors">
-                                <span>{{ row.application.name }}</span>
-                                {% if row.application.type %}
-                                <span class="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-info-emphasis ring-1 ring-inset ring-primary/20">
-                                    {{ row.application.type | plain_name(current_user) }}
-                                </span>
-                                {% endif %}
-                            </a>
-                        </td>
-
-                        <!-- Motivation -->
-                        <td class="px-2">
-                            <div class="flex flex-wrap gap-1.5">
-                                {% for el in row.motivation | default([], true) %}
-                                {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
-                                <span
-                                    {% if relationship_label %}title="{{ relationship_label }}"{% endif %}
-                                    class="inline-flex items-center gap-1.5 rounded-full bg-fuchsia-500/10 px-2.5 py-0.5 text-xs font-medium text-fuchsia-700 ring-1 ring-inset ring-fuchsia-500/20"  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                >
-                                    {{ el.name }}
-                                    {% if el.type %}
-                                    <span class="inline-flex items-center rounded-full bg-fuchsia-500/15 px-1.5 py-0.5 text-xs font-semibold text-fuchsia-800">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ el.type | plain_name(current_user) }}
-                                    </span>
-                                    {% endif %}
-                                    {% if el.relationship_type %}
-                                    <span class="inline-flex items-center rounded-full bg-fuchsia-500/15 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-fuchsia-800">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}
-                                    </span>
-                                    {% endif %}
-                                </span>
-                                {% endfor %}
-                                {% if not row.motivation | default([], true) %}
-                                <span class="text-xs text-muted-foreground">—</span>
-                                {% endif %}
-                            </div>
-                        </td>
-
-                        <!-- Strategy -->
-                        <td class="px-2">
-                            <div class="flex flex-wrap gap-1.5">
-                                {% for el in row.strategy %}
-                                {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
-                                <span
-                                    {% if relationship_label %}title="{{ relationship_label }}"{% endif %}
-                                    class="inline-flex items-center gap-1.5 rounded-full bg-violet-500/10 px-2.5 py-0.5 text-xs font-medium text-violet-700 ring-1 ring-inset ring-violet-500/20"  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                >
-                                    {{ el.name }}
-                                    {% if el.type %}
-                                    <span class="inline-flex items-center rounded-full bg-violet-500/15 px-1.5 py-0.5 text-xs font-semibold text-violet-800">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ el.type | plain_name(current_user) }}
-                                    </span>
-                                    {% endif %}
-                                    {% if el.relationship_type %}
-                                    <span class="inline-flex items-center rounded-full bg-violet-500/15 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-violet-800">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}
-                                    </span>
-                                    {% endif %}
-                                </span>
-                                {% endfor %}
-                                {% if not row.strategy %}
-                                <span class="text-xs text-muted-foreground">—</span>
-                                {% endif %}
-                            </div>
-                        </td>
-
-                        <!-- Business -->
-                        <td class="px-2">
-                            <div class="flex flex-wrap gap-1.5">
-                                {% for el in row.business %}
-                                {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
-                                <span
-                                    {% if relationship_label %}title="{{ relationship_label }}"{% endif %}
-                                    class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-500/20"  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                >
-                                    {{ el.name }}
-                                    {% if el.type %}
-                                    <span class="inline-flex items-center rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-xs font-semibold text-emerald-800">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ el.type | plain_name(current_user) }}
-                                    </span>
-                                    {% endif %}
-                                    {% if el.relationship_type %}
-                                    <span class="inline-flex items-center rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-emerald-800">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}
-                                    </span>
-                                    {% endif %}
-                                </span>
-                                {% endfor %}
-                                {% if not row.business %}
-                                <span class="text-xs text-muted-foreground">—</span>
-                                {% endif %}
-                            </div>
-                        </td>
-
-                        <!-- Technology / impact -->
-                        <td class="px-2">
-                            {% if direction == 'inverse' %}
+                    <tr class="h-12 hover:bg-muted/30 transition-colors">
+                        {{ matrix_row_header(row.application.name, href=url_for('architect_ui.element_traceability', element_id=row.application.id)) }}
+                        {% for key in layer_keys %}
+                        {% set items = row.get(key) %}
+                        {% if key == 'technology' and direction == 'inverse' %}
+                        <td class="px-2 text-center align-middle" data-state="link">
                             <a href="{{ url_for('architect_ui.impact_analysis', element_id=row.application.id) }}"
                                class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
                                 <i data-lucide="activity" class="h-4 w-4"></i>
                                 Impact Assessment
                             </a>
-                            {% else %}
-                            <div class="flex flex-wrap gap-1.5">
-                                {% for el in row.technology %}
-                                {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
-                                <span
-                                    {% if relationship_label %}title="{{ relationship_label }}"{% endif %}
-                                    class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-500/20"  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                >
-                                   {{ el.name }}
-                                    {% if el.type %}
-                                    <span class="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-xs font-semibold text-amber-800">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ el.type | plain_name(current_user) }}
-                                    </span>
-                                    {% endif %}
-                                    {% if el.relationship_type %}
-                                    <span class="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-800">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}
-                                    </span>
-                                    {% endif %}
-                                </span>
-                                {% endfor %}
-                                {% if not row.technology %}
-                                <span class="text-xs text-muted-foreground">—</span>
-                                {% endif %}
-                            </div>
-                            {% endif %}
                         </td>
-
-                        <!-- Data -->
-                        <td class="px-2">
-                            <div class="flex flex-wrap gap-1.5">
-                                {% for el in row.data | default([], true) %}
-                                {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
-                                <span
-                                    {% if relationship_label %}title="{{ relationship_label }}"{% endif %}
-                                    class="inline-flex items-center gap-1.5 rounded-full bg-sky-500/10 px-2.5 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-inset ring-sky-500/20"  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                >
-                                    {{ el.name }}
-                                    {% if el.type %}
-                                    <span class="inline-flex items-center rounded-full bg-sky-500/15 px-1.5 py-0.5 text-xs font-semibold text-sky-800">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ el.type | plain_name(current_user) }}
-                                    </span>
-                                    {% endif %}
-                                    {% if el.relationship_type %}
-                                    <span class="inline-flex items-center rounded-full bg-sky-500/15 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-sky-800">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}
-                                    </span>
-                                    {% endif %}
-                                </span>
-                                {% endfor %}
-                                {% if not row.data | default([], true) %}
-                                <span class="text-xs text-muted-foreground">—</span>
-                                {% endif %}
-                            </div>
-                        </td>
+                        {% elif items is none %}
+                        {{ matrix_cell('not-recorded') }}
+                        {% elif items | length == 0 %}
+                        {{ matrix_cell('empty') }}
+                        {% elif items | length == 1 %}
+                        {% set only = items[0] %}
+                        {% set rel_label = (only.relationship_type | replace('Relationship', '')) if only.relationship_type else '' %}
+                        {{ matrix_cell('single-value',
+                                       rel_abbrev.get(only.relationship_type, rel_label) if only.relationship_type else '1',
+                                       title=only.name ~ (' (' ~ rel_label ~ ')' if rel_label else '')) }}
+                        {% else %}
+                        {{ matrix_cell('multiple-count', items | length, title=items | map(attribute='name') | join(', ')) }}
+                        {% endif %}
+                        {% endfor %}
                     </tr>
                     {% endfor %}
-                {% endcall %}
+        {% endcall %}
         {# Show call-to-action when every row has zero connected elements #}
         {% set ns = namespace(aligned=0) %}
         {% for row in matrix %}
@@ -492,53 +304,8 @@
             </a>
         </div>
         {% endif %}
-        {# TRC-016: pagination controls #}
-        {% if total_pages is defined and total_pages > 1 %}
-        <div class="flex items-center justify-between border-t border-border px-4 py-3">
-            <p class="text-sm text-muted-foreground">
-                Showing {{ (current_page - 1) * page_size + 1 }}–{{ [current_page * page_size, total_count] | min }} of {{ total_count }} elements
-            </p>
-            <div class="flex items-center gap-1">
-                {% if current_page > 1 %}
-                <a href="{{ url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=current_page - 1) }}"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    <i data-lucide="chevron-left" class="h-4 w-4"></i>
-                </a>
-                {% endif %}
-                {% for p in range(1, total_pages + 1) %}
-                {% if p == current_page %}
-                <span class="inline-flex items-center rounded-md bg-primary px-2.5 py-1.5 text-sm font-medium text-primary-foreground">{{ p }}</span>
-                {% elif p <= 3 or p >= total_pages - 2 or (p >= current_page - 1 and p <= current_page + 1) %}
-                <a href="{{ url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=p) }}"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">{{ p }}</a>
-                {% elif p == 4 or p == total_pages - 3 %}
-                <span class="px-1 text-muted-foreground">…</span>
-                {% endif %}
-                {% endfor %}
-                {% if current_page < total_pages %}
-                <a href="{{ url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=current_page + 1) }}"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    <i data-lucide="chevron-right" class="h-4 w-4"></i>
-                </a>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
     </div>
 
     </div><!-- /x-data matrixSearch -->
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script src="/static/vendor/d3.min.js"></script>
-<script src="/static/vendor/d3-sankey.min.js"></script>
-<script src="{{ url_for('static', filename='js/archimate_views/traceability_sankey.js') }}"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    if (window.createTraceabilitySankey) {
-        window.createTraceabilitySankey('#sankey-container', '/architecture/api/traceability/sankey?direction={{ direction }}&plateau={{ current_plateau or "" }}');
-    }
-});
-</script>
 {% endblock %}

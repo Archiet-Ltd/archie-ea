@@ -654,9 +654,12 @@ def traceability_matrix():
                                             plateau=plateau, search=search, scope=scope)
     total_pages = max(1, (total_count + page_size - 1) // page_size)
     matrix = _normalize_traceability_matrix(
+        # The matrix variant is read whole (design/patterns.json: matrix, pagination false),
+        # so the page asks for every row, as the CSV export does.
         service.get_full_matrix(pivot_type=pivot_type, pivot_layer=pivot_layer, plateau=plateau,
-                                limit=page_size, offset=offset, search=search, scope=scope)
+                                limit=None, offset=0, search=search, scope=scope)
     )
+    total_pages = 1
     # ADR-0008: read coverage/orphans from the SAME store the matrix and pivot
     # dropdown read (archimate_elements + archimate_relationships), so the three
     # surfaces on this page agree instead of counting three different stores.
