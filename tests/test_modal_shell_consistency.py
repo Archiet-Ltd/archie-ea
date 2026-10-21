@@ -132,49 +132,27 @@ def test_unified_mapping_modal_zindex_is_not_a_tailwind_arbitrary_class():
     """A CSP fix once moved this modal's z-index onto Tailwind arbitrary-value
     classes (`z-[var(--modal-z,1000)]` on the root, `z-[calc(var(--modal-z,1000)+1)]`
     on the panel). Tailwind's JIT compiler does not reliably emit a usable rule
-    for an arbitrary value that mixes a comma and a `+`, so the compiled
-    stylesheet silently dropped the panel's raised z-index and the panel sat
-    level with its own backdrop instead of above it. The working fix sets both
-    z-index levels as real CSS in the nonce-scoped <style> block at the top of
-    the file, and the modal's root and panel elements must never again carry
-    an arbitrary z-[...] class for this. Fail-first: this failed against the
-    Tailwind-arbitrary-class version of the file before the fix, and passes
-    against the <style>-block version."""
+    for an arbitrary value that mixes a comma and a `+`, so the panel sat level
+    with its own backdrop. A later fix set both levels in a nonce-scoped <style>
+    block, which the content security policy refuses when the modal is imported
+    without context. Both levels now come from the stylesheet rules on
+    modal-root and modal-panel; the root and panel must carry those classes and
+    never an arbitrary z-[...] class."""
     rel = "app/templates/components/unified_mapping_modal.html"
     src = _read(rel)
+    css = _read(STYLESHEET)
 
-    root_rule = re.search(
-        r"#unified-mapping-modal\s*\{\s*z-index:\s*var\(--modal-z,\s*(\d+)\)\s*;?\s*\}",
-        src,
-    )
-    panel_rule = re.search(
-        r"#unified-mapping-modal\s*\[data-modal-panel\]\s*\{\s*z-index:\s*"
-        r"calc\(var\(--modal-z,\s*(\d+)\)\s*\+\s*(\d+)\)\s*;?\s*\}",
-        src,
-    )
-    assert root_rule, (
-        f"{rel}: no explicit '#unified-mapping-modal {{ z-index: var(--modal-z, N) }}' "
-        "rule in a <style> block"
-    )
-    assert panel_rule, (
-        f"{rel}: no explicit panel z-index rule "
-        "('#unified-mapping-modal [data-modal-panel] { z-index: calc(...) }') "
-        "in a <style> block"
-    )
-    assert root_rule.group(1) == panel_rule.group(1), (
-        f"{rel}: the root and panel z-index rules fall back to different "
-        "--modal-z values"
-    )
-    assert int(panel_rule.group(2)) > 0, (
-        f"{rel}: the panel's z-index must be raised strictly above the root, "
-        "not merely equal to it"
-    )
+    root_rule = re.search(r"\.modal-root,\s*\.modal-backdrop\s*\{\s*z-index:\s*var\(--modal-z,\s*(\d+)\)\s*;", css)
+    panel_rule = re.search(r"\.modal-panel\s*\{\s*z-index:\s*calc\(var\(--modal-z,\s*(\d+)\)\s*\+\s*(\d+)\)\s*;", css)
+    assert root_rule and panel_rule, "the stylesheet lost the modal layer scale"
+    assert root_rule.group(1) == panel_rule.group(1), "root and panel fall back to different --modal-z values"
+    assert int(panel_rule.group(2)) > 0, "the panel must sit strictly above its root"
 
     root_tag = re.search(r'<div id="unified-mapping-modal"[^>]*>', src)
     panel_tag = re.search(r"<div data-modal-panel\b[^>]*>", src)
-    assert root_tag and "z-[" not in root_tag.group(0), (
-        f"{rel}: the modal root carries a Tailwind arbitrary z-[...] class again"
-    )
-    assert panel_tag and "z-[" not in panel_tag.group(0), (
-        f"{rel}: the modal panel carries a Tailwind arbitrary z-[...] class again"
-    )
+    assert root_tag and re.search(r'class="[^"]*\bmodal-root\b', root_tag.group(0)), (
+        f"{rel}: the modal root does not carry modal-root")
+    assert panel_tag and re.search(r'class="[^"]*\bmodal-panel\b', panel_tag.group(0)), (
+        f"{rel}: the modal panel does not carry modal-panel")
+    assert "z-[" not in root_tag.group(0), f"{rel}: the modal root carries a Tailwind arbitrary z-[...] class again"
+    assert "z-[" not in panel_tag.group(0), f"{rel}: the modal panel carries a Tailwind arbitrary z-[...] class again"
