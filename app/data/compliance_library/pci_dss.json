@@ -1,0 +1,114 @@
+{
+ "code": "PCI-DSS",
+ "name": "PCI DSS v4.0 Payment Card Industry Data Security Standard",
+ "description": "The 12 principal requirements with short titles and the official reference. The sub-requirements and testing procedures are licensed and are not loaded, so the count here is of principal requirements.",
+ "category": "security",
+ "jurisdiction": "Global",
+ "enforcement_level": "mandatory",
+ "penalty_risk": "high",
+ "applies_to_manufacturing": true,
+ "applies_to_region": "Global",
+ "industry_specific": "general",
+ "official_url": "https://www.pcisecuritystandards.org/document_library/",
+ "standard_version": "4.0",
+ "total_controls": 12,
+ "content_level": "identifiers",
+ "controls": [
+  {
+   "control_code": "Req. 1",
+   "title": "Network security controls",
+   "description": null,
+   "category": "Principal requirement",
+   "subcategory": null,
+   "official_reference": "PCI DSS v4.0"
+  },
+  {
+   "control_code": "Req. 2",
+   "title": "Secure configurations",
+   "description": null,
+   "category": "Principal requirement",
+   "subcategory": null,
+   "official_reference": "PCI DSS v4.0"
+  },
+  {
+   "control_code": "Req. 3",
+   "title": "Protection of stored account data",
+   "description": null,
+   "category": "Principal requirement",
+   "subcategory": null,
+   "official_reference": "PCI DSS v4.0"
+  },
+  {
+   "control_code": "Req. 4",
+   "title": "Cryptography in transmission",
+   "description": null,
+   "category": "Principal requirement",
+   "subcategory": null,
+   "official_reference": "PCI DSS v4.0"
+  },
+  {
+   "control_code": "Req. 5",
+   "title": "Protection from malicious software",
+   "description": null,
+   "category": "Principal requirement",
+   "subcategory": null,
+   "official_reference": "PCI DSS v4.0"
+  },
+  {
+   "control_code": "Req. 6",
+   "title": "Secure systems and software",
+   "description": null,
+   "category": "Principal requirement",
+   "subcategory": null,
+   "official_reference": "PCI DSS v4.0"
+  },
+  {
+   "control_code": "Req. 7",
+   "title": "Access restricted by need to know",
+   "description": null,
+   "category": "Principal requirement",
+   "subcategory": null,
+   "official_reference": "PCI DSS v4.0"
+  },
+  {
+   "control_code": "Req. 8",
+   "title": "User identification and authentication",
+   "description": null,
+   "category": "Principal requirement",
+   "subcategory": null,
+   "official_reference": "PCI DSS v4.0"
+  },
+  {
+   "control_code": "Req. 9",
+   "title": "Physical access restriction",
+   "description": null,
+   "category": "Principal requirement",
+   "subcategory": null,
+   "official_reference": "PCI DSS v4.0"
+  },
+  {
+   "control_code": "Req. 10",
+   "title": "Logging and monitoring",
+   "description": null,
+   "category": "Principal requirement",
+   "subcategory": null,
+   "official_reference": "PCI DSS v4.0"
+  },
+  {
+   "control_code": "Req. 11",
+   "title": "Regular security testing",
+   "description": null,
+   "category": "Principal requirement",
+   "subcategory": null,
+   "official_reference": "PCI DSS v4.0"
+  },
+  {
+   "control_code": "Req. 12",
+   "title": "Information security policy and programs",
+   "description": null,
+   "category": "Principal requirement",
+   "subcategory": null,
+   "official_reference": "PCI DSS v4.0"
+  }
+ ]
+}

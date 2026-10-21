@@ -1,0 +1,810 @@
+{
+ "code": "GDPR",
+ "name": "General Data Protection Regulation (EU) 2016/679",
+ "description": "All 99 articles of the Regulation with their titles and chapters. Articles 5 to 50, the obligations on controllers and processors and the rights of data subjects, also carry a one-line summary; the other articles carry a title only. The text of the articles is not loaded.",
+ "category": "privacy",
+ "jurisdiction": "EU",
+ "enforcement_level": "mandatory",
+ "penalty_risk": "critical",
+ "applies_to_manufacturing": true,
+ "applies_to_region": "EU",
+ "industry_specific": "general",
+ "official_url": "https://eur-lex.europa.eu/eli/reg/2016/679/oj",
+ "standard_version": "2016/679",
+ "total_controls": 99,
+ "content_level": "titles",
+ "controls": [
+  {
+   "control_code": "Art. 1",
+   "title": "Subject-matter and objectives",
+   "description": null,
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 1"
+  },
+  {
+   "control_code": "Art. 2",
+   "title": "Material scope",
+   "description": null,
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 2"
+  },
+  {
+   "control_code": "Art. 3",
+   "title": "Territorial scope",
+   "description": null,
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 3"
+  },
+  {
+   "control_code": "Art. 4",
+   "title": "Definitions",
+   "description": null,
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 4"
+  },
+  {
+   "control_code": "Art. 5",
+   "title": "Principles relating to processing of personal data",
+   "description": "Personal data is processed lawfully, fairly and transparently, for specified purposes, minimised, kept accurate, kept no longer than needed, secured, and the controller can demonstrate it.",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 5"
+  },
+  {
+   "control_code": "Art. 6",
+   "title": "Lawfulness of processing",
+   "description": "Processing is lawful only if at least one of the listed legal bases applies.",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 6"
+  },
+  {
+   "control_code": "Art. 7",
+   "title": "Conditions for consent",
+   "description": "Where consent is the basis the controller can demonstrate it, and the data subject can withdraw it as easily as it was given.",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 7"
+  },
+  {
+   "control_code": "Art. 8",
+   "title": "Child's consent in relation to information society services",
+   "description": "Consent for information society services offered directly to a child is valid only with parental authorisation below the age threshold.",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 8"
+  },
+  {
+   "control_code": "Art. 9",
+   "title": "Processing of special categories of personal data",
+   "description": "Processing special categories of personal data is prohibited unless a listed exception applies.",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 9"
+  },
+  {
+   "control_code": "Art. 10",
+   "title": "Criminal convictions and offences data",
+   "description": "Processing of criminal conviction and offence data is carried out only under official authority or as authorised by law.",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 10"
+  },
+  {
+   "control_code": "Art. 11",
+   "title": "Processing which does not require identification",
+   "description": "A controller need not collect extra data solely to identify a data subject.",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 11"
+  },
+  {
+   "control_code": "Art. 12",
+   "title": "Transparent information and modalities for exercising rights",
+   "description": "Information and communications to data subjects are concise, transparent and easily accessible, and requests are answered within one month.",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 12"
+  },
+  {
+   "control_code": "Art. 13",
+   "title": "Information to be provided where data is collected from the data subject",
+   "description": "Specified information is given to the data subject when data is collected from them.",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 13"
+  },
+  {
+   "control_code": "Art. 14",
+   "title": "Information to be provided where data is not obtained from the data subject",
+   "description": "Specified information is given to the data subject when data is obtained from another source.",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 14"
+  },
+  {
+   "control_code": "Art. 15",
+   "title": "Right of access by the data subject",
+   "description": "The data subject can obtain confirmation, a copy and details of the processing of their data.",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 15"
+  },
+  {
+   "control_code": "Art. 16",
+   "title": "Right to rectification",
+   "description": "The data subject can have inaccurate data rectified and incomplete data completed.",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 16"
+  },
+  {
+   "control_code": "Art. 17",
+   "title": "Right to erasure",
+   "description": "The data subject can have personal data erased where a listed ground applies.",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 17"
+  },
+  {
+   "control_code": "Art. 18",
+   "title": "Right to restriction of processing",
+   "description": "The data subject can restrict processing in listed circumstances.",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 18"
+  },
+  {
+   "control_code": "Art. 19",
+   "title": "Notification obligation regarding rectification, erasure or restriction",
+   "description": "Recipients are notified of rectification, erasure or restriction.",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 19"
+  },
+  {
+   "control_code": "Art. 20",
+   "title": "Right to data portability",
+   "description": "The data subject can receive their data in a structured, machine-readable format and transmit it to another controller.",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 20"
+  },
+  {
+   "control_code": "Art. 21",
+   "title": "Right to object",
+   "description": "The data subject can object to processing based on public interest or legitimate interests, and to direct marketing.",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 21"
+  },
+  {
+   "control_code": "Art. 22",
+   "title": "Automated individual decision-making, including profiling",
+   "description": "The data subject has the right not to be subject to solely automated decisions with legal or similarly significant effects.",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 22"
+  },
+  {
+   "control_code": "Art. 23",
+   "title": "Restrictions",
+   "description": "Union or Member State law may restrict the scope of these rights under listed conditions.",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 23"
+  },
+  {
+   "control_code": "Art. 24",
+   "title": "Responsibility of the controller",
+   "description": "The controller implements and reviews appropriate technical and organisational measures and can demonstrate compliance.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 24"
+  },
+  {
+   "control_code": "Art. 25",
+   "title": "Data protection by design and by default",
+   "description": "Data protection by design and by default is built into processing.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 25"
+  },
+  {
+   "control_code": "Art. 26",
+   "title": "Joint controllers",
+   "description": "Joint controllers determine their respective responsibilities by arrangement.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 26"
+  },
+  {
+   "control_code": "Art. 27",
+   "title": "Representatives of controllers or processors not established in the Union",
+   "description": "Controllers and processors not established in the Union designate a representative in the Union.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 27"
+  },
+  {
+   "control_code": "Art. 28",
+   "title": "Processor",
+   "description": "Processors give sufficient guarantees and process only under a binding contract with the controller.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 28"
+  },
+  {
+   "control_code": "Art. 29",
+   "title": "Processing under the authority of the controller or processor",
+   "description": "A processor and persons acting under it process personal data only on the controller's instructions.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 29"
+  },
+  {
+   "control_code": "Art. 30",
+   "title": "Records of processing activities",
+   "description": "Controllers and processors maintain records of processing activities.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 30"
+  },
+  {
+   "control_code": "Art. 31",
+   "title": "Cooperation with the supervisory authority",
+   "description": "Controllers and processors cooperate with the supervisory authority on request.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 31"
+  },
+  {
+   "control_code": "Art. 32",
+   "title": "Security of processing",
+   "description": "Controllers and processors implement security measures appropriate to the risk.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 32"
+  },
+  {
+   "control_code": "Art. 33",
+   "title": "Notification of a personal data breach to the supervisory authority",
+   "description": "Personal data breaches are notified to the supervisory authority without undue delay and where feasible within 72 hours.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 33"
+  },
+  {
+   "control_code": "Art. 34",
+   "title": "Communication of a personal data breach to the data subject",
+   "description": "High-risk personal data breaches are communicated to the affected data subjects without undue delay.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 34"
+  },
+  {
+   "control_code": "Art. 35",
+   "title": "Data protection impact assessment",
+   "description": "A data protection impact assessment is carried out where processing is likely to result in high risk.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 35"
+  },
+  {
+   "control_code": "Art. 36",
+   "title": "Prior consultation",
+   "description": "The controller consults the supervisory authority before processing where an impact assessment indicates high residual risk.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 36"
+  },
+  {
+   "control_code": "Art. 37",
+   "title": "Designation of the data protection officer",
+   "description": "A data protection officer is designated in the cases the Regulation lists.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 37"
+  },
+  {
+   "control_code": "Art. 38",
+   "title": "Position of the data protection officer",
+   "description": "The data protection officer is involved properly, resourced, independent and reports to the highest management level.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 38"
+  },
+  {
+   "control_code": "Art. 39",
+   "title": "Tasks of the data protection officer",
+   "description": "The data protection officer informs and advises, monitors compliance and acts as contact point for the supervisory authority.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 39"
+  },
+  {
+   "control_code": "Art. 40",
+   "title": "Codes of conduct",
+   "description": "Codes of conduct are encouraged to contribute to the proper application of the Regulation.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 40"
+  },
+  {
+   "control_code": "Art. 41",
+   "title": "Monitoring of approved codes of conduct",
+   "description": "Compliance with approved codes of conduct is monitored by an accredited body.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 41"
+  },
+  {
+   "control_code": "Art. 42",
+   "title": "Certification",
+   "description": "Data protection certification mechanisms, seals and marks are encouraged.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 42"
+  },
+  {
+   "control_code": "Art. 43",
+   "title": "Certification bodies",
+   "description": "Certification bodies are accredited and issue and renew certification.",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 43"
+  },
+  {
+   "control_code": "Art. 44",
+   "title": "General principle for transfers",
+   "description": "Transfers of personal data to third countries take place only where the conditions of this Chapter are met.",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 44"
+  },
+  {
+   "control_code": "Art. 45",
+   "title": "Transfers on the basis of an adequacy decision",
+   "description": "Transfers may take place to a country, territory or sector the Commission has found to ensure an adequate level of protection.",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 45"
+  },
+  {
+   "control_code": "Art. 46",
+   "title": "Transfers subject to appropriate safeguards",
+   "description": "Absent an adequacy decision, transfers require appropriate safeguards with enforceable rights and effective remedies.",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 46"
+  },
+  {
+   "control_code": "Art. 47",
+   "title": "Binding corporate rules",
+   "description": "Binding corporate rules approved by the supervisory authority can provide safeguards for transfers within a group.",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 47"
+  },
+  {
+   "control_code": "Art. 48",
+   "title": "Transfers or disclosures not authorised by Union law",
+   "description": "A third-country court or authority decision requiring transfer or disclosure is recognised only on the basis of an international agreement.",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 48"
+  },
+  {
+   "control_code": "Art. 49",
+   "title": "Derogations for specific situations",
+   "description": "Transfers without adequacy or safeguards are permitted only in the listed specific situations.",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 49"
+  },
+  {
+   "control_code": "Art. 50",
+   "title": "International cooperation for the protection of personal data",
+   "description": "The Commission and supervisory authorities develop international cooperation for the protection of personal data.",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 50"
+  },
+  {
+   "control_code": "Art. 51",
+   "title": "Supervisory authority",
+   "description": null,
+   "category": "Chapter VI: Independent supervisory authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 51"
+  },
+  {
+   "control_code": "Art. 52",
+   "title": "Independence",
+   "description": null,
+   "category": "Chapter VI: Independent supervisory authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 52"
+  },
+  {
+   "control_code": "Art. 53",
+   "title": "General conditions for the members of the supervisory authority",
+   "description": null,
+   "category": "Chapter VI: Independent supervisory authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 53"
+  },
+  {
+   "control_code": "Art. 54",
+   "title": "Rules on the establishment of the supervisory authority",
+   "description": null,
+   "category": "Chapter VI: Independent supervisory authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 54"
+  },
+  {
+   "control_code": "Art. 55",
+   "title": "Competence",
+   "description": null,
+   "category": "Chapter VI: Independent supervisory authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 55"
+  },
+  {
+   "control_code": "Art. 56",
+   "title": "Competence of the lead supervisory authority",
+   "description": null,
+   "category": "Chapter VI: Independent supervisory authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 56"
+  },
+  {
+   "control_code": "Art. 57",
+   "title": "Tasks",
+   "description": null,
+   "category": "Chapter VI: Independent supervisory authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 57"
+  },
+  {
+   "control_code": "Art. 58",
+   "title": "Powers",
+   "description": null,
+   "category": "Chapter VI: Independent supervisory authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 58"
+  },
+  {
+   "control_code": "Art. 59",
+   "title": "Activity reports",
+   "description": null,
+   "category": "Chapter VI: Independent supervisory authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 59"
+  },
+  {
+   "control_code": "Art. 60",
+   "title": "Cooperation between the lead supervisory authority and the other supervisory authorities concerned",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 60"
+  },
+  {
+   "control_code": "Art. 61",
+   "title": "Mutual assistance",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 61"
+  },
+  {
+   "control_code": "Art. 62",
+   "title": "Joint operations of supervisory authorities",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 62"
+  },
+  {
+   "control_code": "Art. 63",
+   "title": "Consistency mechanism",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 63"
+  },
+  {
+   "control_code": "Art. 64",
+   "title": "Opinion of the Board",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 64"
+  },
+  {
+   "control_code": "Art. 65",
+   "title": "Dispute resolution by the Board",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 65"
+  },
+  {
+   "control_code": "Art. 66",
+   "title": "Urgency procedure",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 66"
+  },
+  {
+   "control_code": "Art. 67",
+   "title": "Exchange of information",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 67"
+  },
+  {
+   "control_code": "Art. 68",
+   "title": "European Data Protection Board",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 68"
+  },
+  {
+   "control_code": "Art. 69",
+   "title": "Independence of the Board",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 69"
+  },
+  {
+   "control_code": "Art. 70",
+   "title": "Tasks of the Board",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 70"
+  },
+  {
+   "control_code": "Art. 71",
+   "title": "Reports of the Board",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 71"
+  },
+  {
+   "control_code": "Art. 72",
+   "title": "Procedure of the Board",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 72"
+  },
+  {
+   "control_code": "Art. 73",
+   "title": "Chair of the Board",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 73"
+  },
+  {
+   "control_code": "Art. 74",
+   "title": "Tasks of the Chair",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 74"
+  },
+  {
+   "control_code": "Art. 75",
+   "title": "Secretariat of the Board",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 75"
+  },
+  {
+   "control_code": "Art. 76",
+   "title": "Confidentiality of the Board",
+   "description": null,
+   "category": "Chapter VII: Cooperation and consistency",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 76"
+  },
+  {
+   "control_code": "Art. 77",
+   "title": "Right to lodge a complaint with a supervisory authority",
+   "description": null,
+   "category": "Chapter VIII: Remedies, liability and penalties",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 77"
+  },
+  {
+   "control_code": "Art. 78",
+   "title": "Right to an effective judicial remedy against a supervisory authority",
+   "description": null,
+   "category": "Chapter VIII: Remedies, liability and penalties",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 78"
+  },
+  {
+   "control_code": "Art. 79",
+   "title": "Right to an effective judicial remedy against a controller or processor",
+   "description": null,
+   "category": "Chapter VIII: Remedies, liability and penalties",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 79"
+  },
+  {
+   "control_code": "Art. 80",
+   "title": "Representation of data subjects",
+   "description": null,
+   "category": "Chapter VIII: Remedies, liability and penalties",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 80"
+  },
+  {
+   "control_code": "Art. 81",
+   "title": "Suspension of proceedings",
+   "description": null,
+   "category": "Chapter VIII: Remedies, liability and penalties",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 81"
+  },
+  {
+   "control_code": "Art. 82",
+   "title": "Right to compensation and liability",
+   "description": null,
+   "category": "Chapter VIII: Remedies, liability and penalties",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 82"
+  },
+  {
+   "control_code": "Art. 83",
+   "title": "General conditions for imposing administrative fines",
+   "description": null,
+   "category": "Chapter VIII: Remedies, liability and penalties",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 83"
+  },
+  {
+   "control_code": "Art. 84",
+   "title": "Penalties",
+   "description": null,
+   "category": "Chapter VIII: Remedies, liability and penalties",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 84"
+  },
+  {
+   "control_code": "Art. 85",
+   "title": "Processing and freedom of expression and information",
+   "description": null,
+   "category": "Chapter IX: Provisions relating to specific processing situations",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 85"
+  },
+  {
+   "control_code": "Art. 86",
+   "title": "Processing and public access to official documents",
+   "description": null,
+   "category": "Chapter IX: Provisions relating to specific processing situations",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 86"
+  },
+  {
+   "control_code": "Art. 87",
+   "title": "Processing of the national identification number",
+   "description": null,
+   "category": "Chapter IX: Provisions relating to specific processing situations",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 87"
+  },
+  {
+   "control_code": "Art. 88",
+   "title": "Processing in the context of employment",
+   "description": null,
+   "category": "Chapter IX: Provisions relating to specific processing situations",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 88"
+  },
+  {
+   "control_code": "Art. 89",
+   "title": "Safeguards and derogations for archiving, research and statistical purposes",
+   "description": null,
+   "category": "Chapter IX: Provisions relating to specific processing situations",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 89"
+  },
+  {
+   "control_code": "Art. 90",
+   "title": "Obligations of secrecy",
+   "description": null,
+   "category": "Chapter IX: Provisions relating to specific processing situations",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 90"
+  },
+  {
+   "control_code": "Art. 91",
+   "title": "Existing data protection rules of churches and religious associations",
+   "description": null,
+   "category": "Chapter IX: Provisions relating to specific processing situations",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 91"
+  },
+  {
+   "control_code": "Art. 92",
+   "title": "Exercise of the delegation",
+   "description": null,
+   "category": "Chapter X: Delegated acts and implementing acts",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 92"
+  },
+  {
+   "control_code": "Art. 93",
+   "title": "Committee procedure",
+   "description": null,
+   "category": "Chapter X: Delegated acts and implementing acts",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 93"
+  },
+  {
+   "control_code": "Art. 94",
+   "title": "Repeal of Directive 95/46/EC",
+   "description": null,
+   "category": "Chapter XI: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 94"
+  },
+  {
+   "control_code": "Art. 95",
+   "title": "Relationship with Directive 2002/58/EC",
+   "description": null,
+   "category": "Chapter XI: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 95"
+  },
+  {
+   "control_code": "Art. 96",
+   "title": "Relationship with previously concluded agreements",
+   "description": null,
+   "category": "Chapter XI: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 96"
+  },
+  {
+   "control_code": "Art. 97",
+   "title": "Commission reports",
+   "description": null,
+   "category": "Chapter XI: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 97"
+  },
+  {
+   "control_code": "Art. 98",
+   "title": "Review of other Union legal acts on data protection",
+   "description": null,
+   "category": "Chapter XI: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 98"
+  },
+  {
+   "control_code": "Art. 99",
+   "title": "Entry into force and application",
+   "description": null,
+   "category": "Chapter XI: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2016/679, Article 99"
+  }
+ ]
+}

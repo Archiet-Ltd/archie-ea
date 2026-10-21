@@ -1,0 +1,506 @@
+{
+ "code": "SOC-2",
+ "name": "SOC 2 Trust Services Criteria",
+ "description": "The criteria identifiers (common criteria plus availability, confidentiality, processing integrity and privacy) with short titles and the official reference. The criteria text is licensed and is not loaded.",
+ "category": "security",
+ "jurisdiction": "US",
+ "enforcement_level": "recommended",
+ "penalty_risk": "high",
+ "applies_to_manufacturing": true,
+ "applies_to_region": "Global",
+ "industry_specific": "general",
+ "official_url": "https://www.aicpa-cima.com/topic/audit-assurance/audit-and-assurance-greater-than-soc-2",
+ "standard_version": "2017 (revised 2022)",
+ "total_controls": 61,
+ "content_level": "identifiers",
+ "controls": [
+  {
+   "control_code": "CC1.1",
+   "title": "Integrity and ethical values",
+   "description": null,
+   "category": "Control environment",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC1.2",
+   "title": "Board oversight",
+   "description": null,
+   "category": "Control environment",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC1.3",
+   "title": "Structure, authority and responsibility",
+   "description": null,
+   "category": "Control environment",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC1.4",
+   "title": "Commitment to competence",
+   "description": null,
+   "category": "Control environment",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC1.5",
+   "title": "Accountability",
+   "description": null,
+   "category": "Control environment",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC2.1",
+   "title": "Quality information",
+   "description": null,
+   "category": "Communication and information",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC2.2",
+   "title": "Internal communication",
+   "description": null,
+   "category": "Communication and information",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC2.3",
+   "title": "External communication",
+   "description": null,
+   "category": "Communication and information",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC3.1",
+   "title": "Objectives specification",
+   "description": null,
+   "category": "Risk assessment",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC3.2",
+   "title": "Risk identification and analysis",
+   "description": null,
+   "category": "Risk assessment",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC3.3",
+   "title": "Fraud risk",
+   "description": null,
+   "category": "Risk assessment",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC3.4",
+   "title": "Change assessment",
+   "description": null,
+   "category": "Risk assessment",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC4.1",
+   "title": "Ongoing and separate evaluations",
+   "description": null,
+   "category": "Monitoring activities",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC4.2",
+   "title": "Deficiency evaluation and communication",
+   "description": null,
+   "category": "Monitoring activities",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC5.1",
+   "title": "Control activity selection",
+   "description": null,
+   "category": "Control activities",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC5.2",
+   "title": "Technology general controls",
+   "description": null,
+   "category": "Control activities",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC5.3",
+   "title": "Policies and procedures",
+   "description": null,
+   "category": "Control activities",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC6.1",
+   "title": "Logical access security",
+   "description": null,
+   "category": "Logical and physical access",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC6.2",
+   "title": "User registration and credentials",
+   "description": null,
+   "category": "Logical and physical access",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC6.3",
+   "title": "Access authorization and removal",
+   "description": null,
+   "category": "Logical and physical access",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC6.4",
+   "title": "Physical access",
+   "description": null,
+   "category": "Logical and physical access",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC6.5",
+   "title": "Asset disposal",
+   "description": null,
+   "category": "Logical and physical access",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC6.6",
+   "title": "External threat protection",
+   "description": null,
+   "category": "Logical and physical access",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC6.7",
+   "title": "Data transmission and movement",
+   "description": null,
+   "category": "Logical and physical access",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC6.8",
+   "title": "Malicious software prevention",
+   "description": null,
+   "category": "Logical and physical access",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC7.1",
+   "title": "Vulnerability detection",
+   "description": null,
+   "category": "System operations",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC7.2",
+   "title": "Anomaly monitoring",
+   "description": null,
+   "category": "System operations",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC7.3",
+   "title": "Security event evaluation",
+   "description": null,
+   "category": "System operations",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC7.4",
+   "title": "Incident response",
+   "description": null,
+   "category": "System operations",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC7.5",
+   "title": "Incident recovery",
+   "description": null,
+   "category": "System operations",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC8.1",
+   "title": "Change management",
+   "description": null,
+   "category": "Change management",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC9.1",
+   "title": "Business disruption risk",
+   "description": null,
+   "category": "Risk mitigation",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "CC9.2",
+   "title": "Vendor and partner risk",
+   "description": null,
+   "category": "Risk mitigation",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "A1.1",
+   "title": "Capacity management",
+   "description": null,
+   "category": "Availability",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "A1.2",
+   "title": "Environmental protection and recovery infrastructure",
+   "description": null,
+   "category": "Availability",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "A1.3",
+   "title": "Recovery testing",
+   "description": null,
+   "category": "Availability",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "C1.1",
+   "title": "Confidential information identification",
+   "description": null,
+   "category": "Confidentiality",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "C1.2",
+   "title": "Confidential information disposal",
+   "description": null,
+   "category": "Confidentiality",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "PI1.1",
+   "title": "Processing definitions",
+   "description": null,
+   "category": "Processing integrity",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "PI1.2",
+   "title": "Inputs",
+   "description": null,
+   "category": "Processing integrity",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "PI1.3",
+   "title": "Processing",
+   "description": null,
+   "category": "Processing integrity",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "PI1.4",
+   "title": "Outputs",
+   "description": null,
+   "category": "Processing integrity",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "PI1.5",
+   "title": "Storage",
+   "description": null,
+   "category": "Processing integrity",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P1.1",
+   "title": "Privacy notice",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P2.1",
+   "title": "Choice and consent",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P3.1",
+   "title": "Collection limited to notice",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P3.2",
+   "title": "Explicit consent",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P4.1",
+   "title": "Use limitation",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P4.2",
+   "title": "Retention",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P4.3",
+   "title": "Disposal",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P5.1",
+   "title": "Access",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P5.2",
+   "title": "Correction",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P6.1",
+   "title": "Disclosure consent",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P6.2",
+   "title": "Disclosure records",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P6.3",
+   "title": "Unauthorized disclosure records",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P6.4",
+   "title": "Vendor privacy commitments",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P6.5",
+   "title": "Third-party breach notice",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P6.6",
+   "title": "Breach notification",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P6.7",
+   "title": "Accounting of disclosures",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P7.1",
+   "title": "Data quality",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  },
+  {
+   "control_code": "P8.1",
+   "title": "Inquiry and complaint handling",
+   "description": null,
+   "category": "Privacy",
+   "subcategory": null,
+   "official_reference": "AICPA Trust Services Criteria"
+  }
+ ]
+}

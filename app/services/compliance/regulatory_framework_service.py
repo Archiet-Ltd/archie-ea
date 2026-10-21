@@ -17,9 +17,11 @@ Pre-configured frameworks:
 Frameworks are available as static JSON data in app/data/compliance_frameworks.json
 """
 
+import copy
 import json
 import logging
 import os
+import re
 from datetime import datetime, timedelta
 from typing import Dict, List
 
@@ -30,6 +32,13 @@ from app.models.compliance_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+# The shipped reference-library packs, one JSON file per standard.
+LIBRARY_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "data",
+    "compliance_library",
+)
 
 
 class RegulatoryFrameworkService:
@@ -802,52 +811,169 @@ class RegulatoryFrameworkService:
         return frameworks
 
     @staticmethod
+    def _normal_code(code: str) -> str:
+        """A framework code with spacing, hyphens and case removed, so "ISO - 27001",
+        "ISO-27001" and "ISO27001" are the same framework."""
+        return re.sub(r"[\s\-_/.]", "", code or "").upper()
+
+    @staticmethod
+    def load_library_packs() -> List[Dict]:
+        """The reference-library packs shipped with the product, one JSON file per
+        standard, in a fixed order. A pack that cannot be read is logged and skipped."""
+        packs = []
+        if not os.path.isdir(LIBRARY_DIR):
+            return packs
+        for name in sorted(os.listdir(LIBRARY_DIR)):
+            if not name.endswith(".json"):
+                continue
+            try:
+                with open(os.path.join(LIBRARY_DIR, name), "r", encoding="utf-8") as handle:
+                    packs.append(json.load(handle))
+            except (OSError, ValueError) as exc:
+                logger.error(f"Library pack {name} unreadable: {exc}")
+        return packs
+
+    # Control fields the earlier hand-written definitions spelled differently.
+    _CONTROL_FIELD_ALIASES = {
+        "control_id": "control_code",
+        "criticality": "priority",
+        "control_type": "category",
+    }
+
+    @staticmethod
+    def _control_values(raw: Dict) -> Dict:
+        """A control definition reduced to ComplianceControl columns."""
+        columns = {c.name for c in ComplianceControl.__table__.columns} - {"id", "framework_id"}
+        values = {}
+        for key, value in raw.items():
+            key = RegulatoryFrameworkService._CONTROL_FIELD_ALIASES.get(key, key)
+            if key in columns and key not in values:
+                values[key] = value
+        return values
+
+    @staticmethod
     def seed_manufacturing_frameworks():
-        """
-        Seed database with manufacturing-specific regulatory frameworks.
-        Now loads from JSON by default.
+        """Seed the platform-wide reference library of frameworks and controls.
+
+        The library is shared by every organisation and is never copied per
+        organisation; an organisation adopts a framework through FrameworkAdoption.
+        Safe to run on every deploy: a framework is found by its code (spacing and
+        case ignored), a control by its code within the framework, and a second run
+        changes nothing.
+
+        Library packs (app/data/compliance_library) carry the standards loaded in
+        full or as identifiers; the frameworks defined before the library stay as
+        sample rows unless a pack covers them.
 
         Returns:
-            Number of frameworks seeded
+            Number of frameworks added
         """
-        logger.info("Seeding manufacturing regulatory frameworks from JSON...")
+        logger.info("Seeding the reference library of regulatory frameworks...")
 
-        seeded_count = 0
-
-        # Load from JSON instead of hardcoded data
-        frameworks = RegulatoryFrameworkService.load_frameworks_from_json()
-
-        for framework_data in frameworks:
-            # Check if framework already exists
-            existing = RegulatoryFramework.query.filter_by(code=framework_data["code"]).first()
-
-            if existing:
-                logger.info(f"Framework {framework_data['code']} already exists, skipping")
+        packs = RegulatoryFrameworkService.load_library_packs()
+        normal = RegulatoryFrameworkService._normal_code
+        pack_codes = {normal(pack["code"]) for pack in packs}
+        definitions = [copy.deepcopy(pack) for pack in packs]
+        for framework_data in copy.deepcopy(RegulatoryFrameworkService.load_frameworks_from_json()):
+            if normal(framework_data["code"]) in pack_codes:
                 continue
+            framework_data.setdefault("content_level", "sample")
+            definitions.append(framework_data)
 
-            # Extract controls separately
+        existing_by_code = {normal(f.code): f for f in RegulatoryFramework.query.all()}
+        framework_columns = {c.name for c in RegulatoryFramework.__table__.columns} - {"id"}
+        seeded_count = 0
+        now = datetime.utcnow()
+
+        for framework_data in definitions:
             controls_data = framework_data.pop("controls", [])
+            fields = {k: v for k, v in framework_data.items() if k in framework_columns}
+            framework = existing_by_code.get(normal(fields["code"]))
 
-            # Create framework
-            framework = RegulatoryFramework(**framework_data)
-            framework.last_updated = datetime.utcnow()
-            framework.next_review_date = datetime.utcnow() + timedelta(days=365)
+            if framework is None:
+                framework = RegulatoryFramework(**fields)
+                framework.last_updated = now
+                framework.next_review_date = now + timedelta(days=365)
+                db.session.add(framework)
+                db.session.flush()
+                existing_by_code[normal(framework.code)] = framework
+                seeded_count += 1
+            else:
+                # Library facts are kept current; an existing row keeps its code.
+                for key in ("total_controls", "content_level", "official_url", "standard_version"):
+                    if key in fields and getattr(framework, key) != fields[key]:
+                        setattr(framework, key, fields[key])
 
-            db.session.add(framework)
-            db.session.flush()  # Get framework ID
+            present = {
+                c.control_code: c
+                for c in ComplianceControl.query.filter_by(framework_id=framework.id).all()
+            }
+            for raw in controls_data:
+                values = RegulatoryFrameworkService._control_values(raw)
+                code = values.get("control_code")
+                if not code:
+                    continue
+                control = present.get(code)
+                if control is None:
+                    db.session.add(ComplianceControl(framework_id=framework.id, **values))
+                else:
+                    for key in ("title", "description", "category", "subcategory", "official_reference"):
+                        if key in values and getattr(control, key) != values[key]:
+                            setattr(control, key, values[key])
 
-            # Create controls
-            for control_data in controls_data:
-                control = ComplianceControl(framework_id=framework.id, **control_data)
-                db.session.add(control)
-
-            seeded_count += 1
-            logger.info(f"Seeded framework: {framework.code} with {len(controls_data)} controls")
+            logger.info(f"Library framework {framework.code}: {len(controls_data)} controls defined")
 
         db.session.commit()
 
         logger.info(f"Seeding complete: {seeded_count} frameworks added")
         return seeded_count
+
+    @staticmethod
+    def describe_count(row: Dict) -> str:
+        """One line saying how much of a standard is loaded, without claiming more:
+        "99 of 99 titles, 46 summaries" for a framework with titles for every control and
+        summaries for some, "106 of 106 controls" only where the full set is loaded."""
+        loaded, total, level = row["loaded"], row.get("total"), row["content_level"]
+        of_total = f"{loaded} of {total}" if total else f"{loaded}"
+        if level == "full":
+            return f"{of_total} controls, titles and summaries"
+        if level == "titles":
+            return f"{of_total} titles, {row.get('with_summary', 0)} summaries"
+        if level == "identifiers":
+            return f"{of_total} identifiers and short titles, no standard text"
+        return f"{of_total} controls (sample)"
+
+    @staticmethod
+    def library_counts() -> List[Dict]:
+        """How much of each library framework is loaded: ``loaded`` controls of
+        ``total`` (None when the standard's size is not recorded), and the content
+        level. A partial set is never presented as the standard."""
+        counts = dict(
+            db.session.query(ComplianceControl.framework_id, db.func.count(ComplianceControl.id))
+            .filter(ComplianceControl.is_active.isnot(False))
+            .group_by(ComplianceControl.framework_id)
+            .all()
+        )
+        summarised = dict(
+            db.session.query(ComplianceControl.framework_id, db.func.count(ComplianceControl.id))
+            .filter(ComplianceControl.is_active.isnot(False))
+            .filter(ComplianceControl.description.isnot(None), ComplianceControl.description != "")
+            .group_by(ComplianceControl.framework_id)
+            .all()
+        )
+        return [
+            {
+                "framework_id": f.id,
+                "code": f.code,
+                "name": f.name,
+                "loaded": counts.get(f.id, 0),
+                "with_summary": summarised.get(f.id, 0),
+                "total": f.total_controls,
+                "content_level": f.content_level or "sample",
+                "official_url": f.official_url,
+            }
+            for f in RegulatoryFramework.query.order_by(RegulatoryFramework.code).all()
+        ]
 
     @staticmethod
     def get_applicable_frameworks(

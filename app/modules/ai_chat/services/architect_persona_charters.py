@@ -1214,15 +1214,21 @@ def _security_architect_context() -> str:
     lines = []
 
     def controls():
+        from app.models.application_compliance import ApplicationComplianceControl
         from app.models.compliance_models import ComplianceControl
-        total = db.session.query(func.count(ComplianceControl.id)).scalar() or 0
-        if not total:
+        library = db.session.query(func.count(ComplianceControl.id)).scalar() or 0
+        if not library:
             return "- Compliance controls: none catalogued yet"
-        implemented = db.session.query(func.count(ComplianceControl.id)).filter(
-            ComplianceControl.implementation_status == "completed"
+        # Status is held on the organisation's mapping of a control, not on the shared control.
+        mapped = db.session.query(func.count(ApplicationComplianceControl.id)).scalar() or 0
+        if not mapped:
+            return (f"- Compliance controls: {library} in the reference library, "
+                    "none mapped by this organisation yet")
+        implemented = db.session.query(func.count(ApplicationComplianceControl.id)).filter(
+            ApplicationComplianceControl.implementation_status.in_(("implemented", "verified"))
         ).scalar() or 0
-        pct = round(implemented / total * 100)
-        return (f"- Compliance controls: {implemented}/{total} implemented ({pct}%) — "
+        pct = round(implemented / mapped * 100)
+        return (f"- Compliance controls: {implemented}/{mapped} mapped controls implemented ({pct}%) — "
                 "the unimplemented remainder are open findings")
 
     def frameworks():

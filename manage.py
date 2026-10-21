@@ -1108,10 +1108,24 @@ def register_cli_commands(app):
 
     @app.cli.command()
     def seed_framework_catalogue():
-        """Seed the shared regulatory framework catalogue with ISO 27001, SOC 2 and DORA. Safe to run multiple times."""
+        """Seed the shared reference library of frameworks and controls (NIST CSF 2.0 and GDPR in full; ISO 27001, SOC 2 and PCI DSS as identifiers). Safe to run multiple times."""
         from app.services.compliance.regulatory_framework_service import RegulatoryFrameworkService
         seeded = RegulatoryFrameworkService.seed_manufacturing_frameworks()
         print(f"Framework catalogue: {seeded} frameworks seeded")
+        for row in RegulatoryFrameworkService.library_counts():
+            print(f"  {row['code']}: {RegulatoryFrameworkService.describe_count(row)}")
+
+    @app.cli.command("fold-application-compliance-controls")
+    def fold_application_compliance_controls():
+        """Record each old application-only control row as a realisation link. The old rows stay. Safe to run multiple times."""
+        from app import db
+        from app.modules.compliance.services.control_model_service import fold_legacy_mappings
+        skipped = []
+        folded = fold_legacy_mappings(skipped=skipped)
+        db.session.commit()
+        print(f"Control rows folded onto realisation links: {folded}")
+        for row in skipped:
+            print(f"  skipped row {row['mapping_id']}: {row['reason']}")
 
     # ===== BUSINESS CAPABILITY SEEDING =====
 

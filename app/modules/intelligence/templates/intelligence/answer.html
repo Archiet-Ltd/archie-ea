@@ -39,6 +39,10 @@
     'element_not_found': 'Some of the elements you named could not be found in your organisation.',
     'no_ownership_recorded': 'Some rows have no owner recorded.',
     'no_seed_elements': 'No element was named.',
+    'no_compliance_controls_recorded': 'No control is bound to this element yet.',
+    'no_control_evidence': 'Some controls have no evidence recorded.',
+    'no_application_component': 'This is not an application, and no control is bound to it.',
+    'no_policy_scan_recorded': 'No policy scan has been recorded for this element.',
 } %}
 {% set state_words = {
     'current': 'The worked-out connections under this answer are up to date.',
@@ -49,6 +53,8 @@
 } %}
 {% if kind == 'risk_propagation' %}
     {% set heading = 'Risks that reach ' ~ name_of(answer, answer.params.element_id) %}
+{% elif kind == 'compliance' %}
+    {% set heading = 'Controls that protect ' ~ name_of(answer, answer.params.element_id) %}
 {% elif kind == 'set_impact' %}
     {% set ns = namespace(names=[]) %}
     {% for seed_id in answer.summary.seed_element_ids %}{% set ns.names = ns.names + [name_of(answer, seed_id)] %}{% endfor %}
@@ -103,11 +109,40 @@
     {% endfor %}
 
     {% if not answer.rows %}
-        {% if kind == 'risk_propagation' %}
+        {% if kind == 'compliance' %}
+            {{ empty_state(icon='shield-check', title='No control is bound to this yet', description='Nothing is recorded as protecting this element. That is what is recorded today, not a statement that nothing applies.') }}
+        {% elif kind == 'risk_propagation' %}
             {{ empty_state(icon='shield-check', title='No open risk reaches this', description='Nothing in the risk register is recorded on this or on anything it depends on. That is what is recorded today, not a guarantee.') }}
         {% else %}
             {{ empty_state(icon='search', title='Nothing is recorded as depending on this yet', description='No connections lead from here. Nothing is missing: there is simply nothing recorded.') }}
         {% endif %}
+    {% elif kind == 'compliance' %}
+    {% call section_card(title='Controls') %}
+        <p class="text-sm text-foreground" data-compliance-summary>{{ answer.summary.total }} control{{ '' if answer.summary.total == 1 else 's' }} bound; {{ answer.summary.unmet }} with no evidence recorded.</p>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm" data-answer-rows>
+                <caption class="sr-only">Controls bound to this element and whether evidence is recorded</caption>
+                <thead>
+                    <tr class="text-left text-muted-foreground">
+                        <th scope="col" class="py-2 pr-4 font-medium">Framework</th>
+                        <th scope="col" class="py-2 pr-4 font-medium">Control</th>
+                        <th scope="col" class="py-2 pr-4 font-medium">Status</th>
+                        <th scope="col" class="py-2 font-medium">Evidence</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in answer.rows %}
+                    <tr class="border-t border-border" data-control-id="{{ row.control_id }}" data-no-evidence="{{ 'true' if row.no_evidence else 'false' }}">
+                        <td class="py-2 pr-4 text-foreground">{{ row.framework_name or row.framework_code or '—' }}</td>
+                        <th scope="row" class="py-2 pr-4 text-left font-medium text-foreground">{{ row.code or '—' }} {{ row.name or '' }}</th>
+                        <td class="py-2 pr-4 text-foreground">{{ (row.implementation_status or 'not stated') | replace('_', ' ') }}</td>
+                        <td class="py-2 text-foreground">{% if row.no_evidence %}No evidence recorded{% else %}Evidence recorded{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endcall %}
     {% elif kind == 'risk_propagation' %}
     {% call section_card(title='Risks') %}
         <ul class="space-y-4" data-answer-rows>

@@ -12,6 +12,11 @@ set -eu
 flask --app manage init-db
 flask --app manage schema-upgrade
 flask --app manage reconcile-schema
+# The reference library of frameworks and controls (platform-wide, idempotent: a second run changes
+# nothing), then the record of each old application-only control row as a realisation link (the old
+# rows stay). reconcile-schema comes first because the library fills columns it adds.
+flask --app manage seed-framework-catalogue || echo 'WARN reference library seed skipped - the compliance pages show no frameworks or controls until it runs' >&2
+flask --app manage fold-application-compliance-controls || echo 'WARN control fold skipped - old application-only control rows are still read, but are not yet recorded as links in the model' >&2
 flask --app manage migrate-connector-credentials || echo 'WARN connector credential migration skipped - ServiceNow/Lucidchart secrets saved before this fix remain only in the retired encrypted columns; ServiceNowConnectorService and LucidchartConnectorService read the new OrgCredentialVault store and will treat those organisations as unconfigured until it runs'
 flask --app manage backfill-servicenow-connector-config || echo 'WARN ServiceNow connector config backfill skipped - organisations configured before the connector-framework change remain invisible to the new /admin/connectors page until it runs'
 flask --app manage migrate-connector-row-secrets || echo 'WARN Jira/M365 connector row-secret migration skipped - a legacy connector row still carries its secret only in ConnectorConfig.config instead of the vault until it runs'
