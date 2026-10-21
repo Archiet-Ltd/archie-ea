@@ -334,9 +334,9 @@
     </div>
 
     <!-- Analysis History Panel -->
-    <div x-show="history.length > 0" x-cloak class="rounded-xl border bg-card text-card-foreground">
+    <div x-show="history.length > 0" x-cloak data-block="history" class="rounded-lg border bg-card text-card-foreground">
         <button type="button" @click="historyOpen = !historyOpen"
-                class="w-full flex items-center justify-between p-4 text-left hover:bg-accent/30 transition-colors rounded-xl">
+                class="w-full flex items-center justify-between p-4 text-left hover:bg-accent/30 transition-colors rounded-lg">
             <div class="flex items-center gap-2">
                 <i data-lucide="clock" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
                 <span class="font-semibold text-sm">Recent Analyses</span>

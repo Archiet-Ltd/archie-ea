@@ -2,6 +2,15 @@
 {% from 'macros/page_shell.html' import page_shell, section_card %}
 {% from 'components/answer_cascade.html' import answer_cascade %}
 {% block title %}Dashboard{% endblock %}
+{% block guided_mode_steps %}
+<script id="guided-mode-steps-data" type="application/json">
+[
+  {"title": "Step 1 — Key figures", "text": "The figures at the top show live counts. A low number means data enrichment work is needed."},
+  {"title": "Step 2 — What breaks if it fails", "text": "The answer below follows one application's recorded connections. Open a row to see where each connection comes from."},
+  {"title": "Step 3 — Capability coverage", "text": "The table lists capabilities with the gaps first. Open a row to act on it."}
+]
+</script>
+{% endblock %}
 {% block extra_head_js %}
 <script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard/overview_cascade.js') }}"></script>
@@ -36,7 +45,7 @@
         <h2 id="workspace-links-heading" class="sr-only">Your Workspace</h2>
         {% for link in (my_work_zone.links | selectattr('endpoint', 'in', flask.current_app.view_functions) | list) %}
         {% if not loop.first %}<span class="text-muted-foreground/60" aria-hidden="true">&middot;</span>{% endif %}
-        <a href="{{ url_for(link.endpoint, **(link.query_params or {})) }}" class="rounded px-1 text-muted-foreground transition-colors hover:text-info">{{ link.label }}</a>
+        <a href="{{ url_for(link.endpoint, **(link.query_params or {})) }}" class="inline-flex h-6 min-w-6 items-center justify-center rounded px-1 text-muted-foreground transition-colors hover:text-info">{{ link.label }}</a>
         {% endfor %}
     </nav>
     {% endif %}
