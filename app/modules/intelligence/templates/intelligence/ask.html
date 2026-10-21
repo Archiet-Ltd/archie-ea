@@ -67,7 +67,7 @@
        is rendered once and always; a chip sets openKey, which onSelect() in
        ask.js dispatches on. Chip ids are the contract the smoke journeys drive. #}
     <div class="mx-auto max-w-[760px] space-y-3">
-        <div class="ask-large-input" id="ask-question-panel-impact" :id="'ask-question-panel-' + (openKey || 'impact')">{{ entity_picker('ask', prompt='Type a team, service or system name', input_class='h-12 w-full rounded-md border border-input bg-background px-4 text-base') }}</div>
+        <div class="ask-large-input" id="ask-question-panel">{{ entity_picker('ask', prompt='Type a team, service or system name', input_class='h-12 w-full rounded-md border border-input bg-background px-4 text-base') }}</div>
         <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Question">
             {% set chip_labels = {
                 'impact': 'What breaks if it fails?',
@@ -85,7 +85,7 @@
                     :class="(openKey || 'impact') === '{{ question.key }}' ? 'border-ring bg-muted text-info dark:bg-card' : 'border-input bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground'"
                     aria-expanded="false" aria-describedby="ask-sentence-{{ question.key }}"
                     :aria-expanded="openKey === '{{ question.key }}' ? 'true' : 'false'"
-                    aria-controls="ask-question-panel-{{ question.key }}"
+                    aria-controls="ask-question-panel"
                     @click="openKey = '{{ question.key }}'; $nextTick(() => $refs.pickerInput && $refs.pickerInput.focus())">
                 {{ chip_labels[question.key] }}
             </button>
