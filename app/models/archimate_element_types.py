@@ -2014,6 +2014,23 @@ def application_kind_types() -> Tuple[str, ...]:
     return tuple(sorted(parents | {s for s, p in SPECIALIZATIONS.items() if p in parents}))
 
 
+# The element property that names a specialisation in an exchange file (ADR-0014 Decision 5).
+SPECIALIZATION_PROPERTY = "entelim:specialization"
+
+
+def exchange_type_for(element_type: Optional[str]) -> Tuple[Optional[str], Dict[str, str]]:
+    """``(xsi_type, extra_properties)`` to write for *element_type* in an exchange file.
+
+    A specialisation is written as its standard parent with a property that names it, so every
+    ArchiMate tool can open the file and Entelim reads the specialisation back. Any other type
+    passes through unchanged with no extra property. This is the one place that mapping lives.
+    """
+    parent = SPECIALIZATIONS.get(element_type) if element_type else None
+    if parent:
+        return parent, {SPECIALIZATION_PROPERTY: element_type}
+    return element_type, {}
+
+
 class StandardTypeTable(dict):
     """A dict keyed by standard ArchiMate type, read through ``base_type``.
 

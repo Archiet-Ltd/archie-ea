@@ -93,6 +93,22 @@
             {% endif %}
         </div>
 
+        {% if result.application_kind_decisions %}
+        {% set decided = result.application_kind_decisions.values() | list %}
+        <div class="rounded-md border border-border bg-muted p-4 space-y-1" data-testid="result-application-decisions">
+            <p class="text-sm font-medium">
+                Applications and components:
+                {{ decided | selectattr('type', 'equalto', 'Application') | list | length }} imported as Applications,
+                {{ decided | selectattr('type', 'equalto', 'ApplicationComponent') | list | length }} as application components.
+            </p>
+            <ul class="list-disc list-inside text-sm text-muted-foreground space-y-0.5">
+                {% for d in decided if d.type == 'ApplicationComponent' %}
+                <li>{{ d.name }}: {{ d.reason }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
         {% if result.relationship_notices %}
         <div class="rounded-md border border-border bg-muted p-4 space-y-1" data-testid="result-relationship-notices">
             <p class="text-sm font-medium">Stored as Association, with the modelled type kept in the documentation:</p>
@@ -149,6 +165,20 @@
                     {'value': 'update_existing', 'label': 'Update existing', 'description': 'Overwrite the stored description and merge the imported properties.'},
                     {'value': 'create_all', 'label': 'Create all', 'description': 'Create every element again, even when one with the same name and type exists.'},
                 ]) }}
+
+            <div class="space-y-1">
+                <input type="hidden" name="promote_top_level" value="0">
+                <label class="flex items-start gap-2 text-sm font-medium text-foreground" for="promote_top_level">
+                    <input type="checkbox" id="promote_top_level" name="promote_top_level" value="1" checked
+                           data-testid="switch-promote-top-level" class="mt-1 h-4 w-4 rounded border-input">
+                    <span>Treat top-level components as applications</span>
+                </label>
+                <p class="text-xs text-muted-foreground pl-6">
+                    A file from another tool has no Application type. With this on, a component that no other
+                    component composes or aggregates is imported as an Application, and the preview says why.
+                    Turn it off to import every component as a component.
+                </p>
+            </div>
 
             <div class="flex flex-col gap-2 sm:flex-row">
                 <button type="button" data-testid="btn-preview-import"
@@ -226,6 +256,7 @@
                             <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Name</th>
                             <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Type</th>
                             <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Status</th>
+                            <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Why</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
@@ -237,6 +268,8 @@
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border"
                                           :class="statusClass(elem.status)" x-text="statusLabel(elem.status)"></span>
                                 </td>
+                                <td class="px-3 py-2 text-muted-foreground" data-testid="preview-decision-reason"
+                                    x-text="elem.application_kind_decision || ''"></td>
                             </tr>
                         </template>
                     </tbody>

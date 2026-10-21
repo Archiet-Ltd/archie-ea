@@ -351,7 +351,12 @@ def import_oef():
             break
 
     try:
-        result = ArchiMateImportService().import_xml(content, strategy=strategy, source_label=source_label)
+        result = ArchiMateImportService().import_xml(
+            content,
+            strategy=strategy,
+            source_label=source_label,
+            promote_top_level=_oef_promote_top_level(),
+        )
     except ImportRequestError as exc:
         return _refuse(str(exc), exc.status_code)
 
@@ -388,7 +393,9 @@ def import_oef_preview():
             "No file uploaded. POST multipart/form-data with a field named 'oef_file'."
         ]}), 400
     try:
-        preview = ArchiMateImportService().preview_xml(content)
+        preview = ArchiMateImportService().preview_xml(
+            content, promote_top_level=_oef_promote_top_level()
+        )
     except ImportRequestError as exc:
         return jsonify({"success": False, "errors": [str(exc)]}), exc.status_code
     return jsonify({"success": True, **preview}), 200
@@ -537,6 +544,23 @@ def _oef_strategy():
     else:
         value = request.form.get("strategy")
     return value or "skip_duplicates"
+
+
+def _oef_promote_top_level():
+    """The import page's "Treat top-level components as applications" switch.
+
+    On unless the request says otherwise. A browser form sends a hidden ``0`` before the
+    checkbox's ``1``, so the last value sent wins; a JSON body may send a boolean.
+    """
+    if request.is_json:
+        payload = request.get_json(silent=True) or {}
+        values = [payload.get("promote_top_level")] if isinstance(payload, dict) else []
+    else:
+        values = request.form.getlist("promote_top_level")
+    values = [v for v in values if v is not None]
+    if not values:
+        return True
+    return str(values[-1]).strip().lower() not in ("0", "false", "off", "no")
 
 
 # =============================================================================
