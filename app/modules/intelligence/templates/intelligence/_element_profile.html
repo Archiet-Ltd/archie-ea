@@ -1,0 +1,28 @@
+{# The groups of an element profile: each recorded fact with its basis and date, and a
+   plain statement for each group with nothing recorded. Rendered from the stored
+   snapshot only. #}
+<div class="space-y-4" data-profile-groups>
+    {% for group in answer.summary.groups %}
+    <section class="rounded-xl border border-border bg-card p-6 space-y-3" data-profile-group="{{ group.group }}" data-status="{{ group.status }}" aria-labelledby="profile-{{ group.group }}">
+        <h2 id="profile-{{ group.group }}" class="text-lg font-semibold text-foreground">{{ group.label }}</h2>
+        {% if group.status == 'recorded' %}
+        <ul class="space-y-2">
+            {% for row in answer.rows if row.group == group.group %}
+            <li class="text-sm text-foreground" data-source-type="{{ row.source.type }}" data-source-id="{{ row.source.id }}">
+                <span class="font-medium">{{ row.name }}</span>
+                {% if row.relation %}<span class="text-muted-foreground">{{ row.relation }}</span>{% endif %}
+                {% if row.value is mapping %}
+                    {% for key, shown in row.value.items() %}{% if shown is not none %}<span class="text-muted-foreground">· {{ key | replace('_', ' ') }} {{ shown }}</span> {% endif %}{% endfor %}
+                {% elif row.value is not none %}
+                    <span class="text-muted-foreground">· {{ row.value }}</span>
+                {% endif %}
+                <span class="text-muted-foreground">· {{ 'worked out' if row.basis == 'worked_out' else 'recorded' }}{% if row.as_of %} · {{ row.as_of[:10] }}{% endif %}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-muted-foreground">Not recorded.</p>
+        {% endif %}
+    </section>
+    {% endfor %}
+</div>
