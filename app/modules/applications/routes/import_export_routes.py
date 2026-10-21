@@ -996,6 +996,69 @@ def application_import_page():
 # ---------------------------------------------------------------------------
 # 7. application_import  (POST /import)
 # ---------------------------------------------------------------------------
+_LIFECYCLE_COLUMN_LIMIT = 20
+_REFUSED_ROWS_SHOWN = 50
+
+# Labels people write in a spreadsheet, mapped to the stored lifecycle values.
+_LIFECYCLE_LABELS = {
+    "in production": "operational",
+    "in service": "operational",
+    "in use": "operational",
+    "in development": "development",
+    "under development": "development",
+    "in testing": "testing",
+    "in planning": "planning",
+    "end of life": "deprecated",
+    "end-of-life": "deprecated",
+    "being retired": "deprecated",
+    "decommissioned": "retired",
+    "out of service": "retired",
+}
+
+
+class _RowRefused(ValueError):
+    """A spreadsheet row the import cannot save; the reason is shown to the person."""
+
+
+def _lifecycle_value(raw):
+    """The stored lifecycle value for a cell: a known label is mapped, a value that
+    fits the column is kept, any other over-long value refuses the row."""
+    if not isinstance(raw, str):
+        return raw
+    value = raw.strip()
+    if not value:
+        return None
+    mapped = _LIFECYCLE_LABELS.get(value.casefold())
+    if mapped:
+        return mapped
+    if len(value) > _LIFECYCLE_COLUMN_LIMIT:
+        raise _RowRefused(
+            f"the lifecycle value '{value}' is {len(value)} characters and matches no "
+            f"known lifecycle label (the limit is {_LIFECYCLE_COLUMN_LIMIT})"
+        )
+    return value
+
+
+def _database_reason(exc):
+    """A short, plain reason for a row the database refused."""
+    detail = str(getattr(exc, "orig", None) or exc).strip().splitlines()
+    detail = detail[0].strip() if detail else ""
+    return "the database refused the row" + (f": {detail[:200]}" if detail else "")
+
+
+def _refused_rows_message(refused):
+    shown = refused[:_REFUSED_ROWS_SHOWN]
+    lines = "; ".join(
+        f"Row {r['row']}" + (f" ({r['name']})" if r["name"] else "") + f": {r['reason']}"
+        for r in shown
+    )
+    head = f"{len(refused)} row{'s' if len(refused) != 1 else ''} refused"
+    if len(refused) > len(shown):
+        head += f" (showing the first {len(shown)})"
+    return f"{head}. {lines}"
+
+
+
 @unified_applications_bp.route("/import", methods=["POST"])
 @login_required
 @audit_log("application_import")
@@ -1278,6 +1341,7 @@ def application_import():
             skipped = 0
             updated = 0
             non_numeric_user_counts = []
+            refused = []  # {row, name, reason} for each row the import could not save
             # Track names processed in THIS import to detect duplicates within the same CSV file
             processed_names = set()
 
@@ -1299,7 +1363,10 @@ def application_import():
 
                 name = _clean(row.get(name_column))
                 if not name:
-                    raise ValueError(f"Row {index}: 'Name' is required.")
+                    refused.append(
+                        {"row": index, "name": "", "reason": "the Name cell is empty"}
+                    )
+                    continue
 
                 # Normalize name for duplicate checking (case-insensitive)
                 name_lower = name.lower()
@@ -1322,287 +1389,301 @@ def application_import():
                     skipped += 1
                     processed_names.add(name_lower)  # Track that we've seen this name
                     continue
-                elif existing_app and import_mode == "update":
-                    # Update existing record with flexible column matching
-                    existing_app.component_type = _clean(
-                        get_csv_field(
-                            row,
-                            "Type",
-                            "component_type",
-                            "Component Type",
-                            "App Type",
-                            "Application Type",
-                        )
-                    )
-                    existing_app.application_category = _clean(
-                        get_csv_field(
-                            row, "Category", "application_category", "App Category"
-                        )
-                    )
-                    existing_app.technology_stack = _clean(
-                        get_csv_field(
-                            row,
-                            "Technology Stack",
-                            "technology_stack",
-                            "Technology",
-                            "Tech Stack",
-                            "Stack",
-                        )
-                    )
-                    existing_app.version = _clean(get_csv_field(row, "Version"))
-                    existing_app.deployment_status = (
-                        _clean(
-                            get_csv_field(
-                                row,
-                                "Status",
-                                "deployment_status",
-                                "Deployment Status",
-                                "App Status",
-                                "Application Status",
-                            )
-                        )
-                        or "planned"
-                    )
-                    existing_app.business_domain = _clean(
-                        get_csv_field(
-                            row, "Business Domain", "business_domain", "Domain"
-                        )
-                    )
-                    existing_app.business_owner = _clean(
-                        get_csv_field(
-                            row,
-                            "Owner",
-                            "business_owner",
-                            "Business Owner",
-                            "App Owner",
-                        )
-                    )
-                    existing_app.development_team = _clean(
-                        get_csv_field(
-                            row,
-                            "Team",
-                            "development_team",
-                            "Development Team",
-                            "Dev Team",
-                        )
-                    )
-                    existing_app.user_base_size = _parse_user_count(
-                        get_csv_field(
-                            row,
-                            "Users",
-                            "user_count",
-                            "User Count",
-                            "Number of Users",
-                            "user_base_size",
-                        )
-                    )
-                    existing_app.business_criticality = _clean(
-                        get_csv_field(
-                            row,
-                            "Criticality",
-                            "business_criticality",
-                            "Business Criticality",
-                        )
-                    )
-                    existing_app.description = _clean(
-                        get_csv_field(row, "Description", "App Description")
-                    )
-                    existing_app.lifecycle_status = _clean(
-                        get_csv_field(
-                            row, "Lifecycle Status", "lifecycle_status", "Lifecycle"
-                        )
-                    )
-                    # Vendor and hosting: a blank cell never erases what is stored.
-                    _vendor = _clean(
-                        get_csv_field(row, "Package Vendor", "Vendor", "vendor_name")
-                    )
-                    if _vendor is not None:
-                        existing_app.vendor_name = _vendor
-                    _hosting = _clean(
-                        get_csv_field(row, "Public Cloud Provider", "cloud_provider")
-                    )
-                    if _hosting is not None:
-                        existing_app.cloud_provider = _hosting
-
-                    # Add import fields for auto-mapping functionality
-                    existing_app.imported_capabilities = _clean(
-                        get_csv_field(
-                            row,
-                            "Capabilities",
-                            "imported_capabilities",
-                            "Business Capabilities",
-                            "Capability List",
-                        )
-                    )
-                    existing_app.application_services = _clean(
-                        get_csv_field(
-                            row,
-                            "Services",
-                            "application_services",
-                            "Application Services",
-                            "Service List",
-                        )
-                    )
-                    existing_app.application_functions_text = _clean(
-                        get_csv_field(
-                            row,
-                            "Functions",
-                            "application_functions_text",
-                            "Application Functions",
-                            "Function List",
-                        )
-                    )
-                    existing_app.imported_apqc_codes = _clean(
-                        get_csv_field(
-                            row,
-                            "APQC Codes",
-                            "imported_apqc_codes",
-                            "APQC",
-                            "Process Codes",
-                        )
-                    )
-
-                    updated += 1
-                    processed_names.add(name_lower)  # Track that we've seen this name
-                else:
-                    # Create new record (duplicate mode or doesn't exist) with flexible column matching
-                    app = ApplicationComponent(
-                        name=name,
-                        component_type=_clean(
-                            get_csv_field(
-                                row,
-                                "Type",
-                                "component_type",
-                                "Component Type",
-                                "App Type",
-                                "Application Type",
-                            )
-                        ),
-                        application_category=_clean(
-                            get_csv_field(
-                                row, "Category", "application_category", "App Category"
-                            )
-                        ),
-                        technology_stack=_clean(
-                            get_csv_field(
-                                row,
-                                "Technology Stack",
-                                "technology_stack",
-                                "Technology",
-                                "Tech Stack",
-                                "Stack",
-                            )
-                        ),
-                        version=_clean(get_csv_field(row, "Version")),
-                        deployment_status=_clean(
-                            get_csv_field(
-                                row,
-                                "Status",
-                                "deployment_status",
-                                "Deployment Status",
-                                "App Status",
-                                "Application Status",
-                            )
-                        )
-                        or "planned",
-                        business_domain=_clean(
-                            get_csv_field(
-                                row, "Business Domain", "business_domain", "Domain"
-                            )
-                        ),
-                        business_owner=_clean(
-                            get_csv_field(
-                                row,
-                                "Owner",
-                                "business_owner",
-                                "Business Owner",
-                                "App Owner",
-                            )
-                        ),
-                        development_team=_clean(
-                            get_csv_field(
-                                row,
-                                "Team",
-                                "development_team",
-                                "Development Team",
-                                "Dev Team",
-                            )
-                        ),
-                        user_base_size=_parse_user_count(
-                            get_csv_field(
-                                row,
-                                "Users",
-                                "user_count",
-                                "User Count",
-                                "Number of Users",
-                                "user_base_size",
-                            )
-                        ),
-                        business_criticality=_clean(
-                            get_csv_field(
-                                row,
-                                "Criticality",
-                                "business_criticality",
-                                "Business Criticality",
-                            )
-                        ),
-                        description=_clean(
-                            get_csv_field(row, "Description", "App Description")
-                        ),
-                        lifecycle_status=_clean(
+                outcome = None
+                refusal = None
+                try:
+                    with db.session.begin_nested():
+                        row_lifecycle = _lifecycle_value(
                             get_csv_field(
                                 row, "Lifecycle Status", "lifecycle_status", "Lifecycle"
                             )
-                        ),
-                        vendor_name=_clean(
-                            get_csv_field(
-                                row, "Package Vendor", "Vendor", "vendor_name"
+                        )
+                        if existing_app and import_mode == "update":
+                            # Update existing record with flexible column matching
+                            existing_app.component_type = _clean(
+                                get_csv_field(
+                                    row,
+                                    "Type",
+                                    "component_type",
+                                    "Component Type",
+                                    "App Type",
+                                    "Application Type",
+                                )
                             )
-                        ),
-                        cloud_provider=_clean(
-                            get_csv_field(row, "Public Cloud Provider", "cloud_provider")
-                        ),
-                        # Add import fields for auto-mapping functionality
-                        imported_capabilities=_clean(
-                            get_csv_field(
-                                row,
-                                "Capabilities",
-                                "imported_capabilities",
-                                "Business Capabilities",
-                                "Capability List",
+                            existing_app.application_category = _clean(
+                                get_csv_field(
+                                    row, "Category", "application_category", "App Category"
+                                )
                             )
-                        ),
-                        application_services=_clean(
-                            get_csv_field(
-                                row,
-                                "Services",
-                                "application_services",
-                                "Application Services",
-                                "Service List",
+                            existing_app.technology_stack = _clean(
+                                get_csv_field(
+                                    row,
+                                    "Technology Stack",
+                                    "technology_stack",
+                                    "Technology",
+                                    "Tech Stack",
+                                    "Stack",
+                                )
                             )
-                        ),
-                        application_functions_text=_clean(
-                            get_csv_field(
-                                row,
-                                "Functions",
-                                "application_functions_text",
-                                "Application Functions",
-                                "Function List",
+                            existing_app.version = _clean(get_csv_field(row, "Version"))
+                            existing_app.deployment_status = (
+                                _clean(
+                                    get_csv_field(
+                                        row,
+                                        "Status",
+                                        "deployment_status",
+                                        "Deployment Status",
+                                        "App Status",
+                                        "Application Status",
+                                    )
+                                )
+                                or "planned"
                             )
-                        ),
-                        imported_apqc_codes=_clean(
-                            get_csv_field(
-                                row,
-                                "APQC Codes",
-                                "imported_apqc_codes",
-                                "APQC",
-                                "Process Codes",
+                            existing_app.business_domain = _clean(
+                                get_csv_field(
+                                    row, "Business Domain", "business_domain", "Domain"
+                                )
                             )
-                        ),
+                            existing_app.business_owner = _clean(
+                                get_csv_field(
+                                    row,
+                                    "Owner",
+                                    "business_owner",
+                                    "Business Owner",
+                                    "App Owner",
+                                )
+                            )
+                            existing_app.development_team = _clean(
+                                get_csv_field(
+                                    row,
+                                    "Team",
+                                    "development_team",
+                                    "Development Team",
+                                    "Dev Team",
+                                )
+                            )
+                            existing_app.user_base_size = _parse_user_count(
+                                get_csv_field(
+                                    row,
+                                    "Users",
+                                    "user_count",
+                                    "User Count",
+                                    "Number of Users",
+                                    "user_base_size",
+                                )
+                            )
+                            existing_app.business_criticality = _clean(
+                                get_csv_field(
+                                    row,
+                                    "Criticality",
+                                    "business_criticality",
+                                    "Business Criticality",
+                                )
+                            )
+                            existing_app.description = _clean(
+                                get_csv_field(row, "Description", "App Description")
+                            )
+                            existing_app.lifecycle_status = row_lifecycle
+                            # Vendor and hosting: a blank cell never erases what is stored.
+                            _vendor = _clean(
+                                get_csv_field(row, "Package Vendor", "Vendor", "vendor_name")
+                            )
+                            if _vendor is not None:
+                                existing_app.vendor_name = _vendor
+                            _hosting = _clean(
+                                get_csv_field(row, "Public Cloud Provider", "cloud_provider")
+                            )
+                            if _hosting is not None:
+                                existing_app.cloud_provider = _hosting
+
+                            # Add import fields for auto-mapping functionality
+                            existing_app.imported_capabilities = _clean(
+                                get_csv_field(
+                                    row,
+                                    "Capabilities",
+                                    "imported_capabilities",
+                                    "Business Capabilities",
+                                    "Capability List",
+                                )
+                            )
+                            existing_app.application_services = _clean(
+                                get_csv_field(
+                                    row,
+                                    "Services",
+                                    "application_services",
+                                    "Application Services",
+                                    "Service List",
+                                )
+                            )
+                            existing_app.application_functions_text = _clean(
+                                get_csv_field(
+                                    row,
+                                    "Functions",
+                                    "application_functions_text",
+                                    "Application Functions",
+                                    "Function List",
+                                )
+                            )
+                            existing_app.imported_apqc_codes = _clean(
+                                get_csv_field(
+                                    row,
+                                    "APQC Codes",
+                                    "imported_apqc_codes",
+                                    "APQC",
+                                    "Process Codes",
+                                )
+                            )
+
+                            outcome = "updated"
+                        else:
+                            # Create new record (duplicate mode or doesn't exist) with flexible column matching
+                            app = ApplicationComponent(
+                                name=name,
+                                component_type=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Type",
+                                        "component_type",
+                                        "Component Type",
+                                        "App Type",
+                                        "Application Type",
+                                    )
+                                ),
+                                application_category=_clean(
+                                    get_csv_field(
+                                        row, "Category", "application_category", "App Category"
+                                    )
+                                ),
+                                technology_stack=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Technology Stack",
+                                        "technology_stack",
+                                        "Technology",
+                                        "Tech Stack",
+                                        "Stack",
+                                    )
+                                ),
+                                version=_clean(get_csv_field(row, "Version")),
+                                deployment_status=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Status",
+                                        "deployment_status",
+                                        "Deployment Status",
+                                        "App Status",
+                                        "Application Status",
+                                    )
+                                )
+                                or "planned",
+                                business_domain=_clean(
+                                    get_csv_field(
+                                        row, "Business Domain", "business_domain", "Domain"
+                                    )
+                                ),
+                                business_owner=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Owner",
+                                        "business_owner",
+                                        "Business Owner",
+                                        "App Owner",
+                                    )
+                                ),
+                                development_team=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Team",
+                                        "development_team",
+                                        "Development Team",
+                                        "Dev Team",
+                                    )
+                                ),
+                                user_base_size=_parse_user_count(
+                                    get_csv_field(
+                                        row,
+                                        "Users",
+                                        "user_count",
+                                        "User Count",
+                                        "Number of Users",
+                                        "user_base_size",
+                                    )
+                                ),
+                                business_criticality=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Criticality",
+                                        "business_criticality",
+                                        "Business Criticality",
+                                    )
+                                ),
+                                description=_clean(
+                                    get_csv_field(row, "Description", "App Description")
+                                ),
+                                lifecycle_status=row_lifecycle,
+                                vendor_name=_clean(
+                                    get_csv_field(
+                                        row, "Package Vendor", "Vendor", "vendor_name"
+                                    )
+                                ),
+                                cloud_provider=_clean(
+                                    get_csv_field(row, "Public Cloud Provider", "cloud_provider")
+                                ),
+                                # Add import fields for auto-mapping functionality
+                                imported_capabilities=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Capabilities",
+                                        "imported_capabilities",
+                                        "Business Capabilities",
+                                        "Capability List",
+                                    )
+                                ),
+                                application_services=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Services",
+                                        "application_services",
+                                        "Application Services",
+                                        "Service List",
+                                    )
+                                ),
+                                application_functions_text=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Functions",
+                                        "application_functions_text",
+                                        "Application Functions",
+                                        "Function List",
+                                    )
+                                ),
+                                imported_apqc_codes=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "APQC Codes",
+                                        "imported_apqc_codes",
+                                        "APQC",
+                                        "Process Codes",
+                                    )
+                                ),
+                            )
+                            db.session.add(app)
+                            outcome = "created"
+                except _RowRefused as exc:
+                    refusal = str(exc)
+                except Exception as exc:
+                    current_app.logger.warning(
+                        "Application import: row %s refused: %s", index, exc
                     )
-                    db.session.add(app)
+                    refusal = _database_reason(exc)
+                if refusal is not None:
+                    refused.append({"row": index, "name": name, "reason": refusal})
+                    continue
+                if outcome == "updated":
+                    updated += 1
+                else:
                     count += 1
-                    processed_names.add(name_lower)  # Track that we've seen this name
+                processed_names.add(name_lower)  # Track that we've seen this name
 
             db.session.commit()
 
@@ -1798,8 +1879,12 @@ def application_import():
                 msg_parts.append(f"{updated} updated")
             if skipped > 0:
                 msg_parts.append(f"{skipped} skipped")
+            if refused:
+                msg_parts.append(f"{len(refused)} refused")
 
             flash(f"Import complete: {', '.join(msg_parts)}", "success")
+            if refused:
+                flash(_refused_rows_message(refused), "warning")
 
             # Add AI results to flash message if AI was enabled
             if enable_ai and (
