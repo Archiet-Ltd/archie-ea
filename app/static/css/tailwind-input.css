@@ -103,11 +103,12 @@
     height: auto;
     padding: 2rem 0.5rem;
   }
-  /* The question line above an answer cascade. */
+  /* The question line above an answer cascade: the one sans family, 15px, muted
+     (design/patterns.json has no serif; the earlier serif italic is retired). */
   .question-line {
-    font-family: theme(fontFamily.serif);
-    font-style: italic;
-    font-size: 1.125rem;
+    font-size: 0.9375rem;
+    line-height: 1.4;
+    font-weight: 500;
     letter-spacing: 0;
     color: hsl(var(--muted-foreground));
   }
