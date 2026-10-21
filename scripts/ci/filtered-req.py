@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Filter requirements.txt to drop the heavy packages the CI test jobs do not need.
 
-Excludes: torch, sentence-transformers, transformers, Flask-RQ, flasgger,
-raygun4py, jsmin. Torch, triton and the CUDA libraries arrive only through
-sentence-transformers, so dropping it keeps several GB per job off the runners'
-disks; the application imports each of these lazily or behind a guard.
+Excludes: Flask-RQ, flasgger, raygun4py, jsmin. These are optional and do not
+produce boot warnings. Torch, sentence-transformers, and transformers are kept
+because they are required for boot health (sentence-transformers imports
+torch, and excluding them causes "Sentence transformers not available" warnings).
 
 Usage: python scripts/ci/filtered-req.py requirements.txt [output.txt]
 
@@ -17,9 +17,6 @@ in each CI job.
 import sys
 
 EXCLUDED_PREFIXES = (
-    "torch",
-    "sentence-transformers",
-    "transformers",
     "Flask-RQ",
     "flasgger",
     "raygun4py",
