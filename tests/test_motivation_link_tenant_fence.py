@@ -476,3 +476,231 @@ def test_a_requirement_with_no_archimate_element_is_refused_not_guessed(
     assert req_a.application_component_id == app_a.id, (
         "Requirement linking should succeed for same-org requirement"
     )
+
+
+# --------------------------------------------------------------- Already-linked foreign entities (name disclosure)
+# These tests prove that a caller cannot learn, through the link routes' messages,
+# the name of another organisation's already-linked Goal, Driver or Requirement,
+# or of that organisation's application. Both the application_mgmt (/dashboard/applications/...)
+# and unified_applications (/applications/...) routes are covered.
+
+
+def test_a_caller_cannot_see_a_foreign_already_linked_requirements_names(
+    db_session, make_org, tenant_ctx, client, login_as
+):
+    """Org A must not see Org B's already-linked Requirement name or Org B's application name."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.models import Requirement
+
+    org_a = make_org("alr-req-a")
+    org_b = make_org("alr-req-b")
+
+    # Create apps owned by each org
+    app_a = _make_app(db_session, org_a.id, "App A")
+    app_b = _make_app(db_session, org_b.id, "App B")
+
+    # Create requirement owned by org B, already linked to org B's app
+    req_b = _make_requirement(db_session, org_b.id, "SECRET-ALR-REQUIREMENT-B")
+    req_b.application_component_id = app_b.id
+    db_session.flush()
+
+    # Create a user in org A and log in
+    from app.models.user import User
+    user_a = User(
+        email=f"user-a-{req_b.id}@example.test",
+        organization_id=org_a.id,
+        confirmed=True,
+        enterprise_role="enterprise_architect",
+    )
+    db_session.add(user_a)
+    db_session.flush()
+
+    login_as(client, user_a)
+
+    # Attempt to link org B's already-linked requirement to org A's app via application_mgmt route
+    with tenant_ctx(org_a.id):
+        resp = client.post(
+            f"/dashboard/applications/{app_a.id}/requirements/add",
+            data={"element_id": req_b.id},
+            follow_redirects=True,
+        )
+
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    # The response must not contain the foreign requirement's name or the foreign application's name
+    assert "SECRET-ALR-REQUIREMENT-B" not in body
+    assert "App B" not in body
+    # The foreign link must be untouched, not reassigned to app_a
+    db_session.expire(req_b)
+    assert req_b.application_component_id == app_b.id
+
+
+def test_a_caller_cannot_see_a_foreign_already_linked_goal_or_drivers_names(
+    db_session, make_org, tenant_ctx, client, login_as
+):
+    """Org A must not see Org B's already-linked Goal/Driver names or Org B's application name."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.motivation import Driver, Goal
+
+    org_a = make_org("alr-gd-a")
+    org_b = make_org("alr-gd-b")
+
+    # Create apps owned by each org
+    app_a = _make_app(db_session, org_a.id, "App A")
+    app_b = _make_app(db_session, org_b.id, "App B")
+
+    # Create goal and driver owned by org B, already linked to org B's app
+    goal_b = _make_goal(db_session, org_b.id, "SECRET-ALR-GOAL-B")
+    goal_b.application_component_id = app_b.id
+    driver_b = _make_driver(db_session, org_b.id, "SECRET-ALR-DRIVER-B")
+    driver_b.application_component_id = app_b.id
+    db_session.flush()
+
+    # Create a user in org A and log in
+    from app.models.user import User
+    user_a = User(
+        email=f"user-a-{goal_b.id}@example.test",
+        organization_id=org_a.id,
+        confirmed=True,
+        enterprise_role="enterprise_architect",
+    )
+    db_session.add(user_a)
+    db_session.flush()
+
+    login_as(client, user_a)
+
+    # Attempt to link org B's already-linked goal and driver to org A's app via application_mgmt routes
+    with tenant_ctx(org_a.id):
+        goal_resp = client.post(
+            f"/dashboard/applications/{app_a.id}/goals/add",
+            data={"element_id": goal_b.id},
+            follow_redirects=True,
+        )
+        driver_resp = client.post(
+            f"/dashboard/applications/{app_a.id}/drivers/add",
+            data={"element_id": driver_b.id},
+            follow_redirects=True,
+        )
+
+    for resp in (goal_resp, driver_resp):
+        body = resp.get_data(as_text=True)
+        assert resp.status_code == 200
+        assert "SECRET-ALR-GOAL-B" not in body
+        assert "SECRET-ALR-DRIVER-B" not in body
+        assert "App B" not in body
+
+    # The foreign links must be untouched
+    db_session.expire(goal_b)
+    db_session.expire(driver_b)
+    assert goal_b.application_component_id == app_b.id
+    assert driver_b.application_component_id == app_b.id
+
+
+def test_unified_routes_a_caller_cannot_see_a_foreign_already_linked_requirements_name(
+    db_session, make_org, tenant_ctx, client, login_as
+):
+    """Org A must not see Org B's already-linked Requirement name or Org B's application name via unified route."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.models import Requirement
+
+    org_a = make_org("u-alr-req-a")
+    org_b = make_org("u-alr-req-b")
+
+    # Create apps owned by each org
+    app_a = _make_app(db_session, org_a.id, "App A")
+    app_b = _make_app(db_session, org_b.id, "App B")
+
+    # Create requirement owned by org B, already linked to org B's app
+    req_b = _make_requirement(db_session, org_b.id, "SECRET-U-ALR-REQUIREMENT-B")
+    req_b.application_component_id = app_b.id
+    db_session.flush()
+
+    # Create a user in org A and log in
+    from app.models.user import User
+    user_a = User(
+        email=f"user-a-{req_b.id}@example.test",
+        organization_id=org_a.id,
+        confirmed=True,
+        enterprise_role="enterprise_architect",
+    )
+    db_session.add(user_a)
+    db_session.flush()
+
+    login_as(client, user_a)
+
+    # Attempt to link org B's already-linked requirement to org A's app via unified route
+    with tenant_ctx(org_a.id):
+        resp = client.post(
+            f"/applications/{app_a.id}/requirements/add",
+            data={"element_id": req_b.id},
+            follow_redirects=True,
+        )
+
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert "SECRET-U-ALR-REQUIREMENT-B" not in body
+    assert "App B" not in body
+    db_session.expire(req_b)
+    assert req_b.application_component_id == app_b.id
+
+
+def test_unified_routes_a_caller_cannot_see_a_foreign_already_linked_goal_or_drivers_name(
+    db_session, make_org, tenant_ctx, client, login_as
+):
+    """Org A must not see Org B's already-linked Goal/Driver names or Org B's application name via unified route."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.motivation import Driver, Goal
+
+    org_a = make_org("u-alr-gd-a")
+    org_b = make_org("u-alr-gd-b")
+
+    # Create apps owned by each org
+    app_a = _make_app(db_session, org_a.id, "App A")
+    app_b = _make_app(db_session, org_b.id, "App B")
+
+    # Create goal and driver owned by org B, already linked to org B's app
+    goal_b = _make_goal(db_session, org_b.id, "SECRET-U-ALR-GOAL-B")
+    goal_b.application_component_id = app_b.id
+    driver_b = _make_driver(db_session, org_b.id, "SECRET-U-ALR-DRIVER-B")
+    driver_b.application_component_id = app_b.id
+    db_session.flush()
+
+    # Create a user in org A and log in
+    from app.models.user import User
+    user_a = User(
+        email=f"user-a-{goal_b.id}@example.test",
+        organization_id=org_a.id,
+        confirmed=True,
+        enterprise_role="enterprise_architect",
+    )
+    db_session.add(user_a)
+    db_session.flush()
+
+    login_as(client, user_a)
+
+    # Attempt to link org B's already-linked goal and driver to org A's app via unified routes
+    with tenant_ctx(org_a.id):
+        goal_resp = client.post(
+            f"/applications/{app_a.id}/goals/add",
+            data={"element_id": goal_b.id},
+            follow_redirects=True,
+        )
+        driver_resp = client.post(
+            f"/applications/{app_a.id}/drivers/add",
+            data={"element_id": driver_b.id},
+            follow_redirects=True,
+        )
+
+    for resp in (goal_resp, driver_resp):
+        body = resp.get_data(as_text=True)
+        assert resp.status_code == 200
+        assert "SECRET-U-ALR-GOAL-B" not in body
+        assert "SECRET-U-ALR-DRIVER-B" not in body
+        assert "App B" not in body
+
+    db_session.expire(goal_b)
+    db_session.expire(driver_b)
+    assert goal_b.application_component_id == app_b.id
+    assert driver_b.application_component_id == app_b.id
