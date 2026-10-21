@@ -52,6 +52,7 @@ from app.models.models import (  # dead-code-ok
     ArchitectureModel,
 )
 from app.services.archimate.archimate_llm_service import ArchiMateLLMService
+from app.core.auth.decorators import require_permission
 from app.decorators import audit_log, require_roles
 from app.services.rate_limiter import rate_limit
 from app.utils.validators import (
@@ -85,7 +86,7 @@ logger = logging.getLogger(__name__)
 
 @unified_applications_bp.route("/create", methods=["GET", "POST"])
 @login_required
-@require_roles("admin", "architect")
+@require_permission("create", "application")
 @audit_log("application_create")
 def application_create():
     """Create Application — modal handles creation inline; POST supports JSON.
@@ -691,7 +692,7 @@ def generate_application_archimate(id):
 
 @unified_applications_bp.route("/<int:id>/edit", methods=["GET", "POST"])
 @login_required
-@require_roles("admin", "architect")
+@require_permission("edit", "application")
 @audit_log("application_update")
 def application_edit(id):
     """Edit Application - ALWAYS returns HTML"""
@@ -939,8 +940,8 @@ def application_edit(id):
 
 
 @unified_applications_bp.route("/<int:id>/delete", methods=["POST"])
+@require_permission("delete", "application")
 @login_required
-@require_roles("admin", "architect")
 @audit_log("application_delete")
 def application_delete(id):
     """Delete Application - returns JSON for AJAX requests, HTML redirect otherwise"""
@@ -998,8 +999,8 @@ def application_delete(id):
 
 
 @unified_applications_bp.route("/bulk-delete", methods=["POST"])
+@require_permission("bulk_delete", "application")
 @login_required
-@require_roles("admin")
 @audit_log("application_bulk_delete")
 @rate_limit(5, "1m")
 def bulk_delete_applications():
@@ -1106,8 +1107,8 @@ def bulk_delete_applications():
 
 
 @unified_applications_bp.route("/api/<int:app_id>", methods=["DELETE"])
+@require_permission("delete", "application")
 @login_required
-@require_roles("admin", "architect")
 @audit_log("application_delete")
 def api_delete_application(app_id):
     """API endpoint for deleting an application"""

@@ -65,8 +65,9 @@
     {% call workspace_gate(home_url) %}
     {# Command pattern (design/patterns.json: focused_task): one large input, the
        question lenses as chips beneath it, the answer cascade below. The picker
-       is rendered once and always; a chip sets openKey, which onSelect() in
-       ask.js dispatches on. Chip ids are the contract the smoke journeys drive. #}
+       is rendered once and always; a chip calls toggleQuestion() in ask.js, which
+       sets openKey and answers straight away when an element is already chosen
+       (clicking the chip already chosen keeps it chosen). Chip ids are the contract the smoke journeys drive. #}
     <div class="mx-auto max-w-[760px] space-y-3">
         <div class="ask-large-input">{{ entity_picker('ask', prompt='Type a team, service or system name', input_class='h-12 w-full rounded-md border border-input bg-background px-4 text-base') }}</div>
         <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Question">
@@ -85,7 +86,7 @@
                     class="inline-flex h-8 items-center rounded-md border px-3 text-13 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     :class="(openKey || 'impact') === '{{ question.key }}' ? 'border-ring bg-muted text-info dark:bg-card' : 'border-input bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground'"
                     :aria-pressed="(openKey || 'impact') === '{{ question.key }}' ? 'true' : 'false'"
-                    @click="openKey = '{{ question.key }}'; $nextTick(() => $refs.pickerInput && $refs.pickerInput.focus())">
+                    @click="openKey === '{{ question.key }}' || toggleQuestion('{{ question.key }}')">
                 {{ chip_labels[question.key] }}
             </button>
             {% endfor %}
@@ -95,7 +96,7 @@
         {% endfor %}
     </div>
     <div id="ask-results" aria-busy="false" :aria-busy="busy ? 'true' : 'false'" x-show="answeredKey === 'impact' && state !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-results-heading" x-ref="resultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
+        <h2 id="ask-results-heading" x-ref="resultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         {{ impact_states("state === 'loading'") }}
         <div x-show="state === 'ready'" x-cloak>
             {% call answer_cascade('ask-cascade', question="'What breaks if ' + (centreName || '…') + ' fails or is under-resourced?'", rows='rows', ask='load(node.elementId)', save="Platform.fetch('/api/v1/intelligence/answers', { method: 'POST', body: { question: 'impact', element_id: centreId }, silent: true }).catch(function () {})", row_attrs='data-ask-row', root='centreName') %}
@@ -118,7 +119,7 @@
        blast-radius rows -- a distinct shape from L1's flat row list, so a
        separate result block rather than overloading `rows`. #}
     <div id="ask-risk-results" aria-busy="false" :aria-busy="riskBusy ? 'true' : 'false'" x-show="answeredKey === 'risk' && riskState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-risk-results-heading" x-ref="riskResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
+        <h2 id="ask-risk-results-heading" x-ref="riskResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         <template x-if="riskState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -154,7 +155,7 @@
        why duplicate-detection and TCO are not offered here (neither has a
        per-application HTML page today). #}
     <div id="ask-portfolio-results" aria-busy="false" :aria-busy="portfolioBusy ? 'true' : 'false'" x-show="answeredKey === 'portfolio' && portfolioState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-portfolio-results-heading" x-ref="portfolioResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
+        <h2 id="ask-portfolio-results-heading" x-ref="portfolioResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         <template x-if="portfolioState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -178,7 +179,7 @@
     {# L5: one card per work package seeded on the picked element, each with
        its own blast-radius rows -- same shape as L6's risk cards. #}
     <div id="ask-programme-results" aria-busy="false" :aria-busy="programmeBusy ? 'true' : 'false'" x-show="answeredKey === 'programme' && programmeState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-programme-results-heading" x-ref="programmeResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
+        <h2 id="ask-programme-results-heading" x-ref="programmeResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         <template x-if="programmeState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -222,7 +223,7 @@
        its own blast-radius rows and a nested success-metrics list -- same
        shape as L5's work-package cards. #}
     <div id="ask-strategy-results" aria-busy="false" :aria-busy="strategyBusy ? 'true' : 'false'" x-show="answeredKey === 'strategy' && strategyState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-strategy-results-heading" x-ref="strategyResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
+        <h2 id="ask-strategy-results-heading" x-ref="strategyResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         <template x-if="strategyState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -276,7 +277,7 @@
        inside any loading/error/empty state gate, since it is true on
        every single response regardless of ownership data. #}
     <div id="ask-accountability-results" aria-busy="false" :aria-busy="accountabilityBusy ? 'true' : 'false'" x-show="answeredKey === 'accountability' && accountabilityState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-accountability-results-heading" x-ref="accountabilityResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
+        <h2 id="ask-accountability-results-heading" x-ref="accountabilityResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         <template x-if="accountabilityState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -312,7 +313,7 @@
        the lineage flows. Steward and owner are free text as recorded, never a
        person; anything missing says "not recorded" (no blank, no zero). #}
     <div id="ask-data-results" aria-busy="false" :aria-busy="dataBusy ? 'true' : 'false'" x-show="answeredKey === 'data' && dataState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-data-results-heading" x-ref="dataResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
+        <h2 id="ask-data-results-heading" x-ref="dataResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         <template x-if="dataState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -358,7 +359,7 @@
        so. The last scan time is shown only when one exists; nothing is shown as
        a percentage or a zero. #}
     <div id="ask-compliance-results" aria-busy="false" :aria-busy="complianceBusy ? 'true' : 'false'" x-show="answeredKey === 'compliance' && complianceState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-compliance-results-heading" x-ref="complianceResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
+        <h2 id="ask-compliance-results-heading" x-ref="complianceResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         <template x-if="complianceState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
