@@ -251,8 +251,8 @@ def test_a_last_edit_date_is_not_a_recorded_date(app, db_session, make_org):
     from sqlalchemy import text
 
     db_session.execute(
-        text("update archimate_relationships set created_at = null, updated_at = now() where id = :i"),
-        {"i": rel.id},
+        text("update archimate_relationships set created_at = null, updated_at = now() where id = :i and organization_id = :o"),
+        {"i": rel.id, "o": org.id},
     )
     db_session.commit()
 
