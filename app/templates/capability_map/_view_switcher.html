@@ -32,7 +32,7 @@
 <div data-testid="capability-view-switcher" class="inline-flex flex-nowrap items-center gap-1 rounded-md border border-input bg-muted/50 p-1" role="navigation" aria-label="Capability Map view">
     {% for key, label, icon, endpoint in _views %}
         {% if key == active_view %}
-        <span class="inline-flex shrink-0 items-center whitespace-nowrap rounded-sm text-sm font-medium h-8 px-3 bg-background text-foreground shadow-sm" aria-current="page">
+        <span class="inline-flex shrink-0 items-center whitespace-nowrap rounded-sm text-sm font-medium h-8 px-3 bg-background text-foreground" aria-current="page">
             <i data-lucide="{{ icon }}" class="w-4 h-4 mr-2" aria-hidden="true"></i>{{ label }}
         </span>
         {% elif endpoint in flask.current_app.view_functions %}

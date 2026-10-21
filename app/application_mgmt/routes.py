@@ -2330,8 +2330,7 @@ def render_application_detail(id):
         capability_form_config=capability_form_config,
         archimate_form_config={},
         archimate_viewpoints=[],
-        mermaid_diagrams=[],
-        impact_analysis={},
+        impact_answer=_impact_answer_for_application(app_obj),
         strategy_capabilities=[],
         strategy_resources=[],
         value_streams=[],
@@ -2406,3 +2405,69 @@ def render_application_detail(id):
         archimate_info=archimate_info,
         archimate_relationships=archimate_relationships,
     )
+
+def _impact_answer_for_application(app_obj):
+    """The cited impact answer for an application's ArchiMate element, shaped for the
+    answer cascade card (the same rows the Ask page shows). None when the application has
+    no element or the question cannot be asked."""
+    element_id = getattr(app_obj, "archimate_element_id", None)
+    if not element_id:
+        return None
+    from flask_login import current_user
+
+    try:
+        from ..modules.intelligence.services.answer_envelope import (
+            KIND_IMPACT,
+            AnswerNotAskable,
+            AnswerParamError,
+            ask_and_store,
+        )
+
+        record = ask_and_store(
+            KIND_IMPACT,
+            {"element_id": element_id, "include_derived": True},
+            user_id=getattr(current_user, "id", None),
+        )
+    except (AnswerNotAskable, AnswerParamError):
+        db.session.rollback()
+        return None
+    except Exception:
+        logger.exception("Impact answer failed for application %s", app_obj.id)
+        db.session.rollback()
+        return None
+    elements = record.elements or {}
+
+    def _name(eid):
+        entry = elements.get(str(eid)) or {}
+        return entry.get("name") or ("Element %s" % eid)
+
+    rows = []
+    for row in record.rows or []:
+        relation = row.get("relation") or {}
+        derived = relation.get("kind") == "derived"
+        owners = row.get("owners") or []
+        rows.append(
+            {
+                "key": ("derived-%s-%s" if derived else "explicit-%s-%s")
+                % (relation.get("derived_id") if derived and relation.get("derived_id") is not None else row.get("element_id"), relation.get("depth")),
+                "elementId": row.get("element_id"),
+                "name": _name(row.get("element_id")),
+                "derived": derived,
+                "kindLabel": "Worked out from the model" if derived else "Explicit",
+                "depth": max((relation.get("depth") or 1) - 1, 0),
+                "ownerName": ", ".join(o.get("name") for o in owners if o.get("name")) or None,
+                "sourceConfidence": relation.get("confidence"),
+                "sourceTimestamp": relation.get("computed_at"),
+            }
+        )
+    rows.sort(key=lambda r: (r["depth"], r["derived"], str(r["name"])))
+    return {
+        "address": record.address,
+        "rows": rows,
+        "centre_name": _name(element_id),
+        "element_id": element_id,
+        "truncated": bool(record.truncated),
+        "confidence": record.confidence,
+        "computed_at": record.computed_at.isoformat() if record.computed_at else None,
+    }
+

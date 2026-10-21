@@ -28,7 +28,7 @@
 {% endmacro %}
 
 {% macro user_info(user) %}
-    <div class="rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden">
+    <div class="rounded-lg border border-border bg-card text-card-foreground overflow-hidden">
         <div class="border-b bg-muted/50 px-6 py-3">
             <h3 class="font-semibold">User Information</h3>
         </div>
@@ -79,7 +79,7 @@
             </div>
             <div class="lg:col-span-3">
                 {% if request.endpoint == deletion_endpoint %}
-                    <div class="rounded-lg border border-destructive bg-destructive/10 p-6 mb-6">
+                    <div class="rounded-md border border-destructive bg-destructive/10 px-3 py-2 mb-6">
                         <div class="flex gap-3">
                             <i data-lucide="alert-circle" class="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" aria-hidden="true"></i>
                             <div>
@@ -94,7 +94,7 @@
                         </div>
                     </div>
 
-                    <div x-data="{ confirmed: false }" class="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
+                    <div x-data="{ confirmed: false }" class="rounded-lg border border-border bg-card text-card-foreground p-6">
                         <div class="flex items-start gap-3 mb-4">
                             <input type="checkbox" x-model="confirmed" id="delete-confirm" class="h-4 w-4 rounded border-input mt-0.5 cursor-pointer">
                             <label for="delete-confirm" class="text-sm cursor-pointer select-none">
@@ -105,13 +105,13 @@
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" :disabled="!confirmed"
                                     :class="confirmed ? '' : 'pointer-events-none opacity-50'"
-                                    class="inline-flex items-center justify-center rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 h-10 px-4 py-2 text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                                 Delete this user
                             </button>
                         </form>
                     </div>
                 {% elif form %}
-                    <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
+                    <div class="rounded-lg border border-border bg-card text-card-foreground p-6">
                         {{ f.render_form(form) }}
                     </div>
                 {% else %}

@@ -27,56 +27,56 @@
     {% endwith %}
 
     <!-- Invite Member -->
-    <div class="bg-background shadow rounded-lg mb-8 p-6">
+    <div class="bg-background rounded-lg mb-8 p-6">
         <h2 class="text-lg font-semibold text-foreground mb-1">Invite a teammate</h2>
         <p class="text-sm text-muted-foreground mb-4">They get an e-mail with a link to choose a password and join this organisation. The link works once and for 14 days.</p>
         {% if invite_error %}
         <div role="alert" data-team-invite-error
-             class="mb-4 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive-emphasis">
+             class="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis">
             {{ invite_error }}
         </div>
         {% endif %}
         {% if not mail_is_available %}
         <div role="alert" data-team-mail-unavailable
-             class="mb-4 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
+             class="mb-4 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-foreground">
             E-mail is not available on this server, so invitations cannot be sent to people who do not have an account yet.
         </div>
         {% endif %}
         <form method="POST" action="{{ url_for('team.team_invite') }}" class="flex flex-wrap gap-3 items-end">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="w-full sm:w-auto">
-                <label for="email" class="block text-sm font-medium text-foreground mb-1">Email</label>
+                <label for="email" class="block text-sm font-medium text-muted-foreground mb-1">Email</label>
                 <input id="email" name="email" type="email" required autocomplete="off"
-                    class="flex h-9 w-full sm:w-64 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    class="flex h-9 w-full sm:w-64 rounded-md border border-input bg-background text-foreground px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     placeholder="user@example.com">
             </div>
             <div>
-                <label for="persona" class="block text-sm font-medium text-foreground mb-1">Persona</label>
+                <label for="persona" class="block text-sm font-medium text-muted-foreground mb-1">Persona</label>
                 <select id="persona" name="persona"
-                    class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     {% for value, label in personas %}
                         <option value="{{ value }}">{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div>
-                <label for="role" class="block text-sm font-medium text-foreground mb-1">Role</label>
+                <label for="role" class="block text-sm font-medium text-muted-foreground mb-1">Role</label>
                 <select id="role" name="role"
-                    class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     {% for r in valid_roles %}
                         <option value="{{ r }}"{% if r == 'viewer' %} selected{% endif %}>{{ r }}</option>
                     {% endfor %}
                 </select>
             </div>
             <button type="submit"
-                class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Send invitation
             </button>
         </form>
     </div>
 
     <!-- Open invitations -->
-    <div class="bg-background shadow rounded-lg mb-8 overflow-hidden" data-team-invitations>
+    <div class="bg-background rounded-lg mb-8 overflow-hidden" data-team-invitations>
         <div class="px-6 py-4 border-b border-border">
             <h2 class="text-lg font-semibold text-foreground">Invitations not yet accepted</h2>
         </div>
@@ -110,7 +110,7 @@
                     <form method="POST" action="{{ url_for('team.team_invitation_resend', invitation_id=inv.id) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" aria-label="Resend invitation to {{ inv.user.email }}"
-                            class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-8 px-3 disabled:opacity-50 disabled:pointer-events-none">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                             Resend
                         </button>
                     </form>
@@ -131,8 +131,8 @@
     </div>
 
     <!-- Members Table -->
-    <div class="bg-background shadow rounded-lg overflow-x-auto" data-team-members>
-        <table class="min-w-full divide-y divide-border">
+    <div class="bg-background rounded-lg overflow-x-auto" data-team-members>
+        <table class="dense-table min-w-full divide-y divide-border">
             <thead class="bg-muted/30">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
@@ -163,7 +163,7 @@
                             {% set _raw_role = _role_from_map if _role_from_map else _role_from_member %}
                             {% set current_role = _raw_role if _raw_role in valid_roles else (valid_roles[0] if valid_roles else '') %}
                             <select name="role" data-autosubmit
-                                class="rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm" aria-label="Role">
+                                class="h-9 rounded-md border-border focus:border-primary focus:ring-primary sm:text-sm" aria-label="Role">
                                 {% for r in valid_roles %}
                                     <option value="{{ r }}" {% if current_role == r %}selected{% endif %}>
                                         {{ r }}

@@ -11,7 +11,7 @@
       <h3 class="text-sm font-semibold text-foreground">Outcome Metrics</h3>
       <button type="button"
               @click="addMetric()"
-              class="inline-flex items-center gap-2 h-8 px-3 rounded-md text-xs font-medium border border-input bg-background hover:bg-accent">
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="plus" class="h-3 w-3"></i> Add Metric
       </button>
     </div>
@@ -26,7 +26,7 @@
     <template x-if="outcomeMetrics.length > 0">
       <div class="rounded-md border border-border overflow-hidden">
         <div class="overflow-x-auto">
-          <table class="w-full text-sm">
+          <table class="dense-table w-full text-sm">
             <thead class="bg-muted/50">
               <tr>
                 <th class="text-left p-3 font-medium">Metric</th>
@@ -89,7 +89,7 @@
       <h3 class="text-sm font-semibold text-foreground">Lessons</h3>
       <button type="button"
               @click="addLesson()"
-              class="inline-flex items-center gap-2 h-8 px-3 rounded-md text-xs font-medium border border-input bg-background hover:bg-accent">
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="plus" class="h-3 w-3"></i> Add Lesson
       </button>
     </div>
