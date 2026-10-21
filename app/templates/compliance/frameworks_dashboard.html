@@ -25,7 +25,7 @@
     {# Summary tiles — every value is a real query result; 0 when there is nothing to show. #}
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div class="bg-card text-card-foreground rounded-lg border border-border p-5">
-            <div class="text-sm text-muted-foreground">Active frameworks</div>
+            <div class="text-sm text-muted-foreground">{{ 'Frameworks' if show_all_frameworks else 'Adopted frameworks' }}</div>
             <div class="mt-1 text-2xl font-bold text-foreground">
                 {{ 0 if load_error else (total_frameworks if total_frameworks is not none else 0) }}
             </div>
@@ -63,8 +63,13 @@
        reusing the existing GET /api/compliance/frameworks/<id>/controls
        endpoint (previously reachable only via curl). No new backend. #}
     <div class="bg-card text-card-foreground rounded-lg border border-border overflow-hidden" x-data="frameworksTable()">
-        <div class="px-5 py-4 border-b border-border">
-            <h2 class="text-base font-semibold text-foreground">Frameworks</h2>
+        <div class="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
+            <h2 class="text-base font-semibold text-foreground">{{ 'All frameworks' if show_all_frameworks else 'Adopted frameworks' }}</h2>
+            {% if show_all_frameworks %}
+            <a href="{{ url_for('application_mgmt.compliance_frameworks_dashboard') }}" class="text-sm text-primary hover:underline">Show adopted frameworks only</a>
+            {% else %}
+            <a href="{{ url_for('application_mgmt.compliance_frameworks_dashboard', all=1) }}" class="text-sm text-primary hover:underline">Show all frameworks</a>
+            {% endif %}
         </div>
         {% if frameworks %}
         <div class="overflow-x-auto">
@@ -142,7 +147,11 @@
         {% else %}
         <div class="px-5 py-12 text-center text-sm text-muted-foreground">
             <p class="mb-2">Regulatory frameworks define the compliance standards, controls and obligations your organisation must meet — such as GDPR, SOC 2 or ISO 27001.</p>
+            {% if show_all_frameworks %}
             <p>Frameworks are added by an administrator.</p>
+            {% else %}
+            <p>Your organisation has not adopted a framework yet. <a href="{{ url_for('application_mgmt.compliance_frameworks_dashboard', all=1) }}" class="text-primary hover:underline">Browse all frameworks</a> to adopt one.</p>
+            {% endif %}
         </div>
         {% endif %}
     </div>

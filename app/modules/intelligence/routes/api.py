@@ -940,10 +940,17 @@ def compliance_for_element(element_id: int):
 
     from app.modules.intelligence.services.query_service import IntelligenceQueryService
 
-    result = IntelligenceQueryService.compliance_for_element(element_id)
+    all_frameworks, err = _parse_bool_param(
+        request.args.get("all_frameworks"), default=False, param_name="all_frameworks"
+    )
+    if err is not None:
+        return err
+
+    result = IntelligenceQueryService.compliance_for_element(element_id, all_frameworks=all_frameworks)
 
     return success_response(
         {
+            "frameworks_scope": result.get("frameworks_scope", "adopted"),
             "controls": result["controls"],
             "open_violations": result["open_violations"],
             "last_scan_at": result.get("last_scan_at"),

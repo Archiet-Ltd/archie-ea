@@ -51,6 +51,21 @@ def _control(db_session, code="AC-2", title="Account management", description=No
     return control
 
 
+def _adopt(db_session, org_id, framework):
+    """The organisation adopts *framework* (a framework, or a control's framework)."""
+    from app.models.regulatory_framework import FrameworkAdoption
+
+    framework = getattr(framework, "framework", framework)
+    existing = db_session.query(FrameworkAdoption).filter_by(
+        organization_id=org_id, framework_id=framework.id
+    ).first()
+    if existing is None:
+        db_session.add(FrameworkAdoption(
+            organization_id=org_id, scope="tenant", framework_id=framework.id, status="active"
+        ))
+        db_session.flush()
+
+
 def _user(db_session, org_id):
     from app.models.user import User
 
@@ -505,6 +520,7 @@ def test_old_rows_stay_readable_and_are_folded_not_deleted(app, db_session, make
     db_session.add(component)
     db_session.flush()
     control = _control(db_session)
+    _adopt(db_session, org.id, control)
     legacy = ApplicationComplianceControl(
         organization_id=org.id, application_id=component.id, control_id=control.id,
         implementation_status="implemented", evidence_url="https://evidence.example/ledger",
@@ -537,6 +553,7 @@ def _linked_estate(app, db_session, org, type_="Node", layer="technology"):
 
     node = _element(db_session, org.id, "Primary database host", type_, layer)
     control = _control(db_session, "PR.DS-01", "Data-at-rest protected")
+    _adopt(db_session, org.id, control)
     link_control_to_element(control.id, node.id, org.id)
     db_session.commit()
     return node, control
@@ -626,6 +643,8 @@ def test_two_organisations_never_see_each_others_controls(app, db_session, make_
     a_node = _element(db_session, org_a.id, "A node", "Node", "technology")
     b_node = _element(db_session, org_b.id, "B node", "Node", "technology")
     control = _control(db_session, "PR.DS-01", "Data-at-rest protected")
+    _adopt(db_session, org_a.id, control)
+    _adopt(db_session, org_b.id, control)
     link_control_to_element(control.id, a_node.id, org_a.id)
     db_session.commit()
 
@@ -655,6 +674,7 @@ def test_one_organisations_requirement_element_is_not_read_as_anothers(app, db_s
     org_a, org_b = make_org("elem-a"), make_org("elem-b")
     a_node = _element(db_session, org_a.id, "A node", "Node", "technology")
     control = _control(db_session)
+    _adopt(db_session, org_a.id, control)
     link_control_to_element(control.id, a_node.id, org_a.id)
     b_requirement = control_to_element(control, org_b.id)
     db_session.commit()
@@ -769,3 +789,127 @@ def test_two_old_rows_for_one_link_keep_the_first_legacy_id(db_session, make_org
 
     rel = db_session.query(ArchiMateRelationship).filter_by(source_id=element.id, type="realization").one()
     assert rel.connection_spec["legacy_mapping_id"] == first.id
+
+
+# --------------------------------------------------------------------------- #
+# (f) The adoption filter                                                      #
+# --------------------------------------------------------------------------- #
+
+
+def _two_organisations_with_different_frameworks(app, db_session, make_org):
+    """Organisation A adopts framework one, B adopts framework two. Each organisation has a
+    node bound to a control of BOTH frameworks."""
+    from app.modules.compliance.services.control_model_service import link_control_to_element
+
+    org_a, org_b = make_org("adopt-a"), make_org("adopt-b")
+    control_one = _control(db_session, "ONE-1", "Control of framework one")
+    control_two = _control(db_session, "TWO-1", "Control of framework two")
+    _adopt(db_session, org_a.id, control_one)
+    _adopt(db_session, org_b.id, control_two)
+    nodes = {}
+    for org in (org_a, org_b):
+        node = _element(db_session, org.id, f"Host of {org.id}", "Node", "technology")
+        link_control_to_element(control_one.id, node.id, org.id)
+        link_control_to_element(control_two.id, node.id, org.id)
+        nodes[org.id] = node
+    db_session.commit()
+    return org_a, org_b, nodes, control_one, control_two
+
+
+def test_the_compliance_answer_shows_only_the_frameworks_an_organisation_adopted(app, db_session, make_org):
+    org_a, org_b, nodes, one, two = _two_organisations_with_different_frameworks(app, db_session, make_org)
+
+    def codes(org, **kwargs):
+        result = _in_org(app, org.id, lambda: IntelligenceQueryService.compliance_for_element(nodes[org.id].id, **kwargs))
+        return {c["code"] for c in result["controls"]}
+
+    assert codes(org_a) == {"ONE-1"}
+    assert codes(org_b) == {"TWO-1"}
+    assert codes(org_a, all_frameworks=True) == {"ONE-1", "TWO-1"}
+    assert codes(org_b, all_frameworks=True) == {"ONE-1", "TWO-1"}
+
+
+def test_an_organisation_that_adopted_nothing_sees_no_controls_until_it_asks_for_all(app, db_session, make_org):
+    from app.modules.compliance.services.control_model_service import link_control_to_element
+
+    org = make_org("adopt-none")
+    node = _element(db_session, org.id, "Host", "Node", "technology")
+    link_control_to_element(_control(db_session).id, node.id, org.id)
+    db_session.commit()
+
+    plain = _in_org(app, org.id, lambda: IntelligenceQueryService.compliance_for_element(node.id))
+    everything = _in_org(app, org.id, lambda: IntelligenceQueryService.compliance_for_element(node.id, all_frameworks=True))
+
+    assert plain["controls"] == [] and plain["frameworks_scope"] == "adopted"
+    assert len(everything["controls"]) == 1 and everything["frameworks_scope"] == "all"
+
+
+def test_an_inactive_adoption_does_not_count(app, db_session, make_org):
+    from app.models.regulatory_framework import FrameworkAdoption
+
+    org_a, _org_b, nodes, one, _two = _two_organisations_with_different_frameworks(app, db_session, make_org)
+    db_session.query(FrameworkAdoption).filter_by(organization_id=org_a.id).update({"status": "inactive"})
+    db_session.commit()
+
+    result = _in_org(app, org_a.id, lambda: IntelligenceQueryService.compliance_for_element(nodes[org_a.id].id))
+    assert result["controls"] == []
+
+
+def test_ask_and_the_assistant_and_the_connector_filter_the_same_way(app, db_session, make_org):
+    org_a, org_b, nodes, one, two = _two_organisations_with_different_frameworks(app, db_session, make_org)
+    user_a = _user(db_session, org_a.id)
+    node = nodes[org_a.id]
+
+    ask = _in_org(app, org_a.id, lambda: envelope.ask_and_store("compliance", {"element_id": node.id}))
+    ask_all = _in_org(app, org_a.id, lambda: envelope.ask_and_store(
+        "compliance", {"element_id": node.id, "all_frameworks": True}))
+    tool = _call_tool(app, user_a, org_a.id, {"question": "compliance", "element_id": node.id})
+    tool_all = _call_tool(app, user_a, org_a.id, {"question": "compliance", "element_id": node.id, "all_frameworks": True})
+
+    assert [r["code"] for r in ask.rows] == ["ONE-1"] and ask.summary["frameworks_scope"] == "adopted"
+    assert sorted(r["code"] for r in ask_all.rows) == ["ONE-1", "TWO-1"] and ask_all.summary["frameworks_scope"] == "all"
+    assert [r["code"] for r in tool["result"]["rows"]] == ["ONE-1"]
+    assert sorted(r["code"] for r in tool_all["result"]["rows"]) == ["ONE-1", "TWO-1"]
+    assert ask.address != ask_all.address, "the two questions are stored as two different answers"
+    with pytest.raises(envelope.AnswerParamError):
+        _in_org(app, org_a.id, lambda: envelope.ask_and_store(
+            "compliance", {"element_id": node.id, "all_frameworks": "yes"}))
+
+
+def test_the_answer_tool_offers_the_all_frameworks_option():
+    from app.modules.ai_chat.tools.registry import TOOL_SCHEMAS
+
+    schema = next(t for t in TOOL_SCHEMAS if t["name"] == "answer")
+    assert schema["parameters"]["properties"]["all_frameworks"]["type"] == "boolean"
+
+
+def test_the_pages_list_adopted_frameworks_by_default_and_all_on_request(app, db_session, make_org, client, login_as):
+    from flask import url_for
+
+    org_a, org_b, _nodes, one, two = _two_organisations_with_different_frameworks(app, db_session, make_org)
+    framework_one, framework_two = one.framework, two.framework
+    user_a, user_b = _user(db_session, org_a.id), _user(db_session, org_b.id)
+    db_session.commit()
+
+    def listed(user, path):
+        login_as(client, user)
+        response = client.get(path)
+        assert response.status_code == 200, response.get_data(as_text=True)[:300]
+        return response
+
+    with app.test_request_context("/"):
+        api = url_for("application_mgmt.get_compliance_frameworks")
+        page = url_for("application_mgmt.compliance_frameworks_dashboard")
+
+    for user, mine, theirs in ((user_a, framework_one, framework_two), (user_b, framework_two, framework_one)):
+        codes = {f["code"] for f in listed(user, api).get_json()}
+        assert mine.code in codes and theirs.code not in codes
+        everything = {f["code"] for f in listed(user, api + "?all=1").get_json()}
+        assert {mine.code, theirs.code} <= everything
+
+        html = listed(user, page).get_data(as_text=True)
+        assert mine.code in html and theirs.code not in html
+        assert "Show all frameworks" in html
+        html_all = listed(user, page + "?all=1").get_data(as_text=True)
+        assert mine.code in html_all and theirs.code in html_all
+        assert "Show adopted frameworks only" in html_all

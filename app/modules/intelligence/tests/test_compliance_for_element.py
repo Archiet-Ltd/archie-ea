@@ -47,7 +47,15 @@ def _control(db_session, code="AC-2", framework_code=None):
 
 def _mapping(db_session, org_id, component, control, **fields):
     from app.models.application_compliance import ApplicationComplianceControl
+    from app.models.regulatory_framework import FrameworkAdoption
 
+    # The compliance answer reads the frameworks an organisation has adopted.
+    if not db_session.query(FrameworkAdoption).filter_by(
+        organization_id=org_id, framework_id=control.framework_id
+    ).first():
+        db_session.add(FrameworkAdoption(
+            organization_id=org_id, scope="tenant", framework_id=control.framework_id, status="active"
+        ))
     row = ApplicationComplianceControl(
         organization_id=org_id, application_id=component.id, control_id=control.id, **fields,
     )

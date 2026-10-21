@@ -1033,6 +1033,7 @@ def test_compliance_endpoint_returns_controls_for_a_real_application(
     from app.models.application_compliance import ApplicationComplianceControl
     from app.models.application_portfolio import ApplicationComponent
     from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+    from app.models.regulatory_framework import FrameworkAdoption
 
     org = make_org("compliance-route-ok")
     user = _make_user(db_session, org)
@@ -1044,6 +1045,9 @@ def test_compliance_endpoint_returns_controls_for_a_real_application(
     control = ComplianceControl(framework_id=framework.id, control_code="R-1", title="Route control")
     db_session.add(control)
     db_session.flush()
+    db_session.add(FrameworkAdoption(
+        organization_id=org.id, scope="tenant", framework_id=framework.id, status="active"
+    ))
     db_session.add(ApplicationComplianceControl(
         organization_id=org.id, application_id=component.id, control_id=control.id,
         implementation_status="planned", evidence_url="https://secret.example/x",

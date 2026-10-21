@@ -769,6 +769,13 @@ TOOL_SCHEMAS = [
                         "layer": {"type": "string"},
                     },
                 },
+                "all_frameworks": {
+                    "type": "boolean",
+                    "description": (
+                        "compliance: include controls of frameworks the organisation has not "
+                        "adopted (default false: adopted frameworks only)"
+                    ),
+                },
                 "max_depth": {"type": "integer", "description": "Hops to follow, 1 to 10 (default 3)"},
                 "include_derived": {
                     "type": "boolean",

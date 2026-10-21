@@ -157,7 +157,11 @@ def normalise_params(kind: str, raw: Dict[str, Any]) -> Dict[str, Any]:
 
     if kind == KIND_COMPLIANCE:
         # Which controls protect this element, and which are unmet: one element, no walk.
-        return {"element_id": _as_int(raw.get("element_id"), "element_id")}
+        return {
+            "element_id": _as_int(raw.get("element_id"), "element_id"),
+            # Only the frameworks the organisation has adopted, unless the question asks for all.
+            "all_frameworks": _as_bool(raw.get("all_frameworks"), "all_frameworks", False),
+        }
 
     max_depth = raw.get("max_depth", 3)
     if isinstance(max_depth, bool) or not isinstance(max_depth, int) or not (1 <= max_depth <= 10):
@@ -379,7 +383,9 @@ def build_envelope(
 def _compute_compliance(params: Dict[str, Any]) -> Dict[str, Any]:
     """The compliance question, from the one compliance reader. The rows are the
     controls the element is bound to; ``unmet`` counts those with no evidence recorded."""
-    result = IntelligenceQueryService.compliance_for_element(params["element_id"])
+    result = IntelligenceQueryService.compliance_for_element(
+        params["element_id"], all_frameworks=bool(params.get("all_frameworks"))
+    )
     reasons = list(result.get("reasons") or [])
     if NO_TENANT_CONTEXT_REASON in reasons:
         raise AnswerNotAskable(NO_TENANT_CONTEXT_REASON)
@@ -393,6 +399,7 @@ def _compute_compliance(params: Dict[str, Any]) -> Dict[str, Any]:
         "summary": {
             "unmet": sum(1 for row in rows if row.get("no_evidence")),
             "frameworks": frameworks,
+            "frameworks_scope": result.get("frameworks_scope", "adopted"),
             "open_violations": len(result.get("open_violations") or []),
             "last_scan_at": result.get("last_scan_at"),
         },

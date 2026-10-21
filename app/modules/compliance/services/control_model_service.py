@@ -59,6 +59,23 @@ def element_type_for(control: ComplianceControl) -> str:
     return CONSTRAINT_TYPE if (control.kind or DEFAULT_KIND) == CONSTRAINT_TYPE else REQUIREMENT_TYPE
 
 
+def adopted_framework_ids(organization_id: Optional[int]) -> set:
+    """The ids of the frameworks the organisation has adopted and not set inactive. The one
+    filter the compliance pages, the compliance answer (Ask, the assistant, the connector) and
+    the framework list share. No organisation reads as none adopted."""
+    if organization_id is None:
+        return set()
+    from app.models.regulatory_framework import FrameworkAdoption
+
+    return set(
+        db.session.execute(
+            db.select(FrameworkAdoption.framework_id)
+            .where(FrameworkAdoption.organization_id == organization_id)
+            .where(FrameworkAdoption.status == "active")
+        ).scalars()
+    )
+
+
 def _existing_element(control_id: int, organization_id: int) -> Optional[ArchiMateElement]:
     return db.session.execute(
         db.select(ArchiMateElement)

@@ -2483,7 +2483,7 @@ class IntelligenceQueryService:
         return model.organization_id == organization_id
 
     @staticmethod
-    def compliance_for_element(element_id: int) -> Dict[str, Any]:
+    def compliance_for_element(element_id: int, all_frameworks: bool = False) -> Dict[str, Any]:
         """"Which regulations and controls apply to this, and which controls have no evidence
         of being met?": the controls the element realises (an ordinary realisation link to
         the control's Requirement element, for an element of any core type) and the controls
@@ -2499,6 +2499,10 @@ class IntelligenceQueryService:
         ``not_applicable``/``waived``) adds ``no_control_evidence``. The evidence URL and the
         verifier are user-authored or personal and are not returned; only whether an URL is
         recorded is.
+
+        Only the frameworks the organisation has adopted are read, so a control of a framework it
+        has not adopted is not shown. ``all_frameworks=True`` reads every framework (a catalogue
+        browse, or a look at what is bound beyond the adopted set).
         """
         from datetime import datetime, timezone
 
@@ -2507,7 +2511,10 @@ class IntelligenceQueryService:
         from app.models.application_portfolio import ApplicationComponent
         from app.models.compliance_models import ComplianceControl, RegulatoryFramework
         from app.models.policy_monitoring import ArchitecturePolicy, ComplianceStatus, PolicyViolation
-        from app.modules.compliance.services.control_model_service import controls_realised_by
+        from app.modules.compliance.services.control_model_service import (
+            adopted_framework_ids,
+            controls_realised_by,
+        )
 
         predicate = IntelligenceQueryService._compliance_tenant_predicate
         as_of = datetime.now(timezone.utc).isoformat()
@@ -2543,16 +2550,22 @@ class IntelligenceQueryService:
             return {**empty, "reasons": [NO_APPLICATION_COMPONENT_REASON]}
 
         limit = IntelligenceQueryService._COMPLIANCE_LIMIT
+        adopted = None if all_frameworks else adopted_framework_ids(org_id)
         rows = []
         if component_id is not None:
-            rows = db.session.execute(
+            mapped = (
                 db.select(ApplicationComplianceControl, ComplianceControl, RegulatoryFramework)
                 .outerjoin(ComplianceControl, ComplianceControl.id == ApplicationComplianceControl.control_id)
                 .outerjoin(RegulatoryFramework, RegulatoryFramework.id == ComplianceControl.framework_id)
                 .where(ApplicationComplianceControl.application_id == component_id)
                 .where(predicate(ApplicationComplianceControl, org_id))
-                .order_by(RegulatoryFramework.code, ComplianceControl.control_code, ApplicationComplianceControl.id)
-                .limit(limit)
+            )
+            if adopted is not None:
+                mapped = mapped.where(ComplianceControl.framework_id.in_(adopted))
+            rows = db.session.execute(
+                mapped.order_by(
+                    RegulatoryFramework.code, ComplianceControl.control_code, ApplicationComplianceControl.id
+                ).limit(limit)
             ).all()
 
         # A control can be bound to any core element by a realisation link; an old
@@ -2599,6 +2612,8 @@ class IntelligenceQueryService:
             for link in linked_only:
                 control, framework = details.get(link["control_id"], (None, None))
                 if control is None:
+                    continue
+                if adopted is not None and control.framework_id not in adopted:
                     continue
                 # A control the element is bound to and that has no evidence record is
                 # unmet: nothing is inferred about it being met.
@@ -2660,6 +2675,7 @@ class IntelligenceQueryService:
             "last_scan_at": last_scan.isoformat() if last_scan else None,
             "as_of": as_of,
             "reasons": reasons,
+            "frameworks_scope": "all" if all_frameworks else "adopted",
         }
 
     # ------------------------------------------------------------------ #

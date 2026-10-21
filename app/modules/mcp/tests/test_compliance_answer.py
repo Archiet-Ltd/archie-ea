@@ -17,6 +17,7 @@ from app.modules.mcp.tests.test_tools import _make_user, _mcp_tools_list
 def _world(db_session, make_org):
     from app.models import ArchiMateElement
     from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+    from app.models.regulatory_framework import FrameworkAdoption
     from app.modules.compliance.services.control_model_service import link_control_to_element
 
     org_a, org_b = make_org("mcp-comp-a"), make_org("mcp-comp-b")
@@ -27,6 +28,9 @@ def _world(db_session, make_org):
     control = ComplianceControl(framework_id=framework.id, control_code="PR.DS-01", title="Data-at-rest protected")
     db_session.add(control)
     db_session.flush()
+    db_session.add(FrameworkAdoption(
+        organization_id=org_a.id, scope="tenant", framework_id=framework.id, status="active"
+    ))
     link_control_to_element(control.id, node.id, org_a.id)
     db_session.commit()
     return org_a, org_b, node, control
@@ -75,3 +79,32 @@ def test_another_organisations_token_reads_our_element_as_absent(client, db_sess
     assert status == 200, body
     payload = json.loads(body["result"]["content"][0]["text"])
     assert payload["success"] is False and payload["reason"] == "element_not_found"
+
+
+def test_the_connector_shows_adopted_frameworks_by_default_and_all_on_request(client, db_session, make_org):
+    from flask import current_app
+
+    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+    from app.modules.compliance.services.control_model_service import link_control_to_element
+
+    org_a, _b, node, adopted_control = _world(db_session, make_org)
+    other = RegulatoryFramework(code=f"FW{uuid.uuid4().hex[:8]}", name="Not adopted", category="security")
+    db_session.add(other)
+    db_session.flush()
+    other_control = ComplianceControl(framework_id=other.id, control_code="X-1", title="Not adopted control")
+    db_session.add(other_control)
+    db_session.flush()
+    link_control_to_element(other_control.id, node.id, org_a.id)
+    db_session.commit()
+    user = _make_user(db_session, org_a, "comp-adopt@example.com")
+    token = _mint_token_with_scope(current_app, user, org_a, "mcp:read")
+
+    _status, body = _mcp_call(client, token, "answer", {"question": "compliance", "element_id": node.id})
+    default = json.loads(body["result"]["content"][0]["text"])
+    _status, body = _mcp_call(
+        client, token, "answer", {"question": "compliance", "element_id": node.id, "all_frameworks": True}
+    )
+    everything = json.loads(body["result"]["content"][0]["text"])
+
+    assert [r["control_id"] for r in default["result"]["rows"]] == [adopted_control.id]
+    assert sorted(r["control_id"] for r in everything["result"]["rows"]) == sorted([adopted_control.id, other_control.id])

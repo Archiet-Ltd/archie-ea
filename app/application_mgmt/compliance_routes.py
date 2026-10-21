@@ -1,6 +1,6 @@
 """API routes for compliance framework management."""
 
-from flask import current_app, jsonify, render_template, request
+from flask import current_app, g, jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from app import db
@@ -9,6 +9,24 @@ from app.decorators import require_roles
 from app.models.application_compliance import ApplicationComplianceControl
 from app.models.compliance_models import ComplianceControl, RegulatoryFramework
 from app.utils.route_guards import require_entity
+
+
+def _wants_all_frameworks() -> bool:
+    """The explicit "all frameworks" option of a catalogue browse (``?all=1``)."""
+    return (request.args.get("all") or "").strip().lower() in ("1", "true", "yes")
+
+
+def _frameworks_in_scope(show_all: bool):
+    """Active frameworks: the organisation's adopted ones, or the whole catalogue when asked."""
+    query = RegulatoryFramework.query.filter_by(status="active")
+    if not show_all:
+        from app.modules.compliance.services.control_model_service import adopted_framework_ids
+
+        adopted = adopted_framework_ids(getattr(g, "current_org_id", None))
+        if not adopted:
+            return []
+        query = query.filter(RegulatoryFramework.id.in_(adopted))
+    return query.order_by(RegulatoryFramework.code).all()
 
 
 @application_mgmt.route("/compliance", methods=["GET"])
@@ -28,11 +46,8 @@ def compliance_frameworks_dashboard():
     below is a real query result — an empty estate renders zeros/— rather than a
     fabricated figure.
     """
-    frameworks = (
-        RegulatoryFramework.query.filter_by(status="active")
-        .order_by(RegulatoryFramework.code)
-        .all()
-    )
+    show_all = _wants_all_frameworks()
+    frameworks = _frameworks_in_scope(show_all)
 
     framework_rows = [
         {
@@ -48,7 +63,14 @@ def compliance_frameworks_dashboard():
         for f in frameworks
     ]
 
-    total_controls = ComplianceControl.query.filter_by(is_active=True).count()
+    framework_ids = [f.id for f in frameworks]
+    total_controls = (
+        ComplianceControl.query.filter(ComplianceControl.framework_id.in_(framework_ids))
+        .filter_by(is_active=True)
+        .count()
+        if framework_ids
+        else 0
+    )
 
     # Org-scoped mapping coverage (TenantMixin auto-filters inside the request).
     mappings = ApplicationComplianceControl.query.all()
@@ -61,6 +83,7 @@ def compliance_frameworks_dashboard():
         "compliance/frameworks_dashboard.html",
         frameworks=framework_rows,
         total_frameworks=len(framework_rows),
+        show_all_frameworks=show_all,
         total_controls=total_controls,
         total_mappings=len(mappings),
         mapped_by_status=mapped_by_status,
@@ -71,8 +94,9 @@ def compliance_frameworks_dashboard():
 @application_mgmt.route("/api/compliance/frameworks", methods=["GET"])
 @login_required
 def get_compliance_frameworks():
-    """Get all active compliance frameworks."""
-    frameworks = RegulatoryFramework.query.filter_by(status="active").all()
+    """The active compliance frameworks the organisation has adopted; ``?all=1`` lists the
+    whole catalogue."""
+    frameworks = _frameworks_in_scope(_wants_all_frameworks())
     return jsonify(
         [
             {
