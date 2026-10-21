@@ -383,6 +383,52 @@ def _entity_label(entity_type, entity_id):
         return None
 
 
+def _linked_entity_element_id(entity_type, entity_id):
+    """The ArchiMate element mirroring a linked Application/Solution/Programme
+    (None if it has none), so a risk linked both ways shows that element once."""
+    try:
+        if entity_type == "application":
+            from app.models.application_portfolio import ApplicationComponent as M
+        elif entity_type == "solution":
+            from app.models.solution_models import Solution as M
+        elif entity_type == "programme":
+            from app.models.strategic import StrategicInitiative as M
+        else:
+            return None
+        row = M.query.filter_by(id=entity_id).first()
+        return getattr(row, "archimate_element_id", None) if row else None
+    except Exception:  # noqa: BLE001 -- a stale link must not break the page
+        logger.warning("Could not resolve element of %s #%s", entity_type, entity_id, exc_info=True)
+        return None
+
+
+def _risk_element_touch(risk, links):
+    """The element a risk holds through its element field, as a read-only
+    "what it touches" entry. None when there is none, when it is the risk's own
+    ArchiMate mirror, when it belongs to another organisation, or when an entity
+    link already shows it."""
+    element_id = risk.archimate_element_id
+    if not element_id:
+        return None
+    from app.models.archimate_core import ArchiMateElement
+
+    element = ArchiMateElement.query.filter_by(id=element_id).first()
+    if element is None or element.organization_id != risk.organization_id:
+        return None
+    if element.type == "Assessment" and element.layer == "Motivation" and element.name == risk.title:
+        return None  # the risk's own mirror, not something it touches
+    for link in links:
+        if _linked_entity_element_id(link.entity_type, link.entity_id) == element_id:
+            return None
+    return {
+        "id": None,
+        "entity_type": element.type,
+        "entity_id": element.id,
+        "entity_label": element.name,
+        "via": "element",
+    }
+
+
 def serialize_risk_row(risk):
     """The one place a Risk becomes a row for the shared data_table component.
 
@@ -391,6 +437,7 @@ def serialize_risk_row(risk):
     rather than a second, independently-maintained copy that can drift.
     """
     links = risk_service.list_risk_links(risk.id)
+    touch = _risk_element_touch(risk, links)
     return {
         "id": risk.id,
         "title": risk.title,
@@ -419,7 +466,7 @@ def serialize_risk_row(risk):
                 "entity_label": _entity_label(link.entity_type, link.entity_id),
             }
             for link in links
-        ],
+        ] + ([touch] if touch else []),
     }
 
 
