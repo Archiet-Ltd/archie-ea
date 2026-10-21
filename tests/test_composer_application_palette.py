@@ -55,7 +55,8 @@ def test_application_group_leads_with_application_then_the_component():
     group = _palette()["Application"]
     labels = type_registry_for_page()
     assert group[0] == ("Application", labels["Application"]["label"])
-    assert group[1] == (base_type("Application"), labels[base_type("Application")]["label"])
+    # the chip is short like its siblings (App Collaboration, App Interface); the registry holds the full name
+    assert group[1] == (base_type("Application"), "App Component")
     assert labels["Application"]["label"] == plain_name_for("Application") == "Application"
     assert labels[base_type("Application")]["label"] == "Application component"
     assert labels["Application"]["base"] == labels[base_type("Application")]["base"]
@@ -82,7 +83,10 @@ def test_the_type_registry_reaches_the_page_and_labels_the_notation():
     template = (ROOT / "app/templates/archimate/composer.html").read_text(encoding="utf-8")
     assert "typeRegistry: {{ type_registry|tojson }}" in template
     assert "ComposerRenderer.applyTypeRegistry(" in template
-    assert ':title="t.label" x-text="t.label"' in template, "a long label must stay readable in the chip"
+    assert ':title="t.title || t.label" x-text="t.label"' in template, "the chip's full name is its tooltip"
+    assert "item.title = TYPE_REGISTRY[item.type].label" in RENDERER
+    assert "typeLabel/style', 'fill: hsl(var(--muted-foreground))'" in RENDERER
+    assert "typeLabel/fontSize', 12" in RENDERER
     assert "«" in RENDERER or "\u00ab" in RENDERER
 
 

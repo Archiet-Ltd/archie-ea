@@ -48,7 +48,7 @@ let ComposerRenderer = (function() {
         ],
         'Application': [
             { type: 'Application',              label: 'Application' },
-            { type: 'ApplicationComponent',     label: 'Application component' },
+            { type: 'ApplicationComponent',     label: 'App Component' },
             { type: 'ApplicationCollaboration', label: 'App Collaboration' },
             { type: 'ApplicationInterface',     label: 'App Interface' },
             { type: 'ApplicationInteraction',   label: 'App Interaction' },
@@ -139,7 +139,7 @@ let ComposerRenderer = (function() {
         Object.keys(PALETTE).forEach(function(layerName) {
             PALETTE[layerName].forEach(function(item) {
                 if (TYPE_REGISTRY[item.type] && TYPE_REGISTRY[item.type].label) {
-                    item.label = TYPE_REGISTRY[item.type].label;
+                    item.title = TYPE_REGISTRY[item.type].label;
                 }
             });
         });
@@ -160,6 +160,9 @@ let ComposerRenderer = (function() {
     function placeSpecialisationTag(node, elType, tagY, nameY) {
         if (!specialisationTag(elType)) return;
         node.attr('typeLabel/y', tagY);
+        node.attr('typeLabel/style', 'fill: hsl(var(--muted-foreground))');
+        node.attr('typeLabel/fontSize', 12);
+        node.attr('typeLabel/fontWeight', 500);
         node.attr('nameLabel/y', nameY);
     }
 
@@ -906,7 +909,7 @@ let ComposerRenderer = (function() {
             attrs: shapeAttrs,
         });
 
-        placeSpecialisationTag(node, elType, 58, 70);
+        placeSpecialisationTag(node, elType, 54, 72);
 
         /* UX-CMP-001: Override port colors with layer accent.
          * Ports are pre-declared in CARD_PORTS.items; here we just restyle them. */
@@ -1104,7 +1107,7 @@ let ComposerRenderer = (function() {
             },
         });
 
-        placeSpecialisationTag(container, elType, 10, 22);
+        placeSpecialisationTag(container, elType, 6, 24);
 
         /* UX-CMP-001: Override port colors for containers.
          * Ports pre-declared in CARD_PORTS.items; restyle with layer accent. */

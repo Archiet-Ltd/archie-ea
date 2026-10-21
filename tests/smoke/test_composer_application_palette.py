@@ -64,7 +64,9 @@ def test_application_with_a_component_is_stored_and_survives_reload(browser, liv
 
     # both palette entries are offered with their plain labels
     palette = page.evaluate("Object.values(ComposerRenderer.PALETTE).flat().map(i => [i.type, i.label])")
-    assert [APP, "Application"] in palette and [COMP, "Application component"] in palette
+    assert [APP, "Application"] in palette and [COMP, "App Component"] in palette
+    titles = page.evaluate("Object.values(ComposerRenderer.PALETTE).flat().map(i => [i.type, i.title])")
+    assert [COMP, "Application component"] in titles
 
     _quick_add(page, app_name, APP)
     _quick_add(page, comp_name, COMP)
