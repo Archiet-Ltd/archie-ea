@@ -416,9 +416,12 @@ class AIChatApprovalService:
         return f"{operation_type}:{entity_type}:{json.dumps(normalized_fields, sort_keys=True, default=str)}"
 
     def find_duplicate_pending(
-        self, operation_type: str, entity_type: str, payload: Dict[str, Any]
+        self, operation_type: str, entity_type: str, payload: Dict[str, Any],
+        entity_id: Optional[int] = None,
     ) -> Optional[AIChatCRUDApproval]:
-        """An existing PENDING approval for the same operation, or None."""
+        """An existing PENDING approval for the same operation on the same
+        record, or None. The same change to two different records is two
+        operations, never a duplicate."""
         if not self.user_id:
             return None
         candidate_key = self._normalized_payload_key(operation_type, entity_type, payload)
@@ -431,6 +434,8 @@ class AIChatApprovalService:
             )
             .all()
         )
+        if entity_id is not None:
+            pending = [p for p in pending if p.entity_id == entity_id]
         for existing in pending:
             try:
                 existing_payload = json.loads(existing.operation_payload)
@@ -489,7 +494,7 @@ class AIChatApprovalService:
             # ARCH-021: reuse an existing pending approval for the same operation
             # rather than creating a duplicate. Surfaced to the caller/agent so it
             # can tell the user "already pending" instead of silently re-queuing.
-            duplicate = self.find_duplicate_pending(operation_type, entity_type, operation_payload)
+            duplicate = self.find_duplicate_pending(operation_type, entity_type, operation_payload, entity_id)
             if duplicate:
                 self.logger.info(
                     f"Duplicate pending approval detected for {operation_type} {entity_type}; "
@@ -766,6 +771,8 @@ class AIChatApprovalService:
                     result = data_service.update_application(entity_id, payload)
                 elif approval.entity_type == "vendor":
                     result = data_service.update_vendor(entity_id, payload)
+                elif approval.entity_type == "capability_mapping":
+                    result = data_service.update_capability_mapping(entity_id, payload)
                 elif approval.entity_type == "data_entity_classification":
                     # Accept a proposed classification label.
                     # The label is stored on the entity and propagated

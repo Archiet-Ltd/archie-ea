@@ -6,11 +6,12 @@ Blueprint: ai_data_interaction (url_prefix="/ai-chat/data")
 Routes: 14
 """
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required
 
 from app.core.auth.decorators import require_permission
 from app.decorators import audit_log
+from app.modules.ai_chat.approval_gate import queue_ai_write
 from app.services.ai_data_interaction_service import AIDataInteractionService
 from app.services.rate_limiter import rate_limit
 
@@ -19,6 +20,56 @@ ai_data_interaction = Blueprint("ai_data_interaction", __name__, url_prefix="/ai
 # NOTE: create-capability, update-capability, add-compliance-requirement routes
 # removed — canonical versions live in unified_ai_chat (workflow_routes.py)
 # with better input validation (validate_string, validate_enum, sanitize_html).
+
+
+def _queue_bulk_updates(updates, id_key, entity_type, editable_fields, operation):
+    """Approval on: queue one approval per valid item; nothing is written here.
+
+    Each item is validated as the direct path validates it (id and data
+    present, only editable fields), then queued through queue_ai_write as an
+    "update" of the entity, which the approver replay already executes.
+    Returns the response to send.
+    """
+    from app.modules.ai_chat.services.ai_data_interaction_service import _refuse_uneditable
+
+    results, queued = [], []
+    for update in updates:
+        entity_id = update.get(id_key) if isinstance(update, dict) else None
+        update_data = update.get("update_data", {}) if isinstance(update, dict) else {}
+        if not entity_id or not update_data:
+            results.append({id_key: entity_id, "success": False,
+                            "error": f"Missing {id_key} or update_data"})
+            continue
+        refused = _refuse_uneditable(update_data, editable_fields, operation)
+        if refused:
+            results.append({id_key: entity_id, **refused})
+            continue
+        resp = queue_ai_write(
+            "update", entity_type, update_data,
+            summary=f"Update {entity_type} #{entity_id}",
+            entity_id=entity_id,
+        )
+        body, status = resp[0].get_json(), resp[1]
+        if status != 202:
+            results.append({id_key: entity_id, "success": False,
+                            "error": body.get("error", "Failed to queue approval")})
+            continue
+        queued.append({id_key: entity_id, "approval_id": body["approval_id"]})
+        results.append({id_key: entity_id, "success": False, "queued": True,
+                        "approval_id": body["approval_id"]})
+    failure = len(updates) - len(queued)
+    return (
+        jsonify({
+            "status": "pending_approval" if queued else "error",
+            "success": False,
+            "queued": queued,
+            "summary": {"total": len(updates), "success": 0, "queued": len(queued),
+                        "failure": failure},
+            "results": results,
+            "ai_originated": True,
+        }),
+        202 if queued else 200,
+    )
 
 
 @ai_data_interaction.route("/bulk-update-capabilities", methods=["POST"])
@@ -48,6 +99,13 @@ def bulk_update_capabilities():
         updates = data.get("updates", [])
         if not updates:
             return jsonify({"error": "No updates provided"}), 400
+
+        if current_app.config.get("REQUIRE_AI_APPROVAL", False):
+            from app.modules.ai_chat.services.ai_data_interaction_service import (
+                CAPABILITY_EDITABLE_FIELDS,
+            )
+            return _queue_bulk_updates(updates, "capability_id", "capability",
+                                       CAPABILITY_EDITABLE_FIELDS, "update_capability")
 
         service = AIDataInteractionService(user_id=current_user.id)
         result = service.bulk_update_capabilities(updates)
@@ -165,42 +223,9 @@ def create_application():
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
-@ai_data_interaction.route("/update-application/<int:application_id>", methods=["PUT"])
-@login_required
-@require_permission("edit", "application")
-@audit_log("ai_data_update_application")
-def update_application(application_id):
-    """
-    Update an existing application.
-
-    Expected JSON payload:
-    {
-        "name": "Updated Name",
-        "description": "Updated description",
-        "business_domain": "Updated domain"
-    }
-    """
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "No JSON data received"}), 400
-
-        service = AIDataInteractionService(user_id=current_user.id)
-        result = service.update_application(application_id, data)
-
-        if result["success"]:
-            return jsonify(
-                {
-                    "success": True,
-                    "application_id": result["application_id"],
-                    "message": result["message"],
-                }
-            )
-        else:
-            return jsonify({"success": False, "error": result["error"]}), 400
-
-    except Exception:
-        return jsonify({"success": False, "error": "An internal error occurred"}), 500
+# NOTE: PUT update-application is owned by unified_ai_chat (workflow_routes.py),
+# which refuses uneditable fields and queues for approval. The copy that used to
+# be registered here was shadowed by it and is removed.
 
 
 @ai_data_interaction.route("/create-vendor", methods=["POST"])
@@ -257,6 +282,21 @@ def update_vendor(vendor_id):
         data = request.get_json()
         if not data:
             return jsonify({"error": "No JSON data received"}), 400
+
+        from app.modules.ai_chat.services.ai_data_interaction_service import (
+            VENDOR_EDITABLE_FIELDS, _refuse_uneditable,
+        )
+        refused = _refuse_uneditable(data, VENDOR_EDITABLE_FIELDS, "update_vendor")
+        if refused:
+            return jsonify({"success": False, "error": refused["error"]}), 400
+
+        queued = queue_ai_write(
+            "update", "vendor", data,
+            summary=f"Update vendor #{vendor_id}",
+            entity_id=vendor_id,
+        )
+        if queued is not None:
+            return queued
 
         service = AIDataInteractionService(user_id=current_user.id)
         result = service.update_vendor(vendor_id, data)
@@ -352,6 +392,21 @@ def update_capability_mapping(mapping_id):
         mapping = UnifiedApplicationCapabilityMapping.query.get(mapping_id)
         if mapping is None or not ApplicationComponent.query.get(mapping.application_component_id):
             return jsonify({"success": False, "error": "Mapping not found"}), 404
+
+        from app.modules.ai_chat.services.ai_data_interaction_service import (
+            MAPPING_EDITABLE_FIELDS, _refuse_uneditable,
+        )
+        refused = _refuse_uneditable(data, MAPPING_EDITABLE_FIELDS, "update_capability_mapping")
+        if refused:
+            return jsonify({"success": False, "error": refused["error"]}), 400
+
+        queued = queue_ai_write(
+            "update", "capability_mapping", data,
+            summary=f"Update capability mapping #{mapping_id}",
+            entity_id=mapping_id,
+        )
+        if queued is not None:
+            return queued
 
         service = AIDataInteractionService(user_id=current_user.id)
         result = service.update_capability_mapping(mapping_id, data)
@@ -453,6 +508,13 @@ def bulk_update_applications():
         updates = data.get("updates", [])
         if not updates:
             return jsonify({"error": "No updates provided"}), 400
+
+        if current_app.config.get("REQUIRE_AI_APPROVAL", False):
+            from app.modules.ai_chat.services.ai_data_interaction_service import (
+                application_editable_fields,
+            )
+            return _queue_bulk_updates(updates, "application_id", "application",
+                                       application_editable_fields(), "update_application")
 
         service = AIDataInteractionService(user_id=current_user.id)
         result = service.bulk_update_applications(updates)
