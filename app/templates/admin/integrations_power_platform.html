@@ -19,7 +19,7 @@
     <div id="pp-alert" hidden class="mb-6 rounded-md border p-4 text-sm"></div>
 
     <!-- Credentials card -->
-    <div class="rounded-lg border border-border bg-card text-card-foreground shadow-sm mb-6">
+    <div class="rounded-lg border border-border bg-card text-card-foreground mb-6">
         <div class="flex items-center justify-between px-6 py-4 border-b border-border">
             <div>
                 <h2 class="text-base font-semibold">Service Principal Credentials</h2>
@@ -49,8 +49,8 @@
                            value="{{ config.tenant_id or '' }}"
                            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm
-                                  shadow-sm transition-colors placeholder:text-muted-foreground
-                                  focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+ transition-colors placeholder:text-muted-foreground
+ focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                 </div>
                 <div class="flex flex-col gap-1.5">
                     <label for="client_id" class="text-sm font-medium">Client ID (App ID)</label>
@@ -58,8 +58,8 @@
                            value="{{ config.client_id or '' }}"
                            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm
-                                  shadow-sm transition-colors placeholder:text-muted-foreground
-                                  focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+ transition-colors placeholder:text-muted-foreground
+ focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                 </div>
                 <div class="flex flex-col gap-1.5">
                     <label for="client_secret" class="text-sm font-medium">Client Secret</label>
@@ -67,8 +67,8 @@
                            placeholder="{{ '••••••••' if config.configured else 'Enter client secret' }}"
                            autocomplete="new-password"
                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm
-                                  shadow-sm transition-colors placeholder:text-muted-foreground
-                                  focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+ transition-colors placeholder:text-muted-foreground
+ focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                     {% if config.configured %}
                     <p class="text-xs text-muted-foreground">Leave blank to keep existing secret.</p>
                     {% endif %}
@@ -79,19 +79,17 @@
                            value="{{ config.env_url or '' }}"
                            placeholder="https://org.crm.dynamics.com"
                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm
-                                  shadow-sm transition-colors placeholder:text-muted-foreground
-                                  focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+ transition-colors placeholder:text-muted-foreground
+ focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                 </div>
                 <div class="sm:col-span-2 flex items-center gap-3 pt-1">
                     <button type="button" id="btn-save"
-                            class="inline-flex items-center gap-2 rounded-md text-sm font-medium bg-primary
-                                   text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="save" class="w-4 h-4" aria-hidden="true"></i>
                         Save Credentials
                     </button>
                     <button type="button" id="btn-test"
-                            class="inline-flex items-center gap-2 rounded-md text-sm font-medium border border-input
-                                   bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="plug" class="w-4 h-4" aria-hidden="true"></i>
                         Test Connection
                     </button>
@@ -101,7 +99,7 @@
     </div>
 
     <!-- Discovery card -->
-    <div class="rounded-lg border border-border bg-card text-card-foreground shadow-sm mb-6">
+    <div class="rounded-lg border border-border bg-card text-card-foreground mb-6">
         <div class="flex items-center justify-between px-6 py-4 border-b border-border">
             <div>
                 <h2 class="text-base font-semibold">Discover Power Apps</h2>
@@ -110,9 +108,7 @@
                 </p>
             </div>
             <button type="button" id="btn-discover"
-                    class="inline-flex items-center gap-2 rounded-md text-sm font-medium bg-primary
-                           text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 transition-colors
-                           disabled:opacity-50 disabled:cursor-not-allowed">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="search" class="w-4 h-4" aria-hidden="true"></i>
                 Discover Apps
             </button>
@@ -142,16 +138,14 @@
                     Select all
                 </label>
                 <button type="button" id="btn-import"
-                        class="inline-flex items-center gap-2 rounded-md text-sm font-medium bg-primary
-                               text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 transition-colors
-                               disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                         disabled>
                     <i data-lucide="download" class="w-4 h-4" aria-hidden="true"></i>
                     Import Selected
                 </button>
             </div>
             <div class="overflow-x-auto rounded-md border border-border">
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <thead>
                         <tr class="border-b border-border bg-muted/40">
                             <th class="w-10 px-3 py-2.5"></th>

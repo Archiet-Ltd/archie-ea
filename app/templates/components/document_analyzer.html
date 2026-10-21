@@ -4,7 +4,7 @@
 {% macro document_analyzer_upload(entity_type='application', entity_id=none, entity_name='') %}
 <div x-data="documentAnalyzer('{{ entity_type }}', {{ entity_id or 'null' }})" class="w-full">
     {# Upload Section #}
-    <div class="rounded-lg border bg-card p-6">
+    <div class="rounded-lg border border-border bg-card p-6">
         <div class="flex items-center justify-between mb-4">
             <div>
                 <h3 class="text-lg font-semibold">Analyze Architecture Document</h3>
@@ -190,7 +190,7 @@
     {# Analysis Results #}
     <div x-show="analysisResults" x-cloak class="mt-6 space-y-6">
         {# Results Header #}
-        <div class="rounded-lg border bg-card p-6">
+        <div class="rounded-lg border border-border bg-card p-6">
             <div class="flex items-center justify-between mb-4">
                 <div>
                     <h3 class="text-lg font-semibold">Analysis Results</h3>
@@ -366,7 +366,7 @@
                                         </select>
                                         <span 
                                             x-show="!editMode" x-cloak
-                                            class="px-2 py-0.5 rounded text-xs bg-primary/10 text-primary"
+                                            class="px-2 py-0.5 rounded text-xs bg-primary/10 text-info-emphasis"
                                             x-text="element.type"
                                         ></span>
                                         
@@ -452,7 +452,7 @@
                                     <span class="text-muted-foreground">Allowed relationship types:</span>
                                     <div class="flex flex-wrap gap-1 mt-1">
                                         <template x-for="(allowedType, idx) in error.allowed_types" :key="idx">
-                                            <span class="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs" x-text="allowedType"></span>
+                                            <span class="px-2 py-0.5 rounded bg-primary/10 text-info-emphasis text-xs" x-text="allowedType"></span>
                                         </template>
                                     </div>
                                 </div>
@@ -504,7 +504,7 @@
 
             {# Diff Preview Before Applying #}
             <div x-show="showDiffPreview" x-cloak class="mb-6">
-                <div class="rounded-lg border border-primary/50 bg-primary/5 p-4">
+                <div class="rounded-md border border-primary/50 bg-primary/10 px-3 py-2">
                     <div class="flex items-center justify-between mb-3">
                         <h4 class="text-sm font-semibold">Changes Preview</h4>
                         <button type="button" @click="showDiffPreview = false" class="text-muted-foreground hover:text-foreground" aria-label="Close changes preview">
@@ -528,14 +528,14 @@
             <div class="flex items-center justify-end gap-3">
                 <button type="button" 
                     @click="resetAnalyzer()"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                  aria-label="Reset">
                     Cancel
                 </button>
                 <button type="button" 
                     @click="showDiffPreview = true"
                     x-show="!showDiffPreview" x-cloak
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                  aria-label="Preview changes">
                     <i data-lucide="eye" class="mr-2 h-4 w-4"></i>
                     Preview Changes
@@ -543,7 +543,7 @@
                 <button type="button" 
                     @click="applyAnalysis()"
                     :disabled="applying || editMode"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 disabled:opacity-50"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                  aria-label="Apply analysis">
                     <span x-show="!applying" x-cloak>Apply Analysis</span>
                     <span x-show="applying" x-cloak class="flex items-center gap-2">
@@ -725,7 +725,7 @@ function documentAnalyzer(entityType, entityId) {
             // Show summary notification
             if (errorCount > 0) {
                 const errorDiv = document.createElement('div');
-                errorDiv.className = 'fixed top-4 right-4 bg-warning text-primary-foreground p-4 rounded-lg shadow-lg z-50 max-w-md';
+ errorDiv.className ='fixed top-4 right-4 bg-warning text-primary-foreground p-4 rounded-lg z-50 max-w-md';
                 errorDiv.innerHTML = `
                     <div class="flex items-center gap-2 mb-2">
                         <i data-lucide="alert-triangle" class="h-5 w-5"></i>

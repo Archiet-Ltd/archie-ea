@@ -12,7 +12,7 @@
      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
      @keydown.escape.window="if (!$store.qualityGate.isHardBlock) $store.qualityGate.dismiss()">
 
-  <div class="bg-card border border-border rounded-lg shadow-xl w-full max-w-xl mx-4 max-h-[85vh] overflow-y-auto"
+  <div class="bg-card border border-border rounded-lg w-full max-w-xl mx-4 max-h-[85vh] overflow-y-auto"
        @click.outside="if (!$store.qualityGate.isHardBlock) $store.qualityGate.dismiss()">
 
     {# Header #}
@@ -109,7 +109,7 @@
                 <p class="text-sm text-foreground" x-text="item.issue"></p>
                 <p class="text-xs text-muted-foreground mt-0.5" x-text="item.field_path"></p>
                 <template x-if="item.auto_fixable">
-                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary mt-1">
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis mt-1">
                     Auto-fixable
                   </span>
                 </template>

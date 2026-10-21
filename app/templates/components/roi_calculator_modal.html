@@ -199,7 +199,7 @@
                     type="number"
                     x-model="investment"
                     @input="calculateMetrics()"
-                    class="w-full px-3 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                    class="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                     placeholder="Enter investment amount"
                     min="0"
                     step="1000"
@@ -215,7 +215,7 @@
                     type="number"
                     x-model="timeline"
                     @input="calculateMetrics()"
-                    class="w-full px-3 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                    class="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                     placeholder="Enter timeline"
                     min="1"
                     step="1"
@@ -231,7 +231,7 @@
                     type="number"
                     x-model="annualBenefit"
                     @input="calculateMetrics()"
-                    class="w-full px-3 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                    class="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                     placeholder="Expected annual benefit"
                     min="0"
                     step="1000"
@@ -247,7 +247,7 @@
                     type="number"
                     x-model="discountRate"
                     @input="calculateMetrics()"
-                    class="w-full px-3 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                    class="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                     placeholder="Discount rate"
                     min="0"
                     max="100"
@@ -319,14 +319,14 @@
     <div class="flex items-center justify-end gap-3 mt-6 pt-6 border-t border-border">
         <button type="button"
             @click="saveCurrentScenario()"
-            class="inline-flex items-center gap-2 px-4 py-2 border border-input text-foreground font-medium rounded-lg hover:bg-accent transition-colors"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
          aria-label="Save">
             <i data-lucide="save" class="h-4 w-4"></i>
             Save as Scenario
         </button>
         <button type="button"
             @click="Platform.modal.close('roi-calculator')"
-            class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-colors"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
          aria-label="Close">
             Close
         </button>

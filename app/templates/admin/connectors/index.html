@@ -40,7 +40,7 @@
 
     <div class="grid gap-6 lg:grid-cols-3">
         <!-- Add / edit form -->
-        <div data-slot="card" class="rounded-xl border-2 border-input bg-card h-fit lg:col-span-1">
+        <div data-slot="card" class="rounded-lg border border-input bg-card h-fit lg:col-span-1">
             <div class="p-4 sm:p-6 border-b">
                 <h3 class="text-lg font-semibold">Add connector</h3>
                 <p class="text-sm text-muted-foreground mt-1">
@@ -98,7 +98,7 @@
                 </div>
 
                 <button type="submit"
-                    class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     Save connector
                 </button>
             </form>
@@ -106,9 +106,9 @@
 
         <!-- Connector list -->
         <div class="lg:col-span-2">
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-border">
+                    <table class="dense-table min-w-full divide-y divide-border">
                         <thead>
                             <tr class="text-left text-xs uppercase tracking-wide text-muted-foreground">
                                 <th class="px-4 py-3">Connector</th>
@@ -164,7 +164,7 @@
                                     </td>
                                     <td class="px-4 py-3">
                                         {% if connector.is_proposal %}
-                                            <a href="{{ inbox_url }}" class="inline-flex items-center rounded-md border border-input bg-background px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-accent transition-colors">
+                                            <a href="{{ inbox_url }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                                 In approval queue
                                             </a>
                                         {% else %}
@@ -172,7 +172,7 @@
                                             <form method="POST" action="{{ url_for('m365_connector.connectors_sync', connector_id=connector.id) }}">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                 <button type="submit"
-                                                    class="inline-flex items-center rounded-md border border-input bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-accent transition-colors">
+                                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                                     Sync
                                                 </button>
                                             </form>
@@ -180,7 +180,7 @@
                                                 data-confirm="Remove this connector? Its stored credentials are deleted with it.">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                 <button type="submit"
-                                                    class="inline-flex items-center rounded-md border border-destructive/30 bg-background px-2.5 py-1.5 text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 transition-colors">
+                                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                                     Delete
                                                 </button>
                                             </form>

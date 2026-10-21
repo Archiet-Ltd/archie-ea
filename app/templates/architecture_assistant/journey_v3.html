@@ -122,7 +122,7 @@
 
     {# ── Co-Pilot Banner (full-width, inline) — hidden on locked codegen/deploy steps (7,8) ── #}
     <div x-show="currentStep <= 6" x-cloak class="rounded-lg border border-border bg-card px-5 py-3.5 flex items-start gap-3">
-        <span class="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary shrink-0 mt-0.5">
+        <span class="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-info-emphasis shrink-0 mt-0.5">
             <i data-lucide="sparkles" class="w-3.5 h-3.5" aria-hidden="true"></i>
         </span>
         <div class="flex-1 min-w-0">
@@ -160,7 +160,7 @@
         </div>
         {# Ask Entelim button — opens the chat panel #}
         <button type="button" @click="$dispatch('blueprint-chat-toggle')"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-colors shrink-0"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/10 text-info-emphasis hover:bg-primary/20 border border-primary/20 transition-colors shrink-0"
                 title="Ask Entelim to add drivers, goals, elements, or run inference">
             <i data-lucide="message-square" class="w-3.5 h-3.5" aria-hidden="true"></i>
             Ask Entelim
@@ -168,14 +168,14 @@
     </div>
 
     {# ── Error Banner ── #}
-    <div x-show="error" x-cloak class="rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-3 flex items-center justify-between">
+    <div x-show="error" x-cloak class="rounded-md border border-destructive/40 bg-destructive/10 px-5 py-2 flex items-center justify-between">
         <p class="text-sm text-destructive-emphasis" x-text="error"></p>
         <button type="button" @click="error = null" class="text-xs text-destructive-emphasis/70 hover:text-destructive-emphasis font-medium ml-4 shrink-0">Dismiss</button>
     </div>
 
     {# ── Blocker warnings — only shown on Step 2 where user can action them ── #}
     <template x-if="currentStep === 2 && domainBlockers.filter(b => b.type === 'domain_not_confirmed').length > 0">
-        <div class="rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-3 space-y-1">
+        <div class="rounded-md border border-destructive/40 bg-destructive/10 px-5 py-2 space-y-1">
             <p class="text-xs font-medium text-destructive-emphasis">Cannot proceed:</p>
             <template x-for="b in domainBlockers.filter(b => b.type === 'domain_not_confirmed').slice(0, 4)" :key="b.domain + b.type">
                 <p class="text-xs text-destructive-emphasis/70 pl-2" x-text="'— ' + b.reason"></p>
@@ -233,7 +233,7 @@
             </template>
             <button type="button" @click="nextStep()" x-show="currentStep < 8" x-cloak
                     :disabled="!canProceed()"
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Next Step
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
             </button>
@@ -276,14 +276,14 @@
         x-transition:leave="transition ease-in duration-200"
         x-transition:leave-start="translate-x-0"
         x-transition:leave-end="translate-x-full"
-        class="fixed inset-y-0 right-0 w-full sm:w-[420px] bg-card border-l border-border shadow-2xl z-50 flex flex-col"
+        class="fixed inset-y-0 right-0 w-full sm:w-[420px] bg-card border-l border-border z-50 flex flex-col"
         style="display:none"
         aria-label="Entelim Architecture Assistant">
 
         {# Header #}
         <div class="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
             <div class="flex items-center gap-2.5">
-                <span class="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary">
+                <span class="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-info-emphasis">
                     <i data-lucide="sparkles" class="w-3.5 h-3.5" aria-hidden="true"></i>
                 </span>
                 <div>
@@ -325,7 +325,7 @@
                     {# Assistant message #}
                     <template x-if="msg.role === 'assistant'">
                         <div class="flex items-start gap-2">
-                            <span class="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+                            <span class="w-6 h-6 rounded-full bg-primary/10 text-info-emphasis flex items-center justify-center shrink-0 mt-0.5">
                                 <i data-lucide="sparkles" class="w-3 h-3" aria-hidden="true"></i>
                             </span>
                             <div class="max-w-[85%] px-3.5 py-2.5 rounded-2xl rounded-tl-sm bg-muted text-foreground text-xs leading-relaxed">
@@ -401,7 +401,7 @@
                     @keydown.enter.prevent="if (!$event.shiftKey) sendMessage()"
                     rows="2"
                     placeholder="Describe your problem, goals, constraints… or ask anything."
-                    class="flex-1 text-xs rounded-lg border border-input bg-background px-3 py-2.5 resize-none focus:outline-none focus:ring-1 focus:ring-ring text-foreground placeholder:text-muted-foreground leading-relaxed"
+                    class="flex-1 text-xs rounded-md border border-input bg-background px-3 py-2.5 resize-none focus:outline-none focus:ring-1 focus:ring-ring text-foreground placeholder:text-muted-foreground leading-relaxed"
                  aria-label="Describe your problem, goals, constraints… or ask anything."></textarea>
                 <button aria-label="Send message" type="button" @click="sendMessage()"
                         :disabled="loading || !inputText.trim()"

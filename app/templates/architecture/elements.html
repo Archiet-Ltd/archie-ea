@@ -69,7 +69,7 @@
         </span>
     </div>
     <div x-show="showDiagram" x-cloak x-transition class="mb-6">
-        <div class="rounded-xl border border-border bg-card overflow-hidden">
+        <div class="rounded-lg border border-border bg-card overflow-hidden">
             <div class="bg-muted/20 px-5 py-2 border-b border-border flex items-center justify-between">
                 <span class="text-xs font-medium text-muted-foreground" x-text="diagramViewpointName || 'Architecture Diagram'"></span>
                 <span class="text-xs text-muted-foreground" x-text="diagramElementCount + ' elements, ' + diagramRelCount + ' relationships'"></span>
@@ -106,7 +106,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 transition-transform" :class="debtOpen ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
         </button>
         <div x-show="debtOpen" x-cloak x-transition class="mt-3">
-            <div class="rounded-xl border border-border bg-card overflow-hidden">
+            <div class="rounded-lg border border-border bg-card overflow-hidden">
                 <div class="bg-muted/20 px-5 py-2 border-b border-border flex items-center justify-between">
                     <span class="text-xs font-medium text-muted-foreground">Phase D — Technology Debt Scores</span>
                     <span x-show="debtSummary.total_elements" x-cloak class="text-xs text-muted-foreground" x-text="(debtSummary.total_elements || 0) + ' elements analyzed'"></span>
@@ -116,7 +116,7 @@
                 </div>
                 <div x-show="debtError" x-cloak class="p-4 text-sm text-destructive-emphasis" x-text="debtError"></div>
                 <div x-show="debtLoaded && debtScores.length === 0 && !debtError" x-cloak class="p-6 text-center text-sm text-muted-foreground">No debt scores available.</div>
-                <table x-show="debtLoaded && debtScores.length > 0" x-cloak class="w-full text-sm">
+                <table class="dense-table" x-show="debtLoaded && debtScores.length > 0" x-cloak class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-border">
                             <th class="px-4 py-2 text-left font-medium text-muted-foreground">Element</th>
@@ -148,7 +148,7 @@
     {% set dq_issues = (no_desc_count or 0) + (no_rels_count or 0) + (no_solutions_count or 0) %}
     {% if dq_issues > 0 %}
     <div data-testid="data-quality-banner"
-         class="mb-4 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+         class="mb-4 rounded-md border border-warning/40 bg-warning/10 px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
         <span class="flex items-center gap-1.5 font-medium text-warning-emphasis">
             <svg class="w-4 h-4 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
             Data quality
@@ -184,7 +184,7 @@
                        x-model="searchQuery"
                        @input.debounce.300ms="page=1; fetchElements()"
                        placeholder="Search by name..."
-                       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring pl-9" aria-label="Search by name...">
+                       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring pl-9" aria-label="Search by name...">
                 <svg class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             </div>
             {# Layer dropdown #}
@@ -212,7 +212,7 @@
             <button type="button" @click="advancedOpen = !advancedOpen"
                     data-testid="advanced-toggle"
                     :class="advancedOpen ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent'"
-                    class="h-9 px-3 rounded-md text-sm border border-input transition-colors inline-flex items-center gap-1.5">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
                 Advanced
             </button>
@@ -224,13 +224,13 @@
             <div class="flex-1"></div>
             <span class="text-sm text-muted-foreground" x-text="totalCount + ' elements'"></span>
             <a href="{{ url_for('architect_ui.import_oef') }}"
-               class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-9 px-4 py-2"
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                data-testid="import-oef-link">
                 <svg class="w-4 h-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
                 Import model file
             </a>
             <button type="button" @click="showCreateModal = true"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 <svg class="w-4 h-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                 New Element
             </button>
@@ -285,7 +285,7 @@
     </div>
 
     {# ── Elements Table ── #}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm overflow-hidden">
+    <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
         {# Loading #}
         <div x-show="loading" x-cloak class="p-8 text-center text-muted-foreground">
             <span class="animate-spin h-5 w-5 border-2 border-current border-t-transparent rounded-full inline-block"></span>
@@ -317,7 +317,7 @@
         </div>
 
         {# Table (ARC-003: 8 columns, sortable headers) #}
-        <table x-show="!loading && elements.length > 0" x-cloak class="w-full text-sm" data-testid="elements-table">
+        <table class="dense-table" x-show="!loading && elements.length > 0" x-cloak class="w-full text-sm" data-testid="elements-table">
             <thead>
                 <tr class="border-b border-border">
                     <th class="w-8 px-3 py-3"><input aria-label="Select all elements" type="checkbox" @change="toggleSelectAll($event)" class="rounded border-input"></th>
@@ -390,7 +390,7 @@
             <div class="flex gap-1">
                 <button type="button" @click="page = Math.max(1, page - 1); fetchElements()"
                         :disabled="page <= 1"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-8 px-3 disabled:opacity-50">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Previous
                 </button>
                 <button type="button" @click="page = Math.min(totalPages, page + 1); fetchElements()"
@@ -410,7 +410,7 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="translate-x-0"
          x-transition:leave-end="translate-x-full"
-         class="fixed top-0 right-0 h-full w-full max-w-md bg-card border-l border-border shadow-xl z-30 overflow-y-auto">
+         class="fixed top-0 right-0 h-full w-full max-w-md bg-card border-l border-border z-30 overflow-y-auto">
         <div class="p-6">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-lg font-semibold text-foreground" x-text="selectedElement?.name || ''"></h2>
@@ -439,7 +439,7 @@
             {# Quick actions #}
             <div class="flex gap-2 mb-6">
                 <button type="button" @click="editElement(selectedElement)"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Edit
                 </button>
                 {# Rendered only once an element is selected: the previous
@@ -453,7 +453,7 @@
                        Link honestly to the generic composer instead of a URL that
                        looks scoped but silently isn't. #}
                     <a href="/archimate/composer"
-                       class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Open in Composer
                     </a>
                 </template>
@@ -499,7 +499,7 @@
     <div x-show="showCreateModal" x-cloak
          class="fixed inset-0 z-40 flex items-center justify-center bg-black/50"
          @keydown.escape.window="showCreateModal = false">
-        <div class="bg-card rounded-xl border shadow-xl w-full max-w-md mx-4 p-6"
+        <div class="bg-card rounded-lg border border-border w-full max-w-md mx-4 p-6"
              @click.outside="showCreateModal = false">
             <h2 class="text-lg font-semibold mb-4">Create ArchiMate Element</h2>
             <div class="space-y-4">
@@ -530,22 +530,22 @@
                     <label class="text-sm font-medium">Name</label>
                     <!-- entity-picker-ok: this IS the create form for a new ArchiMate element, name is genuinely free-text -->
                     <input type="text" x-model="createForm.name" placeholder="Element name"
-                           class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Name">
+                           class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Name">
                 </div>
                 <div>
                     <label class="text-sm font-medium">Description</label>
                     <textarea x-model="createForm.description" rows="3" placeholder="Optional description"
-                              class="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none" aria-label="Description"></textarea>
+                              class="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none" aria-label="Description"></textarea>
                 </div>
                 <div x-show="createError" x-cloak class="text-sm text-destructive-emphasis" x-text="createError"></div>
             </div>
             <div class="flex justify-end gap-2 mt-6">
                 <button type="button" @click="showCreateModal = false"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-9 px-4">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Cancel
                 </button>
                 <button type="button" @click="createElement()" :disabled="createSubmitting"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 disabled:opacity-50">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <span x-show="createSubmitting" x-cloak class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block mr-2"></span>
                     Create
                 </button>
@@ -556,7 +556,7 @@
     {# ── Bulk Actions Bar ── #}
     <div x-show="selectedIds.length > 0" x-cloak
          x-transition
-         class="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 bg-card border rounded-xl shadow-lg px-4 py-2 flex items-center gap-3">
+         class="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 bg-card border rounded-xl px-4 py-2 flex items-center gap-3">
         <span class="text-sm font-medium" x-text="selectedIds.length + ' selected'"></span>
         <button type="button" @click="bulkExport()" class="text-sm text-primary hover:underline">Export</button>
         <button type="button" @click="selectedIds = []" class="text-sm text-muted-foreground hover:text-foreground">Clear</button>

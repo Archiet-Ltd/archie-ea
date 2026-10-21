@@ -1,7 +1,7 @@
 <!-- AI Review Queue Panel Component -->
 <!-- Professional EA tool for reviewing AI-generated mappings with confidence scores -->
 <div id="review-queue-panel" hidden class="modal-root fixed inset-0 bg-foreground bg-opacity-50 items-center justify-center" style="z-index:1000;">
-  <div class="bg-background rounded-lg shadow-2xl w-full max-w-7xl h-5/6 flex flex-col">
+  <div class="bg-background rounded-lg w-full max-w-7xl h-5/6 flex flex-col">
     <!-- Header -->
     <div class="flex items-center justify-between p-6 border-b border-border">
       <div>
@@ -32,7 +32,7 @@
             <span class="font-medium text-foreground/80">Select All</span>
           </label>
 
-          <select id="review-type-filter" class="px-4 py-2 border border-border rounded-lg" @change="filterReviewQueue(this.value)" aria-label="Filter by Type">
+          <select id="review-type-filter" class="px-4 py-2 border border-border rounded-md" @change="filterReviewQueue(this.value)" aria-label="Filter by Type">
             <option value="">All Types</option>
             <option value="capability">Capabilities</option>
             <option value="process">APQC Processes</option>
@@ -40,7 +40,7 @@
             <option value="vendor">Vendor Products</option>
           </select>
 
-          <select id="review-confidence-filter" class="px-4 py-2 border border-border rounded-lg" @change="filterByConfidence(this.value)" aria-label="Filter by Confidence Level">
+          <select id="review-confidence-filter" class="px-4 py-2 border border-border rounded-md" @change="filterByConfidence(this.value)" aria-label="Filter by Confidence Level">
             <option value="">All Confidence Levels</option>
             <option value="high">High (≥80%)</option>
             <option value="medium">Medium (60-79%)</option>
@@ -263,7 +263,7 @@ function renderReviewQueue(items) {
           <div class="flex-1">
             <div class="flex items-center gap-3 mb-2">
               <span class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-muted"><i data-lucide="${typeIcons[item.type] || 'box'}" class="w-4 h-4 text-muted-foreground"></i></span>
-              <span class="px-2 py-1 bg-primary/10 text-primary text-xs font-semibold rounded">
+              <span class="px-2 py-1 bg-primary/10 text-info-emphasis text-xs font-semibold rounded">
                 ${typeLabels[item.type]}
               </span>
               <span class="text-sm font-medium text-foreground/80">${escapeHtml(item.application_name)}</span>

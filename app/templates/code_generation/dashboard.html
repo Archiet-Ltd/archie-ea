@@ -299,7 +299,7 @@ function escapeHtml(text) {
 
 function showNotification(message, type) {
     const notification = document.createElement('div');
-    notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 ${
+ notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg z-50 ${
         type === 'success' ? 'bg-primary text-primary-foreground' : 'bg-destructive text-destructive-foreground'
     }`;
     notification.textContent = message;

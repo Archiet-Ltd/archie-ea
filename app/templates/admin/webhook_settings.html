@@ -30,7 +30,7 @@
 
         <!-- Active Subscriptions -->
         <div class="lg:col-span-1">
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Active Subscriptions</h3>
                 </div>
@@ -44,7 +44,7 @@
                                             <!-- webhook_type badge -->
                                             {% set wtype = sub.webhook_type if sub.webhook_type else 'generic' %}
                                             {% if wtype == 'teams' %}
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30"><!-- token-migration-ok -->Teams</span>
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30"><!-- token-migration-ok -->Teams</span>
                                             {% elif wtype == 'slack' %}
                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30"><!-- token-migration-ok -->Slack</span>
                                             {% else %}
@@ -96,7 +96,7 @@
 
         <!-- Add Subscription Form -->
         <div class="lg:col-span-2">
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Add Webhook Subscription</h3>
                 </div>
@@ -195,13 +195,13 @@
                         <!-- Submit -->
                         <div class="flex items-center gap-3 pt-2 border-t">
                             <button type="submit"
-                                    class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                     aria-label="Save webhook subscription">
                                 <i data-lucide="save" class="w-4 h-4" aria-hidden="true"></i>
                                 Save Subscription
                             </button>
                             <a href="{{ url_for('admin.index') }}"
-                               class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors">
+                               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 Cancel
                             </a>
                         </div>
@@ -210,7 +210,7 @@
             </div>
 
             <!-- Setup Guide -->
-            <div class="mt-6 rounded-xl border-2 border-input bg-card p-4 sm:p-6">
+            <div class="mt-6 rounded-lg border border-input bg-card p-4 sm:p-6">
                 <h3 class="text-lg font-semibold mb-4">Setup Instructions</h3>
                 <div class="space-y-4 text-sm text-muted-foreground">
                     <div>

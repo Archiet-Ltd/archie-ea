@@ -66,7 +66,7 @@
                 </template>
                 <button type="button" @click="expandAll()" class="px-3 py-2 text-sm font-medium border-l border-input hover:bg-accent transition-colors">All</button>
             </div>
-            <button type="button" @click="addRoot()" class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
+            <button type="button" @click="addRoot()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="plus" class="w-4 h-4"></i> Add Root
             </button>
     {% endmacro %}
@@ -79,7 +79,7 @@
             <div x-show="nodeCount === 0 && !loading" x-cloak class="flex flex-col items-center justify-center py-24 text-center">
                 <i data-lucide="tree-pine" class="w-12 h-12 text-muted-foreground/40 mb-4"></i>
                 <p class="text-lg font-medium text-muted-foreground">No items yet</p>
-                <button type="button" @click="addRoot()" class="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                <button type="button" @click="addRoot()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-4 items-center">
                     <i data-lucide="plus" class="w-4 h-4"></i> Add First Item
                 </button>
             </div>
@@ -169,7 +169,7 @@
 
     <!-- Delete confirmation -->
     <div x-show="showDeleteConfirm" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @keydown.escape.window="showDeleteConfirm = false">
-        <div class="bg-card rounded-lg border border-border shadow-lg p-6 max-w-sm w-full mx-4" @click.away="showDeleteConfirm = false">
+        <div class="bg-card rounded-lg border border-border p-6 max-w-sm w-full mx-4" @click.away="showDeleteConfirm = false">
             <h3 class="text-base font-semibold">Delete Item</h3>
             <p class="text-sm text-muted-foreground mt-2">Delete <strong x-text="selected?.name"></strong>? Children will be reparented.</p>
             <div class="flex justify-end gap-2 mt-4">

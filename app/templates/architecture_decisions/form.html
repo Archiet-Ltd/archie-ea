@@ -155,7 +155,7 @@
             <!-- Selected elements -->
             <div class="flex flex-wrap gap-2 mb-3 min-h-[2rem]" x-show="selectedElements.length > 0" x-cloak>
                 <template x-for="el in selectedElements" :key="el.id">
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20">
                         <span x-text="el.name"></span>
                         <button aria-label="Remove" type="button" @click="removeElement(el.id)" class="hover:text-destructive-emphasis ml-0.5">
                             <i data-lucide="x" class="h-3 w-3"></i>
@@ -173,8 +173,8 @@
             </div>
 
             <!-- Search results dropdown -->
-            <div x-show="searchError" x-cloak class="mt-1 border border-border rounded-md bg-popover shadow-md px-3 py-2 text-sm text-destructive-emphasis" x-text="searchError"></div>
-            <div x-show="!searchError && searchResults.length > 0" x-cloak class="mt-1 border border-border rounded-md bg-popover shadow-md divide-y divide-border max-h-48 overflow-y-auto">
+            <div x-show="searchError" x-cloak class="mt-1 border border-border rounded-md bg-popover px-3 py-2 text-sm text-destructive-emphasis" x-text="searchError"></div>
+            <div x-show="!searchError && searchResults.length > 0" x-cloak class="mt-1 border border-border rounded-md bg-popover divide-y divide-border max-h-48 overflow-y-auto">
                 <template x-for="el in searchResults" :key="el.id">
                     <button type="button" @click="addElement(el)"
                             class="w-full text-left flex items-center justify-between px-3 py-2 text-sm hover:bg-accent transition-colors">
@@ -191,11 +191,11 @@
         <!-- Submit -->
         <div class="flex items-center justify-between">
             <a href="{{ url_for('arch_decisions.list_decisions') }}"
-               class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Cancel
             </a>
             <button type="submit"
-                    class="inline-flex items-center gap-2 px-5 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="save" class="h-4 w-4"></i>
                 {% if decision %}Save Changes{% else %}Create Decision{% endif %}
             </button>

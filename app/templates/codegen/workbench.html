@@ -139,7 +139,7 @@ body:has([data-workbench]) #main-content > div {
         <div class="flex-1 overflow-y-auto">
             {% include 'codegen/_wb_wizard.html' %}
             <div x-show="phase === 3 && isSalesforceApex" x-cloak class="px-5 pb-6">
-                <div data-salesforce-package-settings class="mx-auto max-w-5xl rounded-xl border border-border bg-card/80 p-5 shadow-sm space-y-4">
+                <div data-salesforce-package-settings class="mx-auto max-w-5xl rounded-xl border border-border bg-card/80 p-5 space-y-4">
                     <div>
                         <h3 class="text-sm font-semibold text-foreground">Salesforce packaging</h3>
                         <p class="text-xs text-muted-foreground mt-1">Configure managed-package output for AppExchange-style bundles. These values are saved with Phase 3 config and sent with generation requests.</p>
@@ -179,7 +179,7 @@ body:has([data-workbench]) #main-content > div {
          class="fixed inset-0 z-50 flex items-center justify-center p-4"
          @keydown.escape.window="saveTemplateModal = false">
         <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="saveTemplateModal = false"></div>
-        <div class="relative z-10 w-full max-w-md rounded-2xl border border-border bg-card shadow-2xl p-6">
+        <div class="relative z-10 w-full max-w-md rounded-lg border border-border bg-card p-6">
             <div class="flex items-center gap-3 mb-5">
                 <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                     <svg class="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"/></svg>
@@ -188,7 +188,7 @@ body:has([data-workbench]) #main-content > div {
                     <p class="text-sm font-semibold text-foreground">Save as Template</p>
                     <p class="text-2xs text-muted-foreground">Capture <span x-text="fileList.length"></span> generated files as a reusable template set</p>
                 </div>
-                <button aria-label="Close save template dialog" type="button" @click="saveTemplateModal = false" class="ml-auto w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+                <button aria-label="Close save template dialog" type="button" @click="saveTemplateModal = false" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 ml-auto w-7 items-center justify-center">
                     <svg class="w-3.5 h-3.5" viewBox="0 0 10 10" fill="currentColor"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                 </button>
             </div>
@@ -197,12 +197,12 @@ body:has([data-workbench]) #main-content > div {
                 <div>
                     <label class="text-2xs font-medium text-foreground mb-1.5 block">Template Name <span class="text-destructive-emphasis">*</span></label>
                     <input x-model="newTemplateName" type="text" placeholder="e.g. GDPR-compliant FastAPI baseline"
-                           class="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-colors" aria-label="Template Name">
+                           class="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-colors" aria-label="Template Name">
                 </div>
                 <div>
                     <label class="text-2xs font-medium text-foreground mb-1.5 block">Description <span class="text-muted-foreground font-normal">(optional)</span></label>
                     <textarea x-model="newTemplateDesc" rows="2" placeholder="What makes this template useful?"
-                              class="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-colors resize-none" aria-label="Description (optional)"></textarea>
+                              class="w-full px-3 py-2 rounded-md border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-colors resize-none" aria-label="Description (optional)"></textarea>
                 </div>
                 <div class="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50 border border-border/50">
                     <svg class="w-3.5 h-3.5 text-muted-foreground shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m21.75 6.75-2.25-2.25m0 0-2.25-2.25M19.5 4.5l2.25 2.25M19.5 4.5l-2.25 2.25M3 3l3.59 3.59m0 0A9.953 9.953 0 0 1 12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 0 1-4.132 4.411m0 0L21 21M3 3l18 18"/></svg>
@@ -216,7 +216,7 @@ body:has([data-workbench]) #main-content > div {
                     Cancel
                 </button>
                 <button type="button" @click="saveAsTemplate()" :disabled="savingAsTemplate || !newTemplateName.trim()"
-                        class="flex-1 h-9 text-sm font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 flex-1 items-center justify-center">
                     <svg x-show="savingAsTemplate" class="w-3.5 h-3.5 wb-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83"/></svg>
                     <span x-text="savingAsTemplate ? 'Saving…' : 'Save Template'"></span>
                 </button>
@@ -261,7 +261,7 @@ body:has([data-workbench]) #main-content > div {
          @click.self="commandPaletteOpen = false"
          @keydown.escape.window="commandPaletteOpen = false">
         <div @click.stop
-             class="w-full max-w-lg rounded-lg border border-border bg-card shadow-2xl overflow-hidden"
+             class="w-full max-w-lg rounded-lg border border-border bg-card overflow-hidden"
              role="dialog" aria-modal="true" aria-label="Workbench command palette">
             <div class="flex items-center gap-2 border-b border-border px-3 py-2.5">
                 <i data-lucide="command" class="h-4 w-4 shrink-0 text-muted-foreground"></i>

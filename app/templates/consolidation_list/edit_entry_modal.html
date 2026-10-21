@@ -5,7 +5,7 @@
         <input type="hidden" id="edit-entry-id">
 
         <!-- Application Info (Read-only) -->
-        <div class="p-4 bg-primary/10 border border-primary/30 rounded-lg">
+        <div class="px-3 py-2 bg-primary/10 border border-primary/40 rounded-md">
             <p class="text-sm font-medium text-primary">Application</p>
             <p class="text-lg font-semibold text-foreground" id="edit-app-name"></p>
         </div>
@@ -13,7 +13,7 @@
         <!-- Recommended Action -->
         <div>
             <label for="edit-action" class="block text-sm font-medium mb-2">Recommended Action</label>
-            <select id="edit-action" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+            <select id="edit-action" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
                 <option value="pending_review">Pending Review</option>
                 <option value="decommission">Decommission</option>
                 <option value="retire">Retire</option>
@@ -51,7 +51,7 @@
         <!-- Status (7-stage lifecycle) -->
         <div>
             <label for="edit-status" class="block text-sm font-medium mb-2">Status</label>
-            <select id="edit-status" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+            <select id="edit-status" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
                 <option value="identified">Identified</option>
                 <option value="under_review">Under Review</option>
                 <option value="impact_assessed">Impact Assessed</option>
@@ -66,11 +66,11 @@
         <div class="grid grid-cols-2 gap-4">
             <div>
                 <label for="edit-wave" class="block text-sm font-medium mb-2">Wave</label>
-                <input type="number" id="edit-wave" min="1" max="10" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="e.g. 1">
+                <input type="number" id="edit-wave" min="1" max="10" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="e.g. 1">
             </div>
             <div>
                 <label for="edit-migration-complexity" class="block text-sm font-medium mb-2">Migration Complexity</label>
-                <select id="edit-migration-complexity" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                <select id="edit-migration-complexity" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
                     <option value="">Not Set</option>
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
@@ -83,12 +83,12 @@
         <div class="grid grid-cols-2 gap-4">
             <div>
                 <label for="edit-annual-cost" class="block text-sm font-medium mb-2">Annual Operating Cost</label>
-                <input type="number" id="edit-annual-cost" step="0.01" min="0" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="0.00">
+                <input type="number" id="edit-annual-cost" step="0.01" min="0" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="0.00">
                 <p class="text-xs text-muted-foreground mt-1">Back-propagates to application TCO</p>
             </div>
             <div>
                 <label for="edit-estimated-savings" class="block text-sm font-medium mb-2">Estimated Annual Savings</label>
-                <input type="number" id="edit-estimated-savings" step="0.01" min="0" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="0.00">
+                <input type="number" id="edit-estimated-savings" step="0.01" min="0" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="0.00">
             </div>
         </div>
 
@@ -96,7 +96,7 @@
         <div class="grid grid-cols-2 gap-4">
             <div>
                 <label for="edit-migration-cost" class="block text-sm font-medium mb-2">Migration Cost</label>
-                <input type="number" id="edit-migration-cost" step="0.01" min="0" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="0.00">
+                <input type="number" id="edit-migration-cost" step="0.01" min="0" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="0.00">
             </div>
             <div class="flex items-end pb-2">
                 <label class="flex items-center gap-2 cursor-pointer">
@@ -109,7 +109,7 @@
         <!-- Data Disposition -->
         <div>
             <label for="edit-data-disposition" class="block text-sm font-medium mb-2">Data Disposition</label>
-            <select id="edit-data-disposition" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+            <select id="edit-data-disposition" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
                 <option value="">Not Set</option>
                 <option value="migrate">Migrate</option>
                 <option value="archive">Archive</option>
@@ -121,32 +121,32 @@
         <!-- Target Date -->
         <div>
             <label for="edit-target-date" class="block text-sm font-medium mb-2">Target Date</label>
-            <input type="date" id="edit-target-date" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+            <input type="date" id="edit-target-date" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
             <p class="text-xs text-muted-foreground mt-1">When should this consolidation be completed?</p>
         </div>
 
         <!-- Business Rationale -->
         <div>
             <label for="edit-rationale" class="block text-sm font-medium mb-2">Business Rationale</label>
-            <textarea id="edit-rationale" rows="3" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Why consolidate this application?"></textarea>
+            <textarea id="edit-rationale" rows="3" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Why consolidate this application?"></textarea>
         </div>
 
         <!-- Risk Assessment -->
         <div>
             <label for="edit-risk" class="block text-sm font-medium mb-2">Risk Assessment</label>
-            <textarea id="edit-risk" rows="3" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="What risks should we consider?"></textarea>
+            <textarea id="edit-risk" rows="3" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="What risks should we consider?"></textarea>
         </div>
 
         <!-- Notes -->
         <div>
             <label for="edit-notes" class="block text-sm font-medium mb-2">Notes</label>
-            <textarea id="edit-notes" rows="3" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Additional notes or observations..."></textarea>
+            <textarea id="edit-notes" rows="3" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Additional notes or observations..."></textarea>
         </div>
 
         <!-- Assigned To -->
         <div>
             <label for="edit-assigned-to" class="block text-sm font-medium mb-2">Assigned To</label>
-            <input type="text" id="edit-assigned-to" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Name or team">
+            <input type="text" id="edit-assigned-to" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Name or team">
         </div>
     </div>
 

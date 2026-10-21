@@ -29,7 +29,7 @@
     {% endwith %}
 
     <!-- Status card -->
-    <div data-slot="card" class="rounded-xl border-2 border-input bg-card mb-6">
+    <div data-slot="card" class="rounded-lg border border-input bg-card mb-6">
         <div class="p-4 sm:p-6 border-b flex items-center justify-between">
             <div>
                 <h3 class="text-lg font-semibold">Connector Status</h3>
@@ -50,11 +50,11 @@
         </div>
         <div class="p-4 sm:p-6 flex gap-3 flex-wrap">
             <button type="button" id="btn-test"
-                class="inline-flex items-center px-4 py-2 rounded-md bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/80 transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Test Connection
             </button>
             <button type="button" id="btn-sync"
-                class="inline-flex items-center px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Sync Now
             </button>
             <span id="sync-msg" class="hidden text-sm text-muted-foreground self-center"></span>
@@ -66,7 +66,7 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <!-- OAuth2 / Instance -->
-        <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+        <div data-slot="card" class="rounded-lg border border-input bg-card">
             <div class="p-4 sm:p-6 border-b">
                 <h3 class="text-lg font-semibold">ServiceNow Instance &amp; OAuth2</h3>
                 <p class="text-sm text-muted-foreground mt-1">
@@ -107,7 +107,7 @@
         </div>
 
         <!-- CMDB Pull Settings -->
-        <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+        <div data-slot="card" class="rounded-lg border border-input bg-card">
             <div class="p-4 sm:p-6 border-b">
                 <h3 class="text-lg font-semibold">CMDB Pull Settings</h3>
                 <p class="text-sm text-muted-foreground mt-1">
@@ -138,7 +138,7 @@
         </div>
 
         <!-- Enable toggle & submit -->
-        <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+        <div data-slot="card" class="rounded-lg border border-input bg-card">
             <div class="p-4 sm:p-6 flex items-center justify-between">
                 <div>
                     <label for="enabled" class="text-sm font-medium">Enable Connector</label>
@@ -160,11 +160,11 @@
 
         <div class="flex gap-3">
             <button type="submit"
-                class="inline-flex items-center px-6 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Save Configuration
             </button>
             <a href="{{ url_for('admin.index') }}"
-                class="inline-flex items-center px-6 py-2 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Cancel
             </a>
         </div>

@@ -10,7 +10,7 @@
     {{ page_header(title='Capability Mapping', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Capability Mapping'}], description='Map applications to business capabilities') }}
 
     {% if load_error %}
-    <div role="alert" class="mb-6 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-emphasis">
+    <div role="alert" class="mb-6 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis">
         {{ load_error }}
     </div>
     {% endif %}
@@ -32,18 +32,18 @@
     </div>
 
     {% if total_caps == 0 and total_apps == 0 %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-12 text-center text-muted-foreground">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-12 text-center text-muted-foreground">
         <p class="font-medium">No data available for mapping.</p>
         <p class="text-sm mt-1 mb-4">Add capabilities and applications first.</p>
         <div class="flex justify-center gap-3">
             <a href="{{ url_for('unified_low_priority.capability_map_capabilities') }}"
-               class="inline-flex items-center h-9 px-4 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:opacity-90">Add capabilities</a>
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Add capabilities</a>
             <a href="{{ url_for('unified_applications.application_list') }}"
-               class="inline-flex items-center h-9 px-4 rounded-md text-sm font-medium border border-border hover:bg-muted">Add applications</a>
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Add applications</a>
         </div>
     </div>
     {% else %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm overflow-hidden">
+    <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
         <div class="px-6 py-4 border-b border-border flex justify-between items-center">
             <h2 class="text-base font-semibold text-foreground">Coverage Matrix</h2>
             <div class="flex gap-3 text-xs text-muted-foreground">
@@ -69,13 +69,13 @@
                     </div>
                     <div class="flex flex-wrap items-center gap-1.5 justify-end max-w-md">
                         {% for m in mapped %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">{{ m.name }}</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">{{ m.name }}</span>
                         {% else %}
                         <span class="text-xs text-muted-foreground">No application mapped</span>
                         {% endfor %}
                         {% if can_edit and total_apps > 0 %}
                         <button type="button" data-action="openMapDialog"
-                                class="ml-2 inline-flex items-center h-8 px-3 rounded-md text-xs font-medium border border-border hover:bg-muted"
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 ml-2 items-center"
                                 aria-label="Map applications to {{ cap.name|e }}">Map applications</button>
                         {% endif %}
                     </div>
@@ -87,7 +87,7 @@
         </div>
     </div>
 
-    <div data-slot="card" class="mt-6 rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="mt-6 rounded-lg border border-border bg-card">
         <div class="px-6 py-4 border-b border-border">
             <h2 class="text-base font-semibold text-foreground">Applications ({{ total_apps }})</h2>
         </div>

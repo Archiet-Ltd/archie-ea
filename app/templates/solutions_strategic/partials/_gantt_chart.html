@@ -62,7 +62,7 @@
             <i data-lucide="alert-circle" class="w-8 h-8 text-destructive mx-auto mb-2" aria-hidden="true"></i>
             <p class="text-sm font-medium text-destructive-emphasis mb-2">Failed to load Gantt chart</p>
             <p class="text-xs text-muted-foreground mb-3" x-text="error"></p>
-            <button type="button" @click="loadGanttData()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+            <button type="button" @click="loadGanttData()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="refresh-cw" class="w-3.5 h-3.5" aria-hidden="true"></i> Retry
             </button>
         </div>
@@ -162,7 +162,7 @@
 
     {# Export Menu (hidden) #}
     <div x-show="showExportMenu" @click.away="showExportMenu = false" x-cloak
-         class="absolute top-12 right-4 z-40 rounded-lg border border-border bg-card shadow-lg p-2 space-y-1">
+         class="absolute top-12 right-4 z-40 rounded-lg border border-border bg-card p-2 space-y-1">
         <button type="button" @click="exportChart('png')" class="w-full text-left px-3 py-2 text-xs rounded-md hover:bg-accent transition-colors">
             Export as PNG
         </button>
@@ -321,8 +321,8 @@
        DETAIL PANEL (slides in on task select)
        ────────────────────────────────────────────────────────────────────────── #}
     <div x-show="selectedTask" x-cloak @click.away="selectedTask = null"
-         class="absolute right-0 top-0 bottom-0 w-80 bg-card border-l border-border shadow-lg overflow-y-auto z-40
-                transform transition-transform duration-200"
+         class="absolute right-0 top-0 bottom-0 w-80 bg-card border-l border-border overflow-y-auto z-40
+ transform transition-transform duration-200"
          :class="selectedTask ? 'translate-x-0' : 'translate-x-full'">
         
         <template x-if="selectedTask">
@@ -429,7 +429,7 @@
     <div x-show="hoverTask && showHover" x-cloak
          class="fixed z-50 pointer-events-none"
          :style="{ left: hoverX + 'px', top: (hoverY - 100) + 'px' }">
-        <div class="rounded-lg border border-border bg-card shadow-lg p-3 max-w-xs">
+        <div class="rounded-lg border border-border bg-card p-3 max-w-xs">
             <div class="text-xs space-y-1">
                 <p class="font-semibold text-foreground" x-text="hoverTask.name"></p>
                 <p class="text-muted-foreground" x-text="formatDate(hoverTask.start_date) + ' → ' + formatDate(hoverTask.end_date)"></p>

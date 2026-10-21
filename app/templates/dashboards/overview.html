@@ -32,7 +32,7 @@
     {# Workspace links: a quiet row, not cards. Heading kept for assistive tech. #}
     {% set my_work_zone = (get_sidebar_zones(current_user) | selectattr('zone', 'equalto', 'my_work') | first) %}
     {% if my_work_zone and my_work_zone.links %}
-    <nav aria-labelledby="workspace-links-heading" class="-mt-4 flex flex-wrap items-center gap-x-1 gap-y-1 text-[13px]">
+    <nav aria-labelledby="workspace-links-heading" class="-mt-4 flex flex-wrap items-center gap-x-1 gap-y-1 text-13">
         <h2 id="workspace-links-heading" class="sr-only">Your Workspace</h2>
         {% for link in (my_work_zone.links | selectattr('endpoint', 'in', flask.current_app.view_functions) | list) %}
         {% if not loop.first %}<span class="text-muted-foreground/60" aria-hidden="true">&middot;</span>{% endif %}
@@ -53,7 +53,7 @@
              } }"
          x-show="show"
          data-testid="welcome-banner"
-         class="flex h-10 items-center justify-between gap-3 rounded-md border border-border bg-card px-4 text-[13px]">
+         class="flex h-10 items-center justify-between gap-3 rounded-md border border-border bg-card px-4 text-13">
         <p class="text-sm text-foreground min-w-0">
             <span class="font-medium">Welcome to {{ config.APP_NAME }}</span>
             <span class="text-muted-foreground"> — <a href="/ai-chat" class="text-info hover:underline">ask the AI architect</a> anytime, no setup needed.</span>
@@ -121,8 +121,8 @@
         ] %}
         {% for label, value, testid, line in kpis %}
         <div class="rounded-lg border border-border bg-card p-4">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
-            <p class="mt-1 text-[28px] font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
+            <p class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
+            <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
             {% if line %}<p class="mt-1 truncate text-xs text-muted-foreground tabular-nums" title="{{ line }}">{{ line }}</p>{% endif %}
         </div>
         {% endfor %}
@@ -193,7 +193,7 @@
     <section aria-labelledby="lifecycle-chart-heading" class="rounded-lg border border-border bg-card" data-testid="lifecycle-distribution">
         <div class="flex items-center justify-between border-b border-border px-4 py-2">
             <h2 id="lifecycle-chart-heading" class="text-base font-semibold text-foreground">Applications by lifecycle</h2>
-            <span class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ metrics.applications|default(0) }} in portfolio</span>
+            <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ metrics.applications|default(0) }} in portfolio</span>
         </div>
         {% set lc = lifecycle_distribution|default([]) %}
         {% if lc %}
@@ -290,7 +290,7 @@
         <section aria-labelledby="capability-coverage-heading" class="mt-8 rounded-lg border border-border bg-card" data-testid="capability-health-widget">
             <div class="flex items-center justify-between border-b border-border px-4 py-2">
                 <h2 id="capability-coverage-heading" class="text-base font-semibold text-foreground">Capability coverage</h2>
-                <span class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ gap_count }} gap{{ 's' if gap_count != 1 else '' }} of {{ ch|length }}</span>
+                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ gap_count }} gap{{ 's' if gap_count != 1 else '' }} of {{ ch|length }}</span>
             </div>
             <div class="max-h-[480px] overflow-auto">
                 <table class="dense-table w-full border-collapse text-sm">
@@ -304,7 +304,7 @@
                     </thead>
                     <tbody>
                         {% for cap in ch %}
-                        <tr class="group h-12 border-b border-border transition-colors hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <tr class="group h-12 border-b border-border transition-colors hover:bg-muted/50">
                             <td class="px-3 align-middle font-medium text-foreground">{{ cap.name }}</td>
                             <td class="px-3 text-right align-middle tabular-nums text-muted-foreground">{{ cap.app_count }}</td>
                             <td class="px-3 align-middle">
@@ -313,7 +313,7 @@
                                 {% else %}<span class="text-destructive-emphasis">Gap</span>{% endif %}
                             </td>
                             <td class="px-3 text-right align-middle">
-                                <a href="{{ url_for('capability_map.index') }}?cap={{ cap.id }}" class="inline-flex h-8 items-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground opacity-0 transition-opacity hover:bg-slate-100 hover:text-info group-hover:opacity-100 focus-visible:opacity-100 dark:hover:bg-slate-700">View</a>
+                                <a href="{{ url_for('capability_map.index') }}?cap={{ cap.id }}" class="inline-flex h-8 items-center rounded-md px-2.5 text-13 font-medium text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-info group-hover:opacity-100 focus-visible:opacity-100">View</a>
                             </td>
                         </tr>
                         {% else %}

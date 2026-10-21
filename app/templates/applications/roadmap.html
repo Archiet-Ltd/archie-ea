@@ -24,7 +24,7 @@
     ) }}
     <div class="flex items-center gap-2">
       {{ button('Back to Application', variant='outline', size='default', href=url_for('unified_applications.application_detail', id=application.id), icon='arrow-left') }}
-      <button type="button" class="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+      <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
         @click="openCreateModal()">
         Add Work Package
       </button>
@@ -32,19 +32,19 @@
   </div>
 
   <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total</p>
       <p class="mt-2 text-2xl font-semibold" x-text="metrics.total"></p>
     </div>
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Planned</p>
       <p class="mt-2 text-2xl font-semibold" x-text="metrics.planned"></p>
     </div>
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">In Progress</p>
       <p class="mt-2 text-2xl font-semibold" x-text="metrics.in_progress"></p>
     </div>
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Completed</p>
       <p class="mt-2 text-2xl font-semibold" x-text="metrics.completed"></p>
     </div>
@@ -72,7 +72,7 @@
       </div>
 
       <div class="overflow-x-auto rounded-lg border">
-        <table class="min-w-full text-sm">
+        <table class="dense-table min-w-full text-sm">
           <thead class="bg-muted/50">
             <tr>
               <th class="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>

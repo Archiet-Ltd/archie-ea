@@ -11,7 +11,7 @@
 
 {# Reusable filter bar macro for capability tables #}
 {% macro capability_filter_bar(context_id, filters=[], has_search=True, has_clear=True) %}
-<div class="bg-card rounded-lg shadow p-4 mb-6">
+<div class="bg-card rounded-lg p-4 mb-6">
     <div class="flex flex-wrap gap-4 items-center">
         {% for filter in filters %}
         {#- Pluralise properly. "All {{ label }}s" produced "All Statuss" and
@@ -205,7 +205,7 @@
                 </div>
 
                 <!-- Business Domain Cards -->
-                <div class="bg-card rounded-lg shadow p-6 mb-6">
+                <div class="bg-card rounded-lg p-6 mb-6">
                     <h3 class="text-lg font-medium text-foreground mb-4">Business Domains</h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4" id="unified-domains-grid">
                         <div class="col-span-full text-center py-8 text-muted-foreground">
@@ -234,7 +234,7 @@
                 ]) }}
 
                 <!-- Data Table with Pagination -->
-                <div class="bg-card rounded-lg shadow">
+                <div class="bg-card rounded-lg">
                     <div class="px-6 py-4 border-b border-border flex justify-between items-center">
                         <h2 class="text-lg font-medium text-foreground">Unified Capability View (Application + Manufacturing)</h2>
                         <div class="text-sm text-muted-foreground">
@@ -243,7 +243,7 @@
                     </div>
 
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-border">
+                        <table class="dense-table min-w-full divide-y divide-border">
                             <thead class="bg-muted/50">
                                 <tr>
                                     <th class="px-6 py-3 text-left">
@@ -404,11 +404,11 @@
                 </div>
 
                 <!-- Manufacturing Domain Cards -->
-                <div class="bg-card rounded-lg shadow p-6 mb-6">
+                <div class="bg-card rounded-lg p-6 mb-6">
                     <h3 class="text-lg font-medium text-foreground mb-4">Manufacturing Domains</h3>
                     <div class="grid grid-cols-1 md:grid-cols-5 gap-4" id="mfg-domains-grid">
                         <!-- Production -->
-                        <div class="bg-warning/5 border-2 border-warning/20 rounded-md p-4 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-warning/10 border-2 border-warning/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="document.getElementById('manufacturing-domain-filter').value='production'; filterTable('manufacturing');">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="p-2 rounded-lg bg-warning/10">
@@ -428,7 +428,7 @@
                         </div>
 
                         <!-- Supply Chain -->
-                        <div class="bg-primary/5 border-2 border-primary/20 rounded-md p-4 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-primary/10 border-2 border-primary/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="document.getElementById('manufacturing-domain-filter').value='supply_chain'; filterTable('manufacturing');">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="p-2 rounded-lg bg-primary/10">
@@ -448,7 +448,7 @@
                         </div>
 
                         <!-- Quality -->
-                        <div class="bg-success/5 border-2 border-success/20 rounded-md p-4 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-success/10 border-2 border-success/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="document.getElementById('manufacturing-domain-filter').value='quality'; filterTable('manufacturing');">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="p-2 rounded-lg bg-success/10">
@@ -468,7 +468,7 @@
                         </div>
 
                         <!-- Maintenance -->
-                        <div class="bg-accent border-2 border-primary/20 rounded-md p-4 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="bg-accent border-2 border-primary/20 rounded-md p-4 transition-shadow cursor-pointer"
                              @click="document.getElementById('manufacturing-domain-filter').value='maintenance'; filterTable('manufacturing');">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="p-2 rounded-lg bg-accent">
@@ -488,7 +488,7 @@
                         </div>
 
                         <!-- Engineering -->
-                        <div class="bg-primary/5 border-2 border-primary/20 rounded-md p-4 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-primary/10 border-2 border-primary/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="document.getElementById('manufacturing-domain-filter').value='engineering'; filterTable('manufacturing');">
                             <div class="flex items-start justify-between mb-3">
                                 <div class="p-2 rounded-lg bg-primary/10">
@@ -526,7 +526,7 @@
                 ]) }}
 
                 <!-- Data Table with Pagination -->
-                <div class="bg-card rounded-lg shadow">
+                <div class="bg-card rounded-lg">
                     <div class="px-6 py-4 border-b border-border flex justify-between items-center">
                         <h2 class="text-lg font-medium text-foreground">Manufacturing Capability Mappings</h2>
                         <div class="text-sm text-muted-foreground">
@@ -535,7 +535,7 @@
                     </div>
 
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-border">
+                        <table class="dense-table min-w-full divide-y divide-border">
                             <thead class="bg-muted/50">
                                 <tr>
                                     <th class="px-6 py-3 text-left">
@@ -658,7 +658,7 @@
                 </div>
 
                 <!-- Application Domain Cards -->
-                <div class="bg-card rounded-lg shadow p-6 mb-6">
+                <div class="bg-card rounded-lg p-6 mb-6">
                     <h3 class="text-lg font-medium text-foreground mb-4">Application Domains</h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4" id="application-domains-grid">
                         <div class="col-span-full text-center py-8 text-muted-foreground">
@@ -679,7 +679,7 @@
                 ]) }}
 
                 <!-- Data Table with Pagination -->
-                <div class="bg-card rounded-lg shadow">
+                <div class="bg-card rounded-lg">
                     <div class="px-6 py-4 border-b border-border flex justify-between items-center">
                         <h2 class="text-lg font-medium text-foreground">Application Capability Mappings</h2>
                         <div class="text-sm text-muted-foreground">
@@ -688,7 +688,7 @@
                     </div>
 
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-border">
+                        <table class="dense-table min-w-full divide-y divide-border">
                             <thead class="bg-muted/50">
                                 <tr>
                                     <th class="px-6 py-3 text-left">
@@ -831,7 +831,7 @@
                 ]) }}
 
                 <!-- Data Table with Pagination -->
-                <div class="bg-card rounded-lg shadow">
+                <div class="bg-card rounded-lg">
                     <div class="px-6 py-4 border-b border-border flex justify-between items-center">
                         <h2 class="text-lg font-medium text-foreground">Gap Analysis (Capabilities Without Applications)</h2>
                         <div class="text-sm text-muted-foreground">
@@ -840,7 +840,7 @@
                     </div>
 
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-border">
+                        <table class="dense-table min-w-full divide-y divide-border">
                             <thead class="bg-muted/50">
                                 <tr>
                                     <th class="px-6 py-3 text-left">
@@ -973,7 +973,7 @@
                     </div>
 
                     <!-- ACM Domain Coverage Summary -->
-                    <div class="bg-card rounded-lg shadow p-4 mb-6">
+                    <div class="bg-card rounded-lg p-4 mb-6">
                         <h3 class="text-md font-medium text-foreground mb-4">Domain Coverage Summary</h3>
                         <div class="grid grid-cols-1 md:grid-cols-7 gap-2" id="acm-domain-coverage-grid">
                             <!-- Populated by JS -->
@@ -982,7 +982,7 @@
                     </div>
 
                     <!-- ACM Gap Filters -->
-                    <div class="bg-card rounded-lg shadow p-4 mb-6">
+                    <div class="bg-card rounded-lg p-4 mb-6">
                         <div class="flex flex-wrap gap-4 items-center">
                             <div class="flex items-center space-x-2">
                                 <label for="acm-gap-domain-filter" class="text-sm font-medium text-muted-foreground">Domain:</label>
@@ -1028,7 +1028,7 @@
                     </div>
 
                     <!-- ACM Gap Table -->
-                    <div class="bg-card rounded-lg shadow">
+                    <div class="bg-card rounded-lg">
                         <div class="px-6 py-4 border-b border-border flex justify-between items-center">
                             <h3 class="text-lg font-medium text-foreground">Technical Capabilities Gap Details</h3>
                             <div class="text-sm text-muted-foreground">
@@ -1036,7 +1036,7 @@
                             </div>
                         </div>
                         <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-border">
+                            <table class="dense-table min-w-full divide-y divide-border">
                                 <thead class="bg-muted/50">
                                     <tr>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -1115,14 +1115,14 @@
                 </div>
 
                 <!-- APQC Process Category Cards -->
-                <div class="bg-card rounded-lg shadow p-6 mb-6">
+                <div class="bg-card rounded-lg p-6 mb-6">
                     <h3 class="text-lg font-medium text-foreground mb-4">APQC Process Categories (PCF)</h3>
                     <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-3" id="process-categories-grid">
                         <!-- Operating Processes (1-5) -->
-                        <div class="bg-primary/5 border-2 border-primary/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-primary/10 border-2 border-primary/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('1.0')">
                             <div class="flex items-start justify-between mb-2">
-                                <span class="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">1.0</span>
+                                <span class="text-xs font-bold text-info-emphasis bg-primary/10 px-2 py-0.5 rounded">1.0</span>
                                 <div class="w-2 h-2 rounded-full bg-muted-foreground/40" id="proc-cat-1-status"></div>
                             </div>
                             <h4 class="text-sm font-semibold text-primary mb-1">Vision &amp; Strategy</h4>
@@ -1131,7 +1131,7 @@
                                 <span class="font-medium text-primary" id="proc-cat-1-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-success/5 border-2 border-success/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-success/10 border-2 border-success/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('2.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-success-emphasis bg-success/10 px-2 py-0.5 rounded">2.0</span>
@@ -1143,7 +1143,7 @@
                                 <span class="font-medium text-success-emphasis" id="proc-cat-2-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-accent border-2 border-primary/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="bg-accent border-2 border-primary/20 rounded-md p-3 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('3.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-primary bg-accent px-2 py-0.5 rounded">3.0</span>
@@ -1155,7 +1155,7 @@
                                 <span class="font-medium text-primary" id="proc-cat-3-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-warning/5 border-2 border-warning/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-warning/10 border-2 border-warning/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('4.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-warning-emphasis bg-warning/10 px-2 py-0.5 rounded">4.0</span>
@@ -1167,7 +1167,7 @@
                                 <span class="font-medium text-warning-emphasis" id="proc-cat-4-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-success/5 border-2 border-info/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-success/10 border-2 border-info/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('5.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-success-emphasis bg-success/10 px-2 py-0.5 rounded">5.0</span>
@@ -1180,10 +1180,10 @@
                             </div>
                         </div>
                         <!-- Management & Support (6-13) -->
-                        <div class="bg-primary/5 border-2 border-primary/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-primary/10 border-2 border-primary/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('6.0')">
                             <div class="flex items-start justify-between mb-2">
-                                <span class="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">6.0</span>
+                                <span class="text-xs font-bold text-info-emphasis bg-primary/10 px-2 py-0.5 rounded">6.0</span>
                                 <div class="w-2 h-2 rounded-full bg-muted-foreground/40" id="proc-cat-6-status"></div>
                             </div>
                             <h4 class="text-sm font-semibold text-primary mb-1">Customer Service</h4>
@@ -1192,7 +1192,7 @@
                                 <span class="font-medium text-primary" id="proc-cat-6-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-destructive/5 border-2 border-destructive/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-destructive/10 border-2 border-destructive/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('7.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-destructive-emphasis bg-destructive/10 px-2 py-0.5 rounded">7.0</span>
@@ -1204,7 +1204,7 @@
                                 <span class="font-medium text-destructive-emphasis" id="proc-cat-7-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-info/5 border-2 border-info/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-info/10 border-2 border-info/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('8.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-info bg-info/10 px-2 py-0.5 rounded">8.0</span>
@@ -1216,7 +1216,7 @@
                                 <span class="font-medium text-info" id="proc-cat-8-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-warning/5 border-2 border-warning/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-warning/10 border-2 border-warning/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('9.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-warning-emphasis bg-warning/10 px-2 py-0.5 rounded">9.0</span>
@@ -1228,7 +1228,7 @@
                                 <span class="font-medium text-warning-emphasis" id="proc-cat-9-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-destructive/5 border-2 border-destructive/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-destructive/10 border-2 border-destructive/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('10.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-destructive-emphasis bg-destructive/10 px-2 py-0.5 rounded">10.0</span>
@@ -1240,7 +1240,7 @@
                                 <span class="font-medium text-destructive-emphasis" id="proc-cat-10-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-success/5 border-2 border-success/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-success/10 border-2 border-success/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('11.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-success-emphasis bg-success/10 px-2 py-0.5 rounded">11.0</span>
@@ -1252,7 +1252,7 @@
                                 <span class="font-medium text-success-emphasis" id="proc-cat-11-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-muted border-2 border-border rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="bg-muted border-2 border-border rounded-md p-3 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('12.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded">12.0</span>
@@ -1264,7 +1264,7 @@
                                 <span class="font-medium text-muted-foreground" id="proc-cat-12-pct">0%</span>
                             </div>
                         </div>
-                        <div class="bg-destructive/5 border-2 border-destructive/20 rounded-md p-3 hover:shadow-md transition-shadow cursor-pointer"
+                        <div class="border bg-destructive/10 border-2 border-destructive/40 rounded-md px-3 py-2 transition-shadow cursor-pointer"
                              @click="filterProcessByCategory('13.0')">
                             <div class="flex items-start justify-between mb-2">
                                 <span class="text-xs font-bold text-destructive-emphasis bg-destructive/10 px-2 py-0.5 rounded">13.0</span>
@@ -1280,7 +1280,7 @@
                 </div>
 
                 <!-- Table Filters -->
-                <div class="bg-card rounded-lg shadow p-4 mb-6">
+                <div class="bg-card rounded-lg p-4 mb-6">
                     <div class="flex flex-wrap gap-4 items-center">
                         <div class="flex items-center space-x-2">
                             <label for="process-category-filter" class="text-sm font-medium text-muted-foreground">Category:</label>
@@ -1334,7 +1334,7 @@
                 </div>
 
                 <!-- Data Table with Pagination -->
-                <div class="bg-card rounded-lg shadow">
+                <div class="bg-card rounded-lg">
                     <div class="px-6 py-4 border-b border-border flex justify-between items-center">
                         <div>
                             <h2 class="text-lg font-medium text-foreground">Process Gap Analysis (Processes Without Applications)</h2>
@@ -1346,7 +1346,7 @@
                     </div>
 
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-border">
+                        <table class="dense-table min-w-full divide-y divide-border">
                             <thead class="bg-muted/50">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('name')">
@@ -1419,7 +1419,7 @@
                 </div>
 
                 <!-- Legend -->
-                <div class="mt-6 bg-card rounded-lg shadow p-4">
+                <div class="mt-6 bg-card rounded-lg p-4">
                     <h3 class="text-sm font-medium text-muted-foreground mb-3">Gap Status Legend</h3>
                     <div class="flex items-center gap-6 flex-wrap">
                         <div class="flex items-center gap-2">
@@ -1620,7 +1620,7 @@
                 </div>
 
                 <!-- Domain Cards Grid -->
-                <div class="bg-card rounded-lg shadow">
+                <div class="bg-card rounded-lg">
                     <div class="px-6 py-4 border-b border-border">
                         <h2 class="text-lg font-medium text-foreground">ACM Technical Capability Domains</h2>
                         <p class="text-sm text-muted-foreground">7 domains covering application architecture capabilities (L0-L4 hierarchy)</p>
@@ -1639,7 +1639,7 @@
                 </div>
 
                 <!-- Capabilities Table -->
-                <div class="bg-card rounded-lg shadow mt-6">
+                <div class="bg-card rounded-lg mt-6">
                     <div class="px-6 py-4 border-b border-border flex justify-between items-center">
                         <div>
                             <h2 class="text-lg font-medium text-foreground">Technical Capabilities</h2>
@@ -1670,7 +1670,7 @@
                         </div>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-border">
+                        <table class="dense-table min-w-full divide-y divide-border">
                             <thead class="bg-muted/50">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Code</th>
@@ -1726,7 +1726,7 @@
         <!-- Convert to Roadmap Modal - Standardized Design -->
         <div id="convert-modal" hidden role="dialog" aria-modal="true" aria-labelledby="convert-modal-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
             <div class="relative top-20 mx-auto p-0 w-full max-w-2xl">
-                <div class="bg-card rounded-lg shadow-xl">
+                <div class="bg-card rounded-lg">
                     <!-- Header -->
                     <div class="flex items-center justify-between p-5 border-b border-border bg-primary rounded-t-lg">
                         <div class="flex items-center space-x-3">
@@ -1777,7 +1777,7 @@
                     <!-- Body -->
                     <div class="p-6 max-h-[60vh] overflow-y-auto">
                         <!-- Description -->
-                        <div class="bg-primary/5 border border-primary/20 rounded-lg p-4 mb-6">
+                        <div class="bg-primary/10 border border-primary/40 rounded-md px-3 py-2 mb-6">
                             <div class="flex items-start space-x-3">
                                 <i data-lucide="info" class="w-5 h-5 text-primary mt-0.5" aria-hidden="true"></i>
                                 <div>
@@ -1863,7 +1863,7 @@
                             <button type="button" @click="closeConvertModal()" class="px-5 py-2.5 text-muted-foreground bg-card border border-input rounded-md hover:bg-accent font-medium" aria-label="Cancel gap conversion">
                                 Cancel
                             </button>
-                            <button type="button" @click="executeConvertGaps(event)" class="px-5 py-2.5 bg-primary text-primary-foreground rounded-md hover:bg-primary flex items-center font-medium shadow-sm" aria-label="Execute gap conversion">
+                            <button type="button" @click="executeConvertGaps(event)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Execute gap conversion">
                                 <i data-lucide="check" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                                 Convert Gaps
                             </button>
@@ -1876,7 +1876,7 @@
         <!-- Edit Gap Modal -->
         <div id="edit-gap-modal" hidden role="dialog" aria-modal="true" aria-labelledby="edit-gap-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
             <div class="relative top-10 mx-auto p-0 w-full max-w-3xl">
-                <div class="bg-card rounded-lg shadow-xl">
+                <div class="bg-card rounded-lg">
                     <!-- Header -->
                     <div class="flex items-center justify-between p-4 border-b border-border bg-primary rounded-t-lg">
                         <div class="flex items-center space-x-3">
@@ -1949,7 +1949,7 @@
                                 <label class="block text-sm font-medium text-muted-foreground mb-1">Color</label>
                                 <div class="flex items-center space-x-2">
                                     <label for="edit-gap-color" class="block text-sm font-medium text-muted-foreground mb-1">Gap color</label>
-                                    <input type="color" id="edit-gap-color" class="w-12 h-10 border border-input rounded cursor-pointer">
+                                    <input type="color" id="edit-gap-color" class="w-12 h-9 border border-input rounded cursor-pointer">
                                     <div id="edit-gap-color-presets" class="flex space-x-1">
                                         <button type="button" @click="setGapColor('#6B7280')" class="w-6 h-6 rounded bg-muted-foreground hover:ring-2 ring-offset-1 ring-muted-foreground" aria-label="Set gap color to gray"></button>
                                         <button type="button" @click="setGapColor('#EAB308')" class="w-6 h-6 rounded bg-warning hover:ring-2 ring-offset-1 ring-warning" aria-label="Set gap color to warning"></button>
@@ -1982,7 +1982,7 @@
                         <div class="border-t border-border pt-4">
                             <div class="flex items-center justify-between mb-3">
                                 <h4 class="font-medium text-muted-foreground">Work Packages</h4>
-                                <button type="button" @click="addWorkPackageToGap()" class="px-3 py-1 text-sm bg-primary/10 text-primary rounded hover:bg-primary/20 flex items-center" aria-label="Add new work package">
+                                <button type="button" @click="addWorkPackageToGap()" class="px-3 py-1 text-sm bg-primary/10 text-info-emphasis rounded hover:bg-primary/20 flex items-center" aria-label="Add new work package">
                                     <i data-lucide="plus" class="w-4 h-4 mr-1" aria-hidden="true"></i>
                                     Add Work Package
                                 </button>
@@ -2003,7 +2003,7 @@
                             <button type="button" @click="closeEditGapModal()" class="px-4 py-2 text-muted-foreground bg-muted rounded-md hover:bg-accent" aria-label="Cancel editing gap">
                                 Cancel
                             </button>
-                            <button type="button" @click="saveGapChanges()" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary flex items-center" aria-label="Save gap changes">
+                            <button type="button" @click="saveGapChanges()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Save gap changes">
                                 <i data-lucide="save" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                                 Save Changes
                             </button>
@@ -2016,7 +2016,7 @@
         <!-- Edit Work Package Modal - Standardized Design -->
         <div id="edit-wp-modal" hidden role="dialog" aria-modal="true" aria-labelledby="edit-wp-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
             <div class="relative top-10 mx-auto p-0 w-full max-w-4xl">
-                <div class="bg-card rounded-lg shadow-xl">
+                <div class="bg-card rounded-lg">
                     <!-- Header -->
                     <div class="flex items-center justify-between p-5 border-b border-border bg-primary rounded-t-lg">
                         <div class="flex items-center space-x-3">
@@ -2179,7 +2179,7 @@
                                         <label class="block text-sm font-medium text-muted-foreground mb-1">Color Theme</label>
                                         <div class="flex items-center space-x-2">
                                             <label for="edit-wp-color" class="block text-sm font-medium text-muted-foreground mb-1">Timeline bar color</label>
-                                            <input type="color" id="edit-wp-color" class="w-16 h-10 border border-input rounded cursor-pointer">
+                                            <input type="color" id="edit-wp-color" class="w-16 h-9 border border-input rounded cursor-pointer">
                                             <span class="text-xs text-muted-foreground">Timeline bar color</span>
                                         </div>
                                     </div>
@@ -2221,7 +2221,7 @@
                                     <div class="relative">
                                         <i data-lucide="search" class="absolute left-4 top-3.5 w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
                                         <label for="wp-children-search" class="block text-sm font-medium text-muted-foreground mb-1">Search child work packages</label>
-                                        <input type="text" id="wp-children-search" placeholder="Search child work packages by name..." class="w-full pl-12 pr-4 py-3 border border-input rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @input="filterWPChildren()">
+                                        <input type="text" id="wp-children-search" placeholder="Search child work packages by name..." class="w-full pl-12 pr-4 py-3 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @input="filterWPChildren()">
                                     </div>
                                 </div>
                                 <div class="grid grid-cols-4 gap-3">
@@ -2305,7 +2305,7 @@
                             <button type="button" @click="closeEditWPModal()" class="px-5 py-2.5 text-muted-foreground bg-card border border-input rounded-md hover:bg-accent font-medium" aria-label="Cancel editing work package">
                                 Cancel
                             </button>
-                            <button type="button" @click="saveWPChanges()" class="px-5 py-2.5 bg-primary text-primary-foreground rounded-md hover:bg-primary flex items-center font-medium shadow-sm" aria-label="Save work package changes">
+                            <button type="button" @click="saveWPChanges()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Save work package changes">
                                 <i data-lucide="save" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                                 Save Changes
                             </button>
@@ -2318,7 +2318,7 @@
         <!-- Delete Confirmation Modal -->
         <div id="delete-confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="delete-confirm-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
             <div class="relative top-20 mx-auto p-0 w-full max-w-md">
-                <div class="bg-card rounded-lg shadow-xl">
+                <div class="bg-card rounded-lg">
                     <!-- Header -->
                     <div class="flex items-center justify-between p-4 border-b border-border bg-destructive rounded-t-lg">
                         <div class="flex items-center space-x-3">
@@ -2344,7 +2344,7 @@
                         </div>
 
                         <!-- Warning for items with children -->
-                        <div id="delete-cascade-warning" class="hidden bg-warning/5 border border-warning/20 rounded-lg p-3 mb-4">
+                        <div id="delete-cascade-warning" class="hidden bg-warning/10 border border-warning/40 rounded-md px-3 py-2 mb-4">
                             <div class="flex items-start">
                                 <i data-lucide="alert-triangle" class="w-5 h-5 text-warning-emphasis mr-2 mt-0.5" aria-hidden="true"></i>
                                 <div class="text-sm">
@@ -2362,7 +2362,7 @@
                         <button type="button" @click="closeDeleteConfirmModal()" class="px-4 py-2 text-muted-foreground bg-card border border-input rounded-md hover:bg-accent" aria-label="Cancel delete operation">
                             Cancel
                         </button>
-                        <button type="button" @click="confirmDelete()" class="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive flex items-center" aria-label="Confirm delete operation">
+                        <button type="button" @click="confirmDelete()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Confirm delete operation">
                             <i data-lucide="trash-2" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                             Delete
                         </button>
@@ -2373,7 +2373,7 @@
 
         <!-- Add to Roadmap Modal -->
         <div id="add-roadmap-modal" hidden role="dialog" aria-modal="true" aria-labelledby="add-roadmap-modal-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
-            <div class="relative top-20 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-card">
+            <div class="relative top-20 mx-auto p-5 border border-border w-full max-w-lg rounded-md bg-card">
                 <div class="flex justify-between items-center mb-4 pb-3 border-b">
                     <h3 class="text-lg font-bold text-foreground flex items-center">
                         <i data-lucide="map" class="w-5 h-5 mr-2 text-primary" aria-hidden="true"></i>
@@ -2389,7 +2389,7 @@
                     <div class="text-sm text-muted-foreground mb-1">Capability</div>
                     <div id="add-roadmap-cap-name" class="font-medium text-foreground"></div>
                     <div class="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                        <span id="add-roadmap-cap-type" class="px-2 py-0.5 rounded bg-primary/10 text-primary"></span>
+                        <span id="add-roadmap-cap-type" class="px-2 py-0.5 rounded bg-primary/10 text-info-emphasis"></span>
                         <span id="add-roadmap-cap-level" class="px-2 py-0.5 rounded bg-muted text-muted-foreground"></span>
                     </div>
                 </div>
@@ -2435,7 +2435,7 @@
                         <label class="block text-sm font-medium text-muted-foreground mb-1">Color</label>
                         <div class="flex items-center gap-2">
                             <label for="add-roadmap-color" class="block text-sm font-medium text-muted-foreground mb-1">Gap color</label>
-                            <input type="color" id="add-roadmap-color" value="#6B7280" class="w-10 h-10 rounded cursor-pointer">
+                            <input type="color" id="add-roadmap-color" value="#6B7280" class="w-10 h-9 rounded cursor-pointer">
                             <div class="flex gap-1">
                                 <button type="button" @click="document.getElementById('add-roadmap-color').value='#6B7280'" class="w-6 h-6 rounded-full bg-muted-foreground hover:ring-2 ring-offset-1 ring-muted-foreground" aria-label="Set roadmap color to gray"></button>
                                 <button type="button" @click="document.getElementById('add-roadmap-color').value='#EAB308'" class="w-6 h-6 rounded-full bg-warning hover:ring-2 ring-offset-1 ring-warning" aria-label="Set roadmap color to warning"></button>
@@ -2460,7 +2460,7 @@
                     <button type="button" @click="closeAddRoadmapModal()" class="px-4 py-2 text-muted-foreground bg-muted rounded-md hover:bg-accent" aria-label="Cancel adding to roadmap">
                         Cancel
                     </button>
-                    <button type="button" @click="submitAddToRoadmap()" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary flex items-center" aria-label="Submit roadmap addition">
+                    <button type="button" @click="submitAddToRoadmap()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit roadmap addition">
                         <i data-lucide="plus" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                         Add to Roadmap
                     </button>
@@ -2470,7 +2470,7 @@
 
         <!-- Quick Add to Roadmap Modal -->
         <div id="quick-add-modal" hidden role="dialog" aria-modal="true" aria-labelledby="quick-add-modal-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
-            <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-card">
+            <div class="relative top-20 mx-auto p-5 border border-border w-full max-w-2xl rounded-md bg-card">
                 <div class="flex justify-between items-center mb-4 pb-3 border-b">
                     <h3 class="text-lg font-bold text-foreground flex items-center">
                         <i data-lucide="search" class="w-5 h-5 mr-2 text-primary" aria-hidden="true"></i>

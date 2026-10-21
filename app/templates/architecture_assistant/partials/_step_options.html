@@ -7,12 +7,12 @@
     </div>
     <div class="flex items-center gap-2">
       <button @click="addManualOption()" type="button"
-        class="inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="plus" class="h-4 w-4"></i> Add Option
       </button>
       <button @click="generateOptions()" type="button"
         :disabled="gaps.length === 0 || optionsLoading"
-        class="inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="sparkles" class="h-4 w-4" x-show="!optionsLoading" x-cloak></i>
         <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="optionsLoading" x-cloak></i>
         <span x-text="optionsLoading ? 'Generating...' : 'Generate Options'"></span>
@@ -134,7 +134,7 @@
     </div>
 
     {# ENH-007: Vendor validation warning #}
-    <div x-show="optionVendorWarning" x-cloak class="mt-3 p-3 rounded-md border border-warning/30 bg-warning/5 text-sm text-warning-emphasis flex items-start gap-2">
+    <div x-show="optionVendorWarning" x-cloak class="mt-3 px-3 py-2 rounded-md border border-warning/40 bg-warning/10 text-sm text-warning-emphasis flex items-start gap-2">
       <i data-lucide="alert-triangle" class="h-4 w-4 shrink-0 mt-0.5"></i>
       <span x-text="optionVendorWarning"></span>
     </div>
@@ -144,7 +144,7 @@
       <button @click="compareOptions()" type="button"
         :disabled="options.length < 2"
         data-testid="compare-options-btn"
-        class="inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent disabled:opacity-50 disabled:pointer-events-none">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="columns" class="h-4 w-4"></i> Compare
       </button>
     </div>

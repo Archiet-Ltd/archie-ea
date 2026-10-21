@@ -1,6 +1,6 @@
 {# Inside blueprintPage(); Platform.modal owns visibility and focus. #}
 {% from 'components/modal.html' import modal %}
-{% set composition_input = 'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50' %}
+{% set composition_input ='flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50' %}
 {% set composition_button = 'inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none' %}
 {% set composition_label = 'block text-xs font-medium text-muted-foreground mb-1.5' %}
 {% call modal(id='bp-composition-editor', size='lg', labelledby='bp-composition-editor-heading') %}
