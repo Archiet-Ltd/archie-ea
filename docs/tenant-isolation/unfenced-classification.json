@@ -4899,9 +4899,9 @@
     "owner_path": "solution_id -> solutions.organization_id",
     "reads": 10,
     "writes": 6,
-    "batch": 4,
+    "batch": 1,
     "confidence": "high",
-    "note": "owner derived through 1 foreign key hop",
+    "note": "an overview CFO figure summed this table across organisations; any write makes it live",
     "parent": "solutions"
   },
   {

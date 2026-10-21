@@ -181,7 +181,7 @@ Protected parents used as owners that are fenced in code but missing from `scrip
 
 Batch 1 and the batches that follow it hold the application and capability tables (owner read from application_components or the capability tables), mapping and coverage tables first. The remaining parents follow, the most read and written first. A batch holds 20 to 40 tables; a large parent is split, so usage falls within a parent but a small parent can fill the end of a batch.
 
-### Batch 1 (26 tables, 644 reads+writes)
+### Batch 1 (27 tables, 660 reads+writes)
 
 - **application_business_actor_mapping** (ApplicationBusinessActorMapping) reads 3, writes 2; owner path: application_component_id -> application_components.organization_id; high
 - **application_capability_coverage** (ApplicationCapabilityCoverage) reads 23, writes 3; owner path: application_component_id -> application_components.organization_id; high
@@ -204,6 +204,7 @@ Batch 1 and the batches that follow it hold the application and capability table
 - **itil_capability_mapping** (ITILCapabilityMapping) reads 0, writes 0; owner path: capability_id -> enterprise_capabilities.business_capability_id -> business_capability.organization_id; medium
 - **options_analysis** (OptionsAnalysis) reads 37, writes 3; owner path: own organization_id column; high
 - **solution_capability_mappings** (SolutionCapabilityMapping) reads 63, writes 28; owner path: capability_id -> business_capability.organization_id; high
+- **solution_tco_items** (SolutionTCOItem) reads 10, writes 6; owner path: solution_id -> solutions.organization_id; high
 - **unified_application_capability_mapping** (UnifiedApplicationCapabilityMapping) reads 58, writes 15; owner path: application_component_id -> application_components.organization_id; high
 - **unified_capability_application_mappings** (UnifiedCapabilityApplicationMapping) reads 3, writes 2; owner path: application_component_id -> application_components.organization_id; high
 - **unified_capability_process_mapping** (UnifiedCapabilityProcessMapping) reads 0, writes 0; owner path: capability_id -> unified_capabilities.organization_id; high
@@ -267,7 +268,7 @@ Batch 1 and the batches that follow it hold the application and capability table
 - **sla_violations** (SLAViolation) reads 0, writes 0; owner path: sla_id -> service_level_agreements.capability_id -> business_capability.organization_id; medium
 - **technical_debt** (TechnicalDebt) reads 0, writes 0; owner path: own organization_id column; medium
 
-### Batch 4 (26 tables, 656 reads+writes)
+### Batch 4 (25 tables, 640 reads+writes)
 
 - **codegen_drift_reports** (CodegenDriftReport) reads 2, writes 3; owner path: solution_id -> solutions.organization_id; high
 - **codegen_generation_history** (CodegenGenerationHistory) reads 15, writes 4; owner path: codegen_generation_id -> codegen_generations.solution_id -> solutions.organization_id; medium
@@ -292,7 +293,6 @@ Batch 1 and the batches that follow it hold the application and capability table
 - **solution_risk_snapshots** (RiskSnapshot) reads 5, writes 2; owner path: solution_id -> solutions.organization_id; high
 - **solution_slas** (SolutionSLA) reads 13, writes 3; owner path: solution_id -> solutions.organization_id; high
 - **solution_stakeholders_sad** (SolutionStakeholderSAD) reads 5, writes 3; owner path: solution_id -> solutions.organization_id; high
-- **solution_tco_items** (SolutionTCOItem) reads 10, writes 6; owner path: solution_id -> solutions.organization_id; high
 - **solution_tech_elements** (SolutionTechElement) reads 8, writes 3; owner path: solution_id -> solutions.organization_id; high
 - **spec_webhooks** (SpecWebhook) reads 5, writes 1; owner path: solution_id -> solutions.organization_id; high
 

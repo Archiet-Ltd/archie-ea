@@ -681,6 +681,9 @@ def main():
 # Verdicts reached by reading the writers and callers by hand (the call-name trace cannot see through
 # instances and aliases). Each note says what was read.
 MANUAL = {
+    "solution_tco_items": dict(batch=1, parent="solutions",
+        owner_path="solution_id -> solutions.organization_id",
+        note="an overview CFO figure summed this table across organisations; any write makes it live"),
     "audit_events": dict(cls="customer_owned", confidence="low", parent="users",
         owner_path="user_id (no foreign key declared) -> users.organization_id",
         note="written by the audit logger on request paths; user_id is a plain integer, system events have none",
@@ -810,6 +813,11 @@ def assign_batches(recs):
     for i, b in enumerate(batches, 1):
         for r in b:
             r.batch = i
+    # A MANUAL entry may pin a table to a batch (a table already summed across organisations).
+    for r in recs:
+        pin = MANUAL.get(r.name, {}).get("batch")
+        if pin and r.batch and r.batch != pin:
+            r.batch = pin
 
 
 # ---------------------------------------------------------------------------------------------
