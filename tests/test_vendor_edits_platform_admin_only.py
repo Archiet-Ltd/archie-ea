@@ -340,3 +340,45 @@ def test_page_and_api_creates_stay_platform_admin_only(
     resp = _send(client, "post", path, {"name": "Probe Vendor"}, as_form)
     assert resp.status_code == 403, (path, resp.status_code)
     assert _count(db_session) == n
+
+
+# ---- auto-create-vendors: create-only import, open to organisation users ----
+
+def _vendor_fields(db_session, vid):
+    db_session.expire_all()
+    return db_session.execute(
+        text("select to_json(t)::text from vendor_organizations t where id = :i"), {"i": vid}
+    ).scalar()
+
+
+def test_import_naming_an_existing_vendor_changes_nothing_and_adds_no_row(
+        app, db_session, client, login_as, world):
+    n = _count(db_session)
+    before = _vendor_fields(db_session, world["vendor_id"])
+    messy = "  " + world["vendor_name"].upper().replace(" ", "   ") + "  "
+    _login(db_session, client, login_as, world["architect_id"])
+    resp = client.post("/dashboard/applications/auto-create-vendors",
+                       json={"vendors": [messy]}, headers={"X-CSRFToken": "test"})
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert resp.get_json()["created"] == 0
+    assert _count(db_session) == n
+    assert _vendor_fields(db_session, world["vendor_id"]) == before
+
+
+def test_import_creates_a_new_name_once_with_who_and_how(
+        app, db_session, client, login_as, world):
+    name = f"Import Vendor {uuid.uuid4().hex[:6]}"
+    n = _count(db_session)
+    _login(db_session, client, login_as, world["architect_id"])
+    resp = client.post("/dashboard/applications/auto-create-vendors",
+                       json={"vendors": [name, "  " + name.upper() + " "]},
+                       headers={"X-CSRFToken": "test"})
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert resp.get_json()["created"] == 1
+    db_session.expire_all()
+    assert _count(db_session) == n + 1
+    row = db_session.execute(
+        text("select created_by_id, seeded_by from vendor_organizations where name=:n"),
+        {"n": name}).one()
+    assert row.created_by_id == world["architect_id"]
+    assert row.seeded_by == "import"
