@@ -20,7 +20,7 @@
         {% macro _ps_actions() %}
 <div class="flex space-x-4">
                 <a href="{{ url_for('maturity_management.frameworks_overview') }}" 
-                   class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     ← Back to Dashboard
                 </a>
             </div>
@@ -29,7 +29,7 @@
     </div>
 
     <!-- Warning Notice -->
-    <div class="bg-warning/10 border border-warning/30 rounded-lg p-4 mb-6">
+    <div class="bg-warning/10 border border-warning/40 rounded-md px-3 py-2 mb-6">
         <div class="flex">
             <div class="flex-shrink-0">
                 <i data-lucide="alert-triangle" class="h-5 w-5 text-warning" aria-hidden="true"></i>
@@ -44,7 +44,7 @@
     </div>
 
     <!-- CSV Import Panel -->
-    <div class="bg-card rounded-lg shadow mb-6"
+    <div class="bg-card rounded-lg mb-6"
          x-data="{
              importing: false,
              result: null,
@@ -102,7 +102,7 @@
         <!-- Import result -->
         <div x-show="result" x-cloak class="px-6 py-4 border-t border-border">
             <div x-show="result && result.success"
-                 class="flex items-start gap-2 text-sm text-success-emphasis bg-success/10 border border-success/30 rounded-lg px-4 py-3">
+                 class="flex items-start gap-2 text-sm text-success-emphasis bg-success/10 border border-success/40 rounded-md px-4 py-2">
                 <i data-lucide="check-circle" class="w-4 h-4 mt-0.5 flex-shrink-0"></i>
                 <div>
                     <span x-text="result && result.message"></span>
@@ -116,7 +116,7 @@
                 </div>
             </div>
             <div x-show="result && !result.success"
-                 class="flex items-start gap-2 text-sm text-destructive-emphasis bg-destructive/10 border border-destructive/30 rounded-lg px-4 py-3">
+                 class="flex items-start gap-2 text-sm text-destructive-emphasis bg-destructive/10 border border-destructive/40 rounded-md px-4 py-2">
                 <i data-lucide="alert-circle" class="w-4 h-4 mt-0.5 flex-shrink-0"></i>
                 <span x-text="result && (result.error || 'Import failed')"></span>
             </div>
@@ -124,7 +124,7 @@
     </div>
 
     <!-- Batch Update Form -->
-    <div class="bg-card rounded-lg shadow mb-6">
+    <div class="bg-card rounded-lg mb-6">
         <div class="px-6 py-4 border-b border-border">
             <h2 class="text-lg font-semibold text-foreground">Batch Update Configuration</h2>
         </div>
@@ -132,14 +132,14 @@
             <form method="POST" action="{{ url_for('maturity_management.batch_update_maturity') }}" class="space-y-6">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <!-- Filter Configuration -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 gap-6">
                     <div>
-                        <label for="domain" class="block text-sm font-medium text-foreground mb-2">
+                        <label for="domain" class="block text-sm font-medium text-muted-foreground mb-1">
                             Filter by Domain <span class="text-muted-foreground">(Optional)</span>
                         </label>
                         <select id="domain" 
                                 name="domain" 
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <option value="">All Domains</option>
                             {% for domain in domains %}
                             <option value="{{ domain }}" {% if domain == selected_domain %}selected{% endif %}>
@@ -151,12 +151,12 @@
                     </div>
                     
                     <div>
-                        <label for="strategic_importance" class="block text-sm font-medium text-foreground mb-2">
+                        <label for="strategic_importance" class="block text-sm font-medium text-muted-foreground mb-1">
                             Filter by Strategic Importance <span class="text-muted-foreground">(Optional)</span>
                         </label>
                         <select id="strategic_importance" 
                                 name="strategic_importance" 
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <option value="">All Levels</option>
                             <option value="critical" {% if selected_importance == 'critical' %}selected{% endif %}>Critical</option>
                             <option value="high" {% if selected_importance == 'high' %}selected{% endif %}>High</option>
@@ -168,14 +168,14 @@
                 </div>
 
                 <!-- Maturity Level Updates -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 gap-6">
                     <div>
-                        <label for="current_maturity_level" class="block text-sm font-medium text-foreground mb-2">
+                        <label for="current_maturity_level" class="block text-sm font-medium text-muted-foreground mb-1">
                             Set Current Maturity Level <span class="text-muted-foreground">(Optional)</span>
                         </label>
                         <select id="current_maturity_level" 
                                 name="current_maturity_level" 
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <option value="">Leave Unchanged</option>
                             {% for level in range(1, 6) %}
                             <option value="{{ level }}">Level {{ level }}</option>
@@ -185,12 +185,12 @@
                     </div>
                     
                     <div>
-                        <label for="target_maturity_level" class="block text-sm font-medium text-foreground mb-2">
+                        <label for="target_maturity_level" class="block text-sm font-medium text-muted-foreground mb-1">
                             Set Target Maturity Level <span class="text-muted-foreground">(Optional)</span>
                         </label>
                         <select id="target_maturity_level" 
                                 name="target_maturity_level" 
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <option value="">Leave Unchanged</option>
                             {% for level in range(1, 6) %}
                             <option value="{{ level }}">Level {{ level }}</option>
@@ -201,7 +201,7 @@
                 </div>
 
                 <div>
-                    <label for="assessment_notes" class="block text-sm font-medium text-foreground mb-2">
+                    <label for="assessment_notes" class="block text-sm font-medium text-muted-foreground mb-1">
                         Assessment Notes <span class="text-muted-foreground">(Optional)</span>
                     </label>
                     <textarea id="assessment_notes" 
@@ -221,7 +221,7 @@
                     
                     <div class="bg-muted/50 rounded-lg overflow-hidden">
                         <div class="max-h-64 overflow-y-auto">
-                            <table class="min-w-full divide-y divide-border">
+                            <table class="dense-table min-w-full divide-y divide-border">
                                 <thead class="bg-muted">
                                     <tr>
                                         <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Capability</th>
@@ -257,11 +257,11 @@
                 <!-- Form Actions -->
                 <div class="flex justify-end space-x-4 border-t border-border pt-6">
                     <a href="{{ url_for('maturity_management.frameworks_overview') }}" 
-                       class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         Cancel
                     </a>
                     <button type="submit" 
-                            class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors" aria-label="Submit">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit">
                         {% if preview_capabilities %}
                             Update {{ preview_capabilities|length }} Capabilities
                         {% else %}
@@ -274,7 +274,7 @@
     </div>
 
     <!-- Quick Templates -->
-    <div class="bg-card rounded-lg shadow">
+    <div class="bg-card rounded-lg">
         <div class="px-6 py-4 border-b border-border">
             <h2 class="text-lg font-semibold text-foreground">Quick Update Templates</h2>
             <p class="text-sm text-muted-foreground">Pre-configured updates for common scenarios</p>

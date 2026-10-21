@@ -10,7 +10,7 @@
    layouts/admin_base.html includes this on every page, so no page template
    has to opt in. `load_error` is normally undefined, which is falsy. #}
 {% if load_error %}
-<div class="relative w-full rounded-lg border border-destructive/50 bg-destructive/10 p-4 mb-4 shadow-sm" role="alert">
+<div class="relative w-full rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 mb-4" role="alert">
     <div class="flex items-start gap-3">
         <i data-lucide="alert-circle" class="flex-shrink-0 w-5 h-5 text-destructive-emphasis" aria-hidden="true"></i>
         <div class="flex-1 text-sm leading-relaxed text-destructive-emphasis">

@@ -80,6 +80,7 @@ from ._helpers import (  # dead-code-ok
     _soft_delete_mirror_archimate_element,
     _verify_app_in_org,
 )
+from app.models.archimate_element_types import is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -557,7 +558,7 @@ def generate_application_archimate(id):
 
         for elem in elements:
             elem_type = elem.get("type")
-            if elem_type == "ApplicationComponent":
+            if is_application_kind(elem_type):
                 continue
 
             arch_elem = ArchiMateElement(

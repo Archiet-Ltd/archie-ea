@@ -42,7 +42,7 @@ ArchiMate 3.2 Compatible with 5-year timeline support
             <!-- Export Options -->
             <div class="relative" x-data="{ exportOpen: false }">
                 <button type="button" @click="exportOpen = !exportOpen" 
-                        class="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90" aria-label="Export options">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Export options">
                     <i data-lucide="download" class="h-4 w-4"></i>
                     Export
                 </button>
@@ -53,7 +53,7 @@ ArchiMate 3.2 Compatible with 5-year timeline support
                      x-transition:leave="transition ease-in duration-75"
                      x-transition:leave-start="opacity-100 transform scale-100"
                      x-transition:leave-end="opacity-0 transform scale-95"
-                     class="absolute right-0 mt-2 w-48 bg-popover border border-border rounded-md shadow-lg z-50">
+                     class="absolute right-0 mt-2 w-48 bg-popover border border-border rounded-md z-50">
                     <button type="button" @click="exportToCSV()" class="w-full text-left px-3 py-2 text-sm hover:bg-accent" aria-label="Export to CSV">
                         Export to CSV
                     </button>
@@ -70,7 +70,7 @@ ArchiMate 3.2 Compatible with 5-year timeline support
 
     <!-- Filter Controls -->
     <div x-show="loadError" x-cloak
-         class="mb-6 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+         class="mb-6 flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
         <i data-lucide="alert-triangle" class="h-5 w-5 text-destructive shrink-0 mt-0.5" aria-hidden="true"></i>
         <p class="text-sm text-destructive-emphasis" x-text="loadError"></p>
     </div>
@@ -196,7 +196,7 @@ ArchiMate 3.2 Compatible with 5-year timeline support
                             </div>
                         </div>
                         <div class="flex items-center gap-2 mt-2 flex-wrap">
-                            <span class="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary flex-shrink-0"
+                            <span class="px-2 py-1 text-xs rounded-full bg-primary/10 text-info-emphasis flex-shrink-0"
                                   x-text="workPackage.business_capability"></span>
                             <span class="text-xs text-muted-foreground flex-shrink-0" x-text="workPackage.progress_percentage + '%'"></span>
                         </div>
@@ -234,7 +234,7 @@ ArchiMate 3.2 Compatible with 5-year timeline support
     <!-- List View -->
     <div x-show="viewMode === 'list'" class="bg-card border border-border rounded-lg">
         <div class="overflow-x-auto">
-            <table class="w-full">
+            <table class="dense-table w-full">
                 <thead class="bg-muted">
                     <tr>
                         <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Work Package</th>
@@ -262,7 +262,7 @@ ArchiMate 3.2 Compatible with 5-year timeline support
                                       x-text="workPackage.status"></span>
                             </td>
                             <td class="px-4 py-3">
-                                <span class="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary"
+                                <span class="px-2 py-1 text-xs rounded-full bg-primary/10 text-info-emphasis"
                                       x-text="workPackage.business_capability"></span>
                             </td>
                             <td class="px-4 py-3 text-sm text-foreground" x-text="workPackage.assigned_to || 'Unassigned'"></td>
@@ -299,7 +299,7 @@ ArchiMate 3.2 Compatible with 5-year timeline support
     <!-- Add Work Package Button -->
     <div class="fixed bottom-6 right-6">
         <button type="button" @click="showAddModal = true" 
-                class="flex items-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90" aria-label="Add work package">
+                class="flex items-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-full hover:bg-primary/90" aria-label="Add work package">
             <i data-lucide="plus" class="h-5 w-5"></i>
             Add Work Package
         </button>
@@ -313,30 +313,30 @@ ArchiMate 3.2 Compatible with 5-year timeline support
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
-         class="modal-root flex items-center justify-center fixed inset-0 bg-black/50 overflow-y-auto z-50" @click.self="showAddModal = false">
+         class="modal-root flex items-center justify-center fixed inset-0 overflow-y-auto z-50 bg-overlay/50" @click.self="showAddModal = false">
         <div class="bg-card border border-border rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <h3 class="text-lg font-semibold text-foreground mb-4">
                 <span x-text="editingWorkPackage ? 'Edit Work Package' : 'Add Work Package'"></span>
             </h3>
             
             <form @submit.prevent="saveWorkPackage()">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-foreground mb-1">Name *</label>
+                        <label class="block text-sm font-medium text-muted-foreground mb-1">Name *</label>
                         <input type="text" x-model="formData.name" required
-                               class="w-full px-3 py-2 border border-input bg-background rounded-md" aria-label="Text field">
+                               class="h-9 w-full px-3 border border-input bg-background rounded-md" aria-label="Text field">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-foreground mb-1">Assigned To</label>
+                        <label class="block text-sm font-medium text-muted-foreground mb-1">Assigned To</label>
                         <input type="text" x-model="formData.assigned_to"
-                               class="w-full px-3 py-2 border border-input bg-background rounded-md" aria-label="Text field">
+                               class="h-9 w-full px-3 border border-input bg-background rounded-md" aria-label="Text field">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-foreground mb-1">Status</label>
+                        <label class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
                         <select x-model="formData.status"
-                                class="w-full px-3 py-2 border border-input bg-background rounded-md" aria-label="Status">
+                                class="h-9 w-full px-3 border border-input bg-background rounded-md" aria-label="Status">
                             <option value="planned">Planned</option>
                             <option value="in_progress">In Progress</option>
                             <option value="completed">Completed</option>
@@ -345,9 +345,9 @@ ArchiMate 3.2 Compatible with 5-year timeline support
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-foreground mb-1">Business Capability</label>
+                        <label class="block text-sm font-medium text-muted-foreground mb-1">Business Capability</label>
                         <select x-model="formData.business_capability"
-                                class="w-full px-3 py-2 border border-input bg-background rounded-md" aria-label="Business Capability">
+                                class="h-9 w-full px-3 border border-input bg-background rounded-md" aria-label="Business Capability">
                             <option value="customer-management">Customer Management</option>
                             <option value="financial-services">Financial Services</option>
                             <option value="supply-chain">Supply Chain Management</option>
@@ -360,39 +360,39 @@ ArchiMate 3.2 Compatible with 5-year timeline support
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-foreground mb-1">Start Date</label>
+                        <label class="block text-sm font-medium text-muted-foreground mb-1">Start Date</label>
                         <input type="date" x-model="formData.start_date"
-                               class="w-full px-3 py-2 border border-input bg-background rounded-md" aria-label="Date field">
+                               class="h-9 w-full px-3 border border-input bg-background rounded-md" aria-label="Date field">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-foreground mb-1">End Date</label>
+                        <label class="block text-sm font-medium text-muted-foreground mb-1">End Date</label>
                         <input type="date" x-model="formData.end_date"
-                               class="w-full px-3 py-2 border border-input bg-background rounded-md" aria-label="Date field">
+                               class="h-9 w-full px-3 border border-input bg-background rounded-md" aria-label="Date field">
                     </div>
                     
-                    <div class="md:col-span-2">
-                        <label class="block text-sm font-medium text-foreground mb-1">Description</label>
+                    <div class="">
+                        <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
                         <textarea x-model="formData.description" rows="3"
                                   class="w-full px-3 py-2 border border-input bg-background rounded-md" aria-label="Description"></textarea>
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-foreground mb-1">Progress (%)</label>
+                        <label class="block text-sm font-medium text-muted-foreground mb-1">Progress (%)</label>
                         <input type="number" x-model="formData.progress_percentage" min="0" max="100"
-                               class="w-full px-3 py-2 border border-input bg-background rounded-md" aria-label="Number field">
+                               class="h-9 w-full px-3 border border-input bg-background rounded-md" aria-label="Number field">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-foreground mb-1">Estimated Cost</label>
+                        <label class="block text-sm font-medium text-muted-foreground mb-1">Estimated Cost</label>
                         <input type="number" x-model="formData.estimated_cost" step="0.01"
-                               class="w-full px-3 py-2 border border-input bg-background rounded-md" aria-label="Number field">
+                               class="h-9 w-full px-3 border border-input bg-background rounded-md" aria-label="Number field">
                     </div>
                 </div>
                 
                 <div class="flex justify-end gap-2 mt-6">
                     <button type="button" @click="showAddModal = false"
-                            class="px-4 py-2 border border-input bg-background rounded-md hover:bg-accent" aria-label="Cancel">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" aria-label="Cancel">
                         Cancel
                     </button>
                     <button type="submit"

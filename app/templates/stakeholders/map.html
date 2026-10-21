@@ -113,7 +113,7 @@
 <div class="flex items-center gap-2">
       {# Solution filter #}
       <select x-model="selectedSolution" @change="selectedProgramme = ''; loadData()"
-              class="text-sm border border-border rounded-lg px-3 py-2 bg-background focus:ring-2 focus:ring-ring outline-none" aria-label="Select a solution...">
+              class="text-sm border border-border rounded-md px-3 py-2 bg-background focus:ring-2 focus:ring-ring outline-none" aria-label="Select a solution...">
         <option value="">Select a solution...</option>
         {% for sol in solutions %}
         <option value="{{ sol.id }}">{{ sol.name }}</option>
@@ -121,14 +121,14 @@
       </select>
       {# Transformation programme filter: the same stakeholders, linked to a programme #}
       <select x-model="selectedProgramme" @change="selectedSolution = ''; loadData()"
-              class="text-sm border border-border rounded-lg px-3 py-2 bg-background focus:ring-2 focus:ring-ring outline-none" aria-label="Select a programme...">
+              class="text-sm border border-border rounded-md px-3 py-2 bg-background focus:ring-2 focus:ring-ring outline-none" aria-label="Select a programme...">
         <option value="">Select a programme...</option>
         {% for programme in programmes %}
         <option value="{{ programme.id }}">{{ programme.name }}</option>
         {% endfor %}
       </select>
       <button type="button" @click="openAddModal()"
-              class="inline-flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium px-4 py-2 rounded-lg shadow-sm transition">
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
         </svg>
@@ -195,7 +195,7 @@
   <section x-show="stakeholders.length > 0" x-cloak class="rounded-xl border border-border bg-card overflow-x-auto"
            aria-labelledby="stk-table-heading">
     <h2 id="stk-table-heading" class="px-4 py-3 border-b border-border text-sm font-semibold">Stakeholders on this map</h2>
-    <table class="w-full text-sm" data-testid="stakeholder-table">
+    <table class="dense-table w-full text-sm" data-testid="stakeholder-table">
       <thead>
         <tr class="border-b border-border text-left text-muted-foreground">
           <th scope="col" class="px-4 py-2 font-medium">Stakeholder</th>
@@ -234,7 +234,7 @@
 
   {# ── Suggestions for a programme: the owners its records name for what it
        affects. Shown only when a programme is chosen. ─────────────────── #}
-  <section x-show="selectedProgramme" x-cloak class="rounded-xl border border-border bg-card p-4"
+  <section x-show="selectedProgramme" x-cloak class="rounded-lg border border-border bg-card p-4"
            aria-labelledby="stk-suggest-heading" data-testid="programme-suggestions">
     <h2 id="stk-suggest-heading" class="text-sm font-semibold">Suggested from what this programme affects</h2>
     <p x-show="suggestions.loading" class="mt-2 text-sm text-muted-foreground">Looking up owners…</p>
@@ -276,19 +276,19 @@
       <p class="text-xs text-muted-foreground mb-2">Describe the initiative — the AI will suggest likely stakeholders (executive sponsors, end users, compliance, vendors, etc.) for you to review and add.</p>
       <textarea x-model="aiPanel.businessContext" rows="6"
                 placeholder="e.g. Building a customer portal for EU customers. Must comply with GDPR. CFO requires ROI within 18 months. 50K existing customers will use the portal."
-                class="w-full border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ring outline-none" aria-label="Business context"></textarea>
+                class="w-full border border-border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-ring outline-none" aria-label="Business context"></textarea>
     </div>
 
     <div class="flex justify-end">
       <button type="button" @click="generateStakeholderSuggestions()" :disabled="aiPanel.loading || !aiPanel.businessContext.trim()"
-              class="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary disabled:bg-muted-foreground/40 text-primary-foreground text-sm font-medium rounded-lg transition-colors" aria-label="Generate suggestions">
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Generate suggestions">
         <i data-lucide="sparkles" class="h-4 w-4" :class="{ 'animate-spin': aiPanel.loading }"></i>
         <span x-text="aiPanel.loading ? 'Generating…' : 'Generate Suggestions'"></span>
       </button>
     </div>
 
     <div x-show="aiPanel.error" x-cloak
-         class="p-3 bg-destructive/5 border border-destructive/20 rounded-lg text-destructive-emphasis text-sm"
+         class="px-3 py-2 bg-destructive/10 border border-destructive/40 rounded-md text-destructive-emphasis text-sm"
          x-text="aiPanel.error"></div>
 
     <div x-show="aiPanel.suggestions.length > 0" x-cloak class="space-y-2 max-h-72 overflow-y-auto">
@@ -317,7 +317,7 @@
     </div>
 
     <div x-show="aiPanel.strategyError" x-cloak
-         class="p-3 bg-destructive/5 border border-destructive/20 rounded-lg text-destructive-emphasis text-sm"
+         class="px-3 py-2 bg-destructive/10 border border-destructive/40 rounded-md text-destructive-emphasis text-sm"
          x-text="aiPanel.strategyError"></div>
 
     <template x-if="!aiPanel.strategyLoading && aiPanel.strategy">
@@ -363,9 +363,9 @@
         <div class="relative">
           <input x-model="personSearch" @input.debounce.300ms="searchPeople()" type="text"
                  placeholder="Search people, teams, departments..."
-                 class="w-full border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ring outline-none" aria-label="Person or Team"/>
-          <div x-show="personSearchError" x-cloak class="absolute z-10 mt-1 w-full border border-border rounded-lg bg-background shadow-lg px-3 py-2 text-sm text-destructive-emphasis" x-text="personSearchError"></div>
-          <div x-show="!personSearchError && personResults.length > 0" class="absolute z-10 mt-1 w-full border border-border rounded-lg bg-background shadow-lg max-h-40 overflow-y-auto">
+                 class="w-full border border-border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-ring outline-none" aria-label="Person or Team"/>
+          <div x-show="personSearchError" x-cloak class="absolute z-10 mt-1 w-full border border-border rounded-lg bg-background px-3 py-2 text-sm text-destructive-emphasis" x-text="personSearchError"></div>
+          <div x-show="!personSearchError && personResults.length > 0" class="absolute z-10 mt-1 w-full border border-border rounded-lg bg-background max-h-40 overflow-y-auto">
             <template x-for="p in personResults" :key="p.source + '-' + p.id">
               <div @click="selectPerson(p)" class="px-3 py-2 hover:bg-muted cursor-pointer text-sm flex items-center justify-between">
                 <span>
@@ -419,7 +419,7 @@
       <div>
         <label class="block text-sm font-medium text-foreground mb-1">Type</label>
         <select x-model="form.stakeholder_type"
-                class="w-full border border-border rounded-lg px-3 py-2 text-sm outline-none" aria-label="Type">
+                class="w-full border border-border rounded-md px-3 py-2 text-sm outline-none" aria-label="Type">
           <option value="individual">Individual</option>
           <option value="group">Group</option>
           <option value="organization">Organization</option>
@@ -429,7 +429,7 @@
       <div>
         <label class="block text-sm font-medium text-foreground mb-1">Attitude</label>
         <select x-model="form.attitude"
-                class="w-full border border-border rounded-lg px-3 py-2 text-sm outline-none" aria-label="Attitude">
+                class="w-full border border-border rounded-md px-3 py-2 text-sm outline-none" aria-label="Attitude">
           <option value="champion">Champion</option>
           <option value="supporter">Supporter</option>
           <option value="neutral">Neutral</option>

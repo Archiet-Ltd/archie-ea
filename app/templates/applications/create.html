@@ -22,7 +22,7 @@
                 {{ form.hidden_tag() if form.hidden_tag is defined else '' }}
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 gap-6">
                     <div class="space-y-2">
                         {% call label(for='name', required=true) %}Application Name{% endcall %}
                         {{ form.name(id='name', class='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', placeholder='Enter application name', autofocus='') }}
@@ -38,7 +38,7 @@
                     {{ form.description(id='description', class='flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', rows=3, placeholder='Describe the application') if form.description is defined else '' }}
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="grid grid-cols-1 gap-6">
                     <div class="space-y-2">
                         {% call label(for='component_type') %}Application Type{% endcall %}
                         {{ form.component_type(id='component_type', class='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2') if form.component_type is defined else '' }}
@@ -58,7 +58,7 @@
                     {{ form.technology_stack(id='technology_stack', class='flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', rows=2, placeholder='e.g., React, Node.js, PostgreSQL') if form.technology_stack is defined else '' }}
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 gap-6">
                     {% for field_id, field_label in [('business_owner', 'Business Owner'), ('technical_owner', 'Technical Owner')] %}
                     <div class="space-y-2" x-data="{
                         ures: [], ushow: false, uErrorShown: false,
@@ -87,7 +87,7 @@
                         {% call label(for=field_id) %}{{ field_label }}{% endcall %}
                         <div class="relative">
                             {{ form[field_id](id=field_id, class='flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', placeholder='Search by name or email...', autocomplete='off', **{'@input.debounce.300ms': 'usearch()', '@focus': 'usearch()'}) if form[field_id] is defined else '' }}
-                            <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                            <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
                                 <template x-for="u in ures" :key="u.id">
                                     <button type="button" @click="uselect(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
                                         <span x-text="u.name" class="font-medium"></span>
@@ -113,7 +113,7 @@
                 {% endif %}
 
                 <div class="flex justify-between pt-4">
-                    <a href="{{ url_for('unified_applications.application_list') }}" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+                    <a href="{{ url_for('unified_applications.application_list') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
                         Cancel
                     </a>
                     {{ button('Create Application', variant='default', type='submit', icon='plus') }}

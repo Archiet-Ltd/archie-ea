@@ -195,26 +195,26 @@ document.addEventListener('alpine:init', () => {
 
     <!-- KPI bar -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="bg-card border border-border rounded-xl p-4">
+        <div class="bg-card border border-border rounded-lg p-4">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Capabilities</p>
             <p class="text-2xl font-bold text-foreground mt-1" x-text="stats.totalCaps || '—'"></p>
         </div>
-        <div class="bg-card border border-border rounded-xl p-4">
+        <div class="bg-card border border-border rounded-lg p-4">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Vendors</p>
             <p class="text-2xl font-bold text-foreground mt-1" x-text="stats.totalVendors || '—'"></p>
         </div>
-        <div class="bg-card border border-border rounded-xl p-4">
+        <div class="bg-card border border-border rounded-lg p-4">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Avg Coverage</p>
             <p class="text-2xl font-bold text-foreground mt-1" x-text="stats.avgCoverage != null ? stats.avgCoverage + '%' : '—'"></p>
         </div>
-        <div class="bg-card border border-border rounded-xl p-4">
+        <div class="bg-card border border-border rounded-lg p-4">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Strong Fits (80%+)</p>
             <p class="text-2xl font-bold text-success mt-1" x-text="stats.strongCount"></p>
         </div>
     </div>
 
     <!-- Filters card -->
-    <div class="bg-card border border-border rounded-xl p-5">
+    <div class="bg-card border border-border rounded-lg p-5">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-sm font-semibold text-foreground">Filters</h2>
             <button type="button" @click="resetFilters()"
@@ -279,7 +279,7 @@ document.addEventListener('alpine:init', () => {
     </div>
 
     <!-- Matrix card -->
-    <div class="bg-card border border-border rounded-xl overflow-hidden">
+    <div class="bg-card border border-border rounded-lg overflow-hidden">
 
         <!-- Loading -->
         <div x-cloak x-show="loading" class="flex flex-col items-center justify-center py-24 gap-3">
@@ -292,7 +292,7 @@ document.addEventListener('alpine:init', () => {
             <i data-lucide="alert-triangle" class="h-10 w-10 text-destructive" aria-hidden="true"></i>
             <p class="text-sm text-muted-foreground" x-text="error"></p>
             <button type="button" @click="loadData()"
-                    class="mt-1 inline-flex items-center gap-2 px-3 py-2 text-sm rounded-md border border-border bg-background hover:bg-muted transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-1 items-center">
                 <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i> Retry
             </button>
         </div>
@@ -319,7 +319,7 @@ document.addEventListener('alpine:init', () => {
         <!-- Matrix table -->
         <div x-cloak x-show="!loading && !error && dataLoaded && capabilities.length > 0"
              class="overflow-auto max-h-[65vh]">
-            <table class="w-full text-xs border-collapse">
+            <table class="dense-table w-full text-xs border-collapse">
                 <thead class="sticky top-0 z-20">
                     <!-- Vendor header row -->
                     <tr>
@@ -349,7 +349,7 @@ document.addEventListener('alpine:init', () => {
                                 :title="cap"
                                 x-text="cap"></td>
                             <template x-for="col in vendorProducts" :key="cap + '::' + col.vendor + '::' + col.product">
-                                    <td class="border-r border-b border-border text-center px-1.5 py-1.5 cursor-pointer transition-all hover:scale-105 hover:shadow-md hover:z-10 relative font-semibold"
+                                    <td class="border-r border-b border-border text-center px-1.5 py-1.5 cursor-pointer transition-all hover:scale-105 hover:z-10 relative font-semibold"
                                         :class="getCellClass(cap, col.vendor, col.product)"
                                         :title="getCellText(cap, col.vendor, col.product) + ' — click for details'"
                                         @click="openDetail(cap, col.vendor, col.product)">
@@ -391,21 +391,21 @@ document.addEventListener('alpine:init', () => {
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0"
      @keydown.escape.window="$store.matrixModal.open = false"
-     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50"
      role="dialog" aria-modal="true" aria-labelledby="matrix-modal-title"
      style="display:none"> <!-- inline-style-ok -->
     <div @click.outside="$store.matrixModal.open = false"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0 scale-95"
          x-transition:enter-end="opacity-100 scale-100"
-         class="bg-card border border-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+         class="bg-card border border-border rounded-lg w-full max-w-2xl max-h-[85vh] flex flex-col">
 
         <!-- Modal header -->
         <div class="flex items-start justify-between px-6 py-4 border-b border-border shrink-0">
             <div class="pr-4 min-w-0">
                 <p class="text-xs text-muted-foreground mb-0.5" x-text="$store.matrixModal.title"></p>
                 <h2 id="matrix-modal-title"
-                    class="text-base font-semibold text-foreground truncate"
+                    class="text-base font-semibold text-foreground text-foreground text-foreground truncate"
                     x-text="$store.matrixModal.subtitle || ''"></h2>
                 <div class="flex items-center gap-2 mt-2" x-cloak x-show="$store.matrixModal.data" role="dialog">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border"
@@ -417,7 +417,7 @@ document.addEventListener('alpine:init', () => {
                 </div>
             </div>
             <button type="button" @click="$store.matrixModal.open = false" aria-label="Close"
-                    class="shrink-0 h-8 w-8 flex items-center justify-center rounded-md hover:bg-muted transition-colors text-muted-foreground">
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0">
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
             </button>
         </div>

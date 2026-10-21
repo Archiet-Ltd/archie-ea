@@ -18,7 +18,7 @@
 
     <div class="bg-card border border-border rounded-lg overflow-hidden">
         {% if decisions %}
-        <table class="w-full text-sm">
+        <table class="dense-table w-full text-sm">
             <thead class="bg-muted/50 border-b border-border">
                 <tr>
                     <th class="text-left px-4 py-3 font-medium text-muted-foreground">Decision ID</th>
@@ -43,7 +43,7 @@
                     <td class="px-4 py-3 text-muted-foreground">{{ d.status|title }}</td>
                     <td class="px-4 py-3 text-right">
                         <a href="{{ url_for('arch_decisions.record_outcome', decision_id=d.id) }}"
-                           class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             Record Outcome
                         </a>
                     </td>

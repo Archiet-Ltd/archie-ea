@@ -42,6 +42,7 @@ from app.services.archimate.document_upload_service import DocumentUploadService
 from app.services.archimate.gemini_file_search_service import GeminiExtractionResult, GeminiFileSearchService
 from app.services.archimate.multi_modal_llm_service import MultiModalLLMService
 from app.services.archimate.tabular_data_extractor import TabularDataExtractor
+from app.models.archimate_element_types import application_kind_types, is_application_kind
 
 
 class DocumentProcessor:
@@ -1000,7 +1001,7 @@ Return the COMPLETE enhanced architecture in the same JSON format:
 
         if application_elements:
             # Analyze application dependencies
-            app_components = [e for e in application_elements if e.type == "ApplicationComponent"]
+            app_components = [e for e in application_elements if is_application_kind(e.type)]
             for component in app_components:
                 try:
                     # Analyze dependencies (upstream/downstream)
@@ -1053,8 +1054,9 @@ Return the COMPLETE enhanced architecture in the same JSON format:
                     logger.info(f"  ✗ Tech dependency analysis failed for {node.name}: {str(e)}")
 
             # Map deployment architecture (app → nodes)
-            app_components = ArchiMateElement.query.filter_by(
-                architecture_id=architecture.id, type="ApplicationComponent"
+            app_components = ArchiMateElement.query.filter(
+                ArchiMateElement.architecture_id == architecture.id,
+                ArchiMateElement.type.in_(application_kind_types()),
             ).all()
 
             for app in app_components:
