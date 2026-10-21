@@ -66,7 +66,7 @@
                         
 {% endset %}
 {% call dense_table(header=_dt_header_2091, rows=(gaps|default([]))|length, empty_text='No gaps identified') %}{% for gap in gaps|default([]) %}
-                        <tr class="hover:bg-muted/50">
+                        <tr id="gap-{{ gap.id }}" class="hover:bg-muted/50">
                             <td class="px-2">
                                 <div class="font-medium">
                                     <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"

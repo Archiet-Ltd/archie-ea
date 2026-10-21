@@ -3,7 +3,7 @@
 {% from 'components/badge.html' import badge %}
 {% set pa = priority_actions %}
 {% set vf = flask.current_app.view_functions %}
-<section class="rounded-lg border bg-card shadow-sm" data-testid="priority-actions" aria-labelledby="priority-actions-title">
+<section id="priority-actions" class="rounded-lg border bg-card shadow-sm" data-testid="priority-actions" aria-labelledby="priority-actions-title">
     <div class="border-b p-4">
         <h2 id="priority-actions-title" class="text-lg font-semibold flex items-center gap-2">
             <i data-lucide="list-ordered" class="h-5 w-5 text-primary" aria-hidden="true"></i>
@@ -15,7 +15,12 @@
     <ol class="divide-y divide-border/50" data-testid="priority-actions-list">
         {% for row in pa.rows %}
         {% if row.kind == 'gap' %}
+            {% if row.covered %}
             {% set href = url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=row.record_id) %}
+            {% else %}
+            {# The gap analysis row for this gap carries the "Convert to Work Package" button the action names. #}
+            {% set href = url_for('enterprise.gap_analysis') ~ '#gap-' ~ row.record_id %}
+            {% endif %}
         {% elif row.kind == 'work_package' %}
             {% set href = url_for('enterprise.work_package_detail', work_package_id=row.record_id) if 'enterprise.work_package_detail' in flask.current_app.view_functions else url_for('enterprise.work_packages') %}
         {% else %}
@@ -39,7 +44,11 @@
         {% endfor %}
     </ol>
     {% if pa.total > pa.rows|length %}
-    <p class="border-t p-3 text-sm text-muted-foreground">Showing the first {{ pa.rows|length }} of {{ pa.total }} actions.</p>
+    <p class="border-t p-3 text-sm text-muted-foreground">Showing the first {{ pa.rows|length }} of {{ pa.total }} actions.
+        <a href="{{ request.path }}?all_actions=1#priority-actions" class="font-medium text-primary hover:underline" data-testid="priority-actions-show-all">Show all {{ pa.total }} actions</a></p>
+    {% elif pa.total > 10 %}
+    <p class="border-t p-3 text-sm text-muted-foreground">Showing all {{ pa.total }} actions.
+        <a href="{{ request.path }}#priority-actions" class="font-medium text-primary hover:underline">Show the first 10</a></p>
     {% endif %}
     {% else %}
     <p class="p-4 text-sm text-muted-foreground" data-testid="priority-actions-empty">Nothing needs doing right now: no open gaps, late or blocked work packages, or open risks.</p>

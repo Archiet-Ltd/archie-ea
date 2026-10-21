@@ -205,11 +205,11 @@ def api_risk_analysis():
 def impact_analysis():
     """Impact analysis dashboard — architecture change ripple-effect visualization."""
     from app.middleware.tenant_context import current_org_id
-    from app.services.priority_action_service import prioritised_actions
+    from app.services.priority_action_service import limit_for, prioritised_actions
 
     return render_template(
         "strategic/impact_analysis.html",
-        priority_actions=prioritised_actions(current_org_id(), limit=10),
+        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
     )
 
 

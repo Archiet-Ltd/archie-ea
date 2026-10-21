@@ -88,7 +88,7 @@ def test_row_wording_and_em_dash_for_unrecorded_values(db_session, make_org, ten
         _wp(db_session, org, "No progress recorded", end=datetime(2026, 10, 7), progress=None, priority="high")
         result = svc.prioritised_actions(org.id, today=TODAY)
     by_name = {r["name"]: r for r in result["rows"]}
-    assert by_name["Data quality gap"]["action"] == "Link a work package to the Data quality gap"
+    assert by_name["Data quality gap"]["action"] == "Convert the Data quality gap to a work package"
     assert by_name["Deploy mobile field app"]["action"] == (
         "Finish Deploy mobile field app: due 7 Oct, 58 percent done"
     )
@@ -166,7 +166,7 @@ def test_unlinking_through_the_writer_uncovers_the_gap(db_session, make_org, ten
         work_package_service.update_work_package(wp.id, organization_id=org.id, gap_id=None)
         unlinked = svc.prioritised_actions(org.id, today=TODAY)
     assert linked["rows"][0]["action"].startswith("Close the Gap to unlink")
-    assert unlinked["rows"][0]["action"].startswith("Link a work package to the Gap to unlink")
+    assert unlinked["rows"][0]["action"].startswith("Convert the Gap to unlink to a work package")
 
 
 def test_another_organisations_link_does_not_cover_a_gap(db_session, make_org, tenant_ctx):
@@ -181,7 +181,7 @@ def test_another_organisations_link_does_not_cover_a_gap(db_session, make_org, t
         own = _gap(db_session, org, "Own gap", "high")
         result = svc.prioritised_actions(org.id, today=TODAY)
     assert _names(result) == [own.name]
-    assert result["rows"][0]["action"].startswith("Link a work package to the Own gap")
+    assert result["rows"][0]["action"].startswith("Convert the Own gap to a work package")
 
 
 @pytest.mark.parametrize("done", ["Completed", "completed", "Cancelled", "Canceled"])
@@ -310,7 +310,7 @@ def test_both_screens_render_the_rule_and_only_own_rows(path, client, login_as, 
     assert response.status_code == 200
     body = response.get_data(as_text=True)
     assert svc.RANKING_RULE in body
-    assert "Link a work package to the Own visible gap" in body
+    assert "Convert the Own visible gap to a work package" in body
     assert "Foreign hidden gap" not in body
 
 

@@ -61,16 +61,20 @@ def test_architect_works_from_the_prioritised_action_list(browser, live_server):
 
         expect(page.get_by_test_id("priority-actions-rule")).to_contain_text("Ranked by severity, critical first")
         expected = [
-            "Link a work package to the %s" % names["gap"],
+            "Convert the %s to a work package" % names["gap"],
             "Finish %s: due %s, 58 percent done" % (
                 names["work"], (datetime.utcnow() - timedelta(days=10)).strftime("%-d %b")),
             "Reduce the risk: %s" % names["risk"],
         ]
         assert _order(page) == expected
 
+        # The gap row names an action; the page it opens must offer that action on that gap.
         page.get_by_test_id("priority-action-link").first.click()
-        page.wait_for_url(lambda url: "/architecture/implementation/Gap/" in url, timeout=PAGE_TIMEOUT)
-        expect(page.locator("main")).to_contain_text(names["gap"])
+        page.wait_for_url(lambda url: "/implementation/gap-analysis" in url, timeout=PAGE_TIMEOUT)
+        gap_row = page.locator("tr").filter(has_text=names["gap"]).first
+        expect(gap_row).to_be_visible()
+        expect(gap_row.get_by_role("button", name="Convert this gap to a work package")).to_be_visible()
+        expect(gap_row.get_by_role("button", name="Convert this gap to a work package")).to_be_enabled()
 
         page.go_back(wait_until="domcontentloaded")
         page.get_by_test_id("priority-action-link").nth(2).click()
@@ -83,5 +87,34 @@ def test_architect_works_from_the_prioritised_action_list(browser, live_server):
 
         page.goto(live_server + LIST_PAGES[1], wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert _order(page) == expected
+    finally:
+        context.close()
+
+
+def test_a_list_cut_at_ten_has_a_link_to_all_of_it(browser, live_server):
+    org = create_fresh_org("enterprise_architect")
+    suffix = org["suffix"]
+    from app import create_app, db
+    from app.models.implementation_migration import Gap
+
+    app = create_app("testing")
+    with app.app_context():
+        for n in range(13):
+            db.session.add(Gap(name="Cut-off gap %02d %s" % (n, suffix), severity="high",
+                               organization_id=org["org_id"]))
+        db.session.commit()
+        db.session.remove()
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        for path in LIST_PAGES:
+            page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+            assert len(_order(page)) == 10
+            page.get_by_role("link", name="Show all 13 actions").click()
+            page.wait_for_url(lambda url: "all_actions=1" in url, timeout=PAGE_TIMEOUT)
+            assert len(_order(page)) == 13
+            expect(page.get_by_test_id("priority-actions")).to_contain_text("Cut-off gap 12 %s" % suffix)
     finally:
         context.close()

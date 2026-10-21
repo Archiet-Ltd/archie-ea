@@ -32,6 +32,12 @@ RANKING_RULE = (
 
 KIND_LABELS = {"gap": "Gap", "work_package": "Work package", "risk": "Risk"}
 RISK_LIMIT = 5
+DEFAULT_LIMIT = 10
+
+
+def limit_for(args) -> Optional[int]:
+    """The row limit a screen should ask for: all rows when the person chose "Show all"."""
+    return None if (args.get("all_actions") or "") == "1" else DEFAULT_LIMIT
 
 _TIERS = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 _GROUP_GAP_UNCOVERED, _GROUP_WORK, _GROUP_RISK, _GROUP_GAP_COVERED = 0, 1, 2, 3
@@ -86,10 +92,10 @@ def _gap_rows(organization_id: int) -> List[Dict[str, Any]]:
             why = "%s; work is linked but the gap is still open." % lead
             group = _GROUP_GAP_COVERED
         else:
-            action = "Link a work package to the %s" % gap.name
+            action = "Convert the %s to a work package" % gap.name
             why = "%s; no work package addresses it yet." % lead
             group = _GROUP_GAP_UNCOVERED
-        rows.append(_item("gap", gap.id, gap.name, action, gap.severity, group, 0, why))
+        rows.append(_item("gap", gap.id, gap.name, action, gap.severity, group, 0, why, covered=bool(addressed)))
     return rows
 
 
