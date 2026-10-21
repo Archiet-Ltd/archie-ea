@@ -4396,7 +4396,7 @@ _LAYER_DISPLAY = {
 }
 
 # Business-friendly type names (avoid ArchiMate jargon)
-_BUSINESS_TYPE_NAMES = {
+_BUSINESS_TYPE_NAMES = StandardTypeTable({
     "BusinessActor": "person or team",
     "BusinessRole": "role",
     "BusinessProcess": "business process",
@@ -4432,7 +4432,7 @@ _BUSINESS_TYPE_NAMES = {
     "Deliverable": "deliverable",
     "Plateau": "plateau",
     "Gap": "gap",
-}
+})
 
 
 def _friendly_type(el_type, audience):
@@ -6264,6 +6264,7 @@ def get_matrix_data():
 import threading as _threading
 import time as _time
 import logging
+from app.models.archimate_element_types import StandardTypeTable
 logger = logging.getLogger(__name__)
 _active_editors_lock = _threading.Lock()
 _active_editors: dict = {}   # {diagram_id_str: {user_id_str: float_timestamp}}

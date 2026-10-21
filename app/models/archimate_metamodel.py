@@ -10,6 +10,7 @@ from datetime import datetime
 from sqlalchemy import and_, or_, text
 
 from .. import db
+from app.models.archimate_element_types import StandardTypeTable
 
 
 class ArchiMateRelationshipRule(db.Model):
@@ -161,12 +162,12 @@ class ArchiMateDerivationEngine:
     def get_layer(element_type):
         """Returns the layer for a given element type based on naming convention."""
         # This mapping should be comprehensive in a production system
-        mapping = {
+        mapping = StandardTypeTable({
             "BusinessActor": "Business",
             "BusinessRole": "Business",
             "ApplicationComponent": "Application",
             "Node": "Technology",
             "Goal": "Motivation",
             # Add all other mappings...
-        }
+        })
         return mapping.get(element_type, "Unknown")

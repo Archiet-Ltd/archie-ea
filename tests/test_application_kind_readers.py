@@ -152,3 +152,46 @@ def test_the_layer_service_accepts_an_application_as_it_accepts_a_component(app,
             service.analyze_application_dependencies(element_id)
         except ValueError as exc:  # pragma: no cover - the failure being pinned
             pytest.fail(f"an Application was refused: {exc}")
+
+
+def test_registry_helpers_agree():
+    from app.models.archimate_element_types import (
+        StandardTypeTable,
+        application_kind_types,
+        is_application_kind,
+    )
+
+    kinds = application_kind_types()
+    assert set(kinds) == {APP, COMP}
+    assert all(is_application_kind(t) for t in kinds)
+    table = StandardTypeTable({COMP: "x", "Node": "y"})
+    assert table.get(APP) == "x" and table[APP] == "x" and APP in table
+    assert table.get("Missing", "d") == "d" and "Missing" not in table
+    assert list(table) == [COMP, "Node"]  # iteration still shows the standard keys only
+
+
+def test_type_keyed_tables_resolve_a_specialisation():
+    from app.modules.architecture.routes.archimate_crud.routes import MODEL_REGISTRY
+    from app.modules.architecture.routes.archimate_crud.services.field_configs import get_element_config
+    from app.modules.architecture.services.element_type_normalizer import ElementTypeNormalizer
+    from app.modules.architecture.services.inference_providers import PROVIDER_REGISTRY
+
+    assert MODEL_REGISTRY.get(APP) is MODEL_REGISTRY.get(COMP) is not None
+    assert get_element_config(APP) is get_element_config(COMP) is not None
+    assert PROVIDER_REGISTRY.get(APP) is PROVIDER_REGISTRY.get(COMP) is not None
+    assert ElementTypeNormalizer.LAYER_MAP.get(APP) == "application"
+
+
+def test_viewpoint_service_filter_keeps_an_application():
+    from types import SimpleNamespace as El
+
+    from app.modules.architecture.services.archimate_viewpoint_service import ArchiMateViewpointService
+
+    service = ArchiMateViewpointService.__new__(ArchiMateViewpointService)
+    kept = service._filter_elements(
+        [El(type=APP, layer="application", name="a"), El(type=COMP, layer="application", name="b")],
+        {"layers": ["application"], "element_types": [COMP]},
+        None,
+    )
+    assert [e.name for e in kept] == ["a", "b"]
+

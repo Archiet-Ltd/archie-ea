@@ -1086,7 +1086,7 @@ def validate_archimate_element_creation(
     elif layer == "application":
         # Application elements benefit from technical specifications
         if (
-            archimate_type == "ApplicationComponent"
+            is_application_kind(archimate_type)
             and properties
             and len(properties) > 0
         ):
@@ -1138,6 +1138,7 @@ from ..models.vendor.vendor_organization import (
     application_vendor_products,
 )
 from ..services.archimate_validation_service import ArchiMateValidationService
+from app.models.archimate_element_types import is_application_kind
 
 # ============================================================================
 # Batch Query Helpers - N + 1 Query Prevention

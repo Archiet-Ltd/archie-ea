@@ -17,7 +17,6 @@ fall: a count above the baseline in any file fails, and so does a file that is n
 """
 import ast
 import json
-import os
 from collections import Counter
 from pathlib import Path
 
@@ -36,7 +35,38 @@ EXEMPT = {
     "app/modules/architecture/services/archimate_exchange_service.py",
 }
 
-BASELINE_PATH = Path(__file__).with_name("application_component_check_baseline.json")
+# What remains, by file. It may only fall: fix a site, then lower the number (or delete the line).
+# Not yet moved (named for the follow-on task):
+#   importers, owned by T-app-03: archimate_import_service, ai_import_service, lucid_import_service,
+#     lucid_import_commands, document_entity_matching_service;
+#   solutions_strategic and solutions_product (journey and design routes), architecture_assistant,
+#     codegen workflow_routes and uml_enrichment_service;
+# Left on purpose (they name a component they create or a vocabulary, not a reader of the stored type):
+#   comprehensive_archimate_service (its own statistics of what it created), routes_application_roadmap
+#   (fallback that creates a component), multi_domain_chat_service (chat command vocabulary),
+#   metric_calculation_service (a domain model name, not an element type).
+BASELINE = {
+    "app/commands/lucid_import_commands.py": 1,
+    "app/main/routes_application_roadmap.py": 1,
+    "app/modules/ai_chat/services/multi_domain_chat_service.py": 1,
+    "app/modules/architecture/services/comprehensive_archimate_service.py": 1,
+    "app/modules/architecture_assistant/architecture_generation.py": 2,
+    "app/modules/architecture_assistant/journey_orchestrator.py": 1,
+    "app/modules/architecture_assistant/validation_engine.py": 1,
+    "app/modules/codegen/routes/workflow_routes.py": 1,
+    "app/modules/codegen/services/uml_enrichment_service.py": 1,
+    "app/modules/solutions_product/services/deterministic_code_generator.py": 1,
+    "app/modules/solutions_strategic/v2/routes/journey_v2_routes.py": 2,
+    "app/modules/solutions_strategic/v2/routes/solution_ai_routes.py": 1,
+    "app/modules/solutions_strategic/v2/routes/solution_design_routes.py": 2,
+    "app/modules/solutions_strategic/v2/routes/solution_link_routes.py": 1,
+    "app/modules/solutions_strategic/v2/services/journey_reasoning_orchestrator.py": 1,
+    "app/services/ai_import_service.py": 1,
+    "app/services/archimate_import_service.py": 2,
+    "app/services/document_entity_matching_service.py": 2,
+    "app/services/lucid_import_service.py": 1,
+    "app/services/metric_calculation_service.py": 1,
+}
 
 
 def _is_literal(node):
@@ -114,7 +144,7 @@ def test_scanner_detects_each_pattern():
 
 def test_no_new_literal_application_component_checks():
     counts, _kinds = scan()
-    baseline = json.loads(BASELINE_PATH.read_text()) if BASELINE_PATH.exists() else {}
+    baseline = BASELINE
     worse = {
         f: (n, baseline.get(f, 0)) for f, n in counts.items() if n > baseline.get(f, 0)
     }
@@ -128,6 +158,6 @@ def test_no_new_literal_application_component_checks():
 def test_baseline_only_falls():
     """Fail when the baseline is stale-high, so the ratchet tightens as sites are fixed."""
     counts, _kinds = scan()
-    baseline = json.loads(BASELINE_PATH.read_text()) if BASELINE_PATH.exists() else {}
+    baseline = BASELINE
     stale = {f: (counts.get(f, 0), n) for f, n in baseline.items() if counts.get(f, 0) < n}
     assert not stale, "Lower the baseline (file: found, baseline): " + json.dumps(stale, indent=1)
