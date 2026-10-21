@@ -276,7 +276,7 @@ def application_create():
             license_cost_annual=form.license_cost_annual.data,
             infrastructure_cost_monthly=form.infrastructure_cost_monthly.data,
             development_cost_annual=form.development_cost_annual.data,
-            maintenance_cost_annual=form.maintenance_cost_annual.data,
+            maintenance_cost=form.maintenance_cost.data,
             cost_center=form.cost_center.data,
             go_live_date=form.go_live_date.data,
             last_major_release_date=form.last_major_release_date.data,
@@ -473,7 +473,7 @@ def application_edit(id):
         app.license_cost_annual = form.license_cost_annual.data
         app.infrastructure_cost_monthly = form.infrastructure_cost_monthly.data
         app.development_cost_annual = form.development_cost_annual.data
-        app.maintenance_cost_annual = form.maintenance_cost_annual.data
+        app.maintenance_cost = form.maintenance_cost.data
         if form.total_cost_of_ownership.data is not None:
             set_annual_cost(app, Decimal(str(form.total_cost_of_ownership.data)))
         else:

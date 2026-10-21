@@ -156,3 +156,11 @@ fi
 # one organisation's unresolved row must not 503 the whole platform.
 flask --app manage backfill-capability-catalogs --apply \
     || echo 'WARN capability catalog backfill incomplete - capabilities/enterprise_capabilities/archimate_capabilities/technical_capabilities may still hold rows neither merged nor quarantined into unified_capabilities; see /admin/errors and re-run flask backfill-capability-catalogs --apply' >&2
+
+# Cost fact store: copy application cost columns, application_costs rows and
+# capability cost allocations into cost_facts, one organisation at a time.
+# Idempotent (upsert on the fact identity). Runs after reconcile-schema so the
+# table and its columns exist. Same WARN-on-failure convention as the backfill-*
+# lines above: a failure must not stop the deploy.
+flask --app manage backfill-cost-facts \
+    || echo 'WARN cost fact backfill skipped - applications whose costs predate the cost fact store show "not recorded" on every screen reading the store until it runs'

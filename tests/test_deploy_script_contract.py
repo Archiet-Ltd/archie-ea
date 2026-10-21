@@ -45,3 +45,15 @@ def test_deploy_schema_runs_backfill_audit_trail():
     assert 'flask --app manage backfill-audit-trail' in script
     assert 'WARN audit trail backfill skipped' in script
     assert 'RUN-01' in script
+
+
+def test_deploy_schema_runs_cost_fact_backfill_warn_on_failure():
+    """The cost fact backfill runs at deploy, after reconcile-schema, and a
+    failure warns rather than stopping the deploy (the form its neighbours use)."""
+    script = _DEPLOY_SCHEMA.read_text(encoding="utf-8")
+    command = "flask --app manage backfill-cost-facts"
+    assert command in script
+    assert script.index(command) > script.index("flask --app manage reconcile-schema")
+    lines = script.splitlines()
+    line = next(text for text in lines[lines.index(command + " \\") + 1:] if text.strip())
+    assert line.lstrip().startswith("|| echo 'WARN cost fact backfill skipped")

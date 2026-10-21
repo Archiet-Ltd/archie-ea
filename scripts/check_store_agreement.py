@@ -32,6 +32,16 @@ is a dict entry and two or more Surface(...) lines. A gate nobody can extend
 gets bypassed, so keep it that way -- put the model path and the URL in the
 registry, never a special case in the engine.
 
+Comparing values as well as presence
+------------------------------------
+Count mode cannot see a column and its fact that both exist and disagree: each
+holds one row for the element, so every count is 1. A concept opts into value
+mode by registering ValuePair(...) entries under its name in VALUE_PAIRS. For
+every element answered by both sides the values must agree within the pair's
+tolerance, else a `value-disagreement` finding names the element and both
+amounts. Opt-in: a concept with no VALUE_PAIRS entry is compared exactly as
+before. Used first by "applications with a recorded annual cost".
+
 Not reporting differences that are legitimate
 ---------------------------------------------
 Two counts may honestly differ, and a gate that cries wolf gets ignored --
@@ -116,6 +126,7 @@ import argparse
 import json
 import os
 import sys
+from decimal import Decimal
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ALLOW_MARKER = "store-agreement-ok:"
@@ -174,6 +185,65 @@ class Surface:
         self.tenant_via = list(tenant_via or [])
         # orm-only: the reason this store is deliberately shared reference data.
         self.shared = shared
+
+
+class ValueSide:
+    """One side of a value comparison: a store read as {key: value}.
+
+    target     dotted model path
+    key        the attribute that identifies the element the value belongs to
+    field      the attribute holding the value (rows where it is NULL are not
+               readings and are left out)
+    filter_eq  attribute -> value, as on Surface
+    """
+
+    def __init__(self, name, target, key, field, filter_eq=None):
+        self.name = name
+        self.target = target
+        self.key = key
+        self.field = field
+        self.filter_eq = filter_eq or {}
+
+
+class ValuePair:
+    """Opt-in second comparison mode: compare VALUES, not just presence.
+
+    Count mode (Surface) cannot see a column and its fact that both exist and
+    disagree: each holds one row for the element, so every count is 1. A concept
+    opts in by registering a ValuePair under its name in VALUE_PAIRS. For every
+    element present on BOTH sides the two values must agree within `tolerance`;
+    an element present on one side only is a presence question and is left to
+    count mode. A concept with no VALUE_PAIRS entry is compared exactly as
+    before.
+    """
+
+    def __init__(self, name, left, right, tolerance="0.005"):
+        self.name = name
+        self.left = left
+        self.right = right
+        self.tolerance = Decimal(tolerance)
+
+
+class ValueReading:
+    """What both sides of a ValuePair answered for one tenant."""
+
+    def __init__(self, pair, left_values, right_values):
+        self.pair = pair
+        self.left_values = left_values
+        self.right_values = right_values
+
+
+class Observations(dict):
+    """{concept: [count rows]} exactly as before, plus the value readings.
+
+    A dict subclass so every existing reader of the count observations is
+    unaffected; `value_readings` is {concept: [ValueReading]} and is empty
+    unless a concept has opted into value comparison.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.value_readings = {}
 
 
 # --------------------------------------------------------------------------
@@ -459,6 +529,44 @@ CONCEPTS = {
     ],
 }
 
+
+# --------------------------------------------------------------------------
+# VALUE PAIRS. A concept listed here is ALSO compared by value. Opt-in: nothing
+# else in CONCEPTS is touched by it.
+# --------------------------------------------------------------------------
+# application column -> the category of the fact the cost accessor keeps in step
+# with it (app.services.application_cost_accessor.FACT_COLUMNS; a test pins the
+# two lists together).
+_APPLICATION_COST_COLUMNS = {
+    "total_cost_of_ownership": "total",
+    "license_cost": "license_cost",
+    "license_cost_annual": "license_cost_annual",
+    "maintenance_cost": "maintenance_cost",
+    "infrastructure_cost": "infrastructure_cost",
+    "infrastructure_cost_monthly": "infrastructure_cost_monthly",
+    "support_cost": "support_cost",
+    "implementation_cost": "implementation_cost",
+    "development_cost_annual": "development_cost_annual",
+}
+_APPLICATION_COST_FACT_SOURCE = "application_cost_accessor"
+
+VALUE_PAIRS = {
+    "applications with a recorded annual cost": [
+        ValuePair(
+            "application.%s = cost fact %s" % (column, category),
+            ValueSide("orm:ApplicationComponent.%s" % column,
+                      "app.models.application_portfolio.ApplicationComponent",
+                      key="id", field=column),
+            ValueSide("orm:CostFact(%s)" % category,
+                      "app.models.cost_fact.CostFact",
+                      key="element_id", field="amount",
+                      filter_eq={"element_type": "application",
+                                 "category": category,
+                                 "source": _APPLICATION_COST_FACT_SOURCE}))
+        for column, category in _APPLICATION_COST_COLUMNS.items()
+    ],
+}
+
 # Concepts and surfaces deliberately NOT registered, and why -- naming the
 # exclusion is the point, because a hollow entry here would defeat the file:
 #
@@ -638,6 +746,48 @@ def compare(observations):
                             "unfiltered population (%d). A filter cannot add "
                             "rows, so the two surfaces are reading different "
                             "stores." % (concept, name, count, scope, total))
+    value_findings, value_notes = _compare_values(
+        getattr(observations, "value_readings", {}))
+    return findings + value_findings, notes + value_notes
+
+
+def _compare_values(value_readings):
+    """Value mode. {concept: [ValueReading]} in, (findings, notes) out.
+
+    For each pair, every element answered by BOTH sides must carry the same
+    value within the pair's tolerance. An element on one side only is not a
+    value question (count mode reports presence) and is not reported here.
+    """
+    findings, notes = [], []
+    for concept in sorted(value_readings):
+        for reading in value_readings[concept]:
+            pair = reading.pair
+            if reading.left_values is None or reading.right_values is None:
+                notes.append("  %s [unanswered] %s: a side could not be read, "
+                             "so its values were not compared"
+                             % (concept, pair.name))
+                continue
+            shared = sorted(set(reading.left_values) & set(reading.right_values))
+            if not shared:
+                notes.append("  %s [no-evidence] %s: no element carries a "
+                             "value on both sides; nothing was compared"
+                             % (concept, pair.name))
+                continue
+            differing = [k for k in shared
+                         if abs(reading.left_values[k] - reading.right_values[k])
+                         > pair.tolerance]
+            if not differing:
+                continue
+            shown = "; ".join(
+                "id %s: %s=%s vs %s=%s" % (
+                    k, pair.left.name, reading.left_values[k],
+                    pair.right.name, reading.right_values[k])
+                for k in differing[:5])
+            findings.append(
+                "  %s [value-disagreement] %s: %d of %d element(s) recorded on "
+                "both sides carry different amounts (%s%s)"
+                % (concept, pair.name, len(differing), len(shared), shown,
+                   "" if len(differing) <= 5 else "; ..."))
     return findings, notes
 
 
@@ -810,7 +960,7 @@ def observe_tenant(app, db, org_id, user=None, concepts=None, http=True):
 
 
 def _observe_concepts(concepts, db, client, org_id, http, notes):
-    observations = {}
+    observations = Observations()
     for concept, surfaces in concepts.items():
         rows = []
         for surface in surfaces:
@@ -836,6 +986,12 @@ def _observe_concepts(concepts, db, client, org_id, http, notes):
                 continue
             rows.append((surface.name, count, surface.scope, unscoped))
         observations[concept] = rows
+        pairs = VALUE_PAIRS.get(concept)
+        if pairs:
+            observations.value_readings[concept] = [
+                ValueReading(pair, _read_values(pair.left, db, org_id),
+                             _read_values(pair.right, db, org_id))
+                for pair in pairs]
     return observations
 
 
@@ -957,6 +1113,34 @@ def _count_orm(surface, db, org_id):
         return None, "the query failed: %s" % str(exc)[:160], False, None
 
 
+def _read_values(side, db, org_id):
+    """{key: Decimal} for one ValueSide in this tenant, or None if unreadable.
+
+    The same tenancy rule as count mode for a store that can be scoped: the ORM
+    events scope a TenantMixin model, a bare organization_id column is filtered
+    here, and anything else cannot be read for one organisation.
+    """
+    module, _, cls = side.target.rpartition(".")
+    try:
+        model = getattr(__import__(module, fromlist=[cls]), cls)
+        key, field = getattr(model, side.key), getattr(model, side.field)
+        query = db.session.query(key, field).select_from(model)
+        for attr, value in side.filter_eq.items():
+            query = query.filter(getattr(model, attr) == value)
+        query = query.filter(field.isnot(None))
+        if not _session_scoped(model):
+            if "organization_id" not in model.__table__.c:
+                return None
+            query = query.filter(model.organization_id == org_id)
+        values = {}
+        for row_key, row_value in query.all():
+            values[row_key] = Decimal(str(row_value))
+        return values
+    except Exception:
+        db.session.rollback()
+        return None
+
+
 def _ask(surface, db, client, org_id=None):
     """(count, reason-it-could-not-answer)."""
     if surface.kind == "orm":
@@ -994,7 +1178,16 @@ def observe_synthetic(root):
                     % root]
     with open(path, encoding="utf-8") as fh:
         raw = json.load(fh)
-    observations = {}
+    observations = Observations()
+    for concept, entries in (raw.pop("__values__", None) or {}).items():
+        observations.value_readings[concept] = [
+            ValueReading(
+                ValuePair(e["pair"], ValueSide(e["left"], "", "", ""),
+                          ValueSide(e["right"], "", "", ""),
+                          tolerance=e.get("tolerance", "0.005")),
+                {k: Decimal(str(v)) for k, v in e["left_values"].items()},
+                {k: Decimal(str(v)) for k, v in e["right_values"].items()})
+            for e in entries]
     for concept, rows in raw.items():
         kept = []
         for row in rows:

@@ -442,7 +442,7 @@ class ApplicationComponentForm(FlaskForm):
         validators=[Optional(), NumberRange(min=0)],
         render_kw={"placeholder": "200000.00"},
     )
-    maintenance_cost_annual = DecimalField(
+    maintenance_cost = DecimalField(
         "Maintenance Cost (Annual)",
         validators=[Optional(), NumberRange(min=0)],
         render_kw={"placeholder": "50000.00"},

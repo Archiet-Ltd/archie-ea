@@ -300,7 +300,7 @@ def application_create():
         cost_field_names = [
             "license_cost_annual",
             "infrastructure_cost_monthly",
-            "maintenance_cost_annual",
+            "maintenance_cost",
             "total_cost_of_ownership",
         ]
         for field in cost_field_names:
@@ -867,7 +867,7 @@ def application_edit(id):
             cost_field_names = [
                 "license_cost_annual",
                 "infrastructure_cost_monthly",
-                "maintenance_cost_annual",
+                "maintenance_cost",
                 "total_cost_of_ownership",
             ]
             for field in cost_field_names:
