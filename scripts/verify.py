@@ -1787,6 +1787,18 @@ def gate_count_checker(name: str, script: str, baseline: int) -> Result:
     return Result(name, PASS if count <= baseline else FAIL, detail, count, baseline)
 
 
+def gate_unfiltered_id_lookups(baseline: int) -> Result:
+    """Lookups by id (``Model.query.get``, ``db.session.get``) on organisation-scoped models.
+
+    ``get`` answers from the identity map without running a query, so the tenant filter is
+    skipped; ``Model.get_in_org(id)`` always runs the filtered query. A ratchet: the count may
+    fall, never rise. See scripts/check_unfiltered_id_lookups.py.
+    """
+    return gate_count_checker(
+        "unfiltered-id-lookups", "scripts/check_unfiltered_id_lookups.py", baseline
+    )
+
+
 # ---------------------------------------------------------------- registry
 
 
@@ -1886,6 +1898,12 @@ def build_gates(baseline: dict) -> list[Gate]:
              "ratchet", gate_unfenced_tables,
              remediation="give the model TenantMixin, or list the table in "
                          "scripts/unfenced_tables.txt with a reason in review",
+             tags=["static", "security"]),
+        Gate("unfiltered-id-lookups",
+             "a lookup by id on an organisation-scoped model runs the organisation filter",
+             "ratchet", lambda: gate_unfiltered_id_lookups(baseline.get("unfiltered_id_lookups", 1193)),
+             remediation="use Model.get_in_org(id) (TenantMixin); or append "
+                         "'unfiltered-id-lookup-ok: <reason>' to the statement or the line before",
              tags=["static", "security"]),
         Gate("reuse-register", "one canonical implementation per concept; no second copy beside it",
              "zero", gate_reuse_register,
