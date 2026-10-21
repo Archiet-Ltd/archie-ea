@@ -209,3 +209,88 @@ def test_another_organisations_origins_never_appear_for_this_one(app, db_session
 
     theirs = _impact(app, org_b.id, b1.id)
     assert _only_row(theirs)["provenance"]["text"] == "Imported from secret-b.xml"
+
+
+def test_a_row_that_stored_only_the_drawers_id_in_source_ref_names_that_person(app, db_session, make_org):
+    org = make_org("pa2-source-ref")
+    person = _user(db_session, org.id, "Grace", "Hopper")
+    a, b = _element(db_session, org.id, "Root"), _element(db_session, org.id, "Dep")
+    _link(db_session, org.id, a, b, source_kind="manual", source_ref=str(person.id))
+    db_session.commit()
+
+    relation = _only_row(_impact(app, org.id, a.id))
+
+    assert relation["provenance"]["text"] == "Drawn by Grace Hopper"
+
+
+def test_a_source_ref_person_from_another_organisation_is_not_named(app, db_session, make_org):
+    org_a, org_b = make_org("pa2-sr-a"), make_org("pa2-sr-b")
+    stranger = _user(db_session, org_b.id, "Mallory", "Outsider")
+    a, b = _element(db_session, org_a.id, "Root"), _element(db_session, org_a.id, "Dep")
+    created = _dt.datetime(2026, 9, 1, 10, 0, 0)
+    _link(
+        db_session, org_a.id, a, b,
+        source_kind="manual", source_ref=str(stranger.id),
+        source_recorded_at=_dt.datetime(2026, 10, 5, 10, 0, 0), created_at=created,
+    )
+    db_session.commit()
+
+    result = _impact(app, org_a.id, a.id)
+    relation = _only_row(result)
+
+    assert "Mallory" not in json.dumps(result, default=str)
+    assert relation["provenance"]["text"] == "origin not recorded"
+    # With no origin, only the creation date is shown.
+    assert relation["computed_at"] == created.isoformat()
+
+
+def test_a_last_edit_date_is_not_a_recorded_date(app, db_session, make_org):
+    org = make_org("pa2-no-updated-at")
+    a, b = _element(db_session, org.id, "Root"), _element(db_session, org.id, "Dep")
+    rel = _link(db_session, org.id, a, b)
+    from sqlalchemy import text
+
+    db_session.execute(
+        text("update archimate_relationships set created_at = null, updated_at = now() where id = :i"),
+        {"i": rel.id},
+    )
+    db_session.commit()
+
+    relation = _only_row(_impact(app, org.id, a.id))
+
+    assert relation["provenance"]["text"] == "origin not recorded"
+    assert relation["computed_at"] is None
+    assert relation["provenance"]["recorded_at"] is None
+
+
+def test_a_relationship_drawn_through_the_drawing_service_names_the_signed_in_person(
+    app, db_session, make_org, tenant_ctx, client, login_as
+):
+    from app.models import ArchitectureModel
+    from app.modules.architecture.services.archimate_relationship_service import (
+        ArchiMateRelationshipService,
+    )
+
+    org = make_org("pa2-real-service")
+    with tenant_ctx(org.id):
+        ada = _user(db_session, org.id, "Ada", "Lovelace")
+        model = ArchitectureModel(name="PA2 model", organization_id=org.id)
+        db_session.add(model)
+        db_session.flush()
+        source, target = _element(db_session, org.id, "Root"), _element(db_session, org.id, "Dep")
+        source.architecture_id = target.architecture_id = model.id
+        db_session.flush()
+        login_as(client, ada)
+        with client:
+            client.get("/")
+            rel = ArchiMateRelationshipService.create_relationship(
+                source_element=source, target_element=target, relationship_type="serving",
+                architecture_id=model.id, organization_id=org.id,
+            )
+            assert rel is not None
+        db_session.commit()
+        source_id = source.id
+
+    relation = _only_row(_impact(app, org.id, source_id))
+    assert relation["provenance"]["text"] == "Drawn by Ada Lovelace"
+    assert relation["computed_at"] is not None

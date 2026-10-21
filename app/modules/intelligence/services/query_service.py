@@ -511,11 +511,17 @@ def _row_origin(rel) -> Dict[str, Any]:
         text = f"Drawn by {label}"
     elif kind in ("connector", "derived") and label:
         text = label
-    recorded = (
-        getattr(rel, "source_recorded_at", None)
-        or getattr(rel, "created_at", None)
-        or getattr(rel, "updated_at", None)
-    )
+    created = getattr(rel, "created_at", None)
+    recorded = getattr(rel, "source_recorded_at", None) or created
+    person_ids: List[int] = []
+    if kind == "manual" and not label:
+        # The drawing path stores the drawer's id in source_ref; older rows
+        # carry created_by_id instead.
+        for candidate in (getattr(rel, "source_ref", None), getattr(rel, "created_by_id", None)):
+            try:
+                person_ids.append(int(candidate))
+            except (TypeError, ValueError):
+                continue
     return {
         "basis": "explicit",
         "kind": kind,
@@ -523,7 +529,8 @@ def _row_origin(rel) -> Dict[str, Any]:
         "text": text or ORIGIN_NOT_RECORDED,
         "recorded_at": recorded.isoformat() if recorded else None,
         # Internal: resolved to a name in one batch, then dropped.
-        "_person_id": getattr(rel, "created_by_id", None) if kind == "manual" and not label else None,
+        "_person_ids": person_ids,
+        "_created_at": created.isoformat() if created else None,
     }
 
 
@@ -566,7 +573,7 @@ def _attach_origins(rows: List[Dict[str, Any]], org_id: int) -> None:
         for row in rows
         if row["relation"]["kind"] == "explicit" and isinstance(row["relation"].get("provenance"), dict)
     ]
-    ids = {o["_person_id"] for o in pending if o.get("_person_id") is not None}
+    ids = {pid for o in pending for pid in o.get("_person_ids") or []}
     names: Dict[int, str] = {}
     if ids:
         from app.models.user import User
@@ -579,12 +586,21 @@ def _attach_origins(rows: List[Dict[str, Any]], org_id: int) -> None:
             full = f"{first} {last}".strip() or user.username or user.email
             if full:
                 names[user.id] = full
-    for origin in pending:
-        person_id = origin.pop("_person_id", None)
-        name = names.get(person_id) if person_id is not None else None
+    for row in rows:
+        relation = row["relation"]
+        origin = relation.get("provenance")
+        if relation["kind"] != "explicit" or not isinstance(origin, dict):
+            continue
+        person_ids = origin.pop("_person_ids", None) or []
+        created_at = origin.pop("_created_at", None)
+        name = next((names[pid] for pid in person_ids if pid in names), None)
         if name:
             origin["label"] = name
             origin["text"] = f"Drawn by {name}"
+        elif origin["text"] == ORIGIN_NOT_RECORDED:
+            # No origin: only the creation date is a recorded date.
+            origin["recorded_at"] = created_at
+            relation["computed_at"] = created_at
 
 
 def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[str, Any]]:
