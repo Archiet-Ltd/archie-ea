@@ -629,6 +629,17 @@ def init_context_processors(app):
 
     app.jinja_env.globals["flask"] = flask
 
+    # One permission matrix: the `can(action, object_type)` template global reads the
+    # same answer require_permission gives the server.
+    from flask_login import current_user as _matrix_user
+
+    from app.core.auth.permissions import can as _matrix_can
+
+    def _template_can(action, object_type):
+        return _matrix_can(_matrix_user, action, object_type)
+
+    app.jinja_env.globals["can"] = _template_can
+
     # NS-006: Register role-based access functions for persona navigation
     from app.utils.role_access import (
         get_launch_sidebar_zones,
