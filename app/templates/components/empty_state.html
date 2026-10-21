@@ -69,9 +69,13 @@
     </p>
     {% endif %}
 
+    {% if cta_text or secondary_cta_text %}
+    {# One row at wide widths with the primary action first; stacked only on narrow screens. #}
+    <div class="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+    {% endif %}
     <!-- CTA Button -->
     {% if cta_text %}
-    <div class="mt-6">
+    <div>
         {% if cta_href and cta_method|lower == 'post' %}
         {# A CTA that CHANGES something must not be an anchor: a link is
            followed by prefetchers and scanners, and GET carries no CSRF
@@ -108,7 +112,7 @@
 
     {# Secondary CTA Button (outline) #}
     {% if secondary_cta_text %}
-    <div class="mt-3">
+    <div>
         {% if secondary_cta_href %}
         <a href="{{ secondary_cta_href }}"
            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
@@ -126,6 +130,9 @@
             {{ secondary_cta_text }}
         </button>
         {% endif %}
+    </div>
+    {% endif %}
+    {% if cta_text or secondary_cta_text %}
     </div>
     {% endif %}
 </div>

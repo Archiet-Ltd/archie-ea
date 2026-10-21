@@ -139,8 +139,8 @@
             {# Owner and cost coverage, read from their one store (portfolio_figures): the
                same counts the application list and the cost screens show. A dash when unknown. #}
             {% set cov = data_coverage if data_coverage is defined and data_coverage else {} %}
-            <p class="mt-1 truncate text-xs text-muted-foreground tabular-nums" data-testid="owner-count">{{ cov.owner_count|dash }} of {{ cov.application_count|dash }} applications have an owner</p>
-            <p class="truncate text-xs text-muted-foreground tabular-nums" data-testid="cost-count">{{ cov.cost_count|dash }} of {{ cov.application_count|dash }} applications have a cost, {{ (("{:,.0f}".format(cov.total_annual_cost)) if cov.total_annual_cost is not none and cov.total_annual_cost is defined else none)|dash }} a year</p>
+            <p class="mt-1 text-xs text-muted-foreground tabular-nums" data-testid="owner-count">{{ cov.owner_count|dash }} of {{ cov.application_count|dash }} have an owner</p>
+            <p class="text-xs text-muted-foreground tabular-nums" data-testid="cost-count">{{ cov.cost_count|dash }} of {{ cov.application_count|dash }} have a cost · {{ (cov.total_annual_cost|currency(cov.currency) if cov.total_annual_cost is not none and cov.total_annual_cost is defined else none)|dash }} a year</p>
             {% endif %}
         </div>
         {% endfor %}
@@ -441,13 +441,13 @@
             {% endfor %}
         </section>
 
-        {% if not cfo.get('tco_by_category') %}
+        {% if not cfo.get('tco_by_application') %}
         <section aria-label="Total cost of ownership" class="rounded-lg border border-border bg-card" data-testid="cfo-empty-state">
             {{ empty_state(
                 icon='circle-dollar-sign',
                 title='No cost figures yet',
-                description='Total cost of ownership has nothing to add up. Costs per application come from the cost import on the consolidation list, and vendor contracts come from the vendor pages.',
-                cta_text='Import costs',
+                description='Total cost of ownership has nothing to add up. Costs for each application are added from the consolidation list, and vendor contracts come from the vendor pages.',
+                cta_text='Open the consolidation list',
                 cta_href='/consolidation-list/',
                 secondary_cta_text='Open vendors',
                 secondary_cta_href='/applications/vendors'
@@ -457,23 +457,23 @@
         <section aria-labelledby="tco-heading" class="rounded-lg border border-border bg-card">
             <div class="flex items-center justify-between border-b border-border px-4 py-2">
                 <h2 id="tco-heading" class="text-base font-semibold text-foreground">Total cost of ownership</h2>
-                {% if cfo.get('total_tco') %}
-                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">Total ${{ '{:,.0f}'.format(cfo.get('total_tco')) }}</span>
+                {% if cfo.get('total_tco') is not none %}
+                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">Total {{ cfo.get('total_tco')|currency(cfo.get('currency')) }}</span>
                 {% endif %}
             </div>
             <table class="dense-table w-full border-collapse text-sm" data-testid="cfo-tco-by-category">
-                <caption class="sr-only">Total cost of ownership by category</caption>
+                <caption class="sr-only">Total cost of ownership by application</caption>
                 <thead class="bg-card">
                     <tr class="border-b border-border">
-                        <th scope="col" class="h-10 px-4 text-left align-middle">Category</th>
+                        <th scope="col" class="h-10 px-4 text-left align-middle">Application</th>
                         <th scope="col" class="h-10 px-4 text-right align-middle">Total cost</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for cat, amount in (cfo.get('tco_by_category') or {}).items() %}
+                    {% for name, amount in cfo.get('tco_by_application') or [] %}
                     <tr class="h-12 border-b border-border last:border-b-0">
-                        <td class="px-4 align-middle capitalize text-foreground">{{ cat }}</td>
-                        <td class="px-4 text-right align-middle font-medium tabular-nums text-foreground">${{ '{:,.0f}'.format(amount) }}</td>
+                        <td class="px-4 align-middle text-foreground">{{ name }}</td>
+                        <td class="px-4 text-right align-middle font-medium tabular-nums text-foreground">{{ amount|currency(cfo.get('currency')) }}</td>
                     </tr>
                     {% else %}
                     <tr><td colspan="2" class="h-12 px-4 text-sm text-muted-foreground">No TCO data recorded yet.</td></tr>

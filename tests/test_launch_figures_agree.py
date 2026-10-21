@@ -142,10 +142,10 @@ def _read_screens(app, user, org):
     figures = {}
 
     dash = _get(app, user, org, "/dashboard/overview").get_data(as_text=True)
-    m = re.search(r'data-testid="owner-count">\s*(\d+) of (\d+) applications have an owner', dash)
+    m = re.search(r'data-testid="owner-count">\s*(\d+) of (\d+) have an owner', dash)
     figures["owners: dashboard"] = (int(m.group(1)), int(m.group(2))) if m else None
     m = re.search(
-        r'data-testid="cost-count">\s*(\d+) of (\d+) applications have a cost, ([\d,]+) a year', dash
+        r'data-testid="cost-count">\s*(\d+) of (\d+) have a cost · \D*([\d,]+)(?:\.\d+)? a year', dash
     )
     figures["cost: dashboard"] = _int(m.group(3)) if m else None
     figures["cost apps: dashboard"] = int(m.group(1)) if m else None
@@ -238,22 +238,71 @@ def test_nothing_recorded_shows_a_dash_not_a_zero(app, db_session, make_org):
     db_session.add(user)
     db_session.flush()
     dash = _get(app, user, org, "/dashboard/overview").get_data(as_text=True)
-    assert "applications have a cost" not in dash or "0 of 0" not in dash
+    assert "have a cost" not in dash or "0 of 0" not in dash
 
 
-def test_the_cfo_tab_is_always_shown_and_says_what_is_missing_when_empty(app, db_session, two_orgs):
+def _user_for(db_session, org, label):
+    from app.models.user import Role, User
+
+    Role.insert_roles()
+    user = User(
+        email=f"agree-{label}-{uuid.uuid4().hex[:8]}@example.com",
+        first_name="E",
+        last_name="E",
+        organization_id=org.id,
+        confirmed=True,
+        enterprise_role="enterprise_architect",
+    )
+    user.role = Role.query.filter_by(name="Architect").one()
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def test_the_cfo_tab_is_always_shown_and_says_what_is_missing_when_empty(app, db_session, make_org):
     from app.utils.role_access import NOT_READY_ENDPOINTS
 
     assert "dashboard_v2.overview#cfo_tab" not in NOT_READY_ENDPOINTS
-    org, user = two_orgs["A"]
+    org = make_org("agree-cfo-empty")
+    # Applications and owners but no recorded cost: the portfolio is not empty, only its cost is.
+    user = _seed_org(db_session, org, {"apps": 4, "owners": 2, "costs": [], "gaps": 1}, "C")
     dash = _get(app, user, org, "/dashboard/overview").get_data(as_text=True)
     assert 'data-testid="layer-tab-cfo"' in dash
     assert "activeRole === 'cfo'" in dash
     # With no cost data the lens shows the shared empty state, naming the figure and where it is filled.
     assert 'data-testid="cfo-empty-state"' in dash
     assert "No cost figures yet" in dash
-    assert "cost import" in dash and "/consolidation-list/" in dash
+    assert "consolidation list" in dash and "/consolidation-list/" in dash
+    assert "Open the consolidation list" in dash
     assert "vendor pages" in dash and "/applications/vendors" in dash
+    # The Applications card says the same thing: no cost total, a dash.
+    m = re.search(r'data-testid="cost-count">\s*([^<]*)<', dash)
+    assert m and "— a year" in m.group(1), m and m.group(1)
+
+
+def _money(text):
+    m = re.search(r"([\d,]+)(?:\.\d+)?", text)
+    return _int(m.group(1))
+
+
+def test_cost_line_and_cfo_lens_read_the_same_source(app, two_orgs):
+    for label, spec in (("A", ORG_A), ("B", ORG_B)):
+        org, user = two_orgs[label]
+        dash = _get(app, user, org, "/dashboard/overview").get_data(as_text=True)
+        assert 'data-testid="cfo-empty-state"' not in dash, "CFO lens says no costs while the card shows some"
+        assert "No cost figures yet" not in dash
+        m = re.search(r'data-testid="cost-count">\s*(\d+) of (\d+) have a cost · \D*([\d,]+)', dash)
+        assert m, "cost line missing"
+        line_count, line_total = int(m.group(1)), _int(m.group(3))
+        table = re.search(r'data-testid="cfo-tco-by-category".*?</table>', dash, re.S).group(0)
+        amounts = [
+            _money(c) for c in re.findall(r'<td class="px-4 text-right[^>]*>\s*([^<]*?)\s*</td>', table)
+        ]
+        header = re.search(r'tracking-\[0\.06em\][^>]*>\s*Total\s+([^<]*)<', dash)
+        assert header, "CFO total missing"
+        assert line_count == len(spec["costs"]) == len(amounts)
+        assert line_total == _money(header.group(1)) == sum(amounts) == sum(spec["costs"])
+        assert sorted(amounts, reverse=True) == sorted(spec["costs"], reverse=True)
 
 
 def test_owners_never_exceed_applications_with_a_duplicate_row(app, two_orgs):

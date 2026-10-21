@@ -50,6 +50,32 @@ def cost_figure(org_id: Optional[int]) -> Dict[str, Any]:
     return get_cost_summary_for_org(org_id)
 
 
+def cost_by_application(org_id: Optional[int], limit: int = 10) -> list:
+    """The applications behind `cost_figure`, largest first, as (name, annual cost) pairs.
+
+    Same population and column as cost_figure (every application of the organisation with a
+    recorded annual cost), so the rows add up to its total. When more than `limit` applications
+    carry a cost the rest are folded into one final "Other applications" pair.
+    """
+    if org_id is None:
+        return []
+    from app.models.application_portfolio import ApplicationComponent
+
+    rows = (
+        db.session.query(ApplicationComponent.name, ApplicationComponent.total_cost_of_ownership)
+        .filter(
+            ApplicationComponent.organization_id == org_id,
+            ApplicationComponent.total_cost_of_ownership.isnot(None),
+        )
+        .order_by(ApplicationComponent.total_cost_of_ownership.desc(), ApplicationComponent.name)
+        .all()
+    )
+    pairs = [(name or "Unnamed application", float(cost)) for name, cost in rows]
+    if len(pairs) > limit:
+        pairs = pairs[:limit] + [("Other applications", sum(c for _, c in pairs[limit:]))]
+    return pairs
+
+
 def vendor_count() -> int:
     """Vendor organisations in the one shared vendor catalogue."""
     from app.models.vendor.vendor_organization import VendorOrganization

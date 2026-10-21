@@ -50,6 +50,7 @@ def overview():
         format_health_score,
     )
     from app.services import portfolio_figures
+    from app.services.application_cost_accessor import get_reporting_currency
 
     metrics = {
         "applications": 0,
@@ -284,18 +285,18 @@ def overview():
                 "sol_ids_with_risks": _sol_ids_with_risks,
             }
 
-            # CFO metrics: TCO aggregation by category
-            tco_by_category = {}
-            try:
-                from app.models.solution_lifecycle_models import SolutionTCOItem
-                for item in SolutionTCOItem.query.all():
-                    cat = item.cost_category or "other"
-                    tco_by_category[cat] = tco_by_category.get(cat, 0) + float(item.amount or 0)
-            except Exception as exc:
-                logger.warning("ENT-017: SolutionTCOItem unavailable: %s", exc)
+            # CFO metrics: read from the one cost store (portfolio_figures), the same
+            # source as the Applications card's cost line, so the two cannot disagree.
+            _cfo_org = getattr(current_user, "organization_id", None)
+            _cfo_cost = portfolio_figures.cost_figure(_cfo_org)
             persona_metrics["cfo"] = {
-                "tco_by_category": tco_by_category,
-                "total_tco": sum(tco_by_category.values()),
+                "tco_by_application": portfolio_figures.cost_by_application(_cfo_org),
+                "total_tco": (
+                    float(_cfo_cost["total_annual_cost"])
+                    if _cfo_cost["total_annual_cost"] is not None
+                    else None
+                ),
+                "currency": get_reporting_currency(_cfo_org),
             }
 
             # Architect metrics: ArchiMate catalog size and solution maturity
@@ -603,6 +604,7 @@ def overview():
             "owner_count": _owners["applications_with_owner"],
             "cost_count": _cost["applications_with_cost"],
             "application_count": _owners["application_count"],
+            "currency": get_reporting_currency(_org),
             "total_annual_cost": (
                 float(_cost["total_annual_cost"])
                 if _cost["total_annual_cost"] is not None
