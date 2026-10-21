@@ -230,7 +230,7 @@ class AIChatMemoryService:
             ChatMessageEmbedding.query.filter(
                 ChatMessageEmbedding.chat_session_id == self.session_id,
                 ChatMessageEmbedding.in_org(current_org_id()),
-            ).delete()
+            ).delete(synchronize_session=False)
             db.session.commit()
             logger.info(f"Cleared session {self.session_id}")
             return True

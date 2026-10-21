@@ -54,6 +54,7 @@ INTENTIONALLY_GLOBAL = {
         "reach the row regardless of the tenant filter; every query is keyed by "
         "sid or user_id and organization_id is kept for attribution only"
     ),
+    # These two are NOT shared: their rows are organisation-scoped through organization_id and filtered by the active organisation; they are listed here only because this matrix has no category yet for scoping without TenantMixin.
     "ConversationThreadRecord": (
         "a chat thread is keyed to its user and to the organisation active when it "
         "was made; the chat service scopes its raw SQL by both user_id and "
