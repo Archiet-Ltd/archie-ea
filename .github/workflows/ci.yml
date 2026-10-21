@@ -214,9 +214,10 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt || {
+          python scripts/ci/filtered-req.py requirements.txt > filtered-req.txt
+          pip install -r filtered-req.txt || {
             echo "::warning::pip install from the cache failed; retrying without it"
-            pip install --no-cache-dir -r requirements.txt
+            pip install --no-cache-dir -r filtered-req.txt
           }
           if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
       - name: Create schema
@@ -329,7 +330,8 @@ jobs:
       - name: Install gate tooling
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt "ruff==${RUFF_VERSION}" pip-audit "bandit==${BANDIT_VERSION}"
+          python scripts/ci/filtered-req.py requirements.txt > filtered-req.txt
+          pip install -r filtered-req.txt "ruff==${RUFF_VERSION}" pip-audit "bandit==${BANDIT_VERSION}"
           mkdir -p scripts/bin
           curl --fail --location --retry 3 \
             --output scripts/bin/tailwindcss \
@@ -359,7 +361,8 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python scripts/ci/filtered-req.py requirements.txt > filtered-req.txt
+          pip install -r filtered-req.txt
       - name: Boot + wiring gate
         env:
           FLASK_CONFIG: testing
@@ -487,9 +490,10 @@ jobs:
           # A truncated file in the restored pip cache fails every job that
           # restores it with the same IncompleteRead, before any test runs;
           # fall back to a clean download once rather than fail the shard.
-          pip install -r requirements.txt || {
+          python scripts/ci/filtered-req.py requirements.txt > filtered-req.txt
+          pip install -r filtered-req.txt || {
             echo "::warning::pip install from the cache failed; retrying without it"
-            pip install --no-cache-dir -r requirements.txt
+            pip install --no-cache-dir -r filtered-req.txt
           }
           pip install pytest-cov
           if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
@@ -673,9 +677,10 @@ jobs:
         if: ${{ steps.select.outputs.any == 'true' }}
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt || {
+          python scripts/ci/filtered-req.py requirements.txt > filtered-req.txt
+          pip install -r filtered-req.txt || {
             echo "::warning::pip install from the cache failed; retrying without it"
-            pip install --no-cache-dir -r requirements.txt
+            pip install --no-cache-dir -r filtered-req.txt
           }
           pip install pytest-cov
           if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
@@ -799,9 +804,10 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt || {
+          python scripts/ci/filtered-req.py requirements.txt > filtered-req.txt
+          pip install -r filtered-req.txt || {
             echo "::warning::pip install from the cache failed; retrying without it"
-            pip install --no-cache-dir -r requirements.txt
+            pip install --no-cache-dir -r filtered-req.txt
           }
           pip install pytest-cov
           if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
