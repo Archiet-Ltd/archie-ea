@@ -48,8 +48,8 @@
 
     // ── requests ──────────────────────────────────────────────────────────
 
-    function searchElements(term) {
-        return Platform.fetch.get(SEARCH_URL, { q: term, limit: 10 }, { silent: true }).then(function (resp) {
+    function searchElements(term, signal) {
+        return Platform.fetch.get(SEARCH_URL, { q: term, limit: 10 }, { silent: true, signal: signal }).then(function (resp) {
             return resp && Array.isArray(resp.data) ? resp.data : [];
         });
     }
@@ -64,7 +64,7 @@
             include_stale: options.includeDerived ? 'true' : 'false',
             max_depth: options.maxDepth,
             with_owner: 'true'
-        }, { silent: true }).then(function (resp) {
+        }, { silent: true, signal: options.signal }).then(function (resp) {
             return resp && resp.data ? resp.data : {};
         });
     }
