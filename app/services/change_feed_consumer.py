@@ -21,6 +21,7 @@ from app.models.models import Notification
 from app.models.user import User
 from app.services import change_rules
 from app.services.event_log_service import read_from_offset
+from app.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -96,16 +97,16 @@ def _consume_batch(organization_id: int, batch_size: int) -> int:
         ).first()
         if already is not None:
             continue
-        db.session.add(
-            Notification(
-                user_id=candidate["user_id"],
-                organization_id=organization_id,
-                message=candidate["message"],
-                url=candidate["url"],
-                event_type=candidate["event_type"],
-                entity_type=candidate["entity_type"],
-                entity_id=candidate["entity_id"],
-            )
+        # The one writer of notifications; it adds without committing, so the
+        # notifications and the offset advance in the same transaction below.
+        NotificationService.create(
+            candidate["user_id"],
+            candidate["message"],
+            candidate["url"],
+            organization_id=organization_id,
+            event_type=candidate["event_type"],
+            entity_type=candidate["entity_type"],
+            entity_id=candidate["entity_id"],
         )
 
     offset.last_ordinal = max(offset.last_ordinal, events[-1]["ordinal"])
