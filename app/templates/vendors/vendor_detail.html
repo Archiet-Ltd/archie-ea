@@ -43,7 +43,7 @@
 
     <div class="flex flex-wrap items-center gap-2 mb-6">
         <a href="{{ url_for('unified_applications.vendors') }}"
-           class="inline-flex items-center justify-center h-9 px-3 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <i data-lucide="arrow-left" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
             Back
         </a>
@@ -51,49 +51,49 @@
         <a href="{{ vendor.website }}"
            target="_blank"
            rel="noopener noreferrer"
-           class="inline-flex items-center justify-center h-9 px-3 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <i data-lucide="external-link" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
             Visit Website
         </a>
         {% endif %}
         <a href="{{ url_for('unified_vendors.edit_vendor', vendor_id=vendor.id) }}"
-           class="inline-flex items-center justify-center h-9 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <i data-lucide="pencil" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
             Edit Vendor
         </a>
         <!-- ENT-045: Ask AI anchor for vendor context -->
         <a href="{{ url_for('unified_ai_chat.index') }}?element_id={{ vendor.id }}&amp;context_type=vendor&amp;domain=vendor_intelligence"
-           class="inline-flex items-center justify-center h-9 px-3 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <i data-lucide="bot" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
             Ask AI
         </a>
         <button type="button" id="score-vendor-btn"
                 data-vendor-id="{{ vendor.id }}"
-                class="inline-flex items-center justify-center h-9 px-3 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <i data-lucide="bar-chart-2" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
             Score Vendor
         </button>
         {% if contract_status == 'catalog' %}
         <a href="#contract-lifecycle"
-           class="inline-flex items-center justify-center h-9 px-3 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <i data-lucide="rocket" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
             Activate Contract
         </a>
         {% endif %}
         <button type="button" @click="openUnifiedMappingModalDiscovery({ context: 'archimate' })"
-                class="inline-flex items-center justify-center h-9 px-3 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                 aria-label="Map to architecture elements">
             <i data-lucide="layers" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
             Map to Architecture
         </button>
         <button type="button" @click="openUnifiedMappingModalDiscovery({ context: 'apqc' })"
-                class="inline-flex items-center justify-center h-9 px-3 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                 aria-label="Map to APQC processes">
             <i data-lucide="git-branch" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
             Map to APQC
         </button>
         <button type="button" @click="analyzerOpen = !analyzerOpen"
-                class="inline-flex items-center justify-center h-9 px-3 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                 aria-label="Toggle document analyzer">
             <i data-lucide="scan-line" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
             Analyze Document
@@ -286,15 +286,15 @@
                     <h3 class="text-sm font-semibold">Activate Contract</h3>
                     <p class="text-xs text-muted-foreground -mt-2">Moves this vendor's contract lifecycle out of "Catalog" — separate from the Operational Status above, which is already Active for most catalog vendors.</p>
                     <div>
-                        <label for="contract_start_date" class="block text-xs text-muted-foreground mb-1">Contract Start Date</label>
+                        <label for="contract_start_date" class="block text-sm font-medium text-muted-foreground mb-1">Contract Start Date</label>
                         <input id="contract_start_date" name="contract_start_date" type="date" class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
                     </div>
                     <div>
-                        <label for="contract_end_date" class="block text-xs text-muted-foreground mb-1">Contract End Date</label>
+                        <label for="contract_end_date" class="block text-sm font-medium text-muted-foreground mb-1">Contract End Date</label>
                         <input id="contract_end_date" name="contract_end_date" type="date" class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
                     </div>
                     <div>
-                        <label for="contract_value_annual" class="block text-xs text-muted-foreground mb-1">Annual Contract Value (USD)</label>
+                        <label for="contract_value_annual" class="block text-sm font-medium text-muted-foreground mb-1">Annual Contract Value (USD)</label>
                         <input id="contract_value_annual" name="contract_value_annual" type="number" step="0.01" min="0" class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" placeholder="100000">
                     </div>
                     <button type="submit" class="w-full inline-flex items-center justify-center h-9 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors" aria-label="Submit">
@@ -315,7 +315,7 @@
                     <h2 class="text-lg font-semibold leading-none tracking-tight">Products & Deployment</h2>
                 </div>
                 <button type="button" data-action="openAddProduct"
-                        class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="plus" class="h-3.5 w-3.5"></i>
                     Add Product
                 </button>
@@ -390,7 +390,7 @@
             {% call card_content() %}
                 {% if vendor_capabilities %}
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left">
+                    <table class="dense-table w-full text-sm text-left">
                         <thead class="text-xs text-muted-foreground uppercase bg-muted/50">
                             <tr>
                                 <th class="px-3 py-2">Capability</th>
@@ -424,7 +424,7 @@
                     {% if vendor.products %}
                     <button type="button"
                             data-modal-open="deployProductModal"
-                            class="inline-flex items-center justify-center gap-2 h-9 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                             aria-label="Deploy Product as Application">
                         <i data-lucide="rocket" class="w-4 h-4" aria-hidden="true"></i>
                         Deploy Product as Application
@@ -460,7 +460,7 @@
                     {% if vendor.products %}
                     <button type="button"
                             data-modal-open="deployProductModal"
-                            class="mt-4 inline-flex items-center justify-center gap-2 h-9 px-4 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-4 items-center justify-center"
                             aria-label="Deploy Product as Application">
                         <i data-lucide="rocket" class="w-4 h-4" aria-hidden="true"></i>
                         Deploy Product as Application
@@ -476,7 +476,7 @@
     <div class="mb-6"
          x-data="concentrationRiskPanel('{{ vendor.id }}')"
          x-init="init()">
-        <div class="rounded-xl border bg-card">
+        <div class="rounded-lg border border-border bg-card">
             <button type="button"
                     @click="open = !open"
                     class="flex w-full items-center justify-between px-6 py-4 text-left">
@@ -537,7 +537,7 @@
         {% call card_content() %}
             {% if vendor_apqc_mappings %}
             <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left">
+                <table class="dense-table w-full text-sm text-left">
                     <thead class="text-xs text-muted-foreground uppercase bg-muted/50">
                         <tr>
                             <th class="px-3 py-2">Process Code</th>
@@ -624,8 +624,8 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="space-y-4">
         <div>
-            <label for="product_selection" class="block text-sm font-medium mb-1.5">Product <span class="text-destructive-emphasis">*</span></label>
-            <select id="product_selection" name="product_selection" required class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" @change="window.updateDeployFormAction && window.updateDeployFormAction()">
+            <label for="product_selection" class="block text-sm font-medium text-muted-foreground mb-1">Product <span class="text-destructive-emphasis">*</span></label>
+            <select id="product_selection" name="product_selection" required class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm" @change="window.updateDeployFormAction && window.updateDeployFormAction()">
                 <option value="">Select a product...</option>
                 {% for product in vendor.products %}
                 <option value="{{ product.id }}">{{ product.name }}</option>
@@ -633,16 +633,16 @@
             </select>
         </div>
         <div>
-            <label for="application_name" class="block text-sm font-medium mb-1.5">Application Name <span class="text-destructive-emphasis">*</span></label>
-            <input type="text" id="application_name" name="application_name" required placeholder="e.g., ServiceNow Production" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm">
+            <label for="application_name" class="block text-sm font-medium text-muted-foreground mb-1">Application Name <span class="text-destructive-emphasis">*</span></label>
+            <input type="text" id="application_name" name="application_name" required placeholder="e.g., ServiceNow Production" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
         </div>
         <div>
-            <label for="description" class="block text-sm font-medium mb-1.5">Description</label>
+            <label for="description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
             <textarea id="description" name="description" rows="3" placeholder="Optional description" class="flex w-full rounded-md border border-input bg-background px-3 py-1 text-sm min-h-[80px]"></textarea>
         </div>
         <div>
-            <label for="deployment_type" class="block text-sm font-medium mb-1.5">Deployment Type</label>
-            <select id="deployment_type" name="deployment_type" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm">
+            <label for="deployment_type" class="block text-sm font-medium text-muted-foreground mb-1">Deployment Type</label>
+            <select id="deployment_type" name="deployment_type" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                 <option value="primary_system">Primary System</option>
                 <option value="integration_layer">Integration Layer</option>
                 <option value="supporting_tool">Supporting Tool</option>
@@ -650,8 +650,8 @@
             </select>
         </div>
         <div>
-            <label for="criticality" class="block text-sm font-medium mb-1.5">Criticality</label>
-            <select id="criticality" name="criticality" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm">
+            <label for="criticality" class="block text-sm font-medium text-muted-foreground mb-1">Criticality</label>
+            <select id="criticality" name="criticality" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                 <option value="mission_critical">Mission Critical</option>
                 <option value="business_critical" selected>Business Critical</option>
                 <option value="business_operational">Business Operational</option>
@@ -659,8 +659,8 @@
             </select>
         </div>
         <div>
-            <label for="hosting_model" class="block text-sm font-medium mb-1.5">Hosting Model</label>
-            <select id="hosting_model" name="hosting_model" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm">
+            <label for="hosting_model" class="block text-sm font-medium text-muted-foreground mb-1">Hosting Model</label>
+            <select id="hosting_model" name="hosting_model" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                 <option value="cloud" selected>Cloud (SaaS)</option>
                 <option value="on_premise">On-Premise</option>
                 <option value="hybrid">Hybrid</option>
@@ -668,13 +668,13 @@
             </select>
         </div>
         <div>
-            <label for="business_owner" class="block text-sm font-medium mb-1.5">Business Owner</label>
-            <input type="text" id="business_owner" name="business_owner" placeholder="e.g., John Smith" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm">
+            <label for="business_owner" class="block text-sm font-medium text-muted-foreground mb-1">Business Owner</label>
+            <input type="text" id="business_owner" name="business_owner" placeholder="e.g., John Smith" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
         </div>
     </div>
     <div class="mt-4 flex justify-end gap-2">
-        <button type="button" data-modal-close="deployProductModal" class="inline-flex items-center justify-center h-9 px-4 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent transition-colors">Cancel</button>
-        <button type="submit" class="inline-flex items-center justify-center h-9 px-4 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">Deploy</button>
+        <button type="button" data-modal-close="deployProductModal" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
+        <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Deploy</button>
     </div>
 </form>
 {% endcall %}
@@ -700,12 +700,12 @@
 {% endif %}
 
 {# Add Product Modal #}
-<div id="add-product-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-    <div class="bg-card border rounded-xl shadow-lg w-full max-w-md mx-4 p-6 space-y-4">
+<div id="add-product-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-overlay/50">
+    <div class="bg-card border border-border rounded-lg w-full max-w-md mx-4 p-6 space-y-4">
         <div class="flex items-center justify-between">
             <h3 class="text-lg font-semibold">Add Product</h3>
             <button aria-label="Close" type="button" data-action="closeAddProduct"
-                    class="text-muted-foreground hover:text-foreground">
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <i data-lucide="x" class="h-4 w-4"></i>
             </button>
         </div>
@@ -749,12 +749,12 @@
         <div id="add-product-error" class="hidden text-sm text-destructive-emphasis"></div>
         <div class="flex gap-2 justify-end pt-2">
             <button type="button" data-action="closeAddProduct"
-                    class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Cancel
             </button>
             <button type="button" id="add-product-submit"
                     data-vendor-id="{{ vendor.id }}"
-                    class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Add Product
             </button>
         </div>

@@ -5,7 +5,7 @@
     <h2 id="room-overview-heading" class="text-lg font-semibold text-foreground">Transformation overview</h2>
     <p class="mt-2 text-sm text-muted-foreground">Follow the durable programme record from objective through evidence and options. Later governed stages remain visible without implying that their services are active.</p>
     {% if room.workstream %}
-    <a href="/solutions/programmes/{{ room.programme.id }}/workstreams/{{ room.workstream.id }}/objective" class="mt-5 inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">Open current workstream</a>
+    <a href="/solutions/programmes/{{ room.programme.id }}/workstreams/{{ room.workstream.id }}/objective" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-5 items-center">Open current workstream</a>
     {% endif %}
   </section>
   <section class="rounded-lg border border-border bg-card p-5" aria-labelledby="overview-workstreams-heading">

@@ -29,7 +29,7 @@
 
     {% if events %}
     <div class="overflow-x-auto rounded-lg border border-border">
-        <table class="w-full text-sm" data-testid="errors-table">
+        <table class="dense-table w-full text-sm" data-testid="errors-table">
             <thead class="bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <tr>
                     <th class="px-4 py-2.5">Source</th>
@@ -58,7 +58,7 @@
                         <form method="post" action="{{ url_for('error_events.resolve_error', event_id=e.id) }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit"
-                                    class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent"
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                                     data-testid="resolve-error-{{ e.id }}">
                                 <i data-lucide="check" class="h-3.5 w-3.5"></i> Resolve
                             </button>

@@ -61,7 +61,7 @@
   ) }}
 
   {% if load_error %}
-  <div class="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-emphasis">
+  <div class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis">
     {{ load_error }}
   </div>
   {% endif %}
@@ -128,7 +128,7 @@
         <h2 class="text-lg font-semibold text-foreground">{{ group.name }}</h2>
       </div>
       <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+        <table class="dense-table w-full text-sm">
           <thead>
             <tr class="border-b border-border text-left">
               <th scope="col" class="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Capability</th>

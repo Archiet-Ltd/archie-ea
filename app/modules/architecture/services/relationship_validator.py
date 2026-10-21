@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 from app.config.archimate_relationship_matrix import (
     ALL_ELEMENTS,
     APPLICATION_ELEMENTS,
+    EXTENSION_ELEMENTS,
     BUSINESS_ELEMENTS,
     IMPLEMENTATION_ELEMENTS,
     MOTIVATION_ELEMENTS,
@@ -29,6 +30,8 @@ from app.config.archimate_relationship_matrix import (
     get_cardinality,
     get_valid_relationships,
 )
+
+from app.models.archimate_element_types import base_type  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -143,13 +146,13 @@ class RelationshipValidator:
         relationship_type = relationship_type.lower() if relationship_type else ""
 
         # Validate element types exist
-        if source_type not in ALL_ELEMENTS:
+        if source_type not in ALL_ELEMENTS and source_type not in EXTENSION_ELEMENTS:
             errors.append(f"Unknown source element type: '{source_type}'")
             similar = self._find_similar_element_types(source_type)
             if similar:
                 suggestions.append(f"Did you mean: {', '.join(similar)}?")
 
-        if target_type not in ALL_ELEMENTS:
+        if target_type not in ALL_ELEMENTS and target_type not in EXTENSION_ELEMENTS:
             errors.append(f"Unknown target element type: '{target_type}'")
             similar = self._find_similar_element_types(target_type)
             if similar:
@@ -447,7 +450,7 @@ class RelationshipValidator:
 
     def _get_element_layer(self, element_type: str) -> str:
         """Get layer for element type using internal mapping"""
-        return self._element_to_layer.get(element_type, "unknown")
+        return self._element_to_layer.get(base_type(element_type), "unknown")
 
     def _normalize_element_type(self, element_type: str) -> str:
         """

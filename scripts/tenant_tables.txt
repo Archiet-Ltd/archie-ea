@@ -91,6 +91,7 @@ capability_maturity_assessment
 capability_roadmap
 capability_tags
 capability_value_stream_mapping
+change_feed_offsets
 command_idempotency_records
 command_materialisations
 compliance_policies

@@ -18,13 +18,13 @@
 <div class="p-6 space-y-6 mx-auto max-w-4xl">
     {% macro _ps_actions() %}
 <a href="{{ url_for('architect_ui.import_restore_points') }}"
-           class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-md hover:bg-accent">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
             <i data-lucide="arrow-left" class="h-4 w-4" aria-hidden="true"></i> Back to restore points
         </a>
     {% endmacro %}
     {{ page_shell(title='Review restore', subtitle='This restores your organisation to how it stood before the import on ' ~ (preview.restore_point.started_at[:16] | replace('T', ' ')) ~ '. Nothing changes until you confirm.', actions_caller=_ps_actions) }}
 
-    <div class="rounded-lg border bg-card p-6 space-y-4" data-testid="restore-summary">
+    <div class="rounded-lg border border-border bg-card p-6 space-y-4" data-testid="restore-summary">
         <h2 class="text-lg font-semibold">What the restore will do</h2>
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div class="rounded-md bg-muted p-3 text-center">
@@ -50,11 +50,11 @@
     </div>
 
     {% if preview.already_restored %}
-    <div class="rounded-md border border-warning bg-warning/5 px-4 py-3 text-sm text-warning-emphasis" data-testid="restore-already">This import has already been restored.</div>
+    <div class="rounded-md border border-warning bg-warning/10 px-4 py-2 text-sm text-warning-emphasis" data-testid="restore-already">This import has already been restored.</div>
     {% endif %}
 
     {% if preview.blockers %}
-    <div class="rounded-md border border-destructive bg-destructive/5 p-4 space-y-1" data-testid="restore-blockers">
+    <div class="rounded-md border border-destructive bg-destructive/10 px-3 py-2 space-y-1" data-testid="restore-blockers">
         <p class="text-sm font-medium text-destructive-emphasis">These records now refer to imported elements. Remove or unlink them, then restore:</p>
         <ul class="list-disc list-inside text-sm text-destructive-emphasis/80">
             {% for b in preview.blockers %}<li>{{ b.count }} in {{ b.label }}</li>{% endfor %}
@@ -63,7 +63,7 @@
     {% endif %}
 
     {% if preview.elements_reverted %}
-    <div class="rounded-lg border bg-card p-6 space-y-3">
+    <div class="rounded-lg border border-border bg-card p-6 space-y-3">
         <h2 class="text-lg font-semibold">Elements returned to their earlier state</h2>
         <ul class="text-sm space-y-1" data-testid="restore-reverts">
             {% for r in preview.elements_reverted[:200] %}
@@ -77,7 +77,7 @@
     </div>
     {% endif %}
 
-    <div class="rounded-lg border bg-card p-6 space-y-3">
+    <div class="rounded-lg border border-border bg-card p-6 space-y-3">
         <h2 class="text-lg font-semibold">Elements removed</h2>
         {% if preview.elements_removed %}
         <ul class="text-sm space-y-1 max-h-72 overflow-y-auto" data-testid="restore-removed-elements">
@@ -91,7 +91,7 @@
 
     <form method="POST" action="{{ url_for('architect_ui.import_restore_confirm', log_id=log_id) }}" class="space-y-6" data-testid="restore-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="rounded-lg border bg-card p-6 space-y-3">
+        <div class="rounded-lg border border-border bg-card p-6 space-y-3">
             <h2 class="text-lg font-semibold">Changes made since the import</h2>
             {% if preview.changes_since %}
             <p class="text-sm text-muted-foreground">Tick a change to apply it again after the restore. Changes to elements the import created go with those elements.</p>
@@ -114,7 +114,7 @@
         </div>
 
         <button type="submit" data-testid="btn-confirm-restore" {% if not preview.can_restore %}disabled{% endif %}
-                class="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <i data-lucide="history" class="h-4 w-4" aria-hidden="true"></i>
             Restore to before this import
         </button>

@@ -18,17 +18,17 @@
     ) }}
 
     <div class="flex items-center gap-2 mt-4 mb-6">
-        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">
+        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
             <i data-lucide="shield-check" class="h-3.5 w-3.5"></i> AI Technical Architect · policy-as-data · live
         </span>
     </div>
 
     {% if not review.success %}
-    <div class="border border-destructive/30 bg-destructive/10 text-destructive-emphasis rounded-xl p-4 text-sm">{{ review.error }}</div>
+    <div class="border border-destructive/40 bg-destructive/10 text-destructive-emphasis rounded-md px-3 py-2 text-sm">{{ review.error }}</div>
     {% else %}
 
     {# ── Score + summary ───────────────────────────────────────────── #}
-    <div class="border border-border rounded-xl bg-card p-6 mb-6 flex items-start gap-5">
+    <div class="border border-border rounded-lg bg-card p-6 mb-6 flex items-start gap-5">
         <div class="shrink-0 text-center">
             {% if review.score is not none %}
             <div class="text-4xl font-bold leading-none
@@ -51,7 +51,7 @@
     {% if review.findings %}
     <div class="space-y-3">
         {% for f in review.findings %}
-        <div class="border border-border rounded-xl bg-card p-4 flex items-start gap-3">
+        <div class="border border-border rounded-lg bg-card p-4 flex items-start gap-3">
             <span class="shrink-0 mt-0.5 inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold uppercase tracking-wide
                 {% if f.severity == 'critical' %}bg-destructive/10 text-destructive-emphasis border border-destructive/30
                 {% elif f.severity == 'high' %}bg-warning/10 text-warning-emphasis border border-warning/30

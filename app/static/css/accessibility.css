@@ -160,10 +160,8 @@ button[disabled] {
     cursor: not-allowed;
 }
 
-button:not(:disabled):hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
+/* Hover is a colour change only (design register: no drop shadows, no lift);
+   each button's own hover classes carry it. */
 
 button:not(:disabled):active {
     transform: translateY(0);
@@ -234,10 +232,9 @@ button:not(:disabled):active {
     transition-duration: 150ms;
 }
 
-/* Improved Modal/Dialog Backdrop */
+/* Modal/Dialog backdrop (design/patterns.json: dialog). Slate-900 at 50%, no blur. */
 .modal-backdrop {
-    background-color: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
+    background-color: rgb(15 23 42 / 0.5);
 }
 
 /* Better Tooltip Styling */

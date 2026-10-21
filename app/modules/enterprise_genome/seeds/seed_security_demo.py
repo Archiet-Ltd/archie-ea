@@ -149,6 +149,7 @@ def seed_security_demo(organization_id: int, session=None, created_by_id=None) -
         ).first()
         if requirement is None:
             requirement = ComplianceRequirement(
+                organization_id=organization_id,
                 archimate_element_id=element.id,
                 title=req_title,
                 description=f"[DEMO] {req_title}",
