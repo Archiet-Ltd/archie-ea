@@ -124,6 +124,12 @@ class RegulatoryFramework(db.Model):
     # References
     official_url = db.Column(db.String(500))
     standard_version = db.Column(db.String(50))
+    # How much of the standard the reference library holds: the number of controls the
+    # standard has (NULL when it is not known) and which of "full" (every control, with
+    # its title and a summary), "identifiers" (identifier, short title and the official
+    # link, never licensed wording) or "sample" (a starter set) is loaded.
+    total_controls = db.Column(db.Integer, nullable=True)
+    content_level = db.Column(db.String(20), nullable=True)
     last_updated = db.Column(db.DateTime)
     next_review_date = db.Column(db.DateTime)
 
