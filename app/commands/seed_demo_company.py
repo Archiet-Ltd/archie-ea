@@ -1472,6 +1472,68 @@ def seed_demo_company() -> dict:
             db.session.flush()
         stats["capability_mappings_created"] = mappings_created
 
+        # ── 7b-2. the same mappings in the unified store ────────────────
+        # The Investment Map reads UnifiedApplicationCapabilityMapping, the
+        # Capability Map reads the legacy rows written above. Writing only the
+        # legacy half left the two screens disagreeing about this organisation
+        # (15 capabilities mapped on one, "Setup Required" on the other). The
+        # unified row is written for the same (application, capability) pair,
+        # through the capability's own projection -- the helpers
+        # `flask seed-demo-mappings` already uses -- so no second mapping table
+        # or hand-made capability row is created.
+        from app.commands.seed_demo_mappings import (
+            _project_missing_unified_rows,
+            _unified_capabilities_by_source,
+        )
+        from app.models.unified_application_capability_mapping import (
+            UnifiedApplicationCapabilityMapping,
+        )
+
+        demo_bcs = [bc for bc in existing_bcs.values() if bc.id is not None]
+        unified_by_source = _unified_capabilities_by_source(
+            org_id, [bc.id for bc in demo_bcs]
+        )
+        unprojected = [bc for bc in demo_bcs if bc.id not in unified_by_source]
+        if unprojected:
+            _project_missing_unified_rows(unprojected)
+            unified_by_source = _unified_capabilities_by_source(
+                org_id, [bc.id for bc in demo_bcs]
+            )
+        demo_apps = _resolve_apps(org_id)
+        demo_app_ids = [a.id for a in demo_apps.values()]
+        # tenant-scoping-ok: the unified mapping table has no organization_id;
+        # the read is scoped through this organisation's own application ids.
+        unified_mapped = {
+            (m.application_component_id, m.unified_capability_id)
+            for m in db.session.query(UnifiedApplicationCapabilityMapping)
+            .filter(
+                UnifiedApplicationCapabilityMapping.application_component_id.in_(
+                    demo_app_ids or [-1]
+                )
+            )
+            .all()
+        }
+        unified_created = 0
+        for app_name, app in demo_apps.items():
+            profile = _APP_PROFILE.get(app_name)
+            bc = existing_bcs.get(profile[3]) if profile else None
+            unified_cap = unified_by_source.get(bc.id) if bc is not None else None
+            if unified_cap is None or (app.id, unified_cap.id) in unified_mapped:
+                continue
+            db.session.add(UnifiedApplicationCapabilityMapping(
+                application_component_id=app.id,
+                unified_capability_id=unified_cap.id,
+                support_level="full",
+                coverage_percentage=80,
+                relationship_type="enables",
+                notes="Lantern Quay demonstration mapping",
+            ))
+            unified_mapped.add((app.id, unified_cap.id))
+            unified_created += 1
+        if unified_created:
+            db.session.flush()
+        stats["unified_capability_mappings_created"] = unified_created
+
         # ── 7c. architecture review board queue ─────────────────────────
         from app.models.architecture_review_board import ARBReviewItem
 

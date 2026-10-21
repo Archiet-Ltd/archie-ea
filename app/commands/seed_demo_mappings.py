@@ -210,6 +210,9 @@ def seed_demo_mappings(org_id, dry_run=False):
     stages = _stages(org_id)
 
     stats = {
+        # How many of this catalogue's application names exist in the
+        # organisation. Zero means the catalogue is for a different estate.
+        "catalogue_applications_matched": sum(1 for name in APP_CAPABILITIES if name in apps),
         "app_capability_created": 0,
         "unified_app_capability_created": 0,
         "stage_capability_created": 0,
@@ -411,6 +414,14 @@ def seed_demo_mappings_command(org_id, dry_run):
         f"{stats['already_present']} already present; {stats['skipped']} skipped "
         "(name not present in this organisation)."
     )
+    if stats["catalogue_applications_matched"] == 0:
+        click.echo(
+            "  None of this organisation's applications appear in this command's "
+            "catalogue (it names products such as SAP S/4HANA, Salesforce Sales Cloud "
+            "and Blue Yonder WMS), so it is for a different demonstration estate and "
+            "linked nothing here. The Lantern Quay Systems demonstration carries its "
+            "own capability mappings, written by `flask seed-demo-company`."
+        )
 
 
 def init_app(app):
