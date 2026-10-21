@@ -77,9 +77,11 @@ def test_brand_click_returns_to_shared_home_without_removing_admin_navigation(br
         assert page.goto(base + "/fixture/start").status == 200
         sidebar = page.get_by_test_id("sidebar")
         command_center = sidebar.get_by_role("link", name="Command Center", exact=True)
-        # Launch cut: the sidebar is the twelve modules for every role; the admin
-        # pages are reached from the profile menu and Settings, not the sidebar.
-        expect(command_center).to_have_count(0)
+        # Launch cut: the grouped tree is the same for every role; a platform administrator keeps
+        # Command Center as a footer link beside All modules.
+        expect(command_center).to_have_count(1 if administrator else 0)
+        if administrator:
+            expect(command_center).to_have_attribute("href", "/admin/")
         brand = sidebar.get_by_role("link", name="Entelim", exact=True)
         with page.expect_navigation() as destination:
             brand.click()

@@ -159,9 +159,11 @@ def test_platform_admin_hits_the_link_budget_exactly(app, db_session, make_org):
     """
     sidebar_html = _sidebar_html(app, db_session, make_org, "platform_admin", "pa-budget")
     link_count = _real_link_count(sidebar_html)
-    assert link_count == SIDEBAR_BUDGET, (
+    # + 1: the footer Command Center link only a platform administrator carries (brand-home journey),
+    # outside the grouped tree whose level-1 entries SIDEBAR_LINK_BUDGET counts.
+    assert link_count == SIDEBAR_BUDGET + 1, (
         f"platform_admin sidebar renders {link_count} links, expected exactly "
-        f"{SIDEBAR_BUDGET} (0 headroom left — see role_access.py's "
+        f"{SIDEBAR_BUDGET + 1} (0 headroom left — see role_access.py's "
         f"SIDEBAR_LINK_BUDGET comment)"
     )
 
@@ -201,9 +203,11 @@ def test_platform_admin_applications_link_not_duplicated(app, db_session, make_o
 
 def test_platform_admin_governance_and_admin_zones_are_not_in_the_sidebar(app, db_session, make_org):
     """Launch cut: the sidebar is the twelve modules for every role, platform_admin included.
-    Admin pages stay reachable from the profile menu and Settings, not the sidebar."""
+    Admin pages stay reachable from the profile menu and Settings, not the sidebar tree. The one
+    exception is the footer Command Center link a platform administrator keeps, so the administration
+    home is one click away."""
     sidebar_html = _sidebar_html(app, db_session, make_org, "platform_admin", "pa-gov-admin")
-    assert "Command Center" not in sidebar_html
+    assert sidebar_html.count('data-testid="sidebar-command-center"') == 1
     assert "Salesforce Integration" not in sidebar_html
     assert "Governance" not in sidebar_html
 
