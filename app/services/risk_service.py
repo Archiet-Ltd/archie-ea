@@ -349,9 +349,9 @@ def ranked_risks():
             for c in sorted(apps_by_risk.get(risk.id, []))
         ]
         app_elements = {t["element_id"] for t in touches}
-        if risk.archimate_element_id is not None and risk.archimate_element_id in names:
-            touches.insert(0, {"name": names[risk.archimate_element_id], "kind": "element",
-                               "id": risk.archimate_element_id, "element_id": risk.archimate_element_id})
+        # The risk's own mirrored element is never listed: it is the risk itself,
+        # not something the risk touches (its page has no relationships to show).
+        app_elements.add(risk.archimate_element_id)
         nearest = sorted(reached, key=lambda e: (reached[e], names.get(e, ""), e))
         touches += [{"name": names[e], "kind": "element", "id": e, "element_id": e}
                     for e in nearest if e in names and e not in app_elements][:_TOUCHES_SHOWN]

@@ -79,7 +79,9 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <a href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" class="text-sm font-medium text-foreground hover:underline">{{ r.title }}</a>
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground capitalize">{{ r.status }}</span>
-                        <span class="text-xs text-muted-foreground">Reaches <span class="tabular-nums">{{ r.exposure if r.exposure is not none else '—' }}</span></span>
+                        {% if r.exposure is not none %}
+                        <span class="text-xs text-muted-foreground">Reaches <span class="tabular-nums">{{ r.exposure }}</span> {{ 'element' if r.exposure == 1 else 'elements' }}</span>
+                        {% endif %}
                     </div>
                     <p class="text-xs text-muted-foreground mt-0.5" data-risk-reason>{{ r.reason }}</p>
                     {% if r.touches %}
@@ -92,6 +94,12 @@
                         {% else %}{{ t.name }}{{ ',' if not loop.last }}{% endif %}
                         {% endfor %}
                     </p>
+                    {% elif r.worked_out %}
+                    <p class="text-xs text-muted-foreground mt-1" data-risk-unlinked>Not linked to any application or capability yet.
+                        <button type="button" @click="openMap({{ r.risk_id }})" class="text-primary hover:underline">Link it</button>
+                    </p>
+                    {% else %}
+                    <p class="text-xs text-muted-foreground mt-1">What this risk touches could not be worked out.</p>
                     {% endif %}
                 </div>
             </li>
@@ -564,6 +572,13 @@ function riskRegister() {
             this.linkSearch = '';
             this.linkResults = [];
             this.panelOpen = true;
+        },
+
+        // From the ranked list: the same slide-over and picker as the row's
+        // "Map to…" action, opened for the risk with this id.
+        openMap(riskId) {
+            const row = (window.RISK_ROWS || []).find(function (r) { return r.id === riskId; });
+            this.openView(row, true);
         },
 
         confirmDelete(row) {
