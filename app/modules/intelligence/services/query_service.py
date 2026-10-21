@@ -572,6 +572,60 @@ def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[st
     return rows
 
 
+def _attach_origins(rows: List[Dict[str, Any]], org_id: Optional[int]) -> None:
+    """Say where each connector-written link of an explicit chain came from.
+
+    A link a connector wrote carries its origin (``source_kind`` ``connector``):
+    the repository, the commit it was read at and the file that shows it. Rows
+    whose chain holds such a link gain ``relation["origins"]``, keyed by the
+    relationship id as text; a chain of drawn or imported links gains nothing,
+    so those rows keep exactly the shape they had. One batched select, fenced
+    to the organisation; nothing but the origin's own fields is read.
+    """
+    import json
+
+    from app.models import ArchiMateRelationship
+
+    ids = sorted({rid for row in rows for rid in row["relation"]["chain"]})
+    if not ids or org_id is None:
+        return
+    found = db.session.execute(
+        db.select(
+            ArchiMateRelationship.id,
+            ArchiMateRelationship.source_ref,
+            ArchiMateRelationship.source_label,
+            ArchiMateRelationship.source_recorded_at,
+        ).where(
+            ArchiMateRelationship.id.in_(ids),
+            ArchiMateRelationship.organization_id == org_id,
+            ArchiMateRelationship.source_kind == "connector",
+        )
+    ).all()
+    origins: Dict[str, Dict[str, Any]] = {}
+    for rel_id, ref, label, recorded_at in found:
+        try:
+            body = json.loads(ref or "{}")
+        except ValueError:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        origins[str(rel_id)] = {
+            "system": body.get("system"),
+            "repository": body.get("repository"),
+            "commit": body.get("commit"),
+            "file": body.get("file"),
+            "detail": body.get("detail"),
+            "label": label,
+            "recorded_at": recorded_at.isoformat() if recorded_at else None,
+        }
+    if not origins:
+        return
+    for row in rows:
+        mine = {str(r): origins[str(r)] for r in row["relation"]["chain"] if str(r) in origins}
+        if mine:
+            row["relation"]["origins"] = mine
+
+
 def _filter_explicit_by_layer(rows: List[Dict[str, Any]], layer: str) -> List[Dict[str, Any]]:
     from app.models import ArchiMateElement
 
@@ -907,6 +961,7 @@ class IntelligenceQueryService:
                         derived_rows = [_derived_row(fact, element_id) for fact in matching]
 
                     rows = explicit_rows + derived_rows
+                    _attach_origins(explicit_rows, org_id)
 
                     # Resolve every element id the result set can name in ONE
                     # batched select, INSIDE the latency scope so

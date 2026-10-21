@@ -1,5 +1,90 @@
 {
   "organization": "acme",
+  "job0": {
+    "directories": {
+      "acme/platform-monorepo/services": [
+        "auth",
+        "gateway",
+        "README.md"
+      ],
+      "acme/platform-monorepo/services/auth": [
+        "Dockerfile",
+        "main.go"
+      ],
+      "acme/platform-monorepo/services/gateway": [
+        "Dockerfile",
+        "main.go"
+      ]
+    },
+    "extra_repositories": [
+      {
+        "description": "Settles card payments",
+        "id": 7013,
+        "language": "Go",
+        "name": "payments-worker",
+        "pushed_at": "2026-10-11T10:00:00Z",
+        "root": [
+          "Dockerfile",
+          "go.mod",
+          "cmd"
+        ]
+      },
+      {
+        "description": "Portal components",
+        "id": 7014,
+        "language": "TypeScript",
+        "name": "customer-portal-ui",
+        "pushed_at": "2026-10-12T15:00:00Z",
+        "root": [
+          "Dockerfile",
+          "package.json",
+          "src"
+        ]
+      },
+      {
+        "description": "Renders PDF invoices for billing-api",
+        "id": 7015,
+        "language": "Java",
+        "name": "invoice-renderer",
+        "pushed_at": "2026-10-08T09:00:00Z",
+        "root": [
+          "Dockerfile",
+          "pom.xml",
+          "src"
+        ]
+      },
+      {
+        "description": "Auth and gateway services",
+        "id": 7016,
+        "language": "Go",
+        "name": "platform-monorepo",
+        "pushed_at": "2026-10-13T08:00:00Z",
+        "root": [
+          "services",
+          "README.md"
+        ]
+      }
+    ],
+    "files": {
+      "acme/billing-api/pom.xml": "<project>\n  <dependencies>\n    <dependency>\n      <groupId>com.acme</groupId>\n      <artifactId>payments-service</artifactId>\n      <version>2.1.0</version>\n    </dependency>\n    <dependency>\n      <groupId>junit</groupId>\n      <artifactId>junit</artifactId>\n      <version>4.13</version>\n    </dependency>\n  </dependencies>\n</project>\n",
+      "acme/customer-portal/docker-compose.yml": "services:\n  web:\n    build: .\n    ports:\n      - \"8080:8080\"\n  billing-api:\n    image: ghcr.io/acme/billing-api:2.0.1\n  cache:\n    image: redis:7\n",
+      "acme/customer-portal/package.json": "{\n  \"name\": \"customer-portal\",\n  \"version\": \"3.4.0\",\n  \"dependencies\": {\n    \"@acme/payments-service\": \"^2.1.0\",\n    \"@acme/shared-utils\": \"^1.0.0\",\n    \"react\": \"^18.2.0\"\n  }\n}",
+      "acme/orders-worker/go.mod": "module github.com/acme/orders-worker\n\ngo 1.22\n\nrequire (\n\tgithub.com/acme/inventory-service v0.3.1\n\tgithub.com/stretchr/testify v1.9.0\n)\n",
+      "acme/payments-service/.github/workflows/deploy.yml": "name: Deploy\non:\n  push:\n    branches: [main]\njobs:\n  deploy-worker:\n    uses: acme/payments-worker/.github/workflows/deploy.yml@main\n    secrets: inherit\n"
+    },
+    "note": "Extends the recorded organisation for the first-model tests: four more repositories (three parts of an application and one monorepo), topics that put three repositories in one system, and the text of the files that name links between repositories.",
+    "topics": {
+      "billing-api": [
+        "product-shop"
+      ],
+      "customer-portal": [
+        "product-shop"
+      ],
+      "payments-service": [
+        "product-shop"
+      ]
+    }
+  },
   "responses": {
     "orgs/acme/repos": [
       {

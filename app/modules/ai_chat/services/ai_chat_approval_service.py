@@ -659,6 +659,16 @@ class AIChatApprovalService:
                     "error": f"Approval is already {approval.status.value}",
                 }
 
+            # A GitHub proposal that cannot land yet (a part whose application is not
+            # in the model, a link whose end is not) is refused here, before it is
+            # claimed, so it stays pending and can be approved once its prerequisite is.
+            if approval.operation_type in ("repository_classification", "repository_relationship"):
+                from app.connectors.github import proposal_blocker
+
+                blocker = proposal_blocker(approval)
+                if blocker:
+                    return {"success": False, "code": "CONFLICT", "error": blocker}
+
             # Overdue-not-expired: an item past expires_at is overdue, not expired —
             # it stays actionable indefinitely (escalate_overdue_approvals, run
             # periodically, notifies the organisation's administrators the first
@@ -738,12 +748,13 @@ class AIChatApprovalService:
 
                 result = execute_connector_proposal(approval)
 
-            elif approval.operation_type in ("repository_classification", "owner_proposal"):
+            elif approval.operation_type in ("repository_classification", "owner_proposal", "repository_relationship"):
                 # The GitHub connector's proposals: an unmatched repository
                 # classified for a person to decide (an approved application is
-                # created through data_service), and a proposed owner that would
-                # replace a person-recorded one. Queued by app/connectors/github.py,
-                # executed by the same module.
+                # created through data_service, a part joins its application),
+                # a link the code states between two repositories, and a proposed
+                # owner that would replace a person-recorded one. Queued by
+                # app/connectors/github.py, executed by the same module.
                 from app.connectors.github import execute_github_proposal
 
                 result = execute_github_proposal(approval, data_service)

@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 from app import db
 from app.middleware.tenant_context import current_org_id
 from app.models.archimate_core import ArchiMateElement
+from app.models.archimate_element_types import base_type
 from app.models.ai_chat_crud_approval import AIChatCRUDApproval
 from app.modules.intelligence.services.crosswalk_service import CrosswalkService
 
@@ -172,7 +173,7 @@ class MatcherService:
         for elem in candidates:
             if _normalise_name(elem.name or "") == norm:
                 if type_name and elem.type:
-                    if _normalise_name(elem.type) != _normalise_name(type_name):
+                    if _normalise_name(base_type(elem.type)) != _normalise_name(base_type(type_name)):
                         continue
                 matched.append(elem)
         return matched
@@ -218,7 +219,7 @@ class MatcherService:
             if _normalise_name(elem.name or "") == norm:
                 continue  # exact match handled elsewhere
             if type_name and elem.type:
-                if _normalise_name(elem.type) != _normalise_name(type_name):
+                if _normalise_name(base_type(elem.type)) != _normalise_name(base_type(type_name)):
                     continue
             is_near, score = DuplicateDetectionUtils.is_duplicate(
                 name, elem.name, mode="fuzzy", threshold=NEAR_DUPLICATE_THRESHOLD,

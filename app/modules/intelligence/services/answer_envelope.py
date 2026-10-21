@@ -263,11 +263,11 @@ def _row_truth_class(kind: str, row: Dict[str, Any]) -> str:
 
 
 def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    cited: Dict[Tuple[str, int], None] = {}
+    cited: Dict[Tuple[str, int], Optional[Dict[str, Any]]] = {}
 
-    def cite(source: str, ident: Any) -> None:
+    def cite(source: str, ident: Any, origin: Optional[Dict[str, Any]] = None) -> None:
         if isinstance(ident, int):
-            cited.setdefault((source, ident), None)
+            cited.setdefault((source, ident), origin)
 
     for row in rows:
         if kind == KIND_RISK_PROPAGATION:
@@ -279,10 +279,15 @@ def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 cite("compliance_control", control.get("control_id"))
             continue
         for relation in _relations_of(kind, row):
+            origins = relation.get("origins") or {}
             for relationship_id in relation.get("chain") or []:
-                cite("relationship", relationship_id)
+                # A link a connector wrote cites the repository and commit it was read at.
+                cite("relationship", relationship_id, origins.get(str(relationship_id)))
             cite("derived_relationship", relation.get("derived_id"))
-    return [{"type": t, "id": i} for (t, i) in sorted(cited)][:MAX_CITATIONS]
+    return [
+        {"type": t, "id": i, **({"origin": cited[(t, i)]} if cited[(t, i)] else {})}
+        for (t, i) in sorted(cited)
+    ][:MAX_CITATIONS]
 
 
 def build_envelope(
