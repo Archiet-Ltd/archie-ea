@@ -193,6 +193,17 @@ class CapabilityGapAnalysisService:
             0, gaps["summary"]["gaps_identified"] - gaps["summary"]["gaps_with_decisions"]
         )
 
+        # Compute average maturity gap (excluding unknown/None gaps)
+        maturity_gaps_list = gaps["maturity_gaps"]
+        known_gaps = [g["maturity_gap"] for g in maturity_gaps_list if g["maturity_gap"] is not None]
+        if known_gaps:
+            gaps["summary"]["average_maturity_gap"] = sum(known_gaps) / len(known_gaps)
+        else:
+            gaps["summary"]["average_maturity_gap"] = None
+
+        # Sort maturity_gaps by gap descending (largest gap first)
+        gaps["maturity_gaps"].sort(key=lambda g: (g["maturity_gap"] is None, -(g["maturity_gap"] or 0)))
+
         return gaps
 
     def _collect_capability_gaps(
@@ -290,7 +301,7 @@ class CapabilityGapAnalysisService:
                 )
 
         # Maturity gap (evaluate even when no apps exist)
-        if include_maturity and maturity_gap_value > 0:
+        if include_maturity and maturity_gap_value is not None:
             gap_infos.append(
                 {
                     "capability_id": capability.id,
@@ -530,7 +541,7 @@ class CapabilityGapAnalysisService:
 
         for capability in capabilities:
             maturity_gap = self._effective_maturity_gap(capability)
-            if maturity_gap <= 0:
+            if maturity_gap is None or maturity_gap <= 0:
                 continue
 
             (
@@ -573,13 +584,17 @@ class CapabilityGapAnalysisService:
 
         return ranked
 
-    def _effective_maturity_gap(self, capability: BusinessCapability) -> int:
-        """Calculate gap even when stored field is null."""
+    def _effective_maturity_gap(self, capability: BusinessCapability) -> Optional[int]:
+        """Calculate gap even when stored field is null.
+
+        Returns None when either current or target maturity is unrecorded,
+        so callers can distinguish "no gap" from "gap unknown".
+        """
         if capability.maturity_gap is not None:
             return capability.maturity_gap
 
         if capability.target_maturity_level is None or capability.current_maturity_level is None:
-            return 0
+            return None
 
         return max(capability.target_maturity_level - capability.current_maturity_level, 0)
 
