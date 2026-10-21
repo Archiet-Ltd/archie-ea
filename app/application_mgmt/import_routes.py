@@ -38,6 +38,7 @@ from .routes import (
     parse_integer_from_range,
 )
 import logging
+from app.models.archimate_element_types import application_kind_types
 logger = logging.getLogger(__name__)
 
 
@@ -1338,8 +1339,8 @@ def analyze_import():
             # Execute queries with proper error handling
             existing_archimate = {
                 e.name.lower(): e
-                for e in ArchiMateElement.query.filter_by(
-                    type="ApplicationComponent"
+                for e in ArchiMateElement.query.filter(
+                    ArchiMateElement.type.in_(application_kind_types())
                 ).all()
             }
             # Prefetch all existing applications to avoid N+1 queries later

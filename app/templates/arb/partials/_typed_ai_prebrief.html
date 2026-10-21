@@ -31,7 +31,7 @@
                 <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-info-emphasis">AI-suggested draft</span>
             </div>
             <button type="button" @click="generate()" :disabled="loading"
-                    class="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap"
                     aria-label="Generate AI pre-brief">
                 <i data-lucide="loader" x-show="loading" x-cloak class="h-3.5 w-3.5 animate-spin" aria-hidden="true"></i>
                 <span x-text="loading ? 'Generating…' : (prebrief ? 'Regenerate' : 'Generate pre-brief')"></span>

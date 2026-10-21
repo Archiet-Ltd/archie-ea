@@ -20,10 +20,20 @@ module.exports = {
       },
     },
     extend: {
+      // Pilot type scale (design register: typography). Plain sizes: the line
+      // height stays inherited, as it was with the arbitrary text-[Npx] values.
+      // The 11px tier is .text-2xs in shadcn_tokens.css (16px line height).
+      fontSize: {
+        '10': '10px',
+        '13': '13px',
+        '15': '15px',
+        '28': '28px',
+      },
       colors: {
         border: "hsl(var(--border) / <alpha-value>)",
         input: "hsl(var(--input) / <alpha-value>)",
         ring: "hsl(var(--ring) / <alpha-value>)",
+        overlay: "hsl(var(--overlay) / <alpha-value>)",
         background: "hsl(var(--background) / <alpha-value>)",
         foreground: "hsl(var(--foreground) / <alpha-value>)",
         primary: {
