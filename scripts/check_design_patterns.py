@@ -226,11 +226,31 @@ def rule_raw_modal(src: str, ctx: Ctx) -> list[Violation]:
     return out
 
 
+# A banned drawing engine is banned by what the page does, not by what a class is called:
+# renaming class="mermaid" while still loading and running Mermaid is the same pattern.
+ENGINE_USE = {
+    "mermaid": re.compile(
+        r"""<script[^>]+src=["'][^"']*mermaid[^"']*["']|\bmermaid\s*\.\s*(?:initialize|run|render|init|contentLoaded|parse)\s*\(|import\s+mermaid\b|from\s+["'][^"']*mermaid""",
+        re.I),
+    "observable": re.compile(r"""@observablehq/|\bnew\s+Runtime\s*\(|<script[^>]+src=["'][^"']*observablehq""", re.I),
+    "d3-sankey": re.compile(r"""\bd3\s*\.\s*sankey\s*\(|<script[^>]+src=["'][^"']*d3-sankey""", re.I),
+    "d3-chord": re.compile(r"""\bd3\s*\.\s*chord\s*\(|\bd3\s*\.\s*ribbon\s*\(""", re.I),
+}
+JINJA_COMMENT_RE = re.compile(r"\{#.*?#\}", re.S)
+
+
 def rule_banned_pattern(src: str, ctx: Ctx) -> list[Violation]:
-    """A banned pattern name inside a class or data- attribute, as a whole word."""
+    """A banned pattern name inside a class or data- attribute, as a whole word; and a banned
+    drawing engine loaded or called anywhere in the template (script tag, import or call)."""
     out = []
     if not ctx.banned:
         return out
+    live = JINJA_COMMENT_RE.sub(lambda m: " " * len(m.group(0)), src)
+    for name, rx in ENGINE_USE.items():
+        if name not in ctx.banned:
+            continue
+        for m in rx.finditer(live):
+            out.append(_v(ctx, src, m.start(), "BANNED_PATTERN", "%s used: %s" % (name, m.group(0)[:80])))
     word = re.compile(r"(?<![\w-])(%s)(?![\w-])" % "|".join(re.escape(b) for b in ctx.banned))
     for rx in (CLASS_ATTR_RE, DATA_ATTR_RE):
         for m in rx.finditer(src):
