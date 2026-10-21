@@ -46,3 +46,64 @@ def test_the_stored_profile_page_lists_each_group(app, db_session, make_org, cli
     assert html.count("Not recorded") >= 6
     assert "Month end close" in html and "serves" in html
     assert 'data-profile-group="processes"' in html
+
+
+def _ask_and_open(client, login_as, user, element_id):
+    login_as(client, user)
+    asked = client.post("/api/v1/intelligence/answers", json={"question": "element_profile", "element_id": element_id})
+    assert asked.status_code in (200, 201), asked.get_data(as_text=True)
+    login_as(client, user)
+    return client.get(asked.get_json()["data"]["page_url"]).get_data(as_text=True)
+
+
+def test_a_group_cut_short_is_not_shown_as_not_recorded(app, db_session, make_org, client, login_as, monkeypatch):
+    from app.models import ArchiMateElement, ArchiMateRelationship
+    from app.modules.intelligence.services import answer_envelope as ae
+
+    org = make_org("prof-page-cut")
+    user = _user(db_session, org.id)
+    app_el = ArchiMateElement(name="Ledger", type="ApplicationComponent", layer="application", organization_id=org.id)
+    db_session.add(app_el)
+    db_session.flush()
+    for i in range(3):
+        peer = ArchiMateElement(name=f"Peer{i}", type="ApplicationComponent", layer="application", organization_id=org.id)
+        db_session.add(peer)
+        db_session.flush()
+        db_session.add(ArchiMateRelationship(source_id=app_el.id, target_id=peer.id, type="Triggering", organization_id=org.id))
+    db_session.commit()
+    monkeypatch.setattr(ae, "SET_IMPACT_MAX_ROWS", 2)
+
+    html = _ask_and_open(client, login_as, user, app_el.id)
+    start = html.index('data-profile-group="processes"')
+    section = html[start:html.index("</section>", start)]
+    assert 'data-status="not_shown"' in section
+    assert "Not shown: more connections than one page." in section
+    assert "Not recorded." not in section
+
+
+def test_a_cost_reached_through_a_worked_out_link_says_so(app, db_session, make_org, client, login_as, monkeypatch):
+    from app.models import ArchiMateElement, ArchiMateRelationship
+    from app.models.application_portfolio import ApplicationComponent
+    from app.modules.intelligence.services import answer_envelope as ae
+
+    org = make_org("prof-page-derived")
+    user = _user(db_session, org.id)
+    cap = ArchiMateElement(name="Billing capability", type="Capability", layer="strategy", organization_id=org.id)
+    crm = ArchiMateElement(name="CRM", type="ApplicationComponent", layer="application", organization_id=org.id)
+    db_session.add_all([cap, crm])
+    db_session.flush()
+    db_session.add(ApplicationComponent(name="CRM", organization_id=org.id, archimate_element_id=crm.id,
+                                        total_cost_of_ownership=5.0))
+    db_session.add(ArchiMateRelationship(source_id=crm.id, target_id=cap.id, type="Realization", organization_id=org.id))
+    db_session.commit()
+    real = ae._profile_connections
+
+    def worked_out(element_id):
+        found, cut, derived_cut = real(element_id)
+        for item in found:
+            item["derived"], item["derived_id"] = True, 1
+        return found, cut, derived_cut
+
+    monkeypatch.setattr(ae, "_profile_connections", worked_out)
+    html = _ask_and_open(client, login_as, user, cap.id)
+    assert "worked out, through a worked-out link to Billing capability" in html

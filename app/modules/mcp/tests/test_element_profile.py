@@ -436,3 +436,12 @@ def test_work_package_gap_and_plateau_carry_their_own_dates_and_only_this_packag
     names = [r["name"] for r in env["rows"]]
     assert not [n for n in names if n.startswith("wo-")], names
     assert other["wp"].id not in {r["source"]["id"] for r in env["rows"] if r["source"]["type"] == "work_package"}
+
+
+def test_capability_cost_once_when_one_application_realises_and_serves_it(client, db_session, make_org):
+    org = make_org("el360-cap-same")
+    seed = _capability(db_session, org, "cs")
+    _link(db_session, org.id, seed["app"], seed["el"], "Serving")
+    db_session.commit()
+    env, _ = _profile(client, _token(seed["user"], org), seed["el"].id)
+    assert [r["name"] for r in _rows(env, "cost")] == ["E-cs-crm"]
