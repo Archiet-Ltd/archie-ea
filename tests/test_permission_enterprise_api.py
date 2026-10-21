@@ -82,20 +82,6 @@ def _post_arb(client, login_as, user):
     return client.post(ARB, json={"title": "Q", "reviewers": [1]})
 
 
-def _stub_arb_service(monkeypatch):
-    """Stand in for the service behind the ARB POST.
-
-    The permission gate is what these tests prove. The service itself is fixed on
-    the branch fix/arb-create-workflow-works, which replaces this stub with a
-    real call asserting 201 and a stored workflow.
-    """
-    monkeypatch.setattr(
-        "app.routes.enterprise_api.arb_service.create_workflow",
-        lambda **kwargs: {"id": 1, "title": kwargs.get("title")},
-        raising=False,
-    )
-
-
 class TestRoutesMovedToTheMatrix:
     def test_no_route_in_the_module_uses_the_retired_decorator(self):
         import inspect
@@ -121,15 +107,14 @@ class TestRoutesMovedToTheMatrix:
         assert _post_arb(client, login_as, architect).status_code == 403
 
     def test_administrator_is_admitted_to_the_write_route(
-        self, app, db_session, login_as, client, monkeypatch
+        self, app, db_session, login_as, client
     ):
         org = _org(db_session, "admin")
         admin = _user(db_session, org, "org_admin", platform_role="Administrator")
         db_session.commit()
-        _stub_arb_service(monkeypatch)
         response = _post_arb(client, login_as, admin)
-        assert response.status_code not in (401, 403)
-        assert response.status_code < 500
+        assert response.status_code == 201, response.get_data(as_text=True)
+        assert response.get_json()["data"]["id"]
 
     def test_anonymous_is_401_on_the_write_route(self, app, db_session, client):
         assert client.post(ARB, json={"title": "Q", "reviewers": [1]}).status_code == 401
@@ -163,9 +148,8 @@ class TestRoutesMovedToTheMatrix:
 
 class TestTwoOrganisations:
     def test_a_grant_in_one_organisation_does_not_open_the_route_in_another(
-        self, app, db_session, login_as, client, monkeypatch
+        self, app, db_session, login_as, client
     ):
-        _stub_arb_service(monkeypatch)
         from app.core.auth.permissions import set_grant
 
         org_a = _org(db_session, "a")
@@ -176,8 +160,7 @@ class TestTwoOrganisations:
         db_session.commit()
 
         admitted = _post_arb(client, login_as, architect_a)
-        assert admitted.status_code not in (401, 403)
-        assert admitted.status_code < 500
+        assert admitted.status_code == 201, admitted.get_data(as_text=True)
         assert _post_arb(client, login_as, architect_b).status_code == 403
 
     def test_an_administrator_of_one_organisation_is_only_a_viewer_in_another(
