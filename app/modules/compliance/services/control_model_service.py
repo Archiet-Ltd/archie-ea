@@ -100,7 +100,20 @@ def control_to_element(control: ComplianceControl, organization_id: int) -> Arch
     try:
         # A savepoint, so losing a race rolls back only this insert.
         with db.session.begin_nested():
-            return _create_element(control, organization_id, element_type, label, framework, framework_code)
+            return create_backbone_element(
+                element_type=element_type,
+                layer=MOTIVATION_LAYER,
+                name=f"{label}: {control.title}",
+                description=control.description or control.title,
+                organization_id=organization_id,
+                provenance={
+                    CONTROL_PROPERTY: control.id,
+                    "control_code": control.control_code,
+                    "framework_code": framework_code,
+                    "framework_version": framework.standard_version if framework is not None else None,
+                    "source": "compliance_library",
+                },
+            )
     except IntegrityError:
         # A concurrent first link made the element between our read and our insert: the
         # unique index on (organization, control) refused the second, so it is already there.
@@ -108,23 +121,6 @@ def control_to_element(control: ComplianceControl, organization_id: int) -> Arch
         if existing is None:
             raise
         return existing
-
-
-def _create_element(control, organization_id, element_type, label, framework, framework_code):
-    return create_backbone_element(
-        element_type=element_type,
-        layer=MOTIVATION_LAYER,
-        name=f"{label}: {control.title}",
-        description=control.description or control.title,
-        organization_id=organization_id,
-        provenance={
-            CONTROL_PROPERTY: control.id,
-            "control_code": control.control_code,
-            "framework_code": framework_code,
-            "framework_version": framework.standard_version if framework is not None else None,
-            "source": "compliance_library",
-        },
-    )
 
 
 def _existing_link(element_id: int, requirement_id: int, organization_id: int):
