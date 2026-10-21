@@ -45,7 +45,10 @@ Two checks, one script
 ----------------------
 ``--count`` / the default report is the READ gate above. ``--new-tables`` is the TABLE
 gate: every database table whose model has no tenant fence must be listed in
-``scripts/unfenced_tables.txt``. A new table that is neither fenced nor listed fails, so
+``scripts/unfenced_tables.txt``, and that list is a baseline: it is compared with the committed
+``scripts/unfenced_tables_baseline.txt`` and any added name fails, so it can only shrink. A new
+table is protected (TenantMixin) or declared shared reference data in
+``scripts/shared_reference_tables.txt`` with a reason after ``#`` (a line with no reason fails). A new table that is neither fenced nor listed fails, so
 the decision (fence it, or say it is global or reached only through a fenced parent)
 is made when the table is created, not after a later feature reads it. Regenerate the
 list with ``--tables`` when a table is removed or gains the mixin.
@@ -88,6 +91,10 @@ import dynamic_dispatch  # noqa: E402  (shared with check_tenant_scoping.py)
 REPO = Path(__file__).resolve().parent.parent
 APP = REPO / "app"
 TABLE_LIST = REPO / "scripts" / "unfenced_tables.txt"
+# The committed snapshot of the list. The list may lose names; it may never gain one.
+TABLE_BASELINE = REPO / "scripts" / "unfenced_tables_baseline.txt"
+# Tables that are shared reference data on purpose. One per line, `table  # reason`.
+SHARED_REFERENCE = REPO / "scripts" / "shared_reference_tables.txt"
 
 FENCE_BASES = ("TenantMixin", "HybridCapabilityTenantMixin", "HybridTenantMixin")
 MODEL_BASES = ("db.Model", "Model", "Base")
@@ -302,6 +309,45 @@ def listed_tables(path=None):
     return names
 
 
+def shared_reference_tables(path=None):
+    """(names, lines_without_a_reason) from the shared-reference file."""
+    path = path or SHARED_REFERENCE
+    names, bare = set(), []
+    if not path.exists():
+        return names, bare
+    for line in path.read_text(encoding="utf-8").splitlines():
+        body, _, reason = line.partition("#")
+        body = body.strip()
+        if not body:
+            continue
+        names.add(body)
+        if not reason.strip():
+            bare.append(body)
+    return names, bare
+
+
+def table_problems(tables, listed=None, baseline=None, shared=None):
+    """Every reason the table gate fails, as printable lines (empty = pass).
+
+    - a name in the unfenced list that the committed baseline does not have (the list can
+      only shrink);
+    - a table with no fence that is neither listed nor declared shared reference data;
+    - a shared-reference line with no reason after ``#``.
+    Removing a name from either file never fails.
+    """
+    listed = listed_tables() if listed is None else listed
+    baseline = listed_tables(TABLE_BASELINE) if baseline is None else baseline
+    shared_names, bare = shared_reference_tables() if shared is None else shared
+    problems = []
+    for name in sorted(listed - baseline):
+        problems.append(f"  added to the unfenced list: {name}")
+    for name in sorted(t for t in tables if t not in listed and t not in shared_names):
+        problems.append(f"  new unfenced table: {name}")
+    for name in sorted(bare):
+        problems.append(f"  shared reference table with no reason: {name}")
+    return problems
+
+
 def scan(app=None, repo=None):
     app, repo = app or APP, repo or REPO
     classes = discover_models(app, repo)
@@ -344,13 +390,14 @@ def main() -> int:
             print("# inherit TenantMixin or be added here, which shows up in review.")
             print(chr(10).join(tables))
             return 0
-        new = [t for t in tables if t not in listed_tables()]
-        for t in new:
-            print(f"  new unfenced table: {t}")
-        if new:
-            print("Give the model TenantMixin, or list the table in scripts/unfenced_tables.txt "
-                  "(global reference data, or reached only through a fenced parent).")
-        print(len(new))
+        problems = table_problems(tables)
+        for line in problems:
+            print(line)
+        if problems:
+            print("Give the model TenantMixin, or declare it shared reference data in "
+                  "scripts/shared_reference_tables.txt with a reason after `#`. "
+                  "scripts/unfenced_tables.txt can only shrink; a name added to it fails.")
+        print(len(problems))
         return 0
     models, hits = scan()
     if args.ambiguous:
