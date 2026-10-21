@@ -49,6 +49,7 @@ from app.services.archimate.archimate_prompts import (
     build_archimate_prompt,
 )
 from app.services.archimate.archimate_validation_engine import ArchiMateValidationEngine
+from app.models.archimate_element_types import StandardTypeTable
 
 if _FAST_INIT:
 
@@ -606,7 +607,7 @@ class ArchiMateLLMService:
 
     def _get_layer_for_element_type(self, element_type: str) -> str:
         """Determine the appropriate ArchiMate 3.2 layer for an element type."""
-        layer_mapping = {
+        layer_mapping = StandardTypeTable({
             # Motivation Layer
             "Stakeholder": "Motivation",
             "Driver": "Motivation",
@@ -672,7 +673,7 @@ class ArchiMateLLMService:
             "ImplementationEvent": "Implementation",
             "Gap": "Implementation",
             "Plateau": "Implementation",
-        }
+        })
 
         return layer_mapping.get(element_type, "Business")  # Default to Business layer
 

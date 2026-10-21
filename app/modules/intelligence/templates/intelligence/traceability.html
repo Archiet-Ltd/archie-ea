@@ -46,7 +46,7 @@
     ) }}
 
     {% call workspace_gate(home_url) %}
-    <section class="rounded-xl border border-border bg-card p-6">
+    <section class="rounded-lg border border-border bg-card p-6">
         <div class="mx-auto max-w-xl">
             {{ entity_picker('trace') }}
         </div>
@@ -88,7 +88,7 @@
                             data-relationship-type="{{ candidate.relationship_type }}"
                             :disabled="adding !== null"
                             @click="addCandidate($event)"
-                            class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 disabled:opacity-50 disabled:pointer-events-none">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Add this relationship
                     </button>
                 </li>

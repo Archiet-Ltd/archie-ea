@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 """Catch a composer link that carries a parameter the composer never reads.
 
-`/archimate/composer` reads exactly five query parameters — three server-side
+`/archimate/composer` reads exactly eight query parameters — six server-side
 in `composer_page` (`archimate_routes.py`): `solution_id`, `viewpoint`,
-`layer`; and two client-side in `composer.js`'s page-load logic:
-`viewpoint_id`, `prefill`. Any other parameter name on a literal
+`layer`, and the focus-mode trio `element`, `depth`, `derived` (open an
+element's impact neighbourhood as an unsaved view); and two client-side in
+`composer.js`'s page-load logic: `viewpoint_id`, `prefill`. Any other parameter name on a literal
 `/archimate/composer?...` string is silently ignored by the receiver, which
 is exactly the bug class fixed across four separate rounds on the night of
 2026-09-19 (dashboard cards, sub-diagram drill-down, AI-chat viewpoint
@@ -36,7 +37,10 @@ import glob
 import re
 import sys
 
-KNOWN_GOOD_PARAMS = {"solution_id", "viewpoint", "layer", "viewpoint_id", "prefill"}
+KNOWN_GOOD_PARAMS = {
+    "solution_id", "viewpoint", "layer", "viewpoint_id", "prefill",
+    "element", "depth", "derived",
+}
 
 # The literal STANDARD_VIEWPOINTS keys from
 # app/services/archimate_viewpoint_service.py. This script is a standalone

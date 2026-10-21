@@ -21,6 +21,7 @@ from sqlalchemy.sql.dml import Delete, Insert, Update
 from sqlalchemy.orm import Session
 
 from app import db
+from app.middleware.tenant_isolation import set_database_tenant_context
 from app.models.transformation_execution import (
     CommandMaterialisation,
     CommandIdempotencyRecord,
@@ -186,6 +187,7 @@ class CommandService:
     @classmethod
     def _issue_claim_challenge(cls, actor: ActorContext) -> Mapping[str, Any]:
         with Session(db.engine, expire_on_commit=False) as session, session.begin():
+            cls._scope_session(session, actor)
             schema = session.scalar(text("SELECT current_schema()"))
             quoted_schema = session.bind.dialect.identifier_preparer.quote(schema)
             return dict(
@@ -210,6 +212,29 @@ class CommandService:
         if value.tzinfo is None:
             return value.replace(tzinfo=timezone.utc)
         return value.astimezone(timezone.utc)
+
+    @staticmethod
+    def _scope_session(session: Session, actor: ActorContext) -> None:
+        """Set this session's row-level-security tenant context.
+
+        Every CommandService transaction opens its own plain
+        ``Session(db.engine)`` (or ``_FencedSession``), deliberately apart
+        from Flask-SQLAlchemy's own ``db.session`` -- but the tenant GUC
+        every RLS policy checks (``archie.organization_id``) is set only by
+        ``app.middleware.tenant_isolation``'s listeners on ``db.session``
+        itself (``after_begin`` / ``do_orm_execute`` / ``before_flush``),
+        which a session CommandService opens directly never reaches. Without
+        this, every plain ORM query here against a row-level-security-
+        fenced table (``command_idempotency_records``, ``operation_results``,
+        ...) silently sees no rows at all, regardless of what is actually
+        there -- indistinguishable, to this module's own checks, from a
+        stale or missing claim. ``set_database_tenant_context`` is the exact
+        helper ``tenant_isolation.py`` already documents for this class of
+        gap ("a few runtime paths open db.engine.connect() or
+        Session(db.engine) directly ... so the session after_begin listener
+        never sees them"); this reuses it rather than reimplementing it.
+        """
+        set_database_tenant_context(session.connection(), actor.organization_id)
 
     @staticmethod
     def _new_claim_token() -> str:
@@ -446,6 +471,7 @@ class CommandService:
         command_result = None
         with _FencedSession(db.engine, expire_on_commit=False) as session, session.begin():
             session.configure_fence(actor, claim)
+            cls._scope_session(session, actor)
             if authorizer is not None:
                 authorizer(session, actor, operation, claim.natural_key)
             # This preflight is intentionally non-locking. A handler may run for
@@ -740,6 +766,7 @@ class CommandService:
         conflict: tuple[str, dict[str, Any]] | None = None
         outcome: CommandClaim | CommandResult | None = None
         with Session(db.engine, expire_on_commit=False) as session, session.begin():
+            cls._scope_session(session, actor)
             # Authorization is mandatory and precedes both receipt creation and
             # immutable-result reconciliation. Resolvers never carry hidden auth.
             authorizer(session, actor, operation, natural_key)
@@ -939,6 +966,7 @@ class CommandService:
         terminal_reason: str | None = None,
     ) -> bool:
         with Session(db.engine, expire_on_commit=False) as session, session.begin():
+            cls._scope_session(session, actor)
             receipt = session.execute(
                 select(CommandIdempotencyRecord)
                 .where(
@@ -1020,6 +1048,7 @@ class CommandService:
         cls, *, actor: ActorContext, claim: CommandClaim
     ) -> CommandClaim:
         with Session(db.engine, expire_on_commit=False) as session, session.begin():
+            cls._scope_session(session, actor)
             receipt = session.execute(
                 select(CommandIdempotencyRecord)
                 .where(

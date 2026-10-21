@@ -147,7 +147,7 @@
 
 <h3>2.1 Stakeholders</h3>
 {% if stakeholders %}
-<table><thead><tr><th>Stakeholder</th><th>Role</th><th>Key Concerns</th><th>Influence</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Stakeholder</th><th>Role</th><th>Key Concerns</th><th>Influence</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for s in stakeholders %}<tr><td>{{ s.name }}</td><td>{{ s.role }}</td><td>{{ s.concerns }}</td><td>{{ s.influence }}</td></tr>{% endfor %}
 </tbody></table>
@@ -155,7 +155,7 @@
 
 <h3>2.2 Business Drivers</h3>
 {% if drivers %}
-<table><thead><tr><th>Driver</th><th>Type</th><th>Description</th><th>Impact</th><th>Urgency</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Driver</th><th>Type</th><th>Description</th><th>Impact</th><th>Urgency</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for d in drivers %}<tr><td>{{ d.name }}</td><td>{{ d.type|title }}</td><td>{{ d.description }}</td><td>{{ d.impact or '—' }}</td><td>{{ d.urgency or '—' }}</td></tr>{% endfor %}
 </tbody></table>
@@ -163,7 +163,7 @@
 
 <h3>2.3 Goals & Objectives</h3>
 {% if goals %}
-<table><thead><tr><th>Goal</th><th>Description</th><th>Success Measure</th><th>Target</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Goal</th><th>Description</th><th>Success Measure</th><th>Target</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for g in goals %}<tr><td>{{ g.name }}</td><td>{{ g.description }}</td><td>{{ g.measurement or '—' }}</td><td>{{ g.target_date or '—' }}</td></tr>{% endfor %}
 </tbody></table>
@@ -171,7 +171,7 @@
 
 <h3>2.4 Constraints</h3>
 {% if constraints %}
-<table><thead><tr><th>Constraint</th><th>Type</th><th>Value/Limit</th><th>Severity</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Constraint</th><th>Type</th><th>Value/Limit</th><th>Severity</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for c in constraints %}<tr><td>{{ c.name }}</td><td>{{ c.type|title }}</td><td>{{ c.value or '—' }}</td><td>{{ c.severity or '—' }}</td></tr>{% endfor %}
 </tbody></table>
@@ -179,7 +179,7 @@
 
 {% if principles %}
 <h3>2.5 Architecture Principles</h3>
-<table><thead><tr><th>Principle</th><th>Statement</th><th>Implications</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Principle</th><th>Statement</th><th>Implications</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for p in principles %}<tr><td>{{ p.name }}</td><td>{{ p.statement }}</td><td>{{ p.implications }}</td></tr>{% endfor %}
 </tbody></table>
@@ -189,7 +189,7 @@
 <h2 class="section"><span class="num">3.</span> Business Architecture <span class="phase-tag">PHASE B</span></h2>
 <h3>3.1 Capability Mappings</h3>
 {% if capabilities %}
-<table><thead><tr><th>Business Capability</th><th>Support Level</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Business Capability</th><th>Support Level</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for c in capabilities %}<tr><td>{{ c.name }}</td><td><span class="badge b-blue">{{ c.support_level|default('mapped')|title }}</span></td></tr>{% endfor %}
 </tbody></table>
@@ -197,7 +197,7 @@
 
 {% if elements_by_layer.get('Business') %}
 <h3>3.2 Business Layer Elements</h3>
-<table><thead><tr><th>Element</th><th>Type</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Element</th><th>Type</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for e in elements_by_layer['Business'] %}<tr><td>{{ e.name }}</td><td>{{ e.type }}</td></tr>{% endfor %}
 </tbody></table>
@@ -207,7 +207,7 @@
 <h2 class="section"><span class="num">4.</span> Information Systems Architecture <span class="phase-tag">PHASE C</span></h2>
 <h3>4.1 Application Landscape</h3>
 {% if applications %}
-<table><thead><tr><th>Application</th><th>Lifecycle</th><th>Vendor</th><th>Owner</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Application</th><th>Lifecycle</th><th>Vendor</th><th>Owner</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for a in applications %}<tr><td>{{ a.name }}</td>
 <td><span class="badge {% if a.lifecycle == 'operational' %}b-green{% elif a.lifecycle in ['retired','deprecated'] %}b-red{% else %}b-grey{% endif %}">{{ a.lifecycle|default('—')|title }}</span></td>
@@ -217,7 +217,7 @@
 
 <h3>4.2 Requirements</h3>
 {% if requirements %}
-<table><thead><tr><th>Requirement</th><th>Type</th><th>Priority</th><th>Mandatory</th><th>Acceptance Criteria</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Requirement</th><th>Type</th><th>Priority</th><th>Mandatory</th><th>Acceptance Criteria</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for r in requirements %}<tr><td><strong>{{ r.name }}</strong><br><span style="color:#64748b">{{ r.description|truncate(140) }}</span></td>
 <td>{{ r.type|replace('_',' ')|title }}</td><td>{{ r.priority or '—' }}</td>
@@ -228,7 +228,7 @@
 
 {% if elements_by_layer.get('Application') %}
 <h3>4.3 Application Layer Elements</h3>
-<table><thead><tr><th>Element</th><th>Type</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Element</th><th>Type</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for e in elements_by_layer['Application'] %}<tr><td>{{ e.name }}</td><td>{{ e.type }}</td></tr>{% endfor %}
 </tbody></table>
@@ -237,7 +237,7 @@
 {# ──────────────────── 5. PHASE D — TECHNOLOGY ──────────────────── #}
 <h2 class="section"><span class="num">5.</span> Technology Architecture <span class="phase-tag">PHASE D</span></h2>
 {% if elements_by_layer.get('Technology') %}
-<table><thead><tr><th>Technology Element</th><th>Type</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Technology Element</th><th>Type</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for e in elements_by_layer['Technology'] %}<tr><td>{{ e.name }}</td><td>{{ e.type }}</td></tr>{% endfor %}
 </tbody></table>
@@ -247,7 +247,7 @@
 <h2 class="section"><span class="num">6.</span> Opportunities &amp; Solutions <span class="phase-tag">PHASE E</span></h2>
 <h3>6.1 Options Analysis</h3>
 {% if options %}
-<table><thead><tr><th>Option</th><th>Approach</th><th>Score</th><th>Indicative Cost</th><th>Timeline</th><th>Recommended</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Option</th><th>Approach</th><th>Score</th><th>Indicative Cost</th><th>Timeline</th><th>Recommended</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for o in options %}<tr>
 <td><strong>{{ o.name }}</strong></td><td>{{ o.type|title }}</td>
@@ -267,7 +267,7 @@
 
 {% if vendor_products %}
 <h3>6.3 Vendor Products Considered</h3>
-<table><thead><tr><th>Product</th><th>Category</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Product</th><th>Category</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for v in vendor_products %}<tr><td>{{ v.name }}</td><td>{{ v.category or '—' }}</td></tr>{% endfor %}
 </tbody></table>
@@ -275,7 +275,7 @@
 
 {% if fit_gap %}
 <h3>6.4 Fit-Gap Analysis</h3>
-<table><thead><tr><th>Business Process</th><th>Module</th><th>Fit Type</th><th>Status</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Business Process</th><th>Module</th><th>Fit Type</th><th>Status</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for f in fit_gap %}<tr><td>{{ f.process }}</td><td>{{ f.module or '—' }}</td>
 <td><span class="badge {% if f.fit_type in ['standard','configuration'] %}b-green{% elif f.fit_type in ['extension','isv_solution'] %}b-amber{% else %}b-red{% endif %}">{{ f.fit_type|replace('_',' ')|title }}</span></td>
@@ -287,14 +287,14 @@
 <h2 class="section"><span class="num">7.</span> Migration Planning <span class="phase-tag">PHASE F</span></h2>
 <h3>7.1 Transition Plateaus</h3>
 {% if plateaus %}
-<table><thead><tr><th>#</th><th>Plateau</th><th>Description</th><th>Target Date</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>#</th><th>Plateau</th><th>Description</th><th>Target Date</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for p in plateaus %}<tr><td>{{ loop.index }}</td><td><strong>{{ p.name }}</strong></td><td>{{ p.description }}</td><td>{{ p.target_date or '—' }}</td></tr>{% endfor %}
 </tbody></table>
 {% else %}<p class="empty">No transition plateaus documented.</p>{% endif %}
 {% if elements_by_layer.get('Implementation') %}
 <h3>7.2 Work Packages &amp; Deliverables</h3>
-<table><thead><tr><th>Element</th><th>Type</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Element</th><th>Type</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for e in elements_by_layer['Implementation'] %}<tr><td>{{ e.name }}</td><td>{{ e.type }}</td></tr>{% endfor %}
 </tbody></table>
@@ -315,7 +315,7 @@
 <h2 class="section"><span class="num">9.</span> Architecture Change Management <span class="phase-tag">PHASE H</span></h2>
 <h3>9.1 Success Metrics</h3>
 {% if metrics %}
-<table><thead><tr><th>Metric</th><th>Target</th><th>Current</th><th>Status</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Metric</th><th>Target</th><th>Current</th><th>Status</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for m in metrics %}<tr><td>{{ m.name }}</td><td>{{ m.target or '—' }}</td><td>{{ m.current or '—' }}</td><td>{{ m.status or '—' }}</td></tr>{% endfor %}
 </tbody></table>
@@ -324,7 +324,7 @@
 {# ──────────────────── 10. RISK REGISTER ──────────────────── #}
 <h2 class="section"><span class="num">10.</span> Risk Register</h2>
 {% if risks %}
-<table><thead><tr><th>Risk</th><th>Impact</th><th>Probability</th><th>Mitigation</th><th>Status</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Risk</th><th>Impact</th><th>Probability</th><th>Mitigation</th><th>Status</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for r in risks %}<tr><td>{{ r.description }}</td>
 <td><span class="badge {% if r.impact in ['critical','high'] %}b-red{% elif r.impact == 'medium' %}b-amber{% else %}b-grey{% endif %}">{{ r.impact|default('—')|title }}</span></td>
@@ -338,7 +338,7 @@
 {% if elements_by_layer %}
 {% for layer, elems in elements_by_layer.items() %}
 <h3>{{ layer }} Layer ({{ elems|length }})</h3>
-<table><thead><tr><th>Element</th><th>Type</th></tr></thead><tbody>
+<table class="dense-table"><thead><tr><th>Element</th><th>Type</th></tr></thead><tbody>
             {# actionable-rows-ok: a printed Solution Architecture / Design Document. This template renders a standalone export (its own DOCTYPE, no app chrome) read on paper or as a PDF, so a row has nowhere to link to and no control to offer. The interactive versions of these tables live in the solution screens. #}
 {% for e in elems %}<tr><td>{{ e.name }}</td><td>{{ e.type }}</td></tr>{% endfor %}
 </tbody></table>

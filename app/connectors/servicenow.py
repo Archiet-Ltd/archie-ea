@@ -104,13 +104,18 @@ class ServiceNowCMDBConnector(BaseConnector):
         """Get OAuth access token from ServiceNow."""
         try:
             token_url = urljoin(self.config.config["base_url"], "/oauth_token.do")
+            cfg = self.config.config
             auth_data = {
-                "grant_type": "password",
-                "client_id": self.config.config["client_id"],
-                "client_secret": self.config.config["client_secret"],
-                "username": self.config.config["username"],
-                "password": self.config.config["password"],
+                "client_id": cfg["client_id"],
+                "client_secret": cfg["client_secret"],
             }
+            if cfg.get("username") and cfg.get("password"):
+                auth_data.update(
+                    grant_type="password", username=cfg["username"], password=cfg["password"]
+                )
+            else:
+                # The connector form collects a client id and secret only.
+                auth_data["grant_type"] = "client_credentials"
 
             async with self._outbound_session() as session:
                 async with session.post(token_url, data=auth_data) as response:
@@ -171,55 +176,29 @@ class ServiceNowCMDBConnector(BaseConnector):
                             logger.warning("Reached 10k record limit, stopping batch sync")
                             break
 
-            # Process records
-            processed = await self._process_cmdb_records(all_records)
-
-            return {
-                "status": "completed",
-                "records_processed": len(all_records),
-                "records_created": processed["created"],
-                "records_updated": processed["updated"],
-                "records_deleted": processed["deleted"],
-            }
+            # Write the records into the organisation's model
+            return await self._process_cmdb_records(all_records)
 
         except Exception as e:
             logger.error(f"Batch sync failed: {e}")
             raise
 
-    async def _process_cmdb_records(self, records: List[Dict[str, Any]]) -> Dict[str, int]:
-        """Process CMDB records and update knowledge graph."""
-        created = 0
-        updated = 0
-        deleted = 0
+    def _record_to_element(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        """One CMDB configuration item as the ArchiMate element its class maps to."""
+        mapped = self._apply_field_mappings(record)
+        return {
+            "external_id": mapped["external_id"],
+            "name": mapped["name"],
+            "description": mapped.get("description"),
+            "element_type": mapped.get("ci_class")
+            or self._map_ci_class_to_archimate(record.get("sys_class_name", "")),
+        }
 
-        for record in records:
-            try:
-                # Apply field mappings
-                mapped_data = {}
-                for mapping in self.get_field_mappings():
-                    try:
-                        value = mapping.apply(record)
-                        if value is not None:
-                            mapped_data[mapping.target_field] = value
-                    except ValueError as e:
-                        logger.warning(f"Field mapping failed for {record.get('sys_id')}: {e}")
-                        continue
-
-                # Determine ArchiMate element type
-                ci_class = record.get("sys_class_name", "")
-                archimate_type = self._map_ci_class_to_archimate(ci_class)
-
-                logger.warning(
-                    "CMDB record %s (%s) mapped but not persisted — KG integration not available",
-                    record.get("sys_id"),
-                    archimate_type,
-                )
-
-            except Exception as e:
-                logger.error(f"Failed to process CMDB record {record.get('sys_id')}: {e}")
-                continue
-
-        return {"created": created, "updated": updated, "deleted": deleted}
+    async def _process_cmdb_records(self, records: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Write CMDB records into the organisation's model; returns the sync counts."""
+        return self.persist_records(
+            records, source_system="servicenow", to_element=self._record_to_element
+        )
 
     async def incremental_sync(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
         """Handle real-time CMDB updates from webhooks."""
@@ -229,15 +208,7 @@ class ServiceNowCMDBConnector(BaseConnector):
                 raise ValueError("No record data in webhook event")
 
             # Process single record
-            processed = await self._process_cmdb_records([record])
-
-            return {
-                "status": "completed",
-                "records_processed": 1,
-                "records_created": processed["created"],
-                "records_updated": processed["updated"],
-                "records_deleted": processed["deleted"],
-            }
+            return await self._process_cmdb_records([record])
 
         except Exception as e:
             logger.error(f"Incremental sync failed: {e}")

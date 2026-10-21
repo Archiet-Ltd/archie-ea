@@ -217,6 +217,7 @@ scripts/check_*.py
 !scripts/check_deployed_deps.py
 !scripts/check_raw_sql_tenancy.py
 !scripts/check_untenanted_reads.py
+!scripts/check_request_field_writes.py
 !scripts/check_reuse_register.py
 !scripts/check_fabricated_data.py
 !scripts/check_macro_import_context.py

@@ -30,7 +30,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Status Panel -->
         <div class="lg:col-span-1">
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Connection Status</h3>
                 </div>
@@ -83,7 +83,7 @@
                             <p class="text-sm text-muted-foreground mb-2">Auto Sync</p>
                             <div class="flex items-center gap-2">
                                 {% if abacus_config.sync_enabled %}
-                                    <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">Enabled</span>
+                                    <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-info-emphasis">Enabled</span>
                                     <span class="text-sm text-muted-foreground">
                                         Every {{ abacus_config.sync_interval_minutes or 1440 }} minutes
                                     </span>
@@ -96,7 +96,7 @@
 
                         <!-- Error Message -->
                         {% if abacus_config and abacus_config.last_error %}
-                            <div class="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                            <div class="px-3 py-2 bg-destructive/10 border border-destructive/40 rounded-md">
                                 <p class="text-sm text-destructive-emphasis font-medium mb-1">Last Error:</p>
                                 <p class="text-xs text-destructive-emphasis/80">{{ abacus_config.last_error }}</p>
                             </div>
@@ -136,7 +136,7 @@
             </div>
 
             <!-- Sync Job Status -->
-            <div data-slot="card" class="mt-6 rounded-xl border-2 border-input bg-card" x-data="syncStatusPanel()">
+            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card" x-data="syncStatusPanel()">
                 <div class="p-4 sm:p-6 border-b flex items-center justify-between">
                     <h3 class="text-lg font-semibold">Sync Job Status</h3>
                     <button type="button" x-show="isStale" @click="clearStaleJobs()" x-cloak
@@ -168,7 +168,7 @@
             <!-- Imported Data Summary -->
             <!-- Updated: 2026-02-03 04:10 - Added imported data tracking -->
             {% if abacus_config or env_config %}
-            <div data-slot="card" class="mt-6 rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b flex items-center justify-between">
                     <h3 class="text-lg font-semibold flex items-center gap-2"><i data-lucide="bar-chart-3" class="w-4 h-4 text-muted-foreground"></i>Imported Data</h3>
                     <span class="text-xs text-muted-foreground">From Abacus</span>
@@ -214,7 +214,7 @@
 
         <!-- Configuration Form -->
         <div class="lg:col-span-2">
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Configuration</h3>
                 </div>
@@ -227,7 +227,7 @@
                             <h4 class="text-sm font-medium mb-4">Connection Settings</h4>
                             <div class="space-y-4">
                                 <div>
-                                    <label for="base_url" class="block text-sm font-medium mb-2">
+                                    <label for="base_url" class="block text-sm font-medium text-muted-foreground mb-1">
                                         Base URL <span class="text-destructive-emphasis">*</span>
                                     </label>
                                     <input type="url"
@@ -235,13 +235,13 @@
                                            name="base_url"
                                            value="{{ form.base_url.data or '' }}"
                                            placeholder="https://your-instance.avolutionsoftware.com"
-                                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                            required>
                                      <p class="text-xs text-muted-foreground mt-1">Your Abacus instance URL (e.g., https://abacus.example.com)</p>
                                 </div>
 
                                 <div>
-                                    <label for="client_id" class="block text-sm font-medium mb-2">
+                                    <label for="client_id" class="block text-sm font-medium text-muted-foreground mb-1">
                                         Client ID <span class="text-destructive-emphasis">*</span>
                                     </label>
                                     <input type="text"
@@ -249,13 +249,13 @@
                                            name="client_id"
                                            value="{{ form.client_id.data or '' }}"
                                            placeholder="your-client-id"
-                                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                            required>
                                      <p class="text-xs text-muted-foreground mt-1">OAuth2 client ID from Abacus API settings</p>
                                 </div>
 
                                 <div>
-                                    <label for="client_secret" class="block text-sm font-medium mb-2">
+                                    <label for="client_secret" class="block text-sm font-medium text-muted-foreground mb-1">
                                         Client Secret {% if not env_config %}<span class="text-destructive-emphasis">*</span>{% endif %}
                                     </label>
                                     <input type="password"
@@ -263,7 +263,7 @@
                                            name="client_secret"
                                            value="{{ form.client_secret.data or '' }}"
                                            placeholder="{% if abacus_config or env_config %}••••••••••••{% else %}your-client-secret{% endif %}"
-                                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                            {% if not abacus_config and not env_config %}required{% endif %} autocomplete="new-password">
                                     <p class="text-xs text-muted-foreground mt-1">
                                         {% if env_config %}
@@ -282,7 +282,7 @@
                             <div class="space-y-4">
                                 <div class="flex items-center justify-between p-3 bg-accent/50 rounded-md">
                                     <div>
-                                        <label for="enabled" class="text-sm font-medium">Enable Integration</label>
+                                        <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">Enable Integration</label>
                                         <p class="text-xs text-muted-foreground">Allow data synchronization with Abacus</p>
                                     </div>
                                     <label class="relative inline-flex items-center cursor-pointer">
@@ -298,7 +298,7 @@
 
                                 <div class="flex items-center justify-between p-3 bg-accent/50 rounded-md">
                                     <div>
-                                        <label for="sync_enabled" class="text-sm font-medium">Enable Auto-Sync</label>
+                                        <label for="sync_enabled" class="block text-sm font-medium text-muted-foreground mb-1">Enable Auto-Sync</label>
                                         <p class="text-xs text-muted-foreground">Automatically sync data on schedule</p>
                                     </div>
                                     <label class="relative inline-flex items-center cursor-pointer">
@@ -313,12 +313,12 @@
                                 </div>
 
                                 <div>
-                                    <label for="sync_interval_minutes" class="block text-sm font-medium mb-2">
+                                    <label for="sync_interval_minutes" class="block text-sm font-medium text-muted-foreground mb-1">
                                         Sync Interval (minutes)
                                     </label>
                                     <select id="sync_interval_minutes"
                                             name="sync_interval_minutes"
-                                            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                         <option value="60" {% if form.sync_interval_minutes.data == 60 %}selected{% endif %}>Every Hour</option>
                                         <option value="240" {% if form.sync_interval_minutes.data == 240 %}selected{% endif %}>Every 4 Hours</option>
                                         <option value="720" {% if form.sync_interval_minutes.data == 720 %}selected{% endif %}>Every 12 Hours</option>
@@ -335,7 +335,7 @@
                             <h4 class="text-sm font-medium mb-4">Relationship Import</h4>
                             <div class="flex items-center justify-between p-3 bg-accent/50 rounded-md">
                                 <div>
-                                    <label for="sync_relationships" class="text-sm font-medium">Sync Relationships</label>
+                                    <label for="sync_relationships" class="block text-sm font-medium text-muted-foreground mb-1">Sync Relationships</label>
                                     <p class="text-xs text-muted-foreground">Import OutConnection relationships as ArchiMate relationships after apps + capabilities</p>
                                 </div>
                                 <label class="relative inline-flex items-center cursor-pointer">
@@ -361,7 +361,7 @@
                                 <div x-show="!typesLoaded && !typesLoading" class="p-3 bg-accent/50 rounded-md">
                                     <p class="text-sm text-muted-foreground mb-2">Discover which entity types are available in your Abacus instance.</p>
                                     <button type="button" @click="discoverTypes()"
-                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-background border border-input hover:bg-accent transition-colors">
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                                         Discover Entity Types
                                     </button>
@@ -370,7 +370,7 @@
                                     Fetching from Abacus API...
                                 </div>
                                 <div x-show="typesLoaded" x-cloak>
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div class="grid grid-cols-1 gap-2">
                                         <template x-for="t in availableTypes" :key="t.name">
                                             <label class="flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer text-sm border border-transparent" :class="selectedTypes.includes(t.name) ? 'bg-primary/5 border-primary/20' : ''">
                                                 <input type="checkbox" :value="t.name" :checked="selectedTypes.includes(t.name)"
@@ -392,7 +392,7 @@
                             <div class="space-y-4">
                                 <div class="p-3 bg-accent/50 rounded-md space-y-3">
                                     <div>
-                                        <label for="filter_countries" class="text-sm font-medium">Country Filter</label>
+                                        <label for="filter_countries" class="block text-sm font-medium text-muted-foreground mb-1">Country Filter</label>
                                         <p class="text-xs text-muted-foreground">Select which countries to import applications from via the "App is used in Country" relationship</p>
                                     </div>
                                     <div>
@@ -401,7 +401,7 @@
                                                name="filter_countries"
                                                value="{{ form.filter_countries.data or '' }}"
                                                placeholder="e.g. United Kingdom,Ireland,France"
-                                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                                               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                                     </div>
                                     <div class="flex flex-wrap gap-2">
                                         <button type="button" @click="addCountry('United Kingdom')" class="text-xs px-2 py-1 rounded bg-accent text-accent-foreground hover:bg-accent/80" aria-label="Add United Kingdom to filter">+ United Kingdom</button>
@@ -419,11 +419,11 @@
                                 <input type="hidden" id="active-filters-data" value="{{ abacus_config.config_json|default('{}', true)|e if abacus_config else '{}' }}">
                                 <input type="hidden" id="dynamic_filters" name="dynamic_filters" value="">
                                 {% if not filter_dimensions %}
-                                <div class="p-3 bg-warning/10 border border-warning/30 rounded-md text-sm text-warning-emphasis">
+                                <div class="px-3 py-2 bg-warning/10 border border-warning/40 rounded-md text-sm text-warning-emphasis">
                                     <p class="font-medium">No filter dimensions available yet</p>
                                     <p class="text-xs mt-1">Click the button below to discover filter options from Abacus. They'll be saved and available on next page load.</p>
                                     <button type="button" id="btn-discover-now"
-                                            class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-background border border-input hover:bg-accent transition-colors">
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-2 items-center">
                                         Fetch Filter Options Now
                                     </button>
                                 </div>
@@ -455,7 +455,7 @@
                                     </div>
 
                                     <div>
-                                        <label for="filter-dimension-select" class="text-xs font-medium mb-1 block">Filter Dimension</label>
+                                        <label for="filter-dimension-select" class="block text-sm font-medium text-muted-foreground mb-1">Filter Dimension</label>
                                         <select id="filter-dimension-select" x-model="selectedDimension"
                                                 class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background">
                                             <option value="">Select a dimension...</option>
@@ -467,7 +467,7 @@
 
                                     {% for dim, values in filter_dimensions.items() %}
                                     <div x-show="selectedDimension === '{{ dim }}'" x-cloak>
-                                        <label class="text-xs font-medium mb-1 block">Select Values</label>
+                                        <label class="block text-sm font-medium text-muted-foreground mb-1">Select Values</label>
                                         <div class="max-h-48 overflow-y-auto border border-border rounded-md bg-background p-2 space-y-1">
                                             {% for val in values %}
                                             <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted cursor-pointer text-sm">
@@ -506,11 +506,11 @@
 
                         <!-- Submit Buttons -->
                         <div class="flex items-center gap-3 pt-4 border-t">
-                            <button type="submit" class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors" aria-label="Save Abacus configuration settings">
+                            <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Save Abacus configuration settings">
                                 <i data-lucide="save" class="w-4 h-4" aria-hidden="true"></i>
                                 Save Settings
                             </button>
-                            <a href="{{ url_for('admin.index') }}" class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors">
+                            <a href="{{ url_for('admin.index') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 Cancel
                             </a>
                         </div>
@@ -522,7 +522,7 @@
 
     <!-- Documentation Section -->
     <div class="mt-8">
-        <div data-slot="card" class="rounded-xl border-2 border-input bg-card p-4 sm:p-6">
+        <div data-slot="card" class="rounded-lg border border-input bg-card p-4 sm:p-6">
             <h3 class="text-lg font-semibold mb-4">Setup Instructions</h3>
             <div class="prose prose-sm max-w-none">
                 <ol class="space-y-2">
@@ -549,7 +549,7 @@
 
 <!-- Relationship Import Configuration (BPP-011) -->
 <div class="mt-6" x-data="relationshipMappings()">
-    <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+    <div data-slot="card" class="rounded-lg border border-input bg-card">
         <div class="p-4 sm:p-6 border-b cursor-pointer flex items-center justify-between"
              @click="expanded = !expanded">
             <div>
@@ -569,7 +569,7 @@
             <template x-if="!loading && !loadError && Object.keys(mappings).length > 0">
                 <div>
                     <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
+                        <table class="dense-table w-full text-sm">
                             <thead>
                                 <tr class="border-b">
                                     <th class="text-left py-2 px-3 font-medium">OutConnection Type</th>
@@ -631,7 +631,7 @@
                     <div class="flex items-center gap-3 mt-4 pt-4 border-t">
                         <button type="button" @click="saveMappings()"
                                 :disabled="saving"
-                                class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <span x-show="!saving">Save Mappings</span>
                             <span x-show="saving">Saving...</span>
                         </button>

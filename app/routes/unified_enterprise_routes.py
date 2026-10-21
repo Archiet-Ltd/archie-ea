@@ -64,6 +64,7 @@ from app.decorators import require_roles
 from app.services import work_package_service
 from app.utils.pagination import safe_int_arg
 from app.utils.tenant import current_organization_id
+from app.models.archimate_element_types import application_kind_types
 
 logger = logging.getLogger(__name__)
 
@@ -301,8 +302,9 @@ def api_solutions():
 def software_architecture_dashboard():
     """Software Architecture Dashboard"""
     try:
-        component_count = ArchiMateElement.query.filter_by(
-            type="ApplicationComponent", layer="Application"
+        component_count = ArchiMateElement.query.filter(
+            ArchiMateElement.type.in_(application_kind_types()),
+            ArchiMateElement.layer == "Application",
         ).count()
         service_count = ArchiMateElement.query.filter_by(
             type="ApplicationService", layer="Application"
