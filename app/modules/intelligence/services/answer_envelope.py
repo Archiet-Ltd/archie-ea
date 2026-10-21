@@ -42,12 +42,15 @@ from app.modules.intelligence.services.query_service import (
     SET_IMPACT_MAX_ROWS,
     SET_IMPACT_MAX_SEEDS,
     IntelligenceQueryService,
+    _resolve_application_owners_batch,
+    _resolve_elements_batch,
 )
 
 KIND_IMPACT = "impact"
 KIND_SET_IMPACT = "set_impact"
 KIND_RISK_PROPAGATION = "risk_propagation"
-ANSWER_KINDS = (KIND_IMPACT, KIND_SET_IMPACT, KIND_RISK_PROPAGATION)
+KIND_ELEMENT_PROFILE = "element_profile"
+ANSWER_KINDS = (KIND_IMPACT, KIND_SET_IMPACT, KIND_RISK_PROPAGATION, KIND_ELEMENT_PROFILE)
 
 CONFIDENCE_LOWEST_DERIVED = "lowest_derived_row"
 CONFIDENCE_DRAWN_ONLY = "drawn_facts_only"
@@ -117,6 +120,7 @@ def as_whole_number(raw: Any, name: str = "value") -> Any:
 # assistant uses it to tell an estate question (which must be answered from a
 # stored answer) from general conversation.
 _QUESTION_CUES = (
+    (KIND_ELEMENT_PROFILE, re.compile(r"\beverything (you know )?about\b|\b(full )?profile of\b|\b360 (view|profile)\b", re.I)),
     (KIND_RISK_PROPAGATION, re.compile(r"\b(risks?)\b.*\b(reach|affect|touch|expos|propagat)", re.I)),
     (KIND_SET_IMPACT, re.compile(r"\b(fail|fails|go down|are down|outage)\b.*\btogether\b|\btogether\b.*\b(fail|down)", re.I)),
     (
@@ -152,6 +156,10 @@ def normalise_params(kind: str, raw: Dict[str, Any]) -> Dict[str, Any]:
         raise AnswerParamError(f"question must be one of {list(ANSWER_KINDS)}")
     if not isinstance(raw, dict):
         raise AnswerParamError("the question must be an object")
+
+    if kind == KIND_ELEMENT_PROFILE:
+        # Everything connected to one element: one element, no walk depth to choose.
+        return {"element_id": _as_int(raw.get("element_id"), "element_id")}
 
     max_depth = raw.get("max_depth", 3)
     if isinstance(max_depth, bool) or not isinstance(max_depth, int) or not (1 <= max_depth <= 10):
@@ -258,6 +266,8 @@ def _row_truth_class(kind: str, row: Dict[str, Any]) -> str:
     derived ones do."""
     if kind == KIND_RISK_PROPAGATION:
         return TRUTH_CLASS_DERIVED if row.get("path_kind") == "derived" else TRUTH_CLASS_DRAWN
+    if kind == KIND_ELEMENT_PROFILE:
+        return TRUTH_CLASS_DERIVED if row.get("basis") == "worked_out" else TRUTH_CLASS_DRAWN
     kinds = {rel.get("kind") for rel in _relations_of(kind, row)}
     return TRUTH_CLASS_DRAWN if "explicit" in kinds else TRUTH_CLASS_DERIVED
 
@@ -270,6 +280,9 @@ def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             cited.setdefault((source, ident), None)
 
     for row in rows:
+        if kind == KIND_ELEMENT_PROFILE:
+            cite(row["source"]["type"], row["source"]["id"])
+            continue
         if kind == KIND_RISK_PROPAGATION:
             cite("risk", row.get("risk_id"))
             for relationship_id in row.get("path_relationships") or []:
@@ -318,6 +331,11 @@ def build_envelope(
                     derived_computed.append(_jsonable(relation["computed_at"]))
             if relation.get("stale"):
                 stale_rows += 1
+        if kind == KIND_ELEMENT_PROFILE and original.get("basis") == "worked_out":
+            if original.get("confidence") is not None:
+                derived_confidences.append(float(original["confidence"]))
+            if original.get("as_of"):
+                derived_computed.append(_jsonable(original["as_of"]))
         if kind == KIND_RISK_PROPAGATION and original.get("path_kind") == "derived":
             if original.get("path_confidence") is not None:
                 derived_confidences.append(float(original["path_confidence"]))
@@ -363,7 +381,350 @@ def build_envelope(
 # --------------------------------------------------------------------------- #
 
 
+
+# --------------------------------------------------------------------------- #
+# The profile of one element: everything connected to it, in groups
+# --------------------------------------------------------------------------- #
+
+# What a person unlocks from each element type's connections. The groups come
+# first, in this order; the connections no group claims follow in "connections".
+PROFILE_GROUPS: Dict[str, List[Tuple[str, str]]] = {
+    "ApplicationComponent": [
+        ("owner", "Owner"),
+        ("cost", "Cost"),
+        ("hosting_node", "Hosting node"),
+        ("end_of_support", "End of support"),
+        ("processes", "Processes and value streams served"),
+        ("interfaces", "Interfaces"),
+        ("risks", "Risks"),
+        ("gaps", "Open gaps"),
+    ],
+    "Capability": [
+        ("delivering_applications", "Delivering applications"),
+        ("owner", "Owner"),
+        ("maturity", "Maturity"),
+        ("cost", "Cost"),
+        ("gaps", "Gaps"),
+    ],
+    "WorkPackage": [
+        ("gap_closed", "Gap closed"),
+        ("plateau", "Plateau"),
+        ("applications_touched", "Applications touched"),
+        ("owner", "Owner"),
+    ],
+}
+PROFILE_OTHER_GROUP = ("connections", "Other connections")
+
+# (group, side the element is on or None for either, connected element types)
+_PROFILE_CLAIMS: Dict[str, List[Tuple[str, Optional[str], frozenset]]] = {
+    "ApplicationComponent": [
+        ("hosting_node", None, frozenset({"Node", "Device", "SystemSoftware"})),
+        ("processes", "out", frozenset({"BusinessProcess", "ValueStream"})),
+        ("interfaces", None, frozenset({"ApplicationInterface"})),
+        ("gaps", None, frozenset({"Gap"})),
+    ],
+    "Capability": [
+        ("delivering_applications", None, frozenset({"ApplicationComponent"})),
+        ("gaps", None, frozenset({"Gap"})),
+    ],
+    "WorkPackage": [
+        ("applications_touched", None, frozenset({"ApplicationComponent"})),
+    ],
+}
+# Shown from the work package's own record instead, so they are not listed twice.
+_PROFILE_SHOWN_ELSEWHERE: Dict[str, frozenset] = {"WorkPackage": frozenset({"Gap", "Plateau"})}
+
+# The reason code a group reports when it has nothing recorded, where the
+# vocabulary has one.
+_PROFILE_ABSENCE: Dict[str, Optional[str]] = {
+    "owner": "no_ownership_recorded",
+    "cost": "no_cost_recorded",
+    "risks": "no_risk_recorded",
+    "gaps": "no_gap_recorded",
+    "gap_closed": "no_gap_recorded",
+    "plateau": "no_plateau_recorded",
+    "maturity": "no_maturity_recorded",
+    "end_of_support": None,
+    "hosting_node": "relationship_not_recorded",
+    "processes": "relationship_not_recorded",
+    "interfaces": "relationship_not_recorded",
+    "delivering_applications": "relationship_not_recorded",
+    "applications_touched": "relationship_not_recorded",
+    "connections": "relationship_not_recorded",
+}
+
+_RELATION_OUT = {
+    "Serving": "serves", "Realization": "realises", "Assignment": "is assigned to",
+    "Access": "accesses", "Triggering": "triggers", "Flow": "flows to",
+    "Association": "is associated with", "Composition": "is composed of",
+    "Aggregation": "aggregates", "Specialization": "specialises", "Influence": "influences",
+}
+_RELATION_IN = {
+    "Serving": "is served by", "Realization": "is realised by", "Assignment": "has assigned",
+    "Access": "is accessed by", "Triggering": "is triggered by", "Flow": "receives flows from",
+    "Association": "is associated with", "Composition": "is part of",
+    "Aggregation": "is aggregated by", "Specialization": "is specialised by",
+    "Influence": "is influenced by",
+}
+
+# Applications whose cost is read for a capability; past it the answer says so.
+PROFILE_MAX_COSTED_APPLICATIONS = 25
+
+
+def _relation_words(relation_type: Optional[str], side: str) -> str:
+    table = _RELATION_OUT if side == "out" else _RELATION_IN
+    return table.get((relation_type or "").capitalize(), (relation_type or "is connected to").lower())
+
+
+def _recorded_on(model: Any, ids: List[Any], org_id: int) -> Dict[int, Optional[str]]:
+    """The date each record was last written, as ISO text, in one select. The readers
+    the profile composes return no timestamps, and every fact carries a date."""
+    wanted = sorted({i for i in ids if isinstance(i, int)})
+    if not wanted:
+        return {}
+    updated_col = getattr(model, "updated_at", None)
+    created_col = getattr(model, "created_at", None)
+    if updated_col is None and created_col is None:
+        return {}
+    stmt = db.select(
+        model.id,
+        updated_col if updated_col is not None else created_col,
+        created_col if created_col is not None else updated_col,
+    ).where(model.id.in_(wanted), model.organization_id == org_id)
+    out: Dict[int, Optional[str]] = {}
+    for ident, updated, made in db.session.execute(stmt).all():
+        stamp = updated or made
+        out[ident] = stamp.isoformat() if stamp is not None else None
+    return out
+
+
+def _profile_connections(element_id: int) -> Tuple[List[Dict[str, Any]], bool]:
+    """The element's direct connections, outgoing then incoming, from the one
+    canonical walk (run once per direction). Recorded connections are the depth-one
+    relationships; connections worked out from longer chains keep their confidence."""
+    found: List[Dict[str, Any]] = []
+    truncated = False
+    for direction, side in (("downstream", "out"), ("upstream", "in")):
+        result = IntelligenceQueryService.cross_layer_impact(
+            element_id,
+            include_derived=True,
+            max_depth=3,
+            direction=direction,
+            with_owner=False,
+            page_size=SET_IMPACT_MAX_ROWS,
+        )
+        if result.get("next_cursor") is not None:
+            truncated = True
+        for row in result.get("rows") or []:
+            relation = row["relation"]
+            derived = relation.get("kind") == "derived"
+            if not derived and relation.get("depth") != 1:
+                continue
+            found.append({
+                "element_id": row["element_id"],
+                "side": side,
+                "relation_type": relation.get("type"),
+                "derived": derived,
+                "relationship_id": (relation.get("chain") or [None])[0],
+                "derived_id": relation.get("derived_id"),
+                "computed_at": relation.get("computed_at"),
+                "confidence": relation.get("confidence"),
+            })
+    return found, truncated
+
+
+def _fact(group: str, label: str, name: str, source: Tuple[str, Any], as_of: Optional[str],
+          *, value: Any = None, basis: str = "recorded", **extra: Any) -> Dict[str, Any]:
+    row = {
+        "group": group, "group_label": label, "name": name, "value": value,
+        "source": {"type": source[0], "id": source[1]}, "as_of": as_of, "basis": basis,
+    }
+    row.update(extra)
+    return row
+
+
+def _application_cost_and_support_rows(portfolio: Dict[str, Any], labels: Dict[str, str],
+                                       only: Optional[str] = None) -> List[Dict[str, Any]]:
+    """The cost and end-of-support facts of a resolved application component, read from
+    the portfolio reader's block. Cost is the entered annual figure; nothing is summed."""
+    component = portfolio.get("component")
+    if not component:
+        return []
+    source = ("application_component", portfolio["application_component_id"])
+    as_of = component.get("updated_at")
+    out: List[Dict[str, Any]] = []
+    cost = component.get("cost") or {}
+    figures = {
+        key: cost[key] for key in (
+            "total_cost_of_ownership", "license_cost_annual", "maintenance_cost", "infrastructure_cost",
+            "support_cost", "implementation_cost", "development_cost_annual",
+        ) if cost.get(key) is not None
+    }
+    if figures:
+        out.append(_fact(
+            "cost", labels.get("cost", "Cost"), "Annual cost as entered", source, as_of,
+            value=figures.get("total_cost_of_ownership"), figures=figures,
+        ))
+    period = component.get("cost_by_period") or {}
+    if period.get("total_cost") is not None:
+        out.append(_fact(
+            "cost", labels.get("cost", "Cost"), f"Cost for fiscal year {period['fiscal_year']}", source, as_of,
+            value=period["total_cost"], budget=period.get("total_budget"),
+        ))
+    if only != "cost" and component.get("end_of_life_date"):
+        out.append(_fact(
+            "end_of_support", labels.get("end_of_support", "End of support"), "End of support", source, as_of,
+            value=component["end_of_life_date"],
+        ))
+    return out
+
+
+def _compute_element_profile(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Everything connected to one element, composed from the readers that already
+    exist: the canonical walk for connections, the owner reader, the portfolio reader
+    for cost and end of support, the risk and programme readers, and the capability
+    maturity reader. A group with nothing recorded says so; nothing is invented."""
+    from app.models import ArchiMateRelationship
+    from app.models.risk import Risk
+    from app.models.unified_work_package import UnifiedWorkPackage
+    from app.modules.capabilities.services.capability_heatmap_service import CapabilityHeatmapService
+
+    element_id = params["element_id"]
+    org_id = current_org_id()
+    subject = _resolve_elements_batch([element_id], org_id)
+    if str(element_id) not in subject:
+        raise AnswerNotAskable(ELEMENT_NOT_FOUND_REASON)
+    element_type = subject[str(element_id)]["type"]
+    groups = PROFILE_GROUPS.get(element_type, [])
+    labels = dict(groups)
+    labels[PROFILE_OTHER_GROUP[0]] = PROFILE_OTHER_GROUP[1]
+    claims = _PROFILE_CLAIMS.get(element_type, [])
+    elsewhere = _PROFILE_SHOWN_ELSEWHERE.get(element_type, frozenset())
+    rows: List[Dict[str, Any]] = []
+    reasons: List[str] = []
+
+    connections, truncated = _profile_connections(element_id)
+    if truncated:
+        reasons.append(ROWS_TRUNCATED_REASON)
+    elements = _resolve_elements_batch([c["element_id"] for c in connections] + [element_id], org_id)
+    dates = _recorded_on(
+        ArchiMateRelationship, [c["relationship_id"] for c in connections if not c["derived"]], org_id
+    )
+    seen = set()
+    for conn in connections:
+        other = elements.get(str(conn["element_id"]))
+        if other is None or other["type"] in elsewhere:
+            continue
+        group = PROFILE_OTHER_GROUP[0]
+        for claimed, side, types in claims:
+            if other["type"] in types and (side is None or side == conn["side"]):
+                group = claimed
+                break
+        key = (group, conn["element_id"], conn["relation_type"], conn["side"], conn["derived"])
+        if key in seen:
+            continue
+        seen.add(key)
+        words = _relation_words(conn["relation_type"], conn["side"])
+        if conn["derived"]:
+            source = ("derived_relationship", conn["derived_id"])
+            as_of, basis = _jsonable(conn["computed_at"]), "worked_out"
+        else:
+            source = ("relationship", conn["relationship_id"])
+            as_of, basis = dates.get(conn["relationship_id"]), "recorded"
+        rows.append(_fact(
+            group, labels[group], other["name"], source, as_of, basis=basis,
+            element_id=conn["element_id"], type=other["type"], relation=words,
+            relation_type=conn["relation_type"], direction=conn["side"],
+            confidence=conn["confidence"] if conn["derived"] else None,
+        ))
+
+    if element_type in ("ApplicationComponent", "Capability"):
+        owners = _resolve_application_owners_batch([element_id], org_id, subject).get(element_id, [])
+        for owner in owners:
+            rows.append(_fact(
+                "owner", labels["owner"], owner["name"], ("application_owner", owner.get("owner_record_id")),
+                owner.get("assigned_at"), value=owner["role"],
+            ))
+
+    if element_type == "ApplicationComponent":
+        portfolio = IntelligenceQueryService.portfolio_component_for_element(element_id)
+        rows.extend(_application_cost_and_support_rows(portfolio, labels))
+        risks = IntelligenceQueryService.risk_for_element(element_id, max_depth=1, include_derived=False)
+        risk_dates = _recorded_on(Risk, [r["risk_id"] for r in risks.get("risks") or []], org_id)
+        for risk in risks.get("risks") or []:
+            rows.append(_fact(
+                "risks", labels["risks"], risk["title"], ("risk", risk["risk_id"]),
+                risk_dates.get(risk["risk_id"]),
+                value={"score": risk.get("risk_score"), "level": risk.get("risk_level"),
+                       "status": risk.get("status")},
+            ))
+
+    if element_type == "Capability":
+        block = CapabilityHeatmapService().maturity_for_elements(
+            [element_id], organization_id=org_id).get(element_id)
+        if block and block.get("current") is not None:
+            rows.append(_fact(
+                "maturity", labels["maturity"], subject[str(element_id)]["name"],
+                ("capability", block.get("capability_id")), block.get("assessed_on"),
+                value={"current": block["current"], "target": block.get("target")},
+            ))
+        delivering = [r for r in rows if r["group"] == "delivering_applications"]
+        for row in delivering[:PROFILE_MAX_COSTED_APPLICATIONS]:
+            portfolio = IntelligenceQueryService.portfolio_component_for_element(row["element_id"])
+            for cost in _application_cost_and_support_rows(portfolio, labels, only="cost"):
+                cost["name"] = row["name"]
+                rows.append(cost)
+        if len(delivering) > PROFILE_MAX_COSTED_APPLICATIONS and ROWS_TRUNCATED_REASON not in reasons:
+            reasons.append(ROWS_TRUNCATED_REASON)
+
+    if element_type == "WorkPackage":
+        programme = IntelligenceQueryService.programme_for_element(
+            element_id, max_depth=1, include_derived=False)
+        packages = programme.get("work_packages") or []
+        wp_dates = _recorded_on(UnifiedWorkPackage, [p["work_package_id"] for p in packages], org_id)
+        for package in packages:
+            wp_id = package["work_package_id"]
+            if package.get("owner"):
+                rows.append(_fact(
+                    "owner", labels["owner"], package["owner"], ("work_package", wp_id), wp_dates.get(wp_id),
+                ))
+            gap, plateau = package.get("gap") or {}, package.get("plateau") or {}
+            if gap.get("gap_id") is not None:
+                rows.append(_fact(
+                    "gap_closed", labels["gap_closed"], gap["name"], ("gap", gap["gap_id"]),
+                    wp_dates.get(wp_id), value=gap.get("resolution_status"),
+                ))
+            if plateau.get("plateau_id") is not None:
+                rows.append(_fact(
+                    "plateau", labels["plateau"], plateau["name"], ("plateau", plateau["plateau_id"]),
+                    wp_dates.get(wp_id), value=plateau.get("target_date"),
+                ))
+
+    order = {name: index for index, (name, _label) in enumerate(groups + [PROFILE_OTHER_GROUP])}
+    rows.sort(key=lambda r: (order[r["group"]], r["name"] or ""))
+    group_status = []
+    for name, label in groups + [PROFILE_OTHER_GROUP]:
+        count = sum(1 for r in rows if r["group"] == name)
+        if name == PROFILE_OTHER_GROUP[0] and not count:
+            continue
+        group_status.append({
+            "group": name, "label": label,
+            "status": "recorded" if count else "not_recorded", "count": count,
+            "reason": None if count else _PROFILE_ABSENCE.get(name),
+        })
+    return {
+        "rows": rows,
+        "total": len(rows),
+        "summary": {"element_type": element_type, "groups": group_status},
+        "reasons": reasons,
+        "truncated": bool(truncated),
+        "elements": elements,
+    }
+
+
 def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    if kind == KIND_ELEMENT_PROFILE:
+        return _compute_element_profile(params)
     if kind == KIND_IMPACT:
         result = IntelligenceQueryService.cross_layer_impact(
             params["element_id"],

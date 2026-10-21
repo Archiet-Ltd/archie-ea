@@ -382,7 +382,12 @@ def _resolve_application_owners_batch(
     }
     for eid, owners in pending.items():
         results[eid] = [
-            {"name": display_by_id[o.id]["user_name"], "role": display_by_id[o.id]["ownership_type_label"]}
+            {
+                "name": display_by_id[o.id]["user_name"],
+                "role": display_by_id[o.id]["ownership_type_label"],
+                "owner_record_id": o.id,
+                "assigned_at": display_by_id[o.id]["assigned_at"],
+            }
             for o in owners
         ]
 
@@ -1894,6 +1899,8 @@ class IntelligenceQueryService:
         licence_entries = _licence_entries(component, org_id)
         component_block = {
             "name": component.name,
+            "updated_at": component.updated_at.isoformat() if component.updated_at else None,
+            "end_of_life_date": component.end_of_life_date.isoformat() if component.end_of_life_date else None,
             "health": _health_block(component),
             "cost": _cost_block(component),
             "cost_by_period": _cost_by_period_block(component, org_id),

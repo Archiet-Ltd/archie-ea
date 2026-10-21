@@ -143,7 +143,7 @@ def test_application_profile_returns_all_eight_groups_each_cited(client, db_sess
     assert _rows(env, "owner")[0]["source"]["type"] == "application_owner"
     assert _rows(env, "risks")[0]["source"]["type"] == "risk"
     _assert_every_row_is_cited(env)
-    assert "Not recorded" not in payload["message"]
+    assert "Not recorded" not in payload["message"], payload["message"]
 
 
 def test_profile_lists_every_connection_not_claimed_by_a_named_group(client, db_session, make_org):
@@ -267,8 +267,8 @@ def _work_package(db_session, org, prefix):
         sync_archimate_element(row)
     db_session.flush()
     app_el = _make_element(db_session, org.id, f"{prefix}-touched")
-    _link(db_session, org.id, wp_el, _gap_element(db_session, gap), "Association")
-    _link(db_session, org.id, wp_el, db_session.get(ArchiMateElement, plateau.archimate_element_id), "Realization")
+    _link(db_session, org.id, wp_el, _gap_element(db_session, gap), "association")
+    _link(db_session, org.id, wp_el, db_session.get(ArchiMateElement, plateau.archimate_element_id), "realization")
     _link(db_session, org.id, wp_el, app_el, "Association")
     db_session.flush()
     return {"user": user, "el": wp_el, "wp": wp, "app": app_el}
@@ -341,3 +341,22 @@ def test_no_new_connector_tool_is_added(client, db_session, make_org):
     names = [t["name"] for t in _mcp_tools_list(client, _token(user, org))]
     assert "answer" in names
     assert not [n for n in names if "profile" in n or "360" in n]
+
+
+def test_message_names_the_groups_with_nothing_recorded(client, db_session, make_org):
+    from app.models.application_owner import ApplicationOwner
+    from app.models.application_portfolio import ApplicationComponent
+
+    org = make_org("el360-partial")
+    user = _make_user(db_session, org, "el360-partial@example.com")
+    el = _make_element(db_session, org.id, "pa-app")
+    component = ApplicationComponent(name="E-pa-app", organization_id=org.id, archimate_element_id=el.id)
+    db_session.add(component)
+    db_session.flush()
+    db_session.add(ApplicationOwner(application_id=component.id, user_id=user.id,
+                                    organization_id=org.id, ownership_type="primary"))
+    db_session.commit()
+    env, payload = _profile(client, _token(user, org), el.id)
+    assert _groups(env)["owner"]["status"] == "recorded"
+    assert "Not recorded: Cost, Hosting node, End of support" in payload["message"], payload["message"]
+    assert all(r["group"] == "owner" for r in env["rows"])
