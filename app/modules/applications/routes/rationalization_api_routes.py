@@ -3907,11 +3907,15 @@ def rationalization_portfolio_scores():
     import time
     from app.models.application_rationalization import ApplicationRationalizationScore
 
+    from app.extensions.cache import org_scoped_cache_key
+
     disposition_filter = request.args.get("disposition", "")
-    cache_key = f"portfolio_scores:{disposition_filter}"
+    # Keyed by organisation. A cache hit runs no query, so the tenant filter cannot
+    # protect it. With no organisation in context nothing is read or kept.
+    org_key = org_scoped_cache_key(f"portfolio_scores:{disposition_filter}")
 
     # Return cached payload if still fresh
-    cached = _PORTFOLIO_SCORES_CACHE.get(cache_key)
+    cached = _PORTFOLIO_SCORES_CACHE.get(org_key) if org_key else None
     if cached:
         cached_at, payload = cached
         if time.time() - cached_at < _PORTFOLIO_SCORES_TTL:
@@ -3967,7 +3971,8 @@ def rationalization_portfolio_scores():
 
         import json
         payload = json.dumps(results)
-        _PORTFOLIO_SCORES_CACHE[cache_key] = (time.time(), payload)
+        if org_key is not None:
+            _PORTFOLIO_SCORES_CACHE[org_key] = (time.time(), payload)
 
         resp = current_app.response_class(
             payload, status=200, mimetype="application/json"

@@ -25,6 +25,7 @@ from sqlalchemy.orm import foreign
 from app.datetime_helpers import utcnow
 
 from app.models.mixins import TenantMixin
+from app.models.mixins.core import _default_org_id
 
 from .. import db
 
@@ -358,7 +359,7 @@ class WorkPackage(TenantMixin, db.Model):
         return f"<WorkPackage {self.name} status={self.status}>"
 
 
-class Deliverable(db.Model):
+class Deliverable(TenantMixin, db.Model):
     """Specific outputs or results produced by work packages."""
 
     __tablename__ = "deliverables"
@@ -400,6 +401,22 @@ class Deliverable(db.Model):
 
     # Link to Goal (Deliverables contribute to Goal achievement)
     goal_id = db.Column(db.Integer, db.ForeignKey("goals.id", ondelete="SET NULL"), index=True)
+
+    # Override TenantMixin's normally non-nullable column for an ADD-only
+    # rollout: the 20261018_typed_tables_org_id migration adds this to an
+    # existing table and leaves a row NULL when no organisation is derivable
+    # from its linked parents. The mixin is still essential: tenant
+    # middleware identifies tenant-owned models by it and applies the
+    # automatic query fence. _deliverable_inherits_organization below still
+    # runs first on insert; this is only the fallback for whatever it leaves
+    # unset, same default function TenantMixin's own column already used.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
 
     # 50 wide to match roadmap_deliverables.status, the store merged in (R1-B04 PR 2).
     delivery_status = db.Column(db.String(50), default="planned", index=True)
@@ -890,6 +907,35 @@ class Gap(TenantMixin, db.Model):
 @event.listens_for(Gap, "before_update")
 def _enforce_gap_kind(mapper, connection, target):
     validate_gap_kind(target)
+
+
+# A deliverable written outside a request (work-package merges, seeders) has no
+# tenant context to take its organisation from, so it inherits the organisation
+# of the record it hangs off. Nothing is guessed: with none of these set the
+# column stays NULL and the insert is refused rather than filed under a tenant.
+_DELIVERABLE_ORG_SOURCES = (
+    ("unified_work_package_id", "unified_work_packages"),
+    ("work_package_id", "work_packages"),
+    ("archimate_element_id", "archimate_elements"),
+    ("application_component_id", "application_components"),
+)
+
+
+@event.listens_for(Deliverable, "before_insert")
+def _deliverable_inherits_organization(mapper, connection, target):
+    if target.organization_id is not None:
+        return
+    for column, table in _DELIVERABLE_ORG_SOURCES:
+        parent_id = getattr(target, column)
+        if parent_id is None:
+            continue
+        org_id = connection.execute(
+            db.text(f"SELECT organization_id FROM {table} WHERE id = :id"),  # nosec B608 - literal table names
+            {"id": parent_id},
+        ).scalar()
+        if org_id is not None:
+            target.organization_id = org_id
+            return
 
 
 # ---------------------------------------------------------------------------

@@ -16,17 +16,17 @@
         actions=[{'text': 'Trace a personal-data category', 'icon': 'git-fork', 'href': url_for('gdpr_bp.dsr_trace'), 'variant': 'outline'}]
     ) }}
 
-    <div class="rounded-xl border border-border bg-card overflow-hidden">
+    <div class="rounded-lg border border-border bg-card overflow-hidden">
         <div class="p-4 border-b border-border bg-muted/30">
             <h2 class="text-lg font-semibold">New request</h2>
             <p class="text-xs text-muted-foreground mt-1">Choose a person in your organisation for access or erasure of what this platform holds about them, or name an outside data subject to scope the search of your own systems.</p>
         </div>
-        <form method="POST" action="{{ url_for('gdpr_bp.dsr_create') }}" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="dsr-create-form">
+        <form method="POST" action="{{ url_for('gdpr_bp.dsr_create') }}" class="p-4 grid grid-cols-1 gap-4" data-testid="dsr-create-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
-                <label for="dsr-type" class="block text-sm font-medium mb-1">Request type</label>
+                <label for="dsr-type" class="block text-sm font-medium text-muted-foreground mb-1">Request type</label>
                 <select id="dsr-type" name="request_type" required data-testid="dsr-type"
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
                     <option value="" selected disabled>Select…</option>
                     {% for value, label in request_types.items() %}
                     <option value="{{ value }}">{{ label }}</option>
@@ -34,9 +34,9 @@
                 </select>
             </div>
             <div>
-                <label for="dsr-subject-user" class="block text-sm font-medium mb-1">Person in your organisation</label>
+                <label for="dsr-subject-user" class="block text-sm font-medium text-muted-foreground mb-1">Person in your organisation</label>
                 <select id="dsr-subject-user" name="subject_user_id" data-testid="dsr-subject-user"
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
                     <option value="">Not a platform user</option>
                     {% for p in people %}
                     <option value="{{ p.id }}">{{ p.email }}</option>
@@ -44,10 +44,10 @@
                 </select>
             </div>
             <div>
-                <label for="dsr-subject-reference" class="block text-sm font-medium mb-1">Outside data subject</label>
+                <label for="dsr-subject-reference" class="block text-sm font-medium text-muted-foreground mb-1">Outside data subject</label>
                 <input id="dsr-subject-reference" name="subject_reference" type="text" maxlength="255"
                     data-testid="dsr-subject-reference" placeholder="Reference or description of the person"
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
             </div>
             <div>
                 <span class="block text-sm font-medium mb-1">Personal-data categories</span>
@@ -65,21 +65,21 @@
                 <p class="text-sm text-muted-foreground">No data entity is recorded as holding personal data yet. Mark one in the data entity catalogue to scope requests against it.</p>
                 {% endif %}
             </div>
-            <div class="md:col-span-2">
+            <div class="">
                 <button type="submit" data-testid="dsr-create-submit"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Record and scope
                 </button>
             </div>
         </form>
     </div>
 
-    <div class="rounded-xl border border-border bg-card overflow-hidden" data-testid="dsr-list">
+    <div class="rounded-lg border border-border bg-card overflow-hidden" data-testid="dsr-list">
         <div class="p-4 border-b border-border bg-muted/30">
             <h2 class="text-lg font-semibold">Requests</h2>
         </div>
         {% if requests %}
-        <table class="w-full text-sm">
+        <table class="dense-table w-full text-sm">
             <thead class="text-left text-muted-foreground">
                 <tr>
                     <th class="px-4 py-2 font-medium">Recorded</th>

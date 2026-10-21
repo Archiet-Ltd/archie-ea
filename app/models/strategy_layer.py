@@ -13,11 +13,12 @@ from sqlalchemy import CheckConstraint, event  # dead-code-ok
 from sqlalchemy.orm import validates  # dead-code-ok
 
 from app.models.mixins import TenantMixin
+from app.models.mixins.core import _default_org_id
 
 from .. import db
 
 
-class StrategyResource(db.Model):
+class StrategyResource(TenantMixin, db.Model):
     """
     ArchiMate 3.2 Resource - Strategic resource (human, information, tangible)
 
@@ -60,6 +61,20 @@ class StrategyResource(db.Model):
     # ArchiMate integration
     archimate_element_id = db.Column(db.Integer, db.ForeignKey("archimate_elements.id"))
     archimate_layer = db.Column(db.String(20), default="Strategy")
+
+    # Override TenantMixin's normally non-nullable column for an ADD-only
+    # rollout: the 20261018_typed_tables_org_id migration adds this to an
+    # existing table and leaves a row NULL when no organisation is derivable
+    # from its linked parents. The mixin is still essential: tenant
+    # middleware identifies tenant-owned models by it and applies the
+    # automatic query fence.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
 
     # Metrics
     utilization_percentage = db.Column(db.Float)

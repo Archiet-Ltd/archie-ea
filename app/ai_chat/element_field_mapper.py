@@ -20,6 +20,7 @@ Works for ALL document types (general architecture, application-specific, vendor
 """
 
 from typing import Any, Dict, Optional
+from app.models.archimate_element_types import is_application_kind
 
 
 def map_element_data_to_model_fields(
@@ -127,7 +128,7 @@ def map_element_data_to_model_fields(
         element_data["description"] = description
         element_data["function_type"] = elem.get("function_type", "")
 
-    elif element_type == "ApplicationComponent":
+    elif is_application_kind(element_type):
         element_data["name"] = name
         element_data["description"] = description
         element_data["technology_stack"] = elem.get("technology_stack", "")

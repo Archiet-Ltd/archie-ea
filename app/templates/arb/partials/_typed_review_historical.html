@@ -26,7 +26,7 @@
 {% set _evidence = review.evidence or {} %}
 {% set _decision = review.decision or {} %}
 
-<div class="mb-6 rounded-lg border border-warning/30 bg-warning/10 p-4" role="alert">
+<div class="mb-6 rounded-md border border-warning/40 bg-warning/10 px-3 py-2" role="alert">
     <p class="flex items-start gap-2 font-medium text-warning-emphasis">
         <i data-lucide="alert-triangle" class="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true"></i>
         Historical review &#8212; evidence snapshot could not be verified.
@@ -85,7 +85,7 @@
             <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Subject</dt>
             <dd class="mt-1">
                 <a href="{{ _subject.canonical_url }}"
-                   class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <i data-lucide="external-link" class="mr-1.5 h-3.5 w-3.5" aria-hidden="true"></i>Open subject
                 </a>
             </dd>

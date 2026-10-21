@@ -57,7 +57,57 @@ def _require_org_id():
     return org_id
 
 
-def _render_team(org_id, error=None, status=200):
+def _permission_context(org_id, members):
+    """Rows, cells and per-user exceptions for the Permissions tab."""
+    from app.core.auth import permissions as matrix
+    from app.models.permission_grant import PermissionGrant
+
+    rows = []
+    for role in VALID_ORG_ROLES:
+        cells = {}
+        for object_type in matrix.OBJECT_TYPES:
+            cells[object_type] = {}
+            for action in matrix.ACTIONS:
+                if role in matrix.LOCKED_ROLES:
+                    allowed, is_set = True, False
+                else:
+                    allowed, is_set = matrix.role_cell(org_id, role, action, object_type)
+                    is_set = is_set and allowed != matrix.default_allowed(role, action, object_type)
+                cells[object_type][action] = {"allowed": allowed, "is_set": is_set}
+        rows.append({"role": role, "locked": role in matrix.LOCKED_ROLES, "cells": cells})
+
+    names = {m.id: m.full_name() for m in members}
+    overrides = []
+    grants = (
+        PermissionGrant.query.filter_by(organization_id=org_id, subject_type="user")
+        .order_by(PermissionGrant.id)
+        .all()
+    )
+    for g in grants:
+        try:
+            uid = int(g.subject_key)
+        except (TypeError, ValueError):
+            continue
+        if uid not in names:
+            continue
+        overrides.append(
+            {
+                "user_id": uid,
+                "name": names[uid],
+                "action": g.action,
+                "object_type": g.object_type,
+                "allowed": bool(g.allowed),
+            }
+        )
+    return {
+        "perm_rows": rows,
+        "perm_actions": matrix.ACTIONS,
+        "perm_object_types": matrix.OBJECT_TYPES,
+        "perm_overrides": overrides,
+    }
+
+
+def _render_team(org_id, error=None, status=200, tab=None):
     from app.modules.account.services import invitation_service
 
     invitations = invitation_service.invitations_for(org_id)
@@ -73,8 +123,11 @@ def _render_team(org_id, error=None, status=200):
     role_map = {
         m.id: rbac_service.get_user_role(org_id, m.id) for m in members
     }
+    permission_context = _permission_context(org_id, members) if tab == "permissions" else {}
     return render_template(
         "admin/team.html",
+        tab=tab or "members",
+        **permission_context,
         members=members,
         role_map=role_map,
         valid_roles=VALID_ORG_ROLES,
@@ -92,7 +145,8 @@ def team():
     """List org members with their roles, and the invitations still open."""
     org_id = _require_org_id()
     require_org_or_platform_admin(org_id)
-    return _render_team(org_id)
+    tab = "permissions" if request.args.get("tab") == "permissions" else "members"
+    return _render_team(org_id, tab=tab)
 
 
 @team_bp.route("/team/invite", methods=["POST"])
@@ -268,6 +322,79 @@ def team_reset_sign_in(user_id):
             "success",
         )
     return redirect(url_for("team.team"))
+
+
+def _permission_form():
+    """The validated (object_type, action) of a Permissions form post."""
+    from app.core.auth import permissions as matrix
+
+    object_type = request.form.get("object_type", "application")
+    action = request.form.get("action", "")
+    if object_type not in matrix.OBJECT_TYPES or action not in matrix.ACTIONS:
+        abort(400)
+    return object_type, action
+
+
+@team_bp.route("/team/permissions/role", methods=["POST"])
+@login_required
+def team_permission_role():
+    """Switch one role's permission on or off for this organisation."""
+    from app.core.auth import permissions as matrix
+
+    org_id = _require_org_id()
+    require_org_or_platform_admin(org_id)
+    object_type, action = _permission_form()
+    role = request.form.get("role", "")
+    if role not in VALID_ORG_ROLES or role in matrix.LOCKED_ROLES:
+        abort(400)
+    allowed = request.form.get("allowed") == "1"
+    if allowed == matrix.default_allowed(role, action, object_type):
+        # Back to the role's default: drop the row rather than store a copy of it.
+        matrix.clear_grant(org_id, "role", role, object_type, action)
+    else:
+        matrix.set_grant(org_id, "role", role, object_type, action, allowed, current_user.id)
+    db.session.commit()
+    return redirect(url_for("team.team", tab="permissions"))
+
+
+@team_bp.route("/team/permissions/user", methods=["POST"])
+@login_required
+def team_permission_user():
+    """Give one person an exception to their role."""
+    from app.core.auth import permissions as matrix
+
+    org_id = _require_org_id()
+    require_org_or_platform_admin(org_id)
+    object_type, action = _permission_form()
+    try:
+        user_id = int(request.form.get("user_id", ""))
+    except ValueError:
+        abort(400)
+    member = User.query.filter_by(id=user_id, organization_id=org_id).first()
+    if member is None:
+        abort(404)
+    allowed = request.form.get("allowed") == "1"
+    matrix.set_grant(org_id, "user", member.id, object_type, action, allowed, current_user.id)
+    db.session.commit()
+    return redirect(url_for("team.team", tab="permissions"))
+
+
+@team_bp.route("/team/permissions/user/remove", methods=["POST"])
+@login_required
+def team_permission_user_remove():
+    """Remove one person's exception, so they follow their role again."""
+    from app.core.auth import permissions as matrix
+
+    org_id = _require_org_id()
+    require_org_or_platform_admin(org_id)
+    object_type, action = _permission_form()
+    try:
+        user_id = int(request.form.get("user_id", ""))
+    except ValueError:
+        abort(400)
+    matrix.clear_grant(org_id, "user", user_id, object_type, action)
+    db.session.commit()
+    return redirect(url_for("team.team", tab="permissions"))
 
 
 @team_bp.route("/team/member/<int:user_id>", methods=["DELETE"])

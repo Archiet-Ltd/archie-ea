@@ -1,8 +1,8 @@
 {# Phase E Options Analysis — TCO aggregation + MCDA scoring (ENT-058) #}
-<div id="phase-e-options" class="bg-card rounded-xl border border-border shadow-sm p-6 transition-all relative mb-6"
+<div id="phase-e-options" class="bg-card rounded-lg border border-border p-6 transition-all relative mb-6"
      x-show="isSectionActive('E')" x-cloak
      :class="isSectionActive('E') ? 'ring-1 ring-primary/10' : ''">
-    <div x-show="isSectionFuture('E')" x-cloak class="absolute inset-0 bg-background/60 z-10 flex items-center justify-center rounded-xl">
+    <div x-show="isSectionFuture('E')" x-cloak class="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-overlay/50">
         <p class="text-sm text-muted-foreground font-medium">Complete Phase <span x-text="currentPhase"></span> to unlock</p>
     </div>
 
@@ -38,7 +38,7 @@
                 AI Migration Roadmap
             </a>
             <button type="button" @click="loadOptionsAnalysis()" :disabled="optionsAnalysisLoading"
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="calculator" class="w-3 h-3" aria-hidden="true" x-show="!optionsAnalysisLoading" x-cloak></i>
                 <i data-lucide="loader-2" class="w-3 h-3 animate-spin" aria-hidden="true" x-show="optionsAnalysisLoading" x-cloak></i>
                 <span x-text="optionsAnalysisLoading ? 'Loading...' : 'Run Analysis'"></span>
@@ -74,7 +74,7 @@
         {# TCO by category table #}
         <template x-if="optionsAnalysisData.tco.by_category && optionsAnalysisData.tco.by_category.length > 0">
             <div class="overflow-x-auto border border-border rounded-lg">
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <thead class="bg-muted/50 border-b border-border">
                         <tr>
                             <th class="text-left px-3 py-2 text-xs font-semibold text-foreground">Category</th>
@@ -164,14 +164,14 @@
         <div class="flex items-center justify-between mb-2">
             <h3 class="text-sm font-semibold text-foreground">Multi-Criteria Decision Analysis</h3>
             <button type="button" @click="editingMcdaCriteria = !editingMcdaCriteria"
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold text-foreground hover:text-foreground hover:bg-accent transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                 <i data-lucide="sliders-horizontal" class="w-3 h-3" aria-hidden="true"></i>
                 <span x-text="editingMcdaCriteria ? 'Close' : 'Edit Weights'"></span>
             </button>
         </div>
 
         {# Criteria weight editor #}
-        <div x-show="editingMcdaCriteria" x-cloak class="mb-4 p-4 rounded-lg border border-primary/20 bg-primary/5">
+        <div x-show="editingMcdaCriteria" x-cloak class="mb-4 px-3 py-2 rounded-md border border-primary/40 bg-primary/10">
             <p class="text-xs text-muted-foreground mb-3">Adjust criteria weights (must sum to 100%):</p>
             <div class="space-y-2">
                 <template x-for="(criterion, cIdx) in mcdaCriteria" :key="cIdx">
@@ -201,7 +201,7 @@
         {# MCDA comparison table (criteria x options) #}
         <template x-if="optionsAnalysisData.mcda.options && optionsAnalysisData.mcda.options.length > 0">
             <div class="overflow-x-auto border border-border rounded-lg">
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <thead class="bg-muted/50 border-b border-border">
                         <tr>
                             <th class="text-left px-3 py-2 text-xs font-semibold text-foreground">Criterion</th>
@@ -270,7 +270,7 @@
                             <span class="text-sm font-semibold text-foreground"
                                   x-text="(opt.option_type || 'Option').charAt(0).toUpperCase() + (opt.option_type || 'option').slice(1)"></span>
                             <template x-if="opt.rank === 1">
-                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/30">
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
                                     <i data-lucide="star" class="w-3 h-3" aria-hidden="true"></i> Top
                                 </span>
                             </template>

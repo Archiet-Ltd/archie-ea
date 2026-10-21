@@ -47,6 +47,7 @@ def _seed_strategy_graph(org_id):
         ))
 
         initiative = PortfolioInitiative(
+            organization_id=org_id,
             name="%s modernisation" % noun,
             archimate_element_id=service.id,
             status="Active",

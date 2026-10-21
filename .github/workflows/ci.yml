@@ -92,7 +92,7 @@ jobs:
   # ---------------------------------------------------------------------------
   changes:
     name: Detect changed paths
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     outputs:
       is_content_only: ${{ steps.detect.outputs.is_content_only }}
@@ -180,7 +180,7 @@ jobs:
     name: Content page tests
     needs: changes
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci')) && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.is_content_only == 'true') && github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     services:
       postgres:
         image: mirror.gcr.io/library/postgres:16
@@ -189,7 +189,7 @@ jobs:
           POSTGRES_DB: archie_test
         ports: ["5432"]
         options: >-
-          --health-cmd pg_isready --health-interval 10s
+          --health-cmd "pg_isready -U postgres" --health-interval 10s
           --health-timeout 5s --health-retries 5
           --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
@@ -207,6 +207,8 @@ jobs:
         run: |
           python -m venv --clear .venv
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Install CPU-only torch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Resolve the postgres service's mapped port
         run: |
           echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
@@ -242,6 +244,7 @@ jobs:
       - name: Upload the content test results
         if: ${{ always() }}
         uses: actions/upload-artifact@v6
+        continue-on-error: true
         with:
           name: content-tests-junit
           path: content-tests.xml
@@ -249,7 +252,7 @@ jobs:
 
   secret-scan:
     name: Secret scan (gitleaks)
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     steps:
       - uses: actions/checkout@v5
@@ -281,7 +284,7 @@ jobs:
   # on success(), so an unknown/skipped state still runs the tests.
   fast_gate:
     name: Fast static checks (compile + lint)
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     steps:
       - uses: actions/checkout@v5
@@ -312,7 +315,7 @@ jobs:
 
   static-gates:
     name: Static gates (compile + ratchets)
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     # The static tag includes route/navigation and CSRF coverage, which import
     # the real app, plus the reproducible CSS build. Install the application
@@ -325,6 +328,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
+      - name: Install CPU-only torch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Install gate tooling
         run: |
           python -m pip install --upgrade pip
@@ -344,7 +349,7 @@ jobs:
 
   boot-health:
     name: Boot health (no database)
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     # Catches the class of failure nothing else here can see: a blueprint that
     # silently fails to register, or a url_for() endpoint that no longer resolves
@@ -355,6 +360,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
+      - name: Install CPU-only torch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
@@ -434,7 +441,7 @@ jobs:
           POSTGRES_DB: archie_test
         ports: ["5432"]
         options: >-
-          --health-cmd pg_isready --health-interval 10s
+          --health-cmd "pg_isready -U postgres" --health-interval 10s
           --health-timeout 5s --health-retries 5
           --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
@@ -470,6 +477,8 @@ jobs:
         run: |
           python -m venv --clear .venv
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Install CPU-only torch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Resolve the postgres service's mapped port
         # The service no longer binds host port 5432 (several of these jobs can run
         # at once on one self-hosted machine), so the docker-assigned host port has
@@ -576,6 +585,7 @@ jobs:
       # its junit/coverage/route evidence, so the combine job can report which
       # tests failed rather than only "a shard's artifact never arrived".
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: tests-shard-${{ matrix.shard }}
@@ -612,7 +622,7 @@ jobs:
           POSTGRES_DB: archie_test
         ports: ["5432"]
         options: >-
-          --health-cmd pg_isready --health-interval 10s
+          --health-cmd "pg_isready -U postgres" --health-interval 10s
           --health-timeout 5s --health-retries 5
           --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
@@ -662,6 +672,9 @@ jobs:
         run: |
           python -m venv --clear .venv
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Install CPU-only torch
+        if: ${{ steps.select.outputs.any == 'true' }}
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Resolve the postgres service's mapped port
         if: ${{ steps.select.outputs.any == 'true' }}
         run: |
@@ -745,6 +758,7 @@ jobs:
             exit "$status"
           fi
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: fast-tests-junit
@@ -768,7 +782,7 @@ jobs:
           POSTGRES_DB: archie_test
         ports: ["5432"]
         options: >-
-          --health-cmd pg_isready --health-interval 10s
+          --health-cmd "pg_isready -U postgres" --health-interval 10s
           --health-timeout 5s --health-retries 5
           --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
@@ -789,6 +803,8 @@ jobs:
         run: |
           python -m venv --clear .venv
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Install CPU-only torch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Resolve the postgres service's mapped port
         run: |
           echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
@@ -879,6 +895,7 @@ jobs:
               handle.write("\n".join(lines) + "\n")
           PY
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: quarantine-tests-junit
@@ -988,6 +1005,7 @@ jobs:
           print(f"line coverage: {rate:.2f}%  ({covered}/{valid} statements)")
           PY
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: coverage-xml
@@ -1012,7 +1030,7 @@ jobs:
   # continue-on-error and `|| true`, so it could not fail.
   db-gates:
     name: Database gates (schema drift)
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     services:
       postgres:
@@ -1020,18 +1038,21 @@ jobs:
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: archie_test
-        ports: ["5432:5432"]
+        ports: ["5432"]
         options: >-
-          --health-cmd pg_isready --health-interval 10s
+          --health-cmd "pg_isready -U postgres" --health-interval 10s
           --health-timeout 5s --health-retries 5
           --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
-      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/archie_test
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/archie_test
       FLASK_CONFIG: testing
       SECRET_KEY: ci-only-not-secret
     steps:
       - uses: actions/checkout@v5
+      - name: Resolve the postgres service's mapped port
+        # Own runners run several jobs at once, so the service no longer binds host port 5432.
+        run: |
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -1061,6 +1082,7 @@ jobs:
           print(f"  with licence: {sum(1 for x in c if x.get('licenses'))}")
           PY
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: sbom-cyclonedx
@@ -1070,6 +1092,64 @@ jobs:
         # --require-db turns a missing database into a FAILURE rather than a skip,
         # so this gate cannot silently pass by not running.
         run: python scripts/verify.py --gate schema-drift --require-db
+
+  store-agreement:
+    name: Store agreement (screens answer one number)
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
+    # Boots the app against a seeded demonstration organisation and asks every
+    # registered screen and API the same question; fails when two disagree by
+    # more than verification_baseline.json (store_agreement), a ratchet that may
+    # only fall. One organisation is enough: the check compares surfaces within
+    # one tenant.
+    services:
+      postgres:
+        image: mirror.gcr.io/library/postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_test
+        ports: ["5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret
+    steps:
+      - uses: actions/checkout@v5
+      - name: Resolve the postgres service's mapped port
+        run: |
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Create schema
+        run: |
+          flask --app manage init-db
+          flask --app manage schema-upgrade
+          flask --app manage reconcile-schema
+      - name: Seed the demonstration organisation
+        env:
+          DEMO_USER_PASSWORD: ci-only-not-secret
+        run: flask --app manage seed-demo-company
+      - name: The check saw a real tenant
+        # An empty database makes every surface answer 0, which agrees. That is
+        # no evidence, so fail rather than pass on it.
+        run: |
+          python scripts/check_store_agreement.py | tee store-agreement.txt
+          if grep -q "no-evidence\] \(no Organization\|the application\|the database\)" store-agreement.txt; then
+            echo "store-agreement could not see a tenant; refusing to pass on no evidence"
+            exit 1
+          fi
+      - name: Store agreement gate
+        run: python scripts/verify.py --gate store-agreement --require-db
 
   # The doubly-neutered `lint` job (continue-on-error: true AND `ruff check . ||
   # true`) that the header comment above says was replaced had in fact survived
@@ -1082,7 +1162,7 @@ jobs:
 
   security-sast:
     name: SAST (bandit)
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     steps:
       - uses: actions/checkout@v5
@@ -1138,7 +1218,7 @@ jobs:
           POSTGRES_DB: archie_smoke
         ports: ["5432:5432"]
         options: >-
-          --health-cmd pg_isready --health-interval 10s
+          --health-cmd "pg_isready -U postgres" --health-interval 10s
           --health-timeout 5s --health-retries 5
           --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
@@ -1181,6 +1261,7 @@ jobs:
           -p scripts.ci.test_sharding
           --junitxml=tests/smoke/_artifacts/chromium-main-${{ matrix.shard }}.xml
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: smoke-junit-main-${{ matrix.shard }}
@@ -1189,6 +1270,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: smoke-main-${{ matrix.shard }}
@@ -1212,7 +1294,7 @@ jobs:
           POSTGRES_DB: archie_smoke
         ports: ["5432:5432"]
         options: >-
-          --health-cmd pg_isready --health-interval 10s
+          --health-cmd "pg_isready -U postgres" --health-interval 10s
           --health-timeout 5s --health-retries 5
           --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
@@ -1253,6 +1335,7 @@ jobs:
           -m adversarial --timeout=3600 -W ignore::DeprecationWarning
           --junitxml=tests/smoke/_artifacts/chromium-adversarial.xml
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: smoke-junit-adversarial
@@ -1261,6 +1344,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: smoke-adversarial
@@ -1284,7 +1368,7 @@ jobs:
           POSTGRES_DB: archie_smoke
         ports: ["5432:5432"]
         options: >-
-          --health-cmd pg_isready --health-interval 10s
+          --health-cmd "pg_isready -U postgres" --health-interval 10s
           --health-timeout 5s --health-retries 5
           --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
@@ -1340,6 +1424,7 @@ jobs:
           -m guide_history --timeout=900 -W ignore::DeprecationWarning
           --junitxml=tests/smoke/_artifacts/chromium-guide-history.xml
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: smoke-junit-other
@@ -1350,6 +1435,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: always()
         with:
           name: smoke-other
@@ -1404,6 +1490,7 @@ jobs:
       - name: Upload browser qualification evidence
         if: always()
         uses: actions/upload-artifact@v6
+        continue-on-error: true
         with:
           name: smoke-chromium-${{ github.sha }}
           path: |
@@ -1428,7 +1515,7 @@ jobs:
           POSTGRES_DB: archie_browser_compat
         ports: ["5432:5432"]
         options: >-
-          --health-cmd pg_isready --health-interval 10s
+          --health-cmd "pg_isready -U postgres" --health-interval 10s
           --health-timeout 5s --health-retries 5
           --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
@@ -1498,6 +1585,7 @@ jobs:
       - name: Upload compatibility evidence
         if: always()
         uses: actions/upload-artifact@v6
+        continue-on-error: true
         with:
           name: smoke-${{ matrix.browser }}-${{ github.sha }}
           path: |
@@ -1529,7 +1617,7 @@ jobs:
           POSTGRES_DB: archie_walkthrough
         ports: ["5432:5432"]
         options: >-
-          --health-cmd pg_isready --health-interval 10s
+          --health-cmd "pg_isready -U postgres" --health-interval 10s
           --health-timeout 5s --health-retries 5
           --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
@@ -1569,6 +1657,7 @@ jobs:
       - name: Upload the report
         if: always()
         uses: actions/upload-artifact@v6
+        continue-on-error: true
         with:
           name: walkthrough-report
           path: |
@@ -1579,7 +1668,7 @@ jobs:
 
   dependency-audit:
     name: Dependency CVEs (pip-audit)
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     if: ${{ github.event_name != 'pull_request' || github.event.action != 'labeled' || (contains(github.event.pull_request.labels.*.name, 'ci-fast') || github.event.label.name == 'full-ci') }}
     # A ratchet against scripts/ci/dependency_baseline.json: the count may fall,
     # never rise. The baseline is accepted risk, not proof of safety - every entry
@@ -1604,6 +1693,7 @@ jobs:
       - boot-health
       - tests
       - db-gates
+      - store-agreement
       - security-sast
       - smoke
       - browser-compatibility
@@ -1707,6 +1797,7 @@ jobs:
           )
           PY
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         with:
           name: release-${{ github.sha }}
           path: release.json
@@ -1730,7 +1821,7 @@ jobs:
   failing-first-proof:
     name: Failing-first proof
     if: ${{ github.event_name == 'pull_request' && (github.event.action != 'labeled' || github.event.label.name == 'failing-first-exempt') }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
     timeout-minutes: 45
     services:
       postgres:
@@ -1740,7 +1831,7 @@ jobs:
           POSTGRES_DB: archie_test
         ports: ["5432"]
         options: >-
-          --health-cmd pg_isready --health-interval 10s
+          --health-cmd "pg_isready -U postgres" --health-interval 10s
           --health-timeout 5s --health-retries 5
           --tmpfs /var/lib/postgresql/data:rw,size=2g
     env:
@@ -1814,6 +1905,7 @@ jobs:
         if: ${{ steps.plan.outputs.mode == 'run' }}
         run: python scripts/ci/check_failing_first.py judge --plan failing-first-plan.json --junit failing-first.xml
       - uses: actions/upload-artifact@v6
+        continue-on-error: true
         if: ${{ always() && steps.plan.outputs.mode == 'run' }}
         with:
           name: failing-first-proof
