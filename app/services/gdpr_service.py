@@ -38,6 +38,7 @@ from app.models.gdpr_request import (
     GDPRRequest,
 )
 from app.models.user import User
+from app.models.archimate_element_types import is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -380,7 +381,7 @@ class GDPRService:
 
         out = []
         for row in answer.get("rows") or []:
-            if _el(row["element_id"]).get("type") != "ApplicationComponent":
+            if not is_application_kind(_el(row["element_id"]).get("type")):
                 continue
             relation = row.get("relation") or {}
             chain = relation.get("chain_elements") or [entity.archimate_element_id, row["element_id"]]

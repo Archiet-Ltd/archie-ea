@@ -31,6 +31,7 @@ from app.modules.architecture.routes.lucidchart_import_routes import (
 from app.modules.architecture.services.archimate_xml_export_service import export_to_xml
 from app.utils.response_helpers import api_error, api_success
 from app.utils.pagination import MAX_PAGE_SIZE, safe_int_arg
+from app.models.archimate_element_types import StandardTypeTable
 
 archimate_bp = Blueprint("archimate", __name__, url_prefix="/archimate")
 register_lucidchart_import_routes(archimate_bp)
@@ -4431,7 +4432,7 @@ _LAYER_DISPLAY = {
 }
 
 # Business-friendly type names (avoid ArchiMate jargon)
-_BUSINESS_TYPE_NAMES = {
+_BUSINESS_TYPE_NAMES = StandardTypeTable({
     "BusinessActor": "person or team",
     "BusinessRole": "role",
     "BusinessProcess": "business process",
@@ -4467,7 +4468,7 @@ _BUSINESS_TYPE_NAMES = {
     "Deliverable": "deliverable",
     "Plateau": "plateau",
     "Gap": "gap",
-}
+})
 
 
 def _friendly_type(el_type, audience):

@@ -48,17 +48,17 @@
         <h2 class="text-xl font-semibold mb-4">Quick Actions</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <a href="{{ url_for('unified_applications.application_list') }}"
-               class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200">
+               class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-background hover:border-primary/50 transition-all duration-200">
                 <i data-lucide="layout-grid" class="w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
                 <span class="text-sm font-medium">Application Portfolio</span>
             </a>
             <a href="{{ url_for('archimate_crud.dashboard') }}"
-               class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200">
+               class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-background hover:border-primary/50 transition-all duration-200">
                 <i data-lucide="boxes" class="w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
                 <span class="text-sm font-medium">ArchiMate Elements</span>
             </a>
             <a href="{{ url_for('archimate_crud.dashboard') }}?layer=technology"
-               class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200">
+               class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-background hover:border-primary/50 transition-all duration-200">
                 <i data-lucide="cpu" class="w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
                 <span class="text-sm font-medium">Technology Architecture</span>
             </a>
@@ -68,7 +68,7 @@
                Enterprise Roadmap is main.capability_roadmap — the same target
                architect_ui.roadmap_builder already redirects to. #}
             <a href="{{ url_for('main.capability_roadmap') }}"
-               class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200">
+               class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-background hover:border-primary/50 transition-all duration-200">
                 <i data-lucide="milestone" class="w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
                 <span class="text-sm font-medium">Implementation Roadmap</span>
             </a>
@@ -91,7 +91,7 @@
             </a>
         </div>
         <div class="overflow-x-auto">
-            <table class="w-full text-sm text-left">
+            <table class="dense-table w-full text-sm text-left">
                 <thead class="bg-muted/50 text-muted-foreground font-medium border-b border-input">
                     <tr>
                         <th class="px-6 py-3">Component</th>
@@ -216,7 +216,7 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 
             <!-- Application Cooperation Viewpoint -->
-            <div class="rounded-lg border border-input bg-muted/20 p-5 flex flex-col gap-3">
+            <div class="rounded-md border border-input bg-muted/20 px-3 py-2 flex flex-col gap-3">
                 <div class="flex items-center gap-2">
                     <span class="flex h-8 w-8 items-center justify-center rounded bg-primary/10">
                         <i data-lucide="network" class="h-4 w-4 text-primary" aria-hidden="true"></i>
@@ -234,7 +234,7 @@
             </div>
 
             <!-- Application Usage Viewpoint -->
-            <div class="rounded-lg border border-input bg-muted/20 p-5 flex flex-col gap-3">
+            <div class="rounded-md border border-input bg-muted/20 px-3 py-2 flex flex-col gap-3">
                 <div class="flex items-center gap-2">
                     <span class="flex h-8 w-8 items-center justify-center rounded bg-primary/10">
                         <i data-lucide="users" class="h-4 w-4 text-primary" aria-hidden="true"></i>
@@ -252,7 +252,7 @@
             </div>
 
             <!-- Technology Realization Viewpoint -->
-            <div class="rounded-lg border border-input bg-muted/20 p-5 flex flex-col gap-3">
+            <div class="rounded-md border border-input bg-muted/20 px-3 py-2 flex flex-col gap-3">
                 <div class="flex items-center gap-2">
                     <span class="flex h-8 w-8 items-center justify-center rounded bg-primary/10">
                         <i data-lucide="server" class="h-4 w-4 text-primary" aria-hidden="true"></i>

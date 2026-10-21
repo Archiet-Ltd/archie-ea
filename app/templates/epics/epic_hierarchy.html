@@ -16,7 +16,7 @@
   {{ page_shell(title='Epic → Story → Sub-task Hierarchy', breadcrumb=[('Home', '/'), ('Epic → Story → Sub-task Hierarchy', none)], actions_caller=_ps_actions) }}
 
   <!-- Add Epic Form -->
-  <div x-show="showEpicForm" x-cloak class="mb-6 p-4 bg-background border border-border rounded-lg shadow-sm">
+  <div x-show="showEpicForm" x-cloak class="mb-6 p-4 bg-background border border-border rounded-lg">
     <h2 class="text-sm font-semibold mb-3 text-foreground">New Epic</h2>
     <div class="flex gap-2">
       <input
@@ -35,9 +35,9 @@
   <!-- Epic Tree -->
   <div class="space-y-4">
     <template x-for="epic in epics" :key="epic.id">
-      <div class="border border-primary/20 rounded-lg overflow-hidden shadow-sm">
+      <div class="border border-primary/20 rounded-lg overflow-hidden">
         <!-- Epic Header -->
-        <div class="bg-primary/5 px-4 py-3 flex items-center gap-3 cursor-pointer"
+        <div class="bg-primary/10 px-4 py-2 flex items-center gap-3 cursor-pointer"
              @click="epic._open = !epic._open">
           <span class="text-primary" x-text="epic._open ? '▼' : '▶'"></span>
           <span class="font-semibold text-primary/90 flex-1" x-text="epic.title"></span>
