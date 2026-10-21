@@ -79,6 +79,18 @@ _PROCUREMENT_ROLES = {"procurement", "portfolio_manager"}
 _PROCUREMENT_OR_FINANCE_ENDPOINTS = {"procurement.licenses_list", "procurement.spend_analytics"}
 
 
+
+def _in_own_role_zones(endpoint: str) -> bool:
+    """True when the current user's own role carries `endpoint` in a non-admin SIDEBAR_ZONES zone."""
+    zones = SIDEBAR_ZONES.get(get_user_role(current_user)) or []
+    return any(
+        link["endpoint"] == endpoint
+        for zone in zones
+        if zone["zone"] != "admin"
+        for link in zone["links"]
+    )
+
+
 def _link_visible(endpoint: str, requires: str | None = None) -> bool:
     """False when `endpoint` belongs to a role-exclusive section this user has no access to, or the
     link itself declares a `requires` guard (role_access.py's `_link(requires=...)`) the user does not
@@ -112,7 +124,13 @@ def _link_visible(endpoint: str, requires: str | None = None) -> bool:
                 # platform_admin_required, and `enterprise_role` defaults to the
                 # string "platform_admin" for every user, so the role lookup
                 # alone would let it through.
-                return bool(getattr(current_user, "is_platform_admin", False))
+                if getattr(current_user, "is_platform_admin", False):
+                    return True
+                # A role whose OWN sidebar zones carry an admin.* page (the security and data architects'
+                # Audit Log, guarded by governance_gate_reader_required, not platform_admin) must still
+                # find it here now that the grouped sidebar no longer lists it. Only the user's own
+                # role's zones count, never the union of all roles'.
+                return _in_own_role_zones(endpoint)
             return can_access_section(current_user, section)
     return True
 
