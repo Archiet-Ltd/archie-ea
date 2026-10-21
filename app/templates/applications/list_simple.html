@@ -107,9 +107,9 @@
 
         title="Find duplicate or overlapping applications that could be consolidated"
 
-        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem">
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-accent" role="menuitem">
 
-        <i data-lucide="layers-2" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-hidden="true"></i>Consolidation
+        <i data-lucide="layers-2" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-accent" role="menuitem" aria-hidden="true"></i>Consolidation
 
       </a>
 
@@ -121,9 +121,9 @@
 
         title="Use AI to design a target-state solution from your application estate"
 
-        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem">
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-accent" role="menuitem">
 
-        <i data-lucide="star" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-hidden="true"></i>Design Solution
+        <i data-lucide="star" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-accent" role="menuitem" aria-hidden="true"></i>Design Solution
 
       </a>
 
@@ -133,9 +133,9 @@
 
         title="Use AI to match applications to known vendor products"
 
-        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-label="Match vendors">
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-accent" role="menuitem" aria-label="Match vendors">
 
-        <i data-lucide="package" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-hidden="true"></i>Vendor Match
+        <i data-lucide="package" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-accent" role="menuitem" aria-hidden="true"></i>Vendor Match
 
       </button>
 
@@ -143,9 +143,9 @@
 
         title="Use AI to suggest capability, process and ArchiMate mappings for your applications"
 
-        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-label="AI map applications">
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-accent" role="menuitem" aria-label="AI map applications">
 
-        <i data-lucide="sparkles" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-hidden="true"></i>AI Map
+        <i data-lucide="sparkles" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-accent" role="menuitem" aria-hidden="true"></i>AI Map
 
       </button>
         </div>
@@ -162,7 +162,7 @@
   {# ─ STATS CARDS ─ #}
   {# ── BIZBOK: Application Cooperation Viewpoint (collapsible) ── #}
   <div x-data="{ appDiagramOpen: false, appDiagramLoaded: false, appDiagramError: '' }" class="mb-4">
-    <button type="button" @click="appDiagramOpen = !appDiagramOpen; if(appDiagramOpen && !appDiagramLoaded) {
+    <button type="button" class="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-accent-foreground transition-colors" @click="appDiagramOpen = !appDiagramOpen; if(appDiagramOpen && !appDiagramLoaded) {
         appDiagramError = '';
         Platform.fetch('/api/archimate/viewpoints/application_cooperation/diagram?limit=25')
             .then(d => {
@@ -178,12 +178,12 @@
                 appDiagramError = 'Could not load the Application Cooperation viewpoint.';
                 Platform.toast.error(appDiagramError);
             });
-    }" class="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+    }">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 transition-transform" :class="appDiagramOpen ? 'rotate-90' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
       Application Cooperation Viewpoint
     </button>
     <div x-show="appDiagramOpen" x-cloak x-transition class="mt-3">
-      <div class="rounded-xl border border-border bg-card overflow-hidden">
+      <div class="rounded-lg border border-border bg-card overflow-hidden">
         <div class="bg-muted/20 px-5 py-2 border-b border-border flex items-center justify-between">
           <span class="text-xs font-medium text-muted-foreground">Application Cooperation Viewpoint</span>
           <a href="/archimate/composer" class="text-2xs text-primary hover:underline">Full Composer →</a>
@@ -346,7 +346,7 @@
         </button>
         {% endif %}
       </div>
-      <button type="button" @click="clearSelection()" class="ml-auto h-7 w-7 rounded-md hover:bg-muted flex items-center justify-center" aria-label="Clear selection">
+      <button type="button" @click="clearSelection()" class="ml-auto h-7 w-7 rounded-md hover:bg-accent flex items-center justify-center" aria-label="Clear selection">
         <i data-lucide="x" class="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true"></i>
       </button>
     </div>
@@ -379,26 +379,26 @@
                with the current filters + page preserved (see list.js _navigate()). #}
             <th scope="col" class="h-10 px-2 align-middle text-left w-20">
               <button type="button" @click="sortBy('id')" data-testid="th-sort-id"
-                class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by ID">
+                class="inline-flex items-center gap-1 rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors" aria-label="Sort by ID">
                 ID<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'id' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'id' && dir === 'desc'" x-cloak aria-hidden="true"></i>
               </button>
             </th>
             <th scope="col" class="h-10 px-2 align-middle text-left min-w-[180px]">
               <button type="button" @click="sortBy('name')" data-testid="th-sort-name"
-                class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by Application name">
+                class="inline-flex items-center gap-1 rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors" aria-label="Sort by Application name">
                 Application<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'name' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'name' && dir === 'desc'" x-cloak aria-hidden="true"></i>
               </button>
             </th>
             <th scope="col" class="h-10 px-2 align-middle text-left min-w-[120px]">
               <button type="button" @click="sortBy('type')" data-testid="th-sort-type"
-                class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by Type">
+                class="inline-flex items-center gap-1 rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors" aria-label="Sort by Type">
                 Type<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'type' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'type' && dir === 'desc'" x-cloak aria-hidden="true"></i>
               </button>
             </th>
             <th scope="col" class="h-10 px-2 align-middle text-left w-10" title="ArchiMate: whether this application has a linked ArchiMate element" aria-label="ArchiMate link status">AM</th>
             <th scope="col" class="h-10 px-2 align-middle text-left min-w-[160px]">
               <button type="button" @click="sortBy('lifecycle_status')" data-testid="th-sort-lifecycle-status"
-                class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by Lifecycle Status">
+                class="inline-flex items-center gap-1 rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors" aria-label="Sort by Lifecycle Status">
                 Lifecycle Status<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'lifecycle_status' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'lifecycle_status' && dir === 'desc'" x-cloak aria-hidden="true"></i>
               </button>
             </th>
@@ -487,21 +487,17 @@
                   </button>
                   <!-- modal-a11y-ok: dropdown menu, not a dialog --><div x-show="mapOpen" x-transition x-cloak
                     class="absolute right-0 mt-1 w-52 bg-card border rounded-md z-30 py-1" role="menu">
-                    <button type="button" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'capability'); mapOpen=false; })()"
-                      class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" role="menuitem" aria-label="Map to Capabilities">
+                    <button type="button" class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'capability'); mapOpen=false; })()" role="menuitem" aria-label="Map to Capabilities">
                       <i data-lucide="box" class="h-4 w-4 text-primary" aria-hidden="true"></i>Map to Capabilities
                     </button>
-                    <button type="button" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'apqc'); mapOpen=false; })()"
-                      class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" role="menuitem" aria-label="Map to APQC">
+                    <button type="button" class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'apqc'); mapOpen=false; })()" role="menuitem" aria-label="Map to APQC">
                       <i data-lucide="git-branch" class="h-4 w-4 text-success" aria-hidden="true"></i>Map to APQC
                     </button>
-                    <button type="button" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'vendor'); mapOpen=false; })()"
-                      class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" role="menuitem" aria-label="Map to Vendors">
+                    <button type="button" class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'vendor'); mapOpen=false; })()" role="menuitem" aria-label="Map to Vendors">
                       <i data-lucide="package" class="h-4 w-4 text-primary" aria-hidden="true"></i>Map to Vendors
                     </button>
                     <div class="border-t my-1"></div>
-                    <button type="button" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'archimate'); mapOpen=false; })()"
-                      class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" role="menuitem" aria-label="Map to ArchiMate">
+                    <button type="button" class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'archimate'); mapOpen=false; })()" role="menuitem" aria-label="Map to ArchiMate">
                       <i data-lucide="layers" class="h-4 w-4 text-warning" aria-hidden="true"></i>Map to ArchiMate
                     </button>
                   </div>
@@ -511,7 +507,7 @@
                   @submit.prevent='Platform.modal.confirmSubmit($event, "Delete " + {{ app.name | tojson }} + "? This cannot be undone.")'>
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit" data-testid="btn-delete-{{ app.id }}"
-                    class="inline-flex items-center justify-center h-8 px-3 rounded-md text-sm font-medium text-destructive-emphasis hover:bg-destructive/10 transition-colors"
+                    class="inline-flex items-center justify-center h-8 px-3 rounded-md text-sm font-medium text-destructive-emphasis hover:bg-accent transition-colors"
                     aria-label="Delete {{ app.name }}">
                     <i data-lucide="trash-2" class="h-4 w-4" aria-hidden="true"></i>
                   </button>
@@ -631,21 +627,17 @@
               </button>
               <!-- modal-a11y-ok: dropdown menu, not a dialog --><div x-show="mapOpen" x-transition x-cloak
                 class="absolute left-0 mt-1 w-52 bg-card border rounded-md z-30 py-1" role="menu">
-                <button type="button" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'capability'); mapOpen=false; })()"
-                  class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" role="menuitem" aria-label="Map to Capabilities">
+                <button type="button" class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'capability'); mapOpen=false; })()" role="menuitem" aria-label="Map to Capabilities">
                   <i data-lucide="box" class="h-4 w-4 text-primary" aria-hidden="true"></i>Map to Capabilities
                 </button>
-                <button type="button" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'apqc'); mapOpen=false; })()"
-                  class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" role="menuitem" aria-label="Map to APQC">
+                <button type="button" class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'apqc'); mapOpen=false; })()" role="menuitem" aria-label="Map to APQC">
                   <i data-lucide="git-branch" class="h-4 w-4 text-success" aria-hidden="true"></i>Map to APQC
                 </button>
-                <button type="button" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'vendor'); mapOpen=false; })()"
-                  class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" role="menuitem" aria-label="Map to Vendors">
+                <button type="button" class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'vendor'); mapOpen=false; })()" role="menuitem" aria-label="Map to Vendors">
                   <i data-lucide="package" class="h-4 w-4 text-primary" aria-hidden="true"></i>Map to Vendors
                 </button>
                 <div class="border-t my-1"></div>
-                <button type="button" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'archimate'); mapOpen=false; })()"
-                  class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" role="menuitem" aria-label="Map to ArchiMate">
+                <button type="button" class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'archimate'); mapOpen=false; })()" role="menuitem" aria-label="Map to ArchiMate">
                   <i data-lucide="layers" class="h-4 w-4 text-warning" aria-hidden="true"></i>Map to ArchiMate
                 </button>
               </div>
@@ -756,7 +748,7 @@
       <div class="overflow-y-auto flex-1 space-y-4">
         <div x-show="!aiMap.result" x-cloak class="space-y-3">
           {% call form_group(id='ai-map-max', label='Applications to analyze', help_text='Most recently added applications are analyzed first.') %}
-            <input id="ai-map-max" type="number" min="1" max="200" x-model.number="aiMap.maxApplications"
+            <input id="ai-map-max" aria-label="Applications to analyze" type="number" min="1" max="200" x-model.number="aiMap.maxApplications"
               class="flex h-9 w-32 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           {% endcall %}
           <label class="flex items-center gap-2 text-sm">
@@ -854,7 +846,7 @@
               class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           {% endcall %}
           {% call form_group(id='ca-type', label='Application Type') %}
-            <select id="ca-type" x-model="form.application_type"
+            <select id="ca-type" aria-label="Application Type" x-model="form.application_type"
               class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <option value="">Select type...</option>
               <option value="application">Application</option>
@@ -867,7 +859,7 @@
             </select>
           {% endcall %}
           {% call form_group(id='ca-criticality', label='Business Criticality') %}
-            <select id="ca-criticality" x-model="form.business_criticality"
+            <select id="ca-criticality" aria-label="Business Criticality" x-model="form.business_criticality"
               class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               {#- Values MUST stay inside VALID_CRITICALITY in
                   app/schemas/api_schemas.py. They previously read
@@ -884,7 +876,7 @@
             </select>
           {% endcall %}
           {% call form_group(id='ca-status', label='Deployment Status') %}
-            <select id="ca-status" x-model="form.deployment_status"
+            <select id="ca-status" aria-label="Deployment Status" x-model="form.deployment_status"
               class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <option value="">Select...</option>
               <option value="production">Production</option>
@@ -915,7 +907,7 @@
                 class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" autocomplete="off">
               <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md  max-h-40 overflow-y-auto">
                 <template x-for="u in ures" :key="u.id">
-                  <button type="button" @click="uselect(u)" :aria-label="'Select ' + u.name" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
+                  <button type="button" @click="uselect(u)" :aria-label="'Select ' + u.name" class="w-full px-3 py-1.5 text-left text-sm hover:bg-accent flex items-center justify-between">
                     <span x-text="u.name" class="font-medium"></span>
                     <span x-text="u.email" class="text-xs text-muted-foreground"></span>
                   </button>

@@ -177,7 +177,7 @@
     </div>
     <div class="flex items-center gap-2 flex-shrink-0">
       <button type="button" @click="dismissed = true"
-        class="text-xs text-warning-emphasis hover:text-warning-emphasis/80 underline">Dismiss</button>
+        class="text-xs text-warning-emphasis hover:text-warning-emphasis/80 underline underline-offset-4 hover:underline">Dismiss</button>
     </div>
   </div>
 </div>
@@ -721,7 +721,7 @@
                   <form method="POST" action="{{ row.delete_url }}" class="inline"
                     data-confirm="Remove this ArchiMate link?">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="inline-flex items-center justify-center h-7 w-7 rounded-md text-destructive-emphasis hover:bg-destructive/10 transition-colors" aria-label="Remove link">
+                    <button type="submit" class="inline-flex items-center justify-center h-7 w-7 rounded-md text-destructive-emphasis hover:bg-accent transition-colors" aria-label="Remove link">
                       <i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i>
                     </button>
                   </form>
@@ -933,7 +933,7 @@
                   <form method="POST" action="{{ row.delete_url }}" class="inline"
                     data-confirm="Remove capability mapping for {{ row.name | e }}?">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="inline-flex items-center justify-center h-7 w-7 rounded-md text-destructive-emphasis hover:bg-destructive/10 transition-colors" aria-label="Remove mapping">
+                    <button type="submit" class="inline-flex items-center justify-center h-7 w-7 rounded-md text-destructive-emphasis hover:bg-accent transition-colors" aria-label="Remove mapping">
                       <i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i>
                     </button>
                   </form>
@@ -1063,7 +1063,7 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="vendor_product_id" value="{{ v.product_id }}">
-                    <button type="submit" class="inline-flex items-center justify-center h-7 w-7 rounded-md text-destructive-emphasis hover:bg-destructive/10 transition-colors" aria-label="Remove vendor product">
+                    <button type="submit" class="inline-flex items-center justify-center h-7 w-7 rounded-md text-destructive-emphasis hover:bg-accent transition-colors" aria-label="Remove vendor product">
                       <i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i>
                     </button>
                   </form>
