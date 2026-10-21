@@ -171,6 +171,14 @@ def update_capability(capability_id):
         if not data:
             return jsonify({"error": "No JSON data received"}), 400
 
+        from app.modules.ai_chat.services.ai_data_interaction_service import (
+            CAPABILITY_EDITABLE_FIELDS, _refuse_uneditable,
+        )
+        # Refuse at queue time, with the same allow-list the approver replay uses.
+        refused = _refuse_uneditable(data, CAPABILITY_EDITABLE_FIELDS, "update_capability")
+        if refused:
+            return jsonify({"success": False, "error": refused["error"]}), 400
+
         queued = queue_ai_write(
             "update", "capability", data,
             summary=f"Update capability #{capability_id}",
@@ -327,6 +335,13 @@ def update_application_metadata(app_id):
         data = request.get_json()
         if not data:
             return jsonify({"error": "No JSON data received"}), 400
+
+        from app.modules.ai_chat.services.ai_data_interaction_service import (
+            _refuse_uneditable, application_editable_fields,
+        )
+        refused = _refuse_uneditable(data, application_editable_fields(), "update_application")
+        if refused:
+            return jsonify({"success": False, "error": refused["error"]}), 400
 
         queued = queue_ai_write(
             "update", "application", data,
