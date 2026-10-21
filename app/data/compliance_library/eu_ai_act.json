@@ -1,0 +1,1037 @@
+{
+ "code": "EU-AI-ACT",
+ "name": "Regulation (EU) 2024/1689 laying down harmonised rules on artificial intelligence (Artificial Intelligence Act)",
+ "description": "All 113 articles of the Regulation, each with its official heading, chapter and a one-line summary. The article text is not reproduced.",
+ "category": "ai-governance",
+ "jurisdiction": "EU",
+ "enforcement_level": "mandatory",
+ "applies_to_manufacturing": true,
+ "applies_to_region": "EU",
+ "industry_specific": "general",
+ "official_url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj",
+ "standard_version": "2024/1689",
+ "content_level": "full",
+ "source_url": "https://publications.europa.eu/resource/celex/32024R1689",
+ "source_text_date": "2024-07-12",
+ "source_note": "Official Journal L, 12 July 2024, as published by the Publications Office of the European Union.",
+ "total_controls": 113,
+ "controls": [
+  {
+   "control_code": "EU-AI-ACT-Art.1",
+   "title": "Subject matter",
+   "description": "Sets the purpose: a uniform legal framework for human-centric, trustworthy AI that protects health, safety and fundamental rights while supporting innovation in the internal market.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 1"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.2",
+   "title": "Scope",
+   "description": "Sets who is covered: providers, deployers, importers, distributors and manufacturers placing AI on the Union market or whose output is used in the Union, and lists the exclusions such as military use and pure research.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 2"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.3",
+   "title": "Definitions",
+   "description": "Defines the terms used, including AI system, provider, deployer, high-risk, general-purpose AI model, systemic risk, substantial modification and serious incident.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 3"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.4",
+   "title": "AI literacy",
+   "description": "Providers and deployers take measures to ensure a sufficient level of AI literacy among their staff and others operating AI systems on their behalf.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 4"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.5",
+   "title": "Prohibited AI practices",
+   "description": "Prohibits specified AI practices, including harmful manipulation, exploitation of vulnerabilities, social scoring, certain predictive policing, untargeted facial image scraping, emotion inference at work and school, and most real-time remote biometric identification in public spaces.",
+   "kind": "Constraint",
+   "category": "Chapter II: Prohibited AI practices",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 5"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.6",
+   "title": "Classification rules for high-risk AI systems",
+   "description": "Sets the rules for classifying an AI system as high-risk: safety components of regulated products and the use cases in Annex III, with an exemption where the system poses no significant risk.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 6"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.7",
+   "title": "Amendments to Annex III",
+   "description": "Empowers the Commission to amend Annex III by adding or modifying high-risk use cases, under stated conditions.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 7"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.8",
+   "title": "Compliance with the requirements",
+   "description": "High-risk AI systems must comply with the requirements of this Section, taking into account their intended purpose and the state of the art.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 8"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.9",
+   "title": "Risk management system",
+   "description": "Providers establish, implement, document and maintain a risk management system across the lifecycle of the high-risk AI system, including identifying, evaluating and mitigating risks and testing.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 9"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.10",
+   "title": "Data and data governance",
+   "description": "Training, validation and testing data for high-risk AI systems meet quality criteria and are subject to data governance practices, including bias examination and, in limited cases, processing of special categories of data.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 10"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.11",
+   "title": "Technical documentation",
+   "description": "Technical documentation is drawn up before market placement, kept up to date and contains at least the elements in Annex IV.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 11"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.12",
+   "title": "Record-keeping",
+   "description": "High-risk AI systems technically allow automatic recording of events (logs) over their lifetime to support traceability, post-market monitoring and risk identification.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 12"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.13",
+   "title": "Transparency and provision of information to deployers",
+   "description": "High-risk AI systems are designed to be sufficiently transparent for deployers to interpret and use their output, and come with instructions for use containing the specified information.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 13"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.14",
+   "title": "Human oversight",
+   "description": "High-risk AI systems are designed so that natural persons can effectively oversee them during use, to prevent or minimise risks, with measures built in or identified for the deployer.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 14"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.15",
+   "title": "Accuracy, robustness and cybersecurity",
+   "description": "High-risk AI systems achieve an appropriate level of accuracy, robustness and cybersecurity throughout their lifecycle and declare accuracy metrics in the instructions for use.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 15"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.16",
+   "title": "Obligations of providers of high-risk AI systems",
+   "description": "Sets the obligations of providers of high-risk AI systems, including compliance with the requirements, quality management, documentation, logs, conformity assessment, CE marking, registration and corrective action.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 16"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.17",
+   "title": "Quality management system",
+   "description": "Providers put a documented quality management system in place covering compliance strategy, design and development controls, testing, data management, risk management, post-market monitoring and incident reporting.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 17"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.18",
+   "title": "Documentation keeping",
+   "description": "Providers keep the technical documentation, quality system documentation and declaration of conformity at the disposal of authorities for ten years after the system is placed on the market.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 18"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.19",
+   "title": "Automatically generated logs",
+   "description": "Providers keep the logs automatically generated by their high-risk AI systems, to the extent under their control, for at least six months.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 19"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.20",
+   "title": "Corrective actions and duty of information",
+   "description": "Providers that find a high-risk AI system is not in conformity take corrective action, withdraw, disable or recall it, and inform distributors, deployers and authorities.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 20"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.21",
+   "title": "Cooperation with competent authorities",
+   "description": "Providers give competent authorities, on reasoned request, the information and documentation needed to show conformity, and access to logs.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 21"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.22",
+   "title": "Authorised representatives of providers of high-risk AI systems",
+   "description": "Providers established outside the Union appoint by written mandate an authorised representative in the Union before making their high-risk AI systems available.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 22"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.23",
+   "title": "Obligations of importers",
+   "description": "Importers verify conformity, documentation, marking and the authorised representative before placing a high-risk AI system on the market, and cooperate with authorities.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 23"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.24",
+   "title": "Obligations of distributors",
+   "description": "Distributors verify CE marking, documentation and instructions before making a high-risk AI system available, and take corrective action if they find non-conformity.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 24"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.25",
+   "title": "Responsibilities along the AI value chain",
+   "description": "A distributor, importer, deployer or other third party is treated as the provider if they put their name on a high-risk system, modify its purpose or substantially modify it, with duties on cooperation along the AI value chain.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 25"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.26",
+   "title": "Obligations of deployers of high-risk AI systems",
+   "description": "Deployers of high-risk AI systems use them according to the instructions, assign competent human oversight, ensure input data is relevant, monitor operation, keep logs and inform affected people and workers.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 26"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.27",
+   "title": "Fundamental rights impact assessment for high-risk AI systems",
+   "description": "Certain deployers, such as public bodies and providers of public services, assess the impact on fundamental rights before first use of a high-risk AI system.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 27"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.28",
+   "title": "Notifying authorities",
+   "description": "Each Member State designates or establishes a notifying authority responsible for assessing, designating and monitoring conformity assessment bodies.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 28"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.29",
+   "title": "Application of a conformity assessment body for notification",
+   "description": "Conformity assessment bodies apply to the notifying authority of their Member State for notification, with the documentation required.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 29"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.30",
+   "title": "Notification procedure",
+   "description": "Notifying authorities notify only conformity assessment bodies that meet the requirements, using the Commission's electronic notification tool.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 30"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.31",
+   "title": "Requirements relating to notified bodies",
+   "description": "Notified bodies must satisfy organisational, quality management, resource and cybersecurity requirements, remain independent and impartial, and carry adequate liability insurance.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 31"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.32",
+   "title": "Presumption of conformity with requirements relating to notified bodies",
+   "description": "A conformity assessment body that meets the relevant harmonised standards is presumed to meet the requirements for notified bodies.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 32"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.33",
+   "title": "Subsidiaries of notified bodies and subcontracting",
+   "description": "Sets the conditions under which a notified body may subcontract tasks or use a subsidiary, and remains responsible for their work.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 33"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.34",
+   "title": "Operational obligations of notified bodies",
+   "description": "Notified bodies verify conformity of high-risk AI systems under Article 43, inform the notifying authority of their activities and keep documentation available.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 34"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.35",
+   "title": "Identification numbers and lists of notified bodies",
+   "description": "The Commission assigns a single identification number to each notified body and publishes the list of notified bodies.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 35"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.36",
+   "title": "Changes to notifications",
+   "description": "The notifying authority notifies the Commission and other Member States of relevant changes to a notification, including restriction, suspension or withdrawal.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 36"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.37",
+   "title": "Challenge to the competence of notified bodies",
+   "description": "The Commission investigates cases where the competence of a notified body or its continued compliance is in doubt.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 37"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.38",
+   "title": "Coordination of notified bodies",
+   "description": "The Commission ensures appropriate coordination and cooperation between notified bodies through a sectoral group.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 38"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.39",
+   "title": "Conformity assessment bodies of third countries",
+   "description": "Conformity assessment bodies from third countries with which the Union has an agreement may be authorised to carry out the activities of notified bodies.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 39"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.40",
+   "title": "Harmonised standards and standardisation deliverables",
+   "description": "High-risk AI systems and general-purpose AI models that conform to published harmonised standards are presumed to conform to the corresponding requirements.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 40"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.41",
+   "title": "Common specifications",
+   "description": "The Commission may adopt common specifications where harmonised standards do not exist or are insufficient, and systems conforming to them are presumed compliant.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 41"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.42",
+   "title": "Presumption of conformity with certain requirements",
+   "description": "High-risk AI systems trained and tested on data reflecting their setting, or certified under a cybersecurity scheme, are presumed to meet the matching requirements.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 42"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.43",
+   "title": "Conformity assessment",
+   "description": "Sets the conformity assessment procedures: internal control or assessment with a notified body, depending on the system, and reassessment after substantial modification.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 43"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.44",
+   "title": "Certificates",
+   "description": "Certificates issued by notified bodies follow a prescribed form, language and validity of up to five or four years, and can be suspended or withdrawn.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 44"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.45",
+   "title": "Information obligations of notified bodies",
+   "description": "Notified bodies inform the notifying authority and other bodies of certificates issued, refused, suspended or withdrawn and of conditions affecting their notification.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 45"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.46",
+   "title": "Derogation from conformity assessment procedure",
+   "description": "Market surveillance authorities may, on a justified request, authorise a specific high-risk AI system for exceptional reasons of public security or protection of life and health, and the Commission may do so on a Union-wide basis.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 46"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.47",
+   "title": "EU declaration of conformity",
+   "description": "Providers draw up an EU declaration of conformity for each high-risk AI system and keep it available for ten years.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 47"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.48",
+   "title": "CE marking",
+   "description": "High-risk AI systems carry a visible, legible and indelible CE marking, or a digital one where provided digitally, followed by the notified body's number where one is involved.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 48"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.49",
+   "title": "Registration",
+   "description": "Providers and certain deployers register themselves and their high-risk AI systems in the EU database before placing them on the market or putting them into service.",
+   "kind": "Requirement",
+   "category": "Chapter III: High-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 49"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.50",
+   "title": "Transparency obligations for providers and deployers of certain AI systems",
+   "description": "Sets transparency duties: users are told when they interact with an AI system, synthetic content is marked in a machine-readable way, and deployers disclose emotion recognition, biometric categorisation, deep fakes and AI-generated public-interest text.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Transparency obligations for providers and deployers of certain AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 50"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.51",
+   "title": "Classification of general-purpose AI models as general-purpose AI models with systemic risk",
+   "description": "A general-purpose AI model is classified as one with systemic risk if it has high-impact capabilities, presumed at a training compute threshold of 10^25 floating point operations, or by Commission decision.",
+   "kind": "Requirement",
+   "category": "Chapter V: General-purpose AI models",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 51"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.52",
+   "title": "Procedure",
+   "description": "Sets the procedure for notifying the Commission that a general-purpose model meets the systemic-risk threshold and for designation, contestation and reassessment.",
+   "kind": "Requirement",
+   "category": "Chapter V: General-purpose AI models",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 52"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.53",
+   "title": "Obligations for providers of general-purpose AI models",
+   "description": "Providers of general-purpose AI models keep technical documentation, give information to downstream providers, set a copyright compliance policy and publish a summary of training content.",
+   "kind": "Requirement",
+   "category": "Chapter V: General-purpose AI models",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 53"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.54",
+   "title": "Authorised representatives of providers of general-purpose AI models",
+   "description": "Providers of general-purpose AI models established outside the Union appoint an authorised representative in the Union before placing the model on the market.",
+   "kind": "Requirement",
+   "category": "Chapter V: General-purpose AI models",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 54"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.55",
+   "title": "Obligations of providers of general-purpose AI models with systemic risk",
+   "description": "Providers of general-purpose AI models with systemic risk perform model evaluation including adversarial testing, assess and mitigate systemic risks, report serious incidents and ensure adequate cybersecurity.",
+   "kind": "Requirement",
+   "category": "Chapter V: General-purpose AI models",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 55"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.56",
+   "title": "Codes of practice",
+   "description": "The AI Office encourages and facilitates codes of practice at Union level to help providers of general-purpose AI models apply the Regulation.",
+   "kind": "Requirement",
+   "category": "Chapter V: General-purpose AI models",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 56"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.57",
+   "title": "AI regulatory sandboxes",
+   "description": "Each Member State ensures that at least one AI regulatory sandbox is operational at national level by 2 August 2026.",
+   "kind": "Requirement",
+   "category": "Chapter VI: Measures in support of innovation",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 57"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.58",
+   "title": "Detailed arrangements for, and functioning of, AI regulatory sandboxes",
+   "description": "The Commission adopts implementing acts specifying the detailed arrangements for the establishment, operation, supervision and exit from AI regulatory sandboxes.",
+   "kind": "Requirement",
+   "category": "Chapter VI: Measures in support of innovation",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 58"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.59",
+   "title": "Further processing of personal data for developing certain AI systems in the public interest in the AI regulatory sandbox",
+   "description": "Personal data lawfully collected for other purposes may be processed in an AI regulatory sandbox solely for developing certain AI systems in the public interest, under listed conditions.",
+   "kind": "Constraint",
+   "category": "Chapter VI: Measures in support of innovation",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 59"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.60",
+   "title": "Testing of high-risk AI systems in real world conditions outside AI regulatory sandboxes",
+   "description": "Testing of high-risk AI systems in real-world conditions outside sandboxes is allowed under a plan approved by the market surveillance authority and with safeguards for participants.",
+   "kind": "Requirement",
+   "category": "Chapter VI: Measures in support of innovation",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 60"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.61",
+   "title": "Informed consent to participate in testing in real world conditions outside AI regulatory sandboxes",
+   "description": "Participants in real-world testing outside sandboxes give freely given, informed consent beforehand, documented and with the right to withdraw.",
+   "kind": "Requirement",
+   "category": "Chapter VI: Measures in support of innovation",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 61"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.62",
+   "title": "Measures for providers and deployers, in particular SMEs, including start-ups",
+   "description": "Member States take measures for SMEs and start-ups, including priority access to sandboxes, awareness and training, and communication channels.",
+   "kind": "Requirement",
+   "category": "Chapter VI: Measures in support of innovation",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 62"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.63",
+   "title": "Derogations for specific operators",
+   "description": "Microenterprises may comply in a simplified way with certain elements of the quality management system required by Article 17.",
+   "kind": "Requirement",
+   "category": "Chapter VI: Measures in support of innovation",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 63"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.64",
+   "title": "AI Office",
+   "description": "The Commission develops Union expertise and capability in AI through the AI Office, supported by Member States.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Governance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 64"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.65",
+   "title": "Establishment and structure of the European Artificial Intelligence Board",
+   "description": "Establishes the European Artificial Intelligence Board, with one representative per Member State, to coordinate and advise on application of the Regulation.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Governance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 65"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.66",
+   "title": "Tasks of the Board",
+   "description": "Lists the tasks of the Board, including advising on implementation, supporting national authorities and contributing to guidelines and codes.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Governance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 66"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.67",
+   "title": "Advisory forum",
+   "description": "Establishes an advisory forum of stakeholders to provide technical expertise to the Board and the Commission.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Governance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 67"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.68",
+   "title": "Scientific panel of independent experts",
+   "description": "The Commission establishes a scientific panel of independent experts to support enforcement, in particular for general-purpose AI models.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Governance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 68"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.69",
+   "title": "Access to the pool of experts by the Member States",
+   "description": "Member States may call upon experts of the scientific panel to support their enforcement activities, subject to fees.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Governance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 69"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.70",
+   "title": "Designation of national competent authorities and single points of contact",
+   "description": "Each Member State designates at least one notifying authority and one market surveillance authority as national competent authorities and notifies a single point of contact to the Commission.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Governance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 70"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.71",
+   "title": "EU database for high-risk AI systems listed in Annex III",
+   "description": "The Commission sets up and maintains an EU database of high-risk AI systems listed in Annex III, with specified information that is publicly accessible.",
+   "kind": "Requirement",
+   "category": "Chapter VIII: EU database for high-risk AI systems",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 71"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.72",
+   "title": "Post-market monitoring by providers and post-market monitoring plan for high-risk AI systems",
+   "description": "Providers establish a documented post-market monitoring system proportionate to the AI technology and risks, based on a post-market monitoring plan.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 72"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.73",
+   "title": "Reporting of serious incidents",
+   "description": "Providers of high-risk AI systems report serious incidents to market surveillance authorities within set time limits, between 2 and 15 days depending on severity, and investigate them.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 73"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.74",
+   "title": "Market surveillance and control of AI systems in the Union market",
+   "description": "Applies Regulation (EU) 2019/1020 on market surveillance to AI systems, and sets the powers and organisation of market surveillance authorities.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 74"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.75",
+   "title": "Mutual assistance, market surveillance and control of general-purpose AI systems",
+   "description": "The AI Office monitors and supervises AI systems built on a general-purpose model by the same provider, and authorities cooperate on mutual assistance.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 75"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.76",
+   "title": "Supervision of testing in real world conditions by market surveillance authorities",
+   "description": "Market surveillance authorities supervise testing in real-world conditions and may require changes, suspension or ending of the test.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 76"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.77",
+   "title": "Powers of authorities protecting fundamental rights",
+   "description": "National authorities that protect fundamental rights may request and access documentation created under this Regulation, and cooperate with market surveillance authorities.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 77"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.78",
+   "title": "Confidentiality",
+   "description": "Authorities and bodies that apply the Regulation respect the confidentiality of information and data obtained, including trade secrets and source code.",
+   "kind": "Constraint",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 78"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.79",
+   "title": "Procedure at national level for dealing with AI systems presenting a risk",
+   "description": "Sets the national procedure for dealing with AI systems that present a risk: evaluation, required corrective action, withdrawal or recall, and notification to the Commission and other Member States.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 79"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.80",
+   "title": "Procedure for dealing with AI systems classified by the provider as non-high-risk in application of Annex III",
+   "description": "Sets the procedure for dealing with AI systems that the provider classified as not high-risk but which a market surveillance authority considers high-risk.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 80"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.81",
+   "title": "Union safeguard procedure",
+   "description": "Sets the Union safeguard procedure for assessing national measures against AI systems when other Member States or the Commission object.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 81"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.82",
+   "title": "Compliant AI systems which present a risk",
+   "description": "Where a compliant AI system nevertheless presents a risk to health, safety or fundamental rights, the authority requires appropriate measures within a set period.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 82"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.83",
+   "title": "Formal non-compliance",
+   "description": "Sets the rules for formal non-compliance such as missing CE marking, declaration of conformity or registration, with required correction and, if not remedied, restriction or withdrawal.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 83"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.84",
+   "title": "Union AI testing support structures",
+   "description": "The Commission designates Union AI testing support structures to provide independent technical or scientific advice to authorities.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 84"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.85",
+   "title": "Right to lodge a complaint with a market surveillance authority",
+   "description": "Any person with grounds to consider the Regulation has been infringed may lodge a complaint with a market surveillance authority.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 85"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.86",
+   "title": "Right to explanation of individual decision-making",
+   "description": "Persons subject to a decision of a deployer based on a high-risk AI system with legal or similarly significant effects have the right to clear and meaningful explanations of the role of the system and the main elements of the decision.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 86"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.87",
+   "title": "Reporting of infringements and protection of reporting persons",
+   "description": "Directive (EU) 2019/1937 on the protection of persons who report breaches of Union law applies to reports of infringements of this Regulation.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 87"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.88",
+   "title": "Enforcement of the obligations of providers of general-purpose AI models",
+   "description": "The Commission has exclusive powers to supervise and enforce the obligations of providers of general-purpose AI models and entrusts the tasks to the AI Office.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 88"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.89",
+   "title": "Monitoring actions",
+   "description": "The AI Office may take the actions necessary to monitor effective implementation and compliance by providers of general-purpose AI models, and downstream providers may lodge complaints.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 89"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.90",
+   "title": "Alerts of systemic risks by the scientific panel",
+   "description": "The scientific panel may give a qualified alert to the AI Office where it suspects a general-purpose model poses a concrete systemic risk or meets the classification criteria.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 90"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.91",
+   "title": "Power to request documentation and information",
+   "description": "The Commission may request documentation and information from the provider of a general-purpose AI model, including by decision.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 91"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.92",
+   "title": "Power to conduct evaluations",
+   "description": "The AI Office may conduct evaluations of a general-purpose AI model to assess compliance or to investigate systemic risks, including through independent experts.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 92"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.93",
+   "title": "Power to request measures",
+   "description": "The Commission may request providers of general-purpose AI models to take measures to comply, mitigate systemic risk, or restrict, withdraw or recall the model.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 93"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.94",
+   "title": "Procedural rights of economic operators of the general-purpose AI model",
+   "description": "Article 18 of Regulation (EU) 2019/1020 on procedural rights of economic operators applies to providers of general-purpose AI models.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Post-market monitoring, information sharing and market surveillance",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 94"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.95",
+   "title": "Codes of conduct for voluntary application of specific requirements",
+   "description": "The AI Office and Member States encourage voluntary codes of conduct that apply some of the high-risk requirements to other AI systems, including on environmental sustainability, AI literacy and inclusive design.",
+   "kind": "Requirement",
+   "category": "Chapter X: Codes of conduct and guidelines",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 95"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.96",
+   "title": "Guidelines from the Commission on the implementation of this Regulation",
+   "description": "The Commission develops guidelines on practical implementation, including the high-risk requirements, prohibited practices, incident reporting and the definition of an AI system.",
+   "kind": "Requirement",
+   "category": "Chapter X: Codes of conduct and guidelines",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 96"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.97",
+   "title": "Exercise of the delegation",
+   "description": "Governs how the Commission exercises its power to adopt delegated acts: five-year period, revocation and the objection period.",
+   "kind": "Requirement",
+   "category": "Chapter XI: Delegation of power and committee procedure",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 97"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.98",
+   "title": "Committee procedure",
+   "description": "Establishes the committee procedure by which the Commission is assisted when adopting implementing acts.",
+   "kind": "Requirement",
+   "category": "Chapter XI: Delegation of power and committee procedure",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 98"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.99",
+   "title": "Penalties",
+   "description": "Member States lay down effective, proportionate and dissuasive penalties, with administrative fines of up to EUR 35 million or 7% of worldwide turnover for prohibited practices and lower ceilings for other breaches.",
+   "kind": "Requirement",
+   "category": "Chapter XII: Penalties",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 99"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.100",
+   "title": "Administrative fines on Union institutions, bodies, offices and agencies",
+   "description": "The European Data Protection Supervisor may impose administrative fines on Union institutions, bodies, offices and agencies.",
+   "kind": "Requirement",
+   "category": "Chapter XII: Penalties",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 100"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.101",
+   "title": "Fines for providers of general-purpose AI models",
+   "description": "The Commission may fine providers of general-purpose AI models up to 3% of worldwide annual turnover or EUR 15 million for listed infringements.",
+   "kind": "Requirement",
+   "category": "Chapter XII: Penalties",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 101"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.102",
+   "title": "Amendment to Regulation (EC) No 300/2008",
+   "description": "Amends Regulation (EC) No 300/2008 on civil aviation security to take the AI Act's high-risk requirements into account.",
+   "kind": "Requirement",
+   "category": "Chapter XIII: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 102"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.103",
+   "title": "Amendment to Regulation (EU) No 167/2013",
+   "description": "Amends Regulation (EU) No 167/2013 on agricultural and forestry vehicles to take the AI Act's high-risk requirements into account.",
+   "kind": "Requirement",
+   "category": "Chapter XIII: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 103"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.104",
+   "title": "Amendment to Regulation (EU) No 168/2013",
+   "description": "Amends Regulation (EU) No 168/2013 on two- or three-wheel vehicles to take the AI Act's high-risk requirements into account.",
+   "kind": "Requirement",
+   "category": "Chapter XIII: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 104"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.105",
+   "title": "Amendment to Directive 2014/90/EU",
+   "description": "Amends Directive 2014/90/EU on marine equipment to take the AI Act's high-risk requirements into account.",
+   "kind": "Requirement",
+   "category": "Chapter XIII: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 105"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.106",
+   "title": "Amendment to Directive (EU) 2016/797",
+   "description": "Amends Directive (EU) 2016/797 on the interoperability of the rail system to take the AI Act's high-risk requirements into account.",
+   "kind": "Requirement",
+   "category": "Chapter XIII: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 106"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.107",
+   "title": "Amendment to Regulation (EU) 2018/858",
+   "description": "Amends Regulation (EU) 2018/858 on motor vehicle type-approval to take the AI Act's high-risk requirements into account.",
+   "kind": "Requirement",
+   "category": "Chapter XIII: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 107"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.108",
+   "title": "Amendments to Regulation (EU) 2018/1139",
+   "description": "Amends Regulation (EU) 2018/1139 on civil aviation so that AI safety components are subject to the AI Act's high-risk requirements.",
+   "kind": "Requirement",
+   "category": "Chapter XIII: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 108"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.109",
+   "title": "Amendment to Regulation (EU) 2019/2144",
+   "description": "Amends Regulation (EU) 2019/2144 on motor vehicle safety to take the AI Act's high-risk requirements into account.",
+   "kind": "Requirement",
+   "category": "Chapter XIII: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 109"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.110",
+   "title": "Amendment to Directive (EU) 2020/1828",
+   "description": "Adds this Regulation to the list of acts in Annex I to Directive (EU) 2020/1828 on representative actions for consumers.",
+   "kind": "Requirement",
+   "category": "Chapter XIII: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 110"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.111",
+   "title": "AI systems already placed on the market or put into service and general-purpose AI models already placed on the marked",
+   "description": "Sets transitional rules for AI systems and general-purpose AI models already on the market, including large-scale IT systems and models placed before 2 August 2025.",
+   "kind": "Requirement",
+   "category": "Chapter XIII: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 111"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.112",
+   "title": "Evaluation and review",
+   "description": "The Commission assesses yearly whether to amend the lists in Annex III and Article 5, and reports on evaluation and review of the Regulation at set intervals.",
+   "kind": "Requirement",
+   "category": "Chapter XIII: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 112"
+  },
+  {
+   "control_code": "EU-AI-ACT-Art.113",
+   "title": "Entry into force and application",
+   "description": "Provides that the Regulation enters into force on the twentieth day after publication and applies from 2 August 2026, with earlier dates for the general provisions and prohibitions, governance and general-purpose models, and a later date for some regulated products.",
+   "kind": "Requirement",
+   "category": "Chapter XIII: Final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2024/1689, Article 113"
+  }
+ ]
+}
