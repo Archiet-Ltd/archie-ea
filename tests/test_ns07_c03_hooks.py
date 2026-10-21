@@ -51,23 +51,43 @@ def test_risk_register_keeps_hooks(app, db_session, make_org, tenant_ctx):
     assert "h-8 rounded-md border" not in html
 
 
-def test_risk_register_panel_is_a_trapped_modal_dialog(app, db_session, make_org, tenant_ctx):
+def test_risk_register_panel_is_the_canonical_dialog(app, db_session, make_org, tenant_ctx):
+    """The detail panel is the modal macro's dialog (the dialog macro replaces a banned side
+    drawer): same id, dialog semantics, a labelled heading, the macro's close button and
+    backdrop, and no slide-over classes or hand-rolled open flag."""
     html = _render_risk_register(app, db_session, make_org, tenant_ctx)
     page = BeautifulSoup(html, "html.parser")
     panel = page.select_one("#risk-detail-panel")
     assert panel is not None
     assert panel.get("role") == "dialog" and panel.get("aria-modal") == "true"
-    assert panel.get("aria-label") == "Risk detail"
-    assert panel.get("x-show") == "panelOpen"
-    assert panel.get("x-trap.inert") == "panelOpen"
-    # close button inside the panel
-    close = panel.select_one('button[aria-label="Close risk detail"]')
-    assert close is not None and close.get("@click") == "panelOpen = false"
-    # the scrim still closes on a click and is hidden from assistive technology
-    scrim = [d for d in page.select('div[x-show="panelOpen"]') if d is not panel][0]
-    assert scrim.get("@click.self") == "panelOpen = false"
-    assert scrim.get("aria-hidden") == "true"
-    assert scrim.get("@keydown.escape.window") == "panelOpen = false"
+    assert panel.has_attr("hidden")  # closed until Platform.modal.open
+    assert panel.get("aria-labelledby") == "risk-detail-title"
+    assert panel.select_one("#risk-detail-title") is not None
+    # the macro's own close button and backdrop (Escape, close and backdrop paths)
+    assert panel.select_one("[data-modal-close=\"risk-detail-panel\"]") is not None
+    assert panel.select_one("[data-modal-backdrop=\"risk-detail-panel\"]") is not None
+    assert panel.select_one("[data-modal-panel]") is not None
+    # no drawer left behind
+    own = panel.decode()
+    assert "sm:w-[28rem]" not in own and "translate-x-full" not in own and "border-l" not in own
+    assert "panelOpen" not in html
+    # the detail content and its controls are inside the dialog
+    assert panel.select_one('[x-text*="selectedRisk"]') is not None
+    assert "openEdit(selectedRisk)" in panel.decode() or "openEdit(selectedRisk)" in html
+    # the dialog sits inside the riskRegister scope (Alpine bindings resolve)
+    root = page.select_one('[x-data*="riskRegister"]')
+    assert root is not None and root.select_one("#risk-detail-panel") is not None
+
+
+def test_risk_register_script_opens_and_closes_the_dialog_through_the_platform():
+    s = _src("governance/risk_register.html")
+    assert "Platform.modal.open('risk-detail-panel')" in s
+    assert "Platform.modal.close('risk-detail-panel')" in s
+    assert "panelOpen" not in s
+    assert "{'label': 'View', 'click': 'openView(row)'}" in s
+    assert "{'label': 'Map to…', 'click': 'openView(row, true)'}" in s
+    # no new caller of the drawer component
+    assert "components/drawer.html" not in s
 
 
 def test_vendors_keep_hooks_and_names():

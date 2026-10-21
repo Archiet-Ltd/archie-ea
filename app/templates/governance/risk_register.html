@@ -375,53 +375,32 @@
     </div>
     {% endcall %}
 
-    {# ── H2: risk detail slide-over -----------------------------------
-       Rows in this table opened nothing; the ADM Kanban board's Sprint
-       Planning panel (app/templates/adm_kanban/board_v2.html) is the
-       platform's existing slide-over pattern for exactly this shape of
-       problem, reused here rather than inventing a second one. Shows
-       Description and Mitigation plan (captured at creation, never shown
-       again after that) plus H1's entity links, with Edit/Delete controls
-       and the "Map to…" picker. #}
-    <div class="relative">
-        <div x-show="panelOpen" x-cloak @keydown.escape.window="panelOpen = false"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-             x-transition:leave="transition ease-in duration-150"
-             x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-             @click.self="panelOpen = false" aria-hidden="true"
-             class="fixed inset-0 z-40 bg-overlay/50"></div>
+    {# ── Risk detail dialog -------------------------------------------
+       Rows in this table open this centred dialog (the dialog macro replaces
+       a banned side drawer). Shows Description and Mitigation plan (captured
+       at creation) plus the entity links, with Edit/Delete controls and the
+       "Map to…" picker. Opened with Platform.modal.open('risk-detail-panel')
+       from a row's View / Map to… action; Escape, the close button and the
+       backdrop close it, and focus is trapped inside while it is open. #}
+    {% call modal(id='risk-detail-panel', labelledby='risk-detail-title', size='lg') %}
+        <h2 id="risk-detail-title" class="text-base font-semibold text-foreground truncate pr-8 mb-4" x-text="selectedRisk ? selectedRisk.title : 'Risk detail'">Risk detail</h2>
 
-        <div x-show="panelOpen" x-cloak x-trap.inert="panelOpen" role="dialog" aria-modal="true" aria-label="Risk detail" id="risk-detail-panel"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
-             x-transition:leave="transition ease-in duration-150"
-             x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
-             class="fixed right-0 top-0 h-full w-full sm:w-[28rem] bg-background border-l border-border z-50 flex flex-col">
-
-            <div class="flex items-center justify-between px-4 py-3 border-b border-border">
-                <h2 class="text-sm font-semibold text-foreground truncate" x-text="selectedRisk ? selectedRisk.title : 'Risk detail'"></h2>
-                <button type="button" @click="panelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close risk detail">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
+        <div class="space-y-5" x-show="selectedRisk">
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted capitalize" x-text="selectedRisk ? selectedRisk.status : ''"></span>
+                <span class="text-xs text-muted-foreground">Score <span class="font-medium text-foreground" x-text="selectedRisk ? selectedRisk.risk_score : ''"></span></span>
+                <span class="text-xs text-muted-foreground">Owner: <span class="text-foreground" x-text="selectedRisk ? selectedRisk.owner : ''"></span></span>
             </div>
 
-            <div class="flex-1 overflow-y-auto p-4 space-y-5" x-show="selectedRisk">
-                <div class="flex items-center gap-2 flex-wrap">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted capitalize" x-text="selectedRisk ? selectedRisk.status : ''"></span>
-                    <span class="text-xs text-muted-foreground">Score <span class="font-medium text-foreground" x-text="selectedRisk ? selectedRisk.risk_score : ''"></span></span>
-                    <span class="text-xs text-muted-foreground">Owner: <span class="text-foreground" x-text="selectedRisk ? selectedRisk.owner : ''"></span></span>
-                </div>
+            <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Description</h3>
+                <p class="text-sm text-foreground whitespace-pre-line" x-text="(selectedRisk && selectedRisk.description) || '—'"></p>
+            </div>
 
-                <div>
-                    <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Description</h3>
-                    <p class="text-sm text-foreground whitespace-pre-line" x-text="(selectedRisk && selectedRisk.description) || '—'"></p>
-                </div>
-
-                <div>
-                    <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Mitigation plan</h3>
-                    <p class="text-sm text-foreground whitespace-pre-line" x-text="(selectedRisk && selectedRisk.mitigation_plan) || '—'"></p>
-                </div>
+            <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Mitigation plan</h3>
+                <p class="text-sm text-foreground whitespace-pre-line" x-text="(selectedRisk && selectedRisk.mitigation_plan) || '—'"></p>
+            </div>
 
                 <div>
                     <div class="flex items-center justify-between mb-1">
@@ -464,7 +443,7 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-2 px-4 py-3 border-t border-border" x-show="selectedRisk">
+            <div class="flex items-center gap-2 mt-6 pt-4 border-t border-border" x-show="selectedRisk">
                 <button type="button" @click="openEdit(selectedRisk)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="pencil" class="h-3.5 w-3.5" aria-hidden="true"></i> Edit
                 </button>
@@ -472,8 +451,7 @@
                     <i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i> Delete
                 </button>
             </div>
-        </div>
-    </div>
+    {% endcall %}
 </div>
 {{ data_table_script() }}
 {% endblock %}
@@ -490,8 +468,7 @@ function riskRegister() {
         },
         editingId: null,
 
-        // H2: detail slide-over state.
-        panelOpen: false,
+        // Detail dialog (Platform.modal 'risk-detail-panel') state.
         selectedRisk: null,
 
         // H1: entity-link picker state, scoped to whichever risk the panel is showing.
@@ -542,7 +519,7 @@ function riskRegister() {
         // row. Reuses the same modal/form/submit() rather than a second copy.
         openEdit(row) {
             if (!row) return;
-            this.panelOpen = false;
+            Platform.modal.close('risk-detail-panel');
             this.editingId = row.id;
             this.form.title = row.title || '';
             this.form.description = row.description || '';
@@ -555,7 +532,7 @@ function riskRegister() {
             Platform.modal.open('create-risk-modal');
         },
 
-        // H2: opens the detail slide-over. `mapMode=true` (from the row's
+        // H2: opens the detail dialog. `mapMode=true` (from the row's
         // "Map to…" action) opens straight into the entity picker.
         openView(row, mapMode) {
             if (!row) return;
@@ -563,7 +540,7 @@ function riskRegister() {
             this.showMapPicker = !!mapMode;
             this.linkSearch = '';
             this.linkResults = [];
-            this.panelOpen = true;
+            Platform.modal.open('risk-detail-panel');
         },
 
         confirmDelete(row) {
@@ -582,7 +559,7 @@ function riskRegister() {
                     .then(function (data) {
                         if (data && data.error) { Platform.toast.error(data.error); return; }
                         Platform.toast.success('Risk deleted.');
-                        self.panelOpen = false;
+                        Platform.modal.close('risk-detail-panel');
                         setTimeout(function () { window.location.reload(); }, 400);
                     })
                     .catch(function (err) {
