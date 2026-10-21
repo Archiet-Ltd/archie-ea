@@ -446,8 +446,10 @@
           {% else %}
           <div class="py-3 text-center">
             <p class="text-sm text-muted-foreground">No ownership data</p>
+            {% if can('edit', 'application') %}
             <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
                class="text-xs text-primary hover:underline mt-1 inline-block">Add via Edit page</a>
+            {% endif %}
           </div>
           {% endif %}
           {% endif %}
@@ -1176,10 +1178,12 @@
   {% call tab_panel('technology', active=(resolved_tab == 'technology')) %}
   <div class="space-y-6">
     <div class="flex justify-end">
+      {% if can('edit', 'application') %}
       <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
          class="inline-flex items-center gap-2 rounded-md border border-input bg-background hover:bg-accent h-9 px-4 text-sm font-medium transition-colors">
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Technology Details
       </a>
+      {% endif %}
     </div>
 
     {% include "applications/_technology_stack_links.html" %}
@@ -1548,10 +1552,12 @@
   {% call tab_panel('compliance', active=(resolved_tab == 'compliance')) %}
   <div class="space-y-6">
     <div class="flex justify-end">
+      {% if can('edit', 'application') %}
       <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
          class="inline-flex items-center gap-2 rounded-md border border-input bg-background hover:bg-accent h-9 px-4 text-sm font-medium transition-colors">
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Compliance Settings
       </a>
+      {% endif %}
     </div>
 
     {# Compliance Score Gauge #}
@@ -1697,10 +1703,12 @@
   {% call tab_panel('health', active=(resolved_tab == 'health')) %}
   <div class="space-y-6">
     <div class="flex justify-end">
+      {% if can('edit', 'application') %}
       <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
          class="inline-flex items-center gap-2 rounded-md border border-input bg-background hover:bg-accent h-9 px-4 text-sm font-medium transition-colors">
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Health & Quality Metrics
       </a>
+      {% endif %}
     </div>
 
     {# Health Metrics #}
@@ -1841,10 +1849,12 @@
   {% call tab_panel('cost', active=(resolved_tab == 'cost')) %}
   <div class="space-y-6">
     <div class="flex justify-end">
+      {% if can('edit', 'application') %}
       <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
          class="inline-flex items-center gap-2 rounded-md border border-input bg-background hover:bg-accent h-9 px-4 text-sm font-medium transition-colors">
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Cost Details
       </a>
+      {% endif %}
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

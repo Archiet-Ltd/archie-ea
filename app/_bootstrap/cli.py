@@ -540,6 +540,14 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register domain element backfill CLI: {e}")
 
+# Application element migration (ADR-0014): flask application-element migrate
+    try:
+        from app.commands import application_element_migration
+        application_element_migration.init_app(app)
+        app.logger.info("Application element migration CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"Failed to register application element migration CLI: {e}")
+
 # Application owners backfill
     try:
         from app.commands import backfill_application_owners
