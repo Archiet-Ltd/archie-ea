@@ -1176,6 +1176,7 @@ def application_import():
 
             # Column mapping sent by the import page: {file header: target field}.
             mapped_header_by_target = {}
+            mapped_headers = set()
             _raw_mappings = request.form.get("field_mappings")
             if _raw_mappings:
                 try:
@@ -1184,29 +1185,45 @@ def application_import():
                     raise ValueError("The column mapping could not be read.")
                 if not isinstance(_mappings, dict):
                     raise ValueError("The column mapping must be an object.")
-                from sqlalchemy import inspect as _sa_inspect
-
-                _known_targets = {
-                    c.name for c in _sa_inspect(ApplicationComponent).columns
-                } | {
+                # Only fields this import actually reads can be mapped; anything
+                # else would be accepted and silently dropped.
+                _readable_targets = {
+                    "name",
+                    "component_type",
+                    "application_category",
+                    "technology_stack",
+                    "version",
+                    "deployment_status",
+                    "business_domain",
+                    "business_owner",
+                    "development_team",
+                    "user_base_size",
+                    "business_criticality",
+                    "description",
+                    "lifecycle_status",
+                    "vendor_name",
                     "package_vendor",
-                    "package_name",
-                    "archimate_capability",
-                    "functionality_capabilities",
+                    "cloud_provider",
+                    "imported_capabilities",
+                    "application_services",
+                    "application_functions_text",
+                    "imported_apqc_codes",
                 }
                 _file_headers = {h for h in reader.fieldnames if h}
                 _bad = []
                 for _header, _target in _mappings.items():
                     if not _target:
                         continue  # "Skip column"
-                    if _target not in _known_targets:
+                    if _target not in _readable_targets:
                         _bad.append(
-                            f"column '{_header}' is mapped to unknown field '{_target}'"
+                            f"column '{_header}' is mapped to field '{_target}', "
+                            "which this import cannot fill"
                         )
                     elif _header not in _file_headers:
                         _bad.append(f"mapped column '{_header}' is not in the file")
                     else:
                         mapped_header_by_target[_target] = _header
+                    mapped_headers.add(_header)
                 if _bad:
                     raise ValueError("; ".join(_bad))
 
@@ -1239,6 +1256,8 @@ def application_import():
                         return row.get(mapped_header_by_target[target])
                 for variant in variants:
                     for key in row.keys():
+                        if key in mapped_headers:
+                            continue  # already assigned to its own field
                         if key and key.lower().strip() == variant.lower():
                             return row[key]
                         if key and key.lower().replace(

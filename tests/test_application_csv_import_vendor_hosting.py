@@ -133,6 +133,7 @@ def test_mapping_for_a_column_the_file_lacks_is_reported(
     _post(client, login_as, user, CUSTOM.format(a=a, b=b), mapping=bad)
     errors = [m for c, m in _flashes(client) if c == "error"]
     assert any("Missing" in m for m in errors), errors
+    assert _apps(db_session, org, [a, b]) == {}
 
 
 def test_rows_land_in_the_importing_organisation_only(
@@ -166,3 +167,69 @@ def test_rows_land_in_the_importing_organisation_only(
         {"o": org_b.id, "a": a, "b": b},
     ).all()
     assert [tuple(r) for r in theirs] == [(other_id, "Other Vendor", "Other Cloud")]
+
+
+@pytest.mark.parametrize("target", ["notes", "application_code", "total_cost_of_ownership", "id", "organization_id"])
+def test_mapping_to_a_field_the_import_does_not_read_is_reported(
+    client, db_session, make_org, login_as, target
+):
+    org = make_org("csvg")
+    user = _admin(db_session, org)
+    a, b = _names()
+    bad = dict(MAPPING, Supplier=target)
+    _post(client, login_as, user, CUSTOM.format(a=a, b=b), mapping=bad)
+    errors = [m for c, m in _flashes(client) if c == "error"]
+    assert any(target in m for m in errors), errors
+    assert _apps(db_session, org, [a, b]) == {}
+
+
+def test_a_mapped_column_does_not_also_feed_another_field(
+    client, db_session, make_org, login_as
+):
+    org = make_org("csvh")
+    user = _admin(db_session, org)
+    a, b = _names()
+    text = "Name,Vendor,Public Cloud Provider\n{a},GitHub,AWS\n{b},Atlassian,Azure\n".format(a=a, b=b)
+    mapping = {"Name": "name", "Vendor": "description", "Public Cloud Provider": "cloud_provider"}
+    _post(client, login_as, user, text, mapping=mapping)
+    apps = _apps(db_session, org, [a, b])
+    assert {k: (v.description, v.vendor_name, v.cloud_provider) for k, v in apps.items()} == {
+        a: ("GitHub", None, "AWS"),
+        b: ("Atlassian", None, "Azure"),
+    }
+
+
+def _existing(db_session, org, name):
+    from app.models.application_layer import ApplicationComponent
+
+    app = ApplicationComponent(
+        name=name, organization_id=org.id, vendor_name="Old Vendor",
+        cloud_provider="Old Cloud", deployment_status="planned",
+    )
+    db_session.add(app)
+    db_session.flush()
+    return app
+
+
+def test_update_mode_blank_cells_keep_stored_vendor_and_hosting(
+    client, db_session, make_org, login_as
+):
+    org = make_org("csvi")
+    user = _admin(db_session, org)
+    a, _ = _names()
+    _existing(db_session, org, a)
+    _post(client, login_as, user, f"Name,Vendor,Public Cloud Provider\n{a},,\n", mode="update")
+    row = _apps(db_session, org, [a])[a]
+    assert (row.vendor_name, row.cloud_provider) == ("Old Vendor", "Old Cloud")
+
+
+def test_update_mode_values_replace_stored_vendor_and_hosting(
+    client, db_session, make_org, login_as
+):
+    org = make_org("csvj")
+    user = _admin(db_session, org)
+    a, _ = _names()
+    _existing(db_session, org, a)
+    _post(client, login_as, user, f"Name,Vendor,Public Cloud Provider\n{a},GitHub,AWS\n", mode="update")
+    row = _apps(db_session, org, [a])[a]
+    assert (row.vendor_name, row.cloud_provider) == ("GitHub", "AWS")
