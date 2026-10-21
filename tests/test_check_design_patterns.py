@@ -295,3 +295,11 @@ def test_d3_sankey_and_chord_calls_are_caught():
 
 def test_an_engine_that_is_not_banned_is_left_alone():
     assert _banned_rules("<script>const c = d3.chord()(matrix);</script>") == []
+
+
+def test_a_greater_than_inside_an_attribute_value_does_not_end_the_tag():
+    before = '<button @click="items.forEach(i => i.open = false)" class="h-9 rounded-md bg-primary px-4">Close all</button>'
+    after = '<button class="h-9 rounded-md bg-primary px-4" @click="items.forEach(i => i.open = false)">Close all</button>'
+    tags = list(cdp.opening_tags(before, "button"))
+    assert len(tags) == 1 and tags[0].group(0).endswith('px-4">')
+    assert run(cdp.rule_raw_button, before) == run(cdp.rule_raw_button, after)
