@@ -1,6 +1,9 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/form_field.html' import form_group, form_footer %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/modal.html' import modal %}
+{% from 'components/button.html' import button %}
 {% from 'components/data_table.html' import data_table, data_table_script with context %}
 
 {% block title %}Risk Register{% endblock %}
@@ -29,7 +32,7 @@
 <div class="p-6 space-y-6 mx-auto" x-data="riskRegister()" x-cloak>
     {% macro _ps_actions() %}
         <button type="button" @click="openCreate()"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Add Risk
         </button>
     {% endmacro %}
@@ -105,7 +108,7 @@
         <h2 class="text-sm font-semibold text-foreground mb-3">All risks</h2>
 
         {# Migrated onto the shared data_table component (components/data_table.html)
-           instead of a hand-rolled <table> — it already had search, sort, a
+           instead of a hand-rolled <table class="dense-table"> — it already had search, sort, a
            correct overflow-auto wrapper and a consistent empty state, but had
            no adopters anywhere in the app, so every list page (including this
            one's clipped STATUS column, E2E-O) reinvented the same layout with
@@ -182,48 +185,34 @@
                     {# DEF-002, Capgemini dry-run: naive "k + 's'" pluralised
                        'dependency' to "dependencys". Real plurals. #}
                     <template x-for="k in kinds" :key="k">
-                        <button type="button" @click="kindFilter = (kindFilter === k ? '' : k)"
-                                :class="kindFilter === k ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'"
-                                class="px-2.5 py-1 rounded text-xs font-medium capitalize transition-colors"
-                                x-text="k === 'dependency' ? 'Dependencies' : (k + 's')"></button>
+                        {{ button(variant='ghost', size='sm', class='px-2.5 text-xs capitalize', on_click="kindFilter = (kindFilter === k ? '' : k)",
+                                  attrs_dict={':class': "kindFilter === k ? '!bg-primary !text-primary-foreground hover:!bg-primary/90' : ''",
+                                              'x-text': "k === 'dependency' ? 'Dependencies' : (k + 's')"}) }}
                     </template>
                 </div>
                 <button type="button" @click="openCreate()"
-                        class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="plus" class="h-3.5 w-3.5" aria-hidden="true"></i> Add item
                 </button>
             </div>
         </div>
         {% if raid_items %}
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead>
-                    <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                        <th class="px-4 py-2 font-medium">Kind</th>
-                        <th class="px-4 py-2 font-medium">Title</th>
-                        <th class="px-4 py-2 font-medium">Programme</th>
-                        <th class="px-4 py-2 font-medium">Owner</th>
-                        <th class="px-4 py-2 font-medium">Target date</th>
-                        <th class="px-4 py-2 font-medium">Status</th>
-                        <th class="px-4 py-2 font-medium text-right">Action</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
+{% call dense_table(columns=[('Kind', ''), ('Title', ''), ('Programme', ''), ('Owner', ''), ('Target date', ''), ('Status', ''), ('Action', 'text-right')], flush=true) %}
                     {% for item in raid_items %}
                     <tr class="hover:bg-accent/40 transition-colors" x-show='!kindFilter || kindFilter === {{ item.kind.value | tojson }}'>
-                        <td class="px-4 py-2">
+                        <td class="px-2">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground capitalize">{{ item.kind.value }}</span>
                         </td>
-                        <td class="px-4 py-2">
+                        <td class="px-2">
                             <div class="font-medium text-foreground">{{ item.title }}</div>
                             {% if item.description %}
                             <div class="text-xs text-muted-foreground">{{ item.description | truncate(90) }}</div>
                             {% endif %}
                         </td>
-                        <td class="px-4 py-2 text-muted-foreground">{{ item.strategic_initiative.name if item.strategic_initiative else (item.programme_name or '—') }}</td>
-                        <td class="px-4 py-2 text-muted-foreground">{{ item.owner or '—' }}</td>
-                        <td class="px-4 py-2 tabular-nums text-muted-foreground">{{ item.target_date.isoformat() if item.target_date else '—' }}</td>
-                        <td class="px-4 py-2">
+                        <td class="px-2 text-muted-foreground">{{ item.strategic_initiative.name if item.strategic_initiative else (item.programme_name or '—') }}</td>
+                        <td class="px-2 text-muted-foreground">{{ item.owner or '—' }}</td>
+                        <td class="px-2 tabular-nums text-muted-foreground">{{ item.target_date.isoformat() if item.target_date else '—' }}</td>
+                        <td class="px-2">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
                                 {% if item.status.value == 'open' %}bg-warning/10 text-warning-emphasis
                                 {% elif item.status.value == 'resolved' %}bg-info/10 text-info-emphasis
@@ -231,7 +220,7 @@
                                 {{ item.status.value | title }}
                             </span>
                         </td>
-                        <td class="px-4 py-2 text-right whitespace-nowrap">
+                        <td class="px-2 text-right whitespace-nowrap">
                             {% if item.status.value != 'closed' %}
                             {# DEF-068, Capgemini dry-run pass 3: the ternary's
                                output ('resolved'/'closed') rendered as a bare
@@ -249,7 +238,7 @@
                             <button type="button"
                                     @click='setStatus({{ item.id }}, {{ ("resolved" if item.status.value == "open" else "closed")|tojson }})'
                                     :disabled="updatingId === {{ item.id }}"
-                                    class="inline-flex items-center rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent hover:text-accent-foreground disabled:opacity-50">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 {{ 'Resolve' if item.status.value == 'open' else 'Close' }}
                             </button>
                             {% else %}
@@ -258,9 +247,7 @@
                         </td>
                     </tr>
                     {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                {% endcall %}
         {% else %}
         <div class="px-4 py-10 text-center">
             <p class="text-sm text-muted-foreground">No assumptions, issues or dependencies recorded yet.</p>
@@ -276,36 +263,31 @@
        directly and never noticed). #}
     {% call modal(id='create-raid-modal', title='Add RAID Item', description='Record an assumption, issue or dependency.', size='lg') %}
     <div class="space-y-4">
-        <div>
-            <label for="raid-kind" class="block text-sm font-medium mb-1">Kind <span class="text-destructive-emphasis">*</span></label>
+        {% call form_group(id='raid-kind', label='Kind', required=true) %}
             <select id="raid-kind" x-model="raidForm.kind"
                     class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm capitalize">
                 <template x-for="k in kinds" :key="k">
                     <option :value="k" x-text="k" class="capitalize"></option>
                 </template>
             </select>
-        </div>
-        <div>
-            <label for="raid-title" class="block text-sm font-medium mb-1">Title <span class="text-destructive-emphasis">*</span></label>
+        {% endcall %}
+        {% call form_group(id='raid-title', label='Title', required=true) %}
             <input id="raid-title" type="text" x-model="raidForm.title"
                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        </div>
-        <div>
-            <label for="raid-description" class="block text-sm font-medium mb-1">Description</label>
+        {% endcall %}
+        {% call form_group(id='raid-description', label='Description') %}
             <textarea id="raid-description" x-model="raidForm.description" rows="3"
                       class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"></textarea>
-        </div>
+        {% endcall %}
         <div class="grid grid-cols-2 gap-3">
-            <div>
-                <label for="raid-owner" class="block text-sm font-medium mb-1">Owner</label>
+            {% call form_group(id='raid-owner', label='Owner') %}
                 <input id="raid-owner" type="text" x-model="raidForm.owner"
                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-            </div>
-            <div>
-                <label for="raid-target-date" class="block text-sm font-medium mb-1">Target date</label>
+            {% endcall %}
+            {% call form_group(id='raid-target-date', label='Target date') %}
                 <input id="raid-target-date" type="date" x-model="raidForm.target_date"
                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-            </div>
+            {% endcall %}
         </div>
         <div>
             <label for="raid-programme" class="block text-sm font-medium mb-1">Programme</label>
@@ -321,11 +303,11 @@
     </div>
     <div class="flex justify-end gap-2 mt-4">
         <button type="button" data-modal-close="create-raid-modal"
-                class="inline-flex items-center h-9 px-4 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             Cancel
         </button>
         <button type="button" @click="submitRaid()" :disabled="raidSaving"
-                class="inline-flex items-center h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <span x-show="raidSaving" x-cloak class="mr-1.5 h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
             Save
         </button>
@@ -336,21 +318,18 @@
     {% call modal(id='create-risk-modal', title='Add Risk', description='Record an enterprise architecture risk.', size='lg') %}
     <div class="space-y-4">
         <p x-show="editingId" x-cloak class="text-xs font-medium text-primary -mt-1">Editing risk #<span x-text="editingId"></span> — use Map to… on the risk's own row to link it to an Application, Solution or Programme.</p>
-        <div>
-            <label for="risk-title" class="block text-sm font-medium mb-1">Title <span class="text-destructive-emphasis">*</span></label>
+        {% call form_group(id='risk-title', label='Title', required=true) %}
             <input id="risk-title" type="text" x-model="form.title"
                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                    placeholder="What could go wrong?">
-        </div>
-        <div>
-            <label for="risk-description" class="block text-sm font-medium mb-1">Description</label>
+        {% endcall %}
+        {% call form_group(id='risk-description', label='Description') %}
             <textarea id="risk-description" rows="2" x-model="form.description"
                       class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       placeholder="Context and consequence"></textarea>
-        </div>
+        {% endcall %}
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-                <label for="risk-likelihood" class="block text-sm font-medium mb-1">Likelihood (1-5) <span class="text-destructive-emphasis">*</span></label>
+            {% call form_group(id='risk-likelihood', label='Likelihood (1-5)', required=true) %}
                 <select id="risk-likelihood" x-model="form.likelihood"
                         class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="1">1</option>
@@ -359,9 +338,8 @@
                     <option value="4">4</option>
                     <option value="5">5</option>
                 </select>
-            </div>
-            <div>
-                <label for="risk-impact" class="block text-sm font-medium mb-1">Impact (1-5) <span class="text-destructive-emphasis">*</span></label>
+            {% endcall %}
+            {% call form_group(id='risk-impact', label='Impact (1-5)', required=true) %}
                 <select id="risk-impact" x-model="form.impact"
                         class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="1">1</option>
@@ -370,81 +348,59 @@
                     <option value="4">4</option>
                     <option value="5">5</option>
                 </select>
-            </div>
+            {% endcall %}
         </div>
-        <div>
-            <label for="risk-owner" class="block text-sm font-medium mb-1">Owner</label>
+        {% call form_group(id='risk-owner', label='Owner') %}
             <input id="risk-owner" type="text" x-model="form.owner"
                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                    placeholder="Who carries this risk?">
-        </div>
-        <div>
-            <label for="risk-mitigation" class="block text-sm font-medium mb-1">Mitigation plan</label>
+        {% endcall %}
+        {% call form_group(id='risk-mitigation', label='Mitigation plan') %}
             <textarea id="risk-mitigation" rows="2" x-model="form.mitigation_plan"
                       class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       placeholder="What reduces it?"></textarea>
-        </div>
+        {% endcall %}
         <div x-show="error" x-cloak role="alert"
              class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis"
              x-text="error"></div>
     </div>
     <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
         <button type="button" data-modal-close="create-risk-modal"
-                class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent transition-colors">Cancel</button>
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
         <button type="button" @click="submit()" :disabled="saving"
-                class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:pointer-events-none">
+                :aria-label="saving ? 'Saving' : (editingId ? 'Save Changes' : 'Add Risk')"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <span x-text="saving ? 'Saving' : (editingId ? 'Save Changes' : 'Add Risk')"></span>
         </button>
     </div>
     {% endcall %}
 
-    {# ── H2: risk detail slide-over -----------------------------------
-       Rows in this table opened nothing; the ADM Kanban board's Sprint
-       Planning panel (app/templates/adm_kanban/board_v2.html) is the
-       platform's existing slide-over pattern for exactly this shape of
-       problem, reused here rather than inventing a second one. Shows
-       Description and Mitigation plan (captured at creation, never shown
-       again after that) plus H1's entity links, with Edit/Delete controls
-       and the "Map to…" picker. #}
-    <div class="relative">
-        <div x-show="panelOpen" x-cloak @keydown.escape.window="panelOpen = false"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-             x-transition:leave="transition ease-in duration-150"
-             x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-             @click.self="panelOpen = false"
-             class="fixed inset-0 bg-black/30 z-40"></div>
+    {# ── Risk detail dialog -------------------------------------------
+       Rows in this table open this centred dialog (the dialog macro replaces
+       a banned side drawer). Shows Description and Mitigation plan (captured
+       at creation) plus the entity links, with Edit/Delete controls and the
+       "Map to…" picker. Opened with Platform.modal.open('risk-detail-panel')
+       from a row's View / Map to… action; Escape, the close button and the
+       backdrop close it, and focus is trapped inside while it is open. #}
+    {% call modal(id='risk-detail-panel', labelledby='risk-detail-title', size='lg') %}
+        <h2 id="risk-detail-title" class="text-base font-semibold text-foreground truncate pr-8 mb-4" x-text="selectedRisk ? selectedRisk.title : 'Risk detail'">Risk detail</h2>
 
-        <div x-show="panelOpen" x-cloak role="dialog" aria-modal="true" aria-label="Risk detail"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
-             x-transition:leave="transition ease-in duration-150"
-             x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
-             class="fixed right-0 top-0 h-full w-full sm:w-[28rem] bg-background border-l border-border shadow-xl z-50 flex flex-col">
-
-            <div class="flex items-center justify-between px-4 py-3 border-b border-border">
-                <h2 class="text-sm font-semibold text-foreground truncate" x-text="selectedRisk ? selectedRisk.title : 'Risk detail'"></h2>
-                <button type="button" @click="panelOpen = false" class="text-muted-foreground hover:text-foreground transition-colors" aria-label="Close risk detail">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
+        <div class="space-y-5" x-show="selectedRisk">
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted capitalize" x-text="selectedRisk ? selectedRisk.status : ''"></span>
+                <span class="text-xs text-muted-foreground">Score <span class="font-medium text-foreground" x-text="selectedRisk ? selectedRisk.risk_score : ''"></span></span>
+                <span class="text-xs text-muted-foreground">Owner: <span class="text-foreground" x-text="selectedRisk ? selectedRisk.owner : ''"></span></span>
             </div>
 
-            <div class="flex-1 overflow-y-auto p-4 space-y-5" x-show="selectedRisk">
-                <div class="flex items-center gap-2 flex-wrap">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted capitalize" x-text="selectedRisk ? selectedRisk.status : ''"></span>
-                    <span class="text-xs text-muted-foreground">Score <span class="font-medium text-foreground" x-text="selectedRisk ? selectedRisk.risk_score : ''"></span></span>
-                    <span class="text-xs text-muted-foreground">Owner: <span class="text-foreground" x-text="selectedRisk ? selectedRisk.owner : ''"></span></span>
-                </div>
+            <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Description</h3>
+                <p class="text-sm text-foreground whitespace-pre-line" x-text="(selectedRisk && selectedRisk.description) || '—'"></p>
+            </div>
 
-                <div>
-                    <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Description</h3>
-                    <p class="text-sm text-foreground whitespace-pre-line" x-text="(selectedRisk && selectedRisk.description) || '—'"></p>
-                </div>
-
-                <div>
-                    <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Mitigation plan</h3>
-                    <p class="text-sm text-foreground whitespace-pre-line" x-text="(selectedRisk && selectedRisk.mitigation_plan) || '—'"></p>
-                </div>
+            <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Mitigation plan</h3>
+                <p class="text-sm text-foreground whitespace-pre-line" x-text="(selectedRisk && selectedRisk.mitigation_plan) || '—'"></p>
+            </div>
 
                 <div>
                     <div class="flex items-center justify-between mb-1">
@@ -459,7 +415,7 @@
                                         <span class="inline-flex items-center px-1.5 py-0 rounded text-2xs font-medium bg-muted text-muted-foreground capitalize mr-1.5" x-text="link.entity_type"></span>
                                         <span :class="link.entity_label ? 'text-foreground' : 'text-destructive-emphasis'" x-text="link.entity_label || ('Deleted ' + link.entity_type + ' (#' + link.entity_id + ')')"></span>
                                     </span>
-                                    <button type="button" @click="removeLink(link.id)" aria-label="Unmap" class="text-xs text-muted-foreground hover:text-destructive-emphasis shrink-0">Unmap</button>
+                                    {{ button(text='Unmap', variant='ghost', size='sm', class='shrink-0 text-xs', on_click='removeLink(link.id)', aria_label='Unmap') }}
                                 </li>
                             </template>
                         </ul>
@@ -468,35 +424,34 @@
 
                     <div x-show="showMapPicker" x-cloak class="mt-3 rounded-md border border-border p-3 space-y-2">
                         <div class="flex gap-2">
-                            <select x-model="linkType" aria-label="Entity type to link" class="h-8 rounded-md border border-input bg-background px-2 text-xs">
+                            <select x-model="linkType" aria-label="Entity type to link" class="h-9 rounded-md border border-input bg-background px-2 text-xs">
                                 <option value="application">Application</option>
                                 <option value="solution">Solution</option>
                                 <option value="programme">Programme</option>
                             </select>
                             <input type="text" x-model="linkSearch" @input.debounce.300ms="searchLinkEntities()"
                                    aria-label="Search entities to link"
-                                   class="flex-1 h-8 rounded-md border border-input bg-background px-2 text-xs"
+                                   class="flex-1 h-9 rounded-md border border-input bg-background px-2 text-xs"
                                    :placeholder="'Search ' + linkType + 's…'">
                         </div>
                         <div x-show="linkResults.length > 0" x-cloak class="max-h-40 overflow-y-auto rounded-md border border-border divide-y divide-border">
                             <template x-for="entity in linkResults" :key="entity.id">
-                                <button type="button" @click="addLink(entity)" class="w-full text-left px-2.5 py-1.5 text-xs hover:bg-accent transition-colors" x-text="entity.name"></button>
+                                <button type="button" @click="addLink(entity)" :aria-label="'Map to ' + entity.name" class="w-full text-left px-2.5 py-1.5 text-xs hover:bg-accent transition-colors" x-text="entity.name"></button>
                             </template>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="flex items-center gap-2 px-4 py-3 border-t border-border" x-show="selectedRisk">
-                <button type="button" @click="openEdit(selectedRisk)" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent transition-colors">
+            <div class="flex items-center gap-2 mt-6 pt-4 border-t border-border" x-show="selectedRisk">
+                <button type="button" @click="openEdit(selectedRisk)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="pencil" class="h-3.5 w-3.5" aria-hidden="true"></i> Edit
                 </button>
-                <button type="button" @click="confirmDelete(selectedRisk)" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-destructive/30 bg-background px-3 text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 transition-colors">
+                <button type="button" @click="confirmDelete(selectedRisk)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i> Delete
                 </button>
             </div>
-        </div>
-    </div>
+    {% endcall %}
 </div>
 {{ data_table_script() }}
 {% endblock %}
@@ -513,8 +468,7 @@ function riskRegister() {
         },
         editingId: null,
 
-        // H2: detail slide-over state.
-        panelOpen: false,
+        // Detail dialog (Platform.modal 'risk-detail-panel') state.
         selectedRisk: null,
 
         // H1: entity-link picker state, scoped to whichever risk the panel is showing.
@@ -565,7 +519,7 @@ function riskRegister() {
         // row. Reuses the same modal/form/submit() rather than a second copy.
         openEdit(row) {
             if (!row) return;
-            this.panelOpen = false;
+            Platform.modal.close('risk-detail-panel');
             this.editingId = row.id;
             this.form.title = row.title || '';
             this.form.description = row.description || '';
@@ -578,7 +532,7 @@ function riskRegister() {
             Platform.modal.open('create-risk-modal');
         },
 
-        // H2: opens the detail slide-over. `mapMode=true` (from the row's
+        // H2: opens the detail dialog. `mapMode=true` (from the row's
         // "Map to…" action) opens straight into the entity picker.
         openView(row, mapMode) {
             if (!row) return;
@@ -586,7 +540,7 @@ function riskRegister() {
             this.showMapPicker = !!mapMode;
             this.linkSearch = '';
             this.linkResults = [];
-            this.panelOpen = true;
+            Platform.modal.open('risk-detail-panel');
         },
 
         confirmDelete(row) {
@@ -605,7 +559,7 @@ function riskRegister() {
                     .then(function (data) {
                         if (data && data.error) { Platform.toast.error(data.error); return; }
                         Platform.toast.success('Risk deleted.');
-                        self.panelOpen = false;
+                        Platform.modal.close('risk-detail-panel');
                         setTimeout(function () { window.location.reload(); }, 400);
                     })
                     .catch(function (err) {

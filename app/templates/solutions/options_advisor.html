@@ -18,28 +18,28 @@
     ) }}
 
     <div class="flex items-center justify-between mt-4 mb-6">
-        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">
+        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
             <i data-lucide="shield-check" class="h-3.5 w-3.5"></i> AI Solution Architect · grounded in solution context
         </span>
         <button type="button" @click="generate()" :disabled="busy"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="sparkles" class="h-4 w-4" :class="busy && 'animate-pulse'"></i>
             <span x-text="busy ? 'Generating…' : (hasAdr ? 'Regenerate' : 'Generate options & decision')"></span>
         </button>
     </div>
 
-    <div x-cloak x-show="error" class="mb-6 rounded-md border border-destructive/30 bg-destructive/10 text-destructive-emphasis p-3 text-sm" x-text="error"></div>
+    <div x-cloak x-show="error" class="mb-6 rounded-md border border-destructive/40 bg-destructive/10 text-destructive-emphasis px-3 py-2 text-sm" x-text="error"></div>
     <div x-cloak x-show="busy" class="mb-6 rounded-md border border-border bg-muted/30 p-4 text-sm text-muted-foreground flex items-center gap-2">
         <i data-lucide="loader" class="h-4 w-4 animate-spin"></i> The Solution Architect is weighing the options — this takes a few seconds.
     </div>
 
     {% if not adr %}
-    <div x-show="!busy" class="border border-border rounded-xl bg-card p-10 text-center">
-        <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary mb-3"><i data-lucide="puzzle" class="h-6 w-6"></i></span>
+    <div x-show="!busy" class="border border-border rounded-lg bg-card p-10 text-center">
+        <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-info-emphasis mb-3"><i data-lucide="puzzle" class="h-6 w-6"></i></span>
         <p class="text-sm font-medium text-foreground">No options analysis yet</p>
         <p class="text-xs text-muted-foreground mt-1 mb-4 max-w-md mx-auto">Generate a structured options paper — 2-3 approaches with cost/risk/timeline trade-offs and a recommended decision record the ARB can review.</p>
         <button type="button" @click="generate()" :disabled="busy"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <span x-text="busy ? 'Generating…' : 'Generate options & decision'"></span>
         </button>
     </div>
@@ -71,8 +71,8 @@
     </div>
 
     {# ── ADR (Nygard) ──────────────────────────────────────────────── #}
-    <div class="border border-border rounded-xl bg-card overflow-hidden">
-        <div class="px-5 py-3 border-b border-border flex items-center justify-between bg-muted/20">
+    <div class="border border-border rounded-lg bg-card overflow-hidden">
+        <div class="border px-5 py-2 border-b border-border flex items-center justify-between bg-muted/20">
             <div class="flex items-center gap-2">
                 <span class="text-xs font-bold uppercase tracking-wider text-muted-foreground">{{ adr.decision_id or ('ADR-%03d' % adr.id) }}</span>
                 <h2 class="text-sm font-semibold text-foreground">{{ adr.title }}</h2>
@@ -100,15 +100,15 @@
                 {% if adr.business_value %}<span>Business value: <strong class="text-foreground">{{ adr.business_value }}</strong></span>{% endif %}
             </div>
         </div>
-        <div class="px-5 py-3 border-t border-border bg-muted/10 flex items-center justify-between">
+        <div class="border px-5 py-2 border-t border-border bg-muted/10 flex items-center justify-between">
             <p class="text-2xs text-muted-foreground">Proposed by the AI Solution Architect · you decide, the ARB disposes</p>
             <div class="flex items-center gap-2">
                 <button type="button" @click="setStatus('rejected')" :disabled="busy"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-input bg-background hover:bg-accent">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="x" class="h-3.5 w-3.5"></i> Reject
                 </button>
                 <button type="button" @click="setStatus('accepted')" :disabled="busy"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="check" class="h-3.5 w-3.5"></i> Accept decision
                 </button>
             </div>

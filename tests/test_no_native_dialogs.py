@@ -50,6 +50,10 @@ def _offending_lines(path):
             if not NATIVE_DIALOG.search(line):
                 continue
             stripped = line.strip()
+            # A documented example that names the hatch scripts/check_ui_contract.py
+            # honours (components/alert.html's call shapes) is not a call site either.
+            if "ui-contract-ok" in line:
+                continue
             # Jinja comments explaining what NOT to do are not call sites.
             if stripped.startswith("{#") or stripped.startswith("<!--"):
                 continue

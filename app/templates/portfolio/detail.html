@@ -30,7 +30,7 @@
      benefit can only be recorded once this row is tied to the specific
      StrategicInitiative row that describes the same real-world programme — a
      human confirms the match, it is never guessed from a matching ID. #}
-  <div class="rounded-lg border bg-card p-6">
+  <div class="rounded-lg border border-border bg-card p-6">
     <p class="text-sm font-medium text-muted-foreground mb-2">Linked transformation programme</p>
     {% if linked_programme %}
     <p class="text-base font-medium">{{ linked_programme.name }}</p>
@@ -43,7 +43,7 @@
           class="flex flex-wrap items-end gap-3">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="flex-1 min-w-[16rem]">
-        <label for="link-programme-id" class="block text-xs font-medium mb-1">This initiative describes the same programme as</label>
+        <label for="link-programme-id" class="block text-sm font-medium text-muted-foreground mb-1">This initiative describes the same programme as</label>
         <select id="link-programme-id" name="programme_id" required
                 class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
           <option value="">Select the matching programme</option>
@@ -65,7 +65,7 @@
 
   {# ── Strategic objectives ─────────────────────────────────────────────────
      The goals this initiative serves, read by the goal trace from the same rows. #}
-  <div class="rounded-lg border bg-card p-6" id="initiative-goals">
+  <div class="rounded-lg border border-border bg-card p-6" id="initiative-goals">
     <p class="text-sm font-medium text-muted-foreground mb-2">Strategic objectives served</p>
     {% if goal_links %}
     <ul class="divide-y">
@@ -99,7 +99,7 @@
           class="mt-4 flex flex-wrap items-end gap-3">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="flex-1 min-w-[16rem]">
-        <label for="initiative-goal-id" class="block text-xs font-medium mb-1">Goal this initiative serves</label>
+        <label for="initiative-goal-id" class="block text-sm font-medium text-muted-foreground mb-1">Goal this initiative serves</label>
         <select id="initiative-goal-id" name="goal_id" required
                 class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
           <option value="">Select a goal</option>
@@ -109,7 +109,7 @@
         </select>
       </div>
       <div>
-        <label for="initiative-goal-level" class="block text-xs font-medium mb-1">Contribution</label>
+        <label for="initiative-goal-level" class="block text-sm font-medium text-muted-foreground mb-1">Contribution</label>
         <select id="initiative-goal-level" name="contribution_level"
                 class="h-9 rounded-md border border-input bg-background px-2 text-sm">
           <option value="">Not recorded</option>
@@ -130,13 +130,13 @@
 
   {# ── Money ─────────────────────────────────────────────────────────────── #}
   <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-    <div class="rounded-lg border bg-card p-6">
+    <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Approved budget</p>
       <p class="text-2xl font-bold mt-3">
         {% if approved_budget is not none %}{{ '{:,.0f}'.format(approved_budget) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
       </p>
     </div>
-    <div class="rounded-lg border bg-card p-6">
+    <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Spent to date</p>
       <p class="text-2xl font-bold mt-3">
         {% if spent_to_date is not none %}{{ '{:,.0f}'.format(spent_to_date) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
@@ -145,13 +145,13 @@
       <p class="text-xs text-muted-foreground mt-1">No actuals feed connected</p>
       {% endif %}
     </div>
-    <div class="rounded-lg border bg-card p-6">
+    <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Forecast</p>
       <p class="text-2xl font-bold mt-3">
         {% if forecast_cost is not none %}{{ '{:,.0f}'.format(forecast_cost) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
       </p>
     </div>
-    <div class="rounded-lg border bg-card p-6">
+    <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Variance</p>
       <p class="text-2xl font-bold mt-3">
         {% if variance_pct is not none %}
@@ -164,7 +164,7 @@
   </div>
 
   {# ── Benefits ──────────────────────────────────────────────────────────── #}
-  <div class="rounded-lg border bg-card">
+  <div class="rounded-lg border border-border bg-card">
     <div class="flex items-center justify-between border-b px-6 py-4">
       <h2 class="text-xl font-semibold">Benefits</h2>
       <div class="text-sm text-muted-foreground">
@@ -182,7 +182,7 @@
       </div>
     </div>
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+      <table class="dense-table w-full text-sm">
         <thead class="border-b bg-muted/40">
           <tr class="text-left">
             <th class="px-4 py-3 font-medium">Benefit</th>
@@ -238,10 +238,10 @@
        a target with no baseline cannot be measured against later. #}
     {% if transformation_programmes %}
     <form method="post" action="{{ url_for('portfolio.selected_programme_benefit_create') }}"
-          class="border-t px-6 py-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-7 items-end">
+          class="border-t px-6 py-4 grid gap-3 grid-cols-1 lg:grid-cols-7 items-end">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="lg:col-span-7">
-        <label for="b-programme" class="block text-xs font-medium mb-1">Transformation programme</label>
+      <div class="">
+        <label for="b-programme" class="block text-sm font-medium text-muted-foreground mb-1">Transformation programme</label>
         <select id="b-programme" name="programme_id" required
                 class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
           <option value="">Select the programme that owns this benefit</option>
@@ -253,13 +253,13 @@
           Benefits are governed by the selected canonical transformation programme.
         </p>
       </div>
-      <div class="lg:col-span-2">
-        <label for="b-name" class="block text-xs font-medium mb-1">Benefit</label>
+      <div class="">
+        <label for="b-name" class="block text-sm font-medium text-muted-foreground mb-1">Benefit</label>
         <input id="b-name" name="name" required placeholder="e.g. Retire duplicate CRM licences"
                class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
       </div>
       <div>
-        <label for="b-type" class="block text-xs font-medium mb-1">Type</label>
+        <label for="b-type" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
         <select id="b-type" name="benefit_type" class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
           <option value="cost_saving">Cost saving</option>
           <option value="cost_avoidance">Cost avoidance</option>
@@ -272,26 +272,26 @@
         </select>
       </div>
       <div>
-        <label for="b-unit" class="block text-xs font-medium mb-1">Unit</label>
+        <label for="b-unit" class="block text-sm font-medium text-muted-foreground mb-1">Unit</label>
         <input id="b-unit" name="unit" placeholder="GBP"
                class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground">
       </div>
       <div>
-        <label for="b-baseline" class="block text-xs font-medium mb-1">Baseline</label>
+        <label for="b-baseline" class="block text-sm font-medium text-muted-foreground mb-1">Baseline</label>
         <input id="b-baseline" name="baseline_value" type="number" step="any"
                class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
       </div>
       <div>
-        <label for="b-target" class="block text-xs font-medium mb-1">Target</label>
+        <label for="b-target" class="block text-sm font-medium text-muted-foreground mb-1">Target</label>
         <input id="b-target" name="target_value" type="number" step="any"
                class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
       </div>
       <div>
-        <label for="b-date" class="block text-xs font-medium mb-1">By</label>
+        <label for="b-date" class="block text-sm font-medium text-muted-foreground mb-1">By</label>
         <input id="b-date" name="target_date" type="date"
                class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
       </div>
-      <div class="lg:col-span-7">
+      <div class="">
         <button type="submit" class="h-9 px-4 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none">
           Add benefit
         </button>
@@ -308,7 +308,7 @@
 
   {# Record a measurement against an existing benefit. #}
   {% if benefits %}
-  <div class="rounded-lg border bg-card">
+  <div class="rounded-lg border border-border bg-card">
     <div class="border-b px-6 py-4">
       <h2 class="text-xl font-semibold">Record a measurement</h2>
       <p class="text-sm text-muted-foreground mt-1">
@@ -329,12 +329,12 @@
           </div>
         </div>
         <div>
-          <label for="m-val-{{ b.id }}" class="block text-xs font-medium mb-1">Actual</label>
+          <label for="m-val-{{ b.id }}" class="block text-sm font-medium text-muted-foreground mb-1">Actual</label>
           <input id="m-val-{{ b.id }}" name="actual_value" type="number" step="any" required
                  class="h-9 w-32 rounded-md border border-input bg-background px-3 text-sm">
         </div>
         <div>
-          <label for="m-date-{{ b.id }}" class="block text-xs font-medium mb-1">Measured on</label>
+          <label for="m-date-{{ b.id }}" class="block text-sm font-medium text-muted-foreground mb-1">Measured on</label>
           <input id="m-date-{{ b.id }}" name="actual_date" type="date"
                  class="h-9 rounded-md border border-input bg-background px-2 text-sm">
         </div>
@@ -346,13 +346,13 @@
   {% endif %}
 
   {# ── RAID: assumptions ─────────────────────────────────────────────────── #}
-  <div class="rounded-lg border bg-card">
+  <div class="rounded-lg border border-border bg-card">
     <div class="border-b px-6 py-4">
       <h2 class="text-xl font-semibold">Assumptions</h2>
       <p class="text-sm text-muted-foreground mt-1">Highest exposure first &mdash; impact &times; uncertainty</p>
     </div>
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+      <table class="dense-table w-full text-sm">
         <thead class="border-b bg-muted/40">
           <tr class="text-left">
             <th class="px-4 py-3 font-medium">Assumption</th>
@@ -406,29 +406,29 @@
     {% endfor %}
 
     <form method="post" action="{{ url_for('portfolio.assumption_create', initiative_id=initiative.id) }}"
-          class="border-t px-6 py-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5 items-end">
+          class="border-t px-6 py-4 grid gap-3 grid-cols-1 items-end">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="lg:col-span-2">
-        <label for="a-stmt" class="block text-xs font-medium mb-1">Assumption</label>
+      <div class="">
+        <label for="a-stmt" class="block text-sm font-medium text-muted-foreground mb-1">Assumption</label>
         <input id="a-stmt" name="statement" required placeholder="e.g. The vendor API supports bulk export"
                class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
       </div>
       <div>
-        <label for="a-impact" class="block text-xs font-medium mb-1">Impact if false (1&ndash;5)</label>
+        <label for="a-impact" class="block text-sm font-medium text-muted-foreground mb-1">Impact if false (1&ndash;5)</label>
         <input id="a-impact" name="impact_if_false" type="number" min="1" max="5"
                class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
       </div>
       <div>
-        <label for="a-conf" class="block text-xs font-medium mb-1">Confidence (1&ndash;5)</label>
+        <label for="a-conf" class="block text-sm font-medium text-muted-foreground mb-1">Confidence (1&ndash;5)</label>
         <input id="a-conf" name="confidence" type="number" min="1" max="5"
                class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
       </div>
       <div>
-        <label for="a-by" class="block text-xs font-medium mb-1">Validate by</label>
+        <label for="a-by" class="block text-sm font-medium text-muted-foreground mb-1">Validate by</label>
         <input id="a-by" name="validate_by_date" type="date"
                class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
       </div>
-      <div class="lg:col-span-5">
+      <div class="">
         <button type="submit" class="h-9 px-4 rounded-md text-sm bg-primary text-primary-foreground hover:bg-primary/90">
           Log assumption
         </button>
@@ -438,7 +438,7 @@
 
   {# ── Delivery and origin ───────────────────────────────────────────────── #}
   <div class="grid gap-6 lg:grid-cols-2">
-    <div class="rounded-lg border bg-card">
+    <div class="rounded-lg border border-border bg-card">
       <div class="border-b px-6 py-4"><h2 class="text-xl font-semibold">Work packages</h2></div>
       <ul class="divide-y">
         {% for wp in work_packages %}
@@ -455,7 +455,7 @@
       {% endif %}
     </div>
 
-    <div class="rounded-lg border bg-card">
+    <div class="rounded-lg border border-border bg-card">
       <div class="border-b px-6 py-4"><h2 class="text-xl font-semibold">Originating demand</h2></div>
       <ul class="divide-y">
         {% for d in demands %}

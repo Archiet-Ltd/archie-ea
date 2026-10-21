@@ -1,4 +1,7 @@
 {% extends "layouts/admin_base.html" %}
+{% from 'components/modal.html' import modal %}
+{% from 'components/dense_table.html' import dense_table %}
+{% from 'components/button.html' import button %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/badge.html' import badge %}
@@ -66,7 +69,7 @@
     ) }}
     <div class="flex flex-wrap items-center gap-2">
       <button type="button"
-        class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
         @click="detectGaps()"
         :disabled="isDetecting">
         <i data-lucide="scan-search" class="h-4 w-4"></i>
@@ -74,13 +77,13 @@
         <span x-show="isDetecting" x-cloak>Detecting…</span>
       </button>
       <button type="button"
-        class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
         @click="openCreatePlateauModal()">
         <i data-lucide="layers" class="h-4 w-4"></i>
         Add Plateau
       </button>
       <button type="button"
-        class="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
         @click="openCreateGapModal()">
         <i data-lucide="plus" class="h-4 w-4"></i>
         Add Gap
@@ -90,35 +93,35 @@
 
   {# ── Metrics Row ── #}
   <div class="grid grid-cols-2 gap-4 md:grid-cols-6">
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Capability Gaps Detected</p>
       <p class="mt-2 text-2xl font-semibold text-foreground" x-text="metrics.total_gaps"></p>
       <p class="mt-1 text-xs text-muted-foreground">Coverage, quality &amp; modernization signals across capabilities</p>
     </div>
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Plateaus</p>
       <p class="mt-2 text-2xl font-semibold text-foreground" x-text="metrics.total_plateaus"></p>
     </div>
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Work Packages</p>
       <p class="mt-2 text-2xl font-semibold text-foreground" x-text="metrics.total_wps"></p>
     </div>
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">AI Generated</p>
       <p class="mt-2 text-2xl font-semibold text-foreground" x-text="metrics.ai_generated"></p>
     </div>
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Capabilities</p>
       <p class="mt-2 text-2xl font-semibold text-foreground">{{ capability_count }}</p>
     </div>
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Domains</p>
       <p class="mt-2 text-2xl font-semibold text-foreground">{{ domain_count }}</p>
     </div>
   </div>
 
   {# ── Plateau Timeline ── #}
-  <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+  <div data-slot="card" class="rounded-lg border border-border bg-card">
     <div class="flex items-center justify-between border-b px-6 py-4">
       <h2 class="text-base font-semibold text-foreground">Plateaus — Implementation Timeline</h2>
       <span class="text-xs text-muted-foreground">ArchiMate 3.2 Implementation &amp; Migration Layer</span>
@@ -140,7 +143,7 @@
           <p class="text-sm font-medium text-foreground">No plateaus defined</p>
           <p class="mt-1 text-xs text-muted-foreground">Add a plateau to define your implementation timeline phases.</p>
           <button type="button"
-            class="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-4 items-center"
             @click="openCreatePlateauModal()">
             <i data-lucide="plus" class="h-4 w-4"></i>
             Add First Plateau
@@ -175,99 +178,96 @@
   <div id="rdm-gantt-chart"></div>
 
   {# ── Work Packages Table ── #}
-  <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+  <div data-slot="card" class="rounded-lg border border-border bg-card">
     <div class="flex items-center justify-between border-b px-6 py-4">
       <h2 class="text-base font-semibold text-foreground">Work Packages</h2>
       <div class="flex items-center gap-3">
         <template x-if="selectedGapIds.length > 0">
           <button type="button"
-            class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
             @click="openAiGenerateModal()">
             <i data-lucide="sparkles" class="h-3.5 w-3.5"></i>
             AI Generate (<span x-text="selectedGapIds.length"></span> gaps)
           </button>
         </template>
         <button type="button"
-          class="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
           @click="openCreateWorkPackageModal(null)">
           <i data-lucide="plus" class="h-3.5 w-3.5"></i>
           Add Work Package
         </button>
       </div>
     </div>
-    <div class="overflow-x-auto">
-      <table class="min-w-full text-sm">
-        <thead class="bg-muted/50">
-          <tr>
-            <th class="w-8 px-4 py-3">
+{% set _dt_header_12698 %}
+            <th scope="col" class="h-10 px-2 align-middle text-left w-8">
               <input type="checkbox" class="rounded border-input"
                 @change="toggleAllGaps($event)"
                 :checked="selectedGapIds.length === filteredGaps.length && filteredGaps.length > 0"
                 aria-label="Select all work packages">
             </th>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Work Package</th>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Priority</th>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Timeline</th>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Gap</th>
-            <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-muted-foreground">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
+            <th scope="col" class="h-10 px-2 align-middle text-left">Work Package</th>
+            <th scope="col" class="h-10 px-2 align-middle text-left">Status</th>
+            <th scope="col" class="h-10 px-2 align-middle text-left">Priority</th>
+            <th scope="col" class="h-10 px-2 align-middle text-left">Timeline</th>
+            <th scope="col" class="h-10 px-2 align-middle text-left">Gap</th>
+            <th scope="col" class="h-10 px-2 align-middle text-right">Actions</th>
+          
+{% endset %}
+{% call dense_table(header=_dt_header_12698, flush=true) %}
           <template x-if="loading">
             <tr>
-              <td colspan="7" class="px-4 py-4">{{ skeleton_table(rows=3, columns=7) }}</td>
+              <td colspan="7" class="px-2 dense-empty">{{ skeleton_table(rows=3, columns=7) }}</td>
             </tr>
           </template>
           <template x-if="!loading && errorMessage">
             <tr>
-              <td colspan="7" class="px-4 py-10 text-center text-sm text-destructive-emphasis">
+              <td colspan="7" class="px-2 dense-empty text-center text-sm text-destructive-emphasis">
                 Work packages could not be read — this is not "none yet".
               </td>
             </tr>
           </template>
           <template x-if="!loading && !errorMessage && workPackages.length === 0">
             <tr>
-              <td colspan="7" class="px-4 py-10 text-center text-sm text-muted-foreground">
+              <td colspan="7" class="px-2 dense-empty text-center text-sm text-muted-foreground">
                 No work packages yet. Add a gap first, then create work packages to resolve it.
               </td>
             </tr>
           </template>
           <template x-for="wp in (loading ? [] : workPackages)" :key="wp.id">
-            <tr class="border-t border-border hover:bg-muted/30">
-              <td class="px-4 py-3">
+            <tr class="hover:bg-muted/30">
+              <td class="px-2">
                 <input type="checkbox" class="rounded border-input"
                   :value="wp.gap_id"
                   x-model="selectedGapIds"
                   :aria-label="'Select ' + (wp.name || 'work package')">
               </td>
-              <td class="px-4 py-3 align-top">
+              <td class="px-2 align-top">
                 <a :href="'/implementation/work-packages/' + wp.id" class="font-medium text-primary hover:underline"
                    data-testid="roadmap-wp-link" x-text="wp.name"></a>
                 <p class="mt-0.5 text-xs text-muted-foreground" x-text="wp.element_type || 'WorkPackage'"></p>
               </td>
-              <td class="px-4 py-3 align-top">
+              <td class="px-2 align-top">
                 <span class="inline-flex rounded-full border px-2 py-0.5 text-xs capitalize"
                   :class="statusClass(wp.status)"
                   x-text="(wp.status || 'planned').replaceAll('_', ' ')"></span>
               </td>
-              <td class="px-4 py-3 align-top">
+              <td class="px-2 align-top">
                 <span class="inline-flex rounded-full border px-2 py-0.5 text-xs capitalize"
                   :class="priorityClass(wp.priority)"
                   x-text="wp.priority || 'medium'"></span>
               </td>
-              <td class="px-4 py-3 align-top text-xs text-muted-foreground">
+              <td class="px-2 align-top text-xs text-muted-foreground">
                 <span x-text="formatDate(wp.start_date)"></span>
                 <span class="mx-1 text-muted-foreground/50">→</span>
                 <span x-text="formatDate(wp.end_date || wp.target_date)"></span>
               </td>
-              <td class="px-4 py-3 align-top text-xs text-muted-foreground" data-testid="roadmap-wp-gaps">
+              <td class="px-2 align-top text-xs text-muted-foreground" data-testid="roadmap-wp-gaps">
                 <template x-if="!wp.gaps || wp.gaps.length === 0"><span>—</span></template>
                 <template x-for="g in (wp.gaps || [])" :key="g.id">
                   <div x-text="g.name"></div>
                 </template>
               </td>
-              <td class="px-4 py-3 align-top text-right">
+              <td class="px-2 align-top text-right">
                 <div class="inline-flex items-center gap-2">
                   <button type="button"
                     class="rounded-md border border-input px-2.5 py-1.5 text-xs hover:bg-muted"
@@ -283,14 +283,12 @@
               </td>
             </tr>
           </template>
-        </tbody>
-      </table>
-    </div>
+        {% endcall %}
   </div>
 
   {# ── Error Banner ── #}
   <template x-if="errorMessage">
-    <div class="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-emphasis"
+    <div class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis"
       x-text="errorMessage"></div>
   </template>
 
@@ -301,31 +299,20 @@
    ════════════════════════════════════════════════════════════ #}
 
 {# Create / Edit Gap Modal #}
-<div id="rdm-create-gap-modal"
-     hidden
-     role="dialog" aria-modal="true" aria-labelledby="rdm-gap-modal-title"
-     class="fixed inset-0 z-50 items-center justify-center bg-black/50 p-4">
-  <div class="w-full max-w-lg rounded-xl border bg-card shadow-xl flex flex-col max-h-[90vh]"
-       x-data="rdmGapModalForm()"
-       x-init="initFromGlobal()">
-    <div class="flex shrink-0 items-center justify-between border-b px-6 py-4">
-      <h3 id="rdm-gap-modal-title" class="text-base font-semibold text-foreground"
-        x-text="isEditing ? 'Edit Gap' : 'Create Gap'"></h3>
-      <button type="button"
-        class="rounded-md border border-input px-2 py-1 text-sm hover:bg-muted"
-        data-modal-close="rdm-create-gap-modal">Close</button>
-    </div>
-    <form class="space-y-4 p-6 overflow-y-auto flex-1 min-h-0" @submit.prevent="submitGapForm()">
+{% call modal(id='rdm-create-gap-modal', labelledby='rdm-gap-modal-title') %}
+<div x-data="rdmGapModalForm()" x-init="initFromGlobal()">
+<h3 id="rdm-gap-modal-title" x-text="isEditing ? 'Edit Gap' : 'Create Gap'" class="text-base font-semibold text-foreground mb-4"></h3>
+    <form class="space-y-4 overflow-y-auto flex-1 min-h-0" @submit.prevent="submitGapForm()">
       <div>
-        <label class="mb-1 block text-sm font-medium text-foreground">Gap Name <span class="text-destructive-emphasis">*</span></label>
+        <label class="block text-sm font-medium text-muted-foreground mb-1">Gap Name <span class="text-destructive-emphasis">*</span></label>
         <input type="text" x-model="form.name" required
-          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Gap Name">
+          class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Gap Name">
       </div>
-      <div class="grid gap-4 sm:grid-cols-2">
+      <div class="grid gap-4 grid-cols-1">
         <div>
-          <label class="mb-1 block text-sm font-medium text-foreground">Gap Type</label>
+          <label class="block text-sm font-medium text-muted-foreground mb-1">Gap Type</label>
           <select x-model="form.gap_type"
-            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Gap Type">
+            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Gap Type">
             <option value="coverage">Coverage</option>
             <option value="quality">Quality</option>
             <option value="retirement">Retirement</option>
@@ -334,9 +321,9 @@
           </select>
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium text-foreground">Priority</label>
+          <label class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
           <select x-model="form.priority"
-            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Priority">
+            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Priority">
             <option value="low">Low</option>
             <option value="medium">Medium</option>
             <option value="high">High</option>
@@ -345,13 +332,13 @@
         </div>
       </div>
       <div>
-        <label class="mb-1 block text-sm font-medium text-foreground">Description</label>
+        <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
         <textarea x-model="form.description" rows="3"
           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Description"></textarea>
       </div>
       <div class="flex items-center justify-end gap-2 border-t pt-4">
         <button type="button"
-          class="rounded-md border border-input px-4 py-2 text-sm hover:bg-muted"
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"
           data-modal-close="rdm-create-gap-modal">Cancel</button>
         <button type="submit"
           class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
@@ -361,50 +348,40 @@
         </button>
       </div>
     </form>
-  </div>
+  
 </div>
+{% endcall %}
 
 {# Create Plateau Modal #}
-<div id="rdm-create-plateau-modal"
-     hidden
-     role="dialog" aria-modal="true" aria-labelledby="rdm-plateau-modal-title"
-     class="fixed inset-0 z-50 items-center justify-center bg-black/50 p-4">
-  <div class="w-full max-w-md rounded-xl border bg-card shadow-xl flex flex-col max-h-[90vh]"
-       x-data="rdmPlateauModalForm()"
-       x-init="initFromGlobal()">
-    <div class="flex shrink-0 items-center justify-between border-b px-6 py-4">
-      <h3 id="rdm-plateau-modal-title" class="text-base font-semibold text-foreground">Add Plateau</h3>
-      <button type="button"
-        class="rounded-md border border-input px-2 py-1 text-sm hover:bg-muted"
-        data-modal-close="rdm-create-plateau-modal">Close</button>
-    </div>
-    <form class="space-y-4 p-6 overflow-y-auto flex-1 min-h-0" @submit.prevent="submitPlateauForm()">
+{% call modal(id='rdm-create-plateau-modal', title='Add Plateau') %}
+<div x-data="rdmPlateauModalForm()" x-init="initFromGlobal()">
+    <form class="space-y-4 overflow-y-auto flex-1 min-h-0" @submit.prevent="submitPlateauForm()">
       <div>
-        <label class="mb-1 block text-sm font-medium text-foreground">Plateau Name <span class="text-destructive-emphasis">*</span></label>
+        <label class="block text-sm font-medium text-muted-foreground mb-1">Plateau Name <span class="text-destructive-emphasis">*</span></label>
         <input type="text" x-model="form.name" required
           placeholder="e.g. Plateau 1 — Foundation"
-          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Plateau Name">
+          class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Plateau Name">
       </div>
-      <div class="grid gap-4 sm:grid-cols-2">
+      <div class="grid gap-4 grid-cols-1">
         <div>
-          <label class="mb-1 block text-sm font-medium text-foreground">Sequence Order <span class="text-destructive-emphasis">*</span></label>
+          <label class="block text-sm font-medium text-muted-foreground mb-1">Sequence Order <span class="text-destructive-emphasis">*</span></label>
           <input type="number" min="1" x-model.number="form.sequence_order" required
-            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Sequence Order">
+            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Sequence Order">
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium text-foreground">Target Date</label>
+          <label class="block text-sm font-medium text-muted-foreground mb-1">Target Date</label>
           <input type="date" x-model="form.target_date"
-            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Target Date">
+            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Target Date">
         </div>
       </div>
       <div>
-        <label class="mb-1 block text-sm font-medium text-foreground">Description</label>
+        <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
         <textarea x-model="form.description" rows="2"
           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Description"></textarea>
       </div>
       <div class="flex items-center justify-end gap-2 border-t pt-4">
         <button type="button"
-          class="rounded-md border border-input px-4 py-2 text-sm hover:bg-muted"
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"
           data-modal-close="rdm-create-plateau-modal">Cancel</button>
         <button type="submit"
           class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
@@ -414,35 +391,25 @@
         </button>
       </div>
     </form>
-  </div>
+  
 </div>
+{% endcall %}
 
 {# Create / Edit Work Package Modal #}
-<div id="rdm-create-wp-modal"
-     hidden
-     role="dialog" aria-modal="true" aria-labelledby="rdm-wp-modal-title"
-     class="fixed inset-0 z-50 items-center justify-center bg-black/50 p-4">
-  <div class="w-full max-w-2xl rounded-xl border bg-card shadow-xl flex flex-col max-h-[90vh]"
-       x-data="rdmWpModalForm()"
-       x-init="initFromGlobal()">
-    <div class="flex shrink-0 items-center justify-between border-b px-6 py-4">
-      <h3 id="rdm-wp-modal-title" class="text-base font-semibold text-foreground"
-        x-text="isEditing ? 'Edit Work Package' : 'Create Work Package'"></h3>
-      <button type="button"
-        class="rounded-md border border-input px-2 py-1 text-sm hover:bg-muted"
-        data-modal-close="rdm-create-wp-modal">Close</button>
-    </div>
-    <form class="space-y-4 p-6 overflow-y-auto flex-1 min-h-0" @submit.prevent="submitWpForm()">
+{% call modal(id='rdm-create-wp-modal', size='lg', labelledby='rdm-wp-modal-title') %}
+<div x-data="rdmWpModalForm()" x-init="initFromGlobal()">
+<h3 id="rdm-wp-modal-title" x-text="isEditing ? 'Edit Work Package' : 'Create Work Package'" class="text-base font-semibold text-foreground mb-4"></h3>
+    <form class="space-y-4 overflow-y-auto flex-1 min-h-0" @submit.prevent="submitWpForm()">
       <div>
-        <label class="mb-1 block text-sm font-medium text-foreground">Name <span class="text-destructive-emphasis">*</span></label>
+        <label class="block text-sm font-medium text-muted-foreground mb-1">Name <span class="text-destructive-emphasis">*</span></label>
         <input type="text" x-model="form.name" required
-          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Name">
+          class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Name">
       </div>
-      <div class="grid gap-4 sm:grid-cols-2">
+      <div class="grid gap-4 grid-cols-1">
         <div>
-          <label class="mb-1 block text-sm font-medium text-foreground">Status</label>
+          <label class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
           <select x-model="form.status"
-            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Status">
+            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Status">
             <option value="planned">Planned</option>
             <option value="in_progress">In Progress</option>
             <option value="completed">Completed</option>
@@ -451,9 +418,9 @@
           </select>
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium text-foreground">Priority</label>
+          <label class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
           <select x-model="form.priority"
-            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Priority">
+            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Priority">
             <option value="low">Low</option>
             <option value="medium">Medium</option>
             <option value="high">High</option>
@@ -461,37 +428,36 @@
           </select>
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium text-foreground">Start Date <span class="text-destructive-emphasis">*</span></label>
+          <label class="block text-sm font-medium text-muted-foreground mb-1">Start Date <span class="text-destructive-emphasis">*</span></label>
           <input type="date" x-model="form.start_date" required
-            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Start Date">
+            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Start Date">
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium text-foreground">Target Date <span class="text-destructive-emphasis">*</span></label>
+          <label class="block text-sm font-medium text-muted-foreground mb-1">Target Date <span class="text-destructive-emphasis">*</span></label>
           <input type="date" x-model="form.target_date" required
-            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Target Date">
+            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Target Date">
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium text-foreground">Linked Gap</label>
+          <label class="block text-sm font-medium text-muted-foreground mb-1">Linked Gap</label>
           <div class="relative">
             <input type="search" autocomplete="off" x-model="gapQuery" @input.debounce.300ms="searchGaps()"
               placeholder="Search gaps by name"
-              class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Linked Gap" data-testid="wp-modal-gap-input">
+              class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Linked Gap" data-testid="wp-modal-gap-input">
             <p class="mt-1 text-xs text-muted-foreground">
               <span x-show="form.gap_id" x-cloak>Linked: <span x-text="gapName"></span></span>
-              <button type="button" x-show="form.gap_id" x-cloak class="ml-2 underline" @click="form.gap_id = null; gapName = ''; gapQuery = ''">Clear</button>
+              {{ button(text='Clear', variant='link', size='sm', class='ml-2', on_click="form.gap_id = null; gapName = ''; gapQuery = ''", attrs_dict={'x-show': 'form.gap_id', 'x-cloak': ''}) }}
             </p>
-            <ul x-show="gapResults.length > 0" x-cloak class="absolute z-20 mt-1 w-full rounded-md border border-border bg-background shadow-md">
+            <ul x-show="gapResults.length > 0" x-cloak class="absolute z-20 mt-1 w-full rounded-md border border-border bg-background">
               <template x-for="g in gapResults" :key="g.id">
-                <li><button type="button" class="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
-                  @click="form.gap_id = g.id; gapName = g.name; gapQuery = ''; gapResults = []" x-text="g.name"></button></li>
+                <li>{{ button(variant='ghost', size='sm', class='w-full !justify-start text-left', on_click="form.gap_id = g.id; gapName = g.name; gapQuery = ''; gapResults = []", attrs_dict={'x-text': 'g.name'}) }}</li>
               </template>
             </ul>
           </div>
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium text-foreground">Target Plateau</label>
+          <label class="block text-sm font-medium text-muted-foreground mb-1">Target Plateau</label>
           <select x-model.number="form.plateau_id"
-            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Target Plateau">
+            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Target Plateau">
             <option :value="null">— None —</option>
             <template x-for="p in $store.rdm.plateaus" :key="p.id">
               <option :value="p.id" x-text="p.name"></option>
@@ -500,13 +466,13 @@
         </div>
       </div>
       <div>
-        <label class="mb-1 block text-sm font-medium text-foreground">Description</label>
+        <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
         <textarea x-model="form.description" rows="3"
           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Description"></textarea>
       </div>
       <div class="flex items-center justify-end gap-2 border-t pt-4">
         <button type="button"
-          class="rounded-md border border-input px-4 py-2 text-sm hover:bg-muted"
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"
           data-modal-close="rdm-create-wp-modal">Cancel</button>
         <button type="submit"
           class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
@@ -516,27 +482,14 @@
         </button>
       </div>
     </form>
-  </div>
+  
 </div>
+{% endcall %}
 
 {# AI Generate Preview Modal #}
-<div id="rdm-ai-generate-modal"
-     hidden
-     role="dialog" aria-modal="true" aria-labelledby="rdm-ai-modal-title"
-     class="fixed inset-0 z-50 items-center justify-center bg-black/50 p-4">
-  <div class="w-full max-w-2xl rounded-xl border bg-card shadow-xl flex flex-col max-h-[90vh]"
-       x-data="rdmAiModalForm()"
-       x-init="initFromGlobal()">
-    <div class="flex shrink-0 items-center justify-between border-b px-6 py-4">
-      <div>
-        <h3 id="rdm-ai-modal-title" class="text-base font-semibold text-foreground">AI Roadmap Generation Preview</h3>
-        <p class="mt-0.5 text-xs text-muted-foreground">Review suggested work packages before confirming. No changes are saved until you click Confirm.</p>
-      </div>
-      <button type="button"
-        class="rounded-md border border-input px-2 py-1 text-sm hover:bg-muted"
-        data-modal-close="rdm-ai-generate-modal">Close</button>
-    </div>
-    <div class="flex-1 min-h-0 overflow-y-auto p-6">
+{% call modal(id='rdm-ai-generate-modal', title='AI Roadmap Generation Preview', description='Review suggested work packages before confirming. No changes are saved until you click Confirm.', size='lg') %}
+<div x-data="rdmAiModalForm()" x-init="initFromGlobal()">
+    <div class="flex-1 min-h-0 overflow-y-auto">
       <template x-if="isLoading">
         <div class="flex items-center justify-center py-10">
           <div class="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
@@ -582,7 +535,7 @@
         </div>
       </template>
     </div>
-    <div class="flex items-center justify-end gap-2 border-t px-6 py-4">
+    <div class="flex items-center justify-end gap-2 border-t py-4 pt-4 mt-4">
       <button type="button"
         class="rounded-md border border-input px-4 py-2 text-sm hover:bg-muted"
         data-modal-close="rdm-ai-generate-modal">Discard</button>
@@ -594,8 +547,9 @@
         <span x-show="isConfirming" x-cloak>Creating…</span>
       </button>
     </div>
-  </div>
+  
 </div>
+{% endcall %}
 {% endblock %}
 
 {% block scripts %}
@@ -1231,7 +1185,7 @@
 
       if (!workPackages.length) {
         document.getElementById('rdm-gantt-chart').innerHTML = `
-          <div class="rounded-xl border bg-card shadow-sm">
+          <div class="rounded-lg border border-border bg-card">
             <div class="flex items-center justify-between border-b px-6 py-4">
               <h2 class="text-base font-semibold text-foreground">Work Package Timeline</h2>
             </div>
@@ -1283,7 +1237,7 @@
       const chartEl = document.getElementById('rdm-gantt-chart');
       if (chartEl) {
         chartEl.innerHTML = `
-          <div class="rounded-xl border bg-card shadow-sm">
+          <div class="rounded-lg border border-border bg-card">
             <div class="flex flex-col items-center justify-center py-10 text-center">
               <i data-lucide="alert-circle" class="mb-3 h-10 w-10 text-destructive/60"></i>
               <p class="text-sm font-medium text-destructive-emphasis">Could not load the timeline.</p>

@@ -70,7 +70,7 @@
     <div class="flex items-center gap-4 pt-2">
       <button type="button" @click.prevent="submitPhaseA()"
               :disabled="submitting"
-              class="inline-flex items-center justify-center rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
         <span x-show="!submitting" x-cloak>Save &amp; Continue to Gap Analysis →</span>
         <span x-show="submitting" x-cloak>Saving...</span>
       </button>

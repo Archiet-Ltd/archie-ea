@@ -21,23 +21,23 @@
 <div id="unified-mapping-modal" hidden aria-hidden="true" class="modal-root fixed inset-0 items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="unified-modal-heading">
     <!-- Backdrop -->
     <div data-modal-backdrop="unified-mapping-modal" aria-hidden="true"
-         class="modal-backdrop absolute inset-0 bg-background/80 transition-opacity duration-200"></div>
+         class="modal-backdrop absolute inset-0 transition-opacity duration-200 bg-overlay/50"></div>
     <div data-modal-panel
-         class="modal-panel relative w-full max-w-5xl p-6 border border-border shadow-lg rounded-lg bg-card text-card-foreground max-h-[90vh] overflow-y-auto">
+         class="modal-panel relative w-full max-w-5xl p-6 border border-border rounded-lg bg-card text-card-foreground max-h-[90vh] overflow-y-auto">
         <!-- Header -->
         <div class="flex justify-between items-center mb-4">
             <h3 id="unified-modal-heading" class="text-lg font-bold">
                 <span id="unified-modal-title">Map Applications to:</span>
                 <span id="unified-modal-target-name" class="text-primary"></span>
             </h3>
-            <button type="button" @click="Platform.modal.close('unified-mapping-modal')" class="text-muted-foreground hover:text-foreground" aria-label="Close modal">
+            <button type="button" @click="Platform.modal.close('unified-mapping-modal')" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close modal">
                 <i data-lucide="x" class="w-6 h-6"></i>
             </button>
         </div>
 
         <!-- Context Indicator Badge -->
         <div id="unified-context-badge" class="mb-4">
-            <span id="unified-context-label" class="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-primary/10 text-primary">
+            <span id="unified-context-label" class="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-primary/10 text-info-emphasis">
                 <i data-lucide="layers" class="w-3 h-3 mr-1"></i>
                 <span id="unified-context-text">Capability Mapping</span>
             </span>
@@ -221,13 +221,13 @@
                     of <span id="unified-target-page-total">0</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button type="button" @click="changeTargetPage(-1)" class="inline-flex items-center justify-center h-9 w-9 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent disabled:pointer-events-none disabled:opacity-50 transition-colors" aria-label="Previous page">
+                    <button type="button" @click="changeTargetPage(-1)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9" aria-label="Previous page">
                         <i data-lucide="chevron-left" class="h-4 w-4"></i>
                     </button>
                     <span class="text-sm text-muted-foreground">
                         Page <span id="unified-target-current-page">1</span> of <span id="unified-target-total-pages">1</span>
                     </span>
-                    <button type="button" @click="changeTargetPage(1)" class="inline-flex items-center justify-center h-9 w-9 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent disabled:pointer-events-none disabled:opacity-50 transition-colors" aria-label="Next page">
+                    <button type="button" @click="changeTargetPage(1)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9" aria-label="Next page">
                         <i data-lucide="chevron-right" class="h-4 w-4"></i>
                     </button>
                 </div>
@@ -332,13 +332,13 @@
                     of <span id="unified-app-page-total">0</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button type="button" @click="changeAppPage(-1)" class="inline-flex items-center justify-center h-9 w-9 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent disabled:pointer-events-none disabled:opacity-50 transition-colors" aria-label="Previous page">
+                    <button type="button" @click="changeAppPage(-1)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9" aria-label="Previous page">
                         <i data-lucide="chevron-left" class="h-4 w-4"></i>
                     </button>
                     <span class="text-sm text-muted-foreground">
                         Page <span id="unified-app-current-page">1</span> of <span id="unified-app-total-pages">1</span>
                     </span>
-                    <button type="button" @click="changeAppPage(1)" class="inline-flex items-center justify-center h-9 w-9 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent disabled:pointer-events-none disabled:opacity-50 transition-colors" aria-label="Next page">
+                    <button type="button" @click="changeAppPage(1)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-9" aria-label="Next page">
                         <i data-lucide="chevron-right" class="h-4 w-4"></i>
                     </button>
                 </div>

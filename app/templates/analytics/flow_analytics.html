@@ -47,7 +47,7 @@
     <!-- Metric Summary Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <!-- Avg Cycle Time -->
-        <div class="bg-background rounded-lg border shadow-sm p-5">
+        <div class="bg-background rounded-lg border p-5">
             <p class="text-sm text-muted-foreground">Avg Cycle Time</p>
             <p class="text-3xl font-bold text-primary mt-1"
                x-text="cycleData ? cycleData.average_cycle_time_days + 'd' : '—'"></p>
@@ -57,7 +57,7 @@
         </div>
 
         <!-- Avg Throughput -->
-        <div class="bg-background rounded-lg border shadow-sm p-5">
+        <div class="bg-background rounded-lg border p-5">
             <p class="text-sm text-muted-foreground">Avg Throughput / Week</p>
             <p class="text-3xl font-bold text-success mt-1"
                x-text="throughputData ? throughputData.average_throughput : '—'"></p>
@@ -65,7 +65,7 @@
         </div>
 
         <!-- Avg Lead Time -->
-        <div class="bg-background rounded-lg border shadow-sm p-5">
+        <div class="bg-background rounded-lg border p-5">
             <p class="text-sm text-muted-foreground">Avg Lead Time</p>
             <p class="text-3xl font-bold text-warning mt-1"
                x-text="leadData ? leadData.average_lead_time_days + 'd' : '—'"></p>
@@ -73,7 +73,7 @@
         </div>
 
         <!-- Flow Efficiency -->
-        <div class="bg-background rounded-lg border shadow-sm p-5">
+        <div class="bg-background rounded-lg border p-5">
             <p class="text-sm text-muted-foreground">Flow Efficiency</p>
             <p class="text-3xl font-bold text-primary mt-1"
                x-text="flowEfficiency !== null ? flowEfficiency + '%' : '—'"></p>
@@ -100,7 +100,7 @@
             <h2 class="text-lg font-semibold text-destructive-emphasis">Flow metrics could not be loaded</h2>
             <p class="text-muted-foreground mt-1 text-sm" x-text="loadError"></p>
             <button type="button" @click="loadAll()"
-                    class="mt-4 inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-4 items-center justify-center">
                 Retry
             </button>
         </div>
@@ -111,7 +111,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
             <!-- Cycle Time Chart -->
-            <div class="bg-background rounded-lg border shadow-sm p-5">
+            <div class="bg-background rounded-lg border p-5">
                 <h2 class="text-lg font-semibold mb-3">Cycle Time Distribution</h2>
                 <div class="relative h-[260px]">
                     <canvas id="cycleTimeChart"></canvas>
@@ -122,7 +122,7 @@
             </div>
 
             <!-- Throughput Chart -->
-            <div class="bg-background rounded-lg border shadow-sm p-5">
+            <div class="bg-background rounded-lg border p-5">
                 <h2 class="text-lg font-semibold mb-3">Throughput per Period</h2>
                 <div class="relative h-[260px]">
                     <canvas id="throughputChart"></canvas>
@@ -136,14 +136,14 @@
 
     <!-- WIP Table -->
     <template x-if="wipData && wipData.columns && wipData.columns.length > 0">
-        <div class="bg-background rounded-lg border shadow-sm p-5">
+        <div class="bg-background rounded-lg border p-5">
             <h2 class="text-lg font-semibold mb-3">WIP Snapshot
                 <span class="text-sm font-normal text-muted-foreground ml-2">
                     (total: <span x-text="wipData.total_wip"></span>)
                 </span>
             </h2>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <thead>
                         <tr class="border-b">
                             <th class="text-left py-2 pr-4 font-medium text-muted-foreground">Board column</th>

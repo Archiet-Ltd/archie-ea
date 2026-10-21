@@ -1,5 +1,7 @@
 ﻿{# smoke-coverage-ok: plain-language filter wiring — el.type, pt.type, pt.layer, row.application.type now use |plain_name and |plain_layer filters #}
 {% extends "layouts/admin_base.html" %}
+{% from 'components/dense_table.html' import dense_table %}
+{% from 'components/button.html' import button %}
 {% from 'components/page_header.html' import page_header %}
 
 {# DEF-032, Capgemini dry-run: the browser tab title said "Requirements
@@ -56,23 +58,23 @@
     <div x-data="{ matrixSearch: '', gapOpen: false }">
 
     <!-- TRC-011: direction toggle / TRC-015: pivot type selector -->
-    <form method="get" action="{{ url_for('architect_ui.traceability_matrix') }}" class="rounded-lg border border-border bg-card p-3 shadow-sm">
+    <form method="get" action="{{ url_for('architect_ui.traceability_matrix') }}" class="rounded-lg border border-border bg-card p-3">
         <div class="flex flex-wrap items-center gap-3">
-            <label for="direction" class="text-sm font-medium text-foreground">Direction:</label>
+            <label for="direction" class="block text-sm font-medium text-muted-foreground mb-1">Direction:</label>
             <select
                 id="direction"
                 name="direction"
-                class="rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
             >
                 <option value="forward" {% if direction == 'forward' %}selected{% endif %}>Top-Down</option>
                 <option value="inverse" {% if direction == 'inverse' %}selected{% endif %}>Bottom-Up</option>
             </select>
             {% if direction == 'forward' and pivot_types %}
-            <label for="pivot_type" class="text-sm font-medium text-foreground">Pivot element:</label>
+            <label for="pivot_type" class="block text-sm font-medium text-muted-foreground mb-1">Pivot element:</label>
             <select
                 id="pivot_type"
                 name="pivot_type"
-                class="rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
             >
                 {% for pt in pivot_types %}
                 <option value="{{ pt.type }}" {% if pt.type == current_pivot_type %}selected{% endif %}>
@@ -84,7 +86,7 @@
             <input type="hidden" name="plateau" value="{{ current_plateau or '' }}">
             <button
                 type="submit"
-                class="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
             >
                 Apply
             </button>
@@ -103,42 +105,42 @@
                 name="search"
                 value="{{ current_search }}"
                 placeholder="Search by element name…"
-                class="w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                class="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
              aria-label="Search by element name…">
         </div>
         <select name="scope"
-                class="rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground" aria-label="Filter by scope">
+                class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground" aria-label="Filter by scope">
             <option value="" {% if not current_scope %}selected{% endif %}>All scopes</option>
             <option value="enterprise" {% if current_scope == 'enterprise' %}selected{% endif %}>Enterprise</option>
             <option value="application" {% if current_scope == 'application' %}selected{% endif %}>Application</option>
             <option value="cross-cutting" {% if current_scope == 'cross-cutting' %}selected{% endif %}>Cross-cutting</option>
         </select>
         <button type="submit"
-                class="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             Search
         </button>
         {% if current_search or current_scope %}
         <a href="{{ url_for('architect_ui.traceability_matrix', direction=direction, pivot_type=current_pivot_type) }}"
-           class="inline-flex items-center gap-1 rounded-md border border-input px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="x" class="h-3.5 w-3.5"></i>
             Clear
         </a>
         {% endif %}
         <a href="/api/archimate/traceability/export"
-           class="inline-flex items-center gap-2 rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="download" class="h-4 w-4"></i>
             Export CSV
         </a>
     </form>
 
     <!-- TRC-010: plateau filter -->
-    <div class="rounded-lg border border-border bg-card p-3 shadow-sm">
+    <div class="rounded-lg border border-border bg-card p-3">
         <div class="flex flex-wrap items-center gap-2">
             <span class="text-sm font-medium text-foreground">Plateau:</span>
             {% for label, value in [('All', None), ('Baseline', 'Baseline'), ('Transition', 'Transition'), ('Target', 'Target')] %}
             <a
                 href="{{ url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=value, direction=direction) if value else url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, direction=direction) }}"
-                class="inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors {{ 'bg-primary text-primary-foreground shadow-sm' if current_plateau == value or (not current_plateau and not value) else 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground' }}"
+                class="inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors {{ 'bg-primary text-primary-foreground ' if current_plateau == value or (not current_plateau and not value) else 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground' }}"
             >
                 {{ label }}
             </a>
@@ -147,7 +149,7 @@
     </div>
 
     <!-- TRC-008: gap/orphan analysis panel -->
-    <section class="rounded-lg border border-border bg-card p-4 shadow-sm">
+    <section class="rounded-lg border border-border bg-card p-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="space-y-3 flex-1">
                 <div class="flex items-center gap-2">
@@ -181,7 +183,8 @@
                 type="button"
                 @click="gapOpen = !gapOpen"
                 :aria-expanded="gapOpen.toString()"
-                class="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                :aria-label="gapOpen ? 'Hide gap panel' : 'Show gap panel'"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
             >
                 <i data-lucide="list-tree" class="h-4 w-4"></i>
                 <span x-text="gapOpen ? 'Hide gap panel' : 'Show gap panel'"></span>
@@ -212,7 +215,7 @@
                 {% endfor %}
             </div>
             {% else %}
-            <div class="rounded-md border border-success/30 bg-success/10 px-4 py-3 text-sm text-success-emphasis">
+            <div class="rounded-md border border-success/40 bg-success/10 px-4 py-2 text-sm text-success-emphasis">
                 All elements are connected across the current traceability chain.
             </div>
             {% endif %}
@@ -230,76 +233,68 @@
        one click away for anyone who wants the flow view. #}
     <div class="flex items-center gap-2">
         <div class="inline-flex rounded-lg border border-border p-1 bg-muted/30" x-data="{ view: 'matrix' }">
-            <button type="button" @click="view = 'sankey'; document.getElementById('sankey-view').style.display = ''; document.getElementById('matrix-view').style.display = 'none'; if (window.createTraceabilitySankey) window.createTraceabilitySankey('#sankey-container', '/architecture/api/traceability/sankey?direction={{ direction }}&plateau={{ current_plateau or '' }}');"
-                    :class="view === 'sankey' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'"
-                    class="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors">
-                <i data-lucide="git-merge" class="h-4 w-4" aria-hidden="true"></i>
-                Sankey
-            </button>
-            <button type="button" @click="view = 'matrix'; document.getElementById('sankey-view').style.display = 'none'; document.getElementById('matrix-view').style.display = '';"
-                    :class="view === 'matrix' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'"
-                    class="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors">
-                <i data-lucide="table" class="h-4 w-4" aria-hidden="true"></i>
-                Matrix
-            </button>
+            {% set _sankey_url = '/architecture/api/traceability/sankey?direction=' ~ direction ~ '&plateau=' ~ (current_plateau or '') %}
+            {% call button(variant='ghost', size='sm', class='gap-2',
+                           on_click="view = 'sankey'; document.getElementById('sankey-view').style.display = ''; document.getElementById('matrix-view').style.display = 'none'; if (window.createTraceabilitySankey) window.createTraceabilitySankey('#sankey-container', '" ~ _sankey_url ~ "');",
+                           attrs_dict={':class': "view === 'sankey' ? '!bg-background !text-foreground' : ''"}) %}<i data-lucide="git-merge" class="h-4 w-4" aria-hidden="true"></i>Sankey{% endcall %}
+            {% call button(variant='ghost', size='sm', class='gap-2',
+                           on_click="view = 'matrix'; document.getElementById('sankey-view').style.display = 'none'; document.getElementById('matrix-view').style.display = '';",
+                           attrs_dict={':class': "view === 'matrix' ? '!bg-background !text-foreground' : ''"}) %}<i data-lucide="table" class="h-4 w-4" aria-hidden="true"></i>Matrix{% endcall %}
         </div>
     </div>
 
     <!-- Sankey view (hidden by default — see T-03 note above) -->
-    <div id="sankey-view" style="display: none; min-height: 500px;" class="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+    <div id="sankey-view" style="display: none; min-height: 500px;" class="rounded-lg border border-border bg-card overflow-hidden">
         <div id="sankey-container" style="width: 100%; min-height: 500px;"></div>
     </div>
 
     <!-- Matrix table (visible by default) -->
-    <div id="matrix-view" class="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+    <div id="matrix-view" class="rounded-lg border border-border bg-card overflow-hidden">
         {% if matrix %}
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead class="border-b border-border bg-muted/50 sticky top-0 z-10">
-                    <tr class="border-b border-border bg-muted/50">
-                        <th class="px-4 py-3 text-left font-semibold text-foreground">{{ 'Technology Element' if direction == 'inverse' else 'Application Component' }}</th>
-                        <th class="px-4 py-3 text-left font-semibold text-foreground">
+{% set _dt_header_16428 %}
+                        <th scope="col" class="h-10 px-2 align-middle text-left">{{ 'Technology Element' if direction == 'inverse' else 'Application Component' }}</th>
+                        <th scope="col" class="h-10 px-2 align-middle text-left">
                             <span class="inline-flex items-center gap-1.5">
                                 <span class="h-2.5 w-2.5 rounded-full bg-fuchsia-500"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
                                 Motivation / Goals
                             </span>
                         </th>
-                        <th class="px-4 py-3 text-left font-semibold text-foreground">
+                        <th scope="col" class="h-10 px-2 align-middle text-left">
                             <span class="inline-flex items-center gap-1.5">
                                 <span class="h-2.5 w-2.5 rounded-full bg-violet-500"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
                                 Strategy Layer
                             </span>
                         </th>
-                        <th class="px-4 py-3 text-left font-semibold text-foreground">
+                        <th scope="col" class="h-10 px-2 align-middle text-left">
                             <span class="inline-flex items-center gap-1.5">
                                 <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
                                 Business Layer
                             </span>
                         </th>
-                        <th class="px-4 py-3 text-left font-semibold text-foreground">
+                        <th scope="col" class="h-10 px-2 align-middle text-left">
                             <span class="inline-flex items-center gap-1.5">
                                 <span class="h-2.5 w-2.5 rounded-full bg-amber-500"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
                                 {{ 'Impact Assessment' if direction == 'inverse' else 'Technology Layer' }}
                             </span>
                         </th>
-                        <th class="px-4 py-3 text-left font-semibold text-foreground">
+                        <th scope="col" class="h-10 px-2 align-middle text-left">
                             <span class="inline-flex items-center gap-1.5">
                                 <span class="h-2.5 w-2.5 rounded-full bg-sky-500"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
                                 Data Objects
                             </span>
                         </th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
+                    
+{% endset %}
+{% call dense_table(header=_dt_header_16428, flush=true) %}
                     {% for row in matrix %}
                     <tr class="hover:bg-muted/30 transition-colors">
                         <!-- Application Component -->
-                        <td class="px-4 py-3">
+                        <td class="px-2">
                             <a href="{{ url_for('architect_ui.element_traceability', element_id=row.application.id) }}"
                                class="inline-flex items-center gap-1.5 font-medium text-foreground hover:text-primary transition-colors">
                                 <span>{{ row.application.name }}</span>
                                 {% if row.application.type %}
-                                <span class="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary ring-1 ring-inset ring-primary/20">
+                                <span class="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-info-emphasis ring-1 ring-inset ring-primary/20">
                                     {{ row.application.type | plain_name(current_user) }}
                                 </span>
                                 {% endif %}
@@ -307,7 +302,7 @@
                         </td>
 
                         <!-- Motivation -->
-                        <td class="px-4 py-3">
+                        <td class="px-2">
                             <div class="flex flex-wrap gap-1.5">
                                 {% for el in row.motivation | default([], true) %}
                                 {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
@@ -335,7 +330,7 @@
                         </td>
 
                         <!-- Strategy -->
-                        <td class="px-4 py-3">
+                        <td class="px-2">
                             <div class="flex flex-wrap gap-1.5">
                                 {% for el in row.strategy %}
                                 {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
@@ -363,7 +358,7 @@
                         </td>
 
                         <!-- Business -->
-                        <td class="px-4 py-3">
+                        <td class="px-2">
                             <div class="flex flex-wrap gap-1.5">
                                 {% for el in row.business %}
                                 {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
@@ -391,7 +386,7 @@
                         </td>
 
                         <!-- Technology / impact -->
-                        <td class="px-4 py-3">
+                        <td class="px-2">
                             {% if direction == 'inverse' %}
                             <a href="{{ url_for('architect_ui.impact_analysis', element_id=row.application.id) }}"
                                class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
@@ -427,7 +422,7 @@
                         </td>
 
                         <!-- Data -->
-                        <td class="px-4 py-3">
+                        <td class="px-2">
                             <div class="flex flex-wrap gap-1.5">
                                 {% for el in row.data | default([], true) %}
                                 {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
@@ -455,9 +450,7 @@
                         </td>
                     </tr>
                     {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                {% endcall %}
         {# Show call-to-action when every row has zero connected elements #}
         {% set ns = namespace(aligned=0) %}
         {% for row in matrix %}
@@ -466,7 +459,7 @@
             {% endif %}
         {% endfor %}
         {% if ns.aligned == 0 %}
-        <div class="mx-4 mb-4 mt-2 rounded-lg border border-warning/30 bg-warning/10 p-4">
+        <div class="mx-4 mb-4 mt-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2">
             <div class="flex items-start gap-3">
                 <i data-lucide="alert-triangle" class="h-5 w-5 text-warning flex-shrink-0 mt-0.5"></i>
                 <div class="flex-1 min-w-0">
@@ -490,7 +483,7 @@
             <p class="text-muted-foreground font-medium">No ApplicationComponent elements found.</p>
             <p class="text-sm text-muted-foreground mt-1">Add ArchiMate elements to build the traceability matrix.</p>
             <a href="{{ url_for('archimate_crud.dashboard') }}"
-               class="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-4 items-center">
                 <i data-lucide="plus" class="h-4 w-4"></i>
                 Add ArchiMate Elements
             </a>
@@ -505,7 +498,7 @@
             <div class="flex items-center gap-1">
                 {% if current_page > 1 %}
                 <a href="{{ url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=current_page - 1) }}"
-                   class="inline-flex items-center rounded-md border border-input bg-background px-2.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent transition-colors">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="chevron-left" class="h-4 w-4"></i>
                 </a>
                 {% endif %}
@@ -514,14 +507,14 @@
                 <span class="inline-flex items-center rounded-md bg-primary px-2.5 py-1.5 text-sm font-medium text-primary-foreground">{{ p }}</span>
                 {% elif p <= 3 or p >= total_pages - 2 or (p >= current_page - 1 and p <= current_page + 1) %}
                 <a href="{{ url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=p) }}"
-                   class="inline-flex items-center rounded-md border border-input bg-background px-2.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent transition-colors">{{ p }}</a>
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">{{ p }}</a>
                 {% elif p == 4 or p == total_pages - 3 %}
                 <span class="px-1 text-muted-foreground">…</span>
                 {% endif %}
                 {% endfor %}
                 {% if current_page < total_pages %}
                 <a href="{{ url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=current_page + 1) }}"
-                   class="inline-flex items-center rounded-md border border-input bg-background px-2.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent transition-colors">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="chevron-right" class="h-4 w-4"></i>
                 </a>
                 {% endif %}

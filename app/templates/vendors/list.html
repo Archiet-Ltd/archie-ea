@@ -1,4 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/form_field.html' import form_group, form_footer %}
 {% from "components/card.html" import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/data_card.html" import data_card %}
@@ -84,11 +85,11 @@
            since it targets the header action specifically. #}
         <span class="mt-3 block" x-show="!hasActiveFilters">
           <button type="button" @click="Platform.modal.open('create-vendor')" aria-label="Add your first vendor"
-                  class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">Add your first vendor</button>
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Add your first vendor</button>
         </span>
         <span class="mt-3 block" x-show="hasActiveFilters" x-cloak>
           <button type="button" @click="clearAllFilters()" aria-label="Clear filters"
-                  class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium border border-input bg-background hover:bg-accent transition-colors">Clear filters</button>
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Clear filters</button>
         </span>
       {% endset %}
       {% call workbench_table(
@@ -123,7 +124,7 @@
         <td class="px-3 align-middle tabular-nums text-muted-foreground text-sm" x-text="row.row_number"></td>
         <td class="px-4 py-3 align-middle">
           <div>
-            <button type="button" @click="openEditModal(row)" class="font-medium text-left hover:text-primary hover:underline transition-colors" x-text="row.name"></button>
+            <button type="button" @click="openEditModal(row)" :aria-label="'Edit ' + row.name" class="font-medium text-left hover:text-primary hover:underline transition-colors" x-text="row.name"></button>
             <template x-if="row.website">
               <a :href="row.website" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline block" x-text="row.website"></a>
             </template>
@@ -162,12 +163,12 @@
           <div class="flex items-center gap-2 justify-end">
             <a :href="'{{ url_for('application_mgmt.vendor_detail', vendor_id=0) }}'.replace('0', row.id)"
                aria-label="View vendor details"
-               class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium border border-input bg-background hover:bg-accent transition-colors">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
               <i data-lucide="eye" class="h-3 w-3"></i>
               View
             </a>
             <button type="button" @click.stop="openEditModal(row)"
-                    class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
               <i data-lucide="pencil" class="h-3 w-3"></i>
               Edit
             </button>
@@ -183,7 +184,7 @@
        lg:block itself while hidden, or an empty bordered box reserves 288px from 1024px up and squeezes
        the table into a scrolled, overlapped state — which is the bug this PR fixes. #}
     <div id="vendor-products-wrapper" class="hidden w-72 shrink-0">
-      <div id="vendor-products-panel" class="sticky top-4 rounded-xl border bg-card p-4 text-sm text-muted-foreground">
+      <div id="vendor-products-panel" class="sticky top-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
       </div>
     </div>
 
@@ -246,9 +247,10 @@
     </div>
     <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
       <button type="button" data-modal-close="edit-vendor-modal"
-              class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent transition-colors">Cancel</button>
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
       <button type="button" @click="saveEdit()" :disabled="editSaving"
-              class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:pointer-events-none">
+              :aria-label="editSaving ? 'Saving' : 'Save Changes'"
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
         <i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" x-show="editSaving" x-cloak></i>
         <span x-text="editSaving ? 'Saving...' : 'Save Changes'"></span>
       </button>
@@ -266,10 +268,11 @@
            placeholder="DELETE" @keydown.enter="executeBulkDelete()" aria-label="DELETE">
     <div class="flex justify-end gap-3">
       <button type="button" data-modal-close="bulk-delete-confirm-modal"
-              class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent transition-colors">Cancel</button>
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
       <button type="button" @click="executeBulkDelete()"
               :disabled="deleteConfirmText !== 'DELETE' || deleteInProgress"
-              class="inline-flex h-9 items-center justify-center rounded-md bg-destructive px-4 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:pointer-events-none">
+              :aria-label="deleteInProgress ? 'Deleting' : 'Delete'"
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
         <i data-lucide="loader-2" class="mr-2 h-4 w-4 animate-spin" x-show="deleteInProgress" x-cloak></i>
         <span x-text="deleteInProgress ? 'Deleting...' : 'Delete'"></span>
       </button>
@@ -281,17 +284,15 @@
     <div x-data="vendorCreateModal()">
       <form @submit.prevent="submitCreateVendor()" class="space-y-4">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div>
-          <label for="cv-name" class="block text-sm font-medium mb-1">Vendor Name <span class="text-destructive-emphasis">*</span></label>
+        {% call form_group(id='cv-name', label='Vendor Name', required=true) %}
           <input type="text" id="cv-name" name="name" x-model="formData.name" required maxlength="200"
-                 class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                 class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                  placeholder="Enter vendor name">
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label for="cv-type" class="block text-sm font-medium mb-1">Vendor Type</label>
+        {% endcall %}
+        <div class="grid grid-cols-1 gap-4">
+          {% call form_group(id='cv-type', label='Vendor Type') %}
             <select id="cv-type" name="vendor_type" x-model="formData.vendor_type"
-                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <option value="">Select type...</option>
               <option value="software_vendor">Software Vendor</option>
               <option value="saas_platform">SaaS Platform</option>
@@ -300,32 +301,30 @@
               <option value="consulting_partner">Consulting Partner</option>
               <option value="managed_service_provider">Managed Service Provider</option>
             </select>
-          </div>
-          <div>
-            <label for="cv-country" class="block text-sm font-medium mb-1">Country</label>
+          {% endcall %}
+          {% call form_group(id='cv-country', label='Country') %}
             <input type="text" id="cv-country" name="country" x-model="formData.country"
-                   class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                    placeholder="e.g. United Kingdom">
-          </div>
+          {% endcall %}
         </div>
-        <div>
-          <label for="cv-website" class="block text-sm font-medium mb-1">Website</label>
+        {% call form_group(id='cv-website', label='Website') %}
           <input type="url" id="cv-website" name="website" x-model="formData.website"
-                 class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                 class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                  placeholder="https://example.com">
-        </div>
-        <div>
-          <label for="cv-description" class="block text-sm font-medium mb-1">Description</label>
+        {% endcall %}
+        {% call form_group(id='cv-description', label='Description') %}
           <textarea id="cv-description" name="description" x-model="formData.description" rows="3"
                     class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     placeholder="Brief description of the vendor"></textarea>
-        </div>
+        {% endcall %}
         <div x-show="errorMsg" x-cloak class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
         <div class="flex justify-end gap-3 pt-2 border-t border-border">
           <button type="button" @click="Platform.modal.close('create-vendor')"
-                  class="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent">Cancel</button>
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
           <button type="submit" :disabled="submitting"
-                  class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                  :aria-label="submitting ? 'Creating vendor' : 'Create Vendor'"
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak></i>
             <span x-text="submitting ? 'Creating...' : 'Create Vendor'"></span>
           </button>
