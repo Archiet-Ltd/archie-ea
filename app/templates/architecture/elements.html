@@ -1,5 +1,6 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/trust_meter.html' import trust_table %}
 
 {% block title %}ArchiMate Elements — Catalog
 {% endblock %}
@@ -173,6 +174,25 @@
         </button>
         {% endif %}
     </div>
+    {% endif %}
+
+    {# ── T-ain-04: how complete and how fresh each area is (counts with denominators, no score) ── #}
+    {% if trust_layers %}
+    <section class="mb-4 rounded-lg border border-border bg-card p-4" data-testid="model-trust" aria-labelledby="model-trust-heading">
+        <h2 id="model-trust-heading" class="text-sm font-semibold text-foreground">How complete and how fresh each area is</h2>
+        <p class="mt-1 text-xs text-muted-foreground">Counts over the elements that can carry each fact. An area with nothing in it says so.</p>
+        <div class="mt-3 overflow-x-auto">
+            {{ trust_table(trust_layers, 'Coverage and freshness by layer') }}
+        </div>
+        {% if trust_types %}
+        <details class="mt-3">
+            <summary class="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">By element type ({{ trust_types|length }})</summary>
+            <div class="mt-2 overflow-x-auto">
+                {{ trust_table(trust_types, 'Coverage and freshness by element type') }}
+            </div>
+        </details>
+        {% endif %}
+    </section>
     {% endif %}
 
     {# ── Filter Bar ── #}

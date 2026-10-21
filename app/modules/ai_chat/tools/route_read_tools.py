@@ -116,6 +116,16 @@ def _intelligence(lens: str) -> Callable[[dict], dict]:
     return handler
 
 
+def _get_model_trust(args: dict) -> dict:
+    area = str(args.get("area") or "").strip()
+    _status, data = call_internal_api(
+        "GET", "/api/v1/intelligence/trust",
+        query_string={"area": area} if area else None,
+        pass_session=True,
+    )
+    return data
+
+
 def _search_elements(args: dict) -> dict:
     query = str(args["query"])
     limit = int(args.get("limit", 30))
@@ -201,6 +211,7 @@ ROUTE_READ_HANDLERS: dict[str, Callable[[dict], dict]] = {
     "ask_programme": _intelligence("programme"),
     "ask_risk": _intelligence("risk"),
     "ask_accountability": _intelligence("accountability"),
+    "get_model_trust": _get_model_trust,
     "search_elements": _search_elements,
     "get_element": _get_element,
     "list_canvases": _list_canvases,

@@ -1,0 +1,57 @@
+{# trust-meter: how complete and how fresh one area of the model is.
+
+   `area` is a record from model_trust(): a muted text line stating counts with
+   their denominators ("2 of 4 owned, last change 3 days ago"). It is not a
+   score, a gauge or a grade, and an area with nothing in it reads "nothing
+   recorded". The line is built once, by the resolver; this only shows it.
+#}
+{% macro trust_meter(area) %}
+<p class="text-xs text-muted-foreground" data-trust-area="{{ area.area }}" data-trust-state="{{ area.state }}">{{ area.line }}</p>
+{% endmacro %}
+
+{% macro trust_table(areas, caption) %}
+{# The same records as a table: one row per area, a column per fact. A fact the
+   kind of element does not carry shows "Not held". #}
+<table class="w-full min-w-[44rem] text-sm" data-testid="trust-table">
+    <caption class="sr-only">{{ caption }}</caption>
+    <thead>
+        <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <th scope="col" class="py-2 pr-4 font-medium">Area</th>
+            <th scope="col" class="py-2 pr-4 font-medium">Owner</th>
+            <th scope="col" class="py-2 pr-4 font-medium">Lifecycle</th>
+            <th scope="col" class="py-2 pr-4 font-medium">Cost</th>
+            <th scope="col" class="py-2 pr-4 font-medium">Connected</th>
+            <th scope="col" class="py-2 font-medium">Last change</th>
+        </tr>
+    </thead>
+    <tbody class="divide-y divide-border">
+    {% for area in areas %}
+        {% if area.state == 'nothing_recorded' %}
+        <tr data-trust-area="{{ area.area }}" data-trust-state="nothing_recorded">
+            <th scope="row" class="py-2 pr-4 text-left text-sm font-medium normal-case tracking-normal text-foreground">{{ area.label|capitalize }}</th>
+            <td colspan="5" class="py-2 text-muted-foreground">{{ area.line }}</td>
+        </tr>
+        {% else %}
+        <tr data-trust-area="{{ area.area }}" data-trust-state="recorded">
+            <th scope="row" class="py-2 pr-4 text-left align-top text-sm font-medium normal-case tracking-normal text-foreground">
+                {{ area.label|capitalize }}
+                <span class="block text-xs font-normal normal-case tracking-normal text-muted-foreground tabular-nums">{{ area.elements_total }} element{{ '' if area.elements_total == 1 else 's' }}</span>
+                <span class="sr-only">{{ area.line }}</span>
+            </th>
+            {% for name in ['owner', 'lifecycle', 'cost', 'relationship'] %}
+            {% set entry = area.coverage[name] %}
+            <td class="py-2 pr-4 align-top tabular-nums text-foreground">
+                {% if entry %}{{ entry.text }}{% if entry.scope %}<span class="block text-xs text-muted-foreground">{{ entry.scope }}</span>{% endif %}
+                {% else %}<span class="text-muted-foreground">Not held</span>{% endif %}
+            </td>
+            {% endfor %}
+            <td class="py-2 align-top text-foreground">
+                {{ area.freshness.text }}
+                {% if area.freshness.dated %}<span class="block text-xs text-muted-foreground tabular-nums">{{ area.freshness.median_text }}; {{ area.freshness.dated }} of {{ area.freshness.of }} dated</span>{% endif %}
+            </td>
+        </tr>
+        {% endif %}
+    {% endfor %}
+    </tbody>
+</table>
+{% endmacro %}

@@ -133,8 +133,14 @@ def list_elements():
     ), _pp).scalar() or 0
     no_solutions_count = max(0, total_count - with_solutions_count)
 
+    from app.modules.intelligence.services.model_trust import model_trust
+
+    trust_areas = model_trust(_org)["areas"] if _org is not None else []
+
     return render_template("architecture/elements.html",
                            layer_stats=layer_stats,
+                           trust_layers=[a for a in trust_areas if a["kind"] == "layer"],
+                           trust_types=[a for a in trust_areas if a["kind"] == "type"],
                            no_desc_count=no_desc_count,
                            no_rels_count=no_rels_count,
                            no_solutions_count=no_solutions_count)

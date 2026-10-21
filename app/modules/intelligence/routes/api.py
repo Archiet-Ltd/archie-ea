@@ -13,6 +13,7 @@
   GET  /api/v1/intelligence/compliance/<element_id>
   GET  /api/v1/intelligence/traceability/<element_id>
   GET  /api/v1/intelligence/yield
+  GET  /api/v1/intelligence/trust       (coverage and freshness per area of the model)
 
 Each new route was added to this EXISTING blueprint rather than a new
 module/blueprint on the same URL prefix (ADR 0008 rule 3: two blueprints
@@ -975,6 +976,37 @@ def derivation_yield():
     from app.modules.intelligence.services.query_service import IntelligenceQueryService
 
     result = IntelligenceQueryService.derivation_yield(organization_id)
+    return success_response(result)
+
+
+@intelligence_api.route("/trust", methods=["GET"])
+@login_required
+def model_trust_for_organisation():
+    """T-ain-04: how complete and how fresh each area of the caller's model is.
+
+    ``?area=`` names one layer (``application``) or element type
+    (``ApplicationComponent``); without it every layer and type present is
+    returned. Serialises ``model_trust`` -- the one resolver the Catalogue
+    index and the answer envelope also read -- with no logic of its own.
+    """
+    organization_id = current_organization_id()
+    if organization_id is None:
+        return error_response(
+            "no tenant context for this request",
+            code="NO_TENANT_CONTEXT",
+            details={"reason": _NO_TENANT_CONTEXT_REASON},
+            status_code=400,
+        )
+
+    from app.modules.intelligence.services.model_trust import UnknownArea, model_trust
+
+    area = (request.args.get("area") or "").strip() or None
+    if area is not None and len(area) > 64:
+        return error_response("area must be a layer or an element type", code="INVALID_PARAMETER", status_code=400)
+    try:
+        result = model_trust(organization_id, area)
+    except UnknownArea:
+        return error_response("area must be a layer or an element type", code="INVALID_PARAMETER", status_code=400)
     return success_response(result)
 
 

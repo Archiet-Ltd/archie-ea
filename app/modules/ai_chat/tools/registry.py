@@ -1930,6 +1930,26 @@ TOOL_SCHEMAS.extend([
         _ELEMENT_ID_PARAMETERS,
     ),
     _route_read_tool(
+        "get_model_trust",
+        "GET /api/v1/intelligence/trust",
+        "Say how complete and how fresh each area of the model is: for every layer "
+        "and element type, how many elements have an owner, a lifecycle, a cost and "
+        "a relationship (each with its denominator) and the newest and median last "
+        "change. Counts only; there is no score. An area with no elements reads "
+        "'nothing recorded'. Pass area (a layer such as 'application' or an element "
+        "type such as 'ApplicationComponent') for one area. State the figures with "
+        "their denominators and the basis returned with them.",
+        {
+            "type": "object",
+            "properties": {
+                "area": {
+                    "type": "string",
+                    "description": "One layer or element type; omit for every area",
+                },
+            },
+        },
+    ),
+    _route_read_tool(
         "search_elements",
         "GET /archimate/api/elements/search",
         "Search ArchiMate elements by name. Returns matching elements "
