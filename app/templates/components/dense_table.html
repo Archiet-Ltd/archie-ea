@@ -73,10 +73,10 @@
        cell states read the same on every matrix. #}
     <div class="matrix-legend flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-2 py-2 text-xs text-muted-foreground" aria-label="Legend">
         {% if legend %}{{ legend }}{% else %}
-        <span class="inline-flex items-center gap-1.5"><span class="not-recorded" aria-hidden="true">·</span> none</span>
-        <span class="inline-flex items-center gap-1.5"><span class="badge badge-sm" aria-hidden="true">value</span> one</span>
-        <span class="inline-flex items-center gap-1.5"><span class="badge badge-neutral badge-sm" aria-hidden="true">n</span> several (count)</span>
-        <span class="inline-flex items-center gap-1.5"><span class="badge badge-warning badge-sm" aria-hidden="true">?</span> not recorded</span>
+        <span class="inline-flex items-center gap-1.5"><span class="text-muted-foreground/60" aria-hidden="true">·</span> none</span>
+        <span class="inline-flex items-center gap-1.5"><span class="inline-flex min-w-6 items-center justify-center rounded-md border px-1.5 py-0.5 text-2xs font-medium tabular-nums border-border bg-muted text-foreground" aria-hidden="true">1</span> one</span>
+        <span class="inline-flex items-center gap-1.5"><span class="inline-flex min-w-6 items-center justify-center rounded-md border px-1.5 py-0.5 text-2xs font-medium tabular-nums border-border bg-secondary text-secondary-foreground" aria-hidden="true">3</span> several, with the count</span>
+        <span class="inline-flex items-center gap-1.5"><span class="inline-flex min-w-6 items-center justify-center rounded-md border px-1.5 py-0.5 text-2xs font-medium tabular-nums border-warning/40 bg-warning/10 text-warning-emphasis" aria-hidden="true">?</span> not recorded</span>
         {% endif %}
     </div>
     {% endif %}
@@ -103,17 +103,17 @@
                'not-recorded' (the answer is unknown, not "none").
    title       optional tooltip text (the names behind a count, for instance). #}
 {% macro matrix_row_header(label, href=None, attrs='') %}
-<th scope="row" class="sticky left-0 z-10 h-12 bg-card px-2 text-left align-middle font-medium text-foreground"{% if attrs %} {{ attrs|safe }}{% endif %}>{% if href %}<a href="{{ href }}" class="hover:text-info">{{ label }}</a>{% else %}{{ label }}{% endif %}</th>
+<th scope="row" class="sticky left-0 z-10 h-12 bg-card px-2 text-left align-middle text-sm font-medium normal-case tracking-normal text-foreground"{% if attrs %} {{ attrs|safe }}{% endif %}>{% if href %}<a href="{{ href }}" class="hover:text-info">{{ label }}</a>{% else %}{{ label }}{% endif %}</th>
 {% endmacro %}
 
 {% macro matrix_cell(state='empty', value=None, title=None, attrs='') %}
 <td class="px-2 text-center align-middle" data-state="{{ state }}"{% if attrs %} {{ attrs|safe }}{% endif %}>
     {%- if state == 'single-value' -%}
-    <span class="badge badge-sm"{% if title %} title="{{ title }}"{% endif %}>{{ value }}</span>
+    <span class="inline-flex min-w-6 items-center justify-center rounded-md border px-1.5 py-0.5 text-2xs font-medium tabular-nums border-border bg-muted text-foreground"{% if title %} title="{{ title }}"{% endif %}>{{ value }}</span>
     {%- elif state == 'multiple-count' -%}
-    <span class="badge badge-neutral badge-sm tabular-nums"{% if title %} title="{{ title }}"{% endif %}>{{ value }}</span>
+    <span class="inline-flex min-w-6 items-center justify-center rounded-md border px-1.5 py-0.5 text-2xs font-medium tabular-nums border-border bg-secondary text-secondary-foreground"{% if title %} title="{{ title }}"{% endif %}>{{ value }}</span>
     {%- elif state == 'not-recorded' -%}
-    <span class="badge badge-warning badge-sm"{% if title %} title="{{ title }}"{% endif %}><span class="sr-only">not recorded</span><span aria-hidden="true">?</span></span>
+    <span class="inline-flex min-w-6 items-center justify-center rounded-md border px-1.5 py-0.5 text-2xs font-medium tabular-nums border-warning/40 bg-warning/10 text-warning-emphasis"{% if title %} title="{{ title }}"{% endif %}><span class="sr-only">not recorded</span><span aria-hidden="true">?</span></span>
     {%- else -%}
     <span class="not-recorded text-muted-foreground/60"{% if title %} title="{{ title }}"{% endif %}><span class="sr-only">none</span><span aria-hidden="true">·</span></span>
     {%- endif -%}
