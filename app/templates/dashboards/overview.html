@@ -1,5 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/dense_table.html' import dense_table %}
+{% from 'components/button.html' import button %}
 {% from 'macros/page_shell.html' import page_shell, section_card %}
 {% from 'components/answer_cascade.html' import answer_cascade %}
 {% block title %}Dashboard{% endblock %}
@@ -46,12 +47,7 @@
             <span class="font-medium">Welcome to {{ config.APP_NAME }}</span>
             <span class="text-muted-foreground"> — <a href="/ai-chat" class="text-info hover:underline">ask the AI architect</a> anytime, no setup needed.</span>
         </p>
-        <button type="button"
-                @click="dismiss()"
-                class="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Dismiss welcome message">
-            <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-        </button>
+        {% call button(variant='ghost', size='icon', class='shrink-0 !h-7 !w-7', on_click='dismiss()', aria_label='Dismiss welcome message') %}<i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>{% endcall %}
     </div>
     {% endif %}
     {% if mode == 'guided' %}

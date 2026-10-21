@@ -3,6 +3,7 @@
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/modal.html' import modal %}
+{% from 'components/button.html' import button %}
 {% from 'components/data_table.html' import data_table, data_table_script with context %}
 
 {% block title %}Risk Register{% endblock %}
@@ -184,10 +185,9 @@
                     {# DEF-002, Capgemini dry-run: naive "k + 's'" pluralised
                        'dependency' to "dependencys". Real plurals. #}
                     <template x-for="k in kinds" :key="k">
-                        <button type="button" @click="kindFilter = (kindFilter === k ? '' : k)"
-                                :class="kindFilter === k ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'"
-                                class="px-2.5 py-1 rounded text-xs font-medium capitalize transition-colors"
-                                x-text="k === 'dependency' ? 'Dependencies' : (k + 's')"></button>
+                        {{ button(variant='ghost', size='sm', class='px-2.5 text-xs capitalize', on_click="kindFilter = (kindFilter === k ? '' : k)",
+                                  attrs_dict={':class': "kindFilter === k ? '!bg-primary !text-primary-foreground hover:!bg-primary/90' : ''",
+                                              'x-text': "k === 'dependency' ? 'Dependencies' : (k + 's')"}) }}
                     </template>
                 </div>
                 <button type="button" @click="openCreate()"
@@ -368,6 +368,7 @@
         <button type="button" data-modal-close="create-risk-modal"
                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
         <button type="button" @click="submit()" :disabled="saving"
+                :aria-label="saving ? 'Saving' : (editingId ? 'Save Changes' : 'Add Risk')"
                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <span x-text="saving ? 'Saving' : (editingId ? 'Save Changes' : 'Add Risk')"></span>
         </button>
@@ -388,10 +389,10 @@
              x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-             @click.self="panelOpen = false"
+             @click.self="panelOpen = false" aria-hidden="true"
              class="fixed inset-0 z-40 bg-overlay/50"></div>
 
-        <div x-show="panelOpen" x-cloak role="dialog" aria-modal="true" aria-label="Risk detail"
+        <div x-show="panelOpen" x-cloak x-trap.inert="panelOpen" role="dialog" aria-modal="true" aria-label="Risk detail" id="risk-detail-panel"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
              x-transition:leave="transition ease-in duration-150"
@@ -435,7 +436,7 @@
                                         <span class="inline-flex items-center px-1.5 py-0 rounded text-2xs font-medium bg-muted text-muted-foreground capitalize mr-1.5" x-text="link.entity_type"></span>
                                         <span :class="link.entity_label ? 'text-foreground' : 'text-destructive-emphasis'" x-text="link.entity_label || ('Deleted ' + link.entity_type + ' (#' + link.entity_id + ')')"></span>
                                     </span>
-                                    <button type="button" @click="removeLink(link.id)" aria-label="Unmap" class="text-xs text-muted-foreground hover:text-destructive-emphasis shrink-0">Unmap</button>
+                                    {{ button(text='Unmap', variant='ghost', size='sm', class='shrink-0 text-xs', on_click='removeLink(link.id)', aria_label='Unmap') }}
                                 </li>
                             </template>
                         </ul>
@@ -444,19 +445,19 @@
 
                     <div x-show="showMapPicker" x-cloak class="mt-3 rounded-md border border-border p-3 space-y-2">
                         <div class="flex gap-2">
-                            <select x-model="linkType" aria-label="Entity type to link" class="h-8 rounded-md border border-input bg-background px-2 text-xs">
+                            <select x-model="linkType" aria-label="Entity type to link" class="h-9 rounded-md border border-input bg-background px-2 text-xs">
                                 <option value="application">Application</option>
                                 <option value="solution">Solution</option>
                                 <option value="programme">Programme</option>
                             </select>
                             <input type="text" x-model="linkSearch" @input.debounce.300ms="searchLinkEntities()"
                                    aria-label="Search entities to link"
-                                   class="flex-1 h-8 rounded-md border border-input bg-background px-2 text-xs"
+                                   class="flex-1 h-9 rounded-md border border-input bg-background px-2 text-xs"
                                    :placeholder="'Search ' + linkType + 's…'">
                         </div>
                         <div x-show="linkResults.length > 0" x-cloak class="max-h-40 overflow-y-auto rounded-md border border-border divide-y divide-border">
                             <template x-for="entity in linkResults" :key="entity.id">
-                                <button type="button" @click="addLink(entity)" class="w-full text-left px-2.5 py-1.5 text-xs hover:bg-accent transition-colors" x-text="entity.name"></button>
+                                <button type="button" @click="addLink(entity)" :aria-label="'Map to ' + entity.name" class="w-full text-left px-2.5 py-1.5 text-xs hover:bg-accent transition-colors" x-text="entity.name"></button>
                             </template>
                         </div>
                     </div>

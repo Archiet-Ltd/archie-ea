@@ -1,6 +1,7 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/dense_table.html' import dense_table %}
+{% from 'components/button.html' import button %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/badge.html' import badge %}
@@ -444,12 +445,11 @@
               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Linked Gap" data-testid="wp-modal-gap-input">
             <p class="mt-1 text-xs text-muted-foreground">
               <span x-show="form.gap_id" x-cloak>Linked: <span x-text="gapName"></span></span>
-              <button type="button" x-show="form.gap_id" x-cloak class="ml-2 underline" @click="form.gap_id = null; gapName = ''; gapQuery = ''">Clear</button>
+              {{ button(text='Clear', variant='link', size='sm', class='ml-2', on_click="form.gap_id = null; gapName = ''; gapQuery = ''", attrs_dict={'x-show': 'form.gap_id', 'x-cloak': ''}) }}
             </p>
             <ul x-show="gapResults.length > 0" x-cloak class="absolute z-20 mt-1 w-full rounded-md border border-border bg-background">
               <template x-for="g in gapResults" :key="g.id">
-                <li><button type="button" class="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
-                  @click="form.gap_id = g.id; gapName = g.name; gapQuery = ''; gapResults = []" x-text="g.name"></button></li>
+                <li>{{ button(variant='ghost', size='sm', class='w-full !justify-start text-left', on_click="form.gap_id = g.id; gapName = g.name; gapQuery = ''; gapResults = []", attrs_dict={'x-text': 'g.name'}) }}</li>
               </template>
             </ul>
           </div>

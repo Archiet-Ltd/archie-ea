@@ -1,6 +1,7 @@
 ﻿{# smoke-coverage-ok: plain-language filter wiring — el.type, pt.type, pt.layer, row.application.type now use |plain_name and |plain_layer filters #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/dense_table.html' import dense_table %}
+{% from 'components/button.html' import button %}
 {% from 'components/page_header.html' import page_header %}
 
 {# DEF-032, Capgemini dry-run: the browser tab title said "Requirements
@@ -182,6 +183,7 @@
                 type="button"
                 @click="gapOpen = !gapOpen"
                 :aria-expanded="gapOpen.toString()"
+                :aria-label="gapOpen ? 'Hide gap panel' : 'Show gap panel'"
                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
             >
                 <i data-lucide="list-tree" class="h-4 w-4"></i>
@@ -231,18 +233,13 @@
        one click away for anyone who wants the flow view. #}
     <div class="flex items-center gap-2">
         <div class="inline-flex rounded-lg border border-border p-1 bg-muted/30" x-data="{ view: 'matrix' }">
-            <button type="button" @click="view = 'sankey'; document.getElementById('sankey-view').style.display = ''; document.getElementById('matrix-view').style.display = 'none'; if (window.createTraceabilitySankey) window.createTraceabilitySankey('#sankey-container', '/architecture/api/traceability/sankey?direction={{ direction }}&plateau={{ current_plateau or '' }}');"
-                    :class="view === 'sankey' ? 'bg-background text-foreground' : 'text-muted-foreground'"
-                    class="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors">
-                <i data-lucide="git-merge" class="h-4 w-4" aria-hidden="true"></i>
-                Sankey
-            </button>
-            <button type="button" @click="view = 'matrix'; document.getElementById('sankey-view').style.display = 'none'; document.getElementById('matrix-view').style.display = '';"
-                    :class="view === 'matrix' ? 'bg-background text-foreground' : 'text-muted-foreground'"
-                    class="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors">
-                <i data-lucide="table" class="h-4 w-4" aria-hidden="true"></i>
-                Matrix
-            </button>
+            {% set _sankey_url = '/architecture/api/traceability/sankey?direction=' ~ direction ~ '&plateau=' ~ (current_plateau or '') %}
+            {% call button(variant='ghost', size='sm', class='gap-2',
+                           on_click="view = 'sankey'; document.getElementById('sankey-view').style.display = ''; document.getElementById('matrix-view').style.display = 'none'; if (window.createTraceabilitySankey) window.createTraceabilitySankey('#sankey-container', '" ~ _sankey_url ~ "');",
+                           attrs_dict={':class': "view === 'sankey' ? '!bg-background !text-foreground' : ''"}) %}<i data-lucide="git-merge" class="h-4 w-4" aria-hidden="true"></i>Sankey{% endcall %}
+            {% call button(variant='ghost', size='sm', class='gap-2',
+                           on_click="view = 'matrix'; document.getElementById('sankey-view').style.display = 'none'; document.getElementById('matrix-view').style.display = '';",
+                           attrs_dict={':class': "view === 'matrix' ? '!bg-background !text-foreground' : ''"}) %}<i data-lucide="table" class="h-4 w-4" aria-hidden="true"></i>Matrix{% endcall %}
         </div>
     </div>
 
