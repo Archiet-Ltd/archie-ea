@@ -23,6 +23,7 @@ against the ``archimate_elements`` table.
 
 from app.utils import safe_xml  # untrusted XML: entity-expansion safe
 import logging
+import uuid
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional, Union
 
@@ -221,12 +222,19 @@ class ArchiMateImportService:
         self,
         content: Union[bytes, str],
         strategy: str = "skip_duplicates",
+        *,
+        source_ref: Optional[str] = None,
+        source_label: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Import an OEF document under ``strategy``.
 
         Raises ``ImportRequestError`` for an unknown strategy, an oversized,
         empty or malformed document, or one with no importable elements --
         all before anything is written.
+
+        Provenance parameters:
+        - source_ref: import batch or run id (e.g., ArchitectureModel id)
+        - source_label: uploaded file name
         """
         if strategy not in STRATEGIES:
             raise ImportRequestError(
@@ -235,7 +243,12 @@ class ArchiMateImportService:
         parsed = self.load(content)
         if not parsed["elements"]:
             raise ImportRequestError("No valid elements found in the XML file.")
-        result = self.execute_import(parsed, strategy=strategy)
+        result = self.execute_import(
+            parsed,
+            strategy=strategy,
+            source_ref=source_ref or uuid.uuid4().hex,
+            source_label=source_label,
+        )
         return {"model_name": parsed.get("model_name", ""), **result}
 
     # ------------------------------------------------------------------
@@ -441,12 +454,28 @@ class ArchiMateImportService:
                     else None
                 )
 
+                rel_props: Dict[str, str] = {}
+                rel_props_container = rel.find(_tag("properties"))
+                if rel_props_container is not None:
+                    for prop in rel_props_container.findall(_tag("property")):
+                        pd_ref = prop.get("propertyDefinitionRef", "")
+                        value_el = prop.find(_tag("value"))
+                        value = (
+                            value_el.text.strip()
+                            if value_el is not None and value_el.text
+                            else ""
+                        )
+                        key = property_defs.get(pd_ref, pd_ref)
+                        if key:
+                            rel_props[key] = value
+
                 relationships.append({
                     "identifier": identifier,
                     "type": rel_type,
                     "source": source,
                     "target": target,
                     "description": rel_description,
+                    "properties": rel_props,
                 })
 
         return {
@@ -529,6 +558,7 @@ class ArchiMateImportService:
                 "source": source_ref,
                 "target": target_ref,
                 "description": rel.get("description"),
+                "properties": rel.get("properties") or {},
             }
 
             if source_type is None or target_type is None:
@@ -703,6 +733,9 @@ class ArchiMateImportService:
         self,
         parsed_data: Dict[str, Any],
         strategy: str = "skip_duplicates",
+        *,
+        source_ref: Optional[str] = None,
+        source_label: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create/update ArchiMate elements from parsed OEF data.
 
@@ -864,6 +897,10 @@ class ArchiMateImportService:
                             layer=layer,
                             description=description,
                             architecture_id=model_id,
+                            source_kind="import",
+                            source_ref=source_ref,
+                            source_label=source_label,
+                            source_recorded_at=datetime.now(timezone.utc),
                         )
                         db.session.add(new_elem)
                         _write_properties(new_elem, props, merge=False)
@@ -882,6 +919,10 @@ class ArchiMateImportService:
                         if description is not None:
                             existing.description = description
                         _write_properties(existing, props, merge=True)
+                        existing.source_kind = "import"
+                        existing.source_ref = source_ref
+                        existing.source_label = source_label
+                        existing.source_recorded_at = datetime.now(timezone.utc)
                         db.session.flush()
                         if identifier:
                             id_map[identifier] = {"db_id": existing.id, "type": existing.type}
@@ -972,6 +1013,14 @@ class ArchiMateImportService:
                     ).first()
                     if existing_rel is not None:
                         relationships_skipped += 1
+                        if strategy == "update_existing":
+                            existing_rel.source_kind = "import"
+                            existing_rel.source_ref = source_ref
+                            existing_rel.source_label = source_label
+                            existing_rel.source_recorded_at = datetime.now(timezone.utc)
+                            _write_properties(
+                                existing_rel, rel.get("properties") or {}, merge=True
+                            )
                         stored_rel, rel_status = existing_rel, "skipped"
                     else:
                         new_rel = ArchiMateRelationship(
@@ -983,6 +1032,13 @@ class ArchiMateImportService:
                             # exists, and it must survive the import.
                             description=rel.get("description"),
                             architecture_id=model_id,
+                            source_kind="import",
+                            source_ref=source_ref,
+                            source_label=source_label,
+                            source_recorded_at=datetime.now(timezone.utc),
+                        )
+                        _write_properties(
+                            new_rel, rel.get("properties") or {}, merge=False
                         )
                         db.session.add(new_rel)
                         db.session.flush()

@@ -23,6 +23,7 @@ from flask_login import current_user, login_required
 from sqlalchemy.orm import joinedload
 
 from app import db
+from app.decorators import require_roles
 from app.models.constants import ArchiMateRelationshipType
 from app.modules.architecture.routes.lucidchart_import_routes import (
     register_lucidchart_import_routes,
@@ -7122,6 +7123,7 @@ def api_composer_element_metrics():
 
 @archimate_bp.route("/api/import/oef", methods=["POST"])
 @login_required
+@require_roles("admin", "architect")
 def api_import_oef():
     """Import an OEF XML model and answer in the composer's shape.
 
@@ -7156,8 +7158,16 @@ def api_import_oef():
     else:
         strategy = request.form.get("strategy") or "skip_duplicates"
 
+    # The uploaded file name is the origin recorded on each row
+    source_label = None
+    for field in ("file", "oef_file"):
+        uploaded = request.files.get(field) if request.files else None
+        if uploaded is not None and uploaded.filename:
+            source_label = uploaded.filename
+            break
+
     try:
-        result = ArchiMateImportService().import_xml(content, strategy=strategy)
+        result = ArchiMateImportService().import_xml(content, strategy=strategy, source_label=source_label)
     except ImportRequestError as exc:
         return jsonify({"error": str(exc)}), exc.status_code
 
