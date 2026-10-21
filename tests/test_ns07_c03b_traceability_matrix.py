@@ -140,3 +140,24 @@ def test_matrix_shows_only_the_signed_in_organisations_elements(
     html = client.get("/architecture/traceability").get_data(as_text=True)
     assert "Alpha ledger" in html and "Billing process" in html
     assert "Zulu foreign app" not in html and "Foreign process" not in html
+
+
+def test_matrix_shows_the_true_count_when_there_are_more_than_three(
+        app, db_session, make_org, tenant_ctx, client, login_as):
+    """The data source's per-layer lists are capped at three for display; the cell is the real number."""
+    org_a, _org_b, user = _seed_two_layers(app, db_session, make_org, tenant_ctx)
+    with tenant_ctx(org_a.id):
+        from app.models import ArchiMateElement
+        hub = ArchiMateElement.query.filter_by(name="Beta portal").one()
+        for i in range(6):
+            _rel(db_session, org_a, hub, _el(db_session, org_a, f"Extra process {i}", "BusinessProcess", "business"),
+                 "RealizationRelationship")
+        for i in range(4):
+            _rel(db_session, org_a, _el(db_session, org_a, f"Extra node {i}", "Node", "technology"), hub,
+                 "ServingRelationship")
+    login_as(client, user)
+    resp = client.get("/architecture/traceability")
+    _page, _table, _heads, rows = _cells(resp.get_data(as_text=True))
+    assert rows["Beta portal"]["business"] == ("multiple-count", 6)
+    assert rows["Beta portal"]["technology"] == ("multiple-count", 4)
+    assert rows["Alpha ledger"]["business"] == ("multiple-count", 2)

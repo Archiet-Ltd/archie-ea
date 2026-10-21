@@ -241,6 +241,7 @@
                         {{ matrix_row_header(row.application.name, href=url_for('architect_ui.element_traceability', element_id=row.application.id)) }}
                         {% for key in layer_keys %}
                         {% set items = row.get(key) %}
+                        {% set n = (row.get('counts') or {}).get(key, items | length if items is not none else 0) %}
                         {% if key == 'technology' and direction == 'inverse' %}
                         <td class="px-2 text-center align-middle" data-state="link">
                             <a href="{{ url_for('architect_ui.impact_analysis', element_id=row.application.id) }}"
@@ -251,16 +252,16 @@
                         </td>
                         {% elif items is none %}
                         {{ matrix_cell('not-recorded') }}
-                        {% elif items | length == 0 %}
+                        {% elif n == 0 %}
                         {{ matrix_cell('empty') }}
-                        {% elif items | length == 1 %}
+                        {% elif n == 1 %}
                         {% set only = items[0] %}
                         {% set rel_label = (only.relationship_type | replace('Relationship', '')) if only.relationship_type else '' %}
                         {{ matrix_cell('single-value',
                                        rel_abbrev.get(only.relationship_type, rel_label) if only.relationship_type else '1',
                                        title=only.name ~ (' (' ~ rel_label ~ ')' if rel_label else '')) }}
                         {% else %}
-                        {{ matrix_cell('multiple-count', items | length, title=items | map(attribute='name') | join(', ')) }}
+                        {{ matrix_cell('multiple-count', n, title=(items | map(attribute='name') | join(', ')) ~ (' and ' ~ (n - items | length) ~ ' more' if n > items | length else '')) }}
                         {% endif %}
                         {% endfor %}
                     </tr>
