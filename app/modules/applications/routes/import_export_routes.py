@@ -1006,10 +1006,6 @@ _MAX_DATABASE_ERRORS_IN_A_ROW = 5
 # mean more than one stage (end of life, retiring, retired ...) is deliberately absent:
 # the row is refused and the person chooses the stage.
 _LIFECYCLE_LABELS = {
-    "in production": "2.1 strategic",
-    "production": "2.1 strategic",
-    "live": "2.1 strategic",
-    "in service": "2.1 strategic",
     "strategic": "2.1 strategic",
     "tactical": "2.2 tactical",
     "undetermined": "1. undetermined",

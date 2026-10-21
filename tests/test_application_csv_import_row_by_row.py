@@ -126,8 +126,6 @@ def test_a_row_that_breaks_a_database_limit_is_refused_alone_and_names_the_colum
 @pytest.mark.parametrize(
     "label,stage",
     [
-        ("In production", "2.1 strategic"),
-        ("Production", "2.1 strategic"),
         ("Decommissioned", "5. decommissioned"),
         ("Sunset", "3. sunset"),
         ("2.2 TACTICAL", "2.2 tactical"),
@@ -147,7 +145,9 @@ def test_known_labels_and_canonical_values_are_saved_as_canonical_stages(
 
 
 @pytest.mark.parametrize(
-    "value", ["End of life", "Retiring", "Planning", "operational", "bogus", "z" * 40]
+    "value",
+    ["End of life", "Retiring", "Planning", "operational", "In production", "Production",
+     "Live", "In service", "bogus", "z" * 40],
 )
 def test_any_other_lifecycle_value_is_refused_with_the_allowed_stages(
     client, db_session, make_org, login_as, value
