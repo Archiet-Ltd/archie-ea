@@ -13,6 +13,7 @@
  "standard_version": "2017 (revised 2022)",
  "total_controls": 61,
  "content_level": "identifiers",
+ "addresses_element_types": ["ApplicationComponent", "Node", "SystemSoftware", "TechnologyService"],
  "controls": [
   {
    "control_code": "CC1.1",

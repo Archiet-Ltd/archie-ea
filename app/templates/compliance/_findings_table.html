@@ -1,0 +1,29 @@
+{# Compliance findings, one row per fact. Shared by the compliance page and the saved answer,
+   so both read the same rows from the one findings function. rows: the finding rows. #}
+<div class="overflow-x-auto">
+    <table class="w-full text-sm" data-answer-rows data-findings-rows>
+        <caption class="sr-only">Compliance findings for the frameworks this organisation has adopted</caption>
+        <thead>
+            <tr class="text-left text-muted-foreground border-b border-border">
+                <th scope="col" class="py-2 pr-4 font-medium">Finding</th>
+                <th scope="col" class="py-2 pr-4 font-medium">Framework</th>
+                <th scope="col" class="py-2 pr-4 font-medium">Control</th>
+                <th scope="col" class="py-2 font-medium">Element</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr class="border-t border-border" data-finding="{{ row.finding }}" data-framework="{{ row.framework_code }}" data-control-id="{{ row.control_id or '' }}" data-element-id="{{ row.element_id or '' }}">
+                <td class="py-2 pr-4 text-foreground">
+                    {% if row.finding == 'control_without_element' %}No element is linked to this control
+                    {% elif row.finding == 'control_without_evidence' %}No evidence recorded for this control on this element
+                    {% else %}No {{ row.framework_code }} control covers this element{% endif %}
+                </td>
+                <td class="py-2 pr-4 text-foreground">{{ row.framework_name or row.framework_code or '—' }}</td>
+                <td class="py-2 pr-4 text-foreground">{% if row.control_id %}{{ row.code or '—' }} {{ row.name or '' }}{% else %}—{% endif %}</td>
+                <td class="py-2 text-foreground">{% if row.element_id %}{{ row.element_name or '—' }} <span class="text-muted-foreground">({{ row.element_type }})</span>{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

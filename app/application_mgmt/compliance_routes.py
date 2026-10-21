@@ -57,8 +57,18 @@ def compliance_frameworks_dashboard():
         status = m.implementation_status or "planned"
         mapped_by_status[status] = mapped_by_status.get(status, 0) + 1
 
+    # Findings from the organisation's own model for the frameworks it has adopted: the
+    # compliance answer, shown in place from the one findings function.
+    from app.modules.intelligence.services import answer_envelope
+
+    try:
+        findings = answer_envelope.preview("compliance", {})
+    except answer_envelope.AnswerNotAskable:
+        findings = None
+
     return render_template(
         "compliance/frameworks_dashboard.html",
+        findings=findings,
         frameworks=framework_rows,
         total_frameworks=len(framework_rows),
         total_controls=total_controls,

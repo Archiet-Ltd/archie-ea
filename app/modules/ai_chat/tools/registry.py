@@ -740,7 +740,11 @@ TOOL_SCHEMAS = [
             "(question=risk_propagation, with element_id), and 'which controls protect "
             "X, and which have no evidence recorded' (question=compliance, with "
             "element_id; the controls the element is bound to, each cited, with a "
-            "count of those that have no evidence recorded). Read-only: the answer is "
+            "count of those that have no evidence recorded), and 'what compliance findings "
+            "does our model have' (question=compliance with no element_id: for the "
+            "frameworks the organisation has adopted, controls with no element linked, "
+            "controls with no evidence recorded, and elements no control of the framework "
+            "covers; optional framework_code and finding narrow it). Read-only: the answer is "
             "stored as an immutable snapshot, nothing in the model changes. State "
             "only what the returned rows say, and name the records they name."
         ),
@@ -755,6 +759,15 @@ TOOL_SCHEMAS = [
                 "element_id": {
                     "type": "integer",
                     "description": "The ArchiMate element id (impact, risk_propagation, compliance)",
+                },
+                "framework_code": {
+                    "type": "string",
+                    "description": "compliance findings: only this adopted framework, such as GDPR",
+                },
+                "finding": {
+                    "type": "string",
+                    "enum": ["control_without_element", "control_without_evidence", "element_without_control"],
+                    "description": "compliance findings: only this kind of finding",
                 },
                 "element_ids": {
                     "type": "array",

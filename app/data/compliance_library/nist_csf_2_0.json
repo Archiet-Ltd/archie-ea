@@ -13,6 +13,7 @@
  "standard_version": "2.0",
  "total_controls": 106,
  "content_level": "full",
+ "addresses_element_types": ["ApplicationComponent", "Node", "SystemSoftware", "Device", "TechnologyService"],
  "controls": [
   {
    "control_code": "GV.OC-01",

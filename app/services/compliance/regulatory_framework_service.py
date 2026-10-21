@@ -40,6 +40,13 @@ LIBRARY_DIR = os.path.join(
     "compliance_library",
 )
 
+# The kinds of compliance finding, one fact each.
+FINDING_CONTROL_NO_ELEMENT = "control_without_element"
+FINDING_CONTROL_NO_EVIDENCE = "control_without_evidence"
+FINDING_ELEMENT_NO_CONTROL = "element_without_control"
+FINDING_KINDS = (FINDING_CONTROL_NO_ELEMENT, FINDING_CONTROL_NO_EVIDENCE, FINDING_ELEMENT_NO_CONTROL)
+FINDINGS_LIMIT = 500
+
 
 class RegulatoryFrameworkService:
     """Service for managing regulatory frameworks and compliance controls"""
@@ -974,6 +981,220 @@ class RegulatoryFrameworkService:
             }
             for f in RegulatoryFramework.query.order_by(RegulatoryFramework.code).all()
         ]
+
+    @staticmethod
+    def framework_element_types(code: str) -> List[str]:
+        """The model element types a framework's controls address, from the library pack
+        (``addresses_element_types``). Empty when the pack records none: with no applicability
+        data the library does not guess which elements a framework reaches."""
+        wanted = RegulatoryFrameworkService._normal_code(code)
+        for pack in RegulatoryFrameworkService.load_library_packs():
+            if RegulatoryFrameworkService._normal_code(pack.get("code")) == wanted:
+                return [t for t in (pack.get("addresses_element_types") or []) if isinstance(t, str)]
+        return []
+
+    @staticmethod
+    def compliance_findings(
+        organization_id: int,
+        framework_code: str = None,
+        finding: str = None,
+        limit: int = FINDINGS_LIMIT,
+    ) -> Dict:
+        """Findings from the organisation's own model, for the frameworks it has adopted.
+
+        The one findings function: the compliance page, the answer envelope (and so Ask and
+        the connector) all read it. Three kinds of row, each one fact:
+
+        * ``control_without_element``: an adopted control no element is linked to (nothing
+          realises its Requirement);
+        * ``control_without_evidence``: an adopted control with a linked element and no
+          evidence recorded for it: no evidence link and no verification date on the
+          organisation's control row, unless the control is waived or not applicable;
+        * ``element_without_control``: an element of a type the framework addresses (the
+          library pack's ``addresses_element_types``) that realises none of that framework's
+          controls.
+
+        Every query carries the organisation; adoption, element, link and evidence rows of
+        another organisation are never read. Returns ``rows`` (at most *limit*), ``total``,
+        ``counts`` per kind, ``frameworks`` (adopted codes) and ``truncated``.
+        """
+        from app.models import ArchiMateElement, ArchiMateRelationship
+        from app.models.application_compliance import ApplicationComplianceControl
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.regulatory_framework import FrameworkAdoption
+        from app.modules.compliance.services import control_model_service as cms
+
+        kinds = (FINDING_CONTROL_NO_ELEMENT, FINDING_CONTROL_NO_EVIDENCE, FINDING_ELEMENT_NO_CONTROL)
+        counts = {kind: 0 for kind in kinds}
+        empty = {"rows": [], "total": 0, "counts": counts, "frameworks": [], "truncated": False}
+        if organization_id is None:
+            return empty
+        wanted = {finding} if finding else set(kinds)
+        normal = RegulatoryFrameworkService._normal_code
+
+        adopted = db.session.execute(
+            db.select(RegulatoryFramework)
+            .join(FrameworkAdoption, FrameworkAdoption.framework_id == RegulatoryFramework.id)
+            .where(FrameworkAdoption.organization_id == organization_id)
+            .where(FrameworkAdoption.status == "active")
+            .where(db.or_(FrameworkAdoption.scope.is_(None), FrameworkAdoption.scope != "reference"))
+            .order_by(RegulatoryFramework.code)
+        ).scalars().all()
+        if framework_code:
+            adopted = [f for f in adopted if normal(f.code) == normal(framework_code)]
+        if not adopted:
+            return empty
+
+        controls = db.session.execute(
+            db.select(ComplianceControl)
+            .where(ComplianceControl.framework_id.in_([f.id for f in adopted]))
+            .where(ComplianceControl.is_active.isnot(False))
+            .order_by(ComplianceControl.framework_id, ComplianceControl.id)
+        ).scalars().all()
+        controls_of: Dict[int, list] = {}
+        for control in controls:
+            controls_of.setdefault(control.framework_id, []).append(control)
+        control_ids = [c.id for c in controls]
+
+        # The organisation's Requirement/Constraint element for each adopted control.
+        requirement_of: Dict[int, int] = {}
+        control_set = set(control_ids)
+        for element_id, properties in db.session.execute(
+            db.select(ArchiMateElement.id, ArchiMateElement.custom_properties)
+            .where(ArchiMateElement.organization_id == organization_id)
+            .where(db.func.lower(ArchiMateElement.type).in_((cms.REQUIREMENT_TYPE.lower(), cms.CONSTRAINT_TYPE.lower())))
+            .order_by(ArchiMateElement.id)
+        ).all():
+            bound = (properties or {}).get(cms.CONTROL_PROPERTY)
+            if isinstance(bound, int) and bound in control_set:
+                requirement_of.setdefault(bound, element_id)
+
+        # Realisation links into those Requirements: control id -> [(element id, link id)].
+        control_of_requirement = {v: k for k, v in requirement_of.items()}
+        linked: Dict[int, list] = {}
+        if requirement_of:
+            for link_id, source_id, target_id in db.session.execute(
+                db.select(ArchiMateRelationship.id, ArchiMateRelationship.source_id, ArchiMateRelationship.target_id)
+                .where(ArchiMateRelationship.organization_id == organization_id)
+                .where(db.func.lower(ArchiMateRelationship.type) == cms.REALIZATION)
+                .where(ArchiMateRelationship.target_id.in_(list(requirement_of.values())))
+                .order_by(ArchiMateRelationship.id)
+            ).all():
+                linked.setdefault(control_of_requirement[target_id], []).append((source_id, link_id))
+
+        element_ids = {source for pairs in linked.values() for source, _ in pairs}
+        elements: Dict[int, tuple] = {}
+        if element_ids:
+            for element_id, name, element_type in db.session.execute(
+                db.select(ArchiMateElement.id, ArchiMateElement.name, ArchiMateElement.type)
+                .where(ArchiMateElement.organization_id == organization_id)
+                .where(ArchiMateElement.id.in_(element_ids))
+            ).all():
+                elements[element_id] = (name, element_type)
+
+        # Evidence: the organisation's own control rows, a row per control for the adoption and
+        # a row per application where one was mapped. Same test as the per-element answer.
+        from app.modules.intelligence.services.query_service import IntelligenceQueryService
+
+        exempt = IntelligenceQueryService._EVIDENCE_NOT_REQUIRED
+        mapping_rows = db.session.execute(
+            db.select(ApplicationComplianceControl)
+            .where(ApplicationComplianceControl.organization_id == organization_id)
+            .where(ApplicationComplianceControl.control_id.in_(control_ids))
+        ).scalars().all()
+        application_element: Dict[int, int] = {}
+        application_ids = {r.application_id for r in mapping_rows if r.application_id is not None}
+        if application_ids:
+            application_element = {
+                component_id: element_id
+                for component_id, element_id in db.session.execute(
+                    db.select(ApplicationComponent.id, ApplicationComponent.archimate_element_id)
+                    .where(ApplicationComponent.id.in_(application_ids))
+                    .where(ApplicationComponent.organization_id == organization_id)
+                ).all()
+            }
+        rows_of: Dict[int, list] = {}
+        for mapping in mapping_rows:
+            rows_of.setdefault(mapping.control_id, []).append(mapping)
+
+        def evidenced(control_id: int, element_id: int) -> bool:
+            for mapping in rows_of.get(control_id, ()):
+                if mapping.application_id is not None and application_element.get(mapping.application_id) != element_id:
+                    continue
+                if (
+                    (mapping.evidence_url or "").strip()
+                    or mapping.verified_date is not None
+                    or mapping.implementation_status in exempt
+                ):
+                    return True
+            return False
+
+        findings: List[Dict] = []
+
+        def base(framework, control=None):
+            return {
+                "framework_id": framework.id,
+                "framework_code": framework.code,
+                "framework_name": framework.name,
+                "control_id": control.id if control is not None else None,
+                "code": control.control_code if control is not None else None,
+                "name": control.title if control is not None else None,
+                "element_id": None,
+                "element_name": None,
+                "element_type": None,
+                "relationship_id": None,
+            }
+
+        for framework in adopted:
+            covered: set = set()
+            first_kinds: List[Dict] = []  # with an element
+            no_element: List[Dict] = []
+            for control in controls_of.get(framework.id, []):
+                pairs = linked.get(control.id, [])
+                covered.update(source for source, _ in pairs)
+                if FINDING_CONTROL_NO_ELEMENT in wanted and not pairs:
+                    no_element.append({
+                        **base(framework, control), "finding": FINDING_CONTROL_NO_ELEMENT,
+                        "no_evidence": True,
+                    })
+                if FINDING_CONTROL_NO_EVIDENCE in wanted:
+                    for source, link_id in pairs:
+                        if source in elements and not evidenced(control.id, source):
+                            name, element_type = elements[source]
+                            first_kinds.append({
+                                **base(framework, control), "finding": FINDING_CONTROL_NO_EVIDENCE,
+                                "element_id": source, "element_name": name,
+                                "element_type": element_type, "relationship_id": link_id,
+                                "no_evidence": True,
+                            })
+            addressed = {t.lower() for t in RegulatoryFrameworkService.framework_element_types(framework.code)}
+            if FINDING_ELEMENT_NO_CONTROL in wanted and addressed:
+                for element_id, name, element_type in db.session.execute(
+                    db.select(ArchiMateElement.id, ArchiMateElement.name, ArchiMateElement.type)
+                    .where(ArchiMateElement.organization_id == organization_id)
+                    .where(db.func.lower(ArchiMateElement.type).in_(addressed))
+                    .order_by(ArchiMateElement.id)
+                ).all():
+                    if element_id not in covered:
+                        first_kinds.append({
+                            **base(framework), "finding": FINDING_ELEMENT_NO_CONTROL,
+                            "element_id": element_id, "element_name": name,
+                            "element_type": element_type, "no_evidence": False,
+                        })
+            # Rows that name an element come before the long list of controls nothing is linked
+            # to, so a cut list keeps the most specific findings.
+            findings.extend(first_kinds)
+            findings.extend(no_element)
+
+        for row in findings:
+            counts[row["finding"]] += 1
+        return {
+            "rows": findings[:limit],
+            "total": len(findings),
+            "counts": counts,
+            "frameworks": [f.code for f in adopted],
+            "truncated": len(findings) > limit,
+        }
 
     @staticmethod
     def get_applicable_frameworks(

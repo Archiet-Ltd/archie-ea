@@ -59,6 +59,35 @@
     </div>
     {% endif %}
 
+    {# Findings: controls with no element or no evidence, and elements no control covers, for the
+       frameworks this organisation has adopted. The same rows the saved answer, Ask and the
+       connector return. #}
+    <div class="bg-card text-card-foreground rounded-lg border border-border overflow-hidden" data-compliance-findings>
+        <div class="px-5 py-4 border-b border-border">
+            <h2 class="text-base font-semibold text-foreground">Findings from your model</h2>
+        </div>
+        {% if findings and findings.summary.frameworks %}
+        <div class="px-5 py-4 space-y-3">
+            <p class="text-sm text-foreground" data-findings-summary>
+                {{ findings.summary.controls_without_element }} control{{ '' if findings.summary.controls_without_element == 1 else 's' }} with no element linked,
+                {{ findings.summary.controls_without_evidence }} with no evidence recorded,
+                {{ findings.summary.elements_without_control }} element{{ '' if findings.summary.elements_without_control == 1 else 's' }} no control covers,
+                across {{ findings.summary.frameworks | join(', ') }}.
+            </p>
+            {% if findings.rows %}
+            {% with rows = findings.rows[:100] %}{% include 'compliance/_findings_table.html' %}{% endwith %}
+            <p class="text-sm text-muted-foreground">Showing {{ [findings.rows | length, 100] | min }} of {{ findings.summary.total }}. The findings rest on {{ findings.citations | length }} recorded links and records.</p>
+            {% else %}
+            <p class="text-sm text-muted-foreground">Nothing in the model is missing a control or its evidence for the adopted frameworks.</p>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="px-5 py-8 text-center text-sm text-muted-foreground">
+            <p>Adopt a framework and its findings appear here: controls with no evidence, and elements no control covers.</p>
+        </div>
+        {% endif %}
+    </div>
+
     {# Frameworks table — each row expands in place to list its controls,
        reusing the existing GET /api/compliance/frameworks/<id>/controls
        endpoint (previously reachable only via curl). No new backend. #}

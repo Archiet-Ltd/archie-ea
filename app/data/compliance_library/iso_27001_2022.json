@@ -13,6 +13,7 @@
  "standard_version": "2022",
  "total_controls": 93,
  "content_level": "identifiers",
+ "addresses_element_types": ["ApplicationComponent", "Node", "SystemSoftware", "Device", "TechnologyService"],
  "controls": [
   {
    "control_code": "A.5.1",

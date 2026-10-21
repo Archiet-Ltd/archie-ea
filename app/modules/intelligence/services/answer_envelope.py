@@ -50,6 +50,12 @@ KIND_SET_IMPACT = "set_impact"
 KIND_RISK_PROPAGATION = "risk_propagation"
 KIND_COMPLIANCE = "compliance"
 ANSWER_KINDS = (KIND_IMPACT, KIND_SET_IMPACT, KIND_RISK_PROPAGATION, KIND_COMPLIANCE)
+# The kinds of compliance finding, from the one findings function.
+COMPLIANCE_FINDING_KINDS = (
+    "control_without_element",
+    "control_without_evidence",
+    "element_without_control",
+)
 
 CONFIDENCE_LOWEST_DERIVED = "lowest_derived_row"
 CONFIDENCE_DRAWN_ONLY = "drawn_facts_only"
@@ -156,8 +162,21 @@ def normalise_params(kind: str, raw: Dict[str, Any]) -> Dict[str, Any]:
         raise AnswerParamError("the question must be an object")
 
     if kind == KIND_COMPLIANCE:
-        # Which controls protect this element, and which are unmet: one element, no walk.
-        return {"element_id": _as_int(raw.get("element_id"), "element_id")}
+        if raw.get("element_id") is not None:
+            # Which controls protect this element, and which have no evidence: one element, no walk.
+            return {"element_id": _as_int(raw.get("element_id"), "element_id")}
+        # No element named: the organisation's findings for the frameworks it has adopted,
+        # optionally narrowed to one framework and one kind of finding.
+        framework_code = raw.get("framework_code")
+        if framework_code is not None and (not isinstance(framework_code, str) or not framework_code.strip()):
+            raise AnswerParamError("framework_code must be the code of a framework")
+        finding = raw.get("finding")
+        if finding is not None and finding not in COMPLIANCE_FINDING_KINDS:
+            raise AnswerParamError(f"finding must be one of {list(COMPLIANCE_FINDING_KINDS)}")
+        return {
+            "framework_code": framework_code.strip() if framework_code else None,
+            "finding": finding,
+        }
 
     max_depth = raw.get("max_depth", 3)
     if isinstance(max_depth, bool) or not isinstance(max_depth, int) or not (1 <= max_depth <= 10):
@@ -282,6 +301,9 @@ def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if kind == KIND_COMPLIANCE:
             cite("compliance_control", row.get("control_id"))
             cite("relationship", row.get("relationship_id"))
+            if row.get("finding"):
+                cite("regulatory_framework", row.get("framework_id"))
+                cite("element", row.get("element_id"))
             continue
         if kind == KIND_RISK_PROPAGATION:
             cite("risk", row.get("risk_id"))
@@ -295,7 +317,14 @@ def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             for relationship_id in relation.get("chain") or []:
                 cite("relationship", relationship_id)
             cite("derived_relationship", relation.get("derived_id"))
-    return [{"type": t, "id": i} for (t, i) in sorted(cited)][:MAX_CITATIONS]
+    if kind == KIND_COMPLIANCE:
+        # Findings cite the framework and the element before the many controls, so a cut list
+        # keeps the records a reader can open first.
+        order = {"regulatory_framework": 0, "element": 1, "relationship": 2, "compliance_control": 3}
+        ranked = sorted(cited, key=lambda key: (order.get(key[0], 9), key[0], key[1]))
+    else:
+        ranked = sorted(cited)
+    return [{"type": t, "id": i} for (t, i) in ranked][:MAX_CITATIONS]
 
 
 def build_envelope(
@@ -376,9 +405,42 @@ def build_envelope(
 # --------------------------------------------------------------------------- #
 
 
+def _compute_compliance_findings(params: Dict[str, Any]) -> Dict[str, Any]:
+    """The organisation's findings for its adopted frameworks, from the one findings function
+    in the regulatory framework service."""
+    from app.services.compliance.regulatory_framework_service import RegulatoryFrameworkService
+
+    org_id = current_org_id()
+    if org_id is None:
+        raise AnswerNotAskable(NO_TENANT_CONTEXT_REASON)
+    result = RegulatoryFrameworkService.compliance_findings(
+        org_id, framework_code=params.get("framework_code"), finding=params.get("finding")
+    )
+    rows = list(result["rows"])
+    counts = result["counts"]
+    reasons = ["no_control_evidence"] if counts["control_without_evidence"] or counts["control_without_element"] else []
+    return {
+        "rows": rows,
+        "total": result["total"],
+        "summary": {
+            "unmet": counts["control_without_evidence"] + counts["control_without_element"],
+            "controls_without_element": counts["control_without_element"],
+            "controls_without_evidence": counts["control_without_evidence"],
+            "elements_without_control": counts["element_without_control"],
+            "frameworks": result["frameworks"],
+        },
+        "reasons": reasons,
+        "truncated": result["truncated"],
+        "elements": _resolve_elements_batch([r["element_id"] for r in rows if r.get("element_id")], org_id),
+    }
+
+
 def _compute_compliance(params: Dict[str, Any]) -> Dict[str, Any]:
     """The compliance question, from the one compliance reader. The rows are the
-    controls the element is bound to; ``unmet`` counts those with no evidence recorded."""
+    controls the element is bound to; ``unmet`` counts those with no evidence recorded.
+    With no element named, the rows are the organisation's findings."""
+    if "element_id" not in params:
+        return _compute_compliance_findings(params)
     result = IntelligenceQueryService.compliance_for_element(params["element_id"])
     reasons = list(result.get("reasons") or [])
     if NO_TENANT_CONTEXT_REASON in reasons:
@@ -477,6 +539,15 @@ def ask_and_store(kind: str, raw_params: Dict[str, Any], *, user_id: Optional[in
     db.session.add(record)
     db.session.commit()
     return record
+
+
+def preview(kind: str, raw_params: Dict[str, Any]) -> Dict[str, Any]:
+    """The envelope for the caller's active organisation without storing it: the same rows,
+    citations and summary ``ask_and_store`` would save, for a page that shows them in place."""
+    if current_org_id() is None:
+        raise AnswerNotAskable(NO_TENANT_CONTEXT_REASON)
+    params = normalise_params(kind, raw_params)
+    return build_envelope(kind, params, _compute(kind, params))
 
 
 def open_answer(address: str):

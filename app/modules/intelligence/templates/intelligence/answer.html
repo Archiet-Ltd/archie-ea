@@ -53,6 +53,8 @@
 } %}
 {% if kind == 'risk_propagation' %}
     {% set heading = 'Risks that reach ' ~ name_of(answer, answer.params.element_id) %}
+{% elif kind == 'compliance' and not answer.params.element_id %}
+    {% set heading = 'Compliance findings' %}
 {% elif kind == 'compliance' %}
     {% set heading = 'Controls that protect ' ~ name_of(answer, answer.params.element_id) %}
 {% elif kind == 'set_impact' %}
@@ -109,13 +111,20 @@
     {% endfor %}
 
     {% if not answer.rows %}
-        {% if kind == 'compliance' %}
+        {% if kind == 'compliance' and not answer.params.element_id %}
+            {{ empty_state(icon='shield-check', title='No compliance findings recorded', description='Either no framework is adopted yet, or nothing in the model is missing a control or its evidence. That is what is recorded today, not a statement that everything is covered.') }}
+        {% elif kind == 'compliance' %}
             {{ empty_state(icon='shield-check', title='No control is bound to this yet', description='Nothing is recorded as protecting this element. That is what is recorded today, not a statement that nothing applies.') }}
         {% elif kind == 'risk_propagation' %}
             {{ empty_state(icon='shield-check', title='No open risk reaches this', description='Nothing in the risk register is recorded on this or on anything it depends on. That is what is recorded today, not a guarantee.') }}
         {% else %}
             {{ empty_state(icon='search', title='Nothing is recorded as depending on this yet', description='No connections lead from here. Nothing is missing: there is simply nothing recorded.') }}
         {% endif %}
+    {% elif kind == 'compliance' and not answer.params.element_id %}
+    {% call section_card(title='Findings') %}
+        <p class="text-sm text-foreground" data-compliance-summary>{{ answer.summary.controls_without_element }} control{{ '' if answer.summary.controls_without_element == 1 else 's' }} with no element linked; {{ answer.summary.controls_without_evidence }} with no evidence recorded; {{ answer.summary.elements_without_control }} element{{ '' if answer.summary.elements_without_control == 1 else 's' }} no control covers.</p>
+        {% with rows = answer.rows %}{% include 'compliance/_findings_table.html' %}{% endwith %}
+    {% endcall %}
     {% elif kind == 'compliance' %}
     {% call section_card(title='Controls') %}
         <p class="text-sm text-foreground" data-compliance-summary>{{ answer.summary.total }} control{{ '' if answer.summary.total == 1 else 's' }} bound; {{ answer.summary.unmet }} with no evidence recorded.</p>

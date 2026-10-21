@@ -13,6 +13,7 @@
  "standard_version": "2016/679",
  "total_controls": 99,
  "content_level": "titles",
+ "addresses_element_types": ["ApplicationComponent", "DataObject", "Node"],
  "controls": [
   {
    "control_code": "Art. 1",

@@ -367,7 +367,8 @@ def test_a_malformed_compliance_question_is_refused(app, db_session, make_org):
     org = make_org("malformed")
     node, _control = _linked_estate(app, db_session, org)
     assert _in_org(app, org.id, lambda: envelope.ask_and_store("compliance", {"element_id": node.id})).rows
-    for params in ({}, {"element_id": "x"}, {"element_id": -1}):
+    # No element at all is the findings question, not a malformed one (see test_compliance_findings).
+    for params in ({"element_id": "x"}, {"element_id": -1}):
         with pytest.raises(envelope.AnswerParamError):
             _in_org(app, org.id, lambda p=params: envelope.ask_and_store("compliance", p))
 

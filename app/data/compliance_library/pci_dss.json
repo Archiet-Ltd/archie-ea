@@ -13,6 +13,7 @@
  "standard_version": "4.0",
  "total_controls": 12,
  "content_level": "identifiers",
+ "addresses_element_types": ["ApplicationComponent", "Node", "SystemSoftware", "Device"],
  "controls": [
   {
    "control_code": "Req. 1",
