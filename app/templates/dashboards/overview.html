@@ -168,7 +168,7 @@
     <section aria-labelledby="architecture-health-heading" class="rounded-lg border border-border bg-card" data-testid="architecture-health">
         <div class="flex items-center justify-between border-b border-border px-4 py-2">
             <h2 id="architecture-health-heading" class="text-base font-semibold text-foreground">Architecture health</h2>
-            <span class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">What the score is weighted from</span>
+            <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">What the score is weighted from</span>
         </div>
         <div class="grid grid-cols-2 gap-px bg-border md:grid-cols-4">
             {% for key, label in [
@@ -341,7 +341,7 @@
             <div>
             <header class="flex items-center justify-between border-b border-border px-4 py-2">
                 <h2 id="executive-summary-heading" class="text-base font-semibold text-foreground">Executive Summary</h2>
-                <span class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">Portfolio at a glance</span>
+                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Portfolio at a glance</span>
             </header>
             <p x-show="execLoading" class="px-4 py-3 text-sm text-muted-foreground" aria-busy="true">Loading the summary…</p>
             <p x-show="execError" x-cloak role="status" class="px-4 py-3 text-sm text-destructive-emphasis" x-text="execError"></p>
@@ -366,8 +366,8 @@
                 ('ArchiMate elements', nav_stats.elements|dash, 'cto-kpi-elements', '/architecture/dashboard')
             ] %}
             <a href="{{ href }}" data-slot="card" class="rounded-lg border border-border bg-card p-4 transition-colors hover:border-ring">
-                <p data-slot="card-description" class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
-                <p data-slot="card-title" class="mt-1 text-[28px] font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
+                <p data-slot="card-description" class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
+                <p data-slot="card-title" class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
             </a>
             {% endfor %}
         </section>
@@ -375,7 +375,7 @@
         <section aria-labelledby="risk-arb-heading" class="rounded-lg border border-border bg-card">
             <div class="flex items-center justify-between border-b border-border px-4 py-2">
                 <h2 id="risk-arb-heading" class="text-base font-semibold text-foreground">Portfolio risk and ARB pipeline</h2>
-                <span class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">Open items by level and status</span>
+                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Open items by level and status</span>
             </div>
             <div class="grid grid-cols-1 gap-px bg-border md:grid-cols-2">
                 <div class="bg-card">
@@ -433,8 +433,8 @@
                 ('Solutions', nav_stats.solutions|dash, 'cfo-kpi-solutions', '/solutions/')
             ] %}
             <a href="{{ href }}" data-slot="card" class="rounded-lg border border-border bg-card p-4 transition-colors hover:border-ring">
-                <p data-slot="card-description" class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
-                <p data-slot="card-title" class="mt-1 text-[28px] font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
+                <p data-slot="card-description" class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
+                <p data-slot="card-title" class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
             </a>
             {% endfor %}
         </section>
@@ -443,7 +443,7 @@
             <div class="flex items-center justify-between border-b border-border px-4 py-2">
                 <h2 id="tco-heading" class="text-base font-semibold text-foreground">Total cost of ownership</h2>
                 {% if cfo.get('total_tco') %}
-                <span class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">Total ${{ '{:,.0f}'.format(cfo.get('total_tco')) }}</span>
+                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">Total ${{ '{:,.0f}'.format(cfo.get('total_tco')) }}</span>
                 {% endif %}
             </div>
             <table class="dense-table w-full border-collapse text-sm" data-testid="cfo-tco-by-category">
@@ -486,7 +486,7 @@
         <section aria-labelledby="layer-heading" class="rounded-lg border border-border bg-card">
             <div class="flex items-center justify-between border-b border-border px-4 py-2">
                 <h2 id="layer-heading" class="text-base font-semibold text-foreground" x-text="(_layers[activeRole]||{label:''}).label + ' layer'"></h2>
-                <span class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums"><span x-text="((c) => c == null ? '—' : c.toLocaleString())((_layers[activeRole]||{}).count)"></span> elements</span>
+                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums"><span x-text="((c) => c == null ? '—' : c.toLocaleString())((_layers[activeRole]||{}).count)"></span> elements</span>
             </div>
             <div class="px-4 py-3">
                 <p class="max-w-2xl text-sm text-muted-foreground" x-text="(_layers[activeRole]||{blurb:''}).blurb"></p>
