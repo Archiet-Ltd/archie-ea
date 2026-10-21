@@ -263,3 +263,35 @@ def test_raw_modal_leaves_a_popover_and_a_menu_beside_their_trigger():
 def test_raw_modal_leaves_a_backdrop_hidden_from_assistive_technology():
     src = '<div x-show="sidebarOpen" aria-hidden="true" class="fixed inset-0 bg-overlay/50"></div>'
     assert run(cdp.rule_raw_modal, src) == []
+
+
+def _banned_rules(src):
+    return [v for v in run(cdp.rule_banned_pattern, src) if v.rule == "BANNED_PATTERN"]
+
+
+def test_banned_engine_is_caught_by_its_use_after_a_class_rename():
+    src = ('<div class="archimate-diagram">graph TD; A-->B</div>\n'
+           '<script>mermaid.run({ querySelector: ".archimate-diagram" });</script>')
+    hits = _banned_rules(src)
+    assert hits and "mermaid used" in hits[0].matched_text
+
+
+def test_banned_engine_is_caught_by_its_script_tag():
+    src = '<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>'
+    assert _banned_rules(src)
+
+
+def test_banned_engine_mentioned_only_in_a_jinja_comment_is_not_use():
+    src = "{# We replaced mermaid.run(...) with the Composer drawing. #}<div class=\"p-4\">x</div>"
+    assert _banned_rules(src) == []
+
+
+def test_d3_sankey_and_chord_calls_are_caught():
+    assert _banned_rules("<script>const s = d3.sankey().nodeWidth(10);</script>")
+    conf = dict(CONFORMANCE, banned_patterns=CONFORMANCE["banned_patterns"] + ["d3-chord"])
+    ctx = cdp.Ctx(conf, "app/templates/x.html")
+    assert cdp.rule_banned_pattern("<script>const c = d3.chord()(matrix);</script>", ctx)
+
+
+def test_an_engine_that_is_not_banned_is_left_alone():
+    assert _banned_rules("<script>const c = d3.chord()(matrix);</script>") == []
