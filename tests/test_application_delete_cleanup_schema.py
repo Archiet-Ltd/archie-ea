@@ -7,9 +7,10 @@ from app.modules.applications.routes import _helpers
 
 @pytest.fixture
 def cleanup(app, db_session):
-    _helpers._reset_schema_cache()
+    _reset = getattr(_helpers, "_reset_schema_cache", lambda: None)
+    _reset()
     yield db_session
-    _helpers._reset_schema_cache()
+    _reset()
 
 
 def _capture(db_session):
