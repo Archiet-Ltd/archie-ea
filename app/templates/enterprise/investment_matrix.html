@@ -158,7 +158,13 @@
 // themselves never need to be JSON-serialized.
 window.__investmentBubbleData = [
     {% for cap in capabilities|default([]) %}
-    {% set gap = cap.maturity_gap if cap.maturity_gap is not none else ((cap.target_maturity_level|default(3, true)) - (cap.current_maturity_level|default(1, true))) %}
+    {% if cap.maturity_gap is not none %}
+        {% set gap = cap.maturity_gap %}
+    {% elif cap.target_maturity_level is not none and cap.current_maturity_level is not none %}
+        {% set gap = cap.target_maturity_level - cap.current_maturity_level %}
+    {% else %}
+        {% set gap = none %}
+    {% endif %}
     {
         name: {{ cap.name|default('Unnamed Capability', true)|tojson }},
         strategic_importance: {{ (cap.strategic_importance|default('medium', true))|lower|tojson }},

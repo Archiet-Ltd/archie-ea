@@ -160,9 +160,15 @@
                         </td>
                         <td class="p-4 text-muted-foreground">{{ item.domain }}</td>
                         <td class="p-4">
+                            {% if item.maturity_gap is not none %}
                             <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold {% if item.maturity_gap > 1 %}border-destructive text-destructive{% else %}border-muted text-muted-foreground{% endif %}">
                                 L{{ item.maturity_gap }} Gap
                             </span>
+                            {% else %}
+                            <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-muted text-muted-foreground">
+                                Maturity not recorded
+                            </span>
+                            {% endif %}
                         </td>
                         <td class="p-4">
                             <div class="flex items-center space-x-2">

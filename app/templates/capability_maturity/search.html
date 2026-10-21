@@ -187,15 +187,21 @@
                             {% endif %}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            {% if cap.maturity_gap and cap.maturity_gap > 0 %}
+                            {% if cap.maturity_gap is not none %}
+                                {% if cap.maturity_gap > 0 %}
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
  {% if cap.maturity_gap > 2 %}bg-destructive/10 text-destructive-emphasis
  {% elif cap.maturity_gap > 1 %}bg-warning/10 text-warning-emphasis
  {% else %}bg-primary/10 text-primary{% endif %}">
                                     {{ cap.maturity_gap }}
                                 </span>
+                                {% else %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">
+                                    0
+                                </span>
+                                {% endif %}
                             {% else %}
-                                <span class="text-muted-foreground">—</span>
+                                <span class="text-muted-foreground">Maturity not recorded</span>
                             {% endif %}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">

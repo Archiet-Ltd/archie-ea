@@ -98,10 +98,14 @@
                         <div class="flex justify-between">
                             <dt class="text-sm font-medium text-muted-foreground">Maturity Gap:</dt>
                             <dd class="text-sm text-foreground">
-                                {% if capability.maturity_gap and capability.maturity_gap > 0 %}
-                                    {{ capability.maturity_gap }}
+                                {% if capability.maturity_gap is not none %}
+                                    {% if capability.maturity_gap > 0 %}
+                                        {{ capability.maturity_gap }}
+                                    {% else %}
+                                        No Gap
+                                    {% endif %}
                                 {% else %}
-                                    No Gap
+                                    Maturity not recorded
                                 {% endif %}
                             </dd>
                         </div>
