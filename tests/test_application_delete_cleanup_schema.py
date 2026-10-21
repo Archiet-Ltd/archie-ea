@@ -61,3 +61,13 @@ def test_present_tables_still_cleaned(cleanup):
     _helpers._cascade_delete_application(987654)
     left = cleanup.execute(text("SELECT count(*) FROM data_flows")).scalar()
     assert left == 1
+
+
+def test_schema_qualified_statement_is_not_skipped(cleanup):
+    cleanup.execute(text("DROP TABLE IF EXISTS delclean_probe CASCADE"))
+    cleanup.execute(text("CREATE TABLE delclean_probe (id serial primary key, app_id integer)"))
+    cleanup.execute(text("INSERT INTO delclean_probe (app_id) VALUES (987654), (1)"))
+    stmt = "DELETE FROM public.delclean_probe WHERE app_id = :id"
+    assert _helpers._statement_targets_exist(stmt) is True
+    cleanup.execute(text(stmt), {"id": 987654})
+    assert cleanup.execute(text("SELECT count(*) FROM delclean_probe")).scalar() == 1

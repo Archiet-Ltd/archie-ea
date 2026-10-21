@@ -193,7 +193,7 @@ def _statement_targets_exist(stmt):
     query is issued against a missing table or column."""
     import re
 
-    m = re.match(r"\s*DELETE FROM (\w+)", stmt)
+    m = re.match(r"\s*DELETE FROM (\w+)\s", stmt)
     if not m:
         return True
     columns = _live_table_columns(m.group(1))
