@@ -23,6 +23,7 @@ from app.extensions import db
 from app.models.vendor_organization import VendorOrganization
 from app.utils.pagination import safe_int_arg
 from app.middleware.tenant_decorators import (
+    platform_admin_required,
     record_vendor_editor,
     shared_vendor_edit_required,
 )
@@ -62,6 +63,7 @@ def vendor_dashboard():
 @login_required
 @require_roles("admin", "architect")
 @audit_log("vendor_create")
+@platform_admin_required
 def create_vendor():
     """Create new vendor (admin/architect only) with validation."""
     if request.method == "GET":
@@ -374,6 +376,7 @@ def api_list_vendors():
 @login_required
 @require_roles("admin", "architect")
 @audit_log("vendor_api_create")
+@platform_admin_required
 def api_create_vendor():
     """API: Create vendor with validation and duplicate prevention."""
     data = request.get_json() or {}

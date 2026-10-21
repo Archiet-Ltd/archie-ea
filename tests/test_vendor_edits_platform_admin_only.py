@@ -247,30 +247,96 @@ def test_platform_admin_can_still_delete(app, db_session, client, login_as, worl
     assert _vendor_row(db_session, world["vendor_id"]) is None
 
 
-@pytest.mark.parametrize("kind", ["api_v1", "management_api", "unified_api", "chat", "page",
-                                  "dashboard_page"])
-def test_architect_can_still_create_a_vendor(
-        app, db_session, client, login_as, world, kind):
-    name = f"Created {kind} {uuid.uuid4().hex[:6]}"
+@pytest.mark.parametrize("approval_on", [False, True])
+def test_architect_is_refused_chat_create_and_nothing_is_created_or_queued(
+        app, db_session, client, login_as, world, monkeypatch, approval_on):
+    monkeypatch.setitem(app.config, "REQUIRE_AI_APPROVAL", approval_on)
+    name = f"Refused chat {uuid.uuid4().hex[:6]}"
+    n = _count(db_session)
+    approvals = db_session.execute(text("select count(*) from ai_chat_crud_approvals")).scalar()
+    _login(db_session, client, login_as, world["architect_id"])
+    resp = client.post(f"{D}/create-vendor", json={"name": name},
+                       headers={"X-CSRFToken": "test"})
+    assert resp.status_code == 403, resp.get_data(as_text=True)[:300]
+    assert REFUSAL in resp.get_data(as_text=True)
+    db_session.expire_all()
+    assert _count(db_session) == n
+    assert db_session.execute(
+        text("select count(*) from ai_chat_crud_approvals")).scalar() == approvals
+
+
+def test_architect_is_refused_the_create_vendor_tool(app, db_session, world):
+    from app.modules.ai_chat.tools.executor import ToolExecutor
+
+    name = f"Refused tool {uuid.uuid4().hex[:6]}"
+    n = _count(db_session)
+    result = ToolExecutor(user_id=world["architect_id"])._tool_create_vendor({"name": name})
+    assert result["success"] is False
+    assert REFUSAL in result["error"]
+    assert _count(db_session) == n
+
+
+def test_service_create_is_refused_for_an_organisation_user_whatever_the_caller(
+        app, db_session, world):
+    """The choke point: a replay or any other caller gets the same refusal."""
+    from app.modules.ai_chat.services.ai_data_interaction_service import (
+        AIDataInteractionService,
+    )
+
+    n = _count(db_session)
+    result = AIDataInteractionService(user_id=world["architect_id"]).create_vendor(
+        {"name": f"Refused svc {uuid.uuid4().hex[:6]}"})
+    assert result["success"] is False and result.get("forbidden") is True
+    assert _count(db_session) == n
+
+
+def test_platform_admin_creates_through_the_chat_and_the_tool(
+        app, db_session, client, login_as, world):
+    from app.modules.ai_chat.tools.executor import ToolExecutor
+
+    chat_name = f"Created chat {uuid.uuid4().hex[:6]}"
+    tool_name = f"Created tool {uuid.uuid4().hex[:6]}"
+    n = _count(db_session)
+    _login(db_session, client, login_as, world["platform_id"])
+    resp = client.post(f"{D}/create-vendor", json={"name": chat_name},
+                       headers={"X-CSRFToken": "test"})
+    assert resp.status_code < 400, resp.get_data(as_text=True)[:300]
+    result = ToolExecutor(user_id=world["platform_id"])._tool_create_vendor({"name": tool_name})
+    assert result["success"] is True, result
+    db_session.expire_all()
+    assert _count(db_session) == n + 2
+
+
+def test_architect_create_is_refused_at_queue_time_and_replay(
+        app, db_session, client, login_as, world, monkeypatch):
+    """A queued create from a platform admin is refused again at replay when
+    the approver is not a platform admin."""
+    monkeypatch.setitem(app.config, "REQUIRE_AI_APPROVAL", True)
+    from app.modules.ai_chat.services.ai_data_interaction_service import (
+        AIDataInteractionService,
+    )
+
+    n = _count(db_session)
+    forbidden = AIDataInteractionService(user_id=world["tenant_admin_a_id"]).create_vendor(
+        {"name": "Replay Probe Vendor"})
+    assert forbidden["success"] is False and forbidden.get("forbidden") is True
+    assert _count(db_session) == n
+
+
+@pytest.mark.parametrize("path,as_form", [
+    ("/api/v1/vendors/", False),
+    ("/api/vendors/", False),
+    ("/vendor-management/api/vendors", False),
+    ("/vendor-management/create", False),
+    ("/applications/vendors/create", True),
+    ("/dashboard/applications/vendors/create", True),
+])
+def test_page_and_api_creates_stay_platform_admin_only(
+        app, db_session, client, login_as, world, path, as_form):
+    """Pins today's policy: a vendor created here is visible to every
+    organisation, so opening these is a separate decision."""
     n = _count(db_session)
     _login(db_session, client, login_as, world["architect_id"])
-    h = {"X-CSRFToken": "test"}
-    if kind == "api_v1":
-        resp = client.post("/api/v1/vendors/", json={"name": name}, headers=h)
-    elif kind == "management_api":
-        resp = client.post("/vendor-management/api/vendors", json={"name": name}, headers=h)
-    elif kind == "unified_api":
-        resp = client.post("/api/vendors/", json={"name": name}, headers=h)
-    elif kind == "chat":
-        resp = client.post(f"{D}/create-vendor", json={"name": name}, headers=h)
-    elif kind == "page":
-        resp = client.post("/applications/vendors/create", data={"name": name,
-                           "vendor_type": "software_vendor"}, headers=h)
-    else:
-        resp = client.post("/dashboard/applications/vendors/create",
-                           data={"name": name, "is_active": "y"}, headers=h)
-    assert resp.status_code < 400, (kind, resp.status_code, resp.get_data(as_text=True)[:300])
-    db_session.expire_all()
-    assert _count(db_session) == n + 1
-    assert db_session.execute(text("select count(*) from vendor_organizations where name=:n"),
-                              {"n": name}).scalar() == 1
+    resp = _send(client, "post", path, {"name": "Probe Vendor"}, as_form)
+    assert resp.status_code == 403, (path, resp.status_code)
+    assert _count(db_session) == n

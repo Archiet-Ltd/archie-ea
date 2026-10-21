@@ -27,6 +27,7 @@ from app.utils.pagination import safe_int_arg
 from app.utils.route_guards import require_entity
 from app.models.vendor_analysis import OptionsAnalysis
 from app.middleware.tenant_decorators import (
+    platform_admin_required,
     record_vendor_editor,
     shared_vendor_edit_required,
 )
@@ -250,6 +251,7 @@ def search_vendors():
 @require_roles("admin", "architect")
 @audit_log("vendor_create")
 @rate_limit(20, "1h")
+@platform_admin_required
 def create_vendor():
     """Create new vendor organization with validation and duplicate prevention."""
     from datetime import datetime

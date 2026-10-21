@@ -377,6 +377,7 @@ def vendor_catalog():
 @unified_vendors_bp.route("/create", methods=["GET", "POST"])
 @login_required
 @require_roles("admin", "architect")
+@platform_admin_required
 def create_vendor():
     """Create new vendor - renders simple create form."""
     return render_template(

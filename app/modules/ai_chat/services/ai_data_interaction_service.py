@@ -366,8 +366,8 @@ class AIDataInteractionService:
             return {"success": False, "error": str(e), "operation": "update_application"}
 
     def _vendor_edit_refusal(self, operation: str) -> Optional[Dict[str, Any]]:
-        """Refuse an edit or delete of a shared vendor row unless the acting
-        user is a platform administrator. Creating a vendor is not gated.
+        """Refuse a create, edit or delete of a shared vendor row unless the
+        acting user is a platform administrator.
 
         The acting user is the signed-in user, or the approver during an
         approval replay. No acting user means refuse: nothing that edits a
@@ -398,6 +398,9 @@ class AIDataInteractionService:
         Returns:
             Operation result with success status and created vendor
         """
+        forbidden = self._vendor_edit_refusal("create_vendor")
+        if forbidden:
+            return forbidden
         try:
             # Basic validation
             if not vendor_data.get("name"):

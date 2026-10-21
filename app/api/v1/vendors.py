@@ -28,6 +28,7 @@ from app.utils.api_response import (
 )
 from app.utils.pagination import safe_int_arg
 from app.middleware.tenant_decorators import (
+    platform_admin_required,
     record_vendor_editor,
     shared_vendor_edit_required,
 )
@@ -202,6 +203,7 @@ def get_vendor(vendor_id):
 @vendors_bp.route("/", methods=["POST"])
 @login_required
 @audit_log("api_vendor_create")
+@platform_admin_required
 def create_vendor():
     """
     Create a new vendor

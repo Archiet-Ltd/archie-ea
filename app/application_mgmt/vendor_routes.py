@@ -131,6 +131,7 @@ def vendors_dashboard():
 
 @application_mgmt.route('/applications/vendors/create', methods=['GET', 'POST'])
 @login_required
+@platform_admin_required
 def create_vendor():
     """Create a new vendor organization."""
     from app.models.vendor.vendor_organization import VendorOrganization

@@ -43,6 +43,16 @@ def _make_user(db_session, org_id):
 # --------------------------------------------------------------- registration
 
 
+def _platform_admin(db_session, org):
+    """Creating a vendor writes a row shared by every organisation, so only a
+    platform administrator may."""
+    from tests.test_platform_admin_route_gates import _user as _gate_user
+
+    user = _gate_user(db_session, org, platform=True)
+    db_session.commit()
+    return user
+
+
 def test_both_tools_registered_with_correct_flags():
     create = TOOL_SCHEMA_BY_NAME.get("create_vendor")
     extract = TOOL_SCHEMA_BY_NAME.get("extract_contract_from_document")
@@ -71,7 +81,7 @@ def test_create_vendor_creates_a_vendor_row(db_session, make_org, tenant_ctx):
     from app.models.vendor.vendor_organization import VendorOrganization
 
     org = make_org("proc")
-    user = _make_user(db_session, org.id)
+    user = _platform_admin(db_session, org)
     name = f"ACME Data {uuid.uuid4().hex[:8]}"
 
     with tenant_ctx(org.id):
@@ -102,7 +112,7 @@ def test_create_vendor_is_shared_reference_data_not_tenant_scoped(
     from app.models.vendor.vendor_organization import VendorOrganization
 
     org_a, org_b = make_org("a"), make_org("b")
-    user_a = _make_user(db_session, org_a.id)
+    user_a = _platform_admin(db_session, org_a)
     name = f"Shared Vendor {uuid.uuid4().hex[:8]}"
 
     with tenant_ctx(org_a.id):

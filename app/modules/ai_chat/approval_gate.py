@@ -85,7 +85,7 @@ def queue_ai_write(operation_type: str, entity_type: str, payload: dict, summary
         action via tag_ai_action for the 'routine decisions automated'
         metric, mirroring the old decorator's disabled-gate behaviour.
     """
-    if entity_type == "vendor" and operation_type in ("update", "delete"):
+    if entity_type == "vendor" and operation_type in ("create", "update", "delete"):
         # A vendor row is shared by every organisation: refuse at queue time
         # for anyone but a platform administrator (the replay refuses again).
         from app.middleware.tenant_decorators import (
