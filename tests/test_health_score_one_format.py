@@ -255,7 +255,11 @@ def _force_health_score(monkeypatch, composite, components):
     def answer(self):
         return {
             "composite_score": composite,
-            "components": components,
+            "components": {
+                key: {"key": key, "label": key.replace("_", " "), "value": value,
+                      "basis": None, "source": None, "as_of": None}
+                for key, value in components.items()
+            },
             "unavailable_components": sorted(key for key, value in components.items() if value is None),
         }
 

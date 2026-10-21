@@ -187,8 +187,9 @@
                 ('capability_coverage', 'Capability Coverage'),
                 ('governance', 'Governance'),
             ] %}
-            {% set val = (health_components or {}).get(key) %}
-            <div class="bg-card px-4 py-3">
+            {% set component = (health_components or {}).get(key) or {} %}
+            {% set val = component.get('value') %}
+            <div class="bg-card px-4 py-3"{% if component.get('basis') %} title="{{ component.basis }}"{% endif %}>
                 <p class="text-xs text-muted-foreground">{{ label }}</p>
                 <p class="mt-1 text-lg font-semibold tabular-nums text-foreground">{{ (val ~ "%") if val is not none else "—" }}</p>
                 {% if key == 'phase_maturity' %}

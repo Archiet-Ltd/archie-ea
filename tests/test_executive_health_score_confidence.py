@@ -39,12 +39,26 @@ def test_health_score_withheld_when_only_governance_is_measurable(
 
         result = ExecutiveDashboardService()._get_health_score()
 
-        assert result["components"]["governance"] is not None
-        assert result["components"]["phase_maturity"] is None
-        assert result["components"]["risk_posture"] is None
-        assert result["components"]["capability_coverage"] is None
-        # Governance alone is 10% of the nominal weight - not enough to
-        # stand in for the whole composite.
+        # One unresolved item is not a governance measure at all: nothing
+        # has been decided, so there is no approval rate to speak of.
+        assert result["components"]["governance"]["value"] is None
+        assert result["components"]["phase_maturity"]["value"] is None
+        assert result["components"]["risk_posture"]["value"] is None
+        assert result["components"]["capability_coverage"]["value"] is None
+        assert result["composite_score"] is None
+
+        # A decided item makes governance measurable. It is still 10% of the
+        # nominal weight - not enough to stand in for the whole composite.
+        db_session.add(ARBReviewItem(
+            organization_id=org.id, status="approved", review_number="REV-TEST-002",
+            title="Decided review", review_type="architecture",
+            submitter_id=submitter.id,
+        ))
+        db_session.flush()
+
+        result = ExecutiveDashboardService()._get_health_score()
+
+        assert result["components"]["governance"]["value"] is not None
         assert result["composite_score"] is None
 
 
@@ -70,6 +84,6 @@ def test_health_score_is_reported_when_most_of_the_weight_is_measured(
 
         # phase_maturity (0.4) + risk_posture (0.3) = 0.7 of the weight is
         # measured - enough to report a real composite.
-        assert result["components"]["phase_maturity"] is not None
-        assert result["components"]["risk_posture"] is not None
+        assert result["components"]["phase_maturity"]["value"] is not None
+        assert result["components"]["risk_posture"]["value"] is not None
         assert result["composite_score"] is not None

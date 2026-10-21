@@ -44,6 +44,25 @@ def test_executive_summary_counts_real_open_risks(db_session, make_org, tenant_c
         assert summary["counts"]["low"] == 0
 
 
+def test_executive_summary_error_gives_none(db_session, make_org, monkeypatch, tenant_ctx):
+    """Forced query error gives total is None; overview renders — not 0."""
+    from app.modules.dashboard.v2.services.executive_dashboard_service import (
+        ExecutiveDashboardService,
+    )
+
+    org = make_org("risk-rollup-error")
+    with tenant_ctx(org.id):
+        # Force the Risk.query to raise an exception so the except branch runs
+        def failing_query(*args, **kwargs):
+            raise RuntimeError("Simulated query failure")
+
+        monkeypatch.setattr("app.models.risk.Risk.query", failing_query)  # type: ignore[attr-defined]
+
+        summary = ExecutiveDashboardService()._get_risk_summary()
+        assert summary["total"] is None
+        assert summary["counts"] is None
+
+
 def test_health_scorecard_risk_counts_match_the_risk_register(db_session, make_org, tenant_ctx):
     from app.modules.dashboard.v2.routes.dashboard_views import (
         _assemble_health_scorecard_metrics,
