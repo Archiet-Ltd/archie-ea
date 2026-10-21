@@ -67,7 +67,7 @@
        is rendered once and always; a chip sets openKey, which onSelect() in
        ask.js dispatches on. Chip ids are the contract the smoke journeys drive. #}
     <div class="mx-auto max-w-[760px] space-y-3">
-        <div class="ask-large-input">{{ entity_picker('ask', prompt='Type a team, service or system name', input_class='h-12 w-full rounded-md border border-input bg-background px-4 text-base') }}</div>
+        <div class="ask-large-input" id="ask-question-panel-impact" :id="'ask-question-panel-' + (openKey || 'impact')">{{ entity_picker('ask', prompt='Type a team, service or system name', input_class='h-12 w-full rounded-md border border-input bg-background px-4 text-base') }}</div>
         <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Question">
             {% set chip_labels = {
                 'impact': 'What breaks if it fails?',
@@ -75,7 +75,7 @@
                 'risk': 'What could hurt it?',
                 'portfolio': 'Rationalization status',
                 'programme': "What's changing?",
-                'data': 'What data does it hold?',
+                'data': 'Data it holds',
                 'compliance': 'Regulations and controls',
                 'accountability': "Who's accountable?"
             } %}
@@ -83,33 +83,33 @@
             <button type="button" id="ask-question-{{ question.key }}" data-question="{{ question.key }}"
                     class="inline-flex h-8 items-center rounded-md border px-3 text-13 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     :class="(openKey || 'impact') === '{{ question.key }}' ? 'border-ring bg-muted text-info dark:bg-card' : 'border-input bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground'"
-                    :aria-pressed="(openKey || 'impact') === '{{ question.key }}' ? 'true' : 'false'"
+                    aria-expanded="false" aria-describedby="ask-sentence-{{ question.key }}"
+                    :aria-expanded="(openKey || 'impact') === '{{ question.key }}' ? 'true' : 'false'"
+                    :aria-controls="(openKey || 'impact') === '{{ question.key }}' ? 'ask-question-panel-{{ question.key }}' : null"
                     @click="openKey = '{{ question.key }}'; $nextTick(() => $refs.pickerInput && $refs.pickerInput.focus())">
                 {{ chip_labels[question.key] }}
             </button>
             {% endfor %}
         </div>
         {% for question in questions %}
-        <p class="text-xs text-muted-foreground" x-show="(openKey || 'impact') === '{{ question.key }}'"{% if question.key != 'impact' %} x-cloak{% endif %}>{{ question.before }} <span class="font-mono text-foreground">___</span> {{ question.after }}</p>
+        {# Every question's full sentence is always in the page: drawn for the chosen
+           question, read out (and described to its chip) for the others. #}
+        <p id="ask-sentence-{{ question.key }}" class="text-xs text-muted-foreground sr-only" :class="(openKey || 'impact') === '{{ question.key }}' ? 'not-sr-only' : 'sr-only'">{{ question.before }} <span class="font-mono text-foreground">___</span> {{ question.after }}</p>
         {% endfor %}
     </div>
     <div id="ask-results" aria-busy="false" :aria-busy="busy ? 'true' : 'false'" x-show="answeredKey === 'impact' && state !== 'idle'" x-cloak class="space-y-4">
         <h2 id="ask-results-heading" x-ref="resultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
         {{ impact_states("state === 'loading'") }}
         <div x-show="state === 'ready'" x-cloak>
-            {% call answer_cascade('ask-cascade', question="'What breaks if ' + (centreName || '…') + ' fails or is under-resourced?'", rows='rows', ask='load(node.elementId)', save="Platform.fetch('/api/v1/intelligence/answers', { method: 'POST', body: { question: 'impact', element_id: centreId }, silent: true }).catch(function () {})", row_attrs='data-ask-row', root='centreName') %}
-                {{ derived_note('node.derived') }}
-                {{ why_button('node.key') }}
-                <a :href="twinMapHref(node)" class="inline-flex h-8 items-center justify-center rounded-md px-2 text-13 font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-info">Map</a>
+            {% call answer_cascade('ask-cascade', question="'What breaks if ' + (centreName || '…') + ' fails or is under-resourced?'", rows='rows', ask='load(node.elementId)', save="Platform.fetch('/api/v1/intelligence/answers', { method: 'POST', body: { question: 'impact', element_id: centreId }, silent: true }).catch(function () {})", row_attrs='data-ask-row', root='centreName', rich=True) %}
+                <div class="flex basis-full flex-wrap items-center gap-3">
+                    {{ derived_note('node.derived') }}
+                    {{ why_button('node.key') }}
+                    <a :href="twinMapHref(node)" class="inline-flex h-8 items-center justify-center rounded-md px-2 text-13 font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-info">View on twin map</a>
+                </div>
+                <div class="basis-full text-xs text-muted-foreground">{{ stale_line('node.staleLine') }}</div>
+                <div class="basis-full">{{ full_detail({'detail': 'node.detail', 'uid': 'node.key'}) }}</div>
             {% endcall %}
-            <div class="mt-4 space-y-2">
-                <template x-for="row in rows" :key="'detail-' + row.key">
-                    <div>
-                        <div class="text-xs text-muted-foreground">{{ stale_line('row.staleLine') }}</div>
-                        {{ full_detail({'detail': 'row.detail', 'uid': 'row.key'}) }}
-                    </div>
-                </template>
-            </div>
         </div>
     </div>
 
