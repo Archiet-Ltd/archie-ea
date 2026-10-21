@@ -493,6 +493,26 @@ class ArchiMateImportService:
     # element-type-keyed matrix in app/config/archimate_relationship_matrix.py.
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _can_keep_as_association(validator, source_type, target_type, rel_type):
+        """True when only the pairing is refused: both element types and the
+        relationship type are known, and Association is allowed for the pair."""
+        from app.config.archimate_relationship_matrix import RELATIONSHIP_TYPES
+
+        # Composition, aggregation and specialization assert that one thing is
+        # part of, or a kind of, another. Softening a wrong one to a plain
+        # association would hide a modelling error, so those stay refused.
+        if (
+            not rel_type
+            or rel_type == "association"
+            or rel_type not in RELATIONSHIP_TYPES
+            or rel_type in ("composition", "aggregation", "specialization")
+        ):
+            return False
+        return validator.validate_relationship(
+            source_type, target_type, "association"
+        ).is_valid
+
     def _classify_relationships(
         self,
         relationships: List[Dict[str, Any]],
@@ -556,6 +576,27 @@ class ArchiMateImportService:
             result = validator.validate_relationship(
                 source_type, target_type, normalized_type
             )
+
+            if not result.is_valid and self._can_keep_as_association(
+                validator, source_type, target_type, normalized_type
+            ):
+                # The pair is known and the type is a real ArchiMate type, but
+                # the matrix has no entry for it. Association is permitted
+                # between any two elements (ArchiMate 3.2 section 5.4.3), so
+                # keep the relationship and record what was modelled.
+                modelled = normalized_type.capitalize()
+                note = f"As modelled: {modelled}."
+                prior = (entry.get("description") or "").strip()
+                entry["description"] = f"{prior} {note}".strip()
+                entry["type"] = "association"
+                entry["notice"] = (
+                    f"{modelled} between {source_type} and {target_type} is not "
+                    f"in the ArchiMate 3.2 matrix; stored as Association "
+                    f"(identifier={identifier or 'n/a'})."
+                )
+                result = validator.validate_relationship(
+                    source_type, target_type, "association"
+                )
 
             if not result.is_valid:
                 entry["status"] = "invalid"
@@ -936,6 +977,7 @@ class ArchiMateImportService:
         relationships_created = 0
         relationships_skipped = 0
         relationships_failed: List[Dict[str, Any]] = []
+        relationship_notices: List[str] = []
 
         for rel in classified:
             if rel["status"] == "invalid":
@@ -1003,6 +1045,8 @@ class ArchiMateImportService:
                         relationships_created += 1
                         created_relationship_ids.append(new_rel.id)
                         stored_rel, rel_status = new_rel, "created"
+                        if rel.get("notice"):
+                            relationship_notices.append(rel["notice"])
                 relationship_results.append({
                     "identifier": rel["identifier"],
                     "id": stored_rel.id,
@@ -1066,6 +1110,7 @@ class ArchiMateImportService:
             "relationships_created": relationships_created,
             "relationships_skipped": relationships_skipped,
             "relationships_failed": relationships_failed,
+            "relationship_notices": relationship_notices,
             "created_ids": created_ids,
             "model_id": model_id,
             "element_results": element_results,

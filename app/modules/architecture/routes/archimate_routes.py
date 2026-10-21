@@ -1192,12 +1192,39 @@ def composer_page():
             reaching this page-render route just means selectViewpoint's
             fetch will come back with that 400 and the composer will show the
             resulting error state rather than a silently unfiltered canvas.
+        element (int): Optional. Open this element's impact neighbourhood as an
+            unsaved view (focus mode). 404 when the element is missing or
+            belongs to another organisation. Ignored when viewpoint_id is set.
+        depth (int): Hops for focus mode, clamped to 1-5, default 3.
+        derived (0|1): Include worked-out connections in focus mode, default 1.
     """
     from app.services.archimate_viewpoint_service import get_available_viewpoints, get_viewpoint_counts
 
     solution_id = request.args.get("solution_id", type=int)
     viewpoint = request.args.get("viewpoint", "")
     initial_layer = request.args.get("layer", "")
+    # Focus mode: ?element=<id>&depth=<1-5>&derived=<0|1> opens that element's
+    # impact neighbourhood as an unsaved view. viewpoint_id wins, so existing
+    # saved-diagram links behave exactly as before.
+    focus = None
+    focus_element_id = request.args.get("element", type=int)
+    if focus_element_id is not None and not request.args.get("viewpoint_id"):
+        # Same fence as the impact endpoint: the tenant-isolation listener scopes
+        # this query, so a missing id and another organisation's id are both 404.
+        from app.models import ArchiMateElement  # noqa: PLC0415
+        centre = ArchiMateElement.query.filter_by(id=focus_element_id).first()
+        if centre is None:
+            abort(404)
+        focus_depth = request.args.get("depth", type=int)
+        focus_depth = 3 if focus_depth is None else max(1, min(5, focus_depth))
+        focus_derived = request.args.get("derived", "1").strip().lower() in ("1", "true")
+        focus = {
+            "element": centre.id,
+            "name": centre.name or f"Element #{centre.id}",
+            "depth": focus_depth,
+            "derived": focus_derived,
+        }
+
     solution_name = None
     if solution_id:
         # solution_id is an unvalidated query parameter, so the raw lookup must
@@ -1228,6 +1255,7 @@ def composer_page():
         viewpoint_counts=vp_counts,
         initial_viewpoint=viewpoint,
         initial_layer=initial_layer,
+        focus=focus,
     )
 
 
