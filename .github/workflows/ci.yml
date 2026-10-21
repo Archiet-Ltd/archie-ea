@@ -201,14 +201,14 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-      - name: Install CPU-only torch
-        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Create an isolated virtual environment for this job's dependencies
         # Same reason as tests-shard: a self-hosted runner's leftover ~/.local
         # site-packages must not shadow this job's dependencies.
         run: |
           python -m venv --clear .venv
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Install CPU-only torch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Resolve the postgres service's mapped port
         run: |
           echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
