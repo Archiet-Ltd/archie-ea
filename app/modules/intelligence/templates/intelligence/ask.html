@@ -75,7 +75,7 @@
                 'risk': 'What could hurt it?',
                 'portfolio': 'Rationalization status',
                 'programme': "What's changing?",
-                'data': 'Data it holds',
+                'data': 'What data does it hold?',
                 'compliance': 'Regulations and controls',
                 'accountability': "Who's accountable?"
             } %}
@@ -92,9 +92,8 @@
             {% endfor %}
         </div>
         {% for question in questions %}
-        {# Every question's full sentence is always in the page: drawn for the chosen
-           question, read out (and described to its chip) for the others. #}
-        <p id="ask-sentence-{{ question.key }}" class="text-xs text-muted-foreground sr-only" :class="(openKey || 'impact') === '{{ question.key }}' ? 'not-sr-only' : 'sr-only'">{{ question.before }} <span class="font-mono text-foreground">___</span> {{ question.after }}</p>
+        {# The chosen question's sentence is drawn; each chip is described by its own. #}
+        <p id="ask-sentence-{{ question.key }}" class="text-xs text-muted-foreground" x-show="(openKey || 'impact') === '{{ question.key }}'"{% if question.key != 'impact' %} x-cloak{% endif %}>{{ question.before }} <span class="font-mono text-foreground">___</span> {{ question.after }}</p>
         {% endfor %}
     </div>
     <div id="ask-results" aria-busy="false" :aria-busy="busy ? 'true' : 'false'" x-show="answeredKey === 'impact' && state !== 'idle'" x-cloak class="space-y-4">
