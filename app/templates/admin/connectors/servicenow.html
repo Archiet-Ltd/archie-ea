@@ -78,27 +78,27 @@
             </div>
             <div class="p-4 sm:p-6 space-y-4">
                 <div>
-                    <label for="instance_url" class="block text-sm font-medium mb-1">Instance URL</label>
+                    <label for="instance_url" class="block text-sm font-medium text-muted-foreground mb-1">Instance URL</label>
                     <input type="url" id="instance_url" name="instance_url"
                         value="{{ cfg.get('instance_url', '') }}"
                         placeholder="https://your-instance.service-now.com"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
                 </div>
                 <div>
-                    <label for="client_id" class="block text-sm font-medium mb-1">Client ID</label>
+                    <label for="client_id" class="block text-sm font-medium text-muted-foreground mb-1">Client ID</label>
                     <input type="text" id="client_id" name="client_id"
                         value="{{ cfg.get('client_id', '') }}"
                         placeholder="OAuth2 client_id from ServiceNow Application Registry"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
                 </div>
                 <div>
-                    <label for="client_secret" class="block text-sm font-medium mb-1">
+                    <label for="client_secret" class="block text-sm font-medium text-muted-foreground mb-1">
                         Client Secret
                         <span class="ml-2 text-xs text-muted-foreground font-normal">(leave blank to keep existing)</span>
                     </label>
                     <input type="password" id="client_secret" name="client_secret"
                         placeholder="{{ '••••••••' if has_secret else 'Enter client secret' }}"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono" autocomplete="new-password">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono" autocomplete="new-password">
                     <p class="mt-1 text-xs text-muted-foreground">
                         Stored encrypted with the organisation's own key in the credential store. Never logged or returned in API responses.
                     </p>
@@ -116,15 +116,15 @@
             </div>
             <div class="p-4 sm:p-6 space-y-4">
                 <div>
-                    <label for="ci_query_filter" class="block text-sm font-medium mb-1">CI Query Filter</label>
+                    <label for="ci_query_filter" class="block text-sm font-medium text-muted-foreground mb-1">CI Query Filter</label>
                     <input type="text" id="ci_query_filter" name="ci_query_filter"
                         value="{{ (cfg.get('field_mapping') or {}).get('ci_query_filter', '') }}"
                         placeholder="operational_status=1^install_status=1"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
                     <p class="mt-1 text-xs text-muted-foreground">ServiceNow encoded query for <code class="font-mono">cmdb_ci_appl</code> table.</p>
                 </div>
                 <div>
-                    <label for="field_mapping" class="block text-sm font-medium mb-1">Field Mapping Overrides (JSON)</label>
+                    <label for="field_mapping" class="block text-sm font-medium text-muted-foreground mb-1">Field Mapping Overrides (JSON)</label>
                     <textarea id="field_mapping" name="field_mapping" rows="6"
                         class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
                         placeholder='{"name": "name", "sys_class_name": "component_type", "u_business_owner": "business_owner"}'
@@ -141,7 +141,7 @@
         <div data-slot="card" class="rounded-lg border border-input bg-card">
             <div class="p-4 sm:p-6 flex items-center justify-between">
                 <div>
-                    <label for="enabled" class="text-sm font-medium">Enable Connector</label>
+                    <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">Enable Connector</label>
                     <p class="text-xs text-muted-foreground mt-0.5">
                         When enabled, CMDB pulls and ARB decision pushes are active.
                     </p>

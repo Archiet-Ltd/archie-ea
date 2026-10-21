@@ -49,13 +49,13 @@
     <div class="rounded-lg border border-border bg-card p-4">
         <form method="get" action="{{ url_for('data_architecture.data_entity_catalog') }}" class="flex flex-wrap gap-3 items-end">
             <div class="flex-1 min-w-[200px]">
-                <label class="text-xs font-medium text-muted-foreground mb-1 block">Search</label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Search</label>
                 <input type="text" name="search" value="{{ search }}"
                     class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     placeholder="Search entities..." aria-label="Search">
             </div>
             <div>
-                <label class="text-xs font-medium text-muted-foreground mb-1 block">Classification</label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Classification</label>
                 <select name="classification" class="h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground" aria-label="Classification">
                     <option value="">All</option>
                     <option value="public" {{ 'selected' if classification == 'public' }}>Public</option>
@@ -65,7 +65,7 @@
                 </select>
             </div>
             <div>
-                <label class="text-xs font-medium text-muted-foreground mb-1 block">Type</label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
                 <select name="entity_type" class="h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground" aria-label="Type">
                     <option value="">All</option>
                     <option value="master" {{ 'selected' if entity_type == 'master' }}>Master</option>
@@ -75,7 +75,7 @@
                 </select>
             </div>
             <div>
-                <label class="text-xs font-medium text-muted-foreground mb-1 block">Domain</label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Domain</label>
                 <select name="domain_id" class="h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground" aria-label="Domain">
                     <option value="">All Domains</option>
                     {% for d in domains %}

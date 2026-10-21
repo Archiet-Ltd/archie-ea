@@ -16,7 +16,6 @@
      aria-hidden="true"
      :aria-busy="loading"
      class="modal-root fixed inset-0 items-center justify-center p-4"
-     style="z-index: var(--modal-z, 1000);"
      role="dialog"
      aria-modal="true"
      aria-labelledby="archimate-modal-title"
@@ -24,16 +23,15 @@
 
     <!-- Backdrop -->
     <div data-modal-backdrop="archimate-mapping-modal" aria-hidden="true"
-         class="modal-backdrop absolute inset-0 bg-background/80 transition-opacity duration-200"></div>
+         class="modal-backdrop absolute inset-0 transition-opacity duration-200 bg-overlay/50"></div>
 
     <div data-modal-panel
-         class="modal-panel relative w-full max-w-5xl p-6 border border-border rounded-lg bg-background max-h-[90vh] overflow-y-auto"
-         style="z-index: calc(var(--modal-z, 1000) + 1);">
+         class="modal-panel relative w-full max-w-5xl p-6 border border-border rounded-lg bg-background max-h-[90vh] overflow-y-auto">
         
         <!-- Header -->
         <div class="flex justify-between items-center mb-6 pb-4 border-b">
             <div>
-                <h3 id="archimate-modal-title" class="text-xl font-bold text-foreground flex items-center">
+                <h3 id="archimate-modal-title" class="text-base font-semibold text-foreground text-foreground text-foreground flex items-center">
                     <i data-lucide="layers" class="w-5 h-5 mr-2 text-primary" aria-hidden="true"></i>
                     Map to ArchiMate Elements
                 </h3>
@@ -41,7 +39,7 @@
                     Capability: <span class="font-semibold text-primary" x-text="capabilityName"></span>
                 </p>
             </div>
-             <button @click="closeMappingModal()" class="text-muted-foreground hover:text-muted-foreground transition-colors" type="button" aria-label="Close ArchiMate mapping dialog">
+             <button @click="closeMappingModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" type="button" aria-label="Close ArchiMate mapping dialog">
                 <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
             </button>
         </div>
@@ -232,7 +230,7 @@
         <!-- Footer Actions -->
         <div class="flex justify-between items-center pt-4 border-t">
             <button type="button" @click="closeMappingModal()" 
-                    class="px-4 py-2 text-sm text-foreground/80 bg-background border border-border rounded-md hover:bg-muted transition-colors" aria-label="Close">
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
                 Cancel
             </button>
             <button type="button" @click="saveMappings()" 

@@ -410,11 +410,11 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="translate-x-0"
          x-transition:leave-end="translate-x-full"
-         class="fixed top-0 right-0 h-full w-full max-w-md bg-card border-l border-border z-30 overflow-y-auto">
+         class="fixed top-0 right-0 h-full w-full max-w-md bg-card border-l border-border z-30 overflow-y-auto border">
         <div class="p-6">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-lg font-semibold text-foreground" x-text="selectedElement?.name || ''"></h2>
-                <button aria-label="Close element details" type="button" @click="selectedElement = null" class="text-muted-foreground hover:text-foreground p-1">
+                <button aria-label="Close element details" type="button" @click="selectedElement = null" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
@@ -497,7 +497,7 @@
 
     {# ── Create Modal ── #}
     <div x-show="showCreateModal" x-cloak
-         class="fixed inset-0 z-40 flex items-center justify-center bg-black/50"
+         class="fixed inset-0 z-40 flex items-center justify-center bg-overlay/50"
          @keydown.escape.window="showCreateModal = false">
         <div class="bg-card rounded-lg border border-border w-full max-w-md mx-4 p-6"
              @click.outside="showCreateModal = false">

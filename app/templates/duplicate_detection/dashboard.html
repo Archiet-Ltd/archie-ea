@@ -54,19 +54,19 @@
               <span>Elapsed: <span class="font-medium text-foreground" x-text="formatDuration(runElapsedSeconds)"></span></span>
             </p>
             <div x-show="runFeedback.status === 'success'" x-cloak class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
-              <div class="rounded-md border border-input/60 bg-background/80 px-2.5 py-2">
+              <div class="rounded-md border border-input/60 bg-overlay/50 px-2.5 py-2">
                 <p class="text-2xs uppercase tracking-wide text-muted-foreground">Apps</p>
                 <p class="text-sm font-semibold text-foreground" x-text="runFeedback.applications_analyzed || 0"></p>
               </div>
-              <div class="rounded-md border border-input/60 bg-background/80 px-2.5 py-2">
+              <div class="rounded-md border border-input/60 bg-overlay/50 px-2.5 py-2">
                 <p class="text-2xs uppercase tracking-wide text-muted-foreground">Groups</p>
                 <p class="text-sm font-semibold text-foreground" x-text="runFeedback.groups_found || 0"></p>
               </div>
-              <div class="rounded-md border border-input/60 bg-background/80 px-2.5 py-2">
+              <div class="rounded-md border border-input/60 bg-overlay/50 px-2.5 py-2">
                 <p class="text-2xs uppercase tracking-wide text-muted-foreground">Exact</p>
                 <p class="text-sm font-semibold text-foreground" x-text="runFeedback.exact_matches || 0"></p>
               </div>
-              <div class="rounded-md border border-input/60 bg-background/80 px-2.5 py-2">
+              <div class="rounded-md border border-input/60 bg-overlay/50 px-2.5 py-2">
                 <p class="text-2xs uppercase tracking-wide text-muted-foreground">Savings</p>
                 <p class="text-sm font-semibold text-foreground">{{ currency_symbol }}<span x-text="formatNumber(runFeedback.estimated_savings || 0)"></span></p>
               </div>
@@ -527,8 +527,8 @@
   <div class="relative flex items-center justify-center min-h-screen px-4">
     <div data-slot="card" class="relative rounded-lg border border-border bg-card max-w-lg w-full p-6" tabindex="-1">
       <div class="flex items-center justify-between mb-6">
-        <h3 id="run-detection-modal-title" class="text-lg font-semibold text-foreground">Run Detection</h3>
-        <button type="button" @click="showRunDetectionModal = false" class="text-muted-foreground hover:text-foreground" aria-label="Close detection modal">
+        <h3 id="run-detection-modal-title" class="text-base font-semibold text-foreground text-foreground text-foreground">Run Detection</h3>
+        <button type="button" @click="showRunDetectionModal = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close detection modal">
           <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
         </button>
       </div>

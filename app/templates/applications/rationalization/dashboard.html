@@ -575,7 +575,7 @@
     <div x-show="showExportModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center"
          @keydown.escape.window="showExportModal = false"
          role="dialog" aria-modal="true" aria-labelledby="export-title">
-        <div class="absolute inset-0 bg-black/30" @click="showExportModal = false"></div>
+        <div class="absolute inset-0 bg-overlay/50" @click="showExportModal = false"></div>
         <div class="relative bg-card rounded-lg border border-border w-full max-w-sm mx-4 p-6">
             <h3 id="export-title" class="text-base font-semibold text-foreground mb-4">Export Business Case</h3>
             <div class="space-y-3">

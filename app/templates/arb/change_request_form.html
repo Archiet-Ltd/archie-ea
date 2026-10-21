@@ -66,17 +66,17 @@
 
             <!-- Title -->
             <div>
-                <label for="cr-title" class="block text-sm font-medium text-foreground mb-1">
+                <label for="cr-title" class="block text-sm font-medium text-muted-foreground mb-1">
                     Title <span class="text-destructive-emphasis">*</span>
                 </label>
                 <input id="cr-title" type="text" x-model="title" required
                        placeholder="Brief title for this change request"
-                       class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
             </div>
 
             <!-- Description -->
             <div>
-                <label for="cr-description" class="block text-sm font-medium text-foreground mb-1">
+                <label for="cr-description" class="block text-sm font-medium text-muted-foreground mb-1">
                     Description <span class="text-destructive-emphasis">*</span>
                 </label>
                 <textarea id="cr-description" x-model="description" required rows="5"
@@ -86,11 +86,11 @@
 
             <!-- Trigger Type -->
             <div>
-                <label for="cr-trigger-type" class="block text-sm font-medium text-foreground mb-1">
+                <label for="cr-trigger-type" class="block text-sm font-medium text-muted-foreground mb-1">
                     Trigger Type <span class="text-destructive-emphasis">*</span>
                 </label>
                 <select id="cr-trigger-type" x-model="trigger_type" required
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                     <option value="">Select trigger type…</option>
                     {% for tt in trigger_types %}
                     <option value="{{ tt }}">{{ tt | replace('_', ' ') | title }}</option>
@@ -99,35 +99,35 @@
             </div>
 
             <!-- Optional fields -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 gap-4">
                 <div>
-                    <label for="cr-capability-id" class="block text-sm font-medium text-foreground mb-1">
+                    <label for="cr-capability-id" class="block text-sm font-medium text-muted-foreground mb-1">
                         Linked Capability ID
                     </label>
                     <input id="cr-capability-id" type="number" x-model="capability_id" min="1"
                            placeholder="Optional"
-                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                 </div>
                 <div>
-                    <label for="cr-solution-id" class="block text-sm font-medium text-foreground mb-1">
+                    <label for="cr-solution-id" class="block text-sm font-medium text-muted-foreground mb-1">
                         Linked Solution ID
                     </label>
                     <input id="cr-solution-id" type="number" x-model="solution_id" min="1"
                            placeholder="Optional"
-                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                 </div>
             </div>
 
             <!-- Supporting Documents -->
             <div class="space-y-2">
-                <label class="block text-sm font-medium text-foreground">
+                <label class="block text-sm font-medium text-muted-foreground mb-1">
                     Supporting Documents <span class="text-xs text-muted-foreground font-normal">(optional)</span>
                 </label>
                 <p class="text-xs text-muted-foreground">Attach impact assessments, cost analyses, architecture diagrams, or other evidence. Max 50 MB per file.</p>
 
                 <!-- Document type selector -->
                 <div class="flex items-center gap-3">
-                    <select x-model="docType" class="rounded-md border border-input bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Supporting Documents (optional)">
+                    <select x-model="docType" class="h-9 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Supporting Documents (optional)">
                         <option value="supporting">Supporting</option>
                         <option value="evidence">Evidence</option>
                         <option value="decision">Decision Record</option>

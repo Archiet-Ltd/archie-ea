@@ -1,6 +1,8 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'macros/page_shell.html' import page_shell, section_card %}
 {% from 'components/answer_cascade.html' import answer_cascade %}
+{% from 'components/provenance.html' import answer_envelope %}
 {% block title %}Dashboard{% endblock %}
 {% block extra_head_js %}
 <script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
@@ -111,9 +113,40 @@
             <p class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
             <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
             {% if line %}<p class="mt-1 truncate text-xs text-muted-foreground tabular-nums" title="{{ line }}">{{ line }}</p>{% endif %}
+            {% if label == 'Solutions' %}<div class="mt-1">{{ answer_envelope(source='count of solutions by ADM phase in this organisation') }}</div>{% endif %}
         </div>
         {% endfor %}
     </section>
+
+    <div class="mt-1">{{ answer_envelope(source='the health score components measured on this organisation; an unmeasured component reads as an em dash') }}</div>
+
+    {# What the health score was weighted from. A component that was not
+       measured reads as an em dash, never as a confident zero. #}
+    <section aria-labelledby="architecture-health-heading" class="rounded-lg border border-border bg-card" data-testid="architecture-health">
+        <div class="flex items-center justify-between border-b border-border px-4 py-2">
+            <h2 id="architecture-health-heading" class="text-base font-semibold text-foreground">Architecture health</h2>
+            <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">What the score is weighted from</span>
+        </div>
+        <div class="grid grid-cols-2 gap-px bg-border md:grid-cols-4">
+            {% for key, label in [
+                ('phase_maturity', 'Phase Maturity'),
+                ('risk_health', 'Risk Posture'),
+                ('capability_coverage', 'Capability Coverage'),
+                ('governance', 'Governance'),
+            ] %}
+            {% set val = (health_components or {}).get(key) %}
+            <div class="bg-card px-4 py-3">
+                <p class="text-xs text-muted-foreground">{{ label }}</p>
+                <p class="mt-1 text-lg font-semibold tabular-nums text-foreground">{{ (val ~ "%") if val is not none else "—" }}</p>
+                {% if key == 'phase_maturity' %}
+                <p class="mt-1 text-xs text-muted-foreground">Share of solutions with a recorded ADM phase that are in phase C or later</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <div class="mt-1">{{ answer_envelope(source='solutions by ADM phase, one row per phase') }}</div>
 
     {# Chart: application lifecycle, one series, hairline container, no vertical grid. #}
     <section aria-labelledby="lifecycle-chart-heading" class="rounded-lg border border-border bg-card" data-testid="lifecycle-distribution">
@@ -171,36 +204,20 @@
                 <h2 id="capability-coverage-heading" class="text-base font-semibold text-foreground">Capability coverage</h2>
                 <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ gap_count }} gap{{ 's' if gap_count != 1 else '' }} of {{ ch|length }}</span>
             </div>
-            <div class="max-h-[480px] overflow-auto">
-                <table class="dense-table w-full border-collapse text-sm">
-                    <thead class="sticky top-0 z-10 bg-card">
-                        <tr class="border-b border-border">
-                            <th class="h-10 px-3 text-left align-middle">Capability</th>
-                            <th class="h-10 px-3 text-right align-middle">Applications</th>
-                            <th class="h-10 px-3 text-left align-middle">Coverage</th>
-                            <th class="h-10 px-3 text-right align-middle"><span class="sr-only">Open</span></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for cap in ch %}
-                        <tr class="group h-12 border-b border-border transition-colors hover:bg-muted/50">
-                            <td class="px-3 align-middle font-medium text-foreground">{{ cap.name }}</td>
-                            <td class="px-3 text-right align-middle tabular-nums text-muted-foreground">{{ cap.app_count }}</td>
-                            <td class="px-3 align-middle">
+{% call dense_table(columns=[('Capability', ''), ('Applications', 'text-right'), ('Coverage', ''), ('', 'text-right')], rows=(ch)|length, empty_text='No capabilities recorded yet.', max_height='480px', flush=true) %}{% for cap in ch %}
+                        <tr class="group transition-colors hover:bg-muted/50">
+                            <td class="px-2 align-middle font-medium text-foreground">{{ cap.name }}</td>
+                            <td class="px-2 text-right align-middle tabular-nums text-muted-foreground">{{ cap.app_count }}</td>
+                            <td class="px-2 align-middle">
                                 {% if cap.coverage_status == 'covered' %}<span class="text-success-emphasis">Covered</span>
                                 {% elif cap.coverage_status == 'partial' %}<span class="text-warning-emphasis">Partial</span>
                                 {% else %}<span class="text-destructive-emphasis">Gap</span>{% endif %}
                             </td>
-                            <td class="px-3 text-right align-middle">
+                            <td class="px-2 text-right align-middle">
                                 <a href="{{ url_for('capability_map.index') }}?cap={{ cap.id }}" class="inline-flex h-8 items-center rounded-md px-2.5 text-13 font-medium text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-info group-hover:opacity-100 focus-visible:opacity-100">View</a>
                             </td>
                         </tr>
-                        {% else %}
-                        <tr><td colspan="4" class="h-12 px-3 text-sm text-muted-foreground">No capabilities recorded yet.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                        {% endfor %}{% endcall %}
         </section>
     </section>
     {% endif %}

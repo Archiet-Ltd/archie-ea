@@ -12,11 +12,11 @@
   <form method="post" class="space-y-4" data-testid="new-agent-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div>
-      <label for="name" class="block text-sm font-medium text-foreground mb-1">Name</label>
-      <input type="text" id="name" name="name" required class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm">
+      <label for="name" class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
+      <input type="text" id="name" name="name" required class="h-9 w-full rounded-md border border-border bg-background px-3 text-sm">
     </div>
     <div>
-      <label for="purpose" class="block text-sm font-medium text-foreground mb-1">Purpose</label>
+      <label for="purpose" class="block text-sm font-medium text-muted-foreground mb-1">Purpose</label>
       <textarea id="purpose" name="purpose" rows="3" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"></textarea>
     </div>
     <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Register</button>

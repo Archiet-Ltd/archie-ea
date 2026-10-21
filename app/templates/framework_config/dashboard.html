@@ -263,20 +263,20 @@
 {% call modal(id='create-framework-config', title='New Framework Configuration', description='Create a new capability framework configuration', size='default') %}
 <form @submit.prevent="submit()" class="space-y-4">
     <div>
-        <label for="cfc-name" class="block text-sm font-medium mb-1">Configuration Name <span class="text-destructive-emphasis">*</span></label>
+        <label for="cfc-name" class="block text-sm font-medium text-muted-foreground mb-1">Configuration Name <span class="text-destructive-emphasis">*</span></label>
         <input type="text" id="cfc-name" x-model="formData.configuration_name" required
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                placeholder="e.g. Enterprise Framework 2026">
     </div>
     <div>
-        <label for="cfc-code" class="block text-sm font-medium mb-1">Configuration Code <span class="text-destructive-emphasis">*</span></label>
+        <label for="cfc-code" class="block text-sm font-medium text-muted-foreground mb-1">Configuration Code <span class="text-destructive-emphasis">*</span></label>
         <input type="text" id="cfc-code" x-model="formData.configuration_code" required
-               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                placeholder="e.g. ENT-FW-2026">
         <p class="text-xs text-muted-foreground mt-1">Unique identifier code for this configuration</p>
     </div>
     <div>
-        <label for="cfc-description" class="block text-sm font-medium mb-1">Description</label>
+        <label for="cfc-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
         <textarea id="cfc-description" x-model="formData.description" rows="2"
                   class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   placeholder="Describe this configuration"></textarea>
@@ -284,7 +284,7 @@
     <div x-show="errorMsg" x-cloak class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
     <div class="flex justify-end gap-3 pt-2 border-t border-border">
         <button type="button" @click="Platform.modal.close('create-framework-config')"
-                class="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent" aria-label="Close">Cancel</button>
+                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">Cancel</button>
         <button type="submit" :disabled="submitting"
                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit">
             <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak></i>

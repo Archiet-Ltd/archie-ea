@@ -61,7 +61,7 @@
                     <label for="gov-exception-mitigation" class="{{ _gov_label }}">Mitigation plan</label>
                     <textarea id="gov-exception-mitigation" x-model="formData.mitigation_plan" rows="2" class="{{ _gov_textarea }}"></textarea>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 gap-4">
                     <div>
                         <label for="gov-exception-status" class="{{ _gov_label }}">Status</label>
                         <select id="gov-exception-status" x-model="formData.status" class="{{ _gov_input }}">
@@ -88,7 +88,7 @@
         {# ── Compliance Mapping ───────────────────────────────────────── #}
         <template x-if="entityType === 'compliance_mapping'">
             <div class="space-y-4">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 gap-4">
                     <div>
                         <label for="gov-compliance-framework" class="{{ _gov_label }}">Framework *</label>
                         <input id="gov-compliance-framework" type="text" x-model="formData.framework" required placeholder="e.g. ISO 27001, GDPR, SOC 2" class="{{ _gov_input }}">
@@ -122,7 +122,7 @@
                         </div>
                     </template>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 gap-4">
                     <div>
                         <label for="gov-compliance-status" class="{{ _gov_label }}">Verification status</label>
                         <select id="gov-compliance-status" x-model="formData.verification_status" class="{{ _gov_input }}">
@@ -147,7 +147,7 @@
         {# ── Change Request ───────────────────────────────────────────── #}
         <template x-if="entityType === 'change_request'">
             <div class="space-y-4">
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 gap-4">
                     <div>
                         <label for="gov-change-type" class="{{ _gov_label }}">Change type *</label>
                         <select id="gov-change-type" x-model="formData.change_type" required class="{{ _gov_input }}">
@@ -159,7 +159,7 @@
                             <option value="other">Other</option>
                         </select>
                     </div>
-                    <div class="sm:col-span-2">
+                    <div class="">
                         <label for="gov-change-title" class="{{ _gov_label }}">Title *</label>
                         <input id="gov-change-title" type="text" x-model="formData.title" required class="{{ _gov_input }}">
                     </div>
@@ -176,7 +176,7 @@
                     <label for="gov-change-impact" class="{{ _gov_label }}">Impact assessment</label>
                     <textarea id="gov-change-impact" x-model="formData.impact_assessment" rows="2" class="{{ _gov_textarea }}"></textarea>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 gap-4">
                     <div>
                         <label for="gov-change-phase" class="{{ _gov_label }}">Affected ADM phase</label>
                         <select id="gov-change-phase" x-model="formData.affected_phase" class="{{ _gov_input }}">
@@ -221,7 +221,7 @@
         {# ── Feasibility Review ───────────────────────────────────────── #}
         <template x-if="entityType === 'feasibility_review'">
             <div class="space-y-4">
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 gap-4">
                     <div>
                         <label for="gov-review-type" class="{{ _gov_label }}">Review type *</label>
                         <select id="gov-review-type" x-model="formData.review_type" required class="{{ _gov_input }}">
@@ -256,7 +256,7 @@
                         </select>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 gap-4">
                     <div>
                         <label for="gov-review-confidence" class="{{ _gov_label }}">Confidence level</label>
                         <select id="gov-review-confidence" x-model="formData.confidence_level" class="{{ _gov_input }}">
@@ -298,7 +298,7 @@
 
     <div class="flex items-center justify-end gap-2 mt-6">
         <button type="button" @click="closeModal()" :disabled="modalSaving"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
         <button type="submit" :disabled="modalSaving"
                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <span x-show="modalSaving" x-cloak class="animate-spin h-4 w-4 mr-2 border-2 border-current border-t-transparent rounded-full inline-block"></span>

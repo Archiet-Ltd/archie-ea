@@ -1,5 +1,6 @@
 {# smoke-coverage-ok: label-only change — plain-language rename, no functional change #}
 {% extends "layouts/admin_base.html" %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/badge.html' import badge %}
@@ -288,7 +289,7 @@
     </div>
     {% endif %}
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 gap-6">
 
       {# Application Identity #}
       <div data-slot="card" class="rounded-lg border border-border bg-card">
@@ -307,9 +308,9 @@
 
           {% macro edit_row(label, name, value, maxlength=255) %}
           <div class="flex justify-between items-center gap-4">
-            <label for="edit-{{ name }}" class="text-muted-foreground shrink-0">{{ label }}</label>
+            <label for="edit-{{ name }}" class="block text-sm font-medium text-muted-foreground mb-1 shrink-0">{{ label }}</label>
             <input type="text" id="edit-{{ name }}" name="{{ name }}" value="{{ value or '' }}" maxlength="{{ maxlength }}"
-                   class="flex h-9 w-2/3 rounded-md border border-input bg-background px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                   class="flex h-9 w-2/3 rounded-md border border-input bg-background px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           {% endmacro %}
 
@@ -374,7 +375,7 @@
                 <button type="button" @click="Platform.fetch.post('/dashboard/api/archimate-elements/{{ archimate_info.id }}/correct', {action:'correct', name, type}).then(function () { correcting = false; confirmed = true; }).catch(function (e) { Platform.toast.error('Could not save the correction: ' + e.message); })"
                   class="text-xs bg-primary text-primary-foreground rounded px-2 py-1">Save</button>
                 <button type="button" @click="correcting=false"
-                  class="text-xs text-muted-foreground hover:text-foreground rounded px-2 py-1">Cancel</button>
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
               </div>
             </template>
             <span x-show="confirmed" class="inline-flex items-center gap-1 text-xs text-success-emphasis">
@@ -399,9 +400,9 @@
           {{ detail_row('Differentiation Level', app.differentiation_level | replace('_',' ') | title if app.differentiation_level else none) }}
           {{ detail_row('User Base Size', app.user_base_size | string if app.user_base_size else none) }}
           <div class="flex justify-between items-center gap-4">
-            <label for="edit-userCount" class="text-muted-foreground shrink-0">User Count</label>
+            <label for="edit-userCount" class="block text-sm font-medium text-muted-foreground mb-1 shrink-0">User Count</label>
             <input type="number" id="edit-userCount" name="userCount" value="{{ app.user_count or '' }}" min="0" max="10000000"
-                   class="flex h-9 w-2/3 rounded-md border border-input bg-background px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                   class="flex h-9 w-2/3 rounded-md border border-input bg-background px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           {{ detail_row('Avg Daily Users', app.average_daily_users | string if app.average_daily_users else none) }}
           {{ detail_row('Max Concurrent Users', app.concurrent_users_max | string if app.concurrent_users_max else none) }}
@@ -473,10 +474,10 @@
 
     {# Description & Notes #}
     {% if edit_mode or app.description or app.business_purpose or app.notes or app.assessment_notes %}
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 gap-6">
       {% if edit_mode %}
       <div data-slot="card" class="rounded-lg border border-border bg-card">
-        <div class="flex flex-col space-y-1.5 p-6 pb-3"><label for="edit-description" class="text-lg font-semibold">Description</label></div>
+        <div class="flex flex-col space-y-1.5 p-6 pb-3"><label for="edit-description" class="block text-sm font-medium text-muted-foreground mb-1 text-lg">Description</label></div>
         <div class="p-6 pt-0">
           <textarea id="edit-description" name="description" rows="4"
                     class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ app.description or '' }}</textarea>
@@ -658,36 +659,22 @@
       <div class="p-6 pt-0">
         <div data-platform-table="application-relationships"
              data-config='{{ dashboard_config.tables["application-relationships"] | tojson }}'>
-          <div class="overflow-x-auto">
-            <table class="dense-table w-full text-sm">
-              <thead>
-                <tr class="border-b">
-                  <th class="pb-2 text-left font-medium text-muted-foreground">Element</th>
-                  <th class="pb-2 text-left font-medium text-muted-foreground">Type</th>
-                  <th class="pb-2 text-left font-medium text-muted-foreground">Relationship</th>
-                  <th class="pb-2 text-left font-medium text-muted-foreground">Direction</th>
-                  <th class="pb-2 text-left font-medium text-muted-foreground">Layer</th>
-                  <th class="pb-2 text-left font-medium text-muted-foreground">Context</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">{# actionable-rows-ok: rows are flattened relationship descriptions built for display by the dashboard
+{% call dense_table(columns=[('Element', ''), ('Type', ''), ('Relationship', ''), ('Direction', ''), ('Layer', ''), ('Context', '')]) %}{# actionable-rows-ok: rows are flattened relationship descriptions built for display by the dashboard
                  config and carry no element id. The ArchiMate Direct Links table below is the
                  editable view of the same relationships. #}
                 {% for row in rel_rows %}
-                <tr class="border-b last:border-0 hover:bg-muted/50">
-                  <td class="py-2 pr-3 font-medium">{{ row.name }}</td>
-                  <td class="py-2 pr-3 text-muted-foreground">{{ row.element_type }}</td>
-                  <td class="py-2 pr-3">{{ row.relationship }}</td>
-                  <td class="py-2 pr-3 text-muted-foreground">{{ row.direction }}</td>
-                  <td class="py-2 pr-3">
+                <tr class="last:border-0 hover:bg-muted/50">
+                  <td class="px-2 font-medium">{{ row.name }}</td>
+                  <td class="px-2 text-muted-foreground">{{ row.element_type }}</td>
+                  <td class="px-2">{{ row.relationship }}</td>
+                  <td class="px-2 text-muted-foreground">{{ row.direction }}</td>
+                  <td class="px-2">
                     {% call badge(variant='neutral') %}{{ row.layer }}{% endcall %}
                   </td>
-                  <td class="py-2 text-muted-foreground">{{ row.context }}</td>
+                  <td class="px-2 text-muted-foreground">{{ row.context }}</td>
                 </tr>
                 {% endfor %}
-              </tbody>
-            </table>
-          </div>
+              {% endcall %}
         </div>
       </div>
     </div>
@@ -715,33 +702,21 @@
         {% endif %}
       </div>
       <div class="p-6 pt-0">
-        <div class="overflow-x-auto">
-          <table class="dense-table w-full text-sm">
-            <thead>
-              <tr class="border-b">
-                <th class="pb-2 text-left font-medium text-muted-foreground">Element</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Type</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Relationship</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Direction</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Layer</th>
-                <th class="pb-2 text-right font-medium text-muted-foreground">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y">
+{% call dense_table(columns=[('Element', ''), ('Type', ''), ('Relationship', ''), ('Direction', ''), ('Layer', ''), ('Actions', 'text-right')]) %}
               {% for row in link_rows %}
-              <tr class="border-b last:border-0 hover:bg-muted/50">
-                <td class="py-2 pr-3 font-medium">{{ row.element }}</td>
-                <td class="py-2 pr-3 text-muted-foreground">{{ row.element_type }}</td>
-                <td class="py-2 pr-3">{{ row.relationship_type }}</td>
-                <td class="py-2 pr-3">
+              <tr class="last:border-0 hover:bg-muted/50">
+                <td class="px-2 font-medium">{{ row.element }}</td>
+                <td class="px-2 text-muted-foreground">{{ row.element_type }}</td>
+                <td class="px-2">{{ row.relationship_type }}</td>
+                <td class="px-2">
                   {% if row.status == 'outbound' %}
                   {% call badge(variant='info') %}→ Outbound{% endcall %}
                   {% else %}
                   {% call badge(variant='secondary') %}← Inbound{% endcall %}
                   {% endif %}
                 </td>
-                <td class="py-2">{% call badge(variant='neutral') %}{{ row.layer }}{% endcall %}</td>
-                <td class="py-2 text-right">
+                <td class="px-2">{% call badge(variant='neutral') %}{{ row.layer }}{% endcall %}</td>
+                <td class="px-2 text-right">
                   {% if row.delete_url %}
                   <form method="POST" action="{{ row.delete_url }}" class="inline"
                     data-confirm="Remove this ArchiMate link?">
@@ -754,9 +729,7 @@
                 </td>
               </tr>
               {% endfor %}
-            </tbody>
-          </table>
-        </div>
+            {% endcall %}
       </div>
     </div>
     {% endif %}
@@ -926,25 +899,11 @@
       <div class="p-6 pt-0">
         {% set cap_rows = dashboard_config.tables['application-capabilities'].rows %}
         {% if cap_rows %}
-        <div class="overflow-x-auto">
-          <table class="dense-table w-full text-sm">
-            <thead>
-              <tr class="border-b">
-                <th class="pb-2 text-left font-medium text-muted-foreground">Capability</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Category</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Support</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Coverage</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Maturity</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Strategic</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Compliance</th>
-                <th class="pb-2 text-right font-medium text-muted-foreground">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y">
+{% call dense_table(columns=[('Capability', ''), ('Category', ''), ('Support', ''), ('Coverage', ''), ('Maturity', ''), ('Strategic', ''), ('Compliance', ''), ('Actions', 'text-right')]) %}
               {% for row in cap_rows %}
               {% set cap_comp = capabilities_with_compliance | selectattr('capability.name','eq',row.name) | list | first %}
-              <tr class="border-b last:border-0 hover:bg-muted/50 {% if cap_comp and cap_comp.is_penalized %}bg-destructive/5{% endif %}">
-                <td class="py-2 pr-3">
+              <tr class="last:border-0 hover:bg-muted/50 {% if cap_comp and cap_comp.is_penalized %}bg-destructive/5{% endif %}">
+                <td class="px-2">
                   {% if row.detail_url %}
                   <a href="{{ row.detail_url }}" class="font-medium text-primary hover:underline">{{ row.name }}</a>
                   {% else %}
@@ -954,22 +913,22 @@
                   {% call badge(variant='destructive') %}Penalized{% endcall %}
                   {% endif %}
                 </td>
-                <td class="py-2 pr-3 text-muted-foreground">{{ row.category }}</td>
-                <td class="py-2 pr-3">{% call badge(variant='outline') %}{{ row.support_level }}{% endcall %}</td>
-                <td class="py-2 pr-3">{{ row.coverage }}</td>
-                <td class="py-2 pr-3">{{ row.maturity }}</td>
-                <td class="py-2 pr-3">
+                <td class="px-2 text-muted-foreground">{{ row.category }}</td>
+                <td class="px-2">{% call badge(variant='outline') %}{{ row.support_level }}{% endcall %}</td>
+                <td class="px-2">{{ row.coverage }}</td>
+                <td class="px-2">{{ row.maturity }}</td>
+                <td class="px-2">
                   {% if row.strategic == 'Yes' %}{% call badge(variant='success') %}Yes{% endcall %}
                   {% else %}{% call badge(variant='neutral') %}No{% endcall %}{% endif %}
                 </td>
-                <td class="py-2">
+                <td class="px-2">
                   {% if cap_comp %}
                   <span class="{% if cap_comp.compliance_score >= 80 %}text-success{% elif cap_comp.compliance_score >= 50 %}text-warning{% else %}text-destructive{% endif %} font-medium">
                     {{ '%.0f' | format(cap_comp.compliance_score) }}%
                   </span>
                   {% else %}—{% endif %}
                 </td>
-                <td class="py-2 text-right">
+                <td class="px-2 text-right">
                   {% if row.delete_url %}
                   <form method="POST" action="{{ row.delete_url }}" class="inline"
                     data-confirm="Remove capability mapping for {{ row.name | e }}?">
@@ -982,9 +941,7 @@
                 </td>
               </tr>
               {% endfor %}
-            </tbody>
-          </table>
-        </div>
+            {% endcall %}
         {% else %}
         <div class="py-8 text-center">
           <i data-lucide="layers" class="mx-auto h-10 w-10 text-muted-foreground mb-3 opacity-40" aria-hidden="true"></i>
@@ -1016,35 +973,20 @@
     <div class="p-6 pt-0">
       {% set proc_rows = dashboard_config.tables['application-processes'].rows %}
       {% if proc_rows %}
-      <div class="overflow-x-auto">
-        <table class="dense-table w-full text-sm">
-          <thead>
-            <tr class="border-b">
-              <th class="pb-2 text-left font-medium text-muted-foreground">Code</th>
-              <th class="pb-2 text-left font-medium text-muted-foreground">Process</th>
-              <th class="pb-2 text-left font-medium text-muted-foreground">Support</th>
-              <th class="pb-2 text-left font-medium text-muted-foreground">Automation</th>
-              <th class="pb-2 text-left font-medium text-muted-foreground">Criticality</th>
-              <th class="pb-2 text-left font-medium text-muted-foreground">Integration</th>
-              <th class="pb-2 text-left font-medium text-muted-foreground">Daily Txns</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y">{# actionable-rows-ok: process-support rows built for display by the dashboard config, with no process
+{% call dense_table(columns=[('Code', ''), ('Process', ''), ('Support', ''), ('Automation', ''), ('Criticality', ''), ('Integration', ''), ('Daily Txns', '')]) %}{# actionable-rows-ok: process-support rows built for display by the dashboard config, with no process
              id to link. Change a mapping from the business process itself. #}
             {% for row in proc_rows %}
-            <tr class="border-b last:border-0 hover:bg-muted/50">
-              <td class="py-2 pr-3">{% call badge(variant='outline') %}{{ row.code }}{% endcall %}</td>
-              <td class="py-2 pr-3 font-medium">{{ row.name }}</td>
-              <td class="py-2 pr-3">{% call badge(variant='neutral') %}{{ row.support_type }}{% endcall %}</td>
-              <td class="py-2 pr-3">{{ row.automation }}</td>
-              <td class="py-2 pr-3">{{ row.criticality }}</td>
-              <td class="py-2 pr-3 text-muted-foreground">{{ row.integration }}</td>
-              <td class="py-2 text-muted-foreground">{{ row.transactions }}</td>
+            <tr class="last:border-0 hover:bg-muted/50">
+              <td class="px-2">{% call badge(variant='outline') %}{{ row.code }}{% endcall %}</td>
+              <td class="px-2 font-medium">{{ row.name }}</td>
+              <td class="px-2">{% call badge(variant='neutral') %}{{ row.support_type }}{% endcall %}</td>
+              <td class="px-2">{{ row.automation }}</td>
+              <td class="px-2">{{ row.criticality }}</td>
+              <td class="px-2 text-muted-foreground">{{ row.integration }}</td>
+              <td class="px-2 text-muted-foreground">{{ row.transactions }}</td>
             </tr>
             {% endfor %}
-          </tbody>
-        </table>
-      </div>
+          {% endcall %}
       {% else %}
       <div class="py-8 text-center">
         <i data-lucide="git-merge" class="mx-auto h-10 w-10 text-muted-foreground mb-3 opacity-40" aria-hidden="true"></i>
@@ -1100,37 +1042,22 @@
       </div>
       <div class="p-6 pt-0">
         {% if vendor_footprint %}
-        <div class="overflow-x-auto">
-          <table class="dense-table w-full text-sm">
-            <thead>
-              <tr class="border-b">
-                <th class="pb-2 text-left font-medium text-muted-foreground">Vendor</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Product</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Deployment</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Criticality</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Hosting</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Support Tier</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Lifecycle</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Status</th>
-                <th class="pb-2 text-right font-medium text-muted-foreground">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y">
+{% call dense_table(columns=[('Vendor', ''), ('Product', ''), ('Deployment', ''), ('Criticality', ''), ('Hosting', ''), ('Support Tier', ''), ('Lifecycle', ''), ('Status', ''), ('Actions', 'text-right')]) %}
               {% for v in vendor_footprint %}
-              <tr class="border-b last:border-0 hover:bg-muted/50">
-                <td class="py-2 pr-3 font-medium">{{ v.vendor_name }}</td>
-                <td class="py-2 pr-3">{{ v.product_name }}</td>
-                <td class="py-2 pr-3 text-muted-foreground">{{ v.deployment_type or '—' }}</td>
-                <td class="py-2 pr-3">
+              <tr class="last:border-0 hover:bg-muted/50">
+                <td class="px-2 font-medium">{{ v.vendor_name }}</td>
+                <td class="px-2">{{ v.product_name }}</td>
+                <td class="px-2 text-muted-foreground">{{ v.deployment_type or '—' }}</td>
+                <td class="px-2">
                   {% if v.criticality %}{% call badge(variant='outline') %}{{ v.criticality }}{% endcall %}{% else %}—{% endif %}
                 </td>
-                <td class="py-2 pr-3 text-muted-foreground">{{ v.hosting_model or '—' }}</td>
-                <td class="py-2 pr-3 text-muted-foreground">{{ v.support_tier or '—' }}</td>
-                <td class="py-2 pr-3 text-muted-foreground text-xs">{{ v.lifecycle or '—' }}</td>
-                <td class="py-2">
+                <td class="px-2 text-muted-foreground">{{ v.hosting_model or '—' }}</td>
+                <td class="px-2 text-muted-foreground">{{ v.support_tier or '—' }}</td>
+                <td class="px-2 text-muted-foreground text-xs">{{ v.lifecycle or '—' }}</td>
+                <td class="px-2">
                   {% if v.status %}{% call badge(variant='neutral') %}{{ v.status }}{% endcall %}{% else %}—{% endif %}
                 </td>
-                <td class="py-2 text-right">
+                <td class="px-2 text-right">
                   <form method="POST" action="{{ url_for('application_mgmt.application_vendor_footprint', id=app.id) }}" class="inline"
                     data-confirm="Remove {{ v.product_name | e }} from vendor footprint?">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -1143,9 +1070,7 @@
                 </td>
               </tr>
               {% endfor %}
-            </tbody>
-          </table>
-        </div>
+            {% endcall %}
         {% else %}
         <div class="py-8 text-center">
           <i data-lucide="building-2" class="mx-auto h-10 w-10 text-muted-foreground mb-3 opacity-40" aria-hidden="true"></i>
@@ -1916,33 +1841,21 @@
     <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Dependency Graph Edges</h3></div>
       <div class="p-6 pt-0">
-        <div class="overflow-x-auto">
-          <table class="dense-table w-full text-sm">
-            <thead>
-              <tr class="border-b">
-                <th class="pb-2 text-left font-medium text-muted-foreground">From</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">To</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Type</th>
-                <th class="pb-2 text-left font-medium text-muted-foreground">Criticality</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y">{# actionable-rows-ok: the edge list behind the dependency graph drawn above -- a textual rendering of
+{% call dense_table(columns=[('From', ''), ('To', ''), ('Type', ''), ('Criticality', '')]) %}{# actionable-rows-ok: the edge list behind the dependency graph drawn above -- a textual rendering of
                the same picture, for reading and export. Dependencies are edited on the
                application at either end. #}
               {% for edge in dependency_graph_data.edges %}
-              <tr class="border-b last:border-0 hover:bg-muted/50">
-                <td class="py-2 pr-3 font-mono text-xs">{{ edge.from }}</td>
-                <td class="py-2 pr-3 font-mono text-xs">{{ edge.to }}</td>
-                <td class="py-2 pr-3">{{ edge.label or edge.type or '—' }}</td>
-                <td class="py-2">
+              <tr class="last:border-0 hover:bg-muted/50">
+                <td class="px-2 font-mono text-xs">{{ edge.from }}</td>
+                <td class="px-2 font-mono text-xs">{{ edge.to }}</td>
+                <td class="px-2">{{ edge.label or edge.type or '—' }}</td>
+                <td class="px-2">
                   {% if edge.criticality %}{% call badge(variant='outline') %}{{ edge.criticality }}{% endcall %}
                   {% else %}—{% endif %}
                 </td>
               </tr>
               {% endfor %}
-            </tbody>
-          </table>
-        </div>
+            {% endcall %}
       </div>
     </div>
     {% endif %}

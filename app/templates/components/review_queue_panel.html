@@ -1,7 +1,7 @@
 <!-- AI Review Queue Panel Component -->
 <!-- Professional EA tool for reviewing AI-generated mappings with confidence scores -->
-<div id="review-queue-panel" hidden class="modal-root fixed inset-0 bg-foreground bg-opacity-50 items-center justify-center" style="z-index:1000;">
-  <div class="bg-background rounded-lg w-full max-w-7xl h-5/6 flex flex-col">
+<div id="review-queue-panel" hidden class="modal-root fixed inset-0 bg-foreground bg-opacity-50 items-center justify-center bg-overlay/50" style="z-index:1000;">
+  <div class="bg-background rounded-lg w-full max-w-7xl h-5/6 flex flex-col border border-border">
     <!-- Header -->
     <div class="flex items-center justify-between p-6 border-b border-border">
       <div>
@@ -14,7 +14,7 @@
           <span id="review-pending-count" class="text-primary font-bold">0</span>
           <span id="review-breakdown" class="text-xs text-muted-foreground ml-2"></span>
         </div>
-        <button type="button" @click="closeReviewQueue()" class="text-muted-foreground hover:text-muted-foreground" aria-label="Close review queue">
+        <button type="button" @click="closeReviewQueue()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close review queue">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
           </svg>

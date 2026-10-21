@@ -125,13 +125,13 @@
     </div>
 
     <!-- Element Detail Modal -->
-    <div id="element-modal" class="modal-root fixed inset-0 bg-black/50 overflow-y-auto z-50 hidden">
+    <div id="element-modal" class="modal-root fixed inset-0 overflow-y-auto z-50 hidden bg-overlay/50">
         <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-card rounded-lg max-w-md w-full">
+            <div class="bg-card rounded-lg max-w-md w-full border border-border">
                 <div class="p-6">
                     <div class="flex justify-between items-start mb-4">
                         <h3 class="text-lg font-semibold" id="modal-element-name">Element Name</h3>
-                        <button type="button" id="btn-close-modal" class="text-muted-foreground hover:text-muted-foreground" aria-label="Close element details modal">
+                        <button type="button" id="btn-close-modal" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close element details modal">
                             <i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>
                         </button>
                     </div>

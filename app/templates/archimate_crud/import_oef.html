@@ -1,4 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Import ArchiMate Model (OEF){% endblock %}
@@ -208,29 +209,18 @@
                 </ul>
             </div>
 
-            <div class="overflow-x-auto rounded-md border border-border">
-                <table class="dense-table w-full text-sm">
-                    <thead class="bg-muted/50">
-                        <tr>
-                            <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Name</th>
-                            <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Type</th>
-                            <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+{% call dense_table(columns=[('Name', ''), ('Type', ''), ('Status', '')]) %}
                         <template x-for="(elem, idx) in (preview ? preview.elements : [])" :key="elem.identifier + '-' + idx">
                             <tr>
-                                <td class="px-3 py-2 font-medium text-foreground break-words" x-text="elem.name"></td>
-                                <td class="px-3 py-2 text-muted-foreground" x-text="elem.type"></td>
-                                <td class="px-3 py-2">
+                                <td class="px-2 font-medium text-foreground break-words" x-text="elem.name"></td>
+                                <td class="px-2 text-muted-foreground" x-text="elem.type"></td>
+                                <td class="px-2">
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border"
                                           :class="statusClass(elem.status)" x-text="statusLabel(elem.status)"></span>
                                 </td>
                             </tr>
                         </template>
-                    </tbody>
-                </table>
-            </div>
+                    {% endcall %}
         </div>
     </div>
 </div>

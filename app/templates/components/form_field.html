@@ -1,28 +1,33 @@
-{# Form Field Wrapper Component
+{# Canonical form field (design/patterns.json: form).
 
-   Wraps label + input + error message with proper accessibility.
-   Handles aria-describedby, aria-invalid, and required indicators.
+   One column, label above the control, 36px controls, 12px help and error
+   text. Three macros, one look:
+
+   form_field  — label + a plain <input> or <textarea> the macro renders.
+   form_group  — label + any control you render yourself (a <select>, an
+                 Alpine-bound input, a radio group); the control goes in the
+                 call block, the label/help/error chrome is the macro's.
+   form_footer — the Cancel / Submit row, right-aligned, 8px gap.
 
    Usage:
-   {% from 'components/form_field.html' import form_field %}
+   {% from 'components/form_field.html' import form_field, form_group, form_footer %}
 
-   {{ form_field(
-       id='app-name',
-       label='Application Name',
-       type='text',
-       placeholder='Enter application name...',
-       required=true,
-       error='Name is required'
-   ) }}
+   {{ form_field(id='app-name', label='Application Name', required=true, placeholder='e.g. Customer Portal') }}
 
-   {{ form_field(
-       id='description',
-       label='Description',
-       input_type='textarea',
-       rows=4,
-       help_text='Describe the application purpose'
-   ) }}
+   {% call form_group(id='app-owner', label='Owner', help_text='The person accountable for this application.') %}
+     <select id="app-owner" name="owner" x-model="form.owner" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">...</select>
+   {% endcall %}
+
+   {{ form_footer(submit_text='Save application', cancel_attrs='data-modal-close="modal-create"') }}
 #}
+
+{% macro form_label(id, label, required=false) %}
+{% if label %}<label for="{{ id }}" class="block text-sm font-medium text-muted-foreground mb-1">{{ label }}{% if required %} <span class="text-destructive-emphasis" aria-hidden="true">*</span>{% endif %}</label>{% endif %}
+{% endmacro %}
+
+{% macro form_note(id, error=none, help_text=none) %}
+{% if error %}<p id="{{ id }}-error" class="mt-1 text-xs text-destructive-emphasis" role="alert">{{ error }}</p>{% elif help_text %}<p id="{{ id }}-help" class="mt-1 text-xs text-muted-foreground">{{ help_text }}</p>{% endif %}
+{% endmacro %}
 
 {% macro form_field(
     id='',
@@ -40,13 +45,8 @@
     class=''
 ) %}
     {% set field_name = name or id %}
-    <div class="space-y-2 {{ class }}">
-        {% if label %}
-        <label for="{{ id }}" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            {{ label }}{% if required %}<span class="text-destructive-emphasis ml-1">*</span>{% endif %}
-        </label>
-        {% endif %}
-
+    <div class="{{ class }}">
+        {{ form_label(id, label, required) }}
         {% if input_type == 'textarea' %}
         <textarea
             id="{{ id }}"
@@ -57,7 +57,7 @@
             {% if error %}aria-invalid="true"{% endif %}
             {% if error %}aria-describedby="{{ id }}-error"{% elif help_text %}aria-describedby="{{ id }}-help"{% endif %}
             rows="{{ rows }}"
-            class="flex min-h-[80px] w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            class="flex min-h-[80px] w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         >{{ value }}</textarea>
         {% else %}
         <input
@@ -70,14 +70,26 @@
             {% if required %}required aria-required="true"{% endif %}
             {% if error %}aria-invalid="true"{% endif %}
             {% if error %}aria-describedby="{{ id }}-error"{% elif help_text %}aria-describedby="{{ id }}-help"{% endif %}
-            class="flex h-10 w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            class="flex h-9 w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         />
         {% endif %}
+        {{ form_note(id, error, help_text) }}
+    </div>
+{% endmacro %}
 
-        {% if error %}
-        <p id="{{ id }}-error" class="text-sm text-destructive-emphasis" role="alert">{{ error }}</p>
-        {% elif help_text %}
-        <p id="{{ id }}-help" class="text-sm text-muted-foreground">{{ help_text }}</p>
+{% macro form_group(id='', label='', required=false, error=none, help_text=none, class='', attrs='') %}
+    <div class="{{ class }}"{% if attrs %} {{ attrs|safe }}{% endif %}>
+        {{ form_label(id, label, required) }}
+        {{ caller() }}
+        {{ form_note(id, error, help_text) }}
+    </div>
+{% endmacro %}
+
+{% macro form_footer(submit_text='Save', cancel_text='Cancel', cancel_attrs='', submit_attrs='', submit_variant='primary', class='') %}
+    <div class="flex justify-end gap-2 pt-2 {{ class }}">
+        {% if cancel_text %}
+        <button type="button" class="inline-flex h-9 items-center justify-center rounded-md px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"{% if cancel_attrs %} {{ cancel_attrs|safe }}{% endif %}>{{ cancel_text }}</button>
         {% endif %}
+        <button type="submit" class="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 {% if submit_variant == 'destructive' %}bg-destructive text-destructive-foreground hover:bg-destructive/90{% else %}bg-primary text-primary-foreground hover:bg-primary/90{% endif %}"{% if submit_attrs %} {{ submit_attrs|safe }}{% endif %}>{{ submit_text }}</button>
     </div>
 {% endmacro %}

@@ -728,7 +728,7 @@
                         <div x-show="showWeb" x-cloak class="rounded-xl border border-success/30 bg-success/60 p-3 mb-3 text-xs text-success-emphasis space-y-2">
                             <p>Download the ZIP, then run:</p>
                             <div class="relative">
-                                <pre class="bg-background/80 rounded-lg px-3 py-2 font-mono text-xs border border-success/30 whitespace-pre-wrap">cd mobile
+                                <pre class="bg-overlay/50 rounded-lg px-3 py-2 font-mono text-xs border border-success/30 whitespace-pre-wrap">cd mobile
 npm install
 cp .env.example .env
 npx expo start --web</pre>
@@ -749,7 +749,7 @@ npx expo start --web</pre>
                         <div x-show="showEas" x-cloak class="rounded-xl border border-info/30 bg-info/60 p-3 mb-3 text-xs text-info-emphasis space-y-2">
                             <p class="font-semibold">Local emulator (no account):</p>
                             <div class="relative">
-                                <pre class="bg-background/80 rounded-lg px-3 py-2 font-mono text-xs border border-info/30 whitespace-pre-wrap">npx expo run:android   # needs Android Studio
+                                <pre class="bg-overlay/50 rounded-lg px-3 py-2 font-mono text-xs border border-info/30 whitespace-pre-wrap">npx expo run:android   # needs Android Studio
 npx expo run:ios       # needs Xcode (macOS only)</pre>
                                 <button type="button" @click="navigator.clipboard.writeText('npx expo run:android'); copied='local'; setTimeout(()=>copied='',1500)"
                                         class="absolute top-2 right-2 h-5 px-2 text-2xs rounded border border-info/30 bg-background text-info-emphasis hover:bg-info/10">
@@ -758,7 +758,7 @@ npx expo run:ios       # needs Xcode (macOS only)</pre>
                             </div>
                             <p class="font-semibold mt-2">Shareable preview APK (free Expo account):</p>
                             <div class="relative">
-                                <pre class="bg-background/80 rounded-lg px-3 py-2 font-mono text-xs border border-info/30 whitespace-pre-wrap">npm install -g eas-cli && eas login
+                                <pre class="bg-overlay/50 rounded-lg px-3 py-2 font-mono text-xs border border-info/30 whitespace-pre-wrap">npm install -g eas-cli && eas login
 eas build --platform android --profile preview</pre>
                                 <button type="button" @click="navigator.clipboard.writeText('npm install -g eas-cli && eas login\neas build --platform android --profile preview'); copied='eas'; setTimeout(()=>copied='',1500)"
                                         class="absolute top-2 right-2 h-5 px-2 text-2xs rounded border border-info/30 bg-background text-info-emphasis hover:bg-info/10">
@@ -967,7 +967,7 @@ eas build --platform android --profile preview</pre>
                             </button>
                         </div>
 
-                        <div x-show="intentPlan" x-cloak class="rounded-lg border border-info/20 bg-background/80 p-2.5 space-y-2">
+                        <div x-show="intentPlan" x-cloak class="rounded-lg border border-info/20 bg-overlay/50 p-2.5 space-y-2">
                             <div class="flex items-start justify-between gap-2">
                                 <p class="text-2xs text-foreground/90 leading-relaxed" x-text="intentPlan && intentPlan.summary"></p>
                                 <span class="shrink-0 text-2xs font-semibold px-1.5 py-0.5 rounded border uppercase tracking-wider"
@@ -1038,7 +1038,7 @@ eas build --platform android --profile preview</pre>
                                           x-text="'Override rate ' + Number(intentGateStats.override_rate || 0).toFixed(1) + '%'"></span>
                                 </div>
                                 <div class="grid grid-cols-4 gap-1 text-xs">
-                                    <div class="rounded border border-border bg-background/80 px-1.5 py-1 text-center">
+                                    <div class="rounded border border-border bg-overlay/50 px-1.5 py-1 text-center">
                                         <p class="text-muted-foreground">Total</p>
                                         <p class="font-semibold text-foreground" x-text="intentGateStats.total_events || 0"></p>
                                     </div>
@@ -1341,7 +1341,7 @@ eas build --platform android --profile preview</pre>
                         </a>
                         <!-- Close ✕ -->
                         <button aria-label="Close preview" type="button" @click="previewModal = false"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 ml-1 w-7 items-center justify-center">
+                                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-1">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                             </svg>
@@ -1373,7 +1373,7 @@ eas build --platform android --profile preview</pre>
                                         <div x-show="showWebCmd" x-cloak class="rounded-lg border border-info/30 bg-info/60 p-2.5 space-y-1.5">
                                             <p class="text-xs text-info-emphasis font-medium">Quick start</p>
                                             <div class="relative">
-                                                <pre class="bg-background/80 rounded px-2 py-1.5 font-mono text-2xs border border-info/30 whitespace-pre-wrap">cd frontend
+                                                <pre class="bg-overlay/50 rounded px-2 py-1.5 font-mono text-2xs border border-info/30 whitespace-pre-wrap">cd frontend
 npm install
 npm run dev</pre>
                                                 <button type="button" @click="navigator.clipboard.writeText('cd frontend\nnpm install\nnpm run dev'); snackCopied='web'; setTimeout(()=>snackCopied='',1500)"
@@ -1429,7 +1429,7 @@ npm run dev</pre>
                                                 </button>
                                                 <div x-show="showEasCmd" x-cloak class="rounded-lg border border-info/30 bg-info/60 p-2.5">
                                                     <div class="relative">
-                                                        <pre class="bg-background/80 rounded px-2 py-1.5 font-mono text-2xs border border-info/30 whitespace-pre-wrap">eas build --platform android --profile preview</pre>
+                                                        <pre class="bg-overlay/50 rounded px-2 py-1.5 font-mono text-2xs border border-info/30 whitespace-pre-wrap">eas build --platform android --profile preview</pre>
                                                         <button type="button" @click="navigator.clipboard.writeText('eas build --platform android --profile preview'); snackCopied='eas'; setTimeout(()=>snackCopied='',1500)"
                                                                 class="absolute top-1 right-1 h-5 px-1.5 text-2xs rounded border border-info/30 bg-background text-info-emphasis"
                                                                 x-text="snackCopied==='eas' ? '✓' : 'Copy'"></button>

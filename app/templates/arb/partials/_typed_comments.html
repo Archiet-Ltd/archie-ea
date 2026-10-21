@@ -53,16 +53,16 @@
     <form method="post" action="{{ url_for('arb.add_comment', id=_rid) }}" class="space-y-3 border-t border-border pt-4">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>
-            <label for="arb-comment-type" class="mb-1.5 block text-sm font-medium text-foreground">Comment type</label>
+            <label for="arb-comment-type" class="block text-sm font-medium text-muted-foreground mb-1">Comment type</label>
             <select id="arb-comment-type" name="comment_type"
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:w-64">
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:w-64">
                 {% for ct in _comment_types %}
                 <option value="{{ ct }}">{{ ct | replace('_', ' ') | capitalize }}</option>
                 {% endfor %}
             </select>
         </div>
         <div>
-            <label for="arb-comment-content" class="mb-1.5 block text-sm font-medium text-foreground">
+            <label for="arb-comment-content" class="block text-sm font-medium text-muted-foreground mb-1">
                 Comment <span class="text-destructive" aria-hidden="true">*</span>
             </label>
             <textarea id="arb-comment-content" name="content" rows="3" required maxlength="4000"

@@ -1,22 +1,22 @@
+{% from 'components/form_field.html' import form_group, form_footer %}
+{% from 'components/dense_table.html' import dense_table %}
 <!-- Application Import Modal with Tabs -->
 <div id="application-import-modal"
      data-modal-id="application-import-modal"
      class="modal-root fixed inset-0 items-center justify-center p-4"
-     style="z-index: var(--modal-z, 1000);"
      hidden
      role="dialog"
      aria-modal="true"
      aria-labelledby="import-modal-title">
   <!-- Backdrop -->
   <div data-modal-backdrop="application-import-modal" aria-hidden="true"
-       class="modal-backdrop absolute inset-0 bg-background/80 transition-opacity duration-200"></div>
+       class="modal-backdrop absolute inset-0 transition-opacity duration-200 bg-overlay/50"></div>
   <div data-modal-panel
-       class="modal-panel relative bg-card rounded-lg w-full max-w-6xl max-h-[90vh] flex flex-col"
-       style="z-index: calc(var(--modal-z, 1000) + 1);">
+       class="modal-panel relative bg-card rounded-lg w-full max-w-6xl max-h-[90vh] flex flex-col border border-border">
       <!-- Modal Header -->
       <div class="flex items-center justify-between p-6 border-b">
-        <h2 id="import-modal-title" class="text-2xl font-semibold">Import Applications</h2>
-        <button type="button" data-modal-close="application-import-modal" class="text-muted-foreground hover:text-muted-foreground" aria-label="Close">
+        <h2 id="import-modal-title" class="text-base font-semibold text-foreground text-foreground">Import Applications</h2>
+        <button type="button" data-modal-close="application-import-modal" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
           </svg>
@@ -47,8 +47,7 @@
               <label class="block text-sm font-medium text-muted-foreground mb-2">
                 Upload File (Excel, CSV, or JSON)
               </label>
-              <div id="drop-zone" class="border-2 border-dashed border-input rounded-lg p-8 text-center transition-colors hover:border-primary">
-                <label for="excel-file-input" class="block text-sm font-medium text-muted-foreground mb-1">Import file</label>
+              {% call form_group(id='excel-file-input', label='Import file', help_text='Drag & drop or click to select. Supports: .xlsx, .xls, .csv, .json', class='border-2 border-dashed border-input rounded-lg p-8 text-center transition-colors hover:border-primary', attrs='id="drop-zone"') %}
                 <input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv,.json" class="hidden" @change="handleExcelFileSelect(event)">
                 <button type="button" @click="document.getElementById('excel-file-input').click()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Choose file to upload">
                   <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -57,8 +56,7 @@
                   Choose File
                 </button>
                 <p class="mt-2 text-sm text-muted-foreground" id="excel-file-name">No file selected</p>
-                <p class="mt-1 text-xs text-muted-foreground">Drag & drop or click to select. Supports: .xlsx, .xls, .csv, .json</p>
-              </div>
+              {% endcall %}
             </div>
 
             <div class="flex items-center justify-between">
@@ -245,22 +243,9 @@
               </div>
             </div>
 
-            <div class="overflow-x-auto border rounded">
-              <table class="dense-table min-w-full divide-y divide-border" id="manual-entry-table">
-                <thead class="bg-muted/50">
-                  <tr>
-                    <th class="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">APP ID</th>
-                    <th class="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Name *</th>
-                    <th class="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Type</th>
-                    <th class="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
-                    <th class="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody class="bg-card divide-y divide-border" id="manual-entry-tbody">
+{% call dense_table(columns=[('APP ID', ''), ('Name *', ''), ('Type', ''), ('Status', ''), ('Actions', '')], id='manual-entry-table', tbody_id='manual-entry-tbody') %}
                   <!-- Rows will be added dynamically -->
-                </tbody>
-              </table>
-            </div>
+                {% endcall %}
 
             <div class="flex justify-end gap-2">
               <button type="button" @click="closeApplicationImportModal()" class="px-4 py-2 border border-input rounded-md text-sm font-medium text-muted-foreground hover:bg-accent" aria-label="Cancel manual entry">
@@ -277,25 +262,9 @@
         <div id="tab-content-history" class="tab-content hidden">
           <div class="space-y-4">
             <h3 class="text-lg font-medium">Import History</h3>
-            <div class="overflow-x-auto border rounded">
-              <table class="dense-table min-w-full divide-y divide-border">
-                <thead class="bg-muted/50">
-                  <tr>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Date</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Imported By</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Source</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">File</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Created</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Updated</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Failed</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody class="bg-card divide-y divide-border" id="import-history-tbody">
+{% call dense_table(columns=[('Date', ''), ('Imported By', ''), ('Source', ''), ('File', ''), ('Created', ''), ('Updated', ''), ('Failed', ''), ('Status', '')], tbody_id='import-history-tbody') %}
                   <!-- Will be populated by JavaScript -->
-                </tbody>
-              </table>
-          </div>
+                {% endcall %}
         </div>
       </div>
     </div>

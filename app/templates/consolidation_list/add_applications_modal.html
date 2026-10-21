@@ -2,16 +2,16 @@
 <div id="add-applications-modal"
      data-modal-id="add-applications-modal"
      hidden
-     class="modal-root items-center justify-center fixed inset-0 bg-black/50 overflow-y-auto z-50" role="dialog"
+     class="modal-root items-center justify-center fixed inset-0 overflow-y-auto z-50 bg-overlay/50" role="dialog"
      aria-modal="true"
      aria-labelledby="add-applications-modal-title">
     <div class="bg-card rounded-lg border border-border max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         <!-- Header -->
         <div class="border-b px-6 py-4">
             <div class="flex items-center justify-between">
-                <h2 id="add-applications-modal-title" class="text-lg font-semibold">Add Applications to Consolidation List</h2>
+                <h2 id="add-applications-modal-title" class="text-base font-semibold text-foreground text-foreground">Add Applications to Consolidation List</h2>
                 <button data-modal-close="add-applications-modal"
-                        class="text-muted-foreground hover:text-foreground text-xl leading-none rounded-md p-1"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         aria-label="Close"
                         type="button">
                     <span aria-hidden="true">&times;</span>

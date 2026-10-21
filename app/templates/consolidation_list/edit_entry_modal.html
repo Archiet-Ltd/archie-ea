@@ -154,7 +154,7 @@
     <div class="flex items-center justify-between mt-6 pt-6 border-t border-border">
         <p class="text-sm text-muted-foreground">Changes will be saved immediately</p>
         <div class="flex gap-2">
-            <button type="button" @click="Platform.modal.close('edit-entry')" class="px-4 py-2 border border-input rounded-lg hover:bg-accent transition-colors" aria-label="Close">
+            <button type="button" @click="Platform.modal.close('edit-entry')" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
                 Cancel
             </button>
             <button type="button" data-action="submitEditEntry" class="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors" aria-label="Action">

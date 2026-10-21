@@ -1,8 +1,74 @@
 {
   "pilot_patterns": {
-    "overview": { "pattern": "dashboard-01", "structure": ["kpi-band", "answer-cascade", "chart", "dense-table"] },
-    "list": { "pattern": "data-table", "structure": ["action-bar", "quiet-alert", "dense-table"] },
-    "focused_task": { "pattern": "command", "structure": ["large-input", "suggestion-chips", "answer-cascade"] }
+    "overview": {
+      "pattern": "dashboard-01",
+      "structure": [
+        "kpi-band",
+        "answer-cascade",
+        "chart",
+        "dense-table"
+      ]
+    },
+    "list": {
+      "pattern": "data-table",
+      "structure": [
+        "action-bar",
+        "quiet-alert",
+        "dense-table"
+      ]
+    },
+    "focused_task": {
+      "pattern": "command",
+      "structure": [
+        "large-input",
+        "suggestion-chips",
+        "answer-cascade"
+      ]
+    },
+    "form": {
+      "pattern": "single-column",
+      "structure": [
+        "page-header",
+        "form-body",
+        "form-footer"
+      ],
+      "rules": [
+        "label-above-input",
+        "inline-validation",
+        "right-aligned-actions"
+      ]
+    },
+    "dialog": {
+      "pattern": "centered-modal",
+      "structure": [
+        "overlay",
+        "dialog-header",
+        "dialog-body",
+        "dialog-footer"
+      ],
+      "rules": [
+        "no-shadows",
+        "hairline-border",
+        "8px-radius"
+      ]
+    },
+    "trust_meter": {
+      "pattern": "trust-meter",
+      "parent": "answer-envelope",
+      "macros": "components/provenance.html answer_envelope(trust=...) for the line under an answer; the per-area view is a dense_table",
+      "spec": {
+        "line": "one muted 12px text line under the provenance line: the resolver's sentence with counts and denominators and the last-change age",
+        "empty_area": "the resolver's 'nothing recorded' sentence, never 0 percent",
+        "per_area_view": "dense_table, one row per area, a column per fact (owner, lifecycle, cost, connected, last change); a fact the type does not carry reads 'Not held'",
+        "source": "model_trust(organization_id, area), the one resolver (reuse register: model-trust)"
+      },
+      "banned": [
+        "trust-score",
+        "trust-gauge",
+        "coloured-grade",
+        "progress-ring"
+      ]
+    }
   },
   "banned_patterns": [
     "card-grid-navigation",
@@ -11,6 +77,12 @@
     "full-width-warning-banners",
     "multi-column-forms",
     "drop-shadows",
-    "icons-inside-kpi-cards"
+    "icons-inside-kpi-cards",
+    "mermaid",
+    "force-directed-graph",
+    "page-level-d3",
+    "side-drawers",
+    "full-screen-modals",
+    "floating-labels"
   ]
 }

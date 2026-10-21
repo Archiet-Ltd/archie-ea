@@ -68,19 +68,19 @@
 <form method="POST" action="{{ url_for('business_model.create') }}" class="space-y-4" data-testid="bmc-create-form">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div>
-    <label for="bmc-name" class="block text-sm font-medium mb-1">Name <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
+    <label for="bmc-name" class="block text-sm font-medium text-muted-foreground mb-1">Name <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
     <input id="bmc-name" name="name" type="text" required maxlength="256" placeholder="e.g. Core Retail Business"
-      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
   </div>
   <div>
-    <label for="bmc-description" class="block text-sm font-medium mb-1">Description</label>
+    <label for="bmc-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
     <textarea id="bmc-description" name="description" rows="2" maxlength="2000" placeholder="Optional context for this canvas"
       class="flex min-h-[64px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
   </div>
   <div>
-    <label for="bmc-operating-model" class="block text-sm font-medium mb-1">Operating Model Archetype</label>
+    <label for="bmc-operating-model" class="block text-sm font-medium text-muted-foreground mb-1">Operating Model Archetype</label>
     <select id="bmc-operating-model" name="operating_model_type"
-      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
       <option value="">Not set</option>
       {% for t in operating_model_types %}
       <option value="{{ t }}">{{ t | capitalize }}</option>
@@ -89,7 +89,7 @@
   </div>
   <div class="flex justify-end gap-3 pt-2 border-t">
     <button type="button" data-modal-close="bmc-create-modal"
-      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
       Cancel
     </button>
     <button type="submit" data-testid="bmc-create-submit"

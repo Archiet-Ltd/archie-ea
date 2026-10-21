@@ -1,7 +1,9 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/status_badge.html' import status_badge %}
+{% from 'components/provenance.html' import answer_envelope %}
 
 {% block title %}Gap Analysis{% endblock %}
 
@@ -33,19 +35,18 @@
         {{ metrics_card(title='Resolved', value=gaps|selectattr('status', 'equalto', 'Resolved')|list|length|default(0), icon='check-circle', icon_class='!text-success', value_class='text-success') }}
     </div>
 
+    <div class="mt-1">{{ answer_envelope(source='count of gaps in the gap register of this organisation') }}</div>
+
     <!-- Gaps Table -->
     <div data-slot="card" class="rounded-lg border border-border bg-card" x-data="gapAnalysisTable()">
         <div class="p-6">
             <h3 class="font-semibold mb-4">Identified Gaps</h3>
-            <div class="overflow-x-auto">
-                <table class="dense-table w-full">
-                    <thead>
-                        <tr class="border-b">
+{% set _dt_header_2091 %}
                             {# T-14 (2 Sep 2026 audit): same server-side sort pattern as /risks/ —
                                survives reload/bookmark since this table has no Alpine array backing it. #}
                             {% macro sort_th(key, label) %}
                             {% set next_dir = 'desc' if current_sort == key and current_dir == 'asc' else 'asc' %}
-                            <th class="text-left p-3 font-medium">
+                            <th scope="col" class="h-10 px-2 align-middle text-left">
                                 <a href="{{ request.path }}?sort={{ key }}&dir={{ next_dir }}"
                                    class="inline-flex items-center gap-1 hover:text-foreground transition-colors"
                                    aria-label="Sort by {{ label }}{{ ', currently ' ~ current_dir ~ 'ending' if current_sort == key }}">
@@ -63,22 +64,21 @@
                             {{ sort_th('priority', 'Priority') }}
                             {{ sort_th('resolution_status', 'Status') }}
                             {{ sort_th('impact', 'Impact') }}
-                            <th class="text-left p-3 font-medium">Work packages</th>
-                            <th class="text-left p-3 font-medium">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y">
-                        {% for gap in gaps|default([]) %}
-                        <tr class="border-b hover:bg-muted/50">
-                            <td class="p-3">
+                            <th scope="col" class="h-10 px-2 align-middle text-left">Work packages</th>
+                            <th scope="col" class="h-10 px-2 align-middle text-left">Actions</th>
+                        
+{% endset %}
+{% call dense_table(header=_dt_header_2091, rows=(gaps|default([]))|length, empty_text='No gaps identified') %}{% for gap in gaps|default([]) %}
+                        <tr class="hover:bg-muted/50">
+                            <td class="px-2">
                                 <div class="font-medium">
                                     <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
                                        class="hover:underline" data-testid="gap-link-{{ gap.id }}">{{ gap.name|default('—', true) }}</a>
                                 </div>
                                 <div class="text-sm text-muted-foreground">{{ gap.description|default('', true)|truncate(50) }}</div>
                             </td>
-                            <td class="p-3">{{ gap.gap_type|default('—', true) }}</td>
-                            <td class="p-3">
+                            <td class="px-2">{{ gap.gap_type|default('—', true) }}</td>
+                            <td class="px-2">
                                 {% if gap.priority == 'Critical' %}
                                     {{ status_badge(gap.priority|default('Normal'), 'error') }}
                                 {% elif gap.priority == 'High' %}
@@ -87,7 +87,7 @@
                                     {{ status_badge(gap.priority|default('Normal'), 'neutral') }}
                                 {% endif %}
                             </td>
-                            <td class="p-3">
+                            <td class="px-2">
                                 {% if gap.resolution_status == 'resolved' %}
                                     {{ status_badge(gap.resolution_status|default('identified'), 'success') }}
                                 {% elif gap.resolution_status == 'in_progress' %}
@@ -96,8 +96,8 @@
                                     {{ status_badge(gap.resolution_status|default('identified'), 'neutral') }}
                                 {% endif %}
                             </td>
-                            <td class="p-3 text-sm text-muted-foreground">{{ gap.impact|default('Unknown') }}</td>
-                            <td class="p-3 text-sm" data-testid="gap-work-packages-{{ gap.id }}">
+                            <td class="px-2 text-sm text-muted-foreground">{{ gap.impact|default('Unknown') }}</td>
+                            <td class="px-2 text-sm" data-testid="gap-work-packages-{{ gap.id }}">
                                 {% for wp in (work_packages_by_gap or {}).get(gap.id, []) %}
                                 <div><a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wp.id) if 'implementation_planning.work_package_detail' in flask.current_app.view_functions else '#' }}"
                                         class="text-primary hover:underline" data-testid="gap-work-package-link">{{ wp.name|default('—', true) }}</a></div>
@@ -105,7 +105,7 @@
                                 <span class="text-muted-foreground">—</span>
                                 {% endfor %}
                             </td>
-                            <td class="p-3">
+                            <td class="px-2">
                                 <button type="button" class="px-3 py-1.5 text-sm rounded-md border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
                                         @click="convertToWorkPackage({{ gap.id }}, {{ (gap.name|default('this gap'))|tojson }}, $event.target)"
                                         :disabled="busyId === {{ gap.id }}"
@@ -115,14 +115,7 @@
                                 </button>
                             </td>
                         </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="7" class="p-6 text-center text-muted-foreground">No gaps identified</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                        {% endfor %}{% endcall %}
         </div>
     </div>
 
@@ -134,29 +127,17 @@
                 These gaps have no work package linked to them. They remain open risks
                 in the transition from baseline to target architecture.
             </p>
-            <div class="overflow-x-auto">
-                <table class="dense-table w-full">
-                    <thead>
-                        <tr class="border-b">
-                            <th class="text-left p-3 font-medium">Gap</th>
-                            <th class="text-left p-3 font-medium">Type</th>
-                            <th class="text-left p-3 font-medium">Priority</th>
-                            <th class="text-left p-3 font-medium">Status</th>
-                            <th class="text-left p-3 font-medium">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y">
-                        {% for gap in not_addressed_gaps|default([]) %}
-                        <tr class="border-b hover:bg-muted/50">
-                            <td class="p-3">
+{% call dense_table(columns=[('Gap', ''), ('Type', ''), ('Priority', ''), ('Status', ''), ('Actions', '')], rows=(not_addressed_gaps|default([]))|length, empty_text='All gaps are addressed by work packages.') %}{% for gap in not_addressed_gaps|default([]) %}
+                        <tr class="hover:bg-muted/50">
+                            <td class="px-2">
                                 <div class="font-medium">
                                     <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
                                        class="hover:underline" data-testid="not-addressed-gap-link-{{ gap.id }}">{{ gap.name|default('—', true) }}</a>
                                 </div>
                                 <div class="text-sm text-muted-foreground">{{ gap.description|default('', true)|truncate(50) }}</div>
                             </td>
-                            <td class="p-3">{{ gap.gap_type|default('—', true) }}</td>
-                            <td class="p-3">
+                            <td class="px-2">{{ gap.gap_type|default('—', true) }}</td>
+                            <td class="px-2">
                                 {% if gap.priority == 'Critical' %}
                                     {{ status_badge(gap.priority|default('Normal'), 'error') }}
                                 {% elif gap.priority == 'High' %}
@@ -165,7 +146,7 @@
                                     {{ status_badge(gap.priority|default('Normal'), 'neutral') }}
                                 {% endif %}
                             </td>
-                            <td class="p-3">
+                            <td class="px-2">
                                 {% if gap.resolution_status == 'resolved' %}
                                     {{ status_badge(gap.resolution_status|default('identified'), 'success') }}
                                 {% elif gap.resolution_status == 'in_progress' %}
@@ -174,23 +155,14 @@
                                     {{ status_badge(gap.resolution_status|default('identified'), 'neutral') }}
                                 {% endif %}
                             </td>
-                            <td class="p-3">
+                            <td class="px-2">
                                 <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
                                    class="px-3 py-1.5 text-sm rounded-md border hover:bg-muted inline-block">
                                     View Details
                                 </a>
                             </td>
                         </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="5" class="p-6 text-center text-muted-foreground">
-                                All gaps are addressed by work packages.
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                        {% endfor %}{% endcall %}
         </div>
     </div>
 </div>

@@ -333,7 +333,7 @@
                         <h3 class="font-semibold text-foreground" x-text="selectedTask.name"></h3>
                         <p class="text-xs text-muted-foreground mt-1" x-text="selectedTask.group"></p>
                     </div>
-                    <button aria-label="Close task details" type="button" @click="selectedTask = null" class="p-1 hover:bg-accent rounded-md">
+                    <button aria-label="Close task details" type="button" @click="selectedTask = null" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <i data-lucide="x" class="w-4 h-4 text-muted-foreground" aria-hidden="true"></i>
                     </button>
                 </div>
