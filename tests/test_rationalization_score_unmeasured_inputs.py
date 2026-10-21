@@ -17,6 +17,28 @@ from datetime import date
 
 import uuid
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _registered_formula(db_session):
+    """Scoring needs a registered formula; none is created on the fly."""
+    from app.models.application_rationalization import ScoringConfiguration
+
+    db_session.add(
+        ScoringConfiguration(
+            name=f"Formula {uuid.uuid4().hex[:8]}",
+            scope_type="global",
+            technical_health_weight=30,
+            business_value_weight=35,
+            cost_efficiency_weight=25,
+            vendor_risk_weight=10,
+            is_active=True,
+            is_default=True,
+        )
+    )
+    db_session.flush()
+
 
 def _bare_app(db_session, org):
     from app.models.application_portfolio import ApplicationComponent
