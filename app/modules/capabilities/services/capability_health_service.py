@@ -18,7 +18,7 @@ PERFORMANCE OPTIMIZED VERSION:
 import logging
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from app import db
 from app.models import BusinessCapability
@@ -245,7 +245,7 @@ class CapabilityHealthService:
                     gaps_identified += 1
                     if has_delivery_plan:
                         gaps_with_decisions += 1
-            if maturity_gap > 0:
+            if maturity_gap is not None and maturity_gap > 0:
                 gaps_identified += 1
                 if has_delivery_plan:
                     gaps_with_decisions += 1
@@ -379,7 +379,8 @@ class CapabilityHealthService:
 
         # 1. Maturity Gap Impact (Max -45 if gap is 3)
         gap = self._effective_maturity_gap(capability)
-        score -= gap * 15
+        if gap is not None:
+            score -= gap * 15
 
         # 2. Application Coverage Impact (using pre-loaded apps)
         if not apps:
@@ -480,12 +481,16 @@ class CapabilityHealthService:
         return bool(planned_solution_count or planned_mapping_count or requirement_count)
 
     @staticmethod
-    def _effective_maturity_gap(capability: BusinessCapability) -> int:
-        """Calculate maturity gap even when stored field is null."""
+    def _effective_maturity_gap(capability: BusinessCapability) -> Optional[int]:
+        """Calculate maturity gap even when stored field is null.
+
+        Returns None when either current or target maturity is unrecorded,
+        so callers can distinguish "no gap" from "gap unknown".
+        """
         if capability.maturity_gap is not None:
             return capability.maturity_gap
         if capability.target_maturity_level is None or capability.current_maturity_level is None:
-            return 0
+            return None
         return max(capability.target_maturity_level - capability.current_maturity_level, 0)
 
     def _get_status_from_score(self, score) -> str:
@@ -497,3 +502,91 @@ class CapabilityHealthService:
         if score >= 60:
             return "Warning"
         return "Critical"
+
+    def assess_capability_health(self, capability: BusinessCapability) -> Dict[str, Any]:
+        """
+        Assess health for a single capability.
+
+        Returns a dict with health score, maturity_recorded flag, and details.
+        """
+        from app.models.application_portfolio import ApplicationCapabilityMapping, ApplicationComponent
+        from app.models.solution_architect_models import SolutionRequirement
+        from app.models.solution_models import SolutionCapabilityMapping
+        from app.services.compliance.compliance_inheritance_service import ComplianceInheritanceService
+
+        # Load applications for this capability
+        app_mappings = (
+            ApplicationCapabilityMapping.query.filter_by(business_capability_id=capability.id)
+            .all()
+        )  # tenant-scoping-ok: FK id already org-scoped (application/capability resolved via a TenantMixin model)
+        app_ids = [m.application_component_id for m in app_mappings]
+        apps = []
+        if app_ids:
+            apps = ApplicationComponent.query.filter(ApplicationComponent.id.in_(app_ids)).all()  # tenant-scoping-ok: FK id already org-scoped
+            for app in apps:
+                mapping = next((m for m in app_mappings if m.application_component_id == app.id), None)
+                if mapping:
+                    app._capability_coverage = mapping.coverage_percentage or 0
+                    app._capability_debt = mapping.technical_debt_score or 0
+
+        # Load compliance score
+        compliance_scores = ComplianceInheritanceService.calculate_compliance_scores_batch([capability.id])
+        compliance_score = compliance_scores.get(capability.id, 100.0)
+
+        # Load delivery signals
+        solution_mappings = (
+            SolutionCapabilityMapping.query.filter_by(capability_id=capability.id)
+            .all()
+        )  # tenant-scoping-ok: FK id already org-scoped
+        planned_solution_ids = set()
+        planned_mapping_count = 0
+        for sm in solution_mappings:
+            if sm.solution_id or sm.problem_id:
+                planned_mapping_count += 1
+            if sm.solution_id:
+                planned_solution_ids.add(sm.solution_id)
+        planned_solution_count = len(planned_solution_ids)
+
+        requirement_count = (
+            SolutionRequirement.query.filter_by(capability_id=capability.id)
+            .filter(SolutionRequirement.deleted_at.is_(None))
+            .count()
+        )  # tenant-scoping-ok: FK id already org-scoped
+
+        # Determine if maturity is recorded
+        maturity_recorded = (
+            capability.maturity_gap is not None
+            or capability.current_maturity_level is not None
+            or capability.target_maturity_level is not None
+        )
+
+        # Calculate health score
+        score = self._calculate_health_score_with_apps(
+            capability,
+            apps,
+            compliance_score,
+            planned_solution_count=planned_solution_count,
+            planned_mapping_count=planned_mapping_count,
+            requirement_count=requirement_count,
+        )
+
+        # Check if assessable (has any real input)
+        is_assessable = self._is_assessable(
+            capability, apps, planned_solution_count, planned_mapping_count, requirement_count
+        )
+        if not is_assessable:
+            score = None
+
+        return {
+            "capability_id": capability.id,
+            "capability_name": capability.name,
+            "score": score,
+            "status": self._get_status_from_score(score),
+            "maturity_recorded": maturity_recorded,
+            "maturity_gap": self._effective_maturity_gap(capability),
+            "compliance_score": compliance_score,
+            "application_count": len(apps),
+            "planned_solution_count": planned_solution_count,
+            "planned_mapping_count": planned_mapping_count,
+            "requirement_count": requirement_count,
+        }
