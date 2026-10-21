@@ -71,7 +71,8 @@ def test_risk_register_touches_journey(live_server, browser):
     expect(touches).to_be_visible()
     # Never the risk's own element.
     assert "mirror" not in touches.inner_text()
-    expect(row).to_contain_text("Reaches 2 elements")
+    # The count is said once per row: in the ranking sentence, not also as a chip.
+    assert row.inner_text().lower().count("reaches 2 elements") == 1, row.inner_text()
     names = touches.locator("a").all_inner_texts()
     assert sorted(names) == sorted(["%s Billing" % noun, "%s Invoices" % noun, "%s Payments" % noun]), names
 
@@ -94,7 +95,7 @@ def test_risk_register_touches_journey(live_server, browser):
     # The unlinked risk says so, and its action opens the link picker.
     register()
     loose = page.locator("[data-risk-row]", has_text="%s loose risk" % noun)
-    expect(loose.locator("[data-risk-unlinked]")).to_contain_text("Not linked to any application or capability yet")
+    expect(loose.locator("[data-risk-unlinked]")).to_contain_text("Not linked to any application, solution or programme yet")
     expect(loose).not_to_contain_text("Touches:")
     expect(loose).not_to_contain_text("Reaches —")
     assert "mirror" not in loose.inner_text()
