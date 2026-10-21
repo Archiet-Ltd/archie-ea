@@ -33,7 +33,7 @@ def test_risk_linked_only_through_element_field_shows_that_element(
         risk = _risk(db_session, org, "Event Relay single point of failure", relay)
         links = serialize_risk_row(risk)["entity_links"]
         assert [(lk["entity_type"], lk["entity_label"]) for lk in links] == [
-            ("ApplicationComponent", "Event Relay")
+            ("application", "Event Relay")
         ]
 
 
@@ -84,3 +84,79 @@ def test_other_organisations_element_never_appears(
         links = serialize_risk_row(risk)["entity_links"]
         assert links == []
         assert "Org B Secret System" not in repr(links)
+
+
+def test_renamed_risk_is_still_not_mapped(app, db_session, make_org, tenant_ctx):
+    """The risk's own backbone mirror is recognised by how it was made, not by
+    its name, so renaming the risk must not make it appear to touch itself."""
+    org = make_org("pa32-rename")
+    with tenant_ctx(org.id):
+        risk = _risk(db_session, org, "Original title")
+        assert risk.archimate_element_id is not None
+        risk.title = "Completely different title"
+        db_session.flush()
+        assert serialize_risk_row(risk)["entity_links"] == []
+
+
+def test_genuine_assessment_named_like_the_risk_is_shown(
+        app, db_session, make_org, tenant_ctx):
+    org = make_org("pa32-assess")
+    with tenant_ctx(org.id):
+        genuine = _element(db_session, org, "Vendor lock-in", "Assessment", "Motivation")
+        risk = _risk(db_session, org, "Vendor lock-in", genuine)
+        links = serialize_risk_row(risk)["entity_links"]
+        assert [lk["entity_label"] for lk in links] == ["Vendor lock-in"]
+
+
+def test_register_rows_use_a_fixed_number_of_queries(
+        app, db_session, make_org, tenant_ctx):
+    from sqlalchemy import event
+
+    from app.modules.architecture.routes.risk_routes import _prefetch_risk_context
+
+    org = make_org("pa32-count")
+
+    def count_for(n):
+        with tenant_ctx(org.id):
+            risks = [
+                _risk(db_session, org, f"Risk {n}-{i}", _element(db_session, org, f"El {n}-{i}"))
+                for i in range(n)
+            ]
+            seen = []
+            engine = db_session.get_bind()
+
+            def _count(conn, cursor, statement, *a):
+                seen.append(statement)
+
+            event.listen(engine, "before_cursor_execute", _count)
+            try:
+                ctx = _prefetch_risk_context(risks)
+                rows = [serialize_risk_row(r, ctx) for r in risks]
+            finally:
+                event.remove(engine, "before_cursor_execute", _count)
+            assert all(len(r["entity_links"]) == 1 for r in rows)
+            return len(seen)
+
+    assert count_for(2) == count_for(8)
+
+
+def test_demo_event_relay_risk_lists_its_element(app, db_session):
+    import os
+
+    from app.commands.seed_demo_company import seed_demo_company
+    from app.models.organization import Organization
+
+    os.environ["DEMO_USER_PASSWORD"] = "test-password"
+    try:
+        seed_demo_company()
+    finally:
+        del os.environ["DEMO_USER_PASSWORD"]
+    org_id = db_session.query(Organization.id).filter_by(slug="lantern-quay").scalar()
+    from flask import g
+
+    with app.test_request_context("/"):
+        g.current_org_id = org_id
+        risk = Risk.query.filter_by(
+            organization_id=org_id, title="Event Relay single point of failure").one()
+        links = serialize_risk_row(risk)["entity_links"]
+        assert [lk["entity_label"] for lk in links] == ["Event Relay"]
