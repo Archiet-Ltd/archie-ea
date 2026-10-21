@@ -16,7 +16,7 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
-from tests.smoke.conftest import PASSWORD
+from tests.smoke.conftest import PASSWORD, all_modules_link
 
 PAGE_TIMEOUT = 30000
 
@@ -72,11 +72,12 @@ def test_composer_sidebar_link_opens_layered_viewpoint_with_elements(browser, li
         # /modules "All modules" directory page (D3) also carrying a matching
         # href, an unqualified partial-href locator could ambiguously match
         # either render site if this ever ran against a page with both present.
-        composer_link = page.locator('nav#sidebar-nav a[href*="/archimate/composer"]').first
+        # Not a launch module: reached from the All modules page, which every sidebar links to.
+        composer_link = all_modules_link(page, "ArchiMate Composer")
         expect(composer_link).to_be_visible(timeout=PAGE_TIMEOUT)
         href = composer_link.get_attribute("href")
         assert href and "viewpoint=layered" in href, (
-            f"sidebar ArchiMate Composer link must carry ?viewpoint=layered, got {href!r}"
+            f"All modules ArchiMate Composer link must carry ?viewpoint=layered, got {href!r}"
         )
 
         composer_link.click()

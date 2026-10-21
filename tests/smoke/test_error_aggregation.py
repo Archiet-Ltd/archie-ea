@@ -16,7 +16,7 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
-from tests.smoke.conftest import PASSWORD
+from tests.smoke.conftest import PASSWORD, all_modules_link
 
 PAGE_TIMEOUT = 30000
 
@@ -63,7 +63,7 @@ def test_client_js_error_is_captured_deduplicated_and_visible_to_admin(browser, 
 
     # Found from the sidebar, not a typed URL.
     admin_page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    sidebar_link = admin_page.get_by_role("link", name=re.compile("^Errors$"))
+    sidebar_link = all_modules_link(admin_page, "Errors")
     expect(sidebar_link).to_be_visible(timeout=PAGE_TIMEOUT)
     sidebar_link.click()
     admin_page.wait_for_url(re.compile(r"/admin/errors"), timeout=PAGE_TIMEOUT)

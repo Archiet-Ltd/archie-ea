@@ -804,3 +804,17 @@ ARCHETYPES = [
     # R1-B36 (TB-0146): promoted from unassignable to assignable.
     "finance", "compliance", "risk", "operations", "non_technical_owner",
 ]
+
+
+def all_modules_link(page, name):
+    """Open the All modules page from the sidebar footer link every role's rendered sidebar carries,
+    and return the locator of the module link called ``name`` on that page.
+
+    The grouped sidebar (20 Oct 2026) shows twelve launch modules; every other module is reached from
+    the All modules page. A journey that used to click a per-role sidebar entry for such a module
+    starts here instead and carries on from the click on the returned link.
+    """
+    entry = page.get_by_test_id("sidebar").get_by_role("link", name="All modules", exact=True)
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT):
+        entry.click()
+    return page.get_by_test_id("modules-directory").get_by_role("link", name=name, exact=True)
