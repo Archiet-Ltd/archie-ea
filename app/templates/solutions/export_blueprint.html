@@ -279,7 +279,7 @@
         {% set sec_elements = section_elements.get(sec_id, []) %}
         {% if sec_elements %}
             <h3>Architecture Elements</h3>
-            <table>
+            <table class="dense-table">
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -307,7 +307,7 @@
         {% if sec_id == 'vision_motivation' and sad_data %}
             {% if sad_data.get('integration_flows') %}
                 <h3>Integration Flows</h3>
-                <table>
+                <table class="dense-table">
                     <thead><tr><th>Name</th><th>Source</th><th>Target</th><th>Protocol</th></tr></thead>
                     <tbody>{# actionable-rows-ok: printed blueprint export (GET /solutions/<id>/export/blueprint) — this page exists to be printed or saved as PDF, so rows carry no controls; edit these records on the solution detail page and re-export. #}
                         {% for f in sad_data.integration_flows %}
@@ -321,7 +321,7 @@
         {% if sec_id == 'application_cooperation' and sad_data %}
             {% if sad_data.get('quality_attributes') %}
                 <h3>Quality Attributes</h3>
-                <table>
+                <table class="dense-table">
                     <thead><tr><th>Attribute</th><th>Target</th><th>Priority</th></tr></thead>
                     <tbody>{# actionable-rows-ok: printed blueprint export (GET /solutions/<id>/export/blueprint) — this page exists to be printed or saved as PDF, so rows carry no controls; edit these records on the solution detail page and re-export. #}
                         {% for qa in sad_data.quality_attributes %}
@@ -332,7 +332,7 @@
             {% endif %}
             {% if sad_data.get('slas') %}
                 <h3>Service Level Agreements</h3>
-                <table>
+                <table class="dense-table">
                     <thead><tr><th>SLA</th><th>Target</th><th>Measurement</th></tr></thead>
                     <tbody>{# actionable-rows-ok: printed blueprint export (GET /solutions/<id>/export/blueprint) — this page exists to be printed or saved as PDF, so rows carry no controls; edit these records on the solution detail page and re-export. #}
                         {% for sla in sad_data.slas %}
@@ -346,7 +346,7 @@
         {% if sec_id == 'transition_roadmap' and sad_data %}
             {% if sad_data.get('investment_phases') %}
                 <h3>Investment Phases</h3>
-                <table>
+                <table class="dense-table">
                     <thead><tr><th>#</th><th>Phase</th><th>Budget</th><th>Status</th></tr></thead>
                     <tbody>{# actionable-rows-ok: printed blueprint export (GET /solutions/<id>/export/blueprint) — this page exists to be printed or saved as PDF, so rows carry no controls; edit these records on the solution detail page and re-export. #}
                         {% for ip in sad_data.investment_phases %}
@@ -385,7 +385,7 @@
         {% if arb_ready.get('phase_checklist') or phase_checklist %}
             {% set _pc = phase_checklist or arb_ready.get('phase_checklist', []) %}
             <h3>ADM Phase Completion ({{ _pc|length }} phases)</h3>
-            <table>
+            <table class="dense-table">
                 <thead><tr><th>Phase</th><th>Status</th></tr></thead>
                 <tbody>{# actionable-rows-ok: printed blueprint export (GET /solutions/<id>/export/blueprint) — this page exists to be printed or saved as PDF, so rows carry no controls; edit these records on the solution detail page and re-export. #}
                     {% for phase in (phase_checklist or arb_ready.get('phase_checklist', [])) %}

@@ -51,7 +51,7 @@
    Retired Banner
 ───────────────────────────────────────────────────────────────────────────── #}
 {% if app and (app.deployment_status == 'retired' or app.lifecycle_status == 'retired') %}
-<div class="mb-4 flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3">
+<div class="mb-4 flex items-center gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2">
   <i data-lucide="alert-triangle" class="h-5 w-5 text-destructive shrink-0" aria-hidden="true"></i>
   <span class="text-sm font-semibold text-destructive-emphasis">RETIRED — This application has been decommissioned and is no longer active.</span>
 </div>
@@ -72,16 +72,16 @@
 {% macro _app_detail_actions() %}
   {% if edit_mode %}
   <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}?tab={{ resolved_tab }}"
-     class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
     Cancel
   </a>
   <button type="submit" form="overview-edit-form"
-     class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
     <i data-lucide="save" class="w-4 h-4 mr-2" aria-hidden="true"></i>Save
   </button>
   {% else %}
   <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}?edit=1&tab={{ resolved_tab }}"
-     class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
     <i data-lucide="pencil" class="w-4 h-4 mr-2" aria-hidden="true"></i>Edit
   </a>
   {% if can_retire_applications(current_user) %}
@@ -188,7 +188,7 @@
 {% if metric_cards is defined and metric_cards %}
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
   {% for card_data in metric_cards %}
-  <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm p-4">
+  <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground p-4">
     <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">{{ card_data.label }}</p>
     <p class="mt-1 text-2xl font-bold text-foreground">{{ card_data.value }}</p>
     {% if card_data.delta %}
@@ -200,7 +200,7 @@
 {% elif not app %}
 {# Portfolio dashboard — show available route-level counters #}
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-  <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm p-4">
+  <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground p-4">
     <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Applications</p>
     <p class="mt-1 text-2xl font-bold text-foreground">{{ total_apps or 0 }}</p>
     {# M2: this counts every ApplicationComponent row regardless of lifecycle_status,
@@ -211,15 +211,15 @@
     <p class="mt-1 text-2xs text-muted-foreground">Includes decommissioned applications</p>
     <a href="{{ url_for('unified_applications.application_list') }}" class="mt-1 inline-block text-2xs text-primary hover:underline">View active portfolio only &rarr;</a>
   </div>
-  <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm p-4">
+  <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground p-4">
     <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Active Interfaces</p>
     <p class="mt-1 text-2xl font-bold text-foreground">{{ active_interfaces or 0 }}</p>
   </div>
-  <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm p-4">
+  <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground p-4">
     <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Capability Coverage</p>
     <p class="mt-1 text-2xl font-bold text-foreground">{{ capability_coverage or 0 }}%</p>
   </div>
-  <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm p-4">
+  <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground p-4">
     <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Avg Tech Debt Score</p>
     <p class="mt-1 text-2xl font-bold text-foreground">{{ avg_tech_debt or 0 }}</p>
   </div>
@@ -291,7 +291,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
       {# Application Identity #}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3">
           <h2 class="text-lg font-semibold">Application Identity</h2>
         </div>
@@ -309,7 +309,7 @@
           <div class="flex justify-between items-center gap-4">
             <label for="edit-{{ name }}" class="text-muted-foreground shrink-0">{{ label }}</label>
             <input type="text" id="edit-{{ name }}" name="{{ name }}" value="{{ value or '' }}" maxlength="{{ maxlength }}"
-                   class="flex h-9 w-2/3 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                   class="flex h-9 w-2/3 rounded-md border border-input bg-background px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           {% endmacro %}
 
@@ -336,7 +336,7 @@
 
       {# ArchiMate Element — connects portfolio to architecture #}
       {% if archimate_info is defined and archimate_info %}
-      <div data-slot="card" class="rounded-xl border border-primary/20 bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-primary/20 bg-card">
         <div class="p-6">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
@@ -386,7 +386,7 @@
       {% endif %}
 
       {# Business Context #}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3">
           <h3 class="text-lg font-semibold">Business Context</h3>
         </div>
@@ -401,7 +401,7 @@
           <div class="flex justify-between items-center gap-4">
             <label for="edit-userCount" class="text-muted-foreground shrink-0">User Count</label>
             <input type="number" id="edit-userCount" name="userCount" value="{{ app.user_count or '' }}" min="0" max="10000000"
-                   class="flex h-9 w-2/3 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                   class="flex h-9 w-2/3 rounded-md border border-input bg-background px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
           </div>
           {{ detail_row('Avg Daily Users', app.average_daily_users | string if app.average_daily_users else none) }}
           {{ detail_row('Max Concurrent Users', app.concurrent_users_max | string if app.concurrent_users_max else none) }}
@@ -420,7 +420,7 @@
       </div>
 
       {# Ownership #}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3">
           <h3 class="text-lg font-semibold">Ownership</h3>
         </div>
@@ -455,7 +455,7 @@
       </div>
 
       {# Dates #}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3">
           <h3 class="text-lg font-semibold">Key Dates</h3>
         </div>
@@ -475,33 +475,33 @@
     {% if edit_mode or app.description or app.business_purpose or app.notes or app.assessment_notes %}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       {% if edit_mode %}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3"><label for="edit-description" class="text-lg font-semibold">Description</label></div>
         <div class="p-6 pt-0">
           <textarea id="edit-description" name="description" rows="4"
-                    class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ app.description or '' }}</textarea>
+                    class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">{{ app.description or '' }}</textarea>
         </div>
       </div>
       {% elif app.description %}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Description</h3></div>
         <div class="p-6 pt-0 text-sm text-foreground whitespace-pre-line">{{ app.description }}</div>
       </div>
       {% endif %}
       {% if app.business_purpose %}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Business Purpose</h3></div>
         <div class="p-6 pt-0 text-sm text-foreground whitespace-pre-line">{{ app.business_purpose }}</div>
       </div>
       {% endif %}
       {% if app.notes %}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Notes</h3></div>
         <div class="p-6 pt-0 text-sm text-foreground whitespace-pre-line">{{ app.notes }}</div>
       </div>
       {% endif %}
       {% if app.assessment_notes %}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Assessment Notes</h3></div>
         <div class="p-6 pt-0 text-sm text-foreground whitespace-pre-line">{{ app.assessment_notes }}</div>
       </div>
@@ -511,7 +511,7 @@
 
     {# Linked Solutions — cross-link to architecture workflow #}
     {% if linked_solutions is defined and linked_solutions %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3">
         <h3 class="text-lg font-semibold">Used in Solutions</h3>
         <p class="text-sm text-muted-foreground">Architecture solutions that reference this application</p>
@@ -522,7 +522,7 @@
           <a href="{{ url_for('solution_design.view_solution', solution_id=sol.id) }}"
              class="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors group">
             <div class="flex items-center gap-3 min-w-0">
-              <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary text-xs font-bold shrink-0">{{ sol.adm_phase or 'A' }}</span>
+              <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-info-emphasis text-xs font-bold shrink-0">{{ sol.adm_phase or 'A' }}</span>
               <div class="min-w-0">
                 <p class="text-sm font-medium text-foreground truncate group-hover:text-primary">{{ sol.name }}</p>
                 <p class="text-xs text-muted-foreground">{{ sol.governance_status or 'Draft' }} · {{ sol.solution_type or 'Platform' }}</p>
@@ -548,7 +548,7 @@
 
     {# ArchiMate element not linked — generate prompt #}
     {% if not app.archimate_element_id %}
-    <div data-slot="card" class="rounded-xl border border-dashed border-border bg-card p-8 text-center">
+    <div data-slot="card" class="rounded-lg border border-dashed border-border bg-card p-8 text-center">
       <i data-lucide="box" class="mx-auto h-10 w-10 text-muted-foreground mb-3" aria-hidden="true"></i>
       <p class="text-sm font-medium text-foreground mb-1">No architecture element linked</p>
       <p class="text-xs text-muted-foreground mb-4">Generate architecture elements using AI to enable relationships, viewpoints, and impact analysis.</p>
@@ -556,13 +556,13 @@
         <form action="{{ url_for('unified_applications.generate_application_archimate', id=app.id) }}" method="POST">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit"
-                  class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Submit">
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" aria-label="Submit">
             <i data-lucide="cpu" class="w-4 h-4 mr-2" aria-hidden="true"></i>Generate Elements
           </button>
         </form>
         {# A95-005: deep link to AI chat with generate-archimate context #}
         <a href="{{ url_for('unified_ai_chat.index') }}?action=generate_archimate&element_id={{ app.id }}&context_type=application&domain=architecture"
-           class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
            aria-label="Generate ArchiMate elements with AI for {{ app.name }}">
           <i data-lucide="bot" class="w-4 h-4 text-primary" aria-hidden="true"></i>Generate ArchiMate with AI
         </a>
@@ -572,7 +572,7 @@
 
     {# Impact Analysis #}
     {% if impact_analysis %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex items-center justify-between p-6 pb-3">
         <h3 class="text-lg font-semibold">Impact Analysis</h3>
         {% if impact_analysis.score is defined %}
@@ -594,7 +594,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {% for key, diagram_src in mermaid_diagrams.items() %}
       {% if diagram_src %}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3">
           <h3 class="text-base font-semibold capitalize">{{ key | replace('_',' ') | title }} Viewpoint</h3>
           {% if archimate_viewpoints.get(key) %}
@@ -641,7 +641,7 @@
       {% endfor %}
     </div>
     {% else %}
-    <div data-slot="card" class="rounded-xl border border-dashed border-border bg-card p-6 text-center">
+    <div data-slot="card" class="rounded-lg border border-dashed border-border bg-card p-6 text-center">
       <p class="text-sm text-muted-foreground">No architecture viewpoint diagrams available. Link an architecture element to generate diagrams.</p>
     </div>
     {% endif %}
@@ -650,7 +650,7 @@
     {# ArchiMate Relationships Table — only show if it has rows (old data source) #}
     {% set rel_rows = dashboard_config.tables['application-relationships'].rows %}
     {% if rel_rows %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3">
         <h3 class="text-lg font-semibold">ArchiMate Relationships</h3>
         <p class="text-sm text-muted-foreground">All elements related to this application component</p>
@@ -659,7 +659,7 @@
         <div data-platform-table="application-relationships"
              data-config='{{ dashboard_config.tables["application-relationships"] | tojson }}'>
           <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
               <thead>
                 <tr class="border-b">
                   <th class="pb-2 text-left font-medium text-muted-foreground">Element</th>
@@ -696,27 +696,27 @@
     {# ArchiMate Direct Links Table — only show when rows exist #}
     {% set link_rows = dashboard_config.tables['application-archimate-links'].rows %}
     {% if link_rows %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 class="text-lg font-semibold">ArchiMate Direct Links</h3>
           <p class="text-sm text-muted-foreground">Explicit relationships managed for this component</p>
         </div>
         <a href="{{ url_for('unified_ai_chat.index') }}?action=generate_archimate&element_id={{ app.id }}&context_type=application&domain=architecture"
-           class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
            aria-label="Generate ArchiMate elements with AI for {{ app.name }}">
           <i data-lucide="bot" class="h-4 w-4 text-primary" aria-hidden="true"></i>Generate ArchiMate with AI
         </a>
         {% if archimate_form_config.enabled %}
         <button type="button" data-modal-open="add-archimate-link-modal"
-                class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Add ArchiMate relationship">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Add ArchiMate relationship">
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Add Relationship
         </button>
         {% endif %}
       </div>
       <div class="p-6 pt-0">
         <div class="overflow-x-auto">
-          <table class="w-full text-sm">
+          <table class="dense-table w-full text-sm">
             <thead>
               <tr class="border-b">
                 <th class="pb-2 text-left font-medium text-muted-foreground">Element</th>
@@ -764,7 +764,7 @@
     {# Strategy Layer #}
     {% set has_strategy = strategy_capabilities or strategy_resources or courses_of_action or value_streams %}
     {% if has_strategy %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3">
         <h3 class="text-lg font-semibold">Strategy Layer</h3>
       </div>
@@ -808,13 +808,13 @@
 
     {# Scores row #}
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+      <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
         <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Functional Maturity</p>
         <p class="mt-1 text-2xl font-bold text-foreground">
           {% if functional_maturity %}{{ '%.1f' | format(functional_maturity) }} / 5{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
         </p>
       </div>
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+      <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
         <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Compliance Score</p>
         {% if compliance_score is none %}
         <p class="mt-1 text-2xl font-bold text-muted-foreground" title="Not yet assessed">&mdash;</p>
@@ -875,12 +875,12 @@
               });
         }
     }" x-init="loadSuggestions()" x-cloak x-show="loaded && suggestions.length > 0"
-       class="rounded-xl border border-primary/20 bg-card shadow-sm mb-4">
+       class="rounded-xl border border-primary/20 bg-card mb-4">
         <div class="p-5">
             <div class="flex items-center gap-2 mb-3">
                 <i data-lucide="sparkles" class="h-4 w-4 text-primary" aria-hidden="true"></i>
                 <h3 class="text-sm font-semibold">Suggested Capabilities</h3>
-                <span class="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold">AI</span>
+                <span class="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-info-emphasis font-semibold">AI</span>
                 <span class="text-xs text-muted-foreground ml-auto" x-text="suggestions.length + ' suggestions from portfolio patterns'"></span>
             </div>
             <div class="space-y-2">
@@ -898,11 +898,11 @@
                             </div>
                         </div>
                         <button type="button" @click="accept(s.capability_id, s.confidence, idx)"
-                                class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 shrink-0">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center shrink-0">
                             <i data-lucide="check" class="h-3 w-3" aria-hidden="true"></i> Accept
                         </button>
                         <button aria-label="Dismiss suggestion" type="button" @click="suggestions.splice(idx, 1)"
-                                class="inline-flex items-center px-1.5 py-1 text-xs rounded-md border border-border hover:bg-muted text-muted-foreground shrink-0">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center shrink-0">
                             <i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>
                         </button>
                     </div>
@@ -912,14 +912,14 @@
     </div>
 
     {# Capabilities Table #}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 class="text-lg font-semibold">Mapped Capabilities</h3>
           <p class="text-sm text-muted-foreground">{{ capabilities | length }} {% if capabilities | length == 1 %}capability{% else %}capabilities{% endif %} linked to this application</p>
         </div>
         <button type="button" data-modal-open="add-capability-modal"
-                class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Map a capability to this application">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Map a capability to this application">
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Map Capability
         </button>
       </div>
@@ -927,7 +927,7 @@
         {% set cap_rows = dashboard_config.tables['application-capabilities'].rows %}
         {% if cap_rows %}
         <div class="overflow-x-auto">
-          <table class="w-full text-sm">
+          <table class="dense-table w-full text-sm">
             <thead>
               <tr class="border-b">
                 <th class="pb-2 text-left font-medium text-muted-foreground">Capability</th>
@@ -1002,14 +1002,14 @@
      TAB: PROCESSES
   ═══════════════════════════════════════════════════════════════════════════ #}
   {% call tab_panel('processes', active=(resolved_tab == 'processes')) %}
-  <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+  <div data-slot="card" class="rounded-lg border border-border bg-card">
     <div class="flex flex-col space-y-1.5 p-6 pb-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h3 class="text-lg font-semibold">Process Mappings</h3>
         <p class="text-sm text-muted-foreground">Business processes supported by this application</p>
       </div>
       <!-- inline-event-ok --><button type="button" @click="openUnifiedMappingModalDiscovery({context:'apqc', ids:[{{ app.id }}]})"
-              class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Map a process to this application">
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Map a process to this application">
           <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Map Process
       </button>
     </div>
@@ -1017,7 +1017,7 @@
       {% set proc_rows = dashboard_config.tables['application-processes'].rows %}
       {% if proc_rows %}
       <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+        <table class="dense-table w-full text-sm">
           <thead>
             <tr class="border-b">
               <th class="pb-2 text-left font-medium text-muted-foreground">Code</th>
@@ -1064,34 +1064,34 @@
 
     {# Vendor summary #}
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+      <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
         <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Vendor Organisations</p>
         <p class="mt-1 text-2xl font-bold text-foreground">{{ vendor_summary.vendor_count }}</p>
       </div>
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+      <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
         <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Products in Use</p>
         <p class="mt-1 text-2xl font-bold text-foreground">{{ vendor_summary.product_count }}</p>
       </div>
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+      <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
         <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Primary Vendor</p>
         <p class="mt-1 text-sm font-medium text-foreground truncate" title="{{ primary_vendor_label }}">{{ primary_vendor_label }}</p>
       </div>
     </div>
 
     {# Vendor Footprint Table #}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <h3 class="text-lg font-semibold">Vendor Footprint</h3>
         {% if vendor_summary.has_archimate %}
         <button type="button" data-modal-open="add-vendor-modal"
-                class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Add vendor product">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Add vendor product">
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Add Vendor Product
         </button>
         {% else %}
         <form method="POST" action="{{ url_for('unified_applications.generate_application_archimate', id=app.id) }}" class="inline">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit"
-                  class="inline-flex items-center gap-2 rounded-md border border-input bg-background hover:bg-accent h-9 px-4 text-sm font-medium transition-colors"
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                   title="Generate an ArchiMate element to enable vendor mapping">
             <i data-lucide="cpu" class="h-4 w-4" aria-hidden="true"></i> Generate ArchiMate Element
           </button>
@@ -1101,7 +1101,7 @@
       <div class="p-6 pt-0">
         {% if vendor_footprint %}
         <div class="overflow-x-auto">
-          <table class="w-full text-sm">
+          <table class="dense-table w-full text-sm">
             <thead>
               <tr class="border-b">
                 <th class="pb-2 text-left font-medium text-muted-foreground">Vendor</th>
@@ -1155,7 +1155,7 @@
           <form method="POST" action="{{ url_for('unified_applications.generate_application_archimate', id=app.id) }}" class="inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit"
-                    class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 text-sm font-medium transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
               <i data-lucide="cpu" class="h-4 w-4" aria-hidden="true"></i> Generate ArchiMate Element
             </button>
           </form>
@@ -1177,7 +1177,7 @@
   <div class="space-y-6">
     <div class="flex justify-end">
       <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
-         class="inline-flex items-center gap-2 rounded-md border border-input bg-background hover:bg-accent h-9 px-4 text-sm font-medium transition-colors">
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Technology Details
       </a>
     </div>
@@ -1187,7 +1187,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
       {# Technology Stack Fields #}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Technology Stack</h3></div>
         <div class="p-6 pt-0 space-y-3 text-sm">
           {% macro tech_row(label, value) %}
@@ -1212,7 +1212,7 @@
       </div>
 
       {# Infrastructure #}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Infrastructure</h3></div>
         <div class="p-6 pt-0 space-y-3 text-sm">
           {% if app.cloud_provider %}<div class="flex justify-between"><span class="text-muted-foreground">Cloud Provider</span><span>{{ app.cloud_provider }}</span></div>{% endif %}
@@ -1227,7 +1227,7 @@
       </div>
 
       {# Performance SLAs #}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Performance & SLAs</h3></div>
         <div class="p-6 pt-0 space-y-3 text-sm">
           {% if app.response_time_target_ms %}<div class="flex justify-between"><span class="text-muted-foreground">Response Time Target</span><span>{{ app.response_time_target_ms }} ms</span></div>{% endif %}
@@ -1240,7 +1240,7 @@
 
       {# ArchiMate Technology Nodes #}
       {% if arch_elements_by_layer %}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Architecture Elements by Layer</h3></div>
         <div class="p-6 pt-0 text-sm space-y-4">
           {% for layer, elements in arch_elements_by_layer.items() %}
@@ -1264,7 +1264,7 @@
 
     {# Technology Mappings #}
     {% if technology_mappings %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Technology Mappings</h3></div>
       <div class="p-6 pt-0">
         <p class="text-sm text-muted-foreground">{{ technology_mappings | length }} technology mapping{% if technology_mappings | length != 1 %}s{% endif %} registered.</p>
@@ -1282,13 +1282,13 @@
   <div class="space-y-6">
     <div class="flex justify-end">
       <a href="{{ url_for('main.application_roadmap', id=app.id) }}"
-         class="inline-flex items-center gap-2 rounded-md border border-input bg-background hover:bg-accent h-9 px-4 text-sm font-medium transition-colors">
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="calendar-check" class="h-4 w-4" aria-hidden="true"></i> Manage in Roadmap Workspace
       </a>
     </div>
 
     {# Work Packages #}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Work Packages</h3></div>
       <div class="p-6 pt-0">
         {% if work_packages %}
@@ -1311,7 +1311,7 @@
 
     {# Deliverables #}
     {% if deliverables %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Deliverables</h3></div>
       <div class="p-6 pt-0">
         <ul class="space-y-2">
@@ -1328,7 +1328,7 @@
 
     {# Plateaus #}
     {% if plateaus %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Architecture Plateaus</h3></div>
       <div class="p-6 pt-0">
         <ul class="space-y-2">
@@ -1345,7 +1345,7 @@
 
     {# Gaps #}
     {% if gaps %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Architecture Gaps</h3></div>
       <div class="p-6 pt-0">
         <ul class="space-y-2">
@@ -1364,7 +1364,7 @@
 
     {# Implementation Events #}
     {% if implementation_events %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Implementation Events</h3></div>
       <div class="p-6 pt-0">
         <ul class="space-y-2">
@@ -1396,29 +1396,29 @@
   {% call tab_panel('roadmap', active=(resolved_tab == 'roadmap')) %}
   <div class="space-y-6">
 
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="p-6 border-b grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
         <div>
           <h3 class="text-lg font-semibold">Application Roadmap</h3>
           <p class="text-sm text-muted-foreground mt-1">Manage tactical transformation initiatives and delivery milestones for this application.</p>
         </div>
         <a href="{{ url_for('main.application_roadmap', id=app.id) }}"
-          class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
           Open Full Roadmap Workspace
         </a>
       </div>
       <div class="p-6 pt-5">
         {% if work_packages %}
         <div class="grid grid-cols-1 gap-4 md:grid-cols-3 mb-4">
-          <div class="rounded-lg border bg-muted/20 p-3">
+          <div class="rounded-md border bg-muted/20 px-3 py-2">
             <p class="text-xs uppercase tracking-wide text-muted-foreground">Total Work Packages</p>
             <p class="mt-1 text-xl font-semibold">{{ work_packages|length }}</p>
           </div>
-          <div class="rounded-lg border bg-muted/20 p-3">
+          <div class="rounded-md border bg-muted/20 px-3 py-2">
             <p class="text-xs uppercase tracking-wide text-muted-foreground">In Progress</p>
             <p class="mt-1 text-xl font-semibold">{{ work_packages|selectattr('status', 'equalto', 'in_progress')|list|length }}</p>
           </div>
-          <div class="rounded-lg border bg-muted/20 p-3">
+          <div class="rounded-md border bg-muted/20 px-3 py-2">
             <p class="text-xs uppercase tracking-wide text-muted-foreground">Completed</p>
             <p class="mt-1 text-xl font-semibold">{{ work_packages|selectattr('status', 'equalto', 'completed')|list|length }}</p>
           </div>
@@ -1444,7 +1444,7 @@
           <p class="text-sm font-medium text-foreground mb-1">No roadmap work packages yet</p>
           <p class="text-xs text-muted-foreground mb-4">Create your first work package to start tracking transformation delivery.</p>
           <a href="{{ url_for('main.application_roadmap', id=app.id) }}"
-            class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <i data-lucide="map" class="h-4 w-4 mr-2" aria-hidden="true"></i> Open Roadmap Workspace
           </a>
           <p class="text-xs text-muted-foreground mt-2">Navigate to the full roadmap workspace to create and manage work packages.</p>
@@ -1464,7 +1464,7 @@
       <p class="text-sm text-muted-foreground">Motivation elements are populated from linked ArchiMate architecture models.</p>
       {% if app.archimate_element_id %}
       <!-- inline-event-ok --><button type="button" @click="openUnifiedMappingModalDiscovery({context:'archimate', ids:[{{ app.id }}]})"
-              class="inline-flex items-center gap-2 rounded-md border border-input bg-background hover:bg-accent h-9 px-4 text-sm font-medium transition-colors">
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="link" class="h-4 w-4" aria-hidden="true"></i> Link ArchiMate Elements
       </button>
       {% endif %}
@@ -1490,7 +1490,7 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
       {% for sect_label, items in motivation_sections %}
       {% if items %}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-base font-semibold">{{ sect_label }}</h3></div>
         <div class="p-6 pt-0">
           <ul class="space-y-2">
@@ -1549,14 +1549,14 @@
   <div class="space-y-6">
     <div class="flex justify-end">
       <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
-         class="inline-flex items-center gap-2 rounded-md border border-input bg-background hover:bg-accent h-9 px-4 text-sm font-medium transition-colors">
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Compliance Settings
       </a>
     </div>
 
     {# Compliance Score Gauge #}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4 text-center lg:col-span-1">
+      <div data-slot="card" class="rounded-lg border border-border bg-card p-4 text-center lg:col-span-1">
         <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Compliance Score</p>
         {% if compliance_score is none %}
         <div class="text-5xl font-bold text-muted-foreground">&mdash;</div>
@@ -1576,7 +1576,7 @@
         {% endif %}
       </div>
 
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+      <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
         <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Data Classification</p>
         <p class="mt-2 font-semibold">
           {% if app.data_classification %}{% call badge(variant='warning') %}{{ app.data_classification | replace('_',' ') | title }}{% endcall %}
@@ -1584,7 +1584,7 @@
         </p>
       </div>
 
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+      <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
         <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Security Level</p>
         <p class="mt-2 font-semibold">
           {% if app.security_level %}
@@ -1595,7 +1595,7 @@
         </p>
       </div>
 
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4 space-y-2 text-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card p-4 space-y-2 text-sm">
         <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Data Privacy</p>
         <div class="flex justify-between">
           <span class="text-muted-foreground">PII Processed</span>
@@ -1612,7 +1612,7 @@
 
     {# Security Details #}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-base font-semibold">Security Configuration</h3></div>
         <div class="p-6 pt-0 space-y-3 text-sm">
           {% if app.authentication_method %}<div class="flex justify-between"><span class="text-muted-foreground">Authentication</span><span>{{ app.authentication_method }}</span></div>{% endif %}
@@ -1633,7 +1633,7 @@
       </div>
 
       {# Compliance Tags and Frameworks #}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-base font-semibold">Compliance Tags & Frameworks</h3></div>
         <div class="p-6 pt-0 space-y-3">
           {% if app.compliance_tags %}
@@ -1673,7 +1673,7 @@
 
     {# Compliance Requirements #}
     {% if compliance_requirements %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-base font-semibold">Compliance Requirements ({{ compliance_requirements | length }})</h3></div>
       <div class="p-6 pt-0">
         <ul class="space-y-2">
@@ -1698,13 +1698,13 @@
   <div class="space-y-6">
     <div class="flex justify-end">
       <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
-         class="inline-flex items-center gap-2 rounded-md border border-input bg-background hover:bg-accent h-9 px-4 text-sm font-medium transition-colors">
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Health & Quality Metrics
       </a>
     </div>
 
     {# Health Metrics #}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Health Metrics</h3></div>
       <div class="p-6 pt-0">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
@@ -1769,7 +1769,7 @@
     </div>
 
     {# Quality Metrics #}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Quality Metrics</h3></div>
       <div class="p-6 pt-0">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
@@ -1842,7 +1842,7 @@
   <div class="space-y-6">
     <div class="flex justify-end">
       <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
-         class="inline-flex items-center gap-2 rounded-md border border-input bg-background hover:bg-accent h-9 px-4 text-sm font-medium transition-colors">
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Edit Cost Details
       </a>
     </div>
@@ -1850,7 +1850,7 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 
       {% macro cost_card(label, value, symbol='£') %}
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+      <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
         <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">{{ label }}</p>
         <p class="mt-1 text-2xl font-bold text-foreground">
           {{ symbol }}{{ '{:,.0f}'.format(value) }}
@@ -1867,7 +1867,7 @@
 
     </div>
 
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <div class="flex items-center justify-between">
         <p class="text-sm font-medium text-muted-foreground">Calculated Total (Licence + Infrastructure + Development + Maintenance)</p>
         <p class="text-xl font-bold text-foreground">{{ currency_symbol }}{{ '{:,.0f}'.format(cost_breakdown.calculated_total) }}</p>
@@ -1886,7 +1886,7 @@
       <p class="text-sm text-muted-foreground">Dependencies are derived from ArchiMate relationships and integration mappings.</p>
       {% if app.archimate_element_id %}
       <!-- inline-event-ok --><button type="button" @click="openUnifiedMappingModalDiscovery({context:'archimate', ids:[{{ app.id }}]})"
-              class="inline-flex items-center gap-2 rounded-md border border-input bg-background hover:bg-accent h-9 px-4 text-sm font-medium transition-colors">
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="link" class="h-4 w-4" aria-hidden="true"></i> Link Dependencies
       </button>
       {% endif %}
@@ -1897,15 +1897,15 @@
     {% set graph_edges = dependency_graph_data.edges | length %}
 
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+      <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
         <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Relationships</p>
         <p class="mt-1 text-2xl font-bold text-foreground">{{ (archimate_relationships.incoming | length + archimate_relationships.outgoing | length) if archimate_relationships else graph_nodes }}</p>
       </div>
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+      <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
         <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Upstream (depend on this)</p>
         <p class="mt-1 text-2xl font-bold text-foreground">{{ archimate_relationships.incoming | length if archimate_relationships else (dependencies_upstream | length) }}</p>
       </div>
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+      <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
         <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Downstream (this depends on)</p>
         <p class="mt-1 text-2xl font-bold text-foreground">{{ archimate_relationships.outgoing | length if archimate_relationships else (dependencies_downstream | length) }}</p>
       </div>
@@ -1913,11 +1913,11 @@
 
     {# Dependency Edges #}
     {% if dependency_graph_data.edges %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Dependency Graph Edges</h3></div>
       <div class="p-6 pt-0">
         <div class="overflow-x-auto">
-          <table class="w-full text-sm">
+          <table class="dense-table w-full text-sm">
             <thead>
               <tr class="border-b">
                 <th class="pb-2 text-left font-medium text-muted-foreground">From</th>
@@ -1949,7 +1949,7 @@
 
     {# Business Actor Mappings #}
     {% if business_actor_mappings %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Business Actor Mappings</h3></div>
       <div class="p-6 pt-0">
         <ul class="space-y-2">
@@ -1966,7 +1966,7 @@
 
     {# Integration Mappings #}
     {% if integration_mappings %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Integration Mappings</h3></div>
       <div class="p-6 pt-0">
         <ul class="space-y-2">
@@ -1985,7 +1985,7 @@
 
     {# Application Documents #}
     {% if application_documents %}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
       <div class="flex flex-col space-y-1.5 p-6 pb-3"><h3 class="text-lg font-semibold">Documents</h3></div>
       <div class="p-6 pt-0">
         <ul class="space-y-2">
@@ -2015,7 +2015,7 @@
     {# Fall back to ArchiMate relationships as dependency view #}
     {% if archimate_relationships and (archimate_relationships.incoming or archimate_relationships.outgoing) %}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3">
           <h4 class="text-sm font-semibold">Upstream ({{ archimate_relationships.incoming | length }} depend on this)</h4>
         </div>
@@ -2035,7 +2035,7 @@
           {% endif %}
         </div>
       </div>
-      <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+      <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="flex flex-col space-y-1.5 p-6 pb-3">
           <h4 class="text-sm font-semibold">Downstream (this depends on {{ archimate_relationships.outgoing | length }})</h4>
         </div>
@@ -2080,7 +2080,7 @@
         <h3 class="text-lg font-semibold text-foreground">EA Workflows</h3>
         <p class="text-sm text-muted-foreground">Architecture review and governance workflows for this application.</p>
       </div>
-      <a href="/ea-workflows" class="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+      <a href="/ea-workflows" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="play-circle" class="h-4 w-4" aria-hidden="true"></i>
         Run Workflow
       </a>

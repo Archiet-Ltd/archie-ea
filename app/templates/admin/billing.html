@@ -5,7 +5,7 @@
 {% set btn_primary = 'inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 transition-colors disabled:opacity-50 disabled:pointer-events-none' %}
 {% set btn_outline = 'inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 transition-colors disabled:opacity-50 disabled:pointer-events-none' %}
 {% set btn_destructive = 'inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-4 py-2 transition-colors disabled:opacity-50 disabled:pointer-events-none' %}
-{% set input_cls = 'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50' %}
+{% set input_cls ='flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50' %}
 
 {% block content %}
 <div class="space-y-6" data-testid="billing-page">
@@ -29,7 +29,7 @@
     {% endwith %}
 
     {% if error %}
-        <div class="rounded-md border p-4 text-sm bg-destructive/5 border-destructive/20 text-destructive-emphasis">
+        <div class="rounded-md border px-3 py-2 text-sm bg-destructive/10 border-destructive/40 text-destructive-emphasis">
             {{ error }}
         </div>
     {% endif %}
@@ -38,7 +38,7 @@
     {% set status_val = subscription.status.value %}
 
     {% if not stripe_configured %}
-    <div class="rounded-md border p-4 text-sm bg-warning/5 border-warning/20 text-warning-emphasis" data-testid="billing-not-configured">
+    <div class="rounded-md border px-3 py-2 text-sm bg-warning/10 border-warning/40 text-warning-emphasis" data-testid="billing-not-configured">
         <p class="font-medium">Online payment is not set up on this installation.</p>
         <p class="mt-1">Plans cannot be bought or changed here yet, and invoices cannot be shown.
             <a href="{{ contact_sales_url }}" class="underline">Contact sales</a> to buy a plan.</p>
@@ -95,7 +95,7 @@
         </div>
 
         {% if limits.limit_reached %}
-        <div class="mt-4 rounded-md border p-4 text-sm bg-warning/5 border-warning/20 text-warning-emphasis" data-testid="billing-limit-reached">
+        <div class="mt-4 rounded-md border px-3 py-2 text-sm bg-warning/10 border-warning/40 text-warning-emphasis" data-testid="billing-limit-reached">
             <p>Your organisation has reached the {{ limits.plan_name }} limit of {{ limits.limit }} {{ 'editors' if limits.counts == 'editors' else 'people' }}. No one new can be added until you upgrade.</p>
             <a href="#plans" class="mt-2 inline-block font-medium underline">See plans and upgrade</a>
         </div>
@@ -271,7 +271,7 @@
             {{ empty_state('receipt', 'No invoices yet', 'An invoice appears here after each payment.') }}
         {% else %}
         <div class="rounded-md border border-border overflow-x-auto">
-            <table class="w-full text-sm" data-testid="invoice-table">
+            <table class="dense-table w-full text-sm" data-testid="invoice-table">
                 <thead>
                     <tr class="border-b border-border bg-muted/40">
                         <th scope="col" class="px-4 py-3 text-left font-medium text-muted-foreground">Date</th>
@@ -302,7 +302,7 @@
     {% endcall %}
 
     {% else %}
-    <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
+    <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground p-6">
         <p class="text-muted-foreground text-sm">No subscription record found for your organisation.</p>
     </div>
     {% endif %}

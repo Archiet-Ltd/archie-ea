@@ -67,8 +67,8 @@
                 <template x-for="z in ['weeks', 'months', 'quarters', 'years']" :key="z">
                     <button type="button" @click="setZoom(z)"
                             :class="zoom === z
-                                ? 'bg-card shadow-sm text-foreground'
-                                : 'text-muted-foreground hover:text-foreground'"
+ ? 'bg-card text-foreground'
+ : 'text-muted-foreground hover:text-foreground'"
                             class="px-2 py-1 text-xs rounded font-medium transition-all capitalize"
                             x-text="z">
                     </button>
@@ -95,7 +95,7 @@
 
             {# Add item (CRUD) #}
             <button type="button" x-show="hasCrud()" x-cloak @click="openCreateForm()"
-                    class="px-2 py-1 text-xs rounded border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                    class="px-2 py-1 text-xs rounded border border-primary/30 bg-primary/10 text-info-emphasis hover:bg-primary/20 transition-colors">
                 <svg class="inline w-3.5 h-3.5 mr-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
                 </svg>
@@ -189,7 +189,7 @@
         </svg>
         <p class="text-sm text-muted-foreground">No timeline items found</p>
         <button type="button" x-show="hasCrud()" x-cloak @click="openCreateForm()"
-                class="mt-3 px-3 py-1.5 text-xs rounded border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                class="mt-3 px-3 py-1.5 text-xs rounded border border-primary/30 bg-primary/10 text-info-emphasis hover:bg-primary/20 transition-colors">
             Add first item
         </button>
     </div>
@@ -583,7 +583,7 @@
          class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
          role="dialog" aria-modal="true" :aria-label="crudEditingId ? 'Edit Item' : 'Add Item'">
         <div @click.outside="closeCrudForm()"
-             class="bg-card border border-border rounded-lg shadow-xl w-full max-w-md mx-4 p-5 space-y-4">
+             class="bg-card border border-border rounded-lg w-full max-w-md mx-4 p-5 space-y-4">
             <h4 class="text-sm font-semibold text-foreground"
                 x-text="crudEditingId ? 'Edit Item' : 'Add Item'"></h4>
             <div class="space-y-3">
@@ -653,7 +653,7 @@
     {# TOOLTIP                                                             #}
     {# ═══════════════════════════════════════════════════════════════════ #}
     <div x-show="hoveredTaskId && !selectedTaskId" x-cloak
-         class="fixed z-50 bg-popover text-popover-foreground shadow-lg rounded-lg px-3 py-2.5 pointer-events-none max-w-xs border border-border"
+         class="fixed z-50 bg-popover text-popover-foreground rounded-lg px-3 py-2.5 pointer-events-none max-w-xs border border-border"
          :style="'left: ' + tooltipPos.x + 'px; top: ' + tooltipPos.y + 'px'">
         <template x-if="getTooltipTask()">
             <div class="space-y-1">

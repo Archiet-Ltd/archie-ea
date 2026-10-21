@@ -18,7 +18,7 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
 
         <!-- Coverage Card -->
-        <div class="rounded-xl border-2 border-input bg-card p-5">
+        <div class="rounded-lg border border-input bg-card p-5">
             <div class="flex items-center justify-between mb-3">
                 <span class="text-sm font-medium text-muted-foreground">Capability Coverage</span>
                 <i data-lucide="target" class="h-4 w-4 text-muted-foreground"></i>
@@ -34,7 +34,7 @@
         </div>
 
         <!-- Total Pricing Rows Card -->
-        <div class="rounded-xl border-2 border-input bg-card p-5">
+        <div class="rounded-lg border border-input bg-card p-5">
             <div class="flex items-center justify-between mb-3">
                 <span class="text-sm font-medium text-muted-foreground">Pricing Rows</span>
                 <i data-lucide="table-2" class="h-4 w-4 text-muted-foreground"></i>
@@ -46,7 +46,7 @@
         </div>
 
         <!-- Freshness Card -->
-        <div class="rounded-xl border-2 border-input bg-card p-5">
+        <div class="rounded-lg border border-input bg-card p-5">
             <div class="flex items-center justify-between mb-3">
                 <span class="text-sm font-medium text-muted-foreground">Fresh Data</span>
                 <i data-lucide="clock" class="h-4 w-4 text-muted-foreground"></i>
@@ -63,7 +63,7 @@
         </div>
 
         <!-- Stale Count Card -->
-        <div class="rounded-xl border-2 border-input bg-card p-5">
+        <div class="rounded-lg border border-input bg-card p-5">
             <div class="flex items-center justify-between mb-3">
                 <span class="text-sm font-medium text-muted-foreground">Stale Rows</span>
                 <i data-lucide="alert-triangle" class="h-4 w-4 text-muted-foreground"></i>
@@ -83,7 +83,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
 
         <!-- Confidence Distribution Pie Chart -->
-        <div class="rounded-xl border-2 border-input bg-card">
+        <div class="rounded-lg border border-input bg-card">
             <div class="p-4 sm:p-6 border-b border-border">
                 <h3 class="text-base font-semibold">Confidence Distribution</h3>
                 <p class="text-sm text-muted-foreground mt-1">
@@ -105,7 +105,7 @@
         </div>
 
         <!-- Staleness Gauge / Bar -->
-        <div class="rounded-xl border-2 border-input bg-card">
+        <div class="rounded-lg border border-input bg-card">
             <div class="p-4 sm:p-6 border-b border-border">
                 <h3 class="text-base font-semibold">Data Freshness</h3>
                 <p class="text-sm text-muted-foreground mt-1">
@@ -156,7 +156,7 @@
     </div>
 
     <!-- Source Breakdown Table -->
-    <div class="rounded-xl border-2 border-input bg-card">
+    <div class="rounded-lg border border-input bg-card">
         <div class="p-4 sm:p-6 border-b border-border">
             <h3 class="text-base font-semibold">Source Breakdown</h3>
             <p class="text-sm text-muted-foreground mt-1">
@@ -165,7 +165,7 @@
         </div>
         {% if analytics.confidence_distribution %}
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
                 <thead>
                     <tr class="border-b border-border bg-muted/50">
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground">Source Type</th>

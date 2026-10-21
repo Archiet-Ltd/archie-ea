@@ -14,7 +14,7 @@
 {% macro tabs_trigger(value='', class='') %}
 <button
     @click="activeTab = '{{ value }}'"
-    :class="activeTab === '{{ value }}' ? 'bg-background text-foreground shadow-sm' : ''"
+    :class="activeTab === '{{ value }}' ? 'bg-background text-foreground ' : ''"
     :aria-selected="activeTab === '{{ value }}'"
     role="tab"
     id="tab-{{ value }}"

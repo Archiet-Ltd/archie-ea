@@ -21,7 +21,7 @@
     ) }}
 
     {# ── Heat Map Grid ── #}
-    <div class="overflow-x-auto rounded-lg border border-border bg-card shadow-sm p-4 mt-6">
+    <div class="overflow-x-auto rounded-lg border border-border bg-card p-4 mt-6">
 
         <div class="flex gap-2">
             {# Y-axis label + tick marks #}
@@ -56,8 +56,8 @@
                                     <button
                                         type="button"
                                         class="w-full text-left mb-1 rounded-full px-2 py-0.5 text-xs font-medium
- bg-background/80 border border-border shadow-sm
- hover:shadow-md transition-shadow cursor-pointer truncate
+ bg-background/80 border border-border 
+ transition-shadow cursor-pointer truncate
  focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
                                         :title="risk.title + (risk.description ? ': ' + risk.description : '')"
                                         :data-testid="'risk-chip-' + risk.id"
@@ -124,7 +124,7 @@
         style="display:none"
     >
         <div
-            class="relative w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl"
+            class="relative w-full max-w-md rounded-lg border border-border bg-card p-6"
             @click.stop
         >
             <button

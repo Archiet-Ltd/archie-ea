@@ -16,7 +16,7 @@
                             <i data-lucide="alert-circle" class="h-3 w-3"></i>
                             <span x-text="errors.length + ' error' + (errors.length>1?'s':'')"></span>
                         </button>
-                        <div x-show="open" x-cloak @click.away="open=false" class="absolute right-0 top-8 w-80 rounded-xl border border-border bg-card shadow-xl z-50 p-3 space-y-2">
+                        <div x-show="open" x-cloak @click.away="open=false" class="absolute right-0 top-8 w-80 rounded-lg border border-border bg-card z-50 p-3 space-y-2">
                             <template x-for="err in errors" :key="err.id">
                                 <div class="flex items-start gap-2 text-xs text-destructive-emphasis">
                                     <i data-lucide="alert-circle" class="h-3 w-3 mt-0.5 shrink-0"></i>
@@ -78,7 +78,7 @@
                             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"/></svg>
                             <span x-text="copied ? 'Copied!' : 'Copy'"></span>
                         </button>
-                        <a :href="shareUrl" target="_blank" class="h-7 px-2 text-xs border border-border rounded-md hover:bg-accent transition-colors text-muted-foreground flex items-center">
+                        <a :href="shareUrl" target="_blank" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
                         </a>
                     </div>
@@ -143,7 +143,7 @@
 
                 <!-- Re-Generate -->
                 <button type="button" @click="generate()" :disabled="generating"
-                        class="h-7 px-3 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors flex items-center gap-1.5">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <svg x-show="generating" class="w-3 h-3 wb-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83"/></svg>
                     <svg x-show="!generating" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347c-.75.412-1.667-.13-1.667-.986V5.653Z"/></svg>
                     <span x-text="generating ? 'Generating…' : 'Re-Generate'"></span>
@@ -293,7 +293,7 @@
                 <!-- expand button when fully collapsed -->
                 <template x-if="leftW === 0">
                     <button type="button" @click.stop="toggleLeftPanel()"
-                            class="absolute left-0.5 top-1/2 -translate-y-1/2 z-10 w-4 h-8 rounded-r bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center shadow-sm"
+                            class="absolute left-0.5 top-1/2 -translate-y-1/2 z-10 w-4 h-8 rounded-r bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center"
                             title="Expand file tree">
                         <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7"/></svg>
                     </button>
@@ -342,7 +342,7 @@
                         </button>
                         <!-- Save -->
                         <button type="button" x-show="selectedFile && editorDirty" x-cloak @click="saveFile()" :disabled="fileSaving"
-                                class="h-6 px-2.5 rounded bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-1">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <svg x-show="fileSaving" class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
                             <i x-show="!fileSaving" data-lucide="save" class="h-3 w-3"></i>
                             <span x-text="fileSaving ? 'Saving…' : 'Save'"></span>
@@ -411,7 +411,7 @@
                               spellcheck="false" aria-label="Selected Content"></textarea>
                     <!-- AI selection toolbar — floats above CM6 editor on text selection -->
                     <div x-show="aiSelectionMenu && cmEditor" x-cloak
-                         class="absolute z-50 flex items-center gap-0.5 p-1 rounded-lg bg-popover border border-border shadow-lg text-xs"
+                         class="absolute z-50 flex items-center gap-0.5 p-1 rounded-lg bg-popover border border-border text-xs"
                          :style="`top:${aiMenuTop}px; left:${aiMenuLeft}px; max-width:280px`"
                          @mousedown.prevent>
                         <button type="button" @click="aiEditSelection('edit')"
@@ -475,8 +475,8 @@
                 <div x-show="rightTab === 'preview'" x-cloak
                      class="tab-pane flex-1 flex flex-col overflow-hidden p-4 space-y-4">
                     <!-- Hero launch button -->
-                    <div class="rounded-xl border-2 border-info/40 bg-info/5 p-5 flex flex-col items-center text-center gap-3">
-                        <div class="w-14 h-14 rounded-full bg-info/10 flex items-center justify-center shadow-sm"><i data-lucide="eye" class="w-7 h-7 text-info-emphasis"></i></div>
+                    <div class="border rounded-md border-2 border-info/40 bg-info/10 px-3 py-2 flex flex-col items-center text-center gap-3">
+                        <div class="w-14 h-14 rounded-full bg-info/10 flex items-center justify-center"><i data-lucide="eye" class="w-7 h-7 text-info-emphasis"></i></div>
                         <div>
                             <p class="text-sm font-semibold text-foreground">Full-Screen Preview</p>
                             <p class="text-xs text-muted-foreground mt-0.5 leading-relaxed">
@@ -519,7 +519,7 @@
                     </div>
                     <!-- No files warning -->
                     <div x-show="!fileList.length" x-cloak
-                         class="rounded-lg bg-warning/10 border border-warning/30 p-3 text-2xs text-warning-emphasis">
+                         class="rounded-md bg-warning/10 border border-warning/40 px-3 py-2 text-2xs text-warning-emphasis">
                         Generate code first, then preview your app here.
                     </div>
                 </div>
@@ -839,7 +839,7 @@
 
                             <!-- Refresh + Run Tests buttons -->
                             <div class="flex gap-1.5">
-                                <button type="button" @click="loadQuality()" class="flex-1 h-8 text-xs font-medium text-muted-foreground border border-border rounded-lg hover:bg-accent transition-colors flex items-center justify-center gap-1.5">
+                                <button type="button" @click="loadQuality()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 flex-1 items-center justify-center">
                                     <i data-lucide="refresh-cw" class="h-3 w-3"></i> Refresh Score
                                 </button>
                                 <button type="button" @click="verify()"
@@ -891,7 +891,7 @@
                                     <div class="flex items-center gap-1.5 mb-0.5">
                                         <span class="text-2xs font-semibold text-foreground" x-text="entry.language || entry.mode || 'Generation'"></span>
                                         <span class="text-xs text-muted-foreground" x-text="entry.generated_at ? new Date(entry.generated_at).toLocaleDateString() : ''"></span>
-                                        <span x-show="idx === 0" class="ml-auto text-2xs font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">CURRENT</span>
+                                        <span x-show="idx === 0" class="ml-auto text-2xs font-semibold text-info-emphasis bg-primary/10 px-1.5 py-0.5 rounded">CURRENT</span>
                                     </div>
                                     <div class="flex items-center gap-2 text-xs text-muted-foreground">
                                         <span x-text="(entry.file_count || 0) + ' files'"></span>
@@ -929,7 +929,7 @@
                             <div x-show="githubSha" x-cloak class="px-3 py-2.5 flex items-center justify-between"><span class="text-muted-foreground">Last commit</span><span class="font-mono text-muted-foreground" x-text="githubSha.substring(0,7)"></span></div>
                         </div>
                         <div class="mt-2.5 flex gap-2">
-                            <button type="button" @click="deploy()" :disabled="deploying" class="flex-1 h-8 text-xs font-semibold rounded-lg border border-border hover:bg-accent transition-colors text-foreground flex items-center justify-center gap-2">
+                            <button type="button" @click="deploy()" :disabled="deploying" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 flex-1 items-center justify-center">
                                 <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
                                 <span x-text="deploying ? 'Pushing…' : 'Push to GitHub'"></span>
                                 <svg x-show="deploying" x-cloak class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
@@ -946,7 +946,7 @@
                             <span x-show="driftReport && driftReport.status === 'drifted'" x-cloak class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30"><i data-lucide="alert-triangle" class="h-3 w-3"></i> Drifted</span>
                         </div>
                         <div class="flex gap-2">
-                            <button type="button" @click="scanDrift()" :disabled="driftScanning" class="h-7 px-2.5 text-xs font-medium text-muted-foreground border border-border rounded-md hover:bg-accent disabled:opacity-50 transition-colors flex items-center gap-1">
+                            <button type="button" @click="scanDrift()" :disabled="driftScanning" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                                 <svg x-show="driftScanning" x-cloak class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
                                 <i x-show="!driftScanning" data-lucide="scan-search" class="h-3 w-3"></i>
                                 <span x-text="driftScanning ? 'Scanning…' : 'Scan Drift'"></span>
@@ -1340,7 +1340,7 @@
                         <div class="flex flex-wrap gap-1.5">
                             <template x-for="key in promptGroups" :key="key">
                                 <button type="button" @click="regenerate(key)" :disabled="promptGroupStatus[key] === 'running'"
-                                        class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs border border-border bg-background hover:bg-muted disabled:opacity-50 transition-colors"
+                                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                         :class="promptGroupStatus[key] === 'error' ? 'border-destructive/30 text-destructive-emphasis' : 'text-muted-foreground hover:text-foreground'">
                                     <svg x-show="promptGroupStatus[key]==='running'" x-cloak class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
                                     <span x-text="key"></span>
@@ -1391,7 +1391,7 @@
                                     </div>
                                     <div class="flex gap-2">
                                         <button type="button" @click="applyGenomePatch()" :disabled="genomePatchApplying"
-                                            class="flex-1 h-7 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-1 transition-colors">
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 flex-1 items-center justify-center">
                                             <svg x-show="genomePatchApplying" class="w-3 h-3 wb-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83"/></svg>
                                             <span x-text="genomePatchApplying ? 'Regenerating…' : 'Confirm & Regenerate'"></span>
                                         </button>
@@ -1405,7 +1405,7 @@
                         </div>
                     </div>
                     <!-- AI-powered intelligences (POST /codegen/intelligence) -->
-                    <div class="shrink-0 p-3 border-b border-border bg-primary/5 space-y-2">
+                    <div class="border shrink-0 px-3 py-2 border-b border-border bg-primary/10 space-y-2">
                         <div class="flex items-center justify-between gap-2">
                             <p class="text-2xs font-semibold text-foreground">AI-powered intelligences</p>
                             <span class="text-2xs text-muted-foreground uppercase tracking-wider">Advisory</span>
@@ -1422,31 +1422,31 @@
                         </div>
                         <div class="flex flex-wrap gap-1">
                             <button type="button" @click="runCodegenIntelligence('journey_copilot_tips')" :disabled="intelligenceLoading"
-                                    class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium border border-border bg-background hover:bg-muted disabled:opacity-50 transition-colors">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 Journey tips
                             </button>
                             <button type="button" @click="runCodegenIntelligence('gap_ambiguity_coach')" :disabled="intelligenceLoading || !hasLlm"
-                                    class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium border border-border bg-background hover:bg-muted disabled:opacity-50 transition-colors">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 Gap coach
                             </button>
                             <button type="button" @click="runCodegenIntelligence('requirements_to_tests')" :disabled="intelligenceLoading || !hasLlm"
-                                    class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium border border-border bg-background hover:bg-muted disabled:opacity-50 transition-colors">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 Req → tests
                             </button>
                             <button type="button" @click="runCodegenIntelligence('traceability_explainer')" :disabled="intelligenceLoading || !hasLlm"
-                                    class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium border border-border bg-background hover:bg-muted disabled:opacity-50 transition-colors">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 Traceability
                             </button>
                             <button type="button" @click="runCodegenIntelligence('failure_triage')" :disabled="intelligenceLoading || !hasLlm"
-                                    class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium border border-border bg-background hover:bg-muted disabled:opacity-50 transition-colors">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 Failure triage
                             </button>
                             <button type="button" @click="runCodegenIntelligence('nfr_compliance_assistant')" :disabled="intelligenceLoading || !hasLlm"
-                                    class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium border border-border bg-background hover:bg-muted disabled:opacity-50 transition-colors">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 NFR / compliance
                             </button>
                             <button type="button" @click="runCodegenIntelligence('regeneration_copilot')" :disabled="intelligenceLoading"
-                                    class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium border border-border bg-background hover:bg-muted disabled:opacity-50 transition-colors">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 Regenerate coach
                             </button>
                         </div>
@@ -1479,7 +1479,7 @@
                         <div class="flex items-center gap-2">
                             <input x-model="intentInstruction" @keydown.enter="buildIntentPlan()" :disabled="intentPlanning"
                                    placeholder="Describe the change goal..."
-                                   class="flex-1 bg-input rounded-lg px-3 py-1.5 text-2xs text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:border-primary/50 transition-colors" aria-label="Describe the change goal..."/>
+                                   class="flex-1 bg-input rounded-md px-3 py-1.5 text-2xs text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:border-primary/50 transition-colors" aria-label="Describe the change goal..."/>
                             <button type="button" @click="buildIntentPlan()" :disabled="intentPlanning || !intentInstruction.trim()"
                                     class="h-7 px-2.5 rounded-lg bg-info/15 text-info-emphasis border border-info/30 hover:bg-info/25 disabled:opacity-50 transition-colors text-xs font-semibold flex items-center gap-1.5">
                                 <svg x-show="intentPlanning" x-cloak class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
@@ -1501,7 +1501,7 @@
                                 <div class="flex flex-wrap gap-1">
                                     <template x-for="(f, fi) in (intentPlan && intentPlan.impacted_files ? intentPlan.impacted_files : [])" :key="fi">
                                         <button type="button" @click="openPlannedFile(f)"
-                                                class="inline-flex items-center gap-1 rounded border border-border bg-muted/30 px-2 py-0.5 text-xs font-mono text-muted-foreground hover:text-foreground hover:bg-muted transition-colors max-w-[220px]"
+                                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center max-w-[220px]"
                                                 :title="f">
                                             <i data-lucide="file-code-2" class="h-2.5 w-2.5 shrink-0"></i>
                                             <span class="truncate" x-text="f"></span>
@@ -1519,7 +1519,7 @@
 
                             <div class="pt-1 flex items-center gap-2">
                                 <button type="button" @click="useIntentAsChatInstruction()"
-                                        class="h-6 px-2 rounded border border-primary/30 bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/20 transition-colors">
+                                        class="h-6 px-2 rounded border border-primary/30 bg-primary/10 text-info-emphasis text-xs font-semibold hover:bg-primary/20 transition-colors">
                                     Use in AI Chat
                                 </button>
                                 <button type="button" @click="runIntentVerifyLoop()"
@@ -1659,7 +1659,7 @@
                         <div class="flex items-center gap-2">
                             <input x-model="chatInstruction" @keydown.enter="chatRegenerate()" :disabled="chatSending"
                                    placeholder="Describe the change…"
-                                   class="flex-1 bg-input rounded-lg px-3 py-1.5 text-2xs text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:border-primary/50 transition-colors" aria-label="Describe the change…"/>
+                                   class="flex-1 bg-input rounded-md px-3 py-1.5 text-2xs text-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:border-primary/50 transition-colors" aria-label="Describe the change…"/>
                             <button aria-label="Regenerate response" type="button" @click="chatRegenerate()" :disabled="chatSending || !chatInstruction.trim() || isChatBlockedByVerify()"
                                     class="h-7 w-7 flex items-center justify-center rounded-lg bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 disabled:opacity-50 transition-colors shrink-0">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 12 6-6 6 6M12 6v12"/></svg>
@@ -1684,7 +1684,7 @@
                                 <div class="flex items-center gap-2 shrink-0">
                                     <span class="text-xs text-muted-foreground" x-text="searchResults.total_files + ' file(s)'"></span>
                                     <button aria-label="Clear search results" type="button" @click="searchResults = null; rightTab = 'ai'"
-                                            class="h-5 w-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 w-5 items-center justify-center">
                                         <i data-lucide="x" class="h-3 w-3"></i>
                                     </button>
                                 </div>
@@ -1776,7 +1776,7 @@
                                         <div class="ml-auto flex items-center gap-1">
                                             <!-- Preview toggle -->
                                             <button type="button" @click="toggleTemplatePreview(tmpl.id)"
-                                                    class="h-5 px-1.5 text-2xs font-medium rounded border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center gap-1">
+                                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                                 <svg class="w-2.5 h-2.5 transition-transform" :class="templatePreviewId === tmpl.id ? 'rotate-180' : ''" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3.5l3 3 3-3"/></svg>
                                                 Files
                                             </button>
@@ -1860,9 +1860,9 @@
                      @keydown.escape.window="previewModal = false">
 
                     <!-- ── Header bar ── -->
-                    <div class="shrink-0 h-12 border-b border-border bg-card flex items-center px-4 gap-2 shadow-sm z-10">
+                    <div class="shrink-0 h-12 border-b border-border bg-card flex items-center px-4 gap-2 z-10">
                         <button type="button" @click="previewModal = false"
-                                class="h-7 px-3 text-xs font-medium border rounded-md flex items-center gap-1.5 text-muted-foreground border-border hover:text-foreground hover:bg-accent transition-colors">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/>
                             </svg>
@@ -1881,7 +1881,7 @@
                                         x-init="$nextTick(() => window.lucide && window.lucide.createIcons())"
                                         class="inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-semibold transition-all"
                                         :class="previewModalTab === tab.key
- ? 'bg-background text-foreground shadow-sm'
+ ? 'bg-background text-foreground '
  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'">
                                     <i :data-lucide="tab.icon" class="w-3.5 h-3.5"></i><span x-text="tab.label"></span>
                                 </button>
@@ -1899,7 +1899,7 @@
                                         x-init="$nextTick(() => window.lucide && window.lucide.createIcons())"
                                         class="h-7 w-9 rounded text-sm transition-all flex items-center justify-center"
                                         :class="previewDevice === d.key
- ? 'bg-background text-foreground shadow-sm'
+ ? 'bg-background text-foreground '
  : 'text-muted-foreground hover:text-foreground'">
                                     <i :data-lucide="d.ico" class="w-4 h-4"></i></button>
                             </template>
@@ -1907,14 +1907,14 @@
                         <div class="flex-1"></div>
                         <a x-show="previewModalTab === 'admin'" x-cloak
                            :href="'/solutions/' + solutionId + '/codegen/preview/admin'" target="_blank"
-                           class="h-7 px-2.5 text-xs font-medium border rounded-md flex items-center gap-1.5 text-muted-foreground border-border hover:text-foreground hover:bg-accent transition-colors">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/>
                             </svg>
                             New tab
                         </a>
                         <button aria-label="Close preview" type="button" @click="previewModal = false"
-                                class="ml-1 h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 ml-1 w-7 items-center justify-center">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                             </svg>
@@ -1932,7 +1932,7 @@
                                 <div x-show="previewModalTab === 'web'">
                                     <p class="text-xs font-semibold text-foreground mb-2">Web App Preview</p>
                                     <p class="text-2xs text-muted-foreground leading-relaxed mb-3">Launch the generated frontend app in a cloud IDE or locally via Docker.</p>
-                                    <div x-show="!hasFrontend" class="rounded-lg bg-warning/10 border border-warning/30 p-3 text-2xs text-warning-emphasis">
+                                    <div x-show="!hasFrontend" class="rounded-md bg-warning/10 border border-warning/40 px-3 py-2 text-2xs text-warning-emphasis">
                                         No <code class="font-mono">frontend/</code> files yet. Re-generate with React, Next.js, or Vue.
                                     </div>
                                     <div x-show="hasFrontend" class="space-y-2">
@@ -1957,7 +1957,7 @@ npm run dev</pre>
                                 <div x-show="previewModalTab === 'mobile'">
                                     <p class="text-xs font-semibold text-foreground mb-2">Mobile App Preview</p>
                                     <p class="text-2xs text-muted-foreground leading-relaxed mb-3">Upload source to Expo Snack for an instant mobile simulator.</p>
-                                    <div x-show="!hasMobile" class="rounded-lg bg-warning/10 border border-warning/30 p-3 text-2xs text-warning-emphasis">
+                                    <div x-show="!hasMobile" class="rounded-md bg-warning/10 border border-warning/40 px-3 py-2 text-2xs text-warning-emphasis">
                                         No <code class="font-mono">mobile/</code> files yet. Re-generate with Expo or React Native.
                                     </div>
                                     <div x-show="hasMobile" class="space-y-2">
@@ -1978,7 +1978,7 @@ npm run dev</pre>
                                                 <button type="button" @click="showQr = !showQr" class="flex-1 h-7 text-xs font-medium rounded-lg border border-border hover:bg-accent transition-colors" x-text="showQr ? 'Hide QR' : 'QR Code'"></button>
                                                 <button type="button" @click="navigator.clipboard.writeText(snackUrl); snackCopied='url'; setTimeout(()=>snackCopied='',1500)" class="flex-1 h-7 text-xs font-medium rounded-lg border border-border hover:bg-accent transition-colors" x-text="snackCopied==='url' ? '✓ Copied' : 'Copy URL'"></button>
                                             </div>
-                                            <img x-show="showQr" x-cloak :src="'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=' + encodeURIComponent(snackUrl)" alt="Snack QR code" class="mx-auto w-32 h-32 rounded-lg border border-border shadow-sm mt-1">
+                                            <img x-show="showQr" x-cloak :src="'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=' + encodeURIComponent(snackUrl)" alt="Snack QR code" class="mx-auto w-32 h-32 rounded-lg border border-border mt-1">
                                         </div>
                                     </div>
                                 </div>
@@ -2004,7 +2004,7 @@ npm run dev</pre>
                                     <p class="text-xs font-semibold text-foreground mb-2">API Documentation</p>
                                     <p class="text-2xs text-muted-foreground leading-relaxed mb-3">Interactive Swagger / OpenAPI docs for the generated backend API.</p>
                                     <div x-show="!previewActive && !swaggerActive" class="space-y-2">
-                                        <div class="rounded-lg bg-warning/10 border border-warning/30 p-3 text-2xs text-warning-emphasis">Start the preview container to load live API docs.</div>
+                                        <div class="rounded-md bg-warning/10 border border-warning/40 px-3 py-2 text-2xs text-warning-emphasis">Start the preview container to load live API docs.</div>
                                         <button type="button" @click="swaggerStarting=true;
                                                         Platform.fetch.post('/solutions/'+solutionId+'/codegen/preview/start', undefined, {silent:true})
                                                         .then(d=>{ if(d.swagger_url||d.url){swaggerUrl=d.swagger_url||d.url; swaggerActive=true;} else {Platform.toast.error(d.error||'The preview container did not report an API docs URL.');} swaggerStarting=false; })
@@ -2039,9 +2039,9 @@ npm run dev</pre>
                                     <p class="text-xs text-muted-foreground">Re-generate using React, Next.js, or Vue to enable this view.</p>
                                 </div>
                                 <div x-show="hasFrontend" class="w-full h-full flex flex-col items-center justify-start p-8 gap-5 overflow-y-auto">
-                                    <div class="w-full max-w-2xl rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
+                                    <div class="w-full max-w-2xl rounded-lg border border-border bg-card p-6 space-y-4">
                                         <div class="flex items-center gap-3">
-                                            <div class="w-12 h-12 rounded-xl bg-info/10 flex items-center justify-center shadow-sm"><i data-lucide="globe" class="w-6 h-6 text-info-emphasis"></i></div>
+                                            <div class="w-12 h-12 rounded-xl bg-info/10 flex items-center justify-center"><i data-lucide="globe" class="w-6 h-6 text-info-emphasis"></i></div>
                                             <div>
                                                 <p class="text-base font-semibold text-foreground">StackBlitz Live Preview</p>
                                                 <p class="text-xs text-muted-foreground">Cloud IDE with hot-reload — no install required</p>
@@ -2054,9 +2054,9 @@ npm run dev</pre>
                                             <span x-text="sbLaunching ? 'Opening StackBlitz…' : 'Open in StackBlitz'"></span>
                                         </button>
                                     </div>
-                                    <div class="w-full max-w-2xl rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
+                                    <div class="w-full max-w-2xl rounded-lg border border-border bg-card p-6 space-y-4">
                                         <div class="flex items-center gap-3">
-                                            <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shadow-sm"><i data-lucide="box" class="w-6 h-6 text-info"></i></div>
+                                            <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center"><i data-lucide="box" class="w-6 h-6 text-info"></i></div>
                                             <div>
                                                 <p class="text-base font-semibold text-foreground">Docker Container</p>
                                                 <p class="text-xs text-muted-foreground">Build and run locally for full feature parity</p>
@@ -2086,7 +2086,7 @@ npm run dev</pre>
                                 </div>
                                 <div x-show="snackUrl" class="flex flex-col items-center justify-start" style="height:100%; padding-top:1rem;">
                                     <div class="relative flex-shrink-0" style="width:393px; height:852px; max-height:calc(100vh - 10rem);">
-                                        <div class="absolute inset-0 rounded-[3rem] border-[12px] border-foreground shadow-2xl bg-card overflow-hidden pointer-events-none z-10">
+                                        <div class="absolute inset-0 rounded-[3rem] border-[12px] border-foreground bg-card overflow-hidden pointer-events-none z-10">
                                             <div class="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-card rounded-b-xl z-20"></div>
                                         </div>
                                         <iframe :src="'https://snack.expo.dev/embedded/' + snackId + '?preview=true&platform=web'"
@@ -2100,18 +2100,18 @@ npm run dev</pre>
                             <div x-show="previewModalTab === 'admin'" class="w-full h-full flex items-center justify-center p-4">
                                 <div x-show="previewDevice === 'desktop'" class="w-full h-full">
                                     <iframe :src="'/solutions/' + solutionId + '/codegen/preview/admin'"
-                                            class="w-full h-full rounded-xl border border-border shadow-sm bg-background" loading="lazy"></iframe>
+                                            class="w-full h-full rounded-xl border border-border bg-background" loading="lazy"></iframe>
                                 </div>
                                 <div x-show="previewDevice === 'tablet'" class="h-full flex items-start justify-center overflow-auto py-4">
                                     <div class="relative flex-shrink-0" style="width:768px; min-height:100vh;">
-                                        <div class="absolute inset-0 rounded-2xl border-4 border-foreground/80 shadow-xl pointer-events-none z-10"></div>
+                                        <div class="absolute inset-0 rounded-2xl border-4 border-foreground/80 pointer-events-none z-10"></div>
                                         <iframe :src="'/solutions/' + solutionId + '/codegen/preview/admin'"
                                                 style="width:768px; min-height:100vh" class="rounded-xl bg-background" loading="lazy"></iframe>
                                     </div>
                                 </div>
                                 <div x-show="previewDevice === 'phone'" class="flex items-center justify-center h-full py-4">
                                     <div class="relative flex-shrink-0" style="width:393px; height:852px; max-height:calc(100vh - 8rem);">
-                                        <div class="absolute inset-0 rounded-[3rem] border-[12px] border-foreground shadow-2xl pointer-events-none z-10">
+                                        <div class="absolute inset-0 rounded-[3rem] border-[12px] border-foreground pointer-events-none z-10">
                                             <div class="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-card rounded-b-xl"></div>
                                         </div>
                                         <iframe :src="'/solutions/' + solutionId + '/codegen/preview/admin'"
@@ -2129,7 +2129,7 @@ npm run dev</pre>
                                 </div>
                                 <iframe x-show="previewActive || swaggerActive" x-cloak
                                         :src="swaggerUrl || ('/solutions/' + solutionId + '/codegen/preview/ui')"
-                                        class="w-full h-full rounded-xl border border-border shadow-sm bg-background" loading="lazy"></iframe>
+                                        class="w-full h-full rounded-xl border border-border bg-background" loading="lazy"></iframe>
                             </div>
 
                         </div><!-- /main content area -->

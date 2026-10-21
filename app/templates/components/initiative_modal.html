@@ -89,7 +89,7 @@
     <!-- Error Alert -->
     <div x-show="error" x-cloak
          x-transition
-         class="mb-4 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive-emphasis text-sm">
+         class="mb-4 px-3 py-2 bg-destructive/10 border border-destructive/40 rounded-md text-destructive-emphasis text-sm">
         <span x-text="error"></span>
     </div>
 
@@ -188,7 +188,7 @@
         <button @click="submitInitiativeForm()"
                 :disabled="loading"
                 type="button"
-                class="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors inline-flex items-center gap-2" aria-label="Submit">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit">
             <span x-show="!loading" x-cloak>Create Initiative</span>
             <span x-show="loading" x-cloak class="inline-flex items-center gap-1">
                 <i data-lucide="loader-2" class="h-4 w-4 animate-spin"></i>

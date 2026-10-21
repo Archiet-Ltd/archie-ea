@@ -25,7 +25,7 @@
   <div class="mb-8">
     {% macro _ps_actions() %}
 <div class="flex gap-3">
-        <select id="app-selector" class="px-3 py-2 border rounded-lg" @change="loadComparison()" aria-label="Select Application...">
+        <select id="app-selector" class="px-3 py-2 border rounded-md" @change="loadComparison()" aria-label="Select Application...">
           <option value="">Select Application...</option>
           {% for app in applications %}
           <option value="{{ app.id }}">{{ app.name }}</option>
@@ -48,7 +48,7 @@
   </div>
 
   <!-- Data Sources Legend -->
-  <div class="bg-card border rounded-lg p-4 mb-6">
+  <div class="bg-card border border-border rounded-lg p-4 mb-6">
     <div class="flex flex-wrap items-center gap-4 text-sm">
       <span class="font-medium">Data Sources:</span>
       <span class="source-badge source-abacus">Abacus (System of Record)</span>
@@ -58,9 +58,9 @@
   </div>
 
   <!-- Comparison Table -->
-  <div class="bg-card border rounded-lg overflow-hidden">
+  <div class="bg-card border border-border rounded-lg overflow-hidden">
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+      <table class="dense-table w-full text-sm">
         <thead class="bg-muted">
           <tr>
             <th class="text-left py-3 px-4 font-medium">Field</th>
@@ -84,7 +84,7 @@
 
   <!-- Resolution Modal -->
   <div id="resolution-modal" class="modal-root items-center justify-center fixed inset-0 bg-black/50 overflow-y-auto z-50" hidden  role="dialog">
-    <div class="bg-card border rounded-lg p-6 max-w-md w-full mx-4">
+    <div class="bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4">
       <h2 class="text-lg font-semibold mb-4">Resolve Conflict</h2>
       <div class="space-y-4">
         <div>
@@ -92,11 +92,11 @@
           <div id="modal-field-name" class="font-medium"></div>
         </div>
         <div class="grid grid-cols-2 gap-4">
-          <div class="p-3 bg-primary/5 rounded-lg">
+          <div class="px-3 py-2 bg-primary/10 rounded-md">
             <div class="text-xs text-primary mb-1">Abacus</div>
             <div id="modal-abacus-value" class="font-medium"></div>
           </div>
-          <div class="p-3 bg-warning/5 rounded-lg">
+          <div class="px-3 py-2 bg-warning/10 rounded-md">
             <div class="text-xs text-warning-emphasis mb-1">Manual/Assessment</div>
             <div id="modal-manual-value" class="font-medium"></div>
           </div>

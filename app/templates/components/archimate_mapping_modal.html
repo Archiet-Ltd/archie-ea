@@ -27,7 +27,7 @@
          class="modal-backdrop absolute inset-0 bg-background/80 transition-opacity duration-200"></div>
 
     <div data-modal-panel
-         class="modal-panel relative w-full max-w-5xl p-6 border border-border shadow-lg rounded-lg bg-background max-h-[90vh] overflow-y-auto"
+         class="modal-panel relative w-full max-w-5xl p-6 border border-border rounded-lg bg-background max-h-[90vh] overflow-y-auto"
          style="z-index: calc(var(--modal-z, 1000) + 1);">
         
         <!-- Header -->
@@ -219,7 +219,7 @@
         </div>
 
         <!-- Info Message -->
-        <div x-show="!selectedLayer" x-cloak class="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+        <div x-show="!selectedLayer" x-cloak class="mb-6 px-3 py-2 bg-primary/10 border border-primary/40 rounded-md">
             <div class="flex items-start">
                 <i data-lucide="info" class="w-5 h-5 text-primary mr-2 mt-0.5"></i>
                 <div>
@@ -238,7 +238,7 @@
             <button type="button" @click="saveMappings()" 
                     :disabled="selectedElements.length === 0 || saving"
                     :class="selectedElements.length === 0 || saving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary'"
-                    class="px-6 py-2 text-sm text-primary-foreground bg-primary rounded-md transition-colors flex items-center" aria-label="Save">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Save">
                 <i data-lucide="save" class="w-4 h-4 mr-2"></i>
                 <span x-text="saving ? 'Saving...' : 'Save Mappings'"></span>
             </button>

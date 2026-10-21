@@ -1,6 +1,6 @@
 {# smoke-coverage-ok: label-only change — plain-language rename, no functional change #}
             {# Architecture Requirements (TOGAF Phases B-D) — Alpine-driven CRUD #}
-            <div id="phase-bcd" class="bg-card rounded-xl border border-border shadow-sm p-6 transition-all relative "
+            <div id="phase-bcd" class="bg-card rounded-lg border border-border p-6 transition-all relative"
                  x-show="isSectionActive('B')" x-cloak
                  :class="isSectionActive('B') ? 'ring-1 ring-primary/10' : ''">
                 <div x-show="isSectionFuture('B')" x-cloak class="absolute inset-0 bg-background/60 z-10 flex items-center justify-center rounded-xl">
@@ -37,17 +37,17 @@
                             <span x-text="generateLoading === 'B' ? 'Generating...' : 'Generate Missing'"></span>
                         </button>
                         {% endif %}
-                        <button type="button" @click="toggleComments('phase_bcd')" class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Comments">
+                        <button type="button" @click="toggleComments('phase_bcd')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" title="Comments">
                             <i data-lucide="message-square" class="w-3.5 h-3.5" aria-hidden="true"></i>
                             <span x-show="commentCount('phase_bcd') > 0" x-text="commentCount('phase_bcd')" class="text-xs bg-primary text-primary-foreground rounded-full px-1 min-w-[16px] text-center" x-cloak></span>
                         </button>
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Phases B-D</span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Phases B-D</span>
                         <div class="flex items-center gap-1.5">
                             <div class="h-1.5 w-16 bg-muted rounded-full overflow-hidden"><div class="h-full bg-primary rounded-full transition-all" :style="{width: phaseCompleteness('BCD').percent + '%'}"></div></div>
                             <span class="text-xs text-muted-foreground" x-text="phaseCompleteness('BCD').label"></span>
                         </div>
                         <button type="button" @click="openEntityModal('requirement')"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <i data-lucide="plus" class="w-3.5 h-3.5" aria-hidden="true"></i> Add Requirement
                         </button>
                     </div>
@@ -55,7 +55,7 @@
 
                 {# Generate Missing Preview Panel (BPP-014) #}
                 <template x-if="generatePreview && generatePreview.phase === 'B'">
-                    <div class="mt-3 rounded-lg border border-warning/30 bg-warning/5 p-4 space-y-3">
+                    <div class="mt-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 space-y-3">
                         <div class="flex items-center justify-between">
                             <h4 class="text-sm font-medium text-warning-emphasis">
                                 Would create <span x-text="generatePreview.count"></span> elements
@@ -109,7 +109,7 @@
 
                 {# AI Suggestion Cards for B-D (SDX-005) #}
                 <template x-if="aiSuggestions.length > 0 && aiSuggestPhase === 'BCD'">
-                    <div class="mb-4 p-3 rounded-md border border-primary/20 bg-primary/5">
+                    <div class="mb-4 px-3 py-2 rounded-md border border-primary/40 bg-primary/10">
                         <p class="text-xs font-medium text-primary mb-2">AI Suggested Elements</p>
                         <div class="space-y-2">
                             <template x-for="(s, idx) in aiSuggestions" :key="idx">
@@ -137,7 +137,7 @@
 
                 {# AI Requirement Suggestion Cards (SDX-006) #}
                 <template x-if="aiRequirementSuggestions.length > 0">
-                    <div class="mb-4 p-3 rounded-md border border-info/20 bg-info/5">
+                    <div class="mb-4 px-3 py-2 rounded-md border border-info/40 bg-info/10">
                         <p class="text-xs font-medium text-info-emphasis mb-2">AI Suggested Requirements</p>
                         <div class="space-y-2">
                             <template x-for="(s, idx) in aiRequirementSuggestions" :key="idx">
@@ -167,7 +167,7 @@
 
                 <template x-if="requirements.length > 0">
                     <div class="overflow-x-auto border border-border rounded-lg">
-                        <table class="w-full text-sm">
+                        <table class="dense-table w-full text-sm">
                             <thead class="bg-muted/50 border-b border-border">
                                 <tr>
                                     <th class="text-left px-3 py-2 text-xs font-medium text-muted-foreground">ID</th>
@@ -276,7 +276,7 @@
                       </template>
                       <button type="button" @click="regenerateAiSuggestions()"
                         :disabled="aiSugRegenLoading"
-                        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="refresh-cw" class="w-3 h-3" :class="aiSugRegenLoading ? 'animate-spin' : ''"></i>
                         <span x-text="aiSugRegenLoading ? 'Analysing…' : 'Run AI Analysis'"></span>
                       </button>
@@ -491,7 +491,7 @@
                       <div class="space-y-2">
                         <template x-for="(a, idx) in aiSuggestions.nextActions" :key="idx">
                           <div class="flex items-start gap-3 px-4 py-3 rounded-md border border-border bg-background">
-                            <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center" x-text="idx+1"></span>
+                            <span class="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-info-emphasis text-xs font-bold flex items-center justify-center" x-text="idx+1"></span>
                             <div class="flex-1 min-w-0">
                               <p class="text-sm font-medium" x-text="a.action || a.title || a.description || a"></p>
                               <p x-cloak x-show="a.rationale || a.reason" class="text-xs text-muted-foreground mt-0.5" x-text="a.rationale || a.reason"></p>
@@ -513,12 +513,12 @@
                 </div>
 
                 {# ENT-060: Business Capability Mappings (Phase B) #}
-                <div class="mt-6 bg-card rounded-xl border border-border shadow-sm p-6">
+                <div class="mt-6 bg-card rounded-lg border border-border p-6">
                     <div class="flex items-center justify-between mb-4">
                         <div class="flex items-center gap-3">
                             <i data-lucide="boxes" class="w-4 h-4 text-primary flex-shrink-0" aria-hidden="true"></i>
                             <h3 class="text-lg font-semibold text-foreground">Business Capabilities</h3>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/30">Phase B</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Phase B</span>
                             <template x-if="capabilityMappingsLoading">
                                 <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-muted-foreground" aria-hidden="true"></i>
                             </template>
@@ -526,7 +526,7 @@
                         <div class="flex items-center gap-2">
                             <span class="text-xs text-muted-foreground" x-text="capabilityMappings.length + ' linked'" x-cloak></span>
                             <button type="button" @click="$dispatch('open-capability-picker', { solutionId: solutionId })"
-                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 <i data-lucide="plus" class="w-3.5 h-3.5" aria-hidden="true"></i> Link Capability
                             </button>
                         </div>
@@ -605,12 +605,12 @@
                 </div>
 
                 {# SAD-03: Capability Health panel (Phase B) #}
-                <div class="mt-4 border border-border rounded-lg p-4 bg-muted/20"
+                <div class="mt-4 border border-border rounded-md px-3 py-2 bg-muted/20"
                      x-cloak x-show="capabilityHealthLoaded && capabilityHealth">
                     <div class="flex items-center gap-2 mb-3">
                         <i data-lucide="activity" class="w-4 h-4 text-muted-foreground flex-shrink-0"></i>
                         <h3 class="text-sm font-semibold text-foreground">Capability Health Scores</h3>
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/30">Phase B</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Phase B</span>
                         <template x-if="capabilityHealthLoading">
                             <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-muted-foreground"></i>
                         </template>
@@ -641,12 +641,12 @@
                 </div>
 
                 {# SAD-14: Workflow Critical Path / Bottleneck Detection (Phase B) #}
-                <div class="mt-4 border border-border rounded-lg p-4 bg-muted/20"
+                <div class="mt-4 border border-border rounded-md px-3 py-2 bg-muted/20"
                      x-cloak x-show="criticalPathLoaded && criticalPath">
                     <div class="flex items-center gap-2 mb-3">
                         <i data-lucide="git-branch" class="w-4 h-4 text-muted-foreground flex-shrink-0"></i>
                         <h3 class="text-sm font-semibold text-foreground">Workflow Optimization — Critical Path</h3>
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/30">Phase B</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Phase B</span>
                         <template x-if="criticalPathLoading">
                             <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-muted-foreground"></i>
                         </template>

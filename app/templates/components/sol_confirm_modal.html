@@ -41,7 +41,7 @@
        aria-hidden="true"></div>
 
   {# Dialog panel #}
-  <div class="relative bg-background rounded-lg border border-border shadow-xl max-w-md w-full mx-4 p-6 flex flex-col gap-4"
+  <div class="relative bg-background rounded-lg border border-border max-w-md w-full mx-4 p-6 flex flex-col gap-4"
        x-transition:enter="transition ease-out duration-150"
        x-transition:enter-start="opacity-0 scale-95"
        x-transition:enter-end="opacity-100 scale-100"
@@ -78,7 +78,7 @@
     <div class="flex justify-end gap-2 pt-1">
       <button type="button"
               @click="activeModal = null"
-              class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium border border-input bg-background text-foreground hover:bg-accent transition-colors min-h-[36px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         {{ cancel_label }}
       </button>
       <button type="button"

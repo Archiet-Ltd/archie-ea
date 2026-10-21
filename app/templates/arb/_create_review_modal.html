@@ -9,13 +9,13 @@
     <div class="sm:col-span-2">
       <label for="car-title" class="block text-sm font-medium mb-1">Title <span class="text-destructive-emphasis">*</span></label>
       <input type="text" id="car-title" x-model="formData.title" required maxlength="255"
-             class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+             class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
              placeholder="e.g. Cloud Migration Architecture Proposal">
     </div>
     <div>
       <label for="car-type" class="block text-sm font-medium mb-1">Review Type <span class="text-destructive-emphasis">*</span></label>
       <select id="car-type" x-model="formData.review_type"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <option value="">Select type...</option>
         <template x-for="rt in formOptions.review_types" :key="rt.value">
           <option :value="rt.value" x-text="rt.label"></option>
@@ -25,7 +25,7 @@
     <div>
       <label for="car-decision-sought" class="block text-sm font-medium mb-1">Decision Sought <span class="text-destructive-emphasis">*</span></label>
       <select id="car-decision-sought" x-model="formData.decision_sought" required
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <option value="">What is the board being asked to approve?</option>
         <template x-for="d in formOptions.decision_types" :key="d.value">
           <option :value="d.value" x-text="d.label"></option>
@@ -45,7 +45,7 @@
          A-F to "match" the blueprint. #}
       <label for="car-togaf" class="block text-sm font-medium mb-1">TOGAF ADM Phase (A-H)</label>
       <select id="car-togaf" x-model="formData.togaf_phase"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <option value="">—</option>
         <option value="phase_a_vision">Phase A: Vision</option>
         <option value="phase_b_business">Phase B: Business</option>
@@ -60,7 +60,7 @@
     <div>
       <label for="car-archimate" class="block text-sm font-medium mb-1">ArchiMate Layer</label>
       <select id="car-archimate" x-model="formData.archimate_layer"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <option value="">—</option>
         <option value="motivation">Motivation</option>
         <option value="strategy">Strategy</option>
@@ -73,7 +73,7 @@
     <div>
       <label for="car-priority" class="block text-sm font-medium mb-1">Priority</label>
       <select id="car-priority" x-model="formData.priority"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <option value="low">Low</option>
         <option value="medium" selected>Medium</option>
         <option value="high">High</option>
@@ -83,7 +83,7 @@
     <div>
       <label for="car-impact" class="block text-sm font-medium mb-1">Business Impact</label>
       <select id="car-impact" x-model="formData.business_impact"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <option value="low">Low</option>
         <option value="medium" selected>Medium</option>
         <option value="high">High</option>
@@ -93,7 +93,7 @@
     <div>
       <label for="car-effort" class="block text-sm font-medium mb-1">Estimated Effort</label>
       <select id="car-effort" x-model="formData.estimated_effort"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <option value="low">Low</option>
         <option value="medium" selected>Medium</option>
         <option value="high">High</option>
@@ -146,7 +146,7 @@
         <div>
           <label for="car-adr" class="block text-sm font-medium mb-1">ADR</label>
           <select id="car-adr" x-model="formData.adr_id"
-                  class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <option value="">—</option>
             <template x-for="a in formOptions.adrs" :key="a.id">
               <option :value="a.id" x-text="(a.adr_number || '') + ' ' + (a.title || '')"></option>
@@ -156,7 +156,7 @@
         <div>
           <label for="car-arch-model" class="block text-sm font-medium mb-1">Architecture Model</label>
           <select id="car-arch-model" x-model="formData.architecture_model_id"
-                  class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <option value="">—</option>
             <template x-for="m in formOptions.architecture_models" :key="m.id">
               <option :value="m.id" x-text="m.name"></option>
@@ -184,7 +184,7 @@
         <div>
           <label for="car-cap-impact-type" class="block text-sm font-medium mb-1">Capability Impact Type</label>
           <select id="car-cap-impact-type" x-model="formData.capability_impact_type"
-                  class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <template x-for="t in formOptions.impact_types" :key="t.value">
               <option :value="t.value" x-text="t.label"></option>
             </template>
@@ -208,7 +208,7 @@
     <button type="button" data-modal-close="create-arb-review"
             class="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent">Cancel</button>
     <button type="submit" :disabled="submitting"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
       <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-cloak x-show="submitting"></i>
       <span x-text="submitting ? 'Submitting...' : 'Submit for Review'"></span>
     </button>

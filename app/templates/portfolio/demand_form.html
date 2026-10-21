@@ -31,11 +31,11 @@
   <form method="post" action="{{ request.path }}" class="space-y-6">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-    <div class="rounded-lg border bg-card p-6 space-y-4">
+    <div class="rounded-lg border border-border bg-card p-6 space-y-4">
       <div>
         <label for="title" class="block text-sm font-medium mb-1.5">Title <span class="text-destructive-emphasis">*</span></label>
         <input id="title" name="title" type="text" required value="{{ form.get('title', '') }}"
-               class="w-full h-10 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+               class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                placeholder="e.g. Replace the manual supplier onboarding process">
       </div>
 
@@ -58,7 +58,7 @@
       <div>
         <label for="capability_id" class="block text-sm font-medium mb-1.5">Capability this is about</label>
         <select id="capability_id" name="capability_id"
-                class="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
           <option value="">&mdash;</option>
           {% for c in capabilities %}
           <option value="{{ c.id }}" {% if form.get('capability_id')|string == c.id|string %}selected{% endif %}>{{ c.name }}</option>
@@ -71,7 +71,7 @@
         <div>
           <label for="source" class="block text-sm font-medium mb-1.5">Source</label>
           <select id="source" name="source"
-                  class="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                  class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             <option value="">&mdash;</option>
             {% for s in sources %}
             <option value="{{ s }}" {% if form.get('source') == s %}selected{% endif %}>{{ s|replace('_',' ')|title }}</option>
@@ -82,12 +82,12 @@
           <label for="requested_for_business_unit" class="block text-sm font-medium mb-1.5">Business unit</label>
           <input id="requested_for_business_unit" name="requested_for_business_unit" type="text"
                  value="{{ form.get('requested_for_business_unit', '') }}"
-                 class="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         </div>
       </div>
     </div>
 
-    <div class="rounded-lg border bg-card p-6 space-y-4">
+    <div class="rounded-lg border border-border bg-card p-6 space-y-4">
       <div>
         <h2 class="text-lg font-semibold">Triage inputs</h2>
         <p class="text-sm text-muted-foreground mt-1">
@@ -100,36 +100,36 @@
           <label for="business_value_score" class="block text-sm font-medium mb-1.5">Business value (1&ndash;5)</label>
           <input id="business_value_score" name="business_value_score" type="number" min="1" max="5"
                  value="{{ form.get('business_value_score', '') }}"
-                 class="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         </div>
         <div>
           <label for="urgency_score" class="block text-sm font-medium mb-1.5">Urgency (1&ndash;5)</label>
           <input id="urgency_score" name="urgency_score" type="number" min="1" max="5"
                  value="{{ form.get('urgency_score', '') }}"
-                 class="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         </div>
         <div>
           <label for="effort_estimate_days" class="block text-sm font-medium mb-1.5">Effort (days)</label>
           <input id="effort_estimate_days" name="effort_estimate_days" type="number" min="0"
                  value="{{ form.get('effort_estimate_days', '') }}"
-                 class="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         </div>
         <div>
           <label for="needed_by_date" class="block text-sm font-medium mb-1.5">Needed by</label>
           <input id="needed_by_date" name="needed_by_date" type="date"
                  value="{{ form.get('needed_by_date', '') }}"
-                 class="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         </div>
       </div>
     </div>
 
     <div class="flex items-center gap-2">
       <button type="submit"
-              class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         Submit demand
       </button>
       <a href="{{ url_for('portfolio.demands') }}"
-         class="inline-flex items-center gap-2 px-4 py-2 text-sm border border-input rounded-md hover:bg-accent">
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         Cancel
       </a>
     </div>

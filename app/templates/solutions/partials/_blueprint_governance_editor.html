@@ -9,8 +9,8 @@
    openEntityModal() are NOT handled here — see docs/qa/claude-governance-result.md. #}
 {% from 'components/modal.html' import modal %}
 <p x-show="entityNotice" x-cloak role="status" class="text-sm text-muted-foreground" x-text="entityNotice"></p>
-{% set _gov_input = 'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50' %}
-{% set _gov_textarea = 'flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-y' %}
+{% set _gov_input ='flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50' %}
+{% set _gov_textarea ='flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-y' %}
 {% set _gov_label = 'block text-xs font-medium text-muted-foreground mb-1.5' %}
 
 {% call modal(id='bp-governance-editor', size='lg', labelledby='bp-governance-editor-heading') %}
@@ -37,7 +37,7 @@
                         <div class="relative">
                             <input id="gov-principle-search" type="text" x-model="govPicker.query" @input.debounce.300ms="searchGovElements()" autocomplete="off" placeholder="Search architecture principles…" class="{{ _gov_input }}">
                             <p x-show="govPicker.error" x-cloak class="mt-1 text-xs text-destructive-emphasis" x-text="govPicker.error"></p>
-                            <ul x-show="govPicker.results.length > 0" x-cloak role="listbox" class="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-border bg-popover shadow-md text-sm">
+                            <ul x-show="govPicker.results.length > 0" x-cloak role="listbox" class="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-border bg-popover text-sm">
                                 <template x-for="el in govPicker.results" :key="el.id">
                                     <li role="option"><button type="button" @click="pickGovElement(el)" class="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground"><span x-text="el.name"></span> <span class="text-xs text-muted-foreground" x-text="el.element_type"></span></button></li>
                                 </template>
@@ -114,7 +114,7 @@
                         <div class="relative">
                             <input id="gov-element-search" type="text" x-model="govPicker.query" @input.debounce.300ms="searchGovElements()" autocomplete="off" placeholder="Search architecture elements…" class="{{ _gov_input }}">
                             <p x-show="govPicker.error" x-cloak class="mt-1 text-xs text-destructive-emphasis" x-text="govPicker.error"></p>
-                            <ul x-show="govPicker.results.length > 0" x-cloak role="listbox" class="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-border bg-popover shadow-md text-sm">
+                            <ul x-show="govPicker.results.length > 0" x-cloak role="listbox" class="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-border bg-popover text-sm">
                                 <template x-for="el in govPicker.results" :key="el.id">
                                     <li role="option"><button type="button" @click="pickGovElement(el)" class="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground"><span x-text="el.name"></span> <span class="text-xs text-muted-foreground" x-text="el.element_type"></span></button></li>
                                 </template>
@@ -298,9 +298,9 @@
 
     <div class="flex items-center justify-end gap-2 mt-6">
         <button type="button" @click="closeModal()" :disabled="modalSaving"
-                class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">Cancel</button>
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
         <button type="submit" :disabled="modalSaving"
-                class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <span x-show="modalSaving" x-cloak class="animate-spin h-4 w-4 mr-2 border-2 border-current border-t-transparent rounded-full inline-block"></span>
             <span x-text="modalSaving ? 'Saving…' : (editingEntity && editingEntity.id ? 'Save changes' : 'Save')"></span>
         </button>

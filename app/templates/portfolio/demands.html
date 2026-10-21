@@ -17,7 +17,7 @@
 
   {% macro _ps_actions() %}
 <a href="{{ url_for('portfolio.demand_new') }}"
-       class="inline-flex items-center gap-2 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
+       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
       <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Submit demand
     </a>
   {% endmacro %}
@@ -33,7 +33,7 @@
     {% endfor %}
   {% endwith %}
 
-  <div class="rounded-lg border bg-card">
+  <div class="rounded-lg border border-border bg-card">
     <div class="border-b px-6 py-4">
       <h2 class="text-xl font-semibold">Awaiting decision ({{ open_demands|length }})</h2>
     </div>
@@ -104,7 +104,7 @@
     {% endif %}
   </div>
 
-  <div class="rounded-lg border bg-card">
+  <div class="rounded-lg border border-border bg-card">
     <div class="border-b px-6 py-4">
       <h2 class="text-xl font-semibold">Decided ({{ decided|length }})</h2>
       <p class="text-sm text-muted-foreground mt-1">
@@ -112,7 +112,7 @@
       </p>
     </div>
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+      <table class="dense-table w-full text-sm">
         <thead class="border-b bg-muted/40">
           <tr class="text-left">
             <th class="px-4 py-3 font-medium">Demand</th>

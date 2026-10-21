@@ -18,7 +18,7 @@
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 -mt-2">
         <div class="flex items-center gap-2">
             <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2
-                {% if instance.status == 'running' %}border-transparent bg-primary/10 text-primary
+                {% if instance.status == 'running' %}border-transparent bg-primary/10 text-info-emphasis
                 {% elif instance.status == 'completed' %}border-transparent bg-success/10 text-success-emphasis
                 {% elif instance.status == 'failed' %}border-transparent bg-destructive/10 text-destructive-emphasis
                 {% elif instance.status == 'waiting_approval' %}border-transparent bg-warning/10 text-warning-emphasis
@@ -33,7 +33,7 @@
             {% if instance.status == 'running' or instance.status == 'waiting_approval' %}
                 <form action="{{ url_for('integration.cancel_workflow', instance_id=instance.id) }}" method="post" @submit.prevent="Platform.modal.confirmSubmit($event, 'Are you sure you want to cancel this workflow?')">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-destructive hover:text-destructive-foreground h-10 px-4 py-2" aria-label="Submit">
+                    <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Submit">
                         Cancel Workflow
                     </button>
                 </form>
@@ -46,14 +46,14 @@
                 
                 <div id="approval-modal" hidden role="dialog" aria-modal="true" aria-labelledby="approval-modal-title" class="modal-root fixed inset-0 z-50 items-center justify-center p-4">
                     <div data-modal-backdrop="approval-modal" class="absolute inset-0 bg-background/80" aria-hidden="true"></div>
-                    <div data-modal-panel class="relative w-full max-w-md bg-background border border-border rounded-lg shadow-lg p-6">
+                    <div data-modal-panel class="relative w-full max-w-md bg-background border border-border rounded-lg p-6">
                         <h3 id="approval-modal-title" class="text-lg font-semibold mb-2">Approve Workflow Step</h3>
                         <p class="text-sm text-muted-foreground mb-4">Provide optional comments for this approval.</p>
                         <form action="{{ url_for('integration.approve_workflow_step', instance_id=instance.id) }}" method="post">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <textarea name="comments" class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mb-4" placeholder="Approval comments..." aria-label="Approval comments..."></textarea>
                             <div class="flex justify-end gap-2">
-                                <button type="button" data-modal-close="approval-modal" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2" aria-label="Action">Cancel</button>
+                                <button type="button" data-modal-close="approval-modal" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Action">Cancel</button>
                                 <button type="submit" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2" aria-label="Submit">Approve & Resume</button>
                             </div>
                         </form>
@@ -66,7 +66,7 @@
     <div class="grid gap-6 md:grid-cols-3">
         <!-- Main Content: Steps -->
         <div class="md:col-span-2 space-y-6">
-            <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm">
+            <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
                 <div class="flex flex-col space-y-1.5 p-6">
                     <div class="flex items-center justify-between">
                         <h3 class="font-semibold leading-none tracking-tight">Execution History</h3>
@@ -105,14 +105,14 @@
                                     <p class="text-xs text-muted-foreground">{{ step.step_type|title }} • {{ step.duration_seconds if step.duration_seconds else 0 }}s</p>
                                     
                                     {% if step.error_message %}
-                                        <div class="mt-2 rounded-md bg-destructive/10 p-3 text-xs text-destructive-emphasis">
+                                        <div class="mt-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive-emphasis">
                                             <p class="font-semibold">Error:</p>
                                             <p>{{ step.error_message }}</p>
                                         </div>
                                     {% endif %}
                                     
                                     {% if step.status == 'waiting_approval' %}
-                                        <div class="mt-2 rounded-md bg-warning/5 p-3 text-xs text-warning-emphasis border border-warning/20">
+                                        <div class="mt-2 rounded-md bg-warning/10 px-3 py-2 text-xs text-warning-emphasis border border-warning/40">
                                             <p class="font-semibold">Waiting for Approval</p>
                                             <p>This step requires manual confirmation to proceed.</p>
                                         </div>
@@ -139,7 +139,7 @@
 
         <!-- Sidebar: Context & Metadata -->
         <div class="space-y-6">
-            <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm">
+            <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
                 <div class="flex flex-col space-y-1.5 p-6">
                     <h3 class="font-semibold leading-none tracking-tight">Instance Details</h3>
                 </div>
@@ -172,7 +172,7 @@
                 </div>
             </div>
 
-            <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm">
+            <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
                 <div class="flex flex-col space-y-1.5 p-6">
                     <h3 class="font-semibold leading-none tracking-tight">Context Data</h3>
                 </div>

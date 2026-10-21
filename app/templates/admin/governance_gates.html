@@ -37,7 +37,7 @@
         <button
             type="button"
             @click="openCreate()"
-            class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="plus" class="h-4 w-4"></i>
             Add Gate
         </button>
@@ -121,7 +121,7 @@
 
         <!-- Gates table -->
         <div x-show="!loading && dbGates.length > 0" x-cloak class="rounded-xl border bg-card overflow-hidden">
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
                 <thead class="border-b bg-muted/50">
                     <tr>
                         <th class="text-left px-4 py-3 font-medium text-muted-foreground">Gate</th>
@@ -192,7 +192,7 @@
         <div class="fixed inset-0 bg-black/50" @click="dismissModal()"></div>
         <!-- Panel -->
         <div class="fixed inset-0 flex items-center justify-center p-4">
-            <div class="bg-card rounded-xl border shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto"
+            <div class="bg-card rounded-lg border border-border w-full max-w-lg max-h-[90vh] overflow-y-auto"
                  @click.stop>
                 <div class="p-6 border-b flex items-center justify-between">
                     <div>
@@ -221,7 +221,7 @@
                             x-model="form.gate_name"
                             :readonly="!!editingGate"
                             placeholder="e.g. arb_submission"
-                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                             :class="editingGate ? 'opacity-60 cursor-not-allowed' : ''"
                             required>
                         <p class="text-xs text-muted-foreground mt-1">Unique identifier, lowercase with underscores. Cannot be changed after creation.</p>
@@ -235,7 +235,7 @@
                             type="text"
                             x-model="form.description"
                             placeholder="e.g. Architecture Review Board submission gate"
-                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     </div>
 
                     <!-- required_sections -->
@@ -276,7 +276,7 @@
                             min="0"
                             max="100"
                             x-model.number="form.min_completeness"
-                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <p class="text-xs text-muted-foreground mt-1">Each required section must reach this completeness threshold (0–100).</p>
                     </div>
 
@@ -290,7 +290,7 @@
                             type="number"
                             min="0"
                             x-model.number="form.required_decisions_count"
-                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <p class="text-xs text-muted-foreground mt-1">Minimum number of approved architecture decisions. Set to 0 to skip this check.</p>
                     </div>
 
@@ -324,12 +324,12 @@
                     <!-- Actions -->
                     <div class="flex justify-end gap-3 pt-2 border-t">
                         <button type="button" @click="dismissModal()"
-                                class="inline-flex items-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-9 px-4 transition-colors">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             Cancel
                         </button>
                         <button type="submit"
                                 :disabled="saving"
-                                class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="saving" x-cloak></i>
                             <span x-text="saving ? 'Saving...' : (editingGate ? 'Save Changes' : 'Create Gate')"></span>
                         </button>

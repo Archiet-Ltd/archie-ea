@@ -22,7 +22,7 @@
       <p class="text-sm text-muted-foreground">Track P0/P1/P2 issues blocking solution delivery</p>
     </div>
     <div class="flex items-center gap-2">
-      <button type="button" @click="showCreateForm = true" class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+      <button type="button" @click="showCreateForm = true" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
         + New Issue
       </button>
     </div>
@@ -69,7 +69,7 @@
       <h3 class="font-bold text-sm mb-4 text-foreground">NEW</h3>
       <div class="space-y-3 min-h-[300px]">
         <template x-for="issue in getFilteredIssues('NEW')" :key="issue.id">
-          <div @click="openIssueDetail(issue)" class="bg-background rounded-lg p-4 shadow-sm hover:shadow-md cursor-pointer border border-border hover:border-border transition-all">
+          <div @click="openIssueDetail(issue)" class="bg-background rounded-lg p-4 cursor-pointer border border-border hover:border-border transition-all">
             <div class="flex items-start justify-between gap-2 mb-2">
               <h4 class="font-semibold text-sm text-foreground flex-1" x-text="issue.title"></h4>
               <span :class="priority_colors[issue.priority]" class="px-2 py-1 rounded text-xs font-medium whitespace-nowrap" x-text="issue.priority"></span>
@@ -110,11 +110,11 @@
     </div>
 
     {# IN_PROGRESS Column #}
-    <div class="bg-primary/5 rounded-lg p-4 border border-primary/20">
+    <div class="bg-primary/10 rounded-md px-3 py-2 border border-primary/40">
       <h3 class="font-bold text-sm mb-4 text-primary">IN PROGRESS</h3>
       <div class="space-y-3 min-h-[300px]">
         <template x-for="issue in getFilteredIssues('IN_PROGRESS')" :key="issue.id">
-          <div @click="openIssueDetail(issue)" class="bg-background rounded-lg p-4 shadow-sm hover:shadow-md cursor-pointer border border-primary/20 hover:border-primary/30 transition-all">
+          <div @click="openIssueDetail(issue)" class="bg-background rounded-lg p-4 cursor-pointer border border-primary/20 hover:border-primary/30 transition-all">
             <div class="flex items-start justify-between gap-2 mb-2">
               <h4 class="font-semibold text-sm text-foreground flex-1" x-text="issue.title"></h4>
               <span :class="priority_colors[issue.priority]" class="px-2 py-1 rounded text-xs font-medium whitespace-nowrap" x-text="issue.priority"></span>
@@ -162,11 +162,11 @@
     </div>
 
     {# RESOLVED Column #}
-    <div class="bg-success/10 rounded-lg p-4 border border-success/30">
+    <div class="bg-success/10 rounded-md px-3 py-2 border border-success/40">
       <h3 class="font-bold text-sm mb-4 text-success-emphasis">RESOLVED</h3>
       <div class="space-y-3 min-h-[300px]">
         <template x-for="issue in getFilteredIssues('RESOLVED')" :key="issue.id">
-          <div @click="openIssueDetail(issue)" class="bg-background rounded-lg p-4 shadow-sm hover:shadow-md cursor-pointer border border-success/30 hover:border-success/50 transition-all opacity-75 hover:opacity-100">
+          <div @click="openIssueDetail(issue)" class="bg-background rounded-lg p-4 cursor-pointer border border-success/30 hover:border-success/50 transition-all opacity-75 hover:opacity-100">
             <div class="flex items-start justify-between gap-2 mb-2">
               <h4 class="font-semibold text-sm text-foreground flex-1 line-through" x-text="issue.title"></h4>
               <span :class="priority_colors[issue.priority]" class="px-2 py-1 rounded text-xs font-medium whitespace-nowrap" x-text="issue.priority"></span>
@@ -203,7 +203,7 @@
     <h3 class="font-bold text-lg mb-4 text-foreground">P0 Escalation Timeline</h3>
     <div class="space-y-4">
       <template x-for="issue in getP0Issues()" :key="'escalation-' + issue.id">
-        <div class="bg-destructive/5 rounded-lg p-4 border border-destructive/20">
+        <div class="bg-destructive/10 rounded-md px-3 py-2 border border-destructive/40">
           <div class="flex items-start justify-between gap-4">
             <div class="flex-1">
               <h4 class="font-semibold text-sm text-foreground" x-text="issue.title"></h4>
@@ -230,7 +230,7 @@
 
             <div class="flex flex-col gap-2">
               <button type="button" @click="manuallyEscalate(issue)" x-show="issue.status !== 'ESCALATED' && issue.status !== 'RESOLVED'" x-cloak
-                      class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-destructive text-primary-foreground hover:bg-destructive/90 h-8 px-3 py-1 whitespace-nowrap">
+                      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
                 Escalate Now
               </button>
               <span x-show="issue.status === 'ESCALATED'" x-cloak class="text-xs font-medium text-destructive-emphasis text-center">
@@ -247,7 +247,7 @@
 {# Issue Detail Modal (to be included separately) #}
 <div id="issue-detail-modal" hidden role="dialog" aria-modal="true" class="fixed inset-0 z-50 flex items-end sm:items-center">
   <div class="fixed inset-0 bg-black/50" @click="showDetailModal = false"></div>
-  <div class="bg-background rounded-t-lg sm:rounded-lg shadow-lg w-full sm:w-full max-w-2xl max-h-[80vh] overflow-y-auto relative">
+  <div class="bg-background rounded-t-lg sm:rounded-lg w-full sm:w-full max-w-2xl max-h-[80vh] overflow-y-auto relative">
     <div class="sticky top-0 bg-background border-b p-4 flex items-center justify-between">
       <h2 class="text-xl font-bold" x-text="selectedIssue?.title || 'Issue Details'"></h2>
       <button type="button" @click="showDetailModal = false" class="text-muted-foreground hover:text-foreground">✕</button>
@@ -285,7 +285,7 @@
       </div>
 
       {# Escalation Info #}
-      <div x-show="selectedIssue?.priority === 'P0'" x-cloak class="bg-destructive/5 border border-destructive/20 rounded-lg p-4">
+      <div x-show="selectedIssue?.priority === 'P0'" x-cloak class="bg-destructive/10 border border-destructive/40 rounded-md px-3 py-2">
         <h4 class="font-semibold text-sm text-destructive-emphasis mb-3">Escalation Information</h4>
         <div class="space-y-2 text-sm text-destructive-emphasis">
           <div class="flex justify-between">
@@ -322,7 +322,7 @@
       <div class="flex gap-2 pt-4 border-t">
         <button type="button" @click="transitionIssue(selectedIssue, 'IN_PROGRESS')" 
                 x-show="selectedIssue?.status === 'NEW'" x-cloak
-                class="flex-1 inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 flex-1 items-center justify-center">
           Start Working
         </button>
         <button type="button" @click="transitionIssue(selectedIssue, 'RESOLVED')" 
@@ -332,7 +332,7 @@
         </button>
         <button type="button" @click="manuallyEscalate(selectedIssue)" 
                 x-show="selectedIssue?.status !== 'ESCALATED' && selectedIssue?.status !== 'RESOLVED' && selectedIssue?.priority === 'P0'" x-cloak
-                class="flex-1 inline-flex items-center justify-center rounded-md text-sm font-medium bg-destructive text-primary-foreground hover:bg-destructive/90 h-9">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 flex-1 items-center justify-center">
           Escalate
         </button>
       </div>

@@ -18,14 +18,14 @@
   <div class="modal-backdrop" data-modal-backdrop aria-hidden="true"></div>
   
   <div class="modal-panel flex items-center justify-center p-4 fixed inset-0 z-50">
-    <div class="bg-card rounded-lg shadow-xl w-full max-w-lg border flex flex-col max-h-[90vh]">
+    <div class="bg-card rounded-lg w-full max-w-lg border border-border flex flex-col max-h-[90vh]">
       <!-- Header -->
       <div class="flex items-center justify-between p-6 border-b shrink-0">
         <div>
           <h2 id="my-modal-title" class="text-lg font-semibold">Modal Title</h2>
           <p id="my-modal-description" class="text-sm text-muted-foreground mt-0.5">Modal description</p>
         </div>
-        <button type="button" data-modal-close="my-modal" aria-label="Close modal" class="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center">
+        <button type="button" data-modal-close="my-modal" aria-label="Close modal" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 w-8 items-center justify-center">
           <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
         </button>
       </div>
@@ -42,7 +42,7 @@
               <div>
                 <label for="field-name" class="block text-sm font-medium mb-1">Field Label <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
                 <input id="field-name" type="text" x-model="formData.name" required
-                  class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   placeholder="Enter value">
               </div>
               
@@ -58,7 +58,7 @@
                 Cancel
               </button>
               <button type="submit" :disabled="submitting"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak aria-hidden="true"></i>
                 <span x-text="submitting ? 'Saving...' : 'Save'"></span>
               </button>
