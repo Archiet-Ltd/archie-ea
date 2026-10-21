@@ -1518,9 +1518,6 @@ def application_import():
                                 row, "Business Domain", "business_domain", "Domain"
                             )
                         ),
-                        vendor_name=_clean(
-                            get_csv_field(row, "Vendor", "Vendor Name", "Package Vendor", "vendor_name")
-                        ),
                         business_owner=_clean(
                             get_csv_field(
                                 row,
@@ -1567,7 +1564,7 @@ def application_import():
                         ),
                         vendor_name=_clean(
                             get_csv_field(
-                                row, "Package Vendor", "Vendor", "vendor_name"
+                                row, "Package Vendor", "Vendor", "vendor_name", "Vendor Name"
                             )
                         ),
                         cloud_provider=_clean(
