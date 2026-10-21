@@ -278,6 +278,12 @@ def update_vendor(vendor_id):
         "strategic_tier": "tier_2_preferred"
     }
     """
+    from app.middleware.tenant_decorators import (
+        SHARED_VENDOR_REFUSAL, shared_vendor_edit_allowed,
+    )
+
+    if not shared_vendor_edit_allowed(current_user):
+        return jsonify({"success": False, "error": SHARED_VENDOR_REFUSAL}), 403
     try:
         data = request.get_json()
         if not data:
@@ -306,7 +312,8 @@ def update_vendor(vendor_id):
                 {"success": True, "vendor_id": result["vendor_id"], "message": result["message"]}
             )
         else:
-            return jsonify({"success": False, "error": result["error"]}), 400
+            status = 403 if result.get("forbidden") else 400
+            return jsonify({"success": False, "error": result["error"]}), status
 
     except Exception:
         return jsonify({"success": False, "error": "An internal error occurred"}), 500

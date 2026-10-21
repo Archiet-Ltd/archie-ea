@@ -15,6 +15,7 @@ import pytest
 from sqlalchemy import text
 
 from tests.test_chat_matrix_write_gate import _user
+from tests.test_platform_admin_route_gates import _user as _admin_user
 from tests.test_chat_update_editable_fields import (  # noqa: F401  (fixtures)
     D, _bulk, _csrf_off, _row, _send, world,
 )
@@ -39,10 +40,12 @@ def gate_on(monkeypatch, app):
 
 @pytest.fixture
 def approvers(db_session, world):
-    a = _user(db_session, world["a"], "architect", "approver-a")
+    # A vendor row is shared, so a vendor change is applied only by a platform admin.
+    a = _admin_user(db_session, world["a"], platform=True)
     b = _user(db_session, world["b"], "architect", "approver-b")
     db_session.commit()
-    return {"a": a, "b": b}
+    db_session.commit()
+    return {"a": a, "b": b, "a_platform": a}
 
 
 def _approve(client, login_as, user, approval_id):
@@ -68,7 +71,7 @@ def test_single_route_queues_then_applies_after_approval(
     assert _row(db_session, kind, rid) == before
     assert _row(db_session, kind, world["recs_b"][kind]) == other
 
-    ok = _approve(client, login_as, approvers["a"], approval_id)
+    ok = _approve(client, login_as, approvers["a_platform" if kind == "vendor" else "a"], approval_id)
     assert ok.status_code == 200, ok.get_data(as_text=True)
     after = json.loads(_row(db_session, kind, rid))
     for field, value in CHANGE[kind].items():
@@ -121,7 +124,7 @@ def test_bulk_route_queues_one_approval_per_item_then_applies(
     assert denied.status_code in (403, 404)
     assert _row(db_session, kind, rid) == before
 
-    ok = _approve(client, login_as, approvers["a"], approval_id)
+    ok = _approve(client, login_as, approvers["a_platform" if kind == "vendor" else "a"], approval_id)
     assert ok.status_code == 200, ok.get_data(as_text=True)
     assert json.loads(_row(db_session, kind, rid))[field] == "bulk queued"
 

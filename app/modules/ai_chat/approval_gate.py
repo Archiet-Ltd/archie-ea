@@ -85,6 +85,16 @@ def queue_ai_write(operation_type: str, entity_type: str, payload: dict, summary
         action via tag_ai_action for the 'routine decisions automated'
         metric, mirroring the old decorator's disabled-gate behaviour.
     """
+    if entity_type == "vendor" and operation_type in ("update", "delete"):
+        # A vendor row is shared by every organisation: refuse at queue time
+        # for anyone but a platform administrator (the replay refuses again).
+        from app.middleware.tenant_decorators import (
+            SHARED_VENDOR_REFUSAL, shared_vendor_edit_allowed,
+        )
+
+        if not shared_vendor_edit_allowed(current_user):
+            return jsonify({"success": False, "error": SHARED_VENDOR_REFUSAL}), 403
+
     if not current_app.config.get("REQUIRE_AI_APPROVAL", False):
         tag_ai_action(
             action_type=request.endpoint,

@@ -12,7 +12,11 @@ from app import db
 from datetime import datetime
 import os
 from app.utils.pagination import safe_int_arg
-from app.middleware.tenant_decorators import platform_admin_required
+from app.middleware.tenant_decorators import (
+    platform_admin_required,
+    record_vendor_editor,
+    shared_vendor_edit_required,
+)
 
 
 # Legacy redirect — /dashboard/vendors → canonical vendor catalogue
@@ -127,7 +131,6 @@ def vendors_dashboard():
 
 @application_mgmt.route('/applications/vendors/create', methods=['GET', 'POST'])
 @login_required
-@platform_admin_required
 def create_vendor():
     """Create a new vendor organization."""
     from app.models.vendor.vendor_organization import VendorOrganization
@@ -361,6 +364,7 @@ def analyze_document_for_vendor(vendor_id):
 
 @application_mgmt.route('/api/vendors/<int:vendor_id>/apply-analysis', methods=['POST'])
 @login_required
+@shared_vendor_edit_required
 def apply_analysis_to_vendor(vendor_id):
     """
     Apply analysis results to vendor organization.
@@ -394,6 +398,8 @@ def apply_analysis_to_vendor(vendor_id):
             analysis_results=analysis_results,
             user_id=current_user.id if current_user.is_authenticated else None
         )
+        record_vendor_editor(updated_vendor)
+        db.session.commit()
         
         # Mark analysis as applied if analysis_id provided
         analysis_id = data.get('analysis_id')
@@ -494,7 +500,7 @@ def vendor_applications_portfolio(vendor_id):
 
 @application_mgmt.route('/applications/vendors/<int:vendor_id>/edit', methods=['GET', 'POST'])
 @login_required
-@platform_admin_required
+@shared_vendor_edit_required
 def edit_vendor(vendor_id):
     """Edit vendor organization."""
     from app.models.vendor.vendor_organization import VendorOrganization
@@ -519,6 +525,7 @@ def edit_vendor(vendor_id):
             vendor.enterprise_readiness_score = form.strategic_fit_score.data
             vendor.status = 'active' if form.is_active.data else 'inactive'
             vendor.updated_at = datetime.utcnow()
+            record_vendor_editor(vendor)
 
             db.session.commit()
             flash(f'Vendor "{vendor.name}" updated successfully.', 'success')
@@ -534,7 +541,7 @@ def edit_vendor(vendor_id):
 
 @application_mgmt.route('/applications/vendors/<int:vendor_id>/delete', methods=['POST'])
 @login_required
-@platform_admin_required
+@shared_vendor_edit_required
 def delete_vendor(vendor_id):
     """Delete vendor organization."""
     from app.models.vendor.vendor_organization import VendorOrganization
@@ -658,7 +665,7 @@ def manage_product_capabilities(vendor_id, product_id):
 # Vendor Onboarding Routes
 @application_mgmt.route('/applications/vendors/<int:vendor_id>/activate', methods=['POST'])
 @login_required
-@platform_admin_required
+@shared_vendor_edit_required
 def activate_vendor(vendor_id):
     """Activate a vendor from catalog to contracted status."""
     from app.services.vendor_onboarding_service import VendorOnboardingService
@@ -690,6 +697,8 @@ def activate_vendor(vendor_id):
             contract_end_date=end_date,
             contract_value=value
         )
+        record_vendor_editor(vendor)
+        db.session.commit()
         
         flash(f'{vendor.name} activated successfully! Status: {vendor.contract_status}', 'success')
         

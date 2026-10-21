@@ -731,7 +731,9 @@ class AIChatApprovalService:
                 return {"success": False, "error": "Invalid operation payload"}
 
             # Execute the operation
-            data_service = AIDataInteractionService(user_id=self.user_id)
+            data_service = AIDataInteractionService(
+                user_id=effective_approver_id or self.user_id
+            )
 
             # Connector changes (create/update/delete/sync) execute through
             # the one connector framework, whose change path only accepts an
