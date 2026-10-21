@@ -9,6 +9,7 @@ import xml.etree.ElementTree as ET
 from app import db
 from app.config.archimate_relationship_matrix import RELATIONSHIP_TYPES
 from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship, ArchitectureModel
+from app.models.archimate_element_types import SPECIALIZATION_PROPERTY, exchange_type_for
 
 # Import (and _normalize_rel_type in archimate_routes.py) store/compare
 # relationship types in lowercase per RELATIONSHIP_TYPES (the canonical
@@ -141,6 +142,10 @@ class ArchiMateOEFService:
             merged.update(_parsed_json_dict(getattr(elem, "properties", None)))
             merged.update(_parsed_json_dict(getattr(elem, "custom_properties", None)))
             merged = {k: v for k, v in merged.items() if not str(k).startswith("archie:")}
+            # The stored type already records a specialisation, so a stored copy of the property is
+            # dropped and the registry's is written (ADR-0014 Decision 5).
+            merged = {k: v for k, v in merged.items() if str(k).strip().lower() != SPECIALIZATION_PROPERTY}
+            merged.update(exchange_type_for(getattr(elem, "type", None))[1])
             if not merged:
                 continue
             elem_props[elem.id] = merged
@@ -163,7 +168,7 @@ class ArchiMateOEFService:
         # <elements>
         elements_el = ET.SubElement(root, f"{{{self.ARCHIMATE_NS}}}elements")
         for elem in elements:
-            el_type = elem.type or "ApplicationComponent"
+            el_type = exchange_type_for(elem.type or "ApplicationComponent")[0]
             el_attrib = {
                 "identifier": f"id-{elem.id}",
                 f"{{{self.XSI_NS}}}type": el_type,

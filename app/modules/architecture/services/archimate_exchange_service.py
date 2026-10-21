@@ -25,6 +25,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import Any, Dict, Optional, Type
 
+from app.models.archimate_element_types import SPECIALIZATION_PROPERTY, exchange_type_for
 from app.models.constants import ArchiMateRelationshipType
 
 
@@ -222,7 +223,7 @@ class ArchiMateExchangeService:
                 for app in solution.applications:
                     app_id = f"id-app-{app.id}"
                     app_elem = self._create_element_xml(
-                        element_type="ApplicationComponent",
+                        element_type="Application",
                         identifier=app_id,
                         name=app.name,
                         documentation=getattr(app, "description", None),
@@ -258,6 +259,8 @@ class ArchiMateExchangeService:
                         target=app_id,
                     )
                     relationships_container.append(rel_elem)
+
+            self._declare_specialization_property(root)
 
             # Add properties
             self._add_properties_to_element(
@@ -882,9 +885,11 @@ class ArchiMateExchangeService:
         Returns:
             XML Element
         """
+        # An Application is written as its parent type with the Entelim property (ADR-0014 Decision 5).
+        exchange_type, extra = exchange_type_for(element_type)
         elem = ET.Element(f"{{{self.ARCHIMATE_NS}}}element")
         elem.set("identifier", identifier)
-        elem.set(f"{{{self.XSI_NS}}}type", element_type)
+        elem.set(f"{{{self.XSI_NS}}}type", exchange_type)
 
         # Add name
         name_elem = ET.SubElement(elem, f"{{{self.ARCHIMATE_NS}}}name")
@@ -895,7 +900,34 @@ class ArchiMateExchangeService:
             doc_elem = ET.SubElement(elem, f"{{{self.ARCHIMATE_NS}}}documentation")
             doc_elem.text = documentation
 
+        if extra:
+            props_elem = ET.SubElement(elem, f"{{{self.ARCHIMATE_NS}}}properties")
+            for key, value in extra.items():
+                prop_elem = ET.SubElement(props_elem, f"{{{self.ARCHIMATE_NS}}}property")
+                prop_elem.set("propertyDefinitionRef", self._PROPERTY_DEFINITION_ID)
+                value_elem = ET.SubElement(prop_elem, f"{{{self.ARCHIMATE_NS}}}value")
+                value_elem.text = value
+
         return elem
+
+    _PROPERTY_DEFINITION_ID = "propid-specialization"
+
+    def _declare_specialization_property(self, root: ET.Element) -> None:
+        """Declare the Entelim property once, after the relationships, when any element carries it."""
+        ns = self.ARCHIMATE_NS
+        used = any(
+            p.get("propertyDefinitionRef") == self._PROPERTY_DEFINITION_ID
+            for p in root.iter(f"{{{ns}}}property")
+        )
+        if not used:
+            return
+        defs = ET.SubElement(root, f"{{{ns}}}propertyDefinitions")
+        definition = ET.SubElement(
+            defs,
+            f"{{{ns}}}propertyDefinition",
+            {"identifier": self._PROPERTY_DEFINITION_ID, "type": "string"},
+        )
+        ET.SubElement(definition, f"{{{ns}}}name").text = SPECIALIZATION_PROPERTY
 
     def _add_properties_to_element(
         self, element: ET.Element, properties: Dict[str, Optional[str]]
@@ -911,7 +943,8 @@ class ArchiMateExchangeService:
             return
 
         # Find or create properties container
-        props_container = element.find(f".//{{{self.ARCHIMATE_NS}}}properties")
+        # Direct child only: a descendant element's own properties must not receive the parent's.
+        props_container = element.find(f"{{{self.ARCHIMATE_NS}}}properties")
         if props_container is None:
             props_container = ET.SubElement(element, f"{{{self.ARCHIMATE_NS}}}properties")
 

@@ -12168,11 +12168,18 @@ def export_solution_oef(solution_id: int):
     for jrow in junction_rows:
         ae = ArchiMateElement.query.get(jrow.element_id)
         if ae:
-            archimate_type = _oef_type(ae.type or jrow.layer_type or "")
+            from app.models.archimate_element_types import exchange_type_for
+
+            if ae.type:
+                stored_type, spec_props = exchange_type_for(ae.type)
+            else:
+                stored_type, spec_props = jrow.layer_type or "", {}
+            archimate_type = _oef_type(stored_type)
             elements_data.append({
                 "id": ae.id,
                 "name": ae.name or jrow.element_name or f"Element {ae.id}",
                 "archimate_type": archimate_type,
+                "properties": spec_props,
                 "description": ae.description or "",
             })
             element_ids_used.add(ae.id)
@@ -12246,6 +12253,7 @@ def export_solution_oef(solution_id: int):
     model_elem.set("name", solution.name or f"Solution {solution_id}")
 
     # <elements>
+    spec_defs: dict = {}
     elements_tag = ET.SubElement(model_elem, f"{{{OEF_NS}}}elements")
     for el in elements_data:
         el_tag = ET.SubElement(elements_tag, f"{{{OEF_NS}}}element")
@@ -12255,6 +12263,14 @@ def export_solution_oef(solution_id: int):
         if el.get("description"):
             doc_tag = ET.SubElement(el_tag, f"{{{OEF_NS}}}documentation")
             doc_tag.text = el["description"]
+        if el.get("properties"):
+            # An Application is its parent type plus the Entelim property (ADR-0014 Decision 5).
+            props_tag = ET.SubElement(el_tag, f"{{{OEF_NS}}}properties")
+            for prop_key, prop_value in el["properties"].items():
+                ident = spec_defs.setdefault(prop_key, f"propid-{len(spec_defs) + 1}")
+                prop_tag = ET.SubElement(props_tag, f"{{{OEF_NS}}}property")
+                prop_tag.set("propertyDefinitionRef", ident)
+                ET.SubElement(prop_tag, f"{{{OEF_NS}}}value").text = prop_value
 
     # <relationships>
     if relationships_data:
@@ -12265,6 +12281,14 @@ def export_solution_oef(solution_id: int):
             rel_tag.set(f"{{{XSI_NS}}}type", rel["type"])
             rel_tag.set("source", f"id-{rel['source_id']}")
             rel_tag.set("target", f"id-{rel['target_id']}")
+
+    if spec_defs:
+        defs_tag = ET.SubElement(model_elem, f"{{{OEF_NS}}}propertyDefinitions")
+        for prop_key, ident in spec_defs.items():
+            def_tag = ET.SubElement(defs_tag, f"{{{OEF_NS}}}propertyDefinition")
+            def_tag.set("identifier", ident)
+            def_tag.set("type", "string")
+            ET.SubElement(def_tag, f"{{{OEF_NS}}}name").text = prop_key
 
     # Serialize with XML declaration
     xml_bytes = b'<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(
