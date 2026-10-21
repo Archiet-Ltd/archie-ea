@@ -848,3 +848,101 @@ def test_business_model_canvas_is_seeded_once_and_tenant_scoped(app, db_session,
     other_id = other.id
     db_session.commit()
     assert BusinessModelCanvas.query.filter_by(organization_id=other_id).count() == 0
+
+
+# ── the demo agrees with itself ─────────────────────────────────────────────
+
+
+def test_demo_store_agreement_check_is_clean(app, db_session, make_org, tenant_ctx):
+    """After seeding, the store-agreement check reports nothing for the demo
+    organisation (the check picks the organisation that holds data; here it is
+    asked about the demo organisation directly, as its demo user)."""
+    import importlib.util
+
+    from app import db
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    spec = importlib.util.spec_from_file_location(
+        "check_store_agreement_demo",
+        os.path.join(root, "scripts", "check_store_agreement.py"))
+    gate = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gate)
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    user = _demo_user(db_session, org_id)
+    with tenant_ctx(org_id):
+        observations, notes = gate.observe_tenant(app, db, org_id, user, http=True)
+    findings, more = gate.compare(observations)
+    assert findings == [], (findings, notes + more)
+
+
+def test_demo_tco_equals_sum_of_cost_components(app, db_session, make_org):
+    from app.models.application_portfolio import ApplicationComponent
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    apps = ApplicationComponent.query.filter_by(organization_id=org_id).all()
+    assert len(apps) == 20
+    for a in apps:
+        components = (
+            (a.license_cost_annual or 0)
+            + (a.infrastructure_cost_monthly or 0) * 12
+            + (a.maintenance_cost or 0)
+            + (a.support_cost or 0)
+            + (a.development_cost_annual or 0)
+        )
+        assert a.total_cost_of_ownership == components, a.name
+
+
+def test_demo_capabilities_all_have_an_owner(app, db_session, make_org):
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.unified_capability import UnifiedCapability
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    bcs = BusinessCapability.query.filter_by(organization_id=org_id).all()
+    ucs = UnifiedCapability.query.filter_by(organization_id=org_id).all()
+    assert len(bcs) == 24 and len(ucs) == 24
+    assert [c.code for c in bcs if not (c.business_owner or "").strip()] == []
+    assert [c.code for c in ucs if not (c.business_owner or "").strip()] == []
+
+
+def test_demo_plateaus_all_have_a_target_date(app, db_session, make_org):
+    from app.models.implementation_migration import Plateau
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    plateaus = Plateau.query.filter_by(organization_id=org_id).all()
+    assert len(plateaus) == 5
+    assert [p.name for p in plateaus if p.target_date is None] == []
+
+
+def test_demo_gaps_all_sit_on_a_plateau_and_have_a_work_package(app, db_session, make_org):
+    from app.models.implementation_migration import Gap
+    from app.services import work_package_service
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    gaps = Gap.query.filter_by(organization_id=org_id).all()
+    assert len(gaps) == 10
+    assert [g.name for g in gaps if not g.plateaus] == []
+    assert [g.name for g in gaps if g.target_plateau_id is None] == []
+    addressed = work_package_service.addressed_gap_ids(org_id)
+    assert [g.name for g in gaps if g.id not in addressed] == []
+
+
+def test_demo_seed_twice_changes_nothing(app, db_session, make_org):
+    from app.models.implementation_migration import Gap
+    from app.services import work_package_service
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    before = _row_counts(org_id)
+    links_before = len(work_package_service.addressed_gap_ids(org_id))
+    plateau_links_before = sum(len(g.plateaus) for g in Gap.query.filter_by(organization_id=org_id))
+    again = _seed_once()
+    assert _row_counts(org_id) == before
+    assert len(work_package_service.addressed_gap_ids(org_id)) == links_before
+    assert sum(len(g.plateaus) for g in Gap.query.filter_by(organization_id=org_id)) == plateau_links_before
+    assert again["gaps_created"] == 0
