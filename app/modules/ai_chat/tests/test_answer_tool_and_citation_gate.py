@@ -122,17 +122,20 @@ def _row_key(row):
 # --------------------------------------------------------------------------- #
 
 
-def test_answer_is_registered_once_and_only_on_the_chat_surface():
+def test_answer_is_registered_once_and_only_on_the_chat_and_connector_surfaces():
     schemas = [s for s in TOOL_SCHEMAS if s["name"] == "answer"]
     assert len(schemas) == 1
     schema = schemas[0]
-    assert schema["surfaces"] == ["chat"]
+    assert schema["surfaces"] == ["chat", "mcp"]
     assert schema["risk_class"] == "read" and schema["mutates"] is False
     assert TOOL_SCHEMA_BY_NAME["answer"] is schema
 
     from app.modules.ai_chat.tools.route_read_tools import connector_tools
 
-    assert "answer" not in {t["name"] for t in connector_tools()}
+    # One tool serves both: the connector lists the same catalogue entry, not a copy.
+    listed = [t for t in connector_tools() if t["name"] == "answer"]
+    assert len(listed) == 1
+    assert listed[0]["inputSchema"] is schema["parameters"]
 
     offered = {
         t["name"]
