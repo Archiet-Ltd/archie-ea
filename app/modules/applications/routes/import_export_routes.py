@@ -1182,8 +1182,65 @@ def application_import():
             if not reader.fieldnames:
                 raise ValueError("CSV file is missing headers.")
 
+            # Column mapping sent by the import page: {file header: target field}.
+            mapped_header_by_target = {}
+            mappings_sent = False
+            _raw_mappings = request.form.get("field_mappings")
+            if _raw_mappings:
+                mappings_sent = True  # the page's mapping is then the complete one
+                try:
+                    _mappings = json.loads(_raw_mappings)
+                except json.JSONDecodeError:
+                    raise ValueError("The column mapping could not be read.")
+                if not isinstance(_mappings, dict):
+                    raise ValueError("The column mapping must be an object.")
+                # Only fields this import actually reads can be mapped; anything
+                # else would be accepted and silently dropped.
+                _readable_targets = {
+                    "name",
+                    "component_type",
+                    "application_category",
+                    "technology_stack",
+                    "version",
+                    "deployment_status",
+                    "business_domain",
+                    "business_owner",
+                    "development_team",
+                    "user_base_size",
+                    "business_criticality",
+                    "description",
+                    "lifecycle_status",
+                    "vendor_name",
+                    "cloud_provider",
+                    "imported_capabilities",
+                    "application_services",
+                    "application_functions_text",
+                    "imported_apqc_codes",
+                }
+                _file_headers = {h for h in reader.fieldnames if h}
+                _bad = []
+                for _header, _target in _mappings.items():
+                    if not _target:
+                        continue  # "Skip column"
+                    if _target not in _readable_targets:
+                        _bad.append(
+                            f"column '{_header}' is mapped to field '{_target}', "
+                            "which this import cannot fill"
+                        )
+                    elif _header not in _file_headers:
+                        _bad.append(f"mapped column '{_header}' is not in the file")
+                    elif _target in mapped_header_by_target:
+                        _bad.append(
+                            f"columns '{mapped_header_by_target[_target]}' and "
+                            f"'{_header}' are both mapped to '{_target}'"
+                        )
+                    else:
+                        mapped_header_by_target[_target] = _header
+                if _bad:
+                    raise ValueError("; ".join(_bad))
+
             # Find the name column (flexible matching)
-            name_column = None
+            name_column = mapped_header_by_target.get("name")
             name_variants = [
                 "name",
                 "application name",
@@ -1192,7 +1249,7 @@ def application_import():
                 "app_name",
                 "appname",
             ]
-            for field in reader.fieldnames:
+            for field in reader.fieldnames if not (name_column or mappings_sent) else ():
                 if field and field.lower().strip() in name_variants:
                     name_column = field
                     break
@@ -1206,6 +1263,12 @@ def application_import():
             def get_csv_field(row, *variants):
                 """Get field value trying multiple column name variants"""
                 for variant in variants:
+                    target = variant.lower().strip().replace(" ", "_")
+                    if target in mapped_header_by_target:
+                        return row.get(mapped_header_by_target[target])
+                for variant in variants:
+                    if mappings_sent:
+                        break  # not named in the mapping, so not imported
                     for key in row.keys():
                         if key and key.lower().strip() == variant.lower():
                             return row[key]
@@ -1330,7 +1393,12 @@ def application_import():
                     ))
                     _set_if_present(existing_app, "user_base_size", _parse_user_count(
                         get_csv_field(
-                            row, "Users", "user_count", "User Count", "Number of Users"
+                            row,
+                            "Users",
+                            "user_count",
+                            "User Count",
+                            "Number of Users",
+                            "user_base_size",
                         )
                     ))
                     _set_if_present(existing_app, "business_criticality", _clean(
@@ -1352,6 +1420,17 @@ def application_import():
                             row, "Lifecycle Status", "lifecycle_status", "Lifecycle"
                         )
                     ))
+                    # Vendor and hosting: a blank cell never erases what is stored.
+                    _vendor = _clean(
+                        get_csv_field(row, "Package Vendor", "Vendor", "vendor_name")
+                    )
+                    if _vendor is not None:
+                        existing_app.vendor_name = _vendor
+                    _hosting = _clean(
+                        get_csv_field(row, "Public Cloud Provider", "cloud_provider")
+                    )
+                    if _hosting is not None:
+                        existing_app.cloud_provider = _hosting
 
                     # Add import fields for auto-mapping functionality
                     _set_if_present(existing_app, "imported_capabilities", _clean(
@@ -1467,6 +1546,7 @@ def application_import():
                                 "user_count",
                                 "User Count",
                                 "Number of Users",
+                                "user_base_size",
                             )
                         ),
                         business_criticality=_clean(
@@ -1484,6 +1564,14 @@ def application_import():
                             get_csv_field(
                                 row, "Lifecycle Status", "lifecycle_status", "Lifecycle"
                             )
+                        ),
+                        vendor_name=_clean(
+                            get_csv_field(
+                                row, "Package Vendor", "Vendor", "vendor_name"
+                            )
+                        ),
+                        cloud_provider=_clean(
+                            get_csv_field(row, "Public Cloud Provider", "cloud_provider")
                         ),
                         # Add import fields for auto-mapping functionality
                         imported_capabilities=_clean(
