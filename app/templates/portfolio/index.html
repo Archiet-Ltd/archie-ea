@@ -18,25 +18,25 @@
 
   {# Summary. Every figure is either real or an em dash; none default to zero. #}
   <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-    <div class="rounded-lg border bg-card p-6">
+    <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Initiatives</p>
       <p class="text-2xl font-bold mt-3">{{ summary.count }}</p>
     </div>
-    <div class="rounded-lg border bg-card p-6">
+    <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Approved budget</p>
       <p class="text-2xl font-bold mt-3">
         {% if summary.total_budget is not none %}{{ '{:,.0f}'.format(summary.total_budget) }}
         {% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
       </p>
     </div>
-    <div class="rounded-lg border bg-card p-6">
+    <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Spent to date</p>
       <p class="text-2xl font-bold mt-3">
         {% if summary.total_spent is not none %}{{ '{:,.0f}'.format(summary.total_spent) }}
         {% else %}<span class="text-muted-foreground" title="No initiative carries a recorded spend">&mdash;</span>{% endif %}
       </p>
     </div>
-    <div class="rounded-lg border bg-card p-6">
+    <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Health</p>
       <div class="flex items-center gap-3 mt-3">
         {% if not summary.count %}
@@ -64,13 +64,13 @@
     {% endif %}
   </div>
 
-  <div class="rounded-lg border bg-card overflow-x-auto">
+  <div class="rounded-lg border border-border bg-card overflow-x-auto">
     {# An empty table with nine column headers under it told a reader nothing
        about what this module is or how it gets populated, which is how a
        complete-but-unpopulated module gets mis-assessed as absent. Render the
        grid only when there is something in it. #}
     {% if initiatives %}
-    <table class="w-full text-sm">
+    <table class="dense-table w-full text-sm">
       <thead class="border-b bg-muted/40">
         <tr class="text-left">
           <th class="px-4 py-3 font-medium">Initiative</th>

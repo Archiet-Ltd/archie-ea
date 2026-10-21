@@ -47,7 +47,7 @@
 {%- endmacro %}
 
 {% macro not_known(text) -%}
-<div class="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-4">
+<div class="rounded-md border border-dashed border-muted-foreground/40 bg-muted/20 px-3 py-2">
   <p class="text-sm font-medium text-foreground">{{ text }}</p>
 </div>
 {%- endmacro %}
@@ -141,7 +141,7 @@
             No assessment date is recorded, so no maturity level is shown — not even a provisional one.
             An unassessed capability is not a Level 1 capability, and this page will not imply that it is.
           </p>
-          <a class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
+          <a class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
              href="{{ url_for('maturity_management.edit_capability_maturity', capability_id=capability.id) }}">
             Record an assessment
           </a>
@@ -253,7 +253,7 @@
     </div>
     {% if applications %}
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+      <table class="dense-table w-full text-sm">
         <thead>
           <tr class="border-b border-border text-left">
             <th scope="col" class="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Application</th>

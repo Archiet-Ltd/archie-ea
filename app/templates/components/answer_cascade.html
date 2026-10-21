@@ -1,0 +1,120 @@
+{# Answer cascade — the signature visual for an answered question
+   (design/patterns.json: "answer-cascade"; DESIGN.md north star).
+
+   Alpine-driven: the calling component owns the state, the macro only renders.
+
+   id        element id for the section.
+   question  Alpine expression giving the question text (serif italic line).
+   rows      Alpine expression giving the node list. Each node may carry either
+             the API shape or the Intelligence row model:
+               entity_name | name, owner | ownerName, depth, derived, key,
+               elementId, source_name | sourceName, source_timestamp |
+               sourceTimestamp, source_confidence | sourceConfidence, kindLabel,
+               staleLine.
+   ask       Alpine expression run with `node` for "What else depends on this"
+             (for example "load(node.elementId)"). Omit to hide the action.
+   save      Alpine expression run by Save. Omit to hide the action.
+   row_attrs extra attributes for every node <li> (for example 'data-ask-row').
+
+   A {% call %} body renders inside each node after the owner, with `node` in
+   scope, for per-node controls such as the Why? button.
+
+   Geometry: 40px node cards, 6px radius, hairline border, 16px padding, 16px
+   icon, 20px indent per depth. Connectors run in the 8px gap between cards:
+   a vertical hairline for siblings, an SVG elbow from the parent column for
+   children. The 6px source pin sits right of the name; its tooltip is an
+   Alpine x-show. No shadows anywhere. #}
+{% from 'intelligence/_parts.html' import element_name, owner_field, health_field %}
+{# rich    when true each node is a row of the Intelligence row model: the name
+           is a heading (or the absence treatment), health and owner come from
+           the shared cells, and the card grows to hold the caller's content. #}
+{% macro answer_cascade(id, question, rows, ask=None, save=None, row_attrs='', root=None, rich=False) %}
+<section id="{{ id }}" class="cascade" data-cascade
+         x-data="{ tip: null, selected: null, shared: false, saved: false,
+                   continues(i, list) { var d = list[i].depth || 0; for (var j = i + 1; j < list.length; j++) { var dj = list[j].depth || 0; if (dj < d) { return false; } if (dj === d) { return true; } } return false; } }">
+    <p class="question-line mb-6 max-w-[640px]" x-text="{{ question }}"></p>
+    <ol class="relative space-y-2 py-6" role="list">
+        {% if root %}
+        {# Root node: the element the question was asked about. #}
+        <li class="relative" data-depth="0" data-root>
+            <div class="flex h-10 items-center gap-2 rounded-md border border-border bg-card px-4">
+                <span class="h-2 w-2 shrink-0 rounded-full bg-foreground" aria-hidden="true"></span>
+                <span class="truncate text-sm font-semibold text-foreground" x-text="{{ root }}"></span>
+                <span class="ml-auto shrink-0 text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Asked about</span>
+            </div>
+        </li>
+        {% endif %}
+        <template x-for="(node, i) in ({{ rows }})" :key="node.key || i">
+            <li class="relative" {{ row_attrs }}
+                :style="'margin-left:' + (20 * (node.depth || 0)) + 'px'"
+                :data-kind="node.derived ? 'derived' : 'explicit'"
+                :data-depth="node.depth || 0">
+                {# Sibling connector at depth 0: hairline through the 8px gap above the card. #}
+                <span x-show="(i > 0 || {{ 'true' if root else 'false' }}) && !(node.depth || 0)" x-cloak
+                      class="absolute left-5 -top-2 h-2 w-px bg-border" aria-hidden="true"></span>
+                {# Branch connector: the parent column runs through the gap and down
+                   the card; an elbow turns into the card at its middle. The vertical
+                   stops at the middle on the last sibling. #}
+                <svg x-show="(node.depth || 0) > 0" x-cloak
+                     class="absolute -left-5 -top-2 h-12 w-5 text-border" viewBox="0 0 20 48" fill="none" aria-hidden="true">
+                    <path :d="'M1 0 V' + (continues(i, {{ rows }}) ? 48 : 28) + ' M1 28 H20'" stroke="currentColor" stroke-width="1" />
+                </svg>
+                <div class="flex {{ 'min-h-10 flex-wrap py-2' if rich else 'h-10' }} items-center gap-2 rounded-md border bg-card px-4 transition-colors hover:bg-muted/50"
+                     :class="selected && selected.key === node.key ? 'border-ring' : 'border-border'"
+                     @click="selected = node">
+                    <svg x-show="!node.derived" class="h-4 w-4 shrink-0 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" />
+                    </svg>
+                    <svg x-show="node.derived" x-cloak class="h-4 w-4 shrink-0 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="6" x2="6" y1="3" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" />
+                    </svg>
+                    {% if rich %}
+                    <h3 class="min-w-0 break-words text-sm font-semibold text-foreground">{{ element_name('node.name') }}</h3>
+                    {% else %}
+                    <span class="truncate text-sm font-semibold text-foreground" x-text="node.entity_name || node.name"></span>
+                    {% endif %}
+                    <button type="button"
+                            class="relative h-1.5 w-1.5 shrink-0 rounded-full bg-primary focus-visible:outline-offset-4"
+                            @mouseenter="tip = node.key" @mouseleave="tip = null"
+                            @focus="tip = node.key" @blur="tip = null"
+                            @click.stop="tip = tip === node.key ? null : node.key"
+                            :aria-expanded="tip === node.key ? 'true' : 'false'"
+                            aria-label="Source of this connection"></button>
+                    <div x-show="tip === node.key" x-cloak role="tooltip"
+                         class="absolute left-0 top-full z-20 mt-1 w-72 rounded-md border border-border bg-popover p-2 text-xs leading-5 text-popover-foreground">
+                        <p class="font-medium" x-text="node.source_name || node.sourceName || (node.derived ? (node.kindLabel || 'Worked out from the model') : 'Recorded in the model')"></p>
+                        <p class="text-muted-foreground" x-show="node.source_timestamp || node.sourceTimestamp || node.staleLine" x-text="node.source_timestamp || node.sourceTimestamp || node.staleLine"></p>
+                        <p class="text-muted-foreground" x-show="node.source_confidence != null || node.sourceConfidence != null" x-text="node.source_confidence != null ? 'Confidence ' + node.source_confidence : (node.sourceConfidence != null ? 'Confidence ' + node.sourceConfidence : '')"></p>
+                    </div>
+                    {% if rich %}
+                    <div class="ml-auto flex flex-wrap items-center gap-x-6 gap-y-1">
+                        {{ health_field() }}
+                        {{ owner_field('node.ownerName') }}
+                    </div>
+                    {% else %}
+                    <span class="ml-auto shrink-0 truncate text-xs text-muted-foreground" x-text="node.owner || node.ownerName || 'No owner recorded'"></span>
+                    {% endif %}
+                    {% if caller %}{{ caller() }}{% endif %}
+                </div>
+            </li>
+        </template>
+    </ol>
+    <div class="flex items-center justify-end gap-2" x-show="({{ rows }}).length" x-cloak>
+        {% if save %}
+        <button type="button"
+                class="inline-flex h-8 items-center rounded-md px-3 text-13 font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-info"
+                @click="{{ save }}; saved = true; setTimeout(() => saved = false, 1500)"
+                x-text="saved ? 'Saved' : 'Save'">Save</button>
+        {% endif %}
+        <button type="button"
+                class="inline-flex h-8 items-center rounded-md px-3 text-13 font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-info"
+                @click="navigator.clipboard && navigator.clipboard.writeText(location.href).then(() => { shared = true; setTimeout(() => shared = false, 1500) })"
+                x-text="shared ? 'Link copied' : 'Share'">Share</button>
+        {% if ask %}
+        <button type="button"
+                class="inline-flex h-8 items-center rounded-md px-3 text-13 font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-info"
+                @click="(function (node) { if (node) { {{ ask }} } })(selected || ({{ rows }})[0])">What else depends on this</button>
+        {% endif %}
+    </div>
+</section>
+{% endmacro %}

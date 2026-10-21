@@ -85,7 +85,7 @@ def validate_teams_webhook_url(url) -> str:
 
 
 # Module-level token cache: connector_id → {access_token, expires_at}
-_token_cache: dict = {}
+_token_cache: dict = {}  # cache-tenancy-ok: keyed by connector id, which is unique across all organisations and only reachable through that connector's own configuration
 
 
 class M365Service:

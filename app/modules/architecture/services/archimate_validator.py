@@ -23,6 +23,7 @@ from app.models.relationship_tables import (
     ServiceDependency,
     ServiceRealization,
 )
+from app.models.archimate_element_types import is_application_kind
 
 RULES_PATH = Path(__file__).with_name("rules").joinpath("archimate_rules.json")
 
@@ -689,7 +690,7 @@ class ArchiMateValidator:
             data_object_records.extend(fetch_data_object_records(batch))
         for record in data_object_records:
             component = record.application_component
-            if component and component.type != "ApplicationComponent":
+            if component and not is_application_kind(component.type):
                 results["warnings"].append(
                     f"DataObjectStorage entry {record.id} references element '{component.name}' not typed as ApplicationComponent."
                 )

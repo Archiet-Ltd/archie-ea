@@ -412,6 +412,39 @@ def test_application_edit_form_saves_annual_cost_and_vendor(page, live_server, s
     assert page.input_value("#vendor_name") == vendor, "the vendor did not persist after reload"
 
 
+def test_gap_analysis_convert_to_work_package_shows_the_new_package(page, live_server, seeded):
+    """Convert to Work Package fired a request and showed nothing new. Click
+    the real button on a gap, see the work package appear in the row, reload
+    and see it still there, and see the button no longer offer a second copy."""
+    import uuid
+
+    from app import create_app
+    from app.services.gap_register_service import create_gap
+
+    name = "Smoke convert gap %s" % uuid.uuid4().hex[:6]
+    app = create_app("testing")
+    with app.app_context():
+        gap, _ = create_gap(seeded["ids"]["org"], name, gap_type="coverage")
+        gap_id = gap.id
+        from app import db
+        db.session.commit()
+
+    _login(page, live_server, seeded["emails"]["enterprise_architect"])
+    _visit(page, live_server, "/enterprise/implementation/gap-analysis")
+    cell = page.locator('[data-testid="gap-work-packages-%d"]' % gap_id)
+    assert cell.count() == 1, "the gap row did not render"
+    assert cell.locator('[data-testid="gap-work-package-link"]').count() == 0
+    button = page.locator("tr", has=page.locator('[data-testid="gap-work-packages-%d"]' % gap_id)) \
+        .get_by_role("button", name="Convert this gap to a work package")
+    button.click()
+    cell.locator('[data-testid="gap-work-package-link"]').first.wait_for(timeout=PAGE_TIMEOUT)
+    assert button.is_disabled(), "the button still offers a second conversion"
+
+    _visit(page, live_server, "/enterprise/implementation/gap-analysis")
+    assert page.locator('[data-testid="gap-work-packages-%d"] [data-testid="gap-work-package-link"]' % gap_id).count() >= 1, \
+        "the work package was not there after reload"
+
+
 def test_application_manager_maintains_an_owned_application(page, live_server, seeded):
     """Set health on an owned application and see it reach the health overview."""
     _login(page, live_server, seeded["emails"]["application_manager"])

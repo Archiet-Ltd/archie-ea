@@ -20,7 +20,7 @@
         {% macro _ps_actions() %}
 <div class="flex space-x-4">
                 <a href="{{ url_for('maturity_management.search_capabilities') }}" 
-                   class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     ← Back to Search
                 </a>
             </div>
@@ -29,7 +29,7 @@
     </div>
 
     <!-- Capability Details -->
-    <div class="bg-card rounded-lg shadow mb-6">
+    <div class="bg-card rounded-lg mb-6">
         <div class="p-6">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -118,7 +118,7 @@
     </div>
 
     <!-- Edit Form -->
-    <div class="bg-card rounded-lg shadow">
+    <div class="bg-card rounded-lg">
         <div class="px-6 py-4 border-b border-border">
             <h2 class="text-lg font-semibold text-foreground">Update Maturity Levels</h2>
         </div>
@@ -126,9 +126,9 @@
             <form method="POST" action="{{ url_for('maturity_management.edit_capability_maturity', capability_id=capability.id) }}" class="space-y-6">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <!-- Maturity Level Reference -->
-                <div class="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                <div class="bg-primary/10 border border-primary/40 rounded-md px-3 py-2">
                     <h3 class="text-sm font-semibold text-foreground mb-2">Maturity Level Reference</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-5 gap-2 text-xs">
+                    <div class="grid grid-cols-1 gap-2 text-xs">
                         <div class="text-center">
                             <div class="font-medium text-destructive-emphasis">Level 1</div>
                             <div class="text-muted-foreground">Initial/Ad Hoc</div>
@@ -153,14 +153,14 @@
                 </div>
 
                 <!-- Form Fields -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 gap-6">
                     <div>
-                        <label for="current_maturity_level" class="block text-sm font-medium text-foreground mb-2">
+                        <label for="current_maturity_level" class="block text-sm font-medium text-muted-foreground mb-1">
                             Current Maturity Level <span class="text-muted-foreground">(1-5)</span>
                         </label>
                         <select id="current_maturity_level" 
                                 name="current_maturity_level" 
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <option value="">Not Set</option>
                             {% for level in range(1, 6) %}
                             <option value="{{ level }}" 
@@ -173,12 +173,12 @@
                     </div>
                     
                     <div>
-                        <label for="target_maturity_level" class="block text-sm font-medium text-foreground mb-2">
+                        <label for="target_maturity_level" class="block text-sm font-medium text-muted-foreground mb-1">
                             Target Maturity Level <span class="text-muted-foreground">(1-5)</span>
                         </label>
                         <select id="target_maturity_level" 
                                 name="target_maturity_level" 
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <option value="">Not Set</option>
                             {% for level in range(1, 6) %}
                             <option value="{{ level }}" 
@@ -192,7 +192,7 @@
                 </div>
 
                 <div>
-                    <label for="assessment_notes" class="block text-sm font-medium text-foreground mb-2">
+                    <label for="assessment_notes" class="block text-sm font-medium text-muted-foreground mb-1">
                         Assessment Notes
                     </label>
                     <textarea id="assessment_notes" 
@@ -214,11 +214,11 @@
                 <!-- Form Actions -->
                 <div class="flex justify-end space-x-4">
                     <a href="{{ url_for('maturity_management.search_capabilities') }}" 
-                       class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         Cancel
                     </a>
                     <button type="submit" 
-                            class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors" aria-label="Submit">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit">
                         Save Changes
                     </button>
                 </div>

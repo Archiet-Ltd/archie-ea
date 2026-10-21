@@ -215,7 +215,7 @@
     <!-- SECTION: LINKED APPLICATIONS -->
     <h2 class="section-title" id="linked-apps">1. Linked Applications</h2>
     {% if applications %}
-    <table>
+    <table class="dense-table">
         <thead>
             <tr><th>#</th><th>Application</th><th>Status</th><th>Criticality</th><th>Technology</th></tr>
         </thead>
@@ -239,7 +239,7 @@
     <h2 class="section-title" id="drivers">2. Architecture Drivers</h2>
     {% set drivers = analysis_data.get('drivers', []) if analysis_data else [] %}
     {% if drivers %}
-    <table>
+    <table class="dense-table">
         <thead><tr><th>Driver</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>{# actionable-rows-ok: printed SAD export (GET /solutions/<id>/export/sad) — this page exists to be printed or saved as PDF, so rows carry no controls; edit these records on the solution detail page and re-export. #}
             {% for d in drivers %}
@@ -259,7 +259,7 @@
     <h2 class="section-title" id="goals">3. Goals & Objectives</h2>
     {% set goals = analysis_data.get('goals', []) if analysis_data else [] %}
     {% if goals %}
-    <table>
+    <table class="dense-table">
         <thead><tr><th>Goal</th><th>Description</th></tr></thead>
         <tbody>{# actionable-rows-ok: printed SAD export (GET /solutions/<id>/export/sad) — this page exists to be printed or saved as PDF, so rows carry no controls; edit these records on the solution detail page and re-export. #}
             {% for g in goals %}
@@ -275,7 +275,7 @@
     <h2 class="section-title" id="requirements">4. Requirements</h2>
     {% set requirements = analysis_data.get('requirements', []) if analysis_data else [] %}
     {% if requirements %}
-    <table>
+    <table class="dense-table">
         <thead><tr><th>Requirement</th><th>Type</th><th>Priority</th><th>Description</th></tr></thead>
         <tbody>{# actionable-rows-ok: printed SAD export (GET /solutions/<id>/export/sad) — this page exists to be printed or saved as PDF, so rows carry no controls; edit these records on the solution detail page and re-export. #}
             {% for r in requirements %}
@@ -296,7 +296,7 @@
     <h2 class="section-title" id="constraints">5. Constraints</h2>
     {% set constraints = analysis_data.get('constraints', []) if analysis_data else [] %}
     {% if constraints %}
-    <table>
+    <table class="dense-table">
         <thead><tr><th>Constraint</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>{# actionable-rows-ok: printed SAD export (GET /solutions/<id>/export/sad) — this page exists to be printed or saved as PDF, so rows carry no controls; edit these records on the solution detail page and re-export. #}
             {% for c in constraints %}
@@ -316,7 +316,7 @@
     <div class="page-break"></div>
     <h2 class="section-title" id="archimate">6. Architecture Elements</h2>
     {% if archimate_elements %}
-    <table>
+    <table class="dense-table">
         <thead><tr><th>Element</th><th>Type</th><th>Layer</th><th>Role</th></tr></thead>
         <tbody>{# actionable-rows-ok: printed SAD export (GET /solutions/<id>/export/sad) — this page exists to be printed or saved as PDF, so rows carry no controls; edit these records on the solution detail page and re-export. #}
             {% for el in archimate_elements %}
@@ -337,7 +337,7 @@
     <h2 class="section-title" id="traceability">7. Traceability Chain</h2>
     {% if traceability_chain %}
     <p>Cross-layer relationships showing how motivation drives architecture through to implementation.</p>
-    <table>
+    <table class="dense-table">
         <thead><tr><th>Source</th><th>Type</th><th>Relationship</th><th>Target</th><th>Type</th></tr></thead>
         <tbody>{# actionable-rows-ok: printed SAD export (GET /solutions/<id>/export/sad) — this page exists to be printed or saved as PDF, so rows carry no controls; edit these records on the solution detail page and re-export. #}
             {% for t in traceability_chain %}
@@ -358,7 +358,7 @@
     <!-- SECTION: RISKS -->
     <h2 class="section-title" id="risks">8. Risk Assessment</h2>
     {% if risks %}
-    <table>
+    <table class="dense-table">
         <thead><tr><th>Risk</th><th>Impact</th><th>Likelihood</th><th>Status</th><th>Mitigation</th></tr></thead>
         <tbody>{# actionable-rows-ok: printed SAD export (GET /solutions/<id>/export/sad) — this page exists to be printed or saved as PDF, so rows carry no controls; edit these records on the solution detail page and re-export. #}
             {% for r in risks %}
@@ -381,7 +381,7 @@
     {% if tco_items %}
     {% set total_cost = tco_items|map(attribute='amount')|select('number')|sum %}
     <p><strong>Total Estimated Cost:</strong> {{ "{:,.0f}".format(total_cost) }}</p>
-    <table>
+    <table class="dense-table">
         <thead><tr><th>Category</th><th>Year</th><th>Recurring</th><th>Amount</th></tr></thead>
         <tbody>{# actionable-rows-ok: printed SAD export (GET /solutions/<id>/export/sad) — this page exists to be printed or saved as PDF, so rows carry no controls; edit these records on the solution detail page and re-export. #}
             {% for t in tco_items %}
@@ -401,7 +401,7 @@
     <!-- SECTION: METRICS -->
     <h2 class="section-title" id="metrics">9. Success Metrics</h2>
     {% if metrics %}
-    <table>
+    <table class="dense-table">
         <thead><tr><th>Metric</th><th>Baseline</th><th>Target</th></tr></thead>
         <tbody>{# actionable-rows-ok: printed SAD export (GET /solutions/<id>/export/sad) — this page exists to be printed or saved as PDF, so rows carry no controls; edit these records on the solution detail page and re-export. #}
             {% for m in metrics %}
@@ -420,7 +420,7 @@
     <!-- SECTION: ARB REVIEW -->
     <h2 class="section-title" id="arb">10. ARB Review History</h2>
     {% if arb_reviews %}
-    <table>
+    <table class="dense-table">
         <thead><tr><th>Submitted</th><th>Reviewer</th><th>Decision</th><th>Notes</th></tr></thead>
         <tbody>{# actionable-rows-ok: printed SAD export (GET /solutions/<id>/export/sad) — this page exists to be printed or saved as PDF, so rows carry no controls; edit these records on the solution detail page and re-export. #}
             {% for r in arb_reviews %}

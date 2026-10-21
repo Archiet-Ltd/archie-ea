@@ -18,15 +18,15 @@
     {% macro _ps_actions() %}
 <div class="flex gap-2">
             <a href="{{ url_for('governance.arb_reviews') }}"
-               class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-md hover:bg-accent">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                 <i data-lucide="shield-check" class="h-4 w-4" aria-hidden="true"></i> ARB Reviews
             </a>
             <a href="{{ url_for('governance.adr_list') }}"
-               class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-md hover:bg-accent">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                 <i data-lucide="file-text" class="h-4 w-4" aria-hidden="true"></i> ADRs
             </a>
             <a href="{{ url_for('governance.risk_register') }}"
-               class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-md hover:bg-accent">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                 <i data-lucide="alert-triangle" class="h-4 w-4" aria-hidden="true"></i> Risk Register
             </a>
         </div>
@@ -35,7 +35,7 @@
 
     <!-- Load failure is surfaced, never swallowed into zeros/empty tables -->
     <div x-show="loadError" x-cloak
-         class="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+         class="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
         <i data-lucide="alert-triangle" class="h-5 w-5 text-destructive shrink-0 mt-0.5" aria-hidden="true"></i>
         <div>
             <p class="text-sm font-medium text-destructive-emphasis">Governance data could not be loaded</p>
@@ -49,7 +49,7 @@
     <!-- Key Metrics -->
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <!-- Pending Reviews -->
-        <div class="rounded-lg border bg-card p-6">
+        <div class="rounded-lg border border-border bg-card p-6">
             <div class="flex items-center justify-between">
                 <p class="text-sm font-medium text-muted-foreground">Pending ARB Reviews</p>
                 <i data-lucide="clock" class="h-4 w-4 text-warning" aria-hidden="true"></i>
@@ -61,7 +61,7 @@
         </div>
 
         <!-- Active Risks -->
-        <div class="rounded-lg border bg-card p-6">
+        <div class="rounded-lg border border-border bg-card p-6">
             <div class="flex items-center justify-between">
                 <p class="text-sm font-medium text-muted-foreground">Active Risks</p>
                 <i data-lucide="alert-triangle" class="h-4 w-4 text-destructive" aria-hidden="true"></i>
@@ -73,7 +73,7 @@
         </div>
 
         <!-- Architecture Decisions -->
-        <div class="rounded-lg border bg-card p-6">
+        <div class="rounded-lg border border-border bg-card p-6">
             <div class="flex items-center justify-between">
                 <p class="text-sm font-medium text-muted-foreground">ADRs (Last 90 days)</p>
                 <i data-lucide="file-check" class="h-4 w-4 text-primary" aria-hidden="true"></i>
@@ -85,7 +85,7 @@
         </div>
 
         <!-- Compliance Rate -->
-        <div class="rounded-lg border bg-card p-6">
+        <div class="rounded-lg border border-border bg-card p-6">
             <div class="flex items-center justify-between">
                 <p class="text-sm font-medium text-muted-foreground">Compliance Rate</p>
                 <i data-lucide="check-circle" class="h-4 w-4 text-success" aria-hidden="true"></i>
@@ -132,13 +132,13 @@
         <div class="flex items-center justify-between">
             <h2 class="text-xl font-semibold">Architecture Principles</h2>
             <button type="button" @click="openCreatePrincipleModal()"
-                class="inline-flex items-center gap-2 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Add Principle
             </button>
         </div>
         <div class="grid gap-4 md:grid-cols-2">
             <template x-for="principle in principles" :key="principle.id">
-                <div class="rounded-lg border bg-card p-4">
+                <div class="rounded-lg border border-border bg-card p-4">
                     <h3 class="font-semibold" x-text="principle.name"></h3>
                     <p class="text-sm text-muted-foreground mt-1" x-text="principle.statement"></p>
                     <div class="mt-3 flex items-center gap-2">
@@ -159,12 +159,12 @@
         <div class="flex items-center justify-between">
             <h2 class="text-xl font-semibold">Technology Standards</h2>
             <button type="button" @click="openCreateStandardModal()"
-                class="inline-flex items-center gap-2 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Add Standard
             </button>
         </div>
         <div class="rounded-lg border">
-            <table class="w-full">
+            <table class="dense-table w-full">
                 <thead class="bg-muted/50">
                     <tr class="text-left text-sm">
                         <th class="p-3 font-medium">Technology</th>
@@ -199,12 +199,12 @@
         <div class="flex items-center justify-between">
             <h2 class="text-xl font-semibold">ARB Reviews</h2>
             <a href="{{ url_for('governance.arb_reviews') }}"
-               class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-md hover:bg-accent">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                 View All <i data-lucide="arrow-right" class="h-4 w-4" aria-hidden="true"></i>
             </a>
         </div>
         <div class="rounded-lg border">
-            <table class="w-full">
+            <table class="dense-table w-full">
                 <thead class="bg-muted/50">
                     <tr class="text-left text-sm">
                         <th class="p-3 font-medium">Solution</th>
@@ -249,7 +249,7 @@
                 </select>
             </div>
         </div>
-        <div class="rounded-lg border bg-card p-6">
+        <div class="rounded-lg border border-border bg-card p-6">
             <p class="text-sm text-muted-foreground text-center py-8">
                 Roadmap visualization will display here &mdash; integration with migration planning
             </p>

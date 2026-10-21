@@ -20,28 +20,28 @@
 
   <!-- Stats Cards -->
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
+    <div class="rounded-lg border border-border bg-card text-card-foreground p-6">
       <div class="flex flex-col gap-2">
         <p class="text-xs font-semibold text-muted-foreground">Total Applications</p>
         <p class="text-3xl font-bold text-foreground">{{ stats.total_applications }}</p>
       </div>
     </div>
 
-    <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
+    <div class="rounded-lg border border-border bg-card text-card-foreground p-6">
       <div class="flex flex-col gap-2">
         <p class="text-xs font-semibold text-muted-foreground">Products with Deployments</p>
         <p class="text-3xl font-bold text-foreground">{{ stats.products_with_deployments }}</p>
       </div>
     </div>
 
-    <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
+    <div class="rounded-lg border border-border bg-card text-card-foreground p-6">
       <div class="flex flex-col gap-2">
         <p class="text-xs font-semibold text-muted-foreground">Total Products</p>
         <p class="text-3xl font-bold text-foreground">{{ stats.total_products }}</p>
       </div>
     </div>
 
-    <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
+    <div class="rounded-lg border border-border bg-card text-card-foreground p-6">
       <div class="flex flex-col gap-2">
         <p class="text-xs font-semibold text-muted-foreground">Deployment Rate</p>
         <p class="text-3xl font-bold text-foreground">
@@ -56,7 +56,7 @@
   </div>
 
   <!-- Applications Table -->
-  <div class="rounded-lg border bg-card text-card-foreground shadow-sm mb-6">
+  <div class="rounded-lg border border-border bg-card text-card-foreground mb-6">
     <div class="p-6 border-b">
       <h2 class="text-lg font-semibold">Deployed Applications</h2>
       <p class="text-muted-foreground text-sm">Applications deployed from {{ vendor.name }}'s products</p>
@@ -66,7 +66,7 @@
       {% if applications %}
       <div class="grid gap-6">
         {% for item in applications %}
-        <div class="rounded-lg border bg-card p-6">
+        <div class="rounded-lg border border-border bg-card p-6">
           <div class="flex flex-col gap-4">
             <div class="flex flex-wrap justify-between items-start gap-4">
               <div class="flex-1 min-w-0">
