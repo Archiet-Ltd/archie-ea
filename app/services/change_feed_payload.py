@@ -155,6 +155,28 @@ def owner_user_ids(entity_type: str, target: object, organization_id: int, actio
     return []
 
 
+def _signed_in_user_id() -> Optional[int]:
+    """The signed-in user's id, read without resolving the login user.
+
+    Asking ``current_user`` here would load the user and cache the result on
+    ``g`` for the rest of the request. A write made before the request has
+    authenticated (a seed, an import that opens its own request context) would
+    then pin an anonymous user for every later call. So read the user already
+    resolved, and otherwise the id the session carries.
+    """
+    from flask import g, has_request_context, session as http_session
+
+    if not has_request_context():
+        return None
+    resolved = g.get("_login_user")
+    if resolved is not None:
+        if getattr(resolved, "is_authenticated", False):
+            return getattr(resolved, "id", None)
+        return None
+    raw = http_session.get("_user_id")
+    return int(raw) if str(raw).isdigit() else None
+
+
 def source_of(session: Any, target: object) -> dict:
     """Who or what made the change, and the origin the row itself records.
 
@@ -172,11 +194,9 @@ def source_of(session: Any, target: object) -> dict:
 
     found: dict = {"kind": "system"}
     try:
-        from flask import has_request_context
-        from flask_login import current_user
-
-        if has_request_context() and getattr(current_user, "is_authenticated", False):
-            found = {"kind": "user", "user_id": current_user.id}
+        user_id = _signed_in_user_id()
+        if user_id is not None:
+            found = {"kind": "user", "user_id": user_id}
     except Exception:  # noqa: BLE001 - a missing user must never block the write
         logger.debug("change feed: could not read the signed-in user", exc_info=True)
     origin = getattr(target, "data_source", None) or getattr(target, "source", None)
