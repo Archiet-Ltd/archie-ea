@@ -72,7 +72,7 @@
   },
   {
    "control_code": "Art. 8",
-   "title": "Child's consent in relation to information society services",
+   "title": "Conditions applicable to child's consent in relation to information society services",
    "description": "Consent for information society services offered directly to a child is valid only with parental authorisation below the age threshold.",
    "category": "Chapter II: Principles",
    "subcategory": null,
@@ -88,7 +88,7 @@
   },
   {
    "control_code": "Art. 10",
-   "title": "Criminal convictions and offences data",
+   "title": "Processing of personal data relating to criminal convictions and offences",
    "description": "Processing of criminal conviction and offence data is carried out only under official authority or as authorised by law.",
    "category": "Chapter II: Principles",
    "subcategory": null,
@@ -104,7 +104,7 @@
   },
   {
    "control_code": "Art. 12",
-   "title": "Transparent information and modalities for exercising rights",
+   "title": "Transparent information, communication and modalities for the exercise of the rights of the data subject",
    "description": "Information and communications to data subjects are concise, transparent and easily accessible, and requests are answered within one month.",
    "category": "Chapter III: Rights of the data subject",
    "subcategory": null,
@@ -112,7 +112,7 @@
   },
   {
    "control_code": "Art. 13",
-   "title": "Information to be provided where data is collected from the data subject",
+   "title": "Information to be provided where personal data are collected from the data subject",
    "description": "Specified information is given to the data subject when data is collected from them.",
    "category": "Chapter III: Rights of the data subject",
    "subcategory": null,
@@ -120,7 +120,7 @@
   },
   {
    "control_code": "Art. 14",
-   "title": "Information to be provided where data is not obtained from the data subject",
+   "title": "Information to be provided where personal data have not been obtained from the data subject",
    "description": "Specified information is given to the data subject when data is obtained from another source.",
    "category": "Chapter III: Rights of the data subject",
    "subcategory": null,
@@ -144,7 +144,7 @@
   },
   {
    "control_code": "Art. 17",
-   "title": "Right to erasure",
+   "title": "Right to erasure (‘right to be forgotten’)",
    "description": "The data subject can have personal data erased where a listed ground applies.",
    "category": "Chapter III: Rights of the data subject",
    "subcategory": null,
@@ -160,7 +160,7 @@
   },
   {
    "control_code": "Art. 19",
-   "title": "Notification obligation regarding rectification, erasure or restriction",
+   "title": "Notification obligation regarding rectification or erasure of personal data or restriction of processing",
    "description": "Recipients are notified of rectification, erasure or restriction.",
    "category": "Chapter III: Rights of the data subject",
    "subcategory": null,
@@ -560,7 +560,7 @@
   },
   {
    "control_code": "Art. 69",
-   "title": "Independence of the Board",
+   "title": "Independence",
    "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
@@ -576,7 +576,7 @@
   },
   {
    "control_code": "Art. 71",
-   "title": "Reports of the Board",
+   "title": "Reports",
    "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
@@ -584,7 +584,7 @@
   },
   {
    "control_code": "Art. 72",
-   "title": "Procedure of the Board",
+   "title": "Procedure",
    "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
@@ -592,7 +592,7 @@
   },
   {
    "control_code": "Art. 73",
-   "title": "Chair of the Board",
+   "title": "Chair",
    "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
@@ -608,7 +608,7 @@
   },
   {
    "control_code": "Art. 75",
-   "title": "Secretariat of the Board",
+   "title": "Secretariat",
    "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
@@ -616,7 +616,7 @@
   },
   {
    "control_code": "Art. 76",
-   "title": "Confidentiality of the Board",
+   "title": "Confidentiality",
    "description": null,
    "category": "Chapter VII: Cooperation and consistency",
    "subcategory": null,
@@ -720,7 +720,7 @@
   },
   {
    "control_code": "Art. 89",
-   "title": "Safeguards and derogations for archiving, research and statistical purposes",
+   "title": "Safeguards and derogations relating to processing for archiving purposes in the public interest, scientific or historical research purposes or statistical purposes",
    "description": null,
    "category": "Chapter IX: Provisions relating to specific processing situations",
    "subcategory": null,
@@ -776,7 +776,7 @@
   },
   {
    "control_code": "Art. 96",
-   "title": "Relationship with previously concluded agreements",
+   "title": "Relationship with previously concluded Agreements",
    "description": null,
    "category": "Chapter XI: Final provisions",
    "subcategory": null,
