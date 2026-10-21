@@ -145,34 +145,42 @@ def get_application_compliance(app_id):
 @require_roles("admin", "architect", "business_architect")
 def map_compliance_control(app_id):
     """Map a compliance control to an application component."""
-    data = request.get_json()
+    data = request.get_json(silent=True)
 
     if not data or "control_id" not in data:
         return jsonify({"error": "control_id required"}), 400
 
-    # Check if mapping already exists
-    existing = ApplicationComplianceControl.query.filter_by(
-        control_id=data["control_id"], application_id=app_id
-    ).first()
+    from app.middleware.tenant_context import current_org_id
+    from app.models.application_portfolio import ApplicationComponent
+    from app.modules.compliance.services.control_model_service import link_control_to_element
 
-    if existing:
-        return jsonify({"error": "Mapping already exists"}), 409
+    organization_id = current_org_id()
+    component = (
+        ApplicationComponent.query.filter_by(id=int(app_id), organization_id=organization_id).first()
+        if organization_id is not None and str(app_id).isdigit()
+        else None
+    )
+    if component is None or component.archimate_element_id is None:
+        return jsonify({"error": "Application not found"}), 404
 
+    # A new link is an ordinary realisation relationship from the application's model
+    # element to the control's Requirement element, not a row in the application-only table.
     try:
-        mapping = ApplicationComplianceControl(
-            application_id=app_id,
-            control_id=data["control_id"],
-            status=data.get("status", "not_implemented"),
-            coverage_percentage=data.get("coverage_percentage", 0),
-            implementation_notes=data.get("implementation_notes"),
-            evidence=data.get("evidence"),
+        relationship = link_control_to_element(
+            data["control_id"], component.archimate_element_id, organization_id
         )
-
-        db.session.add(mapping)
         db.session.commit()
-
-        return jsonify({"success": True, "mapping": mapping.to_dict()})
-
+        return jsonify({
+            "success": True,
+            "mapping": {
+                "relationship_id": relationship.id,
+                "application_id": component.id,
+                "control_id": data["control_id"],
+            },
+        })
+    except ValueError as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 404
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error creating compliance mapping: {str(e)}")
