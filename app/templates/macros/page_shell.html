@@ -157,7 +157,7 @@
     {% if cta_label and cta_href %}
     <div class="mt-6">
         <a href="{{ cta_href }}"
-           class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-10 px-4 py-2 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
             {{ cta_label }}
         </a>
     </div>
@@ -191,7 +191,7 @@
 {% set tag = 'a' if href else ('button' if onclick else 'div') %}
 {% if href or onclick %}
     {% set state_classes = ('border-warning ring-2 ring-warning/20 bg-warning/10' if active else 'border-warning/40 bg-warning/10 hover:border-warning/60') if is_warning else ('border-primary ring-2 ring-primary/20 bg-primary/5' if active else 'border-input bg-background hover:border-primary/50') %}
-    {% set card_classes = 'rounded-xl border-2 ' ~ state_classes ~ ' cursor-pointer hover:shadow-md transition-all duration-200 p-5 block no-underline text-inherit w-full text-left' %}
+ {% set card_classes ='rounded-xl border-2' ~ state_classes ~' cursor-pointer transition-all duration-200 p-5 block no-underline text-inherit w-full text-left' %}
 {% else %}
     {% set card_classes = 'rounded-xl border border-warning/40 bg-warning/10 text-card-foreground p-6' if is_warning else 'rounded-xl border border-border bg-card text-card-foreground p-6' %}
 {% endif %}
@@ -222,7 +222,7 @@
 {% endmacro %}
 
 {% macro section_card(title=None, actions_caller=None) %}
-<div class="rounded-xl border border-border bg-card text-card-foreground">
+<div class="rounded-lg border border-border bg-card text-card-foreground">
     {% if title or actions_caller %}
     <div class="flex items-center justify-between gap-4 p-6 pb-0">
         {% if title %}

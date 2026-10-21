@@ -152,7 +152,7 @@
 
     <!-- Unmapped Items Alert -->
     {% if unmapped_caps or unmapped_products or unmapped_archimate %}
-    <div class="bg-warning/5 border border-warning/20 rounded-lg p-4 mb-6">
+    <div class="bg-warning/10 border border-warning/40 rounded-md px-3 py-2 mb-6">
         <div class="flex items-start gap-3">
             <div class="flex-shrink-0">
                 <i data-lucide="alert-triangle" class="h-6 w-6 text-warning" aria-hidden="true"></i>
@@ -199,7 +199,7 @@
                                 {% endif %}
                             </div>
                             <div class="flex flex-col items-end gap-1">
-                                <span class="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
+                                <span class="px-2 py-1 bg-primary/10 text-info-emphasis text-xs rounded-full">
                                     {{ mapping.mapping_strength }}/5
                                 </span>
                                 {% if mapping.strategic_importance %}
@@ -282,7 +282,7 @@
                             <p class="text-sm text-muted-foreground">{{ mapping.archimate_element_name }}</p>
                             <p class="text-xs text-muted-foreground">{{ mapping.archimate_type }} ({{ mapping.archimate_layer }})</p>
                         </div>
-                        <span class="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
+                        <span class="px-2 py-1 bg-primary/10 text-info-emphasis text-xs rounded-full">
                             {{ mapping.mapping_strength }}/5
                         </span>
                     </div>

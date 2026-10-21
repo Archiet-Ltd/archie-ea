@@ -6,7 +6,7 @@
    applications/technology_links.js on the page. #}
 {% if 'intelligence_ui.twin_map' in flask.current_app.view_functions %}
 {% from 'intelligence/_entity_picker.html' import entity_picker with context %}
-<section data-slot="card" class="rounded-xl border bg-card shadow-sm"
+<section data-slot="card" class="rounded-lg border border-border bg-card"
          x-data="technologyLinks({{ app.id }})" data-technology-links
          aria-labelledby="techstack-heading">
   <div class="flex flex-col space-y-1.5 p-6 pb-3">
@@ -40,7 +40,7 @@
             </a>
             <button type="button" @click="remove(link)"
                     :aria-label="'Remove ' + link.name"
-                    class="inline-flex h-8 items-center rounded-md border border-input bg-background px-2 text-xs font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
               Remove
             </button>
           </div>

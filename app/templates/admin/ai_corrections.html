@@ -60,7 +60,7 @@
         {% call card_content() %}
             {% if rows %}
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm" id="corrections-table">
+                    <table class="dense-table w-full text-sm" id="corrections-table">
                         <thead>
                             <tr class="border-b border-border">
                                 <th class="text-left py-3 px-4 font-medium text-muted-foreground">Application</th>
@@ -80,7 +80,7 @@
                                 <td class="py-3 px-4 text-foreground/80">{{ row.element_name or '—' }}</td>
                                 <td class="py-3 px-4">
                                     {% if row.element_type %}
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
                                             {{ row.element_type }}
                                         </span>
                                     {% else %}
@@ -156,14 +156,14 @@
                                                 <button
                                                     type="button"
                                                     data-action="submitFix" data-eid="{{ row.element_id }}"
-                                                    class="inline-flex items-center gap-1 rounded-md bg-primary text-primary-foreground px-2.5 py-1 text-xs font-medium hover:bg-primary/90 transition-colors"
+                                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                                     aria-label="Submit fix for element {{ row.element_id }}">
                                                     Submit Fix
                                                 </button>
                                                 <button
                                                     type="button"
                                                     data-action="toggleFixForm" data-eid="{{ row.element_id }}"
-                                                    class="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors"
+                                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                                     aria-label="Cancel fix for element {{ row.element_id }}">
                                                     Cancel
                                                 </button>

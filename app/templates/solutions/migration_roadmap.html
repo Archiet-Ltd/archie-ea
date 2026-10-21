@@ -18,35 +18,35 @@
     ) }}
 
     <div class="flex items-center justify-between mt-4 mb-6">
-        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">
+        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
             <i data-lucide="route" class="h-3.5 w-3.5"></i> AI Solution Architect · TOGAF Phase F · grounded in solution context
         </span>
         <button type="button" @click="generate()" :disabled="busy"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="sparkles" class="h-4 w-4" :class="busy && 'animate-pulse'"></i>
             <span x-text="busy ? 'Generating…' : (hasRoadmap ? 'Regenerate roadmap' : 'Generate migration roadmap')"></span>
         </button>
     </div>
 
-    <div x-cloak x-show="error" class="mb-6 rounded-md border border-destructive/30 bg-destructive/10 text-destructive-emphasis p-3 text-sm" x-text="error"></div>
+    <div x-cloak x-show="error" class="mb-6 rounded-md border border-destructive/40 bg-destructive/10 text-destructive-emphasis px-3 py-2 text-sm" x-text="error"></div>
     <div x-cloak x-show="busy" class="mb-6 rounded-md border border-border bg-muted/30 p-4 text-sm text-muted-foreground flex items-center gap-2">
         <i data-lucide="loader" class="h-4 w-4 animate-spin"></i> The Solution Architect is sequencing the plateaus — this takes a few seconds.
     </div>
 
     {% if not roadmap %}
-    <div x-show="!busy" class="border border-border rounded-xl bg-card p-10 text-center">
-        <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary mb-3"><i data-lucide="route" class="h-6 w-6"></i></span>
+    <div x-show="!busy" class="border border-border rounded-lg bg-card p-10 text-center">
+        <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-info-emphasis mb-3"><i data-lucide="route" class="h-6 w-6"></i></span>
         <p class="text-sm font-medium text-foreground">No migration roadmap yet</p>
         <p class="text-xs text-muted-foreground mt-1 mb-4 max-w-md mx-auto">Generate a Phase F roadmap — 2-4 transition plateaus with objectives, horizons, and the work packages that move the estate to the target state.</p>
         <button type="button" @click="generate()" :disabled="busy"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <span x-text="busy ? 'Generating…' : 'Generate migration roadmap'"></span>
         </button>
     </div>
     {% else %}
 
     {# ── Roadmap header ────────────────────────────────────────────── #}
-    <div class="border border-border rounded-xl bg-card p-5 mb-6">
+    <div class="border border-border rounded-lg bg-card p-5 mb-6">
         <div class="flex items-start justify-between gap-4">
             <div>
                 <h2 class="text-base font-semibold text-foreground">{{ roadmap.headline }}</h2>
@@ -64,8 +64,8 @@
         {% for p in roadmap.plateaus %}
         <li class="ml-6">
             <span class="absolute -left-[0.7rem] flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-2xs font-bold ring-4 ring-background">{{ p.sequence }}</span>
-            <div class="border border-border rounded-xl bg-card overflow-hidden">
-                <div class="px-5 py-3 border-b border-border flex items-center justify-between bg-muted/20">
+            <div class="border border-border rounded-lg bg-card overflow-hidden">
+                <div class="border px-5 py-2 border-b border-border flex items-center justify-between bg-muted/20">
                     <h3 class="text-sm font-semibold text-foreground">{{ p.name }}</h3>
                     {% if p.horizon_months %}<span class="inline-flex items-center gap-1 text-2xs text-muted-foreground"><i data-lucide="clock" class="h-3 w-3"></i> ~{{ p.horizon_months }} mo</span>{% endif %}
                 </div>

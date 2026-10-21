@@ -11,6 +11,7 @@ from collections import defaultdict
 from typing import Any, Dict, List
 
 from app.services.llm_service import LLMService
+from app.models.archimate_element_types import is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -219,7 +220,7 @@ class ArchiMateRelationshipGenerator:
     def _gen_application_rels(self, elements: List[Dict]) -> List[Dict]:
         """Application layer relationships."""
         rels = []
-        comps = [e for e in elements if e.get("type") == "ApplicationComponent"]
+        comps = [e for e in elements if is_application_kind(e.get("type"))]
         svcs = [e for e in elements if e.get("type") == "ApplicationService"]
         data = [e for e in elements if e.get("type") == "DataObject"]
 
@@ -308,7 +309,7 @@ class ArchiMateRelationshipGenerator:
             comps = [
                 e
                 for e in elements_by_layer["application"]
-                if e.get("type") == "ApplicationComponent"
+                if is_application_kind(e.get("type"))
             ]
             for i, proc in enumerate(procs):
                 if i < len(comps):
@@ -326,7 +327,7 @@ class ArchiMateRelationshipGenerator:
             comps = [
                 e
                 for e in elements_by_layer["application"]
-                if e.get("type") == "ApplicationComponent"
+                if is_application_kind(e.get("type"))
             ]
             nodes = [e for e in elements_by_layer["technology"] if e.get("type") == "Node"]
             for i, comp in enumerate(comps):

@@ -24,7 +24,7 @@
     ) }}
     <div class="flex items-center gap-2">
       {{ button('Back to Application', variant='outline', size='default', href=url_for('unified_applications.application_detail', id=application.id), icon='arrow-left') }}
-      <button type="button" class="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+      <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
         @click="openCreateModal()">
         Add Work Package
       </button>
@@ -32,19 +32,19 @@
   </div>
 
   <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total</p>
       <p class="mt-2 text-2xl font-semibold" x-text="metrics.total"></p>
     </div>
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Planned</p>
       <p class="mt-2 text-2xl font-semibold" x-text="metrics.planned"></p>
     </div>
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">In Progress</p>
       <p class="mt-2 text-2xl font-semibold" x-text="metrics.in_progress"></p>
     </div>
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Completed</p>
       <p class="mt-2 text-2xl font-semibold" x-text="metrics.completed"></p>
     </div>
@@ -72,7 +72,7 @@
       </div>
 
       <div class="overflow-x-auto rounded-lg border">
-        <table class="min-w-full text-sm">
+        <table class="dense-table min-w-full text-sm">
           <thead class="bg-muted/50">
             <tr>
               <th class="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
@@ -138,16 +138,16 @@
   {# The shared macro keeps display:flex off the closed root: a flex utility
      overrides native hidden and would intercept the Add button's first click. #}
   {% call modal(id='roadmap-work-package-modal', size='lg', labelledby='roadmap-modal-title') %}
-      <h3 id="roadmap-modal-title" class="text-lg font-semibold pr-8 mb-4" x-text="isEditing ? 'Edit Work Package' : 'Create Work Package'"></h3>
+      <h3 id="roadmap-modal-title" class="text-base font-semibold text-foreground text-foreground pr-8 mb-4" x-text="isEditing ? 'Edit Work Package' : 'Create Work Package'"></h3>
       <form class="space-y-4" @submit.prevent="submitForm()">
-        <div class="grid gap-4 sm:grid-cols-2">
-          <div class="sm:col-span-2">
-            <label class="mb-1 block text-sm font-medium">Name</label>
-            <input type="text" x-model="form.name" required class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Name">
+        <div class="grid gap-4 grid-cols-1">
+          <div class="">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
+            <input type="text" x-model="form.name" required class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Name">
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium">Transformation Type</label>
-            <select x-model="form.transformation_type" required class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Transformation Type">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Transformation Type</label>
+            <select x-model="form.transformation_type" required class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Transformation Type">
               <option value="Modernization">Modernization</option>
               <option value="Integration">Integration</option>
               <option value="Migration">Migration</option>
@@ -155,8 +155,8 @@
             </select>
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium">Status</label>
-            <select x-model="form.status" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Status">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
+            <select x-model="form.status" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Status">
               <option value="planned">Planned</option>
               <option value="in_progress">In Progress</option>
               <option value="blocked">Blocked</option>
@@ -164,8 +164,8 @@
             </select>
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium">Priority</label>
-            <select x-model="form.priority" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Priority">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
+            <select x-model="form.priority" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Priority">
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
@@ -173,12 +173,12 @@
             </select>
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium">Application Phase</label>
-            <input type="text" x-model="form.application_phase" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Application Phase">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Application Phase</label>
+            <input type="text" x-model="form.application_phase" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Application Phase">
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium">Target Plateau</label>
-            <select x-model.number="form.plateau_id" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Target Plateau">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Target Plateau</label>
+            <select x-model.number="form.plateau_id" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Target Plateau">
               <option :value="null">— None —</option>
               <template x-for="p in plateaus" :key="p.id">
                 <option :value="p.id" x-text="p.name"></option>
@@ -186,17 +186,17 @@
             </select>
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium">Linked Capability</label>
-            <select x-model.number="form.capability_id" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Linked Capability">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Linked Capability</label>
+            <select x-model.number="form.capability_id" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Linked Capability">
               <option :value="null">— None —</option>
               <template x-for="c in capabilities" :key="c.id">
                 <option :value="c.id" x-text="c.name"></option>
               </template>
             </select>
           </div>
-          <div class="sm:col-span-2">
-            <label class="mb-1 block text-sm font-medium">Target Architecture Element</label>
-            <select x-model.number="form.archimate_element_id" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Target Architecture Element">
+          <div class="">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Target Architecture Element</label>
+            <select x-model.number="form.archimate_element_id" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Target Architecture Element">
               <option :value="null">-- Auto (ApplicationComponent) --</option>
               <template x-for="el in archiElements" :key="el.id">
                 <option :value="el.id" x-text="el.name + ' (' + el.type + ')'"></option>
@@ -204,24 +204,24 @@
             </select>
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium">Start Date</label>
-            <input type="date" x-model="form.start_date" required class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Start Date">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Start Date</label>
+            <input type="date" x-model="form.start_date" required class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Start Date">
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium">Target Date</label>
-            <input type="date" x-model="form.target_date" required class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Target Date">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Target Date</label>
+            <input type="date" x-model="form.target_date" required class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Target Date">
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium">Estimated Effort Hours</label>
-            <input type="number" min="0" step="1" x-model.number="form.estimated_effort_hours" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Estimated Effort Hours">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Estimated Effort Hours</label>
+            <input type="number" min="0" step="1" x-model.number="form.estimated_effort_hours" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Estimated Effort Hours">
           </div>
-          <div class="sm:col-span-2">
-            <label class="mb-1 block text-sm font-medium">Description</label>
+          <div class="">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
             <textarea x-model="form.description" rows="3" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Description"></textarea>
           </div>
         </div>
         <div class="flex items-center justify-end gap-2 border-t pt-4">
-          <button type="button" class="rounded-md border px-4 py-2 text-sm hover:bg-muted" data-modal-close="roadmap-work-package-modal">Cancel</button>
+          <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" data-modal-close="roadmap-work-package-modal">Cancel</button>
           <button type="submit" class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
             :disabled="isSubmitting">
             <span x-show="!isSubmitting" x-cloak x-text="isEditing ? 'Save Changes' : 'Create Work Package'"></span>

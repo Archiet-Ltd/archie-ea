@@ -42,7 +42,7 @@
 
     {# Summary Stat Cards #}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200 p-5">
+        <div class="rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200 p-5">
             <div class="flex items-start gap-4">
                 <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary">
                     <i data-lucide="layers" class="h-5 w-5 text-primary-foreground" aria-hidden="true"></i>
@@ -55,7 +55,7 @@
             </div>
         </div>
 
-        <div class="rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200 p-5">
+        <div class="rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200 p-5">
             <div class="flex items-start gap-4">
                 <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary">
                     <i data-lucide="scan-line" class="h-5 w-5 text-primary-foreground" aria-hidden="true"></i>
@@ -68,7 +68,7 @@
             </div>
         </div>
 
-        <div class="rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200 p-5">
+        <div class="rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200 p-5">
             <div class="flex items-start gap-4">
                 <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-success">
                     <i data-lucide="piggy-bank" class="h-5 w-5 text-primary-foreground" aria-hidden="true"></i>
@@ -81,7 +81,7 @@
             </div>
         </div>
 
-        <div class="rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200 p-5">
+        <div class="rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200 p-5">
             <div class="flex items-start gap-4">
                 {% set priority_color = {'high': 'bg-destructive', 'medium': 'bg-warning', 'low': 'bg-success'} %}
                 <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg {{ priority_color.get(group.consolidation_priority, 'bg-warning') }}">
@@ -97,7 +97,7 @@
     </div>
 
     {# Similarity Breakdown — computed client-side from app metadata when server values are 0 #}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-6">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
         <h2 class="text-lg font-semibold text-foreground mb-4">Similarity Breakdown</h2>
         <div class="space-y-4">
             {# token-migration-ok: chart colors must be visually distinct per category #}
@@ -118,7 +118,7 @@
     </div>
 
     {# Applications Table #}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="p-4 sm:p-6 border-b">
             <div class="flex items-center justify-between">
                 <div>
@@ -139,12 +139,12 @@
                 </p>
                 <div class="flex items-center gap-2">
                     <button type="button" @click="addSelectedToConsolidation()"
-                            class="inline-flex items-center justify-center h-8 px-4 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors" aria-label="Add selected to consolidation list">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Add selected to consolidation list">
                         <i data-lucide="arrow-right-circle" class="w-3.5 h-3.5 mr-1.5" aria-hidden="true"></i>
                         Add Selected to Consolidation
                     </button>
                     <button type="button" @click="selectedApps = []"
-                            class="inline-flex items-center justify-center h-8 px-3 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" aria-label="Clear selection">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center" aria-label="Clear selection">
                         <i data-lucide="x" class="w-3.5 h-3.5" aria-hidden="true"></i>
                     </button>
                 </div>
@@ -152,7 +152,7 @@
         </div>
 
         <div class="overflow-x-auto">
-            <table class="w-full border-collapse">
+            <table class="dense-table w-full border-collapse">
                 <thead class="bg-muted/50 border-b">
                     <tr>
                         <th class="px-4 py-3 w-10">
@@ -203,7 +203,7 @@
     </div>
 
     {# Intelligence Tabs #}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="border-b">
             <nav class="flex -mb-px" aria-label="Intelligence tabs">
                 <button type="button" @click="switchTab('confidence')"
@@ -281,7 +281,7 @@
 
                     {# Pairwise Table #}
                     <div class="overflow-x-auto">
-                        <table class="w-full border-collapse">
+                        <table class="dense-table w-full border-collapse">
                             <thead class="bg-muted/50 border-b">
                                 <tr>
                                     <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">App 1</th>
@@ -360,7 +360,7 @@
                                 vs <span class="text-primary" x-text="dup.app_name"></span>
                             </h3>
                             <div class="overflow-x-auto">
-                                <table class="w-full border-collapse">
+                                <table class="dense-table w-full border-collapse">
                                     <thead class="bg-muted/50 border-b">
                                         <tr>
                                             <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Field</th>
@@ -439,7 +439,7 @@
 
                     {# Per-App Impact Table #}
                     <div class="overflow-x-auto">
-                        <table class="w-full border-collapse">
+                        <table class="dense-table w-full border-collapse">
                             <thead class="bg-muted/50 border-b">
                                 <tr>
                                     <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Application</th>
@@ -456,7 +456,7 @@
                                             <div class="flex items-center gap-2">
                                                 <span class="text-sm font-medium text-foreground" x-text="app.name"></span>
                                                 <span x-show="app.is_primary" x-cloak
-                                                      class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/30">Primary</span>
+                                                      class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Primary</span>
                                             </div>
                                         </td>
                                         <td class="px-4 py-3 text-sm text-foreground" x-text="app.dependency_count"></td>

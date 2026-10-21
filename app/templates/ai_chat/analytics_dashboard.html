@@ -14,7 +14,7 @@
       <select id="date-range"
               x-model="days"
               @change="fetchData()"
-              class="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring">
+              class="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
         <option value="7">Last 7 days</option>
         <option value="30" selected>Last 30 days</option>
         <option value="90">Last 90 days</option>
@@ -36,7 +36,7 @@
 
   <!-- Error state -->
   <template x-if="error && !loading">
-    <div class="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive-emphasis">
+    <div class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis">
       <span x-text="error"></span>
     </div>
   </template>
@@ -46,13 +46,13 @@
       <!-- Row 1: Stat cards -->
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         <!-- Total Messages -->
-        <div class="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <div class="rounded-lg border border-border bg-card p-5">
           <p class="text-sm font-medium text-muted-foreground">Total Messages</p>
           <p class="mt-2 text-3xl font-bold text-foreground" x-text="data.total_messages.toLocaleString()"></p>
           <p class="mt-1 text-xs text-muted-foreground">Last <span x-text="days"></span> days</p>
         </div>
         <!-- Positive Feedback % -->
-        <div class="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <div class="rounded-lg border border-border bg-card p-5">
           <p class="text-sm font-medium text-muted-foreground">Positive Feedback</p>
           <p class="mt-2 text-3xl font-bold text-foreground"><span x-text="data.positive_pct"></span>%</p>
           <p class="mt-1 text-xs text-muted-foreground">
@@ -61,13 +61,13 @@
           </p>
         </div>
         <!-- Active Users -->
-        <div class="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <div class="rounded-lg border border-border bg-card p-5">
           <p class="text-sm font-medium text-muted-foreground">Active Users</p>
           <p class="mt-2 text-3xl font-bold text-foreground" x-text="data.active_users.toLocaleString()"></p>
           <p class="mt-1 text-xs text-muted-foreground">Distinct users</p>
         </div>
         <!-- Avg Response Time -->
-        <div class="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <div class="rounded-lg border border-border bg-card p-5">
           <p class="text-sm font-medium text-muted-foreground">Avg Response Time</p>
           <p class="mt-2 text-3xl font-bold text-foreground"><span x-text="data.avg_response_time_ms"></span><span class="text-lg font-normal text-muted-foreground"> ms</span></p>
           <p class="mt-1 text-xs text-muted-foreground">Processing time</p>
@@ -77,7 +77,7 @@
       <!-- A95-012: AI automation metrics row -->
       <div id="ai-metrics-widget" class="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-6" aria-label="AI automation metrics">
         <!-- Routine Decisions Automated -->
-        <div data-slot="card" class="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-5">
           <p class="text-sm font-medium text-muted-foreground">Routine Decisions Automated</p>
           <p class="mt-2 text-3xl font-bold text-foreground">
             <strong id="ai-decisions-count" aria-live="polite">–</strong>
@@ -85,7 +85,7 @@
           <p class="mt-1 text-xs text-muted-foreground">AI-originated actions this session</p>
         </div>
         <!-- Solutions Touch-Only-for-Review -->
-        <div data-slot="card" class="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-5">
           <p class="text-sm font-medium text-muted-foreground">Solutions AI-Drafted</p>
           <p class="mt-2 text-3xl font-bold text-foreground">
             <strong id="ai-solutions-count" aria-live="polite">–</strong>
@@ -126,7 +126,7 @@
       <!-- Row 2: Feedback chart + Usage by domain -->
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-6">
         <!-- Feedback distribution (CSS bar chart) -->
-        <div class="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <div class="rounded-lg border border-border bg-card p-5">
           <h2 class="text-base font-semibold text-foreground mb-4">Feedback by Domain</h2>
           <template x-if="Object.keys(data.feedback_summary.by_domain).length === 0">
             <p class="text-sm text-muted-foreground py-4">No feedback data in this period.</p>
@@ -155,13 +155,13 @@
         </div>
 
         <!-- Usage by domain table -->
-        <div class="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <div class="rounded-lg border border-border bg-card p-5">
           <h2 class="text-base font-semibold text-foreground mb-4">Usage by Domain</h2>
           <template x-if="data.usage_by_domain.length === 0">
             <p class="text-sm text-muted-foreground py-4">No usage data in this period.</p>
           </template>
           <div class="overflow-x-auto" x-show="data.usage_by_domain.length > 0" x-cloak>
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
               <thead>
                 <tr class="border-b border-border">
                   <th class="pb-2 text-left font-medium text-muted-foreground">Domain</th>
@@ -186,7 +186,7 @@
       </div>
 
       <!-- Row 3: Daily usage chart -->
-      <div class="rounded-lg border border-border bg-card p-5 shadow-sm mb-6">
+      <div class="rounded-lg border border-border bg-card p-5 mb-6">
         <h2 class="text-base font-semibold text-foreground mb-4">Daily Usage</h2>
         <template x-if="data.daily_usage.length === 0">
           <p class="text-sm text-muted-foreground py-4">No daily data in this period.</p>
@@ -198,7 +198,7 @@
                    :style="'height:' + dailyBarHeight(day.count) + '%'"
                    :title="day.date + ': ' + day.count + ' messages'"></div>
               <!-- Tooltip on hover -->
-              <div class="absolute -top-8 hidden group-hover:block rounded bg-popover border border-border px-2 py-1 text-xs text-popover-foreground shadow whitespace-nowrap z-10">
+              <div class="absolute -top-8 hidden group-hover:block rounded bg-popover border border-border px-2 py-1 text-xs text-popover-foreground whitespace-nowrap z-10">
                 <span x-text="day.date"></span>: <span x-text="day.count"></span>
               </div>
             </div>
@@ -213,13 +213,13 @@
       <!-- Row 4: Provider stats + Top personas -->
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-6">
         <!-- Provider stats -->
-        <div class="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <div class="rounded-lg border border-border bg-card p-5">
           <h2 class="text-base font-semibold text-foreground mb-4">Provider Stats</h2>
           <template x-if="data.provider_stats.length === 0">
             <p class="text-sm text-muted-foreground py-4">No provider data in this period.</p>
           </template>
           <div class="overflow-x-auto" x-show="data.provider_stats.length > 0" x-cloak>
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
               <thead>
                 <tr class="border-b border-border">
                   <th class="pb-2 text-left font-medium text-muted-foreground">Provider</th>
@@ -245,7 +245,7 @@
         </div>
 
         <!-- Top personas -->
-        <div class="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <div class="rounded-lg border border-border bg-card p-5">
           <h2 class="text-base font-semibold text-foreground mb-4">Top Personas</h2>
           <template x-if="data.usage_by_persona.length === 0">
             <p class="text-sm text-muted-foreground py-4">No persona data in this period.</p>
@@ -268,10 +268,10 @@
       </div>
 
       <!-- Row 5: Top templates -->
-      <div class="rounded-lg border border-border bg-card p-5 shadow-sm mb-6" x-show="data.top_templates.length > 0" x-cloak>
+      <div class="rounded-lg border border-border bg-card p-5 mb-6" x-show="data.top_templates.length > 0" x-cloak>
         <h2 class="text-base font-semibold text-foreground mb-4">Top Prompt Templates</h2>
         <div class="overflow-x-auto">
-          <table class="w-full text-sm">
+          <table class="dense-table w-full text-sm">
             <thead>
               <tr class="border-b border-border">
                 <th class="pb-2 text-left font-medium text-muted-foreground">#</th>
