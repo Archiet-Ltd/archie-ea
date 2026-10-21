@@ -36,11 +36,11 @@
             <p class="mt-1 text-sm text-muted-foreground" id="model-description">Loading model...</p>
         </div>
         <div class="flex flex-wrap items-center gap-2 shrink-0">
-            <button type="button" id="btn-export-xml" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-10 px-4 py-2 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90" aria-label="Export model as XML">
+            <button type="button" id="btn-export-xml" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" aria-label="Export model as XML">
                 <i data-lucide="download" class="h-4 w-4 mr-2" aria-hidden="true"></i>
                 Export XML
             </button>
-            <button type="button" id="btn-open-composer" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-10 px-4 py-2 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-secondary text-secondary-foreground hover:bg-secondary/80" aria-label="Back to Architecture Assistant">
+            <button type="button" id="btn-open-composer" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" aria-label="Back to Architecture Assistant">
                 <i data-lucide="edit" class="h-4 w-4 mr-2" aria-hidden="true"></i>
                 Back to Assistant
             </button>
@@ -59,7 +59,7 @@
     <div class="bg-card border border-border rounded-lg p-4 mb-6">
         <h2 class="text-lg font-semibold mb-3">ArchiMate 3.2 Layers</h2>
         <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <button type="button" class="layer-nav-btn active px-3 py-2 rounded-md text-sm font-medium bg-primary/10 text-primary border border-primary/20" data-layer="business" aria-label="Filter Business Layer elements">
+            <button type="button" class="layer-nav-btn active px-3 py-2 rounded-md text-sm font-medium bg-primary/10 text-info-emphasis border border-primary/20" data-layer="business" aria-label="Filter Business Layer elements">
                 Business Layer
             </button>
             <button type="button" class="layer-nav-btn px-3 py-2 rounded-md text-sm font-medium bg-muted text-foreground border border-border" data-layer="application" aria-label="Filter Application Layer elements">
@@ -127,7 +127,7 @@
     <!-- Element Detail Modal -->
     <div id="element-modal" class="modal-root fixed inset-0 bg-black/50 overflow-y-auto z-50 hidden">
         <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-card rounded-lg shadow-xl max-w-md w-full">
+            <div class="bg-card rounded-lg max-w-md w-full">
                 <div class="p-6">
                     <div class="flex justify-between items-start mb-4">
                         <h3 class="text-lg font-semibold" id="modal-element-name">Element Name</h3>

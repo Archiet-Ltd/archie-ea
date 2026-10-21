@@ -24,6 +24,7 @@ from .decorators import (
     permission_required,
     require_auth,
     require_feature,
+    require_permission,
     require_roles,
     requires_permission,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "permission_required",
     "require_auth",
     "require_feature",
+    "require_permission",
     "require_roles",
     "audit_log",
 ]

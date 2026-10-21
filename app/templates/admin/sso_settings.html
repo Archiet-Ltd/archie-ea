@@ -33,7 +33,7 @@
         <div class="lg:col-span-1 space-y-6">
 
             <!-- Add Mapping Card -->
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Add Mapping</h3>
                 </div>
@@ -92,7 +92,7 @@
             </div>
 
             <!-- Sync All Users Card -->
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Sync Roles</h3>
                 </div>
@@ -114,7 +114,7 @@
             </div>
 
             <!-- Info Card -->
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Role Priority</h3>
                 </div>
@@ -126,7 +126,7 @@
                             Platform Admin
                         </li>
                         <li class="flex items-center gap-2 text-sm">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">2</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">2</span>
                             Enterprise Architect
                         </li>
                         <li class="flex items-center gap-2 text-sm">
@@ -148,7 +148,7 @@
 
         <!-- Right column: current mappings table -->
         <div class="lg:col-span-2">
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b flex items-center justify-between">
                     <div>
                         <h3 class="text-lg font-semibold">Current Mappings</h3>
@@ -163,7 +163,7 @@
 
                 {% if mappings %}
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
+                    <table class="dense-table w-full text-sm">
                         <thead>
                             <tr class="border-b bg-muted/40">
                                 <th class="text-left px-4 py-3 font-medium text-muted-foreground">IdP Group Name</th>
@@ -204,7 +204,7 @@
                                             <input type="hidden" name="action" value="toggle"/>
                                             <input type="hidden" name="mapping_id" value="{{ mapping.id }}"/>
                                             <button type="submit"
-                                                    class="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+                                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                                     aria-label="{{ 'Disable' if mapping.is_active else 'Enable' }} mapping for {{ mapping.sso_group_name }}">
                                                 {% if mapping.is_active %}
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>

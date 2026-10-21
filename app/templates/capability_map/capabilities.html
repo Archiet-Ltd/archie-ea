@@ -15,7 +15,7 @@
         {{ page_header(title='Business Capabilities', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Business Capabilities'}], description='Capability taxonomy and hierarchy') }}
         {% if can_edit %}
         <button type="button" data-action="openCapCreate"
-            class="inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 shrink-0"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center shrink-0"
             aria-label="New Capability">
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> New Capability
         </button>
@@ -48,7 +48,7 @@
         {# None means never assessed — render an em dash, not a fabricated score. #}
         {% set current_mat = cap.current_maturity_level|int if cap.current_maturity_level else none %}
         {% set mat_pct = ((current_mat / 5) * 100)|int if current_mat else 0 %}
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-5 hover:bg-muted/30 cap-card"
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-5 hover:bg-muted/30 cap-card"
              data-level="{{ cap.level|default(1) }}"
              data-cap-id="{{ cap.id }}"
              data-cap-name="{{ cap.name|e }}"
@@ -64,7 +64,7 @@
             <div class="flex justify-between items-start mb-2">
                 <h3 class="font-medium text-foreground leading-snug">{{ cap.name }}</h3>
                 <div class="flex items-center gap-1 shrink-0 ml-2">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">L{{ cap.level|default(1) }}</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">L{{ cap.level|default(1) }}</span>
                     {% if can_edit %}
                     <button type="button" data-action="openCapEdit"
                         class="p-1 rounded hover:bg-muted text-muted-foreground" aria-label="Edit {{ cap.name|e }}">
@@ -113,7 +113,7 @@
             </div>
         </div>
         {% else %}
-        <div data-slot="card" class="col-span-full rounded-xl border bg-card shadow-sm p-10 text-center text-muted-foreground">
+        <div data-slot="card" class="col-span-full rounded-lg border border-border bg-card p-10 text-center text-muted-foreground">
             No capabilities yet.{% if can_edit %} Click <b>New Capability</b> to add one.{% endif %}
         </div>
         {% endfor %}

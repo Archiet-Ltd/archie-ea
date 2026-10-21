@@ -141,7 +141,7 @@
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="impact-scenario-comparison-title"
-                class="relative w-full max-w-6xl bg-background rounded-lg shadow-xl max-h-[90vh] overflow-y-auto"
+                class="relative w-full max-w-6xl bg-background rounded-lg max-h-[90vh] overflow-y-auto"
             >
                 <!-- Header -->
                 <div class="sticky top-0 z-10 bg-background flex items-center justify-between px-6 py-4 border-b border-border">
@@ -210,7 +210,7 @@
                     <!-- Comparison Table -->
                     <div x-show="selectedScenarios.length > 0" x-cloak class="border rounded-lg overflow-hidden">
                         <div class="overflow-x-auto">
-                            <table class="w-full">
+                            <table class="dense-table w-full">
                                 <thead class="bg-muted">
                                     <tr>
                                         <th class="px-4 py-3 text-left text-sm font-semibold text-foreground/80 w-48">Metric</th>
@@ -238,7 +238,7 @@
                                         <td class="px-4 py-3 text-sm font-medium text-foreground">Change Type</td>
                                         <template x-for="scenarioId in selectedScenarios" :key="'type-' + scenarioId">
                                             <td class="px-4 py-3 text-sm">
-                                                <span class="px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium" x-text="getScenario(scenarioId)?.change_type"></span>
+                                                <span class="px-2 py-1 bg-primary/10 text-info-emphasis rounded text-xs font-medium" x-text="getScenario(scenarioId)?.change_type"></span>
                                             </td>
                                         </template>
                                     </tr>
@@ -317,7 +317,7 @@
                     <button type="button"
                         @click="exportToCSV()"
                         :disabled="selectedScenarios.length === 0"
-                        class="inline-flex items-center gap-2 px-4 py-2 bg-background border border-border text-foreground/80 font-medium rounded-lg hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                      aria-label="Export">
                         <i data-lucide="download" class="h-4 w-4"></i>
                         Export to CSV

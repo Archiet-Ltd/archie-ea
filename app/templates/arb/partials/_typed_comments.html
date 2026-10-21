@@ -55,7 +55,7 @@
         <div>
             <label for="arb-comment-type" class="mb-1.5 block text-sm font-medium text-foreground">Comment type</label>
             <select id="arb-comment-type" name="comment_type"
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:w-64">
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:w-64">
                 {% for ct in _comment_types %}
                 <option value="{{ ct }}">{{ ct | replace('_', ' ') | capitalize }}</option>
                 {% endfor %}
@@ -67,11 +67,11 @@
             </label>
             <textarea id="arb-comment-content" name="content" rows="3" required maxlength="4000"
                       placeholder="Add your comment…"
-                      class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                      class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
         </div>
         <div class="flex justify-end">
             <button type="submit"
-                    class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Add comment
             </button>
         </div>

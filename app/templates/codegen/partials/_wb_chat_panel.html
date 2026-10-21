@@ -138,7 +138,7 @@
         x-model="input"
         @keydown.enter.prevent="if (!$event.shiftKey) send()"
         @keydown.shift.enter.prevent="input += '\n'"
-        class="flex-1 resize-none rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-secondary)] text-[var(--color-text)] text-xs px-2.5 py-2 focus:outline-none focus:border-[var(--color-primary)] min-h-[60px] max-h-[160px]"
+        class="flex-1 resize-none rounded-md border border-[var(--color-border)] bg-[var(--color-surface-secondary)] text-[var(--color-text)] text-xs px-2.5 py-2 focus:outline-none focus:border-[var(--color-primary)] min-h-[60px] max-h-[160px]"
         placeholder="Ask about this code or request a change... (Enter to send, Shift+Enter for newline)"
         :disabled="isStreaming"
         x-ref="input"

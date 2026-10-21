@@ -355,6 +355,18 @@ else:
         superseded_at = db.Column(db.DateTime, nullable=True)
         last_confirmed = db.Column(db.DateTime, nullable=True)
 
+        # Provenance origin: where this element came from.
+        # source_kind: 'manual', 'import', 'connector', 'derived'
+        # source_ref: import batch id, connector run id, or user id as text
+        # source_label: file name, connector name, or person's display name
+        # source_recorded_at: when the origin was recorded
+        # Nullable so every existing row stays valid; existing rows read as
+        # 'manual' with created_by_id when columns are null (no backfill).
+        source_kind = db.Column(db.String(20), nullable=True)
+        source_ref = db.Column(db.Text, nullable=True)
+        source_label = db.Column(db.Text, nullable=True)
+        source_recorded_at = db.Column(db.DateTime, nullable=True)
+
         # Relationship tracking
         parent_id = db.Column(db.Integer, db.ForeignKey("archimate_elements.id"), nullable=True)
 
@@ -570,6 +582,20 @@ else:
         # so every pre-existing relationship still renders instead of being
         # dropped for lacking a value reconcile-schema cannot backfill.
         sequence_order = db.Column(db.Integer, nullable=True)
+
+        # Provenance origin: where this relationship came from.
+        # source_kind: 'manual', 'import', 'connector', 'derived'
+        # source_ref: import batch id, connector run id, or user id as text
+        # source_label: file name, connector name, or person's display name
+        # source_recorded_at: when the origin was recorded
+        # Nullable so every existing row stays valid; existing rows read as
+        # 'manual' with created_by_id when columns are null (no backfill).
+        source_kind = db.Column(db.String(20), nullable=True)
+        source_ref = db.Column(db.Text, nullable=True)
+        source_label = db.Column(db.Text, nullable=True)
+        source_recorded_at = db.Column(db.DateTime, nullable=True)
+        # Properties read from the exchange file for this relationship.
+        custom_properties = db.Column(db.JSON, nullable=True)
 
         architecture = db.relationship("ArchitectureModel", backref="archimate_relationships")
         source = db.relationship(

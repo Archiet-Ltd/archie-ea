@@ -15,7 +15,7 @@
     <div>
         <label for="cap-select" class="block text-sm font-medium mb-1.5">Capability <span class="text-destructive-emphasis">*</span></label>
         <select id="cap-select" name="capability_id" required
-                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <option value="">Select a capability...</option>
             {% for opt in capability_form_config.capability_options %}
             <option value="{{ opt.id }}"{% if opt.disabled %} disabled{% endif %}>{{ opt.label }}</option>
@@ -26,7 +26,7 @@
     <div>
         <label for="cap-support" class="block text-sm font-medium mb-1.5">Support Level</label>
         <select id="cap-support" name="support_level"
-                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <option value="">Select...</option>
             {% for val, label in capability_form_config.support_levels %}
             <option value="{{ val }}">{{ label }}</option>
@@ -38,12 +38,12 @@
         <div>
             <label for="cap-coverage" class="block text-sm font-medium mb-1.5">Coverage %</label>
             <input type="number" id="cap-coverage" name="coverage_percentage" min="0" max="100" placeholder="0-100"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
         </div>
         <div>
             <label for="cap-maturity" class="block text-sm font-medium mb-1.5">Maturity Level</label>
             <select id="cap-maturity" name="maturity_level"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 <option value="">Select...</option>
                 {% for val, label in capability_form_config.maturity_levels %}
                 <option value="{{ val }}">{{ label }}</option>
@@ -61,7 +61,7 @@
     <div>
         <label for="cap-notes" class="block text-sm font-medium mb-1.5">Notes</label>
         <textarea id="cap-notes" name="notes" rows="2" placeholder="Optional notes about this mapping..."
-                  class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                  class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
     </div>
 </div>
 {% endcall %}

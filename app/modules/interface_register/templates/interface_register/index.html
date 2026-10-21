@@ -22,7 +22,7 @@
           <p class="text-xs text-muted-foreground">{{ init.fiscal_year_start }}–{{ init.fiscal_year_end }}</p>
         </div>
         <a href="{{ url_for('interface_register.index', initiative_id=init.id) }}"
-           class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-transparent hover:bg-accent hover:text-accent-foreground h-9 px-3 shrink-0">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center shrink-0">
           View register
         </a>
       </li>
@@ -42,13 +42,13 @@
   <div class="mb-4 flex justify-end gap-2">
     <a href="{{ url_for('interface_register.comparison', initiative_id=initiative.id) }}"
        data-testid="interface-comparison-link"
-       class="inline-flex items-center gap-2 rounded-md text-sm font-medium border border-input bg-transparent hover:bg-accent hover:text-accent-foreground h-9 px-4">
+       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
       <i data-lucide="git-compare" class="h-4 w-4" aria-hidden="true"></i>
       As-is / To-be comparison
     </a>
     <a href="{{ url_for('interface_register.new', initiative_id=initiative.id) }}"
        data-testid="interface-register-new"
-       class="inline-flex items-center gap-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4">
+       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
       <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
       New interface
     </a>
@@ -57,7 +57,7 @@
   {% if rows %}
   <div class="rounded-lg border border-border bg-card overflow-hidden">
     <div class="hidden md:block overflow-x-auto">
-      <table class="w-full text-sm" data-testid="interface-register-table">
+      <table class="dense-table w-full text-sm" data-testid="interface-register-table">
         <thead class="bg-muted/50 text-xs text-muted-foreground uppercase tracking-wide">
           <tr>
             <th class="text-left px-4 py-2.5">Name</th>
@@ -93,7 +93,7 @@
             <td class="px-4 py-2.5 text-right">
               <a href="{{ url_for('interface_register.edit', element_id=element.id) }}"
                  data-testid="interface-edit-{{ element.id }}"
-                 class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3">
+                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Edit
               </a>
             </td>
@@ -116,7 +116,7 @@
             <p class="text-xs text-muted-foreground mt-0.5">{{ meta.business_criticality | dash if meta else '—' }}</p>
           </div>
           <a href="{{ url_for('interface_register.edit', element_id=element.id) }}"
-             class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-transparent hover:bg-accent h-8 px-3 shrink-0">
+             class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center shrink-0">
             Edit
           </a>
         </div>

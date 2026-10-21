@@ -18,7 +18,7 @@
     {# Header #}
     {% macro _ps_actions() %}
 <a href="{{ url_for('data_architecture.create_data_entity') }}"
-           class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="plus" class="w-4 h-4" aria-hidden="true"></i>
             Create Entity
         </a>
@@ -27,26 +27,26 @@
 
     {# Summary Cards #}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="rounded-lg border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Entities</div>
             <div class="text-2xl font-bold text-foreground mt-1">{{ total_count }}</div>
         </div>
-        <div class="rounded-lg border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Domains</div>
             <div class="text-2xl font-bold text-foreground mt-1">{{ domains|length }}</div>
         </div>
-        <div class="rounded-lg border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">PII Entities</div>
             <div class="text-2xl font-bold text-foreground mt-1">{{ entities|selectattr('contains_pii')|list|length }}</div>
         </div>
-        <div class="rounded-lg border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Classifications</div>
             <div class="text-2xl font-bold text-foreground mt-1">{{ classification_dist|length }}</div>
         </div>
     </div>
 
     {# Filters #}
-    <div class="rounded-lg border bg-card p-4">
+    <div class="rounded-lg border border-border bg-card p-4">
         <form method="get" action="{{ url_for('data_architecture.data_entity_catalog') }}" class="flex flex-wrap gap-3 items-end">
             <div class="flex-1 min-w-[200px]">
                 <label class="text-xs font-medium text-muted-foreground mb-1 block">Search</label>
@@ -87,7 +87,7 @@
                 Filter
             </button>
             {% if search or classification or entity_type or domain_id %}
-            <a href="{{ url_for('data_architecture.data_entity_catalog') }}" class="h-9 px-3 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent transition-colors inline-flex items-center">
+            <a href="{{ url_for('data_architecture.data_entity_catalog') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Clear
             </a>
             {% endif %}
@@ -96,8 +96,8 @@
 
     {# Entity Table #}
     {% if entities %}
-    <div class="rounded-lg border bg-card overflow-hidden">
-        <table class="w-full">
+    <div class="rounded-lg border border-border bg-card overflow-hidden">
+        <table class="dense-table w-full">
             <thead>
                 <tr class="border-b bg-muted/50">
                     <th class="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide px-4 py-3">#</th>
@@ -187,7 +187,7 @@
                     </td>
                     <td class="px-4 py-3 text-right">
                         <a href="{{ url_for('data_architecture.edit_data_entity', entity_id=entity.id) }}"
-                           class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             Edit
                         </a>
                     </td>
@@ -197,7 +197,7 @@
         </table>
     </div>
     {% else %}
-    <div class="rounded-lg border bg-card p-12 text-center">
+    <div class="rounded-lg border border-border bg-card p-12 text-center">
         <div class="mx-auto w-12 h-12 rounded-lg bg-muted flex items-center justify-center mb-4">
             <i data-lucide="database" class="w-6 h-6 text-muted-foreground" aria-hidden="true"></i>
         </div>

@@ -16,7 +16,7 @@
     <div class="flex items-center gap-3 flex-wrap">
         <label for="solution-filter" class="text-sm font-medium text-muted-foreground">Filter by Solution:</label>
         <select id="solution-filter"
-                class="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                class="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 @change="if($event.target.value){location.href='?solution_id='+$event.target.value}else{location.href=location.pathname}">
             <option value="">All Solutions</option>
             {% for sol in solutions_list %}
@@ -50,7 +50,7 @@
 
     {% if chain.requirements | length == 0 %}
     <!-- TRC-025: Amber banner when motivation layer is disconnected from architecture -->
-    <div class="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 flex items-start gap-3 text-sm text-warning-emphasis">
+    <div class="rounded-md border border-warning/40 bg-warning/10 px-4 py-2 flex items-start gap-3 text-sm text-warning-emphasis">
         <i data-lucide="alert-triangle" class="h-4 w-4 mt-0.5 shrink-0 text-warning"></i>
         <span>
             <strong>Motivation layer not connected to architecture.</strong>
@@ -63,7 +63,7 @@
     <!-- TRC-002: Clear selection button -->
     <div x-show="selected.layer" x-cloak class="flex justify-end">
         <button @click="clearSelection()" type="button"
-            class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium border border-input bg-background hover:bg-accent">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="x" class="h-3.5 w-3.5"></i> Clear selection
         </button>
     </div>
@@ -78,7 +78,7 @@
             <section
                 data-layer="stakeholders"
                 aria-label="Stakeholder layer"
-                class="w-56 lg:w-auto flex-shrink-0 rounded-lg border border-border bg-card shadow-sm"
+                class="w-56 lg:w-auto flex-shrink-0 rounded-lg border border-border bg-card"
             >
                 <div class="flex items-center gap-2 border-b border-border px-4 py-3 bg-violet-50">  {# design-tokens-ok #}
                     <span class="h-3 w-3 rounded-full bg-violet-500" aria-hidden="true"></span>  {# design-tokens-ok #}
@@ -110,7 +110,7 @@
             <section
                 data-layer="drivers"
                 aria-label="Driver layer"
-                class="w-56 lg:w-auto flex-shrink-0 rounded-lg border border-border bg-card shadow-sm"
+                class="w-56 lg:w-auto flex-shrink-0 rounded-lg border border-border bg-card"
             >
                 <div class="flex items-center gap-2 border-b border-border px-4 py-3 bg-amber-50">  {# design-tokens-ok #}
                     <span class="h-3 w-3 rounded-full bg-amber-500" aria-hidden="true"></span>  {# design-tokens-ok #}
@@ -141,7 +141,7 @@
             <section
                 data-layer="goals"
                 aria-label="Goal layer"
-                class="w-56 lg:w-auto flex-shrink-0 rounded-lg border border-border bg-card shadow-sm"
+                class="w-56 lg:w-auto flex-shrink-0 rounded-lg border border-border bg-card"
             >
                 <div class="flex items-center gap-2 border-b border-border px-4 py-3 bg-emerald-50">  {# design-tokens-ok #}
                     <span class="h-3 w-3 rounded-full bg-emerald-500" aria-hidden="true"></span>  {# design-tokens-ok #}
@@ -172,9 +172,9 @@
             <section
                 data-layer="requirements"
                 aria-label="Requirement layer"
-                class="w-56 lg:w-auto flex-shrink-0 rounded-lg border border-border bg-card shadow-sm"
+                class="w-56 lg:w-auto flex-shrink-0 rounded-lg border border-border bg-card"
             >
-                <div class="flex items-center gap-2 border-b border-border px-4 py-3 bg-primary/5">
+                <div class="border flex items-center gap-2 border-b border-border px-4 py-2 bg-primary/10">
                     <span class="h-3 w-3 rounded-full bg-primary" aria-hidden="true"></span>
                     <h2 class="text-sm font-semibold text-primary">Requirement</h2>
                     <span class="text-xs text-muted-foreground">{{ chain.requirements | length }}</span>
@@ -206,7 +206,7 @@
             <section
                 data-layer="capabilities"
                 aria-label="Capability layer"
-                class="w-56 lg:w-auto flex-shrink-0 rounded-lg border border-border bg-card shadow-sm"
+                class="w-56 lg:w-auto flex-shrink-0 rounded-lg border border-border bg-card"
             >
                 <div class="flex items-center gap-2 border-b border-border px-4 py-3 bg-indigo-50">  {# design-tokens-ok #}
                     <span class="h-3 w-3 rounded-full bg-primary" aria-hidden="true"></span>
@@ -237,7 +237,7 @@
             <section
                 data-layer="processes"
                 aria-label="Process layer"
-                class="w-56 lg:w-auto flex-shrink-0 rounded-lg border border-border bg-card shadow-sm"
+                class="w-56 lg:w-auto flex-shrink-0 rounded-lg border border-border bg-card"
             >
                 <div class="flex items-center gap-2 border-b border-border px-4 py-3 bg-teal-50">  {# design-tokens-ok #}
                     <span class="h-3 w-3 rounded-full bg-teal-500" aria-hidden="true"></span>  {# design-tokens-ok #}
@@ -268,7 +268,7 @@
             <section
                 data-layer="applications"
                 aria-label="Application layer"
-                class="w-56 lg:w-auto flex-shrink-0 rounded-lg border border-border bg-card shadow-sm"
+                class="w-56 lg:w-auto flex-shrink-0 rounded-lg border border-border bg-card"
             >
                 <div class="flex items-center gap-2 border-b border-border px-4 py-3 bg-orange-50">  {# design-tokens-ok #}
                     <span class="h-3 w-3 rounded-full bg-orange-500" aria-hidden="true"></span>  {# design-tokens-ok #}
@@ -299,7 +299,7 @@
             <section
                 data-layer="technology"
                 aria-label="Technology layer"
-                class="w-56 lg:w-auto flex-shrink-0 rounded-lg border border-border bg-card shadow-sm"
+                class="w-56 lg:w-auto flex-shrink-0 rounded-lg border border-border bg-card"
             >
                 <div class="flex items-center gap-2 border-b border-border px-4 py-3 bg-muted">
                     <span class="h-3 w-3 rounded-full bg-muted-foreground" aria-hidden="true"></span>
@@ -360,7 +360,7 @@
         </h3>
         <div class="flex flex-wrap gap-2" id="linked-solutions-container">
             <template x-for="sol in linkedSolutions" :key="sol.id">
-                <a :href="'/solutions/' + sol.id" class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors">
+                <a :href="'/solutions/' + sol.id" class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30 hover:bg-primary/20 transition-colors">
                     <span x-text="sol.name"></span>
                     <span class="ml-1 opacity-60" x-text="'(' + sol.element_role + ')'"></span>
                 </a>
@@ -373,7 +373,7 @@
     <!-- GLB-059 / TRC-027: Edit modal. Option B: in-place PATCH only for Technology layer; others show redirect. -->
     <div x-show="editModalOpen" x-cloak class="fixed inset-0 z-50 flex items-start justify-center pt-20" @keydown.escape.window="editModalOpen = false" role="dialog" aria-modal="true" aria-labelledby="edit-element-title"><!-- modal-a11y-ok -->
         <div class="fixed inset-0 bg-black/50" @click="editModalOpen = false"></div>
-        <div class="relative z-10 w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg">
+        <div class="relative z-10 w-full max-w-md rounded-lg border border-border bg-card p-6">
             <h2 id="edit-element-title" class="text-lg font-semibold mb-4">Edit Element</h2>
             <div class="flex gap-2 mb-4">
                 <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground" x-text="editElement.layer"></span>
@@ -385,7 +385,7 @@
                         <label for="edit-name" class="block text-sm font-medium mb-1">Name</label>
                         <input id="edit-name" type="text" x-model="editElement.name" maxlength="100"
                                placeholder="Element name"
-                               class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring">
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring">
                     </div>
                     <div class="mb-4">
                         <label for="edit-desc" class="block text-sm font-medium mb-1">Description</label>
@@ -402,9 +402,9 @@
                            class="text-xs text-muted-foreground hover:text-foreground underline">Edit in Composer</a>
                         <div class="flex gap-2">
                             <button type="button" @click="editModalOpen = false"
-                                    class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground">Cancel</button>
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
                             <button type="button" @click="saveEdit()" :disabled="editSaving"
-                                    class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                                 <span x-show="!editSaving" x-cloak>Save</span>
                                 <span x-show="editSaving" x-cloak>Saving...</span>
                             </button>
@@ -420,7 +420,7 @@
                         <a href="/archimate/composer"
                            class="text-sm font-medium text-primary hover:underline">Edit in Composer</a>
                         <button type="button" @click="editModalOpen = false"
-                                class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground">Close</button>
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Close</button>
                     </div>
                 </div>
             </template>
@@ -430,12 +430,12 @@
     <!-- TRC-028: Gap link modal (picker for linking orphan to goal/application) -->
     <div x-show="linkModalOpen" x-cloak class="fixed inset-0 z-50 flex items-start justify-center pt-20" @keydown.escape.window="closeLinkModal()" role="dialog" aria-modal="true" aria-labelledby="link-modal-title"><!-- modal-a11y-ok -->
         <div class="fixed inset-0 bg-black/50" @click="closeLinkModal()"></div>
-        <div class="relative z-10 w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg">
+        <div class="relative z-10 w-full max-w-md rounded-lg border border-border bg-card p-6">
             <h2 id="link-modal-title" class="text-lg font-semibold mb-2" x-text="linkType === 'driver-goal' ? 'Link Driver to Goal' : 'Link Capability to Application'"></h2>
             <p class="text-sm text-muted-foreground mb-3" x-show="linkSource" x-cloak><span x-text="'Linking: ' + (linkSource && linkSource.name)"></span></p>
             <div class="mb-4">
                 <label class="block text-sm font-medium mb-1" x-text="linkType === 'driver-goal' ? 'Select Goal' : 'Select Application'"></label>
-                <select x-model="linkTargetId" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Select">
+                <select x-model="linkTargetId" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Select">
                     <option value="">— Select —</option>
                     <template x-for="t in linkTargets" :key="t.id">
                         <option :value="t.id" x-text="t.name"></option>
@@ -444,8 +444,8 @@
             </div>
             <div x-show="linkError" x-cloak class="text-destructive-emphasis text-xs mb-3" x-text="linkError"></div>
             <div class="flex justify-end gap-2">
-                <button type="button" @click="closeLinkModal()" class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium border border-input bg-background hover:bg-accent">Cancel</button>
-                <button type="button" @click="submitLink()" :disabled="!linkTargetId || linkSaving" class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                <button type="button" @click="closeLinkModal()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
+                <button type="button" @click="submitLink()" :disabled="!linkTargetId || linkSaving" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <span x-show="!linkSaving" x-cloak>Link</span>
                     <span x-show="linkSaving" x-cloak>Saving...</span>
                 </button>

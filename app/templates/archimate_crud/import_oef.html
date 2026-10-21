@@ -17,11 +17,11 @@
     <!-- Header -->
     {% macro _ps_actions() %}
 <a href="{{ url_for('archimate_crud.dashboard') }}"
-           class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-md hover:bg-accent">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
             <i data-lucide="arrow-left" class="h-4 w-4" aria-hidden="true"></i> Back to Dashboard
         </a>
 <a href="{{ url_for('architect_ui.import_restore_points') }}" data-testid="link-restore-points"
-           class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-md hover:bg-accent">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
             <i data-lucide="history" class="h-4 w-4" aria-hidden="true"></i> Restore before an import
         </a>
     {% endmacro %}
@@ -38,7 +38,7 @@
 
     {% if result %}
     <!-- Import Result -->
-    <div class="rounded-lg border bg-card p-6 space-y-4" data-testid="import-result">
+    <div class="rounded-lg border border-border bg-card p-6 space-y-4" data-testid="import-result">
         <h2 class="text-lg font-semibold">Import Result</h2>
         <p class="text-sm text-muted-foreground">
             {% if result.model_name %}Model <span class="font-medium text-foreground">{{ result.model_name }}</span>,
@@ -82,7 +82,7 @@
                 </div>
             </div>
             {% if result.relationships_failed %}
-            <div class="rounded-md border border-destructive bg-destructive/5 p-4 space-y-1">
+            <div class="rounded-md border border-destructive bg-destructive/10 px-3 py-2 space-y-1">
                 <p class="text-sm font-medium text-destructive-emphasis">Relationships not imported:</p>
                 <ul class="list-disc list-inside text-sm text-destructive-emphasis/80 space-y-0.5">
                     {% for failure in result.relationships_failed %}
@@ -93,8 +93,19 @@
             {% endif %}
         </div>
 
+        {% if result.relationship_notices %}
+        <div class="rounded-md border border-border bg-muted p-4 space-y-1" data-testid="result-relationship-notices">
+            <p class="text-sm font-medium">Stored as Association, with the modelled type kept in the documentation:</p>
+            <ul class="list-disc list-inside text-sm text-muted-foreground space-y-0.5">
+                {% for note in result.relationship_notices %}
+                <li>{{ note }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
         {% if result.errors %}
-        <div class="rounded-md border border-warning bg-warning/5 p-4 space-y-1">
+        <div class="rounded-md border border-warning bg-warning/10 px-3 py-2 space-y-1">
             <p class="text-sm font-medium text-warning-emphasis">Messages from the import:</p>
             <ul class="list-disc list-inside text-sm text-warning-emphasis/80 space-y-0.5">
                 {% for err in result.errors %}
@@ -105,7 +116,7 @@
         {% endif %}
 
         <a href="/architecture/elements"
-           class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="layout-grid" class="h-4 w-4" aria-hidden="true"></i>
             Open the element catalog
         </a>
@@ -113,7 +124,7 @@
     {% endif %}
 
     <!-- Upload Form -->
-    <div class="rounded-lg border bg-card p-6 space-y-4" x-data="oefImport()">
+    <div class="rounded-lg border border-border bg-card p-6 space-y-4" x-data="oefImport()">
         <h2 class="text-lg font-semibold">Upload OEF XML File</h2>
         <form method="POST" action="{{ url_for('architect_ui.import_oef') }}" enctype="multipart/form-data" class="space-y-4"
               x-ref="importForm" @change="syncStrategy($event)">
@@ -142,13 +153,13 @@
             <div class="flex flex-col gap-2 sm:flex-row">
                 <button type="button" data-testid="btn-preview-import"
                     @click="runPreview()" :disabled="!fileName || previewing"
-                    class="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 sm:flex-1 disabled:opacity-50 disabled:pointer-events-none">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center sm:flex-1">
                     <span x-show="previewing" x-cloak class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block"></span>
                     <i x-show="!previewing" x-cloak data-lucide="eye" class="h-4 w-4" aria-hidden="true"></i>
                     Preview import
                 </button>
                 <button type="submit" data-testid="btn-import-model"
-                    class="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 sm:flex-1 disabled:opacity-50 disabled:pointer-events-none">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center sm:flex-1">
                     <i data-lucide="upload" class="h-4 w-4" aria-hidden="true"></i>
                     Import Model
                 </button>
@@ -156,7 +167,7 @@
         </form>
 
         <div x-show="previewError" x-cloak role="alert"
-             class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive-emphasis"
+             class="rounded-md border border-destructive bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis"
              x-text="previewError"></div>
 
         <!-- Preview: what Import Model will do with this file, nothing written yet -->
@@ -199,7 +210,7 @@
                 </div>
             </div>
 
-            <div x-show="invalidRelationships().length" x-cloak class="rounded-md border border-destructive bg-destructive/5 p-4 space-y-1">
+            <div x-show="invalidRelationships().length" x-cloak class="rounded-md border border-destructive bg-destructive/10 px-3 py-2 space-y-1">
                 <p class="text-sm font-medium text-destructive-emphasis">Relationships that will not be imported:</p>
                 <ul class="list-disc list-inside text-sm text-destructive-emphasis/80 space-y-0.5">
                     <template x-for="rel in invalidRelationships()" :key="rel.identifier">
@@ -209,7 +220,7 @@
             </div>
 
             <div class="overflow-x-auto rounded-md border border-border">
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <thead class="bg-muted/50">
                         <tr>
                             <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Name</th>

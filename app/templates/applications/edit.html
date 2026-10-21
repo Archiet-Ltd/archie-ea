@@ -23,7 +23,7 @@
     <input type="hidden" name="updated_at" value="{{ application.updated_at.isoformat() if application.updated_at else '' }}">
 
     {# ── Identity ── #}
-    <section class="rounded-xl border border-border bg-card p-6 space-y-4">
+    <section class="rounded-lg border border-border bg-card p-6 space-y-4">
       <h2 class="text-lg font-semibold">Identity</h2>
 
       <div>
@@ -56,7 +56,7 @@
     </section>
 
     {# ── Ownership ── #}
-    <section class="rounded-xl border border-border bg-card p-6 space-y-4">
+    <section class="rounded-lg border border-border bg-card p-6 space-y-4">
       <h2 class="text-lg font-semibold">Ownership</h2>
       <p class="text-sm text-muted-foreground">Assign owner records below. Legacy text fields are read-only.</p>
 
@@ -102,7 +102,7 @@
                  placeholder="Type at least 2 characters…"
                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                  data-app-id="{{ application.id }}">
-          <div id="owner_picker_results" class="hidden absolute z-10 mt-1 w-full rounded-md border border-border bg-card shadow-lg max-h-48 overflow-y-auto"></div>
+          <div id="owner_picker_results" class="hidden absolute z-10 mt-1 w-full rounded-md border border-border bg-card max-h-48 overflow-y-auto"></div>
         </div>
         <div>
           <label for="owner_type_select" class="block text-sm font-medium mb-1">Role</label>
@@ -116,7 +116,7 @@
         </div>
         <div>
           <button type="button" id="add-owner-btn" disabled
-                  class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6 text-sm font-medium transition-colors disabled:opacity-50">
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Add owner
           </button>
         </div>
@@ -124,7 +124,7 @@
     </section>
 
     {# ── Classification ── #}
-    <section class="rounded-xl border border-border bg-card p-6 space-y-4">
+    <section class="rounded-lg border border-border bg-card p-6 space-y-4">
       <h2 class="text-lg font-semibold">Classification</h2>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -212,7 +212,7 @@
     </section>
 
     {# ── Technical profile ── #}
-    <section class="rounded-xl border border-border bg-card p-6 space-y-4">
+    <section class="rounded-lg border border-border bg-card p-6 space-y-4">
       <h2 class="text-lg font-semibold">Technical profile</h2>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -272,7 +272,7 @@
     </section>
 
     {# ── Compliance and notes ── #}
-    <section class="rounded-xl border border-border bg-card p-6 space-y-4">
+    <section class="rounded-lg border border-border bg-card p-6 space-y-4">
       <h2 class="text-lg font-semibold">Compliance and notes</h2>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -306,7 +306,7 @@
       <a href="{{ url_for('unified_applications.application_detail', id=application.id) }}"
          class="text-sm text-muted-foreground hover:text-foreground">Cancel</a>
       <button type="submit"
-              class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6 text-sm font-medium transition-colors">
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="save" class="h-4 w-4" aria-hidden="true"></i> Save Changes
       </button>
     </div>

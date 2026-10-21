@@ -19,7 +19,7 @@
 <div class="space-y-6">
     {% macro _ps_actions() %}
     <a href="{{ url_for('data_architecture.edit_data_entity', entity_id=entity.id) }}"
-       class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent transition-colors">
+       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="pencil" class="w-4 h-4" aria-hidden="true"></i>
         Edit
     </a>
@@ -27,26 +27,26 @@
     {{ page_shell(title=entity.name, subtitle=entity.description or 'Data entity', actions_caller=_ps_actions) }}
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="rounded-lg border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Type</div>
             <div class="text-sm font-semibold text-foreground mt-1">{{ entity.entity_type or '—' }}</div>
         </div>
-        <div class="rounded-lg border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Classification</div>
             <div class="text-sm font-semibold text-foreground mt-1">{{ entity.data_classification or '—' }}</div>
         </div>
-        <div class="rounded-lg border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">System of record</div>
             <div class="text-sm font-semibold text-foreground mt-1">{{ entity.system_of_record or '—' }}</div>
         </div>
-        <div class="rounded-lg border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Contains PII</div>
             <div class="text-sm font-semibold text-foreground mt-1">{{ 'Yes' if entity.contains_pii else 'No' }}</div>
         </div>
     </div>
 
     {# CRUD matrix: one row per application recorded as accessing this entity. #}
-    <section class="rounded-lg border bg-card" aria-labelledby="crud-matrix-heading" data-crud-matrix>
+    <section class="rounded-lg border border-border bg-card" aria-labelledby="crud-matrix-heading" data-crud-matrix>
         <div class="px-5 py-4 border-b border-border">
             <h2 id="crud-matrix-heading" class="text-lg font-semibold text-foreground">CRUD matrix</h2>
             <p class="text-xs text-muted-foreground mt-0.5">Which applications create, read, update or delete {{ entity.name }}.</p>
@@ -54,7 +54,7 @@
         <div class="p-5">
             {% if access_rows %}
             <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
+                <table class="dense-table min-w-full text-sm">
                     <caption class="sr-only">Applications and the operations they perform on {{ entity.name }}</caption>
                     <thead>
                         <tr class="border-b bg-muted/50">
@@ -77,7 +77,7 @@
                             <td class="text-center px-4 py-3" data-crud-cell="{{ letter }}"
                                 data-crud-value="{{ 'yes' if value is sameas true else ('no' if value is sameas false else 'unspecified') }}">
                                 {% if value is sameas true %}
-                                <span class="inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-md text-xs font-semibold bg-primary/10 text-primary border border-primary/30" title="{{ label }}s">{{ letter }}</span>
+                                <span class="inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded-md text-xs font-semibold bg-primary/10 text-info-emphasis border border-primary/30" title="{{ label }}s">{{ letter }}</span>
                                 <span class="sr-only">{{ label }}s</span>
                                 {% elif value is sameas false %}
                                 <span class="text-muted-foreground" aria-hidden="true">&middot;</span>
@@ -114,10 +114,10 @@
                            x-model="query" @input.debounce.300ms="search()"
                            role="combobox" :aria-expanded="results.length > 0 ? 'true' : 'false'" aria-controls="access-application-results"
                            placeholder="Search applications..."
-                           class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                           class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     <ul id="access-application-results" role="listbox" x-show="results.length > 0" x-cloak
                         @click.outside="results = []"
-                        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-card shadow-lg max-h-64 overflow-y-auto">
+                        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-card max-h-64 overflow-y-auto">
                         <template x-for="app in results" :key="app.id">
                             <li role="option">
                                 <button type="button" @click="choose(app)"
@@ -138,7 +138,7 @@
                     {% endfor %}
                 </fieldset>
                 <button type="submit" :disabled="!selected"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Record access
                 </button>
             </div>

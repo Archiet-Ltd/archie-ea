@@ -17,7 +17,7 @@
   </div>
 
   <!-- Error State -->
-  <div x-show="errorMsg && !loading" x-cloak class="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mb-4">
+  <div x-show="errorMsg && !loading" x-cloak class="bg-destructive/10 border border-destructive/40 rounded-md px-3 py-2 mb-4">
     <p class="text-sm text-destructive-emphasis" x-text="errorMsg"></p>
   </div>
 
@@ -48,7 +48,7 @@
 
     <!-- Modal -->
     <div class="flex min-h-full items-center justify-center p-4">
-      <div class="relative bg-card border border-border rounded-lg shadow-lg max-w-4xl w-full"
+      <div class="relative bg-card border border-border rounded-lg max-w-4xl w-full"
            @click.away="selectedConnector = null">
         <!-- Header -->
         <div class="border-b border-border px-6 py-4 flex items-center justify-between">

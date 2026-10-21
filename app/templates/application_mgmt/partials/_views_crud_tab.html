@@ -13,11 +13,11 @@
 
     {# ── Edit Overview Form ── #}
     {% if edit_mode %}
-    <div class="bg-card rounded-xl border border-border shadow-sm p-6">
+    <div class="bg-card rounded-lg border border-border p-6">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-xl font-bold text-foreground">Edit Application</h2>
             <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}"
-               class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
                 Cancel
             </a>
@@ -115,12 +115,12 @@
 
             <div class="flex gap-3 pt-2">
                 <button type="submit"
-                        class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Submit">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit">
                     <i data-lucide="save" class="h-4 w-4" aria-hidden="true"></i>
                     Save Changes
                 </button>
                 <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}"
-                   class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     Cancel
                 </a>
             </div>
@@ -130,7 +130,7 @@
     {% else %}
 
     {# ── Delete Zone ── #}
-    <div class="bg-card rounded-xl border border-destructive/30 shadow-sm p-6">
+    <div class="bg-card rounded-lg border border-destructive/30 p-6">
         <h2 class="text-xl font-bold text-foreground mb-2">Danger Zone</h2>
         <p class="text-sm text-muted-foreground mb-4">
             Permanently delete this application and all associated data. This action cannot be undone.
@@ -138,7 +138,7 @@
         <div x-data="{ confirmDelete() { Platform.confirm({ title: 'Delete this application?', message: 'This permanently deletes the application and all associated data. This cannot be undone.', confirmText: 'Delete', variant: 'destructive' }).then(function (ok) { if (ok) document.getElementById('delete-app-form').submit(); }); } }">
             <button type="button"
                     @click="confirmDelete()"
-                    class="inline-flex items-center gap-2 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Delete">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Delete">
                 <i data-lucide="trash-2" class="h-4 w-4" aria-hidden="true"></i>
                 Delete Application
             </button>

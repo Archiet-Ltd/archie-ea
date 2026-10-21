@@ -75,20 +75,22 @@
     <div class="flex flex-wrap items-center gap-2" data-testid="page-actions">
       {# ARCH-105: grouped primary / data / AI-assisted, with tooltips explaining each
          action in plain business language and a divider between groups. #}
+      {% if can('create', 'application') %}
       <button type="button" data-testid="btn-add-application" data-modal-open="modal-create"
         title="Register a new application in the portfolio"
         class="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-4 text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Add application">
         <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Add Application
       </button>
+      {% endif %}
       <div class="hidden sm:block h-6 border-l border-input" aria-hidden="true"></div>
       <button type="button" data-testid="btn-import" data-modal-open="application-import-modal"
         title="Import applications from a spreadsheet or the Abacus feed"
-        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Import applications">
+        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Import applications">
         <i data-lucide="upload" class="h-4 w-4" aria-hidden="true"></i>Import
       </button>
       <button type="button" data-testid="btn-export" @click="exportCSV()"
         title="Download the current filtered list as a CSV file"
-        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Export applications">
+        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Export applications">
         <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export
       </button>
       <div class="hidden sm:block h-6 border-l border-input" aria-hidden="true"></div>
@@ -96,32 +98,54 @@
       <div class="relative" x-data="{ moreOpen: false }">
         <button type="button" data-testid="btn-more-actions" @click="moreOpen = !moreOpen" @click.outside="moreOpen = false" @keydown.escape="moreOpen = false"
           :aria-expanded="moreOpen.toString()" aria-haspopup="menu" aria-label="More actions"
-          class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           More<i data-lucide="chevron-down" class="h-4 w-4" aria-hidden="true"></i>
         </button>
         <div x-show="moreOpen" x-cloak class="absolute right-0 z-30 mt-1 w-56 rounded-md border border-border bg-popover p-1" role="menu">
-      <a href="{{ url_for('consolidation_list.dashboard') }}" data-testid="btn-consolidation"
-        title="Find duplicate or overlapping applications that could be consolidated"
-        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem">
-        <i data-lucide="layers-2" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-hidden="true"></i>Consolidation
-      </a>
-      {% endif %}
-      {% if 'solution_design.list_solutions' in flask.current_app.view_functions %}
-      <a href="{{ url_for('solution_design.list_solutions') }}" data-testid="btn-design-solution"
-        title="Use AI to design a target-state solution from your application estate"
-        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem">
-        <i data-lucide="star" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-hidden="true"></i>Design Solution
-      </a>
-      {% endif %}
-      <button type="button" data-testid="btn-match-vendors" @click="openUnifiedMappingModalDiscovery({context:'vendor'})"
-        title="Use AI to match applications to known vendor products"
-        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-label="Match vendors">
-        <i data-lucide="package" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-hidden="true"></i>Vendor Match
-      </button>
-      <button type="button" data-testid="btn-ai-map" @click="openAiMapModal()"
-        title="Use AI to suggest capability, process and ArchiMate mappings for your applications"
-        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-label="AI map applications">
-        <i data-lucide="sparkles" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" role="menuitem" aria-hidden="true"></i>AI Map
+      <a href="{{ url_for('consolidation_list.dashboard') }}" data-testid="btn-consolidation"
+
+        title="Find duplicate or overlapping applications that could be consolidated"
+
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem">
+
+        <i data-lucide="layers-2" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-hidden="true"></i>Consolidation
+
+      </a>
+
+      {% endif %}
+
+      {% if 'solution_design.list_solutions' in flask.current_app.view_functions %}
+
+      <a href="{{ url_for('solution_design.list_solutions') }}" data-testid="btn-design-solution"
+
+        title="Use AI to design a target-state solution from your application estate"
+
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem">
+
+        <i data-lucide="star" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-hidden="true"></i>Design Solution
+
+      </a>
+
+      {% endif %}
+
+      <button type="button" data-testid="btn-match-vendors" @click="openUnifiedMappingModalDiscovery({context:'vendor'})"
+
+        title="Use AI to match applications to known vendor products"
+
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-label="Match vendors">
+
+        <i data-lucide="package" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-hidden="true"></i>Vendor Match
+
+      </button>
+
+      <button type="button" data-testid="btn-ai-map" @click="openAiMapModal()"
+
+        title="Use AI to suggest capability, process and ArchiMate mappings for your applications"
+
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-label="AI map applications">
+
+        <i data-lucide="sparkles" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-hidden="true"></i>AI Map
+
       </button>
         </div>
       </div>
@@ -314,7 +338,7 @@
           class="h-8 px-3 rounded-md border border-input bg-background text-xs font-medium hover:bg-accent transition-colors inline-flex items-center gap-1.5" aria-label="Add tag">
           <i data-lucide="tag" class="h-3.5 w-3.5" aria-hidden="true"></i>Tag
         </button>
-        {% if current_user.is_admin() or current_user.role_archetype == 'architect' %}
+        {% if can('bulk_delete', 'application') %}
         <button type="button" data-testid="bulk-btn-delete" @click="confirmBulkDelete()"
           class="h-8 px-3 rounded-md border border-destructive/30 bg-destructive/5 text-destructive-emphasis text-xs font-medium hover:bg-destructive/10 transition-colors inline-flex items-center gap-1.5" aria-label="Delete">
           <i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i>Delete
@@ -346,7 +370,7 @@
 <table class="dense-table w-full border-collapse" data-testid="applications-table">
         <thead class="sticky top-0 z-10 bg-card">
           <tr class="border-b border-border">
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle w-10 text-left">
+            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle w-10 text-left">
               <input type="checkbox" id="select-all-desktop" data-testid="select-all"
                 :checked="allSelected()" :indeterminate="someSelected()"
                 @change="toggleSelectAll($event.target.checked)"
@@ -354,26 +378,26 @@
             </th>
             {# ARCH-100: sortable headers. sortBy() toggles asc/desc and re-navigates
                with the current filters + page preserved (see list.js _navigate()). #}
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left w-20">
+            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left w-20">
               <button type="button" @click="sortBy('id')" data-testid="th-sort-id"
                 class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by ID">
                 ID<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'id' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'id' && dir === 'desc'" x-cloak aria-hidden="true"></i>
               </button>
             </th>
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[180px]">
+            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[180px]">
               <button type="button" @click="sortBy('name')" data-testid="th-sort-name"
                 class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by Application name">
                 Application<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'name' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'name' && dir === 'desc'" x-cloak aria-hidden="true"></i>
               </button>
             </th>
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[120px]">
+            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[120px]">
               <button type="button" @click="sortBy('type')" data-testid="th-sort-type"
                 class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by Type">
                 Type<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'type' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'type' && dir === 'desc'" x-cloak aria-hidden="true"></i>
               </button>
             </th>
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left w-10" title="ArchiMate: whether this application has a linked ArchiMate element" aria-label="ArchiMate link status">AM</th>
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[160px]">
+            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left w-10" title="ArchiMate: whether this application has a linked ArchiMate element" aria-label="ArchiMate link status">AM</th>
+            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[160px]">
               <button type="button" @click="sortBy('lifecycle_status')" data-testid="th-sort-lifecycle-status"
                 class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by Lifecycle Status">
                 Lifecycle Status<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'lifecycle_status' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'lifecycle_status' && dir === 'desc'" x-cloak aria-hidden="true"></i>
@@ -381,12 +405,12 @@
             </th>
             {# Hidden until data enrichment — Criticality, Business Owner, Vendor #}
             {#
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[130px]">Criticality</th>
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[140px]">Business Owner</th>
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[130px]">Vendor</th>
+            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[130px]">Criticality</th>
+            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[140px]">Business Owner</th>
+            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[130px]">Vendor</th>
             #}
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[150px]">Capability</th>
-            <th class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-right min-w-[180px]">Actions</th>
+            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[150px]">Capability</th>
+            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-right min-w-[180px]">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y">
@@ -396,7 +420,7 @@
           {%- set ck = (app.business_criticality or '').lower() -%}
           {%- set cc = CRIT_MAP.get(ck, 'bg-muted text-muted-foreground') -%}
           {%- set pc = app.capability_mappings[0] if app.capability_mappings else none -%}
-          <tr class="group h-12 border-b border-border transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" data-app-id="{{ app.id }}" data-testid="app-row-{{ app.id }}">
+          <tr class="group h-12 border-b border-border transition-colors hover:bg-muted/50" data-app-id="{{ app.id }}" data-testid="app-row-{{ app.id }}">
             <td class="px-3 py-0 align-middle">
               <input type="checkbox" class="row-select rounded border-input h-4 w-4 cursor-pointer"
                 :checked="selectedIds.has({{ app.id }})"
@@ -446,13 +470,15 @@
               <div class="flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                 <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}"
                   data-testid="btn-view-{{ app.id }}"
-                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-info dark:hover:bg-slate-700">View</a>
+                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-13 font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info">View</a>
                 <a href="{{ url_for('unified_applications.application_fact_sheet', id=app.id) }}"
                   data-testid="btn-factsheet-{{ app.id }}" title="Fact sheet — single source of truth"
-                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-info dark:hover:bg-slate-700">Fact sheet</a>
+                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-13 font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info">Fact sheet</a>
+                {% if can('edit', 'application') %}
                 <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
                   data-testid="btn-edit-{{ app.id }}"
-                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-slate-100 hover:text-info dark:hover:bg-slate-700">Edit</a>
+                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-13 font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info">Edit</a>
+                {% endif %}
                 <div class="relative" x-data="{ mapOpen: false }"
                   data-app-map-id="{{ app.id }}"
                   data-app-map-name="{{ app.name | e }}">
@@ -483,7 +509,7 @@
                     </button>
                   </div>
                 </div>
-                {% if current_user.is_admin() or current_user.role_archetype == 'architect' %}
+                {% if can('delete', 'application') %}
                 <form method="POST" action="{{ url_for('unified_applications.application_delete', id=app.id) }}"
                   @submit.prevent='Platform.modal.confirmSubmit($event, "Delete " + {{ app.name | tojson }} + "? This cannot be undone.")'>
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -592,11 +618,13 @@
               class="inline-flex items-center gap-1 h-8 px-2.5 rounded-md text-xs font-medium hover:bg-accent transition-colors">
               <i data-lucide="file-text" class="h-3.5 w-3.5" aria-hidden="true"></i>Fact sheet
             </a>
+            {% if can('edit', 'application') %}
             <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
               data-testid="btn-edit-mobile-{{ app.id }}"
               class="inline-flex items-center gap-1 h-8 px-2.5 rounded-md text-xs font-medium hover:bg-accent transition-colors">
               <i data-lucide="pencil" class="h-3.5 w-3.5" aria-hidden="true"></i>Edit
             </a>
+            {% endif %}
             <div class="relative" x-data="{ mapOpen: false }"
               data-app-map-id="{{ app.id }}"
               data-app-map-name="{{ app.name | e }}">
@@ -628,7 +656,7 @@
                 </button>
               </div>
             </div>
-            {% if current_user.is_admin() or current_user.role_archetype == 'architect' %}
+            {% if can('delete', 'application') %}
             <form method="POST" action="{{ url_for('unified_applications.application_delete', id=app.id) }}" class="ml-auto"
               @submit.prevent='Platform.modal.confirmSubmit($event, "Delete " + {{ app.name | tojson }} + "? This cannot be undone.")'>
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

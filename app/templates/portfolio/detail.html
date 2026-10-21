@@ -30,7 +30,7 @@
      benefit can only be recorded once this row is tied to the specific
      StrategicInitiative row that describes the same real-world programme — a
      human confirms the match, it is never guessed from a matching ID. #}
-  <div class="rounded-lg border bg-card p-6">
+  <div class="rounded-lg border border-border bg-card p-6">
     <p class="text-sm font-medium text-muted-foreground mb-2">Linked transformation programme</p>
     {% if linked_programme %}
     <p class="text-base font-medium">{{ linked_programme.name }}</p>
@@ -65,7 +65,7 @@
 
   {# ── Strategic objectives ─────────────────────────────────────────────────
      The goals this initiative serves, read by the goal trace from the same rows. #}
-  <div class="rounded-lg border bg-card p-6" id="initiative-goals">
+  <div class="rounded-lg border border-border bg-card p-6" id="initiative-goals">
     <p class="text-sm font-medium text-muted-foreground mb-2">Strategic objectives served</p>
     {% if goal_links %}
     <ul class="divide-y">
@@ -130,13 +130,13 @@
 
   {# ── Money ─────────────────────────────────────────────────────────────── #}
   <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-    <div class="rounded-lg border bg-card p-6">
+    <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Approved budget</p>
       <p class="text-2xl font-bold mt-3">
         {% if approved_budget is not none %}{{ '{:,.0f}'.format(approved_budget) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
       </p>
     </div>
-    <div class="rounded-lg border bg-card p-6">
+    <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Spent to date</p>
       <p class="text-2xl font-bold mt-3">
         {% if spent_to_date is not none %}{{ '{:,.0f}'.format(spent_to_date) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
@@ -145,13 +145,13 @@
       <p class="text-xs text-muted-foreground mt-1">No actuals feed connected</p>
       {% endif %}
     </div>
-    <div class="rounded-lg border bg-card p-6">
+    <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Forecast</p>
       <p class="text-2xl font-bold mt-3">
         {% if forecast_cost is not none %}{{ '{:,.0f}'.format(forecast_cost) }}{% else %}<span class="text-muted-foreground">&mdash;</span>{% endif %}
       </p>
     </div>
-    <div class="rounded-lg border bg-card p-6">
+    <div class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm font-medium text-muted-foreground">Variance</p>
       <p class="text-2xl font-bold mt-3">
         {% if variance_pct is not none %}
@@ -164,7 +164,7 @@
   </div>
 
   {# ── Benefits ──────────────────────────────────────────────────────────── #}
-  <div class="rounded-lg border bg-card">
+  <div class="rounded-lg border border-border bg-card">
     <div class="flex items-center justify-between border-b px-6 py-4">
       <h2 class="text-xl font-semibold">Benefits</h2>
       <div class="text-sm text-muted-foreground">
@@ -182,7 +182,7 @@
       </div>
     </div>
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+      <table class="dense-table w-full text-sm">
         <thead class="border-b bg-muted/40">
           <tr class="text-left">
             <th class="px-4 py-3 font-medium">Benefit</th>
@@ -308,7 +308,7 @@
 
   {# Record a measurement against an existing benefit. #}
   {% if benefits %}
-  <div class="rounded-lg border bg-card">
+  <div class="rounded-lg border border-border bg-card">
     <div class="border-b px-6 py-4">
       <h2 class="text-xl font-semibold">Record a measurement</h2>
       <p class="text-sm text-muted-foreground mt-1">
@@ -346,13 +346,13 @@
   {% endif %}
 
   {# ── RAID: assumptions ─────────────────────────────────────────────────── #}
-  <div class="rounded-lg border bg-card">
+  <div class="rounded-lg border border-border bg-card">
     <div class="border-b px-6 py-4">
       <h2 class="text-xl font-semibold">Assumptions</h2>
       <p class="text-sm text-muted-foreground mt-1">Highest exposure first &mdash; impact &times; uncertainty</p>
     </div>
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+      <table class="dense-table w-full text-sm">
         <thead class="border-b bg-muted/40">
           <tr class="text-left">
             <th class="px-4 py-3 font-medium">Assumption</th>
@@ -438,7 +438,7 @@
 
   {# ── Delivery and origin ───────────────────────────────────────────────── #}
   <div class="grid gap-6 lg:grid-cols-2">
-    <div class="rounded-lg border bg-card">
+    <div class="rounded-lg border border-border bg-card">
       <div class="border-b px-6 py-4"><h2 class="text-xl font-semibold">Work packages</h2></div>
       <ul class="divide-y">
         {% for wp in work_packages %}
@@ -455,7 +455,7 @@
       {% endif %}
     </div>
 
-    <div class="rounded-lg border bg-card">
+    <div class="rounded-lg border border-border bg-card">
       <div class="border-b px-6 py-4"><h2 class="text-xl font-semibold">Originating demand</h2></div>
       <ul class="divide-y">
         {% for d in demands %}
