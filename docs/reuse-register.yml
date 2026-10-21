@@ -413,6 +413,8 @@ entries:
         - set_application_owner
         - application_owner_text
         - application_owner_expression
+        - application_is_owned_expression
+        - application_is_owned
         - resolve_user_by_name
     reuse: >
       An owner is a person recorded as an ApplicationOwner row, written only through set_element_owner (an
@@ -422,6 +424,10 @@ entries:
       The legacy_* columns behind them hold only a name that matched no user and are written by the service and
       the backfill alone. Do not write a second owner row, a second name-to-user lookup, or read an owner text
       column directly. The retirement of those columns is a named follow-up, not part of this entry.
+      "Owned" (an application has an accountable owner: a primary or business owner record, or a legacy
+      application or business owner text) is defined once, by application_is_owned_expression and
+      application_is_owned; the dashboard owner coverage and the Ask question on applications with no owner
+      both read it. Do not write another owned count.
     must_not_create:
       - id: owner-name-resolver
         regex: 'def\s+_?resolve_(user|owner)_by_name\s*\('

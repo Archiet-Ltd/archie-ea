@@ -151,24 +151,13 @@ def _build_overview_context():
         if _org is not None:
             # An owner is recorded as an ApplicationOwner row; the owner text
             # columns counted above only hold a name that matched no user.
-            from app.models.application_owner import ApplicationOwner
             from app.models.application_portfolio import ApplicationComponent
+            from app.services.element_ownership_service import application_is_owned_expression
 
-            has_owner_text = db.or_(
-                ApplicationComponent.legacy_application_owner.isnot(None),
-                ApplicationComponent.legacy_business_owner.isnot(None),
-            )
-            has_recorded_owner = (
-                db.select(ApplicationOwner.id)
-                .where(ApplicationOwner.application_id == ApplicationComponent.id)
-                .where(ApplicationOwner.organization_id == _org)
-                .where(ApplicationOwner.ownership_type.in_(("primary", "business")))
-                .exists()
-            )
             owned = db.session.execute(
                 db.select(db.func.count(ApplicationComponent.id))
                 .where(ApplicationComponent.organization_id == _org)
-                .where(db.or_(has_owner_text, has_recorded_owner))
+                .where(application_is_owned_expression(ApplicationComponent))
             ).scalar_one()
             data_coverage["owner"] = round(owned / total_apps * 100)
     except Exception as e:
