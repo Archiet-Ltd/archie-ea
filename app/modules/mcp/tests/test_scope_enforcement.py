@@ -136,6 +136,7 @@ class TestScopeEnforcedOnToolCall:
             ("ask_programme", {"element_id": element.id}),
             ("ask_risk", {"element_id": element.id}),
             ("ask_accountability", {"element_id": element.id}),
+            ("ask_contents", {"element_id": element.id}),
             ("search_elements", {"query": "scope-ok-test", "limit": 5}),
             ("get_element", {"element_id": element.id}),
             ("list_canvases", {}),

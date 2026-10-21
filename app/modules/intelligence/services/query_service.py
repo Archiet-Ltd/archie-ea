@@ -93,6 +93,15 @@ LICENCE_USAGE_NOT_SYNCED_REASON = validate_reason_code("licence_usage_not_synced
 NO_SEED_ELEMENTS_REASON = validate_reason_code("no_seed_elements")
 SEED_LIMIT_REACHED_REASON = validate_reason_code("seed_limit_reached")
 ROWS_TRUNCATED_REASON = validate_reason_code("rows_truncated")
+NO_CONTENTS_RECORDED_REASON = validate_reason_code("no_contents_recorded")
+
+# The contents question: which elements hold other elements, what they hold,
+# and which relationship types carry "is part of / realizes / serves".
+CONTAINER_ELEMENT_TYPES = ("WorkPackage", "Plateau", "ImplementationEvent")
+CONTENT_ELEMENT_TYPES = ("ApplicationComponent", "Capability", "Gap", "Value", "WorkPackage")
+CONTENT_RELATIONSHIP_TYPES = (
+    "aggregation", "composition", "realization", "association", "triggering", "serving",
+)
 SET_IMPACT_MAX_SEEDS = 25
 SET_IMPACT_MAX_ROWS = 1000
 
@@ -2229,6 +2238,139 @@ class IntelligenceQueryService:
                 )
 
         return {"work_packages": wp_payloads, "reasons": [], "elements": all_elements}
+
+    @staticmethod
+    def _contents_hop(org_id: int, container_ids, exclude_ids) -> List[Dict[str, Any]]:
+        """One hop out of ``container_ids`` over the six contents relationship
+        types, either direction: one row per (container, other element,
+        relationship). Relationship and element are both fenced to ``org_id``
+        (TenantMixin plus the explicit predicate); another organisation's rows
+        never appear. Only application, capability, gap, value and work
+        package elements come back."""
+        from app.models import ArchiMateElement, ArchiMateRelationship
+
+        ids = list(container_ids)
+        if not ids:
+            return []
+        rels = (
+            db.session.execute(
+                db.select(ArchiMateRelationship)
+                .where(
+                    ArchiMateRelationship.organization_id == org_id,
+                    db.func.lower(ArchiMateRelationship.type).in_(CONTENT_RELATIONSHIP_TYPES),
+                    db.or_(
+                        ArchiMateRelationship.source_id.in_(ids),
+                        ArchiMateRelationship.target_id.in_(ids),
+                    ),
+                )
+                .order_by(ArchiMateRelationship.id)
+            )
+            .scalars()
+            .all()
+        )
+        wanted = set()
+        for rel in rels:
+            wanted.update((rel.source_id, rel.target_id))
+        elements = {}
+        if wanted:
+            for el in db.session.execute(
+                db.select(ArchiMateElement).where(
+                    ArchiMateElement.id.in_(wanted),
+                    ArchiMateElement.organization_id == org_id,
+                    ArchiMateElement.type.in_(CONTENT_ELEMENT_TYPES),
+                )
+            ).scalars():
+                elements[el.id] = el
+        rows: List[Dict[str, Any]] = []
+        seen = set()
+        for rel in rels:
+            for container_id, other_id, direction in (
+                (rel.source_id, rel.target_id, "outgoing"),
+                (rel.target_id, rel.source_id, "incoming"),
+            ):
+                if container_id not in ids or other_id in exclude_ids:
+                    continue
+                other = elements.get(other_id)
+                if other is None or (container_id, rel.id) in seen:
+                    continue
+                seen.add((container_id, rel.id))
+                rows.append(
+                    {
+                        "container_id": container_id,
+                        "id": other.id,
+                        "name": other.name,
+                        "type": other.type,
+                        "layer": other.layer,
+                        "relationship_type": rel.type,
+                        "direction": direction,
+                        "documentation": rel.description,
+                    }
+                )
+        return rows
+
+    @staticmethod
+    def contents_for_element(element_id: int) -> Dict[str, Any]:
+        """Ask's contents question: what is in this release, plateau or work
+        package? For a WorkPackage, Plateau or ImplementationEvent element:
+        the applications, capabilities, gaps, value propositions and other
+        work packages linked to it by Aggregation, Composition, Realization,
+        Association, Triggering or Serving, either direction (hop 1), and the
+        same for each container found at hop 1 (hop 2, ``derived`` true,
+        ``via`` naming the container). Both hops are the one ``_contents_hop``
+        read. Each row: id, name, type, layer, relationship_type, direction,
+        documentation. An element that is not a container, or has nothing
+        linked, returns the ``no_contents_recorded`` reason with no rows.
+        """
+        from app.models import ArchiMateElement
+
+        org_id = current_org_id()
+
+        with record_query_latency("contents_for_element") as scope:
+            scope.organization_id = org_id
+
+            if org_id is None:
+                return {"element": None, "contents": [], "reasons": [NO_TENANT_CONTEXT_REASON]}
+
+            element = db.session.execute(
+                db.select(ArchiMateElement).where(
+                    ArchiMateElement.id == element_id,
+                    ArchiMateElement.organization_id == org_id,
+                )
+            ).scalar_one_or_none()
+            if element is None:
+                return {"element": None, "contents": [], "reasons": [ELEMENT_NOT_FOUND_REASON]}
+
+            header = {
+                "id": element.id,
+                "name": element.name,
+                "type": element.type,
+                "layer": element.layer,
+            }
+            if element.type not in CONTAINER_ELEMENT_TYPES:
+                return {"element": header, "contents": [], "reasons": [NO_CONTENTS_RECORDED_REASON]}
+
+            contents: List[Dict[str, Any]] = []
+            seen_ids = {element.id}
+            for row in IntelligenceQueryService._contents_hop(org_id, [element.id], {element.id}):
+                row.pop("container_id")
+                row.update({"hop": 1, "derived": False, "via": None})
+                seen_ids.add(row["id"])
+                contents.append(row)
+
+            containers = {r["id"]: r for r in contents if r["type"] in CONTAINER_ELEMENT_TYPES}
+            for row in IntelligenceQueryService._contents_hop(org_id, list(containers), seen_ids):
+                via = containers[row.pop("container_id")]
+                if row["id"] in seen_ids:
+                    continue
+                seen_ids.add(row["id"])
+                row.update({"hop": 2, "derived": True, "via": {"id": via["id"], "name": via["name"]}})
+                contents.append(row)
+
+            return {
+                "element": header,
+                "contents": contents,
+                "reasons": [] if contents else [NO_CONTENTS_RECORDED_REASON],
+            }
 
     @staticmethod
     def accountability_for_element(element_id: int) -> Dict[str, Any]:

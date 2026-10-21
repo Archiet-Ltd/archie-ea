@@ -14,6 +14,7 @@ own pages, with the same tenant isolation and the same honest empty states.
 | `ask_strategy` | What strategic initiatives this element is linked to, and how each is tracking against its budget |
 | `ask_portfolio` | Which application component this element maps to, for rationalization and duplicate detection |
 | `ask_programme` | What work packages this element is part of, whether each is on time and on budget, and what each touches |
+| `ask_contents` | What a release, plateau or work package contains: the applications, capabilities, gaps, value propositions and other work packages linked to it, with how each is linked |
 | `ask_risk` | What risks threaten this element, and what each risk touches |
 | `ask_accountability` | Who is accountable for this element |
 | `search_elements` | Find elements by name — returns the id, name, type, and layer the lens tools need as input |
@@ -49,7 +50,7 @@ support for remote MCP servers.
    in, you see a consent screen listing the scopes being requested.
 3. Grant access. The assistant receives a token scoped to your
    organisation and the `mcp:read` permission.
-4. The assistant can now call any of the nine read tools on your behalf.
+4. The assistant can now call any of the read tools on your behalf.
 
 The token is tied to your user account, not to your organisation as a
 whole. It expires after one hour.

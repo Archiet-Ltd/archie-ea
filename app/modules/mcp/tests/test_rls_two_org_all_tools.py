@@ -45,7 +45,7 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 
 ALL_TEN_TOOLS = [
     "ask_impact", "ask_strategy", "ask_portfolio", "ask_programme",
-    "ask_risk", "ask_accountability", "get_element", "search_elements",
+    "ask_risk", "ask_accountability", "ask_contents", "get_element", "search_elements",
     "list_canvases", "get_canvas",
 ]
 
@@ -130,7 +130,7 @@ print("TOOLS_LIST", json.dumps(tools))
 
 calls = []
 for eid_tag, eid in (("A", A["element"]), ("B", B["element"])):
-    for lens in ("impact", "strategy", "portfolio", "programme", "risk", "accountability"):
+    for lens in ("impact", "strategy", "portfolio", "programme", "contents", "risk", "accountability"):
         calls.append((f"ask_{lens}", {"element_id": eid}, eid_tag))
     calls.append(("get_element", {"element_id": eid}, eid_tag))
 calls += [("search_elements", {"query": "SECRET", "limit": 200}, "*"),

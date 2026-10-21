@@ -14,7 +14,7 @@ from app.modules.mcp.tests.test_tools import _make_element, _make_user, _mcp_too
 
 OLD_NAMES_WITH_ARGUMENTS = [
     ("ask_impact", "element"), ("ask_strategy", "element"), ("ask_portfolio", "element"),
-    ("ask_programme", "element"), ("ask_risk", "element"), ("ask_accountability", "element"),
+    ("ask_programme", "element"), ("ask_risk", "element"), ("ask_accountability", "element"), ("ask_contents", "element"),
     ("search_elements", "search"), ("get_element", "element"),
     ("list_canvases", "none"), ("get_canvas", "canvas"),
 ]

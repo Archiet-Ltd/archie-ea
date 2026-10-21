@@ -189,6 +189,12 @@ REASON_CODES = frozenset(
         "no_seed_elements",
         "seed_limit_reached",
         "rows_truncated",
+        # Ask's contents question ("what is in this release / plateau / work
+        # package"): a container element with no linked application,
+        # capability, gap, value or work package, or an element that is not a
+        # container at all, has nothing to list -- an honest absence, never an
+        # empty guess.
+        "no_contents_recorded",
     }
 )
 

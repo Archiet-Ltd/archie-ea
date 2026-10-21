@@ -233,7 +233,7 @@ class TestMCPInitialize:
         assert resp.status_code == 401
 
     def test_tools_list_returns_ten_tools(self, client, db_session, make_org, login_as):
-        """tools/list returns exactly the ten read-only tools."""
+        """tools/list returns exactly the eleven read-only tools."""
         org = make_org("mcp")
         user = _make_user(db_session, org, "mcp-list@example.com")
         token = _mint_oauth_token(client, db_session, org, user, login_as)
@@ -242,8 +242,8 @@ class TestMCPInitialize:
         tool_names = {t["name"] for t in tools}
         expected = {
             "ask_impact", "ask_strategy", "ask_portfolio", "ask_programme",
-            "ask_risk", "ask_accountability", "search_elements", "get_element",
-            "list_canvases", "get_canvas",
+            "ask_risk", "ask_accountability", "ask_contents", "search_elements",
+            "get_element", "list_canvases", "get_canvas",
         }
         assert tool_names == expected
 
@@ -308,7 +308,7 @@ class TestBearerOnlySessionLess:
         )
         assert resp.status_code == 200, resp.get_data(as_text=True)
         data = resp.get_json()
-        assert len(data["result"]["tools"]) == 10
+        assert len(data["result"]["tools"]) == 11
 
     def test_tools_call_with_no_session_cookie_succeeds(self, client, db_session, make_org, login_as):
         """A real tools/call (ask_impact) over a bearer token, on a client
