@@ -37,7 +37,10 @@ from flask import (
 from flask_login import current_user, login_required
 from openpyxl import load_workbook
 from app import db
-from app.models.application_portfolio import ApplicationComponent
+from app.models.application_portfolio import (
+    APPLICATION_LIFECYCLE_STAGES,
+    ApplicationComponent,
+)
 from app.models.audit_log import AuditLog
 from app.services.ai_import_service import get_ai_import_service
 from app.utils.file_validation import (
@@ -996,23 +999,47 @@ def application_import_page():
 # ---------------------------------------------------------------------------
 # 7. application_import  (POST /import)
 # ---------------------------------------------------------------------------
-_LIFECYCLE_COLUMN_LIMIT = 20
 _REFUSED_ROWS_SHOWN = 50
+_MAX_DATABASE_ERRORS_IN_A_ROW = 5
 
-# Labels people write in a spreadsheet, mapped to the stored lifecycle values.
+# Labels people write in a spreadsheet that name exactly one stage. A label that could
+# mean more than one stage (end of life, retiring, retired ...) is deliberately absent:
+# the row is refused and the person chooses the stage.
 _LIFECYCLE_LABELS = {
-    "in production": "operational",
-    "in service": "operational",
-    "in use": "operational",
-    "in development": "development",
-    "under development": "development",
-    "in testing": "testing",
-    "in planning": "planning",
-    "end of life": "deprecated",
-    "end-of-life": "deprecated",
-    "being retired": "deprecated",
-    "decommissioned": "retired",
-    "out of service": "retired",
+    "in production": "2.1 strategic",
+    "production": "2.1 strategic",
+    "live": "2.1 strategic",
+    "in service": "2.1 strategic",
+    "strategic": "2.1 strategic",
+    "tactical": "2.2 tactical",
+    "undetermined": "1. undetermined",
+    "sunset": "3. sunset",
+    "read-only": "4.3 read-only",
+    "read only": "4.3 read-only",
+    "stopped": "4.4 stopped",
+    "decommissioned": "5. decommissioned",
+}
+
+# What the spreadsheet column is called on the import page, for messages.
+_FIELD_LABELS = {
+    "name": "Name",
+    "component_type": "Type",
+    "application_category": "Category",
+    "technology_stack": "Technology Stack",
+    "version": "Version",
+    "deployment_status": "Status",
+    "business_domain": "Business Domain",
+    "business_owner": "Owner",
+    "development_team": "Team",
+    "business_criticality": "Criticality",
+    "description": "Description",
+    "lifecycle_status": "Lifecycle Status",
+    "vendor_name": "Vendor",
+    "cloud_provider": "Public Cloud Provider",
+    "imported_capabilities": "Capabilities",
+    "application_services": "Services",
+    "application_functions_text": "Functions",
+    "imported_apqc_codes": "APQC Codes",
 }
 
 
@@ -1021,29 +1048,53 @@ class _RowRefused(ValueError):
 
 
 def _lifecycle_value(raw):
-    """The stored lifecycle value for a cell: a known label is mapped, a value that
-    fits the column is kept, any other over-long value refuses the row."""
+    """The canonical lifecycle stage for a cell, or a refusal that lists the stages."""
     if not isinstance(raw, str):
         return raw
     value = raw.strip()
     if not value:
         return None
-    mapped = _LIFECYCLE_LABELS.get(value.casefold())
+    folded = value.casefold()
+    for stage in APPLICATION_LIFECYCLE_STAGES:
+        if stage.casefold() == folded:
+            return stage
+    mapped = _LIFECYCLE_LABELS.get(folded)
     if mapped:
         return mapped
-    if len(value) > _LIFECYCLE_COLUMN_LIMIT:
-        raise _RowRefused(
-            f"the lifecycle value '{value}' is {len(value)} characters and matches no "
-            f"known lifecycle label (the limit is {_LIFECYCLE_COLUMN_LIMIT})"
-        )
-    return value
+    raise _RowRefused(
+        f"the lifecycle value '{value}' is not one of the allowed stages "
+        f"({'; '.join(APPLICATION_LIFECYCLE_STAGES)})"
+    )
 
 
-def _database_reason(exc):
-    """A short, plain reason for a row the database refused."""
-    detail = str(getattr(exc, "orig", None) or exc).strip().splitlines()
-    detail = detail[0].strip() if detail else ""
-    return "the database refused the row" + (f": {detail[:200]}" if detail else "")
+def _check_lengths(obj, header_by_field):
+    """Refuse a row whose text is longer than its column, naming the spreadsheet column."""
+    for column in obj.__table__.columns:
+        limit = getattr(column.type, "length", None)
+        field = column.key
+        if not limit or field not in _FIELD_LABELS:
+            continue
+        value = getattr(obj, field, None)
+        if isinstance(value, str) and len(value) > limit:
+            label = header_by_field.get(field) or _FIELD_LABELS[field]
+            raise _RowRefused(
+                f"the {label} value is {len(value)} characters; the limit is {limit}"
+            )
+
+
+def _database_reason(exc, row_number):
+    """A plain reason for a row the database refused; never the database's own text."""
+    from sqlalchemy.exc import DataError, IntegrityError
+
+    code = getattr(getattr(exc, "orig", None), "pgcode", None)
+    if isinstance(exc, IntegrityError):
+        if code == "23505":
+            return "an application with this name or identifier already exists"
+        if code == "23502":
+            return "a required value is missing"
+    if isinstance(exc, DataError):
+        return "one of the values is too long or in the wrong format"
+    return f"the row could not be saved; details are in the log for row {row_number}"
 
 
 def _refused_rows_message(refused):
@@ -1342,6 +1393,8 @@ def application_import():
             updated = 0
             non_numeric_user_counts = []
             refused = []  # {row, name, reason} for each row the import could not save
+            database_errors_in_a_row = 0
+            stopped_at_row = None
             # Track names processed in THIS import to detect duplicates within the same CSV file
             processed_names = set()
 
@@ -1534,6 +1587,7 @@ def application_import():
                                 )
                             )
 
+                            _check_lengths(existing_app, mapped_header_by_target)
                             outcome = "updated"
                         else:
                             # Create new record (duplicate mode or doesn't exist) with flexible column matching
@@ -1667,6 +1721,7 @@ def application_import():
                                     )
                                 ),
                             )
+                            _check_lengths(app, mapped_header_by_target)
                             db.session.add(app)
                             outcome = "created"
                 except _RowRefused as exc:
@@ -1675,10 +1730,15 @@ def application_import():
                     current_app.logger.warning(
                         "Application import: row %s refused: %s", index, exc
                     )
-                    refusal = _database_reason(exc)
+                    refusal = _database_reason(exc, index)
+                    database_errors_in_a_row += 1
                 if refusal is not None:
                     refused.append({"row": index, "name": name, "reason": refusal})
+                    if database_errors_in_a_row >= _MAX_DATABASE_ERRORS_IN_A_ROW:
+                        stopped_at_row = index
+                        break
                     continue
+                database_errors_in_a_row = 0
                 if outcome == "updated":
                     updated += 1
                 else:
@@ -1882,7 +1942,15 @@ def application_import():
             if refused:
                 msg_parts.append(f"{len(refused)} refused")
 
-            flash(f"Import complete: {', '.join(msg_parts)}", "success")
+            if stopped_at_row is not None:
+                flash(
+                    f"Import stopped after {_MAX_DATABASE_ERRORS_IN_A_ROW} database errors "
+                    f"in a row at row {stopped_at_row}; the rows after it were not read. "
+                    f"Saved so far: {', '.join(msg_parts)}",
+                    "error",
+                )
+            else:
+                flash(f"Import complete: {', '.join(msg_parts)}", "success")
             if refused:
                 flash(_refused_rows_message(refused), "warning")
 
