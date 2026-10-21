@@ -12,21 +12,21 @@
     </div>
 
     {# Loading state #}
-    <div x-show="architectureLoading" x-cloak class="rounded-xl border border-border bg-card p-12 text-center">
+    <div x-show="architectureLoading" x-cloak class="rounded-lg border border-border bg-card p-12 text-center">
         <span class="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full inline-block mb-3"></span>
         <p class="text-sm text-muted-foreground">Loading architecture elements...</p>
     </div>
 
     {# No capabilities warning #}
     <div x-show="acceptedCapabilities.length === 0 && !architectureResult && !domainsPopulated && reasoningLandscape.length === 0 && !architectureLoading" x-cloak
-         class="rounded-xl border border-dashed border-border bg-card p-12 text-center">
+         class="rounded-lg border border-dashed border-border bg-card p-12 text-center">
         <p class="text-sm text-muted-foreground mb-1">No data yet</p>
         <p class="text-xs text-muted-foreground/60">Accept at least one capability in Step 2, then the platform will map your application landscape.</p>
     </div>
 
     {# ── LLM degradation warning ─────────────────────────── #}
     <div x-show="llmDegraded.step3" x-cloak
-         class="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3">
+         class="flex items-start gap-3 rounded-md border border-warning/40 bg-warning/10 px-4 py-2">
         <svg class="h-4 w-4 text-warning mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
         </svg>
@@ -38,7 +38,7 @@
 
     {# TRAC-001: chain health warning banner for Step 3 (empty layers) #}
     <template x-if="stepWarnings[3] && !stepWarningsDismissed[3]">
-        <div class="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3">
+        <div class="rounded-md border border-warning/40 bg-warning/10 px-4 py-2">
             <div class="flex items-start justify-between gap-3">
                 <div class="flex items-start gap-3 flex-1">
                     <svg class="h-4 w-4 text-warning mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -104,23 +104,23 @@
             {# Summary strip — 4 stat cards (hidden when no apps) #}
             <div x-show="reasoningLandscape.length > 0" x-cloak>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div class="rounded-xl border border-border bg-card px-4 py-3">
+                <div class="rounded-lg border border-border bg-card px-4 py-3">
                     <p class="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Applications</p>
                     <p class="text-xl font-bold text-foreground" x-text="reasoningLandscape.length"></p>
                 </div>
-                <div class="rounded-xl border border-border bg-card px-4 py-3">
+                <div class="rounded-lg border border-border bg-card px-4 py-3">
                     <p class="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Annual Operating</p>
                     <p class="text-xl font-bold text-foreground"
                        x-text="reasoningCostSummary && reasoningCostSummary.total_annual_operating ? '$' + Math.round(reasoningCostSummary.total_annual_operating / 1000) + 'K' : '—'"></p>
                     <p x-show="reasoningCostSummary && reasoningCostSummary.cost_coverage_pct > 0" class="text-xs text-muted-foreground"
                        x-text="reasoningCostSummary.cost_coverage_pct + '% cost coverage'"></p>
                 </div>
-                <div class="rounded-xl border border-border bg-card px-4 py-3">
+                <div class="rounded-lg border border-border bg-card px-4 py-3">
                     <p class="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Strategic</p>
                     <p class="text-xl font-bold text-success"
                        x-text="reasoningLandscape.filter(function(a){ return !a.is_decommissioning; }).length"></p>
                 </div>
-                <div class="rounded-xl border border-border bg-card px-4 py-3">
+                <div class="rounded-lg border border-border bg-card px-4 py-3">
                     <p class="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Decommissioning</p>
                     <p class="text-xl font-bold"
                        :class="reasoningLandscape.filter(function(a){ return a.is_decommissioning; }).length > 0 ? 'text-destructive' : 'text-muted-foreground'"
@@ -130,7 +130,7 @@
             </div>
 
             {# Application list with expandable detail panels #}
-            <div class="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
+            <div class="rounded-lg border border-border bg-card divide-y divide-border overflow-hidden">
                 <template x-for="(app, idx) in reasoningLandscape" :key="idx">
                     <div :class="app.is_decommissioning ? 'bg-destructive/[0.02]' : ''">
                         {# Top row: always visible #}
@@ -169,7 +169,7 @@
                         </div>
                         {# Expanded detail panel — full LandscapeApplication fields #}
                         <div x-show="expandedLayers['app-' + (app.app_id || idx)]" x-cloak
-                             class="border-t border-border px-5 py-4 bg-muted/10">
+                             class="border border-t border-border px-5 py-2 bg-muted/10">
                             <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
                                 <div>
                                     <p class="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Lifecycle Status</p>
@@ -227,15 +227,15 @@
 
       {# ── Zero-touch quality dashboard ── #}
       <div x-show="architectureResult && architectureResult.auto_quality" x-cloak
-           class="rounded-xl border border-border bg-card overflow-hidden mb-4">
-        <div class="px-5 py-4 border-b border-border bg-muted/20 flex items-center justify-between">
+           class="rounded-lg border border-border bg-card overflow-hidden mb-4">
+        <div class="border px-5 py-2 border-b border-border bg-muted/20 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
             <span class="text-sm font-semibold text-foreground">Architecture Generated</span>
           </div>
-          <button type="button" @click="nextStep()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors">
+          <button type="button" @click="nextStep()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             Proceed to Blueprint
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
           </button>
@@ -303,7 +303,7 @@
               </svg>
               <span class="text-sm text-muted-foreground/60">0 auto-rejected</span>
             </div>
-            <div x-show="openRej" x-cloak class="border-t border-border bg-muted/10 px-5 py-3 space-y-1">
+            <div x-show="openRej" x-cloak class="border border-t border-border bg-muted/10 px-5 py-2 space-y-1">
               <p class="text-xs text-muted-foreground mb-2">Rejected elements are not saved to the database and do not appear in code generation.</p>
               <template x-for="rej in (architectureResult.auto_quality.rejected_reasons || [])" :key="rej.name + rej.type">
                 <div class="flex items-start gap-2 py-1">
@@ -319,7 +319,7 @@
         {# ── Semantic review flags (LLM self-critique) ── #}
         <template x-if="critiqueFlags.length > 0 && !critiqueDismissed">
           <div class="border-t border-border">
-            <div class="px-5 py-3 bg-info/5 border-b border-info/20 flex items-center justify-between gap-3">
+            <div class="border px-5 py-2 bg-info/10 border-b border-info/40 flex items-center justify-between gap-3">
               <div class="flex items-center gap-2 flex-wrap">
                 <svg class="w-4 h-4 text-info shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -389,7 +389,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
               </svg>
             </button>
-            <div x-show="semOpen" x-cloak class="border-t border-border bg-warning/5 px-5 py-3 space-y-3">
+            <div x-show="semOpen" x-cloak class="border border-t border-border bg-warning/10 px-5 py-2 space-y-3">
 
               {# Orphan count #}
               <div x-show="(architectureResult.semantic_quality.orphan_count || 0) > 0" class="flex items-start gap-2">
@@ -450,7 +450,7 @@
 
       {# ── Elements content ── #}
       <div>
-        <div class="rounded-xl border border-border bg-card overflow-hidden">
+        <div class="rounded-lg border border-border bg-card overflow-hidden">
             {# Collapsible header #}
             <button type="button" @click="expandedLayers._archimate = !expandedLayers._archimate"
                     class="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors">
@@ -666,7 +666,7 @@
 
                                 {# Expanded detail panel with description + metadata + property editor #}
                                 <template x-if="(el.acm_domain && isElementExpanded(el.acm_domain, el.id || el.name)) || expandedLayers['el-' + (el.id || el.name)]">
-                                    <div class="border-t border-border px-4 py-3 bg-muted/10 space-y-3">
+                                    <div class="border border-t border-border px-4 py-2 bg-muted/10 space-y-3">
                                         {# Description #}
                                         <p class="text-xs text-muted-foreground" x-text="el.description || 'No description'"></p>
 
@@ -860,8 +860,8 @@
     </div>{# end architectureResult block #}
 
     {# ── Traceability Flow — standalone card, auto-loads from DB ── #}
-    <div class="rounded-xl border border-border bg-card overflow-hidden mt-4">
-      <div class="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2">
+    <div class="rounded-lg border border-border bg-card overflow-hidden mt-4">
+      <div class="border px-5 py-2 border-b border-border bg-muted/20 flex items-center gap-2">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
         </svg>
@@ -875,8 +875,8 @@
     </div>
 
     {# ── Data Model Review — field confirmation panel ── #}
-    <div class="rounded-xl border border-border bg-card overflow-hidden mt-4">
-      <div class="px-5 py-3 border-b border-border bg-muted/20">
+    <div class="rounded-lg border border-border bg-card overflow-hidden mt-4">
+      <div class="border px-5 py-2 border-b border-border bg-muted/20">
         <div class="flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
@@ -892,8 +892,8 @@
     </div>
 
     {# ── Business Process Step Editor — define actor/action/target/validation per process element ── #}
-    <div class="rounded-xl border border-border bg-card overflow-hidden mt-4">
-      <div class="px-5 py-3 border-b border-border bg-muted/20">
+    <div class="rounded-lg border border-border bg-card overflow-hidden mt-4">
+      <div class="border px-5 py-2 border-b border-border bg-muted/20">
         <div class="flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
@@ -910,7 +910,7 @@
 
     {# ── Application Capabilities — cross-cutting concern toggles ─────── #}
     <div x-show="architectureResult || domainsPopulated" x-cloak
-         class="rounded-xl border border-border bg-card overflow-hidden">
+         class="rounded-lg border border-border bg-card overflow-hidden">
         <button type="button" @click="capabilitiesOpen = !capabilitiesOpen"
                 class="w-full flex items-center justify-between px-5 py-3 hover:bg-muted/50 transition-colors">
             <div class="flex items-center gap-2">

@@ -12,7 +12,7 @@
     </div>
     {% macro _ps_actions() %}
 <a href="{{ url_for('my_applications.dashboard') }}"
-           class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border hover:bg-accent transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
             <i data-lucide="arrow-left" class="w-4 h-4"></i>
             Back to Dashboard
         </a>
@@ -142,7 +142,7 @@
     {% endif %}
 
     <!-- Info Box -->
-    <div class="mt-6 bg-info/10 border border-info/30 rounded-lg p-4">
+    <div class="mt-6 bg-info/10 border border-info/40 rounded-md px-3 py-2">
         <div class="flex items-start gap-3">
             <i data-lucide="info" class="w-5 h-5 text-info-emphasis flex-shrink-0 mt-0.5"></i>
             <div class="text-sm text-info-emphasis">

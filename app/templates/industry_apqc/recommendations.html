@@ -17,8 +17,8 @@
     <div class="rounded-xl border-2 border-input bg-background p-4 mb-6">
         <form method="GET" action="{{ url_for('industry_apqc.industry_apqc_recommendations') }}" class="flex flex-wrap items-center gap-4">
             <div>
-                <label class="text-sm font-medium text-muted-foreground">Industry</label>
-                <select name="industry" class="ml-2 rounded-lg border-2 border-input px-3 py-1.5 text-sm" aria-label="Industry">
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Industry</label>
+                <select name="industry" class="h-9 ml-2 rounded-md border-2 border-input px-3 text-sm" aria-label="Industry">
                     <option value="">All Industries</option>
                     {% for fw in frameworks %}
                     <option value="{{ fw.industry_code }}" {% if selected_industry|default('')|string == fw.industry_code|string %}selected{% endif %}>
@@ -30,9 +30,9 @@
             <div class="flex items-center gap-2">
                 <input type="checkbox" name="quick_wins" value="true" id="quick_wins"
                        {% if quick_wins_only %}checked{% endif %}>
-                <label for="quick_wins" class="text-sm">Quick Wins Only</label>
+                <label for="quick_wins" class="block text-sm font-medium text-muted-foreground mb-1">Quick Wins Only</label>
             </div>
-            <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm" aria-label="Submit">
+            <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit">
                 <i data-lucide="filter" class="h-4 w-4" aria-hidden="true"></i>
                 Apply Filters
             </button>

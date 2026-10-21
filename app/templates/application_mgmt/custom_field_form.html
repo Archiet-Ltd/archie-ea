@@ -10,7 +10,7 @@
         <div class="mb-8">
             {% macro _ps_actions() %}
 <a href="{{ url_for('unified_applications.application_list') }}"
-                   class="inline-flex items-center px-4 py-2 border border-input rounded-md shadow-sm text-sm font-medium text-muted-foreground bg-card hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring">
+                   class="inline-flex items-center px-4 py-2 border border-input rounded-md text-sm font-medium text-muted-foreground bg-card hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring">
                     <i data-lucide="arrow-left" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                     Back to Applications
                 </a>
@@ -19,7 +19,7 @@
         </div>
 
         <!-- Custom Field Form -->
-        <div class="bg-card rounded-lg border p-6">
+        <div class="bg-card rounded-lg border border-border p-6">
             <form method="POST" action="{{ request.path }}">
                 {{ form.hidden_tag() }}
                 
@@ -80,11 +80,11 @@
                 <!-- Submit Buttons -->
                 <div class="flex items-center justify-end space-x-4">
                     <a href="{{ url_for('unified_applications.application_list') }}"
-                       class="px-4 py-2 border border-input rounded-md shadow-sm text-sm font-medium text-muted-foreground bg-card hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring">
+                       class="px-4 py-2 border border-input rounded-md text-sm font-medium text-muted-foreground bg-card hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring">
                         Cancel
                     </a>
                     <button type="submit"
-                            class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring" aria-label="Submit">
+                            class="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring" aria-label="Submit">
                         Save Custom Field
                     </button>
                 </div>
@@ -94,7 +94,7 @@
         <!-- Existing Custom Fields -->
         <div class="mt-8">
             <h2 class="text-lg font-semibold text-foreground mb-4">Existing Custom Fields</h2>
-            <div class="bg-card rounded-lg border">
+            <div class="bg-card rounded-lg border border-border">
                 <div class="p-4">
                     <p class="text-muted-foreground text-sm">No custom fields defined yet.</p>
                 </div>

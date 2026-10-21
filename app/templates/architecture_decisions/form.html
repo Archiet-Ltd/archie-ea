@@ -24,19 +24,19 @@
         <!-- Title -->
         <div class="bg-card border border-border rounded-lg p-6 space-y-5">
             <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5" for="title">Title <span class="text-destructive-emphasis">*</span></label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1" for="title">Title <span class="text-destructive-emphasis">*</span></label>
                 <input type="text" id="title" name="title" required
                        value="{{ decision.title if decision else '' }}"
                        placeholder="e.g. Adopt microservices for order management domain"
-                       class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" autofocus>
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" autofocus>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 gap-4">
                 <!-- Status -->
                 <div>
-                    <label class="block text-sm font-medium text-foreground mb-1.5" for="status">Status</label>
+                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="status">Status</label>
                     <select id="status" name="status"
-                            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                         {% for val, label in [('proposed','Proposed'),('accepted','Accepted'),('deprecated','Deprecated'),('superseded','Superseded')] %}
                         <option value="{{ val }}" {% if decision and decision.status == val %}selected{% elif not decision and val == 'proposed' %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
@@ -45,9 +45,9 @@
 
                 <!-- ADM Phase -->
                 <div>
-                    <label class="block text-sm font-medium text-foreground mb-1.5" for="adm_phase">TOGAF ADM Phase</label>
+                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="adm_phase">TOGAF ADM Phase</label>
                     <select id="adm_phase" name="adm_phase"
-                            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                         <option value="">— None —</option>
                         {% for ph, label in [
                             ('A','Phase A: Architecture Vision'),
@@ -102,7 +102,7 @@
         <!-- Content sections -->
         <div class="bg-card border border-border rounded-lg p-6 space-y-5">
             <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5" for="context">Context</label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1" for="context">Context</label>
                 <p class="text-xs text-muted-foreground mb-2">Why was this decision needed? What forces or constraints drove it?</p>
                 <textarea id="context" name="context" rows="4"
                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y font-mono"
@@ -110,7 +110,7 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5" for="decision">Decision <span class="text-destructive-emphasis">*</span></label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1" for="decision">Decision <span class="text-destructive-emphasis">*</span></label>
                 <p class="text-xs text-muted-foreground mb-2">What was decided? Be specific and unambiguous.</p>
                 <textarea id="decision" name="decision" rows="4"
                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y font-mono"
@@ -118,7 +118,7 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5" for="consequences">Consequences</label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1" for="consequences">Consequences</label>
                 <p class="text-xs text-muted-foreground mb-2">What are the resulting context, trade-offs, and implications?</p>
                 <textarea id="consequences" name="consequences" rows="4"
                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y font-mono"
@@ -126,7 +126,7 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5" for="alternatives">Alternatives Considered</label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1" for="alternatives">Alternatives Considered</label>
                 <p class="text-xs text-muted-foreground mb-2">What other options were evaluated and why were they rejected?</p>
                 <textarea id="alternatives" name="alternatives" rows="4"
                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y font-mono"
@@ -134,11 +134,11 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5" for="review_date">Review Date</label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1" for="review_date">Review Date</label>
                 <p class="text-xs text-muted-foreground mb-2">Come back to this decision on or after this date -- a vendor renewal, a deviation granted "for now". Leave blank if this decision does not need a future review.</p>
                 <input type="date" id="review_date" name="review_date"
                        value="{{ decision.review_date.isoformat() if decision and decision.review_date else '' }}"
-                       class="w-full max-w-xs rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                       class="h-9 w-full max-w-xs rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             </div>
         </div>
 
@@ -155,7 +155,7 @@
             <!-- Selected elements -->
             <div class="flex flex-wrap gap-2 mb-3 min-h-[2rem]" x-show="selectedElements.length > 0" x-cloak>
                 <template x-for="el in selectedElements" :key="el.id">
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20">
                         <span x-text="el.name"></span>
                         <button aria-label="Remove" type="button" @click="removeElement(el.id)" class="hover:text-destructive-emphasis ml-0.5">
                             <i data-lucide="x" class="h-3 w-3"></i>
@@ -169,12 +169,12 @@
                 <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none"></i>
                 <input type="text" x-model="searchQuery" @input.debounce.300ms="searchElements()"
                        placeholder="Search ArchiMate elements..."
-                       class="w-full pl-9 pr-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Search ArchiMate elements...">
+                       class="h-9 w-full pl-9 pr-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Search ArchiMate elements...">
             </div>
 
             <!-- Search results dropdown -->
-            <div x-show="searchError" x-cloak class="mt-1 border border-border rounded-md bg-popover shadow-md px-3 py-2 text-sm text-destructive-emphasis" x-text="searchError"></div>
-            <div x-show="!searchError && searchResults.length > 0" x-cloak class="mt-1 border border-border rounded-md bg-popover shadow-md divide-y divide-border max-h-48 overflow-y-auto">
+            <div x-show="searchError" x-cloak class="mt-1 border border-border rounded-md bg-popover px-3 py-2 text-sm text-destructive-emphasis" x-text="searchError"></div>
+            <div x-show="!searchError && searchResults.length > 0" x-cloak class="mt-1 border border-border rounded-md bg-popover divide-y divide-border max-h-48 overflow-y-auto">
                 <template x-for="el in searchResults" :key="el.id">
                     <button type="button" @click="addElement(el)"
                             class="w-full text-left flex items-center justify-between px-3 py-2 text-sm hover:bg-accent transition-colors">
@@ -191,11 +191,11 @@
         <!-- Submit -->
         <div class="flex items-center justify-between">
             <a href="{{ url_for('arch_decisions.list_decisions') }}"
-               class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Cancel
             </a>
             <button type="submit"
-                    class="inline-flex items-center gap-2 px-5 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="save" class="h-4 w-4"></i>
                 {% if decision %}Save Changes{% else %}Create Decision{% endif %}
             </button>

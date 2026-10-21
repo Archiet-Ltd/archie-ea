@@ -22,7 +22,7 @@
 
 <body class="h-full bg-background text-foreground antialiased">
   <a href="#main-content"
-     class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:rounded-md focus:shadow-lg focus:ring-2 focus:ring-ring">
+     class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:rounded-md focus:ring-2 focus:ring-ring">
     Skip to main content
   </a>
   {# Example dropdown menu setup. Uncomment lines to view
@@ -73,7 +73,7 @@
   {% if current_user.is_authenticated %}
   <a href="{{ url_for('unified_ai_chat.index') }}"
      id="unified-ai-chat-fab"
-     class="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 flex items-center justify-center z-50 transition-all duration-200 group"
+     class="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-primary text-primary-foreground hover:scale-105 flex items-center justify-center z-50 transition-all duration-200 group"
      title="AI Assistant (Ctrl+K)">
     <i data-lucide="message-circle" class="h-6 w-6 group-hover:scale-110 transition-transform"></i>
     <span class="absolute -top-8 right-0 bg-foreground text-background text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
