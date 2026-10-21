@@ -45,7 +45,6 @@ Idempotent; safe to re-run.
 
 import click
 from flask.cli import with_appcontext
-from sqlalchemy import text
 
 from app import db
 
