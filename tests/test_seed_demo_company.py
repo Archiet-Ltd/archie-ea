@@ -144,7 +144,7 @@ def test_seed_creates_organisation_and_exits_zero(app, db_session, make_org):
         f"all seeded work packages must carry org_id={org_id}, got {wp_orgs}"
     )
     assert counts["plateaus"] == 5
-    assert counts["gaps"] == 10
+    assert counts["gaps"] == 12
     assert counts["users"] >= 17  # demo user + 16 owner users
 
 
@@ -848,3 +848,97 @@ def test_business_model_canvas_is_seeded_once_and_tenant_scoped(app, db_session,
     other_id = other.id
     db_session.commit()
     assert BusinessModelCanvas.query.filter_by(organization_id=other_id).count() == 0
+
+
+# ── solution development chain (T-sol-04) ───────────────────────────────────
+
+
+def _chain_counts(org_id):
+    from app.models.architecture_decision import ArchitectureDecision
+    from app.models.architecture_journey import ArchitectureJourney
+    from app.models.solution_lifecycle_models import SolutionOption
+    from app.models.solution_models import Solution
+    from app.models.vendor_analysis import (
+        AnalysisRecommendation,
+        OptionsAnalysis,
+        VendorOption,
+    )
+    from app.models.implementation_migration import Gap
+
+    return {
+        "solutions": Solution.query.filter_by(organization_id=org_id).count(),
+        "options": SolutionOption.query.filter_by(organization_id=org_id).count(),
+        "decisions": ArchitectureDecision.query.filter_by(organization_id=org_id).count(),
+        "analyses": OptionsAnalysis.query.filter_by(organization_id=org_id).count(),
+        "vendor_options": VendorOption.query.filter_by(organization_id=org_id).count(),
+        "recommendations": AnalysisRecommendation.query.filter_by(organization_id=org_id).count(),
+        "journeys": ArchitectureJourney.query.filter_by(organization_id=org_id).count(),
+        "solution_gaps": Gap.query.filter_by(organization_id=org_id, context="solution").count(),
+    }
+
+
+def test_solution_chain_is_seeded_once_with_the_agreed_shape(app, db_session, make_org):
+    from app.models.solution_models import Solution
+    from app.models.vendor_analysis import OptionsAnalysis
+
+    first = _seed_once()
+    org_id = _get_lantern_org_id()
+    counts = _chain_counts(org_id)
+    assert counts == {
+        "solutions": 2, "options": 3, "decisions": 1, "analyses": 2,
+        "vendor_options": 6, "recommendations": 1, "journeys": 1, "solution_gaps": 2,
+    }
+    assert first["solutions_created"] == 2
+
+    complete = Solution.query.filter_by(organization_id=org_id, adm_phase="E").one()
+    assert Solution.query.filter_by(organization_id=org_id, adm_phase="B").count() == 1
+    assert complete.section_narratives
+    analysis = OptionsAnalysis.query.filter_by(organization_id=org_id, status="completed").one()
+    assert [v.ranking for v in analysis.vendor_options] == [1, 2, 3, 4]
+    assert all(v.organization_id == org_id for v in analysis.vendor_options)
+    assert OptionsAnalysis.query.filter_by(organization_id=org_id, status="draft").count() == 1
+
+    second = _seed_once()
+    assert _chain_counts(org_id) == counts
+    for key in (
+        "solutions_created", "solution_options_created", "decisions_created",
+        "vendor_analyses_created", "vendor_options_created", "journeys_created",
+        "chain_gaps_created",
+    ):
+        assert second[key] == 0, key
+
+
+def test_solution_chain_pages_return_200_for_the_demo_user(app, db_session, make_org, client, login_as):
+    from app.models.architecture_journey import ArchitectureJourney
+    from app.models.solution_models import Solution
+    from app.models.vendor_analysis import OptionsAnalysis
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    complete_id = Solution.query.filter_by(organization_id=org_id, adm_phase="E").one().id
+    early_id = Solution.query.filter_by(organization_id=org_id, adm_phase="B").one().id
+    done_id = OptionsAnalysis.query.filter_by(organization_id=org_id, status="completed").one().id
+    draft_id = OptionsAnalysis.query.filter_by(organization_id=org_id, status="draft").one().id
+    journey_id = ArchitectureJourney.query.filter_by(organization_id=org_id).one().id
+    _login_demo(client, login_as, db_session, org_id)
+
+    paths = [
+        f"/dashboard/vendor-analysis/{done_id}",
+        f"/dashboard/vendor-analysis/{draft_id}",
+        f"/dashboard/api/vendor-analysis/{done_id}/results",
+        f"/dashboard/api/vendor-analysis/{done_id}/comparison",
+        f"/dashboard/api/vendor-analysis/{done_id}/export-history",
+        f"/solutions/{complete_id}",
+        f"/solutions/{early_id}",
+        f"/solutions/{complete_id}/options-advisor",
+        f"/solutions/{early_id}/options-advisor",
+        f"/solutions/{complete_id}/review-packet",
+        f"/architecture-journey/work/{journey_id}",
+    ]
+    for path in paths:
+        resp = client.get(path)
+        assert resp.status_code == 200, f"{path} -> {resp.status_code}"
+
+    export = client.get(f"/dashboard/api/vendor-analysis/{done_id}/export?format=csv")
+    assert export.status_code == 200
+    assert b"ServiceNow" in export.data
