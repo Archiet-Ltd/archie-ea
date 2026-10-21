@@ -23,10 +23,10 @@
 
         <!-- Error state -->
         <div x-show="error" x-cloak data-testid="approval-inbox-unavailable" role="alert"
-             class="rounded-md bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive-emphasis flex items-center justify-between gap-3">
+             class="rounded-md bg-destructive/10 border border-destructive/40 px-4 py-2 text-sm text-destructive-emphasis flex items-center justify-between gap-3">
             <span x-text="error"></span>
             <button type="button" @click="fetchApprovals()" aria-label="Retry approval inbox"
-                    class="inline-flex h-8 items-center justify-center rounded-md border border-destructive/30 bg-background px-3 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50 disabled:pointer-events-none">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Retry
             </button>
         </div>
@@ -41,7 +41,7 @@
 
         <!-- Approval cards -->
         <template x-for="item in approvals" :key="item.id">
-            <div class="rounded-xl border bg-card p-5 space-y-3"
+            <div class="rounded-lg border border-border bg-card p-5 space-y-3"
                  :id="'approval-' + item.id" :data-testid="'approval-card-' + item.id"
                  :class="focusId === item.id ? 'border-primary ring-2 ring-primary' : 'border-border'">
                 <!-- Top row: operation badge + entity type + created -->
@@ -87,7 +87,7 @@
                     <button type="button" @click="toggleImpact(item.id)"
                             :aria-expanded="!!impactOpen[item.id]"
                             :data-testid="'approval-impact-toggle-' + item.id"
-                            class="inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="network" class="h-3 w-3" aria-hidden="true"></i>
                         <span x-text="impactOpen[item.id] ? 'Hide what this affects' : 'What does this affect?'"></span>
                     </button>
@@ -146,11 +146,11 @@
                         <div class="flex gap-2">
                             <button type="button" @click="confirmReject(item.id)"
                                     :class="busyIds[item.id] ? 'opacity-50 pointer-events-none' : ''"
-                                    class="inline-flex items-center gap-1 rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 Confirm Reject
                             </button>
                             <button type="button" @click="cancelReject()"
-                                    class="inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 Cancel
                             </button>
                         </div>

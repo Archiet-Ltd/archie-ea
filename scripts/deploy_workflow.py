@@ -83,6 +83,7 @@ REQUIRED_CHECKS = (
     "Browser compatibility (webkit)",
     "Level 10 archetype walkthrough",
     "Dependency CVEs (pip-audit)",
+    "Store agreement (screens answer one number)",
 )
 
 # Jobs in ci.yml that are deliberately not required, with the reason. Adding a

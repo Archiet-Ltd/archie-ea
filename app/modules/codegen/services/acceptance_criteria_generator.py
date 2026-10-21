@@ -26,6 +26,7 @@ These criteria are:
 """
 import logging
 import re
+from app.models.archimate_element_types import application_kind_types
 
 logger = logging.getLogger(__name__)
 
@@ -366,7 +367,7 @@ class AcceptanceCriteriaGenerator:
 
             elements = ArchiMateElement.query.filter(
                 ArchiMateElement.id.in_(element_ids),
-                ArchiMateElement.type == "ApplicationComponent",
+                ArchiMateElement.type.in_(application_kind_types()),
             ).all()
 
             criteria = []

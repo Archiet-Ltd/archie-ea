@@ -1,14 +1,14 @@
 <!-- APQC Hierarchy Tree Browser Component -->
 <!-- Professional EA tool for APQC PCF navigation with full parent/child context -->
-<div id="apqc-tree-browser" hidden class="modal-root fixed inset-0 bg-foreground bg-opacity-50 items-center justify-center" style="z-index:1000;">
-  <div class="bg-background rounded-lg shadow-2xl w-full max-w-6xl h-5/6 flex flex-col">
+<div id="apqc-tree-browser" hidden class="modal-root fixed inset-0 bg-foreground bg-opacity-50 items-center justify-center bg-overlay/50" style="z-index:1000;">
+  <div class="bg-background rounded-lg w-full max-w-6xl h-5/6 flex flex-col border border-border">
     <!-- Header -->
     <div class="flex items-center justify-between p-6 border-b border-border">
       <div>
         <h2 class="text-2xl font-bold text-foreground">APQC PCF Hierarchy Browser</h2>
         <p class="text-sm text-muted-foreground mt-1">Navigate the complete APQC Process Classification Framework</p>
       </div>
-      <button type="button" @click="closeAPQCBrowser()" class="text-muted-foreground hover:text-muted-foreground" aria-label="Close APQC browser">
+      <button type="button" @click="closeAPQCBrowser()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close APQC browser">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
         </svg>
@@ -21,10 +21,10 @@
         <div class="flex-1">
           <label for="apqc-search" class="block text-sm font-medium text-muted-foreground mb-1">Search processes</label>
           <input type="text" id="apqc-search" placeholder="Search processes by name or code..."
-            class="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            class="w-full px-4 py-2 border border-border rounded-md focus:ring-2 focus:ring-primary focus:border-transparent"
             @input="searchAPQCProcesses(this.value)">
         </div>
-        <select id="apqc-level-filter" class="px-4 py-2 border border-border rounded-lg" @change="filterAPQCByLevel(this.value)" aria-label="Filter by Level">
+        <select id="apqc-level-filter" class="px-4 py-2 border border-border rounded-md" @change="filterAPQCByLevel(this.value)" aria-label="Filter by Level">
           <option value="">All Levels</option>
           <option value="1">Level 1 - Operating Processes</option>
           <option value="2">Level 2 - Process Groups</option>
@@ -57,7 +57,7 @@
     </div>
 
     <!-- Selected Process Details Panel -->
-    <div id="apqc-details-panel" class="hidden border-t border-border bg-primary/5 p-4">
+    <div id="apqc-details-panel" class="border hidden border-t border-border bg-primary/10 px-3 py-2">
       <div class="flex items-start justify-between">
         <div class="flex-1">
           <div class="flex items-center gap-3 mb-2">
@@ -156,7 +156,7 @@ function renderAPQCTree(nodes, parentPath = []) {
 
     return `
       <div class="mb-2" data-level="${node.level}" data-process-id="${node.process_id || node.id}">
-        <div class="flex items-center gap-2 p-3 rounded-md border ${levelColor} hover:shadow-md transition-shadow cursor-pointer"
+        <div class="flex items-center gap-2 p-3 rounded-md border ${levelColor} transition-shadow cursor-pointer"
              data-action="toggleAPQCNode" data-params='${JSON.stringify([nodeId, node, currentPath]).replace(/'/g, "&#39;")}'>
           ${hasChildren ? `
             <svg class="w-5 h-5 transition-transform ${isExpanded ? 'rotate-90' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">

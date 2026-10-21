@@ -21,7 +21,7 @@
 
   <!-- Key Metrics Cards -->
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-    <div class="bg-card border rounded-lg p-6 transition-all duration-300 hover:scale-[1.02]">
+    <div class="bg-card border border-border rounded-lg p-6 transition-all duration-300 hover:scale-[1.02]">
       <div class="flex items-center justify-between mb-2">
         <span class="text-sm text-muted-foreground">Total Applications</span>
         <i data-lucide="layout-grid" class="h-4 w-4 text-primary" aria-hidden="true"></i>
@@ -30,7 +30,7 @@
       <div class="text-xs text-muted-foreground mt-1">In portfolio scope</div>
     </div>
 
-    <div class="bg-card border rounded-lg p-6 transition-all duration-300 hover:scale-[1.02]">
+    <div class="bg-card border border-border rounded-lg p-6 transition-all duration-300 hover:scale-[1.02]">
       <div class="flex items-center justify-between mb-2">
         <span class="text-sm text-muted-foreground">Avg Health Score</span>
         <i data-lucide="activity" class="h-4 w-4 text-success" aria-hidden="true"></i>
@@ -39,7 +39,7 @@
       <div class="text-xs text-muted-foreground mt-1">Weighted composite</div>
     </div>
 
-    <div class="bg-card border rounded-lg p-6 transition-all duration-300 hover:scale-[1.02]">
+    <div class="bg-card border border-border rounded-lg p-6 transition-all duration-300 hover:scale-[1.02]">
       <div class="flex items-center justify-between mb-2">
         <span class="text-sm text-muted-foreground">Elimination Candidates</span>
         <i data-lucide="trash-2" class="h-4 w-4 text-destructive" aria-hidden="true"></i>
@@ -48,7 +48,7 @@
       <div class="text-xs text-muted-foreground mt-1">Potential savings</div>
     </div>
 
-    <div class="bg-card border rounded-lg p-6 transition-all duration-300 hover:scale-[1.02]">
+    <div class="bg-card border border-border rounded-lg p-6 transition-all duration-300 hover:scale-[1.02]">
       <div class="flex items-center justify-between mb-2">
         <span class="text-sm text-muted-foreground">Investment Needed</span>
         <i data-lucide="trending-up" class="h-4 w-4 text-warning" aria-hidden="true"></i>
@@ -60,7 +60,7 @@
 
   <!-- TIME Framework Distribution -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-    <div class="bg-card border rounded-lg p-6">
+    <div class="bg-card border border-border rounded-lg p-6">
       <h2 class="text-lg font-semibold mb-4">TIME Framework Distribution</h2>
       <div class="h-64">
         <canvas id="timeChart"></canvas>
@@ -71,17 +71,17 @@
           <div class="text-xs text-muted-foreground">Maintain as-is</div>
           <div class="text-xs text-muted-foreground mt-1 font-medium">→ <span class="text-blue-600">Retain</span></div><!-- token-migration-ok -->
         </div>
-        <div class="p-3 bg-success/5 rounded-lg">
+        <div class="px-3 py-2 bg-success/10 rounded-md">
           <div class="text-sm font-medium text-success-emphasis">INVEST</div>
           <div class="text-xs text-success-emphasis">Strategic enhancement</div>
           <div class="text-xs text-muted-foreground mt-1 font-medium">→ <span class="text-amber-600">Refactor</span></div><!-- design-tokens-ok: 7R disposition legend, 7 distinct hues > available semantic tokens -->
         </div>
-        <div class="p-3 bg-warning/5 rounded-lg">
+        <div class="px-3 py-2 bg-warning/10 rounded-md">
           <div class="text-sm font-medium text-warning-emphasis">MIGRATE</div>
           <div class="text-xs text-warning-emphasis">Platform transition</div>
           <div class="text-xs text-muted-foreground mt-1 font-medium">→ <span class="text-sky-600">Rehost</span> / <span class="text-violet-600">Replatform</span> / <span class="text-orange-600">Replace</span></div><!-- design-tokens-ok: 7R disposition legend, 7 distinct hues > available semantic tokens -->
         </div>
-        <div class="p-3 bg-destructive/5 rounded-lg">
+        <div class="px-3 py-2 bg-destructive/10 rounded-md">
           <div class="text-sm font-medium text-destructive-emphasis">ELIMINATE</div>
           <div class="text-xs text-destructive-emphasis">Retire/consolidate</div>
           <div class="text-xs text-muted-foreground mt-1 font-medium">→ <span class="text-purple-600">Consolidate</span> / <span class="text-red-600">Retire</span></div><!-- token-migration-ok -->
@@ -90,7 +90,7 @@
     </div>
 
     <!-- Cost Tier Distribution -->
-    <div class="bg-card border rounded-lg p-6">
+    <div class="bg-card border border-border rounded-lg p-6">
       <h2 class="text-lg font-semibold mb-4">TCO Cost Tier Distribution</h2>
       <div id="cost-tiers-container" class="space-y-4">
         <div class="animate-pulse space-y-3">
@@ -109,7 +109,7 @@
   </div>
 
   <!-- Scoring Dimensions -->
-  <div class="bg-card border rounded-lg p-6 mb-8">
+  <div class="bg-card border border-border rounded-lg p-6 mb-8">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold">Scoring Dimension Breakdown</h2>
       <select aria-label="Scoring configuration" id="config-selector" class="text-sm border rounded px-2 py-1">
@@ -141,10 +141,10 @@
   </div>
 
   <!-- Top Candidates Table -->
-  <div class="bg-card border rounded-lg p-6">
+  <div class="bg-card border border-border rounded-lg p-6">
     <h2 class="text-lg font-semibold mb-4">Top Action Candidates</h2>
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+      <table class="dense-table w-full text-sm">
         <thead>
           <tr class="border-b">
             <th class="text-left py-2 px-2">Application</th>

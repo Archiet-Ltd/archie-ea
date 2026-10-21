@@ -46,7 +46,7 @@
     </div>
 
     <!-- Description -->
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-6 mb-6">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 mb-6">
         <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Description</h2>
         <p class="text-sm text-foreground leading-relaxed">
             {{ standard.description or 'No description provided.' }}
@@ -54,7 +54,7 @@
     </div>
 
     <!-- Details grid -->
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-6 mb-6">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 mb-6">
         <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Details</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
             <div>
@@ -107,7 +107,7 @@
     </div>
 
     <!-- Applies To -->
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-6 mb-6">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 mb-6">
         <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Applies To</h2>
         {% if standard.applies_to_review_types %}
         <div class="flex flex-wrap gap-2">
@@ -123,7 +123,7 @@
     </div>
 
     <!-- Requirements -->
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-6 mb-6">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 mb-6">
         <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Requirements</h2>
         {% if standard.requirements %}
         <ol class="space-y-2 list-decimal list-inside">
@@ -137,11 +137,11 @@
     </div>
 
     <!-- Checklist Items -->
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-6 mb-6">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 mb-6">
         <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Reviewer Checklist</h2>
         {% if standard.checklist_items %}
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
                 <thead>
                     <tr class="border-b">
                         <th class="text-left py-2 pr-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Item</th>
@@ -175,7 +175,7 @@
 
     {% if standard.exception_process %}
     <!-- Exception Process -->
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-6 mb-6">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 mb-6">
         <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Exception Process</h2>
         <p class="text-sm text-foreground leading-relaxed whitespace-pre-line">{{ standard.exception_process }}</p>
     </div>

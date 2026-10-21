@@ -94,14 +94,14 @@
             <input type="text" x-model="workflowName" placeholder="Workflow name..."
                    class="rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-64" aria-label="Workflow name...">
             <div class="flex-1"></div>
-            <button type="button" @click="compileWorkflow()" class="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+            <button type="button" @click="compileWorkflow()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2l8 6-8 6z"/></svg>
                 Compile to n8n
             </button>
-            <button type="button" @click="saveWorkflow()" class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors">
+            <button type="button" @click="saveWorkflow()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Save
             </button>
-            <button type="button" @click="clearCanvas()" class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive-emphasis transition-colors">
+            <button type="button" @click="clearCanvas()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Clear
             </button>
         </div>
@@ -121,7 +121,7 @@
             <div class="p-3">
                 <div class="flex items-center justify-between mb-3">
                     <h3 class="text-sm font-semibold text-foreground">Properties</h3>
-                    <button aria-label="Close step details" type="button" @click="selectedStep = null" class="text-muted-foreground hover:text-foreground">
+                    <button aria-label="Close step details" type="button" @click="selectedStep = null" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg>
                     </button>
                 </div>

@@ -81,7 +81,7 @@ python-magic-bin>=0.4.14,<1.0.0; platform_system == "Windows" and python_version
 # -----------------------------------------------------------------------------
 # (Test tooling moved to requirements-test.txt — it was shipping in the
 #  production image, enlarging attack surface and CVE surface for no benefit.)
-Pillow>=12.3.0,<13.0.0       # CVE: 24 advisories at 10.4.0 (parses untrusted uploads)
+Pillow>=13.0.0,<14.0.0       # CVE: 24 advisories at 10.4.0 (parses untrusted uploads)
 
 # -----------------------------------------------------------------------------
 # 5. AI/LLM API CLIENTS (Cloud-based - no heavy ML deps)
