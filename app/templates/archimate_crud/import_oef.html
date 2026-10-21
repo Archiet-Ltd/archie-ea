@@ -93,6 +93,17 @@
             {% endif %}
         </div>
 
+        {% if result.relationship_notices %}
+        <div class="rounded-md border border-border bg-muted p-4 space-y-1" data-testid="result-relationship-notices">
+            <p class="text-sm font-medium">Stored as Association, with the modelled type kept in the documentation:</p>
+            <ul class="list-disc list-inside text-sm text-muted-foreground space-y-0.5">
+                {% for note in result.relationship_notices %}
+                <li>{{ note }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
         {% if result.errors %}
         <div class="rounded-md border border-warning bg-warning/10 px-3 py-2 space-y-1">
             <p class="text-sm font-medium text-warning-emphasis">Messages from the import:</p>

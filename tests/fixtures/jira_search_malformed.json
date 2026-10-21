@@ -1,0 +1,21 @@
+{
+  "startAt": 0,
+  "maxResults": 100,
+  "total": 3,
+  "issues": [
+    {
+      "id": "20001",
+      "key": "EA-11",
+      "fields": {"summary": "Consolidate data centres", "status": {"name": "To Do"}, "issuetype": {"name": "Epic"}}
+    },
+    {
+      "id": "20002",
+      "key": "EA-12",
+      "fields": {"status": {"name": "To Do"}, "issuetype": {"name": "Task"}}
+    },
+    {
+      "key": "EA-13",
+      "fields": {"summary": "Issue that arrived without an id", "issuetype": {"name": "Task"}}
+    }
+  ]
+}
